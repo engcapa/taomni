@@ -2,6 +2,10 @@
 
 ## 2026-11-22 当前进展
 
+- 合入远程 `main` 的 `3dd574044`（#854）。合并提交 `6eed8689b` 保留新版记事本、不可用关联处理器的回退和模块设置，原生 Mail 附件崩溃回归沿用主线等待只读文本就绪的断言。
+- Windows MSI 修正 Tools 导航定位后完成同一候选的强退复验。MFA 宿主在验证工具清理前已退出，重开后使用旧账号并继续 HOTP。联合构建已收齐 Linux、Windows、macOS ARM64 和 Intel 安装件，以及四个目标的 RDP Server 签名包。 [Windows 复跑](https://github.com/engcapa/taomni/actions/runs/44960070675) · [联合构建](https://github.com/engcapa/taomni/actions/runs/44951621527)
+- macOS Intel DMG 通过同一候选的实装替换、回退、模式互斥、MFA 强退恢复和权限连续性观察。与 Linux、Windows、ARM64 共四个目标的回执均绑定安装件构建 `617bce843`。 [macOS Intel 实装](https://github.com/engcapa/taomni/actions/runs/44961742884)
+- Local Voice 0.1.0 将 Whisper、SenseVoice 和 Zipformer 推理交给签名宿主。核心管理麦克风、云端语音和已有模型缓存。Browser 验证缺失模块时打开商店，Native 用签名包和固定语音样本验证识别及停用。Windows 模块包提供识别 DLL，核心安装件清理旧文件并核对产物。
 - 同一 `617bce843` 候选的 Linux deb 通过 MFA 安装、回退、重装、GUI 与 headless 双向互斥及强退回收。deb、RPM 和 AppImage 都通过 `noexec` 恢复并校验 15 份 profile 输入。macOS ARM64 DMG 也通过安装回退、双向互斥和 MFA 强退恢复。Windows MSI 通过安装回退和互斥，强退前的旧版 MFA 造数因 File Explorer 插入导航栏而找不到 Tools 按钮。已修正 UI Automation 定位并保留原持续运行和进程回收断言。 [Linux](https://github.com/engcapa/taomni/actions/runs/44958085653) · [Windows 与 macOS ARM64](https://github.com/engcapa/taomni/actions/runs/44958965056)
 - Local servers 0.1.1 的源码 `66d0b58f9` 已进入三端 Browser、Native 与完整崩溃回归。验证覆盖签名模块的 HTTP、SSH/SFTP、备份与停用，以及旧服务器预检、SSH 凭据界面和终端 PTY。 [三端回归](https://github.com/engcapa/taomni/actions/runs/44957237883)
 - 候选 `0.6.0` Linux deb 完成签名 MFA 的升级、回退和重装。G11 的反向桌面竞争进程只收到测试数据路径，缺少 Xvfb 的显示和认证变量，退出码为 101。已修正测试环境并保留退出码、占用提示、监听端点和原进程存活的断言。 [原始升级回执](https://github.com/engcapa/taomni/actions/runs/44956421239)

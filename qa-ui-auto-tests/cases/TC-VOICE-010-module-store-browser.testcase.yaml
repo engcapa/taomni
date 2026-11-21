@@ -1,0 +1,39 @@
+id: TC-VOICE-010
+title: Missing Local Voice opens the Module Store from the dictation button
+covers: [F-AI-2.3, F-Modules-1]
+tags: [voice, modules, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 90
+steps:
+- open: '${cfg.app.base_url}/?voiceFixture=1&voiceModule=missing'
+- click: '[data-testid="tao-home-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="chat-voice-button"]'
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: '[data-testid="voice-open-module-store"]'
+- assert_text: {selector: '[data-testid="voice-dictation-error"]', contains: 'Install Local Voice'}
+- assert_attribute: {selector: '[data-testid="chat-voice-button"]', name: data-state, equals: idle}
+- click: '[data-testid="voice-open-module-store"]'
+- wait_for: '[data-testid="module-offline-archive"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: module-store
+    requirement: A missing module keeps dictation idle and opens the install view on request.
+    actions: [2, 3, 5, 9]
+    checkpoints:
+    - {step: 7, expectation: The alert names the required module.}
+    - {step: 8, expectation: Recording does not start when no module is installed.}
+    - {step: 10, expectation: The Module Store installation controls become visible.}
+    - {step: 11, expectation: The renderer reports no runtime errors.}
+    results: [7, 8, 10, 11]
+  visual:
+  - check: The dictation alert and module installation controls.
+    method: automated
+    reason: The alert text and offline installation field are asserted.
+  native:
+  - check: Signed host execution and real inference.
+    method: not-applicable
+    reason: TC-MODULES-067 verifies the native boundary.

@@ -339,6 +339,7 @@ controls:
     - '[data-testid="module-action-enable-servers"]'
     - '[data-testid="module-action-enable-mail"]'
     - '[data-testid="module-action-enable-screenshot"]'
+    - '[data-testid="module-action-enable-ai-voice-local"]'
   - id: module-status-mfa
     selector: '[data-testid="module-status-mfa"]'
     kind: display
@@ -354,6 +355,7 @@ controls:
     - '[data-testid="module-action-disable-servers"]'
     - '[data-testid="module-action-disable-mail"]'
     - '[data-testid="module-action-disable-screenshot"]'
+    - '[data-testid="module-action-disable-ai-voice-local"]'
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
@@ -4950,6 +4952,9 @@ files:
 - src/components/settings/AsrPanel.tsx
 - src-tauri/src/voice/
 - src-tauri/src/asr/
+- src-tauri/plugins/ai-voice-local/
+- src-tauri/crates/taomni-local-voice-api/
+- src-tauri/crates/taomni-asr-models/
 controls:
 - id: chat-voice-button
   selector: '[data-testid="chat-voice-button"]'
@@ -4957,6 +4962,12 @@ controls:
 - id: chat-voice-cancel
   selector: '[data-testid="chat-voice-button-cancel"]'
   kind: interactive
+- id: local-voice-module-store
+  selector: '[data-testid="voice-open-module-store"]'
+  kind: interactive
+- id: voice-dictation-error
+  selector: '[data-testid="voice-dictation-error"]'
+  kind: display
 - id: voice-settings-close
   selector: '[data-testid="voice-settings-close"]'
   kind: interactive

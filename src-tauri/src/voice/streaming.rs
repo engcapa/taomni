@@ -46,12 +46,9 @@ pub use events::{TranscriptEvent, TranscriptSink, event_sink};
 
 use events::{emit, pcm16};
 
-pub use local::run_routed_local;
+pub use local::{is_local_provider, run_local};
 
-#[cfg(any(feature = "asr-sherpa", not(feature = "asr-sherpa")))]
-pub use local::run_local;
-
-use local::{forward_until_idle, sherpa_model_dir};
+use local::forward_until_idle;
 
 pub use routing::run_online;
 

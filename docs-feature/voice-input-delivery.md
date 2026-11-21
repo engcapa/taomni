@@ -52,7 +52,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --lib asr_migration_tests
 
 ```bash
 python scripts/voice-fixture.py --root /tmp/taomni-voice-fixture
-NEWMOB_CACHE_DIR=/tmp/taomni-voice-fixture TAOMNI_VOICE_PCM=/tmp/taomni-voice-fixture/jfk.f32 TAOMNI_VOICE_ZH_PCM=/tmp/taomni-voice-fixture/zh.f32 cargo test --manifest-path src-tauri/Cargo.toml --lib base_decodes -- --ignored --nocapture --test-threads=1
+NEWMOB_CACHE_DIR=/tmp/taomni-voice-fixture TAOMNI_VOICE_PCM=/tmp/taomni-voice-fixture/jfk.f32 TAOMNI_VOICE_ZH_PCM=/tmp/taomni-voice-fixture/zh.f32 cargo test --manifest-path src-tauri/Cargo.toml --features asr-whisper --lib base_decodes -- --ignored --nocapture --test-threads=1
 ```
 
 脚本会显式下载约 148 MB；已有正确文件复用，下载后校验官方目录的哈希。`NEWMOB_CACHE_DIR` 仅调试构建生效。Windows 使用 PowerShell 设置对应环境变量；原生构建需 CMake、C/C++ 工具链和 libclang，Linux 还需 ALSA 开发包以及 README 中的 Tauri 依赖。

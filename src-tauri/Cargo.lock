@@ -10930,7 +10930,6 @@ dependencies = [
  "sha1 0.11.0",
  "sha2 0.11.0",
  "shellexpand",
- "sherpa-onnx",
  "signal-hook 0.3.18",
  "socket2 0.6.5",
  "sqlparser",
@@ -10938,9 +10937,12 @@ dependencies = [
  "sqlx-mysql",
  "sqlx-postgres",
  "subtle",
+ "taomni-asr-models",
  "taomni-capture",
  "taomni-file-uri",
  "taomni-local-servers-engine",
+ "taomni-local-voice-api",
+ "taomni-local-voice-engine",
  "taomni-mail-api",
  "taomni-mail-engine",
  "taomni-mfa-engine",
@@ -10995,7 +10997,6 @@ dependencies = [
  "webkit2gtk",
  "webview2-com",
  "which",
- "whisper-rs",
  "winapi",
  "windows 0.62.2",
  "winreg 0.55.0",
@@ -11006,6 +11007,16 @@ dependencies = [
  "zip 4.6.1",
  "zlib-rs",
  "zookeeper-client",
+]
+
+[[package]]
+name = "taomni-asr-models"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
+ "sha2 0.11.0",
+ "tempfile",
 ]
 
 [[package]]
@@ -11121,6 +11132,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-local-voice-api"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "taomni-plugin-stream",
+ "tokio",
+]
+
+[[package]]
+name = "taomni-local-voice-engine"
+version = "0.1.0"
+dependencies = [
+ "sherpa-onnx",
+ "taomni-asr-models",
+ "tokio",
+ "whisper-rs",
+]
+
+[[package]]
 name = "taomni-mail-api"
 version = "0.1.0"
 dependencies = [
@@ -11177,6 +11208,20 @@ dependencies = [
  "sha2 0.11.0",
  "uuid",
  "zeroize",
+]
+
+[[package]]
+name = "taomni-plugin-ai-voice-local"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "taomni-asr-models",
+ "taomni-local-voice-api",
+ "taomni-local-voice-engine",
+ "taomni-plugin-api",
+ "taomni-plugin-sdk",
+ "tokio",
 ]
 
 [[package]]

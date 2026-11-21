@@ -1,6 +1,7 @@
 //! A dedicated thread creates, stops and drops cpal streams on the same thread.
 //! No unsafe Send/Sync overrides; callbacks only copy bounded mono samples.
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use std::path::Path;
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 pub const MAX_SECONDS: usize = 120;
@@ -12,7 +13,13 @@ pub struct Capture {
     /// consume this channel while recording is still active.
     pub chunks: Arc<Mutex<Option<tokio::sync::mpsc::Receiver<Vec<f32>>>>>,
 }
-pub async fn start(streaming: bool) -> Result<Capture, String> {
+#[path = "capture_fixture.rs"]
+mod fixture;
+
+pub async fn start(streaming: bool, profile: &Path) -> Result<Capture, String> {
+    if let Some(capture) = fixture::start(profile, streaming)? {
+        return Ok(capture);
+    }
     let (stop, rx) = mpsc::channel();
     let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
     let (result_tx, result) = tokio::sync::oneshot::channel();

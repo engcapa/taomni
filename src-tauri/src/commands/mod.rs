@@ -676,6 +676,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "voice_sherpa_model_installation"
         | "voice_install_sherpa_model" => asr::handle(invoke),
         "voice_capture_supported"
+        | "voice_check_local_module"
         | "voice_start_capture"
         | "voice_start_stream"
         | "voice_cleanup_text"

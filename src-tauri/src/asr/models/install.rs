@@ -191,7 +191,7 @@ pub async fn voice_install_model(
                     .save(&crate::ai::config::default_ai_config_path())
                     .map_err(|e| e.to_string())?;
                 ai.config = updated;
-                ai.asr = std::sync::Arc::new(super::super::manager::AsrManager::configured(
+                ai.asr = std::sync::Arc::new(super::super::manager::configured(
                     m.id,
                     &ai.config.asr.language,
                 ));

@@ -155,6 +155,8 @@
 
 - `[data-testid="chat-voice-button"]` — interactive — F-AI-2.3.chat-voice-button
 - `[data-testid="chat-voice-button-cancel"]` — interactive — F-AI-2.3.chat-voice-cancel
+- `[data-testid="voice-open-module-store"]` — interactive — F-AI-2.3.local-voice-module-store
+- `[data-testid="voice-dictation-error"]` — display — F-AI-2.3.voice-dictation-error
 - `[data-testid="voice-settings-close"]` — interactive — F-AI-2.3.voice-settings-close
 - `[data-testid="voice-settings-dialog"]` — display — F-AI-2.3.voice-settings-dialog
 - `[data-testid="asr-installation-progress"]` — display — F-AI-2.3.asr-installation-progress
@@ -2857,6 +2859,7 @@
   ↳ `[data-testid="module-action-enable-servers"]` — alias
   ↳ `[data-testid="module-action-enable-mail"]` — alias
   ↳ `[data-testid="module-action-enable-screenshot"]` — alias
+  ↳ `[data-testid="module-action-enable-ai-voice-local"]` — alias
 - `[data-testid="module-status-mfa"]` — display — F-Modules-1.module-status-mfa
 - `[data-testid="module-action-disable-hello-plugin"]` — interactive — F-Modules-1.module-action-disable-hello-plugin
   ↳ `[data-testid="module-action-disable-mfa"]` — alias
@@ -2867,6 +2870,7 @@
   ↳ `[data-testid="module-action-disable-servers"]` — alias
   ↳ `[data-testid="module-action-disable-mail"]` — alias
   ↳ `[data-testid="module-action-disable-screenshot"]` — alias
+  ↳ `[data-testid="module-action-disable-ai-voice-local"]` — alias
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
 - `[data-testid="module-action-install-hello-plugin"]` — interactive — F-Modules-1.module-action-install-hello-plugin
   ↳ `[data-testid="module-action-install-mfa"]` — alias

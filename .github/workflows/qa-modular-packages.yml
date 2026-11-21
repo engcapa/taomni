@@ -10,7 +10,7 @@ on:
       module:
         description: Official QA module
         type: choice
-        options: [hello-plugin, mfa, mail, vnc-client, vnc-server, rdp-client, rdp-server, screenshot, servers]
+        options: [hello-plugin, mfa, mail, vnc-client, vnc-server, rdp-client, rdp-server, screenshot, servers, ai-voice-local]
         default: hello-plugin
       macos_runner:
         description: Hosted macOS package builder (both Darwin targets remain explicit)
@@ -75,7 +75,7 @@ jobs:
             hello-plugin) echo 'host_package=taomni-hello-plugin' >> "$GITHUB_OUTPUT" ;;
             mfa) echo 'host_package=taomni-plugin-mfa' >> "$GITHUB_OUTPUT" ;;
             mail) echo 'host_package=taomni-plugin-mail' >> "$GITHUB_OUTPUT" ;;
-            vnc-client|vnc-server|rdp-client|rdp-server|screenshot|servers) echo "host_package=taomni-plugin-$QA_MODULE" >> "$GITHUB_OUTPUT" ;;
+            vnc-client|vnc-server|rdp-client|rdp-server|screenshot|servers|ai-voice-local) echo "host_package=taomni-plugin-$QA_MODULE" >> "$GITHUB_OUTPUT" ;;
             *) echo 'Unknown official QA module.' >&2; exit 1 ;;
           esac
           test -n "$(git for-each-ref --format='%(refname)' --contains HEAD refs/remotes/origin/)" || {
@@ -107,6 +107,7 @@ jobs:
                         'vnc-client': 'signed-vnc', 'vnc-server': 'signed-local-vnc',
                         'rdp-client': 'signed-rdp', 'rdp-server': 'signed-local-rdp',
                         'servers': 'signed-local-servers',
+                        'ai-voice-local': 'signed-local-voice',
                         'screenshot': 'signed-screenshot'}[os.environ['QA_MODULE']]
           roster = set()
           if raw := os.environ.get('PACKAGE_NATIVE_BUILDS'):
@@ -181,6 +182,9 @@ jobs:
       - name: Install Linux dependencies for the RDP Server host
         if: env.QA_MODULE == 'rdp-server' && runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev libasound2-dev libxkbcommon-dev
+      - name: Refresh cached Local Voice runtime
+        if: env.QA_MODULE == 'ai-voice-local'
+        run: node scripts/refresh-sherpa-onnx-cache.mjs src-tauri/Cargo.toml '${{ matrix.target }}'
       # Candidate code, Cargo build scripts and host binaries never share a
       # runner/job with signing secrets. Nothing from this job is executed by
       # the signing job; it receives only an inert payload directory.
@@ -202,7 +206,9 @@ jobs:
           MODULE_LEGACY_ROSTER: ${{ matrix.legacy_roster }}
         run: |
           python - <<'PY'
-          import json, os, pathlib, shutil
+          import json, os, pathlib, shutil, sys
+          sys.path.insert(0, 'scripts')
+          from local_voice_runtime import stage_runtime
           def stage(slug, folder):
               source = pathlib.Path('src-tauri/plugins') / slug
               output = pathlib.Path(folder)
@@ -213,6 +219,7 @@ jobs:
               (output / 'module.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
               binaries = pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release'
               shutil.copyfile(binaries / host, output / host)
+              stage_runtime(slug, os.environ['MODULE_PLATFORM'], binaries, output)
               if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
                   helper = 'taomni-vnc-key-helper.exe'
                   shutil.copyfile(binaries / helper, output / helper)
@@ -298,10 +305,12 @@ jobs:
           MODULE_LEGACY_ROSTER: ${{ matrix.legacy_roster }}
         run: |
           python - <<'PY'
-          import json, os, pathlib, shutil
+          import json, os, pathlib, shutil, sys
+          sys.path.insert(0, 'scripts')
+          from local_voice_runtime import runtime_files, verify_runtime
           root = pathlib.Path('candidate')
           module = os.environ['QA_MODULE']
-          assert module in {'hello-plugin', 'mfa', 'mail', 'vnc-client', 'vnc-server', 'rdp-client', 'rdp-server', 'screenshot', 'servers'}, 'Unknown official QA module'
+          assert module in {'hello-plugin', 'mfa', 'mail', 'vnc-client', 'vnc-server', 'rdp-client', 'rdp-server', 'screenshot', 'servers', 'ai-voice-local'}, 'Unknown official QA module'
           observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
           assert observed == {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': module}
           assert not any(p.is_symlink() for p in root.rglob('*'))
@@ -312,7 +321,7 @@ jobs:
               if os.environ['MODULE_PLATFORM'].startswith('windows'):
                   expected['entry']['host'] += '.exe'
               assert expected['id'] == 'taomni-plugin-' + slug
-              binaries = {expected['entry']['host']}
+              binaries = {expected['entry']['host'], *runtime_files(slug, os.environ['MODULE_PLATFORM'])}
               if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
                   binaries.add('taomni-vnc-key-helper.exe')
               allowed = {'module.json', *binaries}
@@ -324,6 +333,7 @@ jobs:
                       if source.is_file():
                           allowed.add(source.relative_to(trusted_source).as_posix())
               payload = root / folder
+              verify_runtime(slug, os.environ['MODULE_PLATFORM'], payload)
               manifest = json.loads((payload / 'module.json').read_text(encoding='utf-8'))
               expected_version = expected['version'] if version is None else version
               assert manifest == {**expected, 'version': expected_version}, 'Candidate metadata differs from the trusted official contract'

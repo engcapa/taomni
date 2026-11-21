@@ -128,6 +128,10 @@ jobs:
               assert "taomni-plugin-vnc-server" not in packages, f"{target}: the core depends on the VNC daemon host"
               assert not packages.intersection({"taomni-plugin-servers", "taomni-local-servers-engine"}), f"{target}: the core depends on the Local servers engine"
               assert not packages.intersection({
+                  "taomni-plugin-ai-voice-local", "taomni-local-voice-engine",
+                  "whisper-rs", "whisper-rs-sys", "sherpa-onnx", "sherpa-onnx-sys", "llama-cpp-2",
+              }), f"{target}: the core depends on local voice or model inference"
+              assert not packages.intersection({
                   "taomni-plugin-rdp-server", "taomni-rdp-server-engine", "ironrdp-server",
               }), f"{target}: the core depends on the RDP Server engine"
               assert "taomni-screenshot-api" in packages, f"{target}: missing shared screenshot contract"

@@ -137,9 +137,6 @@ jobs:
           workspaces: src-tauri -> target
           key: ${{ steps.windows-cache-scope.outputs.key }}
 
-      - name: Refresh sherpa-onnx native cache
-        run: node scripts/refresh-sherpa-onnx-cache.mjs
-
       - name: Install Linux bundle dependencies
         if: matrix.platform == 'ubuntu-22.04'
         timeout-minutes: 20
@@ -289,6 +286,16 @@ jobs:
 
       # Build only. Release assets are published by the finalizer after every
       # platform and signature gate passes.
+      - name: Remove previous voice build outputs from the core package input
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $runtime = @("sherpa-onnx-c-api.dll", "sherpa-onnx-cxx-api.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll")
+          foreach ($name in $runtime) {
+            $path = Join-Path "src-tauri/target/release" $name
+            if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path }
+          }
+
       - name: Build desktop bundles
         id: tauri_build
         uses: tauri-apps/tauri-action@action-v0.6.2
@@ -302,12 +309,9 @@ jobs:
         shell: pwsh
         env:
           TAOMNI_REQUIRE_NSIS_TESTS: '1'
-          TAOMNI_SHERPA_NATIVE_TEST: '1'
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
-          $env:TAOMNI_SHERPA_TEST_ARCHIVE_DIR = (Resolve-Path src-tauri/target/sherpa-onnx-prebuilt).Path
-          node --test scripts/sherpa-onnx-cache.test.mjs
           node --test scripts/windows-runtime-bundle.test.mjs
           pwsh -File scripts/verify-windows-release-bundle.ps1
 
@@ -371,9 +375,6 @@ jobs:
         with:
           workspaces: src-tauri -> target
           cache-on-failure: true
-
-      - name: Refresh sherpa-onnx native cache
-        run: node scripts/refresh-sherpa-onnx-cache.mjs src-tauri/Cargo.toml aarch64-apple-darwin x86_64-apple-darwin
 
       # -----------------------------------------------------------------------
       # Install MIT Kerberos for both architectures.

@@ -1,0 +1,21 @@
+{
+  "id": "taomni-plugin-ai-voice-local",
+  "slug": "ai-voice-local",
+  "name": "Local Voice",
+  "description": "Recognize speech on this device using Whisper, SenseVoice, or Zipformer.",
+  "version": "0.1.0",
+  "coreApiVersion": "1",
+  "kind": "media",
+  "status": "provisional",
+  "platforms": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"],
+  "entry": { "host": "taomni-plugin-ai-voice-local", "protocol": 1 },
+  "tabs": [],
+  "commands": ["voice/prepare", "voice/start"],
+  "permissions": [],
+  "dataDir": "plugins/ai-voice-local",
+  "dataSchemaVersion": 1,
+  "backupPaths": [],
+  "legacyTables": [],
+  "vaultFixedKeys": [],
+  "snapshot": "file"
+}

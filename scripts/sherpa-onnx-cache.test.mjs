@@ -7,22 +7,19 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const refresh = fileURLToPath(new URL("./refresh-sherpa-onnx-cache.mjs", import.meta.url));
-const workflow = readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
-
-test("both release builders refresh sherpa native state after restoring Rust caches", () => {
-  for (const job of ["build", "build-macos"]) {
-    const body = workflow.split(`  ${job}:`)[1].split(/\n  [\w-]+:/)[0];
-    const cache = body.indexOf("uses: swatinem/rust-cache@v2");
+test("Local Voice packages refresh Sherpa state after restoring Rust caches", () => {
+  for (const file of ["release-modules", "qa-modular-packages"]) {
+    const workflow = readFileSync(new URL(`../.github/workflows/${file}.yml`, import.meta.url), "utf8");
+    const body = workflow.split("  build:")[1].split(/\n  [\w-]+:/)[0];
+    const cache = body.indexOf("uses: Swatinem/rust-cache@v2");
     const refresh = body.indexOf("run: node scripts/refresh-sherpa-onnx-cache.mjs");
-    const firstBuild = body.search(/run:.*cargo|run:.*pnpm tauri|pwsh scripts\/stage-sockscap/);
-    assert(cache >= 0 && refresh > cache, `${job}: refresh must follow cache restore`);
-    assert(firstBuild < 0 || refresh < firstBuild, `${job}: refresh must precede native builds`);
+    const build = body.indexOf("run: cargo build");
+    assert(cache >= 0 && refresh > cache && build > refresh);
+    assert(body.includes("stage_runtime(slug"));
+    assert(workflow.includes("verify_runtime("));
   }
-  const macos = workflow.split("  build-macos:")[1];
-  assert(macos.includes("refresh-sherpa-onnx-cache.mjs src-tauri/Cargo.toml aarch64-apple-darwin x86_64-apple-darwin"));
-  const gate = workflow.split("- name: Verify Windows installer runtimes")[1].split("- name: Collect workflow artifacts")[0];
-  assert(gate.includes("TAOMNI_SHERPA_NATIVE_TEST: '1'"));
-  assert(gate.includes("node --test scripts/sherpa-onnx-cache.test.mjs"));
+  const core = readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
+  assert(!core.includes("run: node scripts/refresh-sherpa-onnx-cache.mjs"));
 });
 
 // Opt in to real MSVC linking, using a locally available upstream archive.

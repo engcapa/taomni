@@ -31,16 +31,6 @@ try {
     Get-Content -LiteralPath (Join-Path $work 'msi.log') -Tail 60
     throw "MSI extraction failed: $($process.ExitCode)"
   }
-  Add-Type @'
-using System;
-using System.Runtime.InteropServices;
-public static class TaomniRuntimeLoader {
-  [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-  public static extern IntPtr LoadLibraryEx(string path, IntPtr file, uint flags);
-  [DllImport("kernel32.dll")]
-  public static extern bool FreeLibrary(IntPtr module);
-}
-'@
   foreach ($directory in @($nsisDir, $msiDir)) {
     $executables = @(Get-ChildItem -LiteralPath $directory -Recurse -File -Filter taomni.exe)
     if ($executables.Count -ne 1) { throw "Expected one taomni.exe in $directory" }
@@ -64,27 +54,12 @@ public static class TaomniRuntimeLoader {
         throw "Bundled SocksCap resource differs from staging: $name"
       }
     }
-    # Tauri patches the main executable's bundle-type marker separately for
-    # NSIS/MSI, so its hash legitimately differs between the two installers.
     foreach ($name in $dlls) {
-      $bundled = Join-Path $appDir $name
-      if (-not (Test-Path -LiteralPath $bundled -PathType Leaf)) {
-        throw "Missing runtime file beside taomni.exe: $bundled"
-      }
-      if ((Get-FileHash -LiteralPath $bundled).Hash -ne (Get-FileHash -LiteralPath (Join-Path $ReleaseDir $name)).Hash) {
-        throw "Bundled file differs from build output: $bundled"
+      if (Get-ChildItem -LiteralPath $directory -Recurse -File -Filter $name) {
+        throw "The Windows core installer contains the Local Voice runtime: $name"
       }
     }
-    foreach ($name in $dlls) {
-      # Resolve dependencies ONLY beside the extracted DLL and in System32.
-      # PATH, Cargo output and an existing MSI install must not hide omissions.
-      $handle = [TaomniRuntimeLoader]::LoadLibraryEx((Join-Path $appDir $name), [IntPtr]::Zero, 0x900)
-      if ($handle -eq [IntPtr]::Zero) {
-        throw "Cannot load bundled $name (Win32 error $([Runtime.InteropServices.Marshal]::GetLastWin32Error()))"
-      }
-      [void][TaomniRuntimeLoader]::FreeLibrary($handle)
-    }
-    Write-Host "Verified installer payload and isolated DLL loading: $directory"
+    Write-Host "Verified Windows core installer payload: $directory"
   }
 } finally {
   # $work is a freshly created, absolute child of the temporary directory.

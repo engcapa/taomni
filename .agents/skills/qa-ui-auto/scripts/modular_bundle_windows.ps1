@@ -61,7 +61,13 @@ public static class TaomniPackageRuntimeLoader {
 }
 '@
   $runtimeFiles = @('sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll')
-  foreach ($name in $runtimeFiles) {
+
+  # Previously released monolithic MSI samples may still own these libraries.
+  $present = @($runtimeFiles | Where-Object { Test-Path -LiteralPath (Join-Path $app.DirectoryName $_) -PathType Leaf })
+  if ($present.Count -ne 0 -and $present.Count -ne $runtimeFiles.Count) {
+    throw 'The MSI contains an incomplete legacy Local Voice runtime'
+  }
+  foreach ($name in $present) {
     $path = Join-Path $app.DirectoryName $name
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing packaged runtime: $name" }
     # Exclude PATH/Cargo caches: dependencies must resolve beside the extracted
@@ -82,7 +88,7 @@ public static class TaomniPackageRuntimeLoader {
     executableSha256 = (Get-FileHash -LiteralPath $app.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     productVersion = $app.VersionInfo.ProductVersion
     architecture = 'x86_64'
-    isolatedRuntimeLoads = $runtimeFiles
+    isolatedRuntimeLoads = $present
     regularFiles = $files.Count
     regularFileBytes = [long]$payloadBytes
     largestFiles = @($files | Sort-Object -Property bytes -Descending | Select-Object -First 25)

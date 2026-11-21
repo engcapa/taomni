@@ -191,6 +191,9 @@ jobs:
       - name: Install Linux dependencies for the RDP Server host
         if: needs.source.outputs.slug == 'rdp-server' && runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev libasound2-dev libxkbcommon-dev
+      - name: Refresh cached Local Voice runtime
+        if: needs.source.outputs.slug == 'ai-voice-local'
+        run: node scripts/refresh-sherpa-onnx-cache.mjs src-tauri/Cargo.toml '${{ matrix.target }}'
       - name: Build the module host without signing credentials
         run: cargo build --manifest-path src-tauri/Cargo.toml -p '${{ needs.source.outputs.package }}' --release --target '${{ matrix.target }}' --locked
       - name: Build the Windows VNC key helper
@@ -204,7 +207,9 @@ jobs:
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
         run: |
           python - <<'PY'
-          import json, os, pathlib, shutil
+          import json, os, pathlib, shutil, sys
+          sys.path.insert(0, 'scripts')
+          from local_voice_runtime import stage_runtime
           slug = os.environ['MODULE_SLUG']
           source = pathlib.Path('src-tauri/plugins') / slug
           manifest = json.loads((source / 'module.json').read_text(encoding='utf-8'))
@@ -218,6 +223,7 @@ jobs:
           binaries = pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release'
           if host:
               shutil.copyfile(binaries / host, payload / host)
+          stage_runtime(slug, os.environ['MODULE_PLATFORM'], binaries, payload)
           if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
               helper = 'taomni-vnc-key-helper.exe'
               shutil.copyfile(binaries / helper, payload / helper)
@@ -274,7 +280,9 @@ jobs:
           PACKAGE_ONLY: ${{ inputs.package_only || false }}
         run: |
           python - <<'PY'
-          import json, os, pathlib, re
+          import json, os, pathlib, re, sys
+          sys.path.insert(0, 'scripts')
+          from local_voice_runtime import verify_runtime
           root = pathlib.Path('candidate')
           observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
           expected_observed = {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': os.environ['MODULE_SLUG']}
@@ -294,6 +302,7 @@ jobs:
               raise SystemExit('candidate module status or identity is invalid for this release')
           if any(path.is_symlink() for path in root.rglob('*')):
               raise SystemExit('candidate payload contains a symlink')
+          verify_runtime(os.environ['MODULE_SLUG'], os.environ['MODULE_PLATFORM'], root / 'unsigned-module')
           if os.environ['MODULE_SLUG'] == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
               helper = root / 'unsigned-module/taomni-vnc-key-helper.exe'
               if not helper.is_file() or helper.stat().st_size == 0:

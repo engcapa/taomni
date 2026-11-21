@@ -39,10 +39,10 @@ function sharedLibraryViolations(root) {
       }
     }
   }
-  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api", "taomni-rdp-client-engine", "taomni-mail-engine", "taomni-vnc-api", "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector", "taomni-screenshot-api", "taomni-screenshot-ocr", "taomni-screenshot-recording", "taomni-server-process", "taomni-local-servers-engine", "taomni-pty"]) {
+  for (const name of ["taomni-asr-models", "taomni-local-voice-api", "taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api", "taomni-rdp-client-engine", "taomni-mail-engine", "taomni-vnc-api", "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector", "taomni-screenshot-api", "taomni-screenshot-ocr", "taomni-screenshot-recording", "taomni-server-process", "taomni-local-servers-engine", "taomni-pty"]) {
     const directory = path.join(root, "src-tauri/crates", name);
     const manifest = fs.readFileSync(path.join(directory, "Cargo.toml"), "utf8");
-    const usesRoutedTcp = name === "taomni-rdp-client-api" || name === "taomni-screenshot-api";
+    const usesRoutedTcp = ["taomni-rdp-client-api", "taomni-screenshot-api", "taomni-local-voice-api"].includes(name);
     for (const match of manifest.matchAll(/\bpackage\s*=\s*"(tauri(?:-[^"\s]+)?|wry|taomni|taomni-plugin-[^"\s]+)"/g)) {
       errors.push(`${name}/Cargo.toml: aliased dependency links application/plugin package ${match[1]}`);
     }
@@ -148,7 +148,8 @@ function hostViolations(root, slug, title, treeFile) {
     const packageName = value.match(/\bpackage\s*=\s*"([^"]+)"/)?.[1] ?? name;
     const dependencyPath = value.match(/\bpath\s*=\s*"([^"]+)"/)?.[1];
     const resolved = dependencyPath && path.resolve(directory, dependencyPath);
-    if (forbidden(packageName) || resolved === path.join(root, "src-tauri") || resolved?.startsWith(plugins + path.sep)) {
+    const otherModule = resolved?.startsWith(plugins + path.sep) && !resolved.startsWith(directory + path.sep);
+    if (forbidden(packageName) || resolved === path.join(root, "src-tauri") || otherModule) {
       errors.push(`${title} host ${section}.${name} links core-owned services, native runtime or another module`);
     }
   }
@@ -182,6 +183,7 @@ export function modularBoundaryViolations(root, { linuxTreeFile, mfaTreeFile, mf
     ...hostViolations(root, "vnc-server", "VNC Server"),
     ...hostViolations(root, "rdp-server", "RDP Server"),
     ...hostViolations(root, "servers", "Local servers"),
+    ...hostViolations(root, "ai-voice-local", "Local Voice"),
   ];
   const consumers = ["screenshot", "mfa", "mobile"];
   for (const consumer of consumers) {

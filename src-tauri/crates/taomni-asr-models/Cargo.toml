@@ -1,0 +1,15 @@
+[package]
+name = "taomni-asr-models"
+version = "0.1.0"
+description = "Pinned Taomni speech model identities and artifact verification"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[dependencies]
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.11"
+
+[dev-dependencies]
+tempfile = "3"

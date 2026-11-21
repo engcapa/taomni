@@ -14,6 +14,8 @@ default-run = "taomni"
 # patch table, while ordinary Cargo commands continue to target Taomni only.
 [workspace]
 members = [
+    "crates/taomni-asr-models",
+    "crates/taomni-local-voice-api",
     "crates/taomni-capture",
     "crates/taomni-download-gates",
     "crates/taomni-host-gates",
@@ -43,6 +45,8 @@ members = [
     "crates/taomni-vnc-engine",
     "crates/taomni-vnc-key-protocol",
     "plugins/hello-plugin",
+    "plugins/ai-voice-local",
+    "plugins/ai-voice-local/engine",
     "plugins/mail",
     "plugins/mfa",
     "plugins/rdp-client",
@@ -92,6 +96,9 @@ tauri-plugin-process = "2"
 tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+taomni-asr-models = { path = "crates/taomni-asr-models" }
+taomni-local-voice-api = { path = "crates/taomni-local-voice-api" }
+taomni-local-voice-engine = { path = "plugins/ai-voice-local/engine", optional = true }
 taomni-plugin-api = { path = "crates/taomni-plugin-api" }
 taomni-plugin-services = { path = "crates/taomni-plugin-services" }
 taomni-plugin-stream = { path = "crates/taomni-plugin-stream" }
@@ -235,7 +242,6 @@ zeroize = { version = "1", features = ["zeroize_derive"] }
 keyring = "4"
 keyring-core = "1"
 cpal = { version = "0.17", optional = true }
-whisper-rs = { version = "0.16", optional = true }
 ash = { version = "0.38", optional = true }
 llama-cpp-2 = { version = "0.1", optional = true }
 plist = "1.9"
@@ -309,7 +315,7 @@ wry = { path = "vendor/wry" }
 winscard = { path = "vendor/winscard" }
 
 [features]
-default = ["hbase-kerberos", "voice-capture", "asr-whisper", "asr-sherpa"]
+default = ["hbase-kerberos", "voice-capture"]
 # Isolated QA exercises both the pre-module relay and the signed host.
 legacy-vnc-client = ["dep:taomni-vnc-engine", "dep:taomni-vnc-key-protocol"]
 legacy-rdp-client = ["dep:taomni-rdp-client-engine"]
@@ -319,8 +325,8 @@ legacy-screenshot-media = ["dep:taomni-screenshot-ocr", "dep:taomni-screenshot-r
 # Dedicated hosted test harness: use the production pinned key on every thread
 # instead of the normal unit-fixture key. Production verification is unchanged.
 qa-release-trust-gates = []
-asr-whisper = ["dep:whisper-rs"]
-asr-sherpa = ["dep:sherpa-onnx"]
+asr-whisper = ["taomni-local-voice-engine/asr-whisper"]
+asr-sherpa = ["taomni-local-voice-engine/asr-sherpa"]
 # RDP server sound: WASAPI loopback / virtual-microphone playback through cpal
 # (macOS loopback uses ScreenCaptureKit; Linux uses PipeWire directly).
 rdp-server-audio = ["taomni-rdp-server-engine?/rdp-server-audio"]
@@ -369,15 +375,6 @@ windows = { version = "0.62", features = [
   "Win32_UI_Shell",
   "Win32_System_DataExchange",
 ] }
-# On Windows, upstream sherpa-onnx prebuilt static libraries are compiled with /MT (MT_StaticRelease),
-# which conflicts with Rust MSVC /MD (MD_DynamicRelease) and whisper-rs-sys (LNK2038).
-# Using shared linking resolves the runtime library mismatch via the DLL import library.
-sherpa-onnx = { version = "1.13.8", default-features = false, features = ["shared"], optional = true }
-
-[target.'cfg(not(windows))'.dependencies]
-sherpa-onnx = { version = "1.13.8", optional = true }
-
-
 [target.'cfg(target_os = "macos")'.dependencies]
 # Legacy RDP server macOS capture fallback. The primary capture source below is
 # ScreenCaptureKit, whose bounded stream queue prevents AVCaptureScreenInput's

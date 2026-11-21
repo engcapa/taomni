@@ -1,0 +1,68 @@
+id: TC-MODULES-067
+title: A signed Local Voice host decodes real speech and disabling it returns the install guidance
+covers: [F-AI-2.3, F-Modules-1]
+tags: [voice, modules, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, module_signed_voice_archive]
+timeout_sec: 260
+steps:
+- open: '${cfg.app.base_url}'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="tao-home-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="chat-voice-button"]'
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: '[data-testid="voice-open-module-store"]'
+- assert_text: {selector: '[data-testid="voice-dictation-error"]', contains: 'Install Local Voice'}
+- click: '[data-testid="voice-open-module-store"]'
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.local_voice_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.local_voice_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- assert_file_sha256: {path: '${fixture.local_voice_host}', equals: '${fixture.local_voice_host_sha256}'}
+- click: '[data-testid="module-action-enable-ai-voice-local"]'
+- wait_for: '[data-testid="module-action-disable-ai-voice-local"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-local-terminal"]'
+- wait_for: '[data-testid="chat-voice-button"]'
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="recording"]', timeout_sec: 40}
+- click: '[data-testid="chat-voice-button"]'
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 45}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: country}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-ai-voice-local"]'
+- wait_for: '[data-testid="module-action-enable-ai-voice-local"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-local-terminal"]'
+- wait_for: '[data-testid="chat-voice-button"]'
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: '[data-testid="voice-open-module-store"]'
+- assert_text: {selector: '[data-testid="voice-dictation-error"]', contains: 'Enable Local Voice'}
+- assert_attribute: {selector: '[data-testid="chat-voice-button"]', name: data-state, equals: idle}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: installed-decode
+    requirement: A signed host and preserved model cache let the user decode speech into the editable draft after enable.
+    actions: [6, 9, 12, 15, 20, 22, 27, 32]
+    checkpoints:
+    - {step: 8, expectation: The local module is unavailable before installation.}
+    - {step: 14, expectation: The installed native host matches the package fixture.}
+    - {step: 23, expectation: Local inference recognizes the expected phrase in the draft.}
+    - {step: 24, expectation: The transcript also includes the distinct reference word.}
+    - {step: 34, expectation: The alert names the now-disabled module.}
+    - {step: 35, expectation: Disabling the module disables inference in the same app process.}
+    - {step: 36, expectation: The renderer reports no runtime errors.}
+    results: [8, 14, 23, 24, 34, 35, 36]
+  visual:
+  - check: The required or disabled module is visible in the recording status.
+    method: automated
+    reason: Both states are checked in the alert beside the editable draft.
+  native:
+  - check: Package signature, installed executable, real inference and module lifecycle.
+    method: automated
+    reason: The QA profile feeds verified PCM through the normal recording path. The host performs real native Whisper decoding.

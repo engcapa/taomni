@@ -75,6 +75,12 @@ pub fn cancel_all() {
 pub fn voice_capture_supported() -> bool {
     cfg!(feature = "voice-capture")
 }
+
+#[tauri::command]
+pub fn voice_check_local_module(state: State<'_, AppState>) -> Result<(), String> {
+    super::local_host::use_host(&state.plugins).map(|_| ())
+}
+
 #[tauri::command]
 pub async fn voice_start_capture(
     session_id: String,
@@ -141,7 +147,10 @@ async fn voice_start_capture_inner(
     }
     let result = async {
         if prepare_engine {
-            session.engine.prepare().await?;
+            session
+                .engine
+                .prepare(&state.plugins, &session.stop_task)
+                .await?;
         }
         if session.cancel.load(Ordering::Relaxed) {
             return Err("Cancelled".into());
@@ -157,7 +166,7 @@ async fn voice_start_capture_inner(
         }
         #[cfg(feature = "voice-capture")]
         {
-            let capture = super::capture::start(!prepare_engine).await?;
+            let capture = super::capture::start(!prepare_engine, &state.core.paths.data).await?;
             let mut guard = session.capture.lock().unwrap();
             if session.cancel.load(Ordering::Relaxed) {
                 let _ = capture.stop.send(());
@@ -235,6 +244,9 @@ async fn start_realtime_stream(
     }
     let online =
         ["aliyun", "volcengine", "soniox", "deepgram", "gemini"].contains(&active.as_str());
+    if super::streaming::is_local_provider(&active) {
+        super::local_host::use_host(&state.plugins)?;
+    }
     if full_local_mode && online {
         return Err(
             "FULL_LOCAL_MODE: online ASR is disabled while full local mode is enabled".into(),
@@ -313,28 +325,22 @@ async fn start_realtime_stream(
         .as_ref()
         .and_then(|capture| capture.chunks.lock().unwrap().take())
         .ok_or("Recording stream is not ready")?;
+    let plugins = state.plugins.clone();
     session.streaming.store(true, Ordering::SeqCst);
     tokio::spawn(async move {
         let backend = async {
             match active.as_str() {
-                "local-auto" | "sensevoice-small" => {
-                    crate::voice::streaming::run_routed_local(
+                provider if super::streaming::is_local_provider(provider) => {
+                    super::streaming::run_local(
+                        &plugins,
                         crate::voice::streaming::event_sink(app.clone()),
                         session_id.clone(),
                         chunks,
+                        provider,
                         language,
-                        session.engine.clone(),
+                        &session.engine,
                         session.cancel.clone(),
-                    )
-                    .await
-                }
-                "sherpa-zipformer-zh-en" => {
-                    crate::voice::streaming::run_local(
-                        crate::voice::streaming::event_sink(app.clone()),
-                        session_id.clone(),
-                        chunks,
-                        language.clone(),
-                        language,
+                        &session.stop_task,
                     )
                     .await
                 }
@@ -498,7 +504,12 @@ pub async fn voice_stop_and_transcribe(
             let started = std::time::Instant::now();
             let transcript = session
                 .engine
-                .transcribe(pcm, session.cancel.clone())
+                .transcribe(
+                    &state.plugins,
+                    pcm,
+                    session.cancel.clone(),
+                    &session.stop_task,
+                )
                 .await?;
             if session.cancel.load(Ordering::Relaxed)
                 || state.legacy.ai_ctx.read().await.config.fully_disabled
@@ -534,7 +545,7 @@ mod tests {
             finishing: AtomicBool::new(false),
             stop_task: tokio_util::sync::CancellationToken::new(),
             completed: tokio::sync::watch::channel(None).0,
-            engine: Arc::new(AsrManager::configured("whisper-base", "auto")),
+            engine: Arc::new(crate::asr::manager::configured("whisper-base", "auto")),
             streaming: AtomicBool::new(false),
             #[cfg(feature = "voice-capture")]
             capture: Mutex::new(None),

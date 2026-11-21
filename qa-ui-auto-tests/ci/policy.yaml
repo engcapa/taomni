@@ -103,6 +103,7 @@ cases:
 - TC-MODULES-064
 - TC-MODULES-065
 - TC-MODULES-066
+- TC-MODULES-067
 - TC-BACKUP-RESTORE-001
 - TC-WS-GIT-CLONE-01-defaults-proxy-and-clone-browser
 - TC-WS-GIT-CLONE-02-background-close-cancel-retry-browser
@@ -754,6 +755,7 @@ cases:
 - TC-WELCOME-RS-N-04-restore-local-shell
 - TC-auto-F-AI-2-1
 - TC-VOICE-001
+- TC-VOICE-010
 - TC-VOICE-002
 - TC-VOICE-003
 - TC-VOICE-004

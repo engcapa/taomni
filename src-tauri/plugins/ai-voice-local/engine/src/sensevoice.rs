@@ -1,28 +1,46 @@
 //! CPU-only SenseVoice final decoding; weights remain explicitly installed.
-use super::catalog;
+use std::path::PathBuf;
 use std::sync::{
-    Arc, Mutex,
+    Arc,
     atomic::{AtomicBool, Ordering},
 };
+#[cfg(feature = "asr-sherpa")]
+use std::{path::Path, sync::Mutex};
+#[cfg(feature = "asr-sherpa")]
+use taomni_asr_models as catalog;
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct SenseVoice {
+    #[cfg(feature = "asr-sherpa")]
+    models_root: PathBuf,
     #[cfg(feature = "asr-sherpa")]
     recognizer: Arc<Mutex<Option<sherpa_onnx::OfflineRecognizer>>>,
 }
 impl SenseVoice {
-    /// Keep a single warm language configuration across short streaming sessions.
-    /// Existing sessions retain their own Arc when the language changes.
-    pub fn cached(language: &str) -> Self {
+    pub fn new(models_root: PathBuf) -> Self {
+        #[cfg(not(feature = "asr-sherpa"))]
+        let _ = models_root;
+        Self {
+            #[cfg(feature = "asr-sherpa")]
+            models_root,
+            #[cfg(feature = "asr-sherpa")]
+            recognizer: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// Keep one warm language and model location across short sessions.
+    #[cfg(feature = "asr-sherpa")]
+    pub fn cached(models_root: &Path, language: &str) -> Self {
         static CACHE: std::sync::OnceLock<Mutex<Option<(String, SenseVoice)>>> =
             std::sync::OnceLock::new();
         let mut cache = CACHE.get_or_init(|| Mutex::new(None)).lock().unwrap();
-        if let Some((previous, recognizer)) = cache.as_ref() {
-            if previous == language {
-                return recognizer.clone();
-            }
+        if let Some((previous, recognizer)) = cache.as_ref()
+            && previous == language
+            && recognizer.models_root == models_root
+        {
+            return recognizer.clone();
         }
-        let recognizer = Self::default();
+        let recognizer = Self::new(models_root.to_owned());
         *cache = Some((language.to_owned(), recognizer.clone()));
         recognizer
     }
@@ -35,13 +53,13 @@ impl SenseVoice {
         {
             let context = self.recognizer.clone();
             let language = language.to_string();
+            let model = catalog::model("sensevoice-small")?;
+            let path = catalog::version_path(&self.models_root, model);
             tokio::task::spawn_blocking(move || {
                 let mut guard = context.lock().map_err(|_| "ASR_MODEL_LOCK")?;
                 if guard.is_some() {
                     return Ok(());
                 }
-                let model = catalog::model("sensevoice-small")?;
-                let path = catalog::path(model);
                 catalog::verify(model, &path)?;
                 let tokens = path.with_file_name("tokens.txt");
                 catalog::verify(&catalog::SENSE_TOKENS, &tokens)?;

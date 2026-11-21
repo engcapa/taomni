@@ -41,6 +41,12 @@ export async function voiceStub(command: string, args?: Record<string, unknown>)
     return null;
   }
   if (command === "voice_capture_supported") return enabled();
+  if (command === "voice_check_local_module") {
+    if (new URLSearchParams(window.location.search).get("voiceModule") === "missing") {
+      throw new Error("ASR_MODULE_REQUIRED: Install Local Voice from Settings → Module Store.");
+    }
+    return null;
+  }
   if (command === "voice_models" || command === "voice_check_models") return models.map((m) => {
     const installed = enabled() && sessionStorage.getItem(`voice-fixture:${m.id}`) === "installed";
     const update = m.id === "whisper-base" && new URLSearchParams(window.location.search).get("voiceOldBase") === "1" && !installed;

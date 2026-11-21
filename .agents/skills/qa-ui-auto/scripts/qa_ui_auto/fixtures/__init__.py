@@ -106,7 +106,7 @@ from . import java_real_project
 from . import dual_display_required
 from . import rdp_deferred_clipboard
 from . import module_offline_archive
-from . import module_signed_archive, module_backup_data
+from . import module_signed_archive, module_backup_data, module_voice
 from . import module_preview
 from . import module_upgrade
 from . import module_legacy_install, module_legacy_mfa
@@ -165,6 +165,7 @@ REGISTRY: dict[str, Fixture] = {
     "module_signed_vnc_server_archive": Fixture("module_signed_vnc_server_archive", module_signed_archive.setup_vnc_server),
     "module_signed_rdp_server_archive": Fixture("module_signed_rdp_server_archive", module_signed_archive.setup_rdp_server),
     "module_signed_servers_archive": Fixture("module_signed_servers_archive", module_signed_archive.setup_servers),
+    "module_signed_voice_archive": Fixture("module_signed_voice_archive", module_voice.setup),
     "local_servers_http": Fixture("local_servers_http", servers_http_observation.setup),
     "local_servers_ssh": Fixture("local_servers_ssh", servers_ssh_observation.setup),
     "module_execution": Fixture("module_execution", module_execution.setup, module_execution.teardown),
