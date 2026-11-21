@@ -1,5 +1,6 @@
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { documentPathKey } from "./pathIdentity";
 import { workspaceEditorRuntimeId } from "../workspaceRuntimeIdentity";
 import type { CodeWorkspaceFileContext } from "../../stores/app/types";
@@ -47,6 +48,9 @@ export function removeCleanViewerTabs(path: string): void {
   const app = useAppStore.getState();
   const ids = app.tabs.filter((tab) => tab.fileViewer && documentPathKey(tab.fileViewer.path) === key).map((tab) => tab.id);
   if (ids.length) app.removeTabs(ids);
+  const explorer = useExplorerStore.getState();
+  const explorerIds = explorer.tabs.filter((tab) => tab.fileViewer && documentPathKey(tab.fileViewer.path) === key).map((tab) => tab.id);
+  if (explorerIds.length) explorer.closeTabs(explorerIds);
   const platform = useWorkspacePlatformStore.getState();
   for (const workspace of platform.workspaces) for (const tab of workspace.openTabs) {
     if (tab.fileViewer && documentPathKey(tab.fileViewer.path) === key) platform.closeWorkspaceTab(workspace.id, tab.id);

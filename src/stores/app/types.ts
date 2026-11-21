@@ -10,7 +10,7 @@ import { type SidebarCollapsedByGroup } from "../sidebarRailPolicy";
  * automation and stored preferences stay valid; `home`, `workspaces` and
  * `agents` extend the same rail.
  */
-export type PrimaryNavMode = "home" | "workspaces" | "sessions" | "agents" | "tools";
+export type PrimaryNavMode = "home" | "workspaces" | "sessions" | "explorer" | "agents" | "tools";
 
 /** Backwards-compatible alias for the former two-value sidebar tab type. */
 export type SideTab = PrimaryNavMode;

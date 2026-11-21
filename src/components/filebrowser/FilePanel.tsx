@@ -24,6 +24,7 @@ export function FilePanel({
   onEmptyContext,
   onCrossPaneDrop,
   acceptCrossPane,
+  entriesOverride,
   filterText,
   onFilterTextChange,
   onDownloadSelected,
@@ -96,10 +97,11 @@ export function FilePanel({
 
   const sortedEntries = useMemo<FileEntry[]>(() => {
     if (!pane) return [];
-    let entries = showHidden
-      ? pane.entries
-      : pane.entries.filter((e) => !e.isHidden);
-    if (filterText && filterText.trim()) {
+    const source = entriesOverride ?? pane.entries;
+    let entries = entriesOverride || showHidden
+      ? source
+      : source.filter((e) => !e.isHidden);
+    if (!entriesOverride && filterText && filterText.trim()) {
       const needle = filterText.trim().toLowerCase();
       entries = entries.filter((e) => e.name.toLowerCase().includes(needle));
     }
@@ -121,7 +123,7 @@ export function FilePanel({
           return a.name.localeCompare(b.name) * dir;
       }
     });
-  }, [pane?.entries, sortKey, sortDir, showHidden, filterText]);
+  }, [pane?.entries, entriesOverride, sortKey, sortDir, showHidden, filterText]);
 
   const normalizedFilter = filterText?.trim() ?? "";
   const filterActive = normalizedFilter.length > 0;

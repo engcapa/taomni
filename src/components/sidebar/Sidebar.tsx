@@ -11,6 +11,7 @@ import { ToolsPanel } from "./ToolsPanel";
 import { HomeSidebar } from "./HomeSidebar";
 import { AgentsSidebar } from "./AgentsSidebar";
 import { WorkspaceSidebar } from "../workspace/WorkspaceSidebar";
+import { ExplorerSidebarPanel } from "../explorer/ExplorerSidebarPanel";
 
 interface SidebarProps {
   onNewSession?: (groupPath?: string | null) => void;
@@ -71,6 +72,8 @@ export function Sidebar({
         return <WorkspaceSidebar onOpenSessionPicker={() => openSessionPicker(activeWorkspaceId)} />;
       case "agents":
         return <AgentsSidebar />;
+      case "explorer":
+        return <ExplorerSidebarPanel />;
       case "tools":
         return <ToolsPanel onCommand={onCommand} />;
       case "sessions":

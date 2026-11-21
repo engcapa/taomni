@@ -91,6 +91,35 @@ describe("Explorer shared FilePanel selection", () => {
     expect(native.explorerWriteClipboardFiles).not.toHaveBeenCalled();
     expect(screen.getByTestId("explorer-status")).not.toHaveTextContent("selected");
   });
+  it("searches recursive glob results with relative paths and preserves the directory pane", async () => {
+    const nested = { ...file("nested.md", {}, "/fixture/folder"), relativePath: "folder/nested.md" };
+    native.explorerSearchEntries.mockImplementation(async (_root: string, _query: string, recursive: boolean) => ({
+      entries: recursive ? [nested] : [], scanned: 5, truncated: false, cancelled: false, failed: [],
+    }));
+    const { root } = await mountShell();
+    fireEvent.change(screen.getByTestId("explorer-filter"), { target: { value: "*.md" } });
+    await waitFor(() => expect(native.explorerSearchEntries).toHaveBeenCalledWith("/fixture", "*.md", false, false, expect.any(String)));
+    await waitFor(() => expect(rows(root)).toHaveLength(0));
+    fireEvent.click(screen.getByTestId("explorer-search-recursive"));
+    await waitFor(() => expect(rows(root)).toContain("nested.md"));
+    expect(native.explorerSearchEntries).toHaveBeenLastCalledWith("/fixture", "*.md", true, false, expect.any(String));
+    expect(screen.getByTestId("explorer-search-result-path")).toHaveTextContent("folder/nested.md");
+    expect(screen.getByTestId("explorer-search-status")).toHaveTextContent("1 results · 5 scanned");
+    fireEvent.click(screen.getByTestId("explorer-search-clear"));
+    await waitFor(() => expect(rows(root)).toContain("alpha.txt"));
+    expect(useSftpStore.getState().sessions[TAB].local.path).toBe("/fixture");
+  });
+
+  it("cancels a debounced search before IPC starts and restores the unfiltered listing on clear", async () => {
+    const { root } = await mountShell();
+    fireEvent.change(screen.getByTestId("explorer-filter"), { target: { value: "**/*.md" } });
+    fireEvent.click(await screen.findByTestId("explorer-search-cancel"));
+    await waitFor(() => expect(screen.getByTestId("explorer-search-status")).toHaveTextContent("Cancelled · 0 results · 0 scanned"));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 300)); });
+    expect(native.explorerSearchEntries).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("explorer-search-clear"));
+    await waitFor(() => expect(rows(root)).toContain("alpha.txt"));
+  });
 });
 
 describe("Explorer editing and shortcut ownership", () => {

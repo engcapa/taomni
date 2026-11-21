@@ -113,6 +113,7 @@
           "markdown_native",
           "file_open_raster",
           "explorer_large_directory",
+          "explorer_search_native",
           "workspace_search_large",
           "workspace_compact_tree",
           "workspace_hidden_entries",

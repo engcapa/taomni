@@ -31,7 +31,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
         if (existing) {
           return {
             activeTabId: existing.id,
-            activeSideTab: ["home", "workspaces", "agents"].includes(s.activeSideTab) ? "sessions" : s.activeSideTab,
+            activeSideTab: ["home", "workspaces", "agents", "explorer"].includes(s.activeSideTab) ? "sessions" : s.activeSideTab,
             tabFilter: null,
             terminalSplitActive: false,
             statusMessage: tr("status.openedTab", { title: existing.title }),
@@ -53,7 +53,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
       return {
         tabs: nextTabs,
         activeTabId: tab.id,
-        activeSideTab: ["home", "workspaces", "agents"].includes(s.activeSideTab) ? "sessions" : s.activeSideTab,
+        activeSideTab: ["home", "workspaces", "agents", "explorer"].includes(s.activeSideTab) ? "sessions" : s.activeSideTab,
         recentWorkspaces: recentResult.recentWorkspaces,
         recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         // A freshly opened tab must be visible, so drop any active focus filter.
@@ -314,7 +314,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
       return {
         activeTabId: id,
         ...(s.mergeToolWindowRail && tab?.type !== "welcome" ? { sidebarCollapsed: s.sidebarCollapsedByGroup[sidebarRailGroup(tab?.type)] } : {}),
-        activeSideTab: tab?.type === "welcome" ? "home" : s.activeSideTab === "home" || s.activeSideTab === "workspaces" || s.activeSideTab === "agents" ? "sessions" : s.activeSideTab,
+        activeSideTab: tab?.type === "welcome" ? "home" : s.activeSideTab === "home" || s.activeSideTab === "workspaces" || s.activeSideTab === "agents" || s.activeSideTab === "explorer" ? "sessions" : s.activeSideTab,
         recentWorkspaces: recentResult.recentWorkspaces,
         recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         terminalSplitActive: tab?.type === "terminal" ? s.terminalSplitActive : false,

@@ -88,7 +88,7 @@ for (const command of ["select_private_key_file","select_upload_file","select_sa
   stubCommandRegistry.register({ domain: "files", command, handler: (args, options) => invokeFiles(command, args, options) });
 }
 
-for (const command of ["explorer_canonical_path", "explorer_same_volume", "explorer_write_clipboard_files", "explorer_update_cut_clipboard", "local_copy_entries", "local_move_entries", "local_trash_entries", "local_trash_restore", "local_properties", "explorer_read_preview_text", "explorer_read_preview_bytes", "explorer_cancel_operation", "local_rename_entry", "local_create_entry"]) {
+for (const command of ["explorer_canonical_path", "explorer_same_volume", "explorer_write_clipboard_files", "explorer_update_cut_clipboard", "local_copy_entries", "local_move_entries", "local_trash_entries", "local_trash_restore", "local_properties", "explorer_read_preview_text", "explorer_read_preview_bytes", "explorer_search_entries", "explorer_cancel_operation", "local_rename_entry", "local_create_entry"]) {
   stubCommandRegistry.register({ domain: "explorer", command, handler: (args) => invokeExplorer(command, args) });
 }
 

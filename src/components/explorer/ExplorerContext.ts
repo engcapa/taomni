@@ -7,6 +7,8 @@ export interface ExplorerViewContext {
   onOpenExplorer: (path: string, forceNew?: boolean) => void;
   onOpenTerminal: (path: string) => void;
   onProperties: () => void;
+  searchActive: boolean;
+  searchPaths: Record<string, string>;
 }
 export const ExplorerContext = createContext<ExplorerViewContext | null>(null);
 export function useExplorerContext() {
