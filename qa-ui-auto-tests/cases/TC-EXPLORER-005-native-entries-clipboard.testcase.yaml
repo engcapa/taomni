@@ -158,7 +158,11 @@ steps:
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
 - right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
 - click: '[data-testid="terminal-context-explorer-new"]'
-- wait_for: {selector: ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 2)', timeout_sec: 90}
+- wait_for:
+    selector: >-
+      [data-testid="explorer-workspace-tab"][data-tab-type="file-browser"] ~
+      [data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]
+    timeout_sec: 90
 - assert_count:
     selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
     equal: 2
