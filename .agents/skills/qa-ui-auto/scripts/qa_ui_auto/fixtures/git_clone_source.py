@@ -65,13 +65,14 @@ def create_native_fixture(parent: Path) -> dict[str, str]:
     _git(source, "checkout", "main")
     parent_dir = workspace / "clones"
     parent_dir.mkdir()
-    destination = parent_dir / "qa-clone"
+    workspace_name = "qa-clone-workspace"
+    destination = parent_dir / workspace_name
     return {
         "url": source.as_posix(),
         "source": source.as_posix(),
         "parent": parent_dir.as_posix(),
         "destination": destination.as_posix(),
-        "workspace_name": "qa-clone-workspace",
+        "workspace_name": workspace_name,
         "branch": "develop",
         "main_file": "README.md",
         "branch_file": "branch-only.txt",

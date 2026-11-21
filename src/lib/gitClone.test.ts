@@ -69,6 +69,9 @@ describe("git clone form validation", () => {
     expect(joinClonePath("C:\\Users\\me\\taomni-workspaces", "repo")).toBe(
       "C:\\Users\\me\\taomni-workspaces\\repo",
     );
+    expect(joinClonePath("C:/Users/me/taomni-workspaces", "repo")).toBe(
+      "C:\\Users\\me\\taomni-workspaces\\repo",
+    );
     expect(joinClonePath("/home/me/taomni-workspaces/", "repo")).toBe(
       "/home/me/taomni-workspaces/repo",
     );

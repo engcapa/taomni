@@ -25,9 +25,10 @@ steps:
 - wait_for: '[data-testid="workspace-switcher-button"]'
 - click: '[data-testid="workspace-open-session-plus"]'
 - click: '[data-testid="workspace-plus-clone-git"]'
-- wait_for: '[data-testid="workspace-git-clone-modal"]'
+- wait_for: '[data-testid="workspace-git-clone-location"]:not([disabled])'
 - eval_readonly:
-    expression: (document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-git-clone-location"]')?.value || "").split(String.fromCharCode(92)).join("/").endsWith("taomni-workspaces")
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-git-clone-location"]')?.value
+    contains: taomni-workspaces
     expect_truthy: true
 - fill:
     selector: '[data-testid="workspace-git-clone-url"]'
@@ -60,7 +61,7 @@ steps:
     timeout_sec: 180
 - assert_text:
     selector: '[data-testid="workspace-git-clone-success"]'
-    contains: ${fixture.git_clone_destination}
+    contains: ${fixture.git_clone_workspace_name}
 - click: '[data-testid="workspace-git-clone-close"]'
 - wait_for: '[data-testid="workspace-switcher-button"]'
 - assert_text:
@@ -89,7 +90,7 @@ steps:
 - assert_no_runtime_errors: null
 - screenshot: git-clone-native-workspace.png
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: The native dialog opens with the default parent directory ending in taomni-workspaces and

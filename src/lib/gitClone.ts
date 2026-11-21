@@ -220,8 +220,12 @@ export function validateWorkspaceName(value: string): GitCloneNameError | null {
 export function joinClonePath(parent: string, name: string): string {
   const trimmedParent = parent.trim().replace(/[\\/]+$/, "");
   if (!trimmedParent) return name.trim();
-  const separator = /^[A-Za-z]:[\\/]/.test(trimmedParent) || trimmedParent.startsWith("\\\\") ? "\\" : "/";
-  return `${trimmedParent}${separator}${name.trim()}`;
+  const windows = /^[A-Za-z]:[\\/]/.test(trimmedParent) || trimmedParent.startsWith("\\\\");
+  const normalizedParent = windows
+    ? trimmedParent.replace(/\//g, "\\")
+    : trimmedParent;
+  const separator = windows ? "\\" : "/";
+  return `${normalizedParent}${separator}${name.trim()}`;
 }
 
 export function isAbsoluteClonePath(value: string): boolean {

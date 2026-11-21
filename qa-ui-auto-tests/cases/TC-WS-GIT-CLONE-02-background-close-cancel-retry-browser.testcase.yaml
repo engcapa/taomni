@@ -75,7 +75,7 @@ steps:
 - assert_no_runtime_errors: null
 - screenshot: git-clone-background-cancel-retry-browser.png
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: Closing the dialog while cloning hides it without cancelling; the + menu reopens the

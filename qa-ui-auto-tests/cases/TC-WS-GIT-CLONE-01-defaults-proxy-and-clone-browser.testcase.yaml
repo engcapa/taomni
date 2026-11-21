@@ -137,7 +137,7 @@ steps:
 - assert_visible: '[data-testid="code-workspace-tree-root"][data-root-path="${fixture.git_clone_destination}"]'
 - screenshot: git-clone-defaults-proxy-browser.png
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: The Workspaces + menu opens one clone dialog whose identity, branch, parent location
