@@ -4,8 +4,10 @@ from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
+import platform
 import socket
 import sqlite3
+import subprocess
 import tempfile
 import zipfile
 
@@ -51,6 +53,8 @@ def run(ctx, phase):
         "hostSha256": digest, "packageSha256": receipt["sha256"], "writerLease": lease,
         "listener": listening, "port": port, "settingsSha256": settings,
     }
+    if phase == "idle" and platform.system() == "Darwin":
+        evidence["macosSigning"] = observe_macos_signing(ctx, executable)
     if phase != "idle":
         for path in (cert, key):
             ordinary(path)
@@ -63,6 +67,25 @@ def run(ctx, phase):
     return f"Verified signed RDP Server {phase}"
 
 
+def observe_macos_signing(ctx, executable):
+    def capture(*argv):
+        result = subprocess.run([*argv, str(executable)], capture_output=True, text=True, timeout=15)
+        return {"code": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+
+    details = {
+        "verify": capture("/usr/bin/codesign", "--verify", "--strict"),
+        "identity": capture("/usr/bin/codesign", "-d", "--verbose=4", "-r-"),
+        "gatekeeper": capture("/usr/sbin/spctl", "--assess", "--type", "execute", "--verbose=4"),
+    }
+    (ctx.case_dir / "signed-rdp-server-macos-signing.json").write_text(
+        json.dumps(details, indent=2) + "\n", encoding="utf-8",
+    )
+    if (details["verify"]["code"] or details["identity"]["code"]
+            or "(runtime)" not in details["identity"]["stderr"]):
+        raise StepError("The installed macOS RDP Server lacks a verified hardened-runtime signature")
+    return details
+
+
 def observe_settings(profile, signed, phase):
     path = profile / "plugins/rdp-server/data/config.json"
     ordinary(path)
@@ -70,9 +93,13 @@ def observe_settings(profile, signed, phase):
     record = json.loads(raw)
     settings = record["settings"]
     legacy = json.loads(signed["legacy_settings"])
-    for field in ("port", "bindAddress", "username", "viewOnly", "clipboardServerToClient", "microphone"):
+    for field in ("port", "bindAddress", "username", "clipboardServerToClient", "microphone"):
         if settings.get(field) != legacy[field]:
             raise StepError(f"RDP Server did not retain the legacy {field} setting")
+    if phase == "idle" and settings.get("viewOnly") is not True:
+        raise StepError("The legacy view-only preference was not imported")
+    if phase != "idle" and (settings.get("viewOnly") is not False or settings.get("requireControlApproval") is not False):
+        raise StepError("The RDP Server did not save the requested interactive settings")
     with closing(sqlite3.connect((profile / "taomni.db").as_uri() + "?mode=ro", uri=True)) as database:
         rows = database.execute("SELECT server_type, config_json FROM server_configs ORDER BY server_type").fetchall()
     if rows != [("http", '{"port":18080}'), ("rdp", signed["legacy_settings"])]:

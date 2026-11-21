@@ -70,6 +70,7 @@ steps:
 - wait_for: '[data-testid="server-row-vnc"][data-status="stopped"]'
 - assert_visible: '[data-testid="server-field-vnc-view-only"]:checked'
 - click: '[data-testid="server-row-vnc-start"]'
+- wait_for: {selector: '[data-testid="server-row-vnc"][data-status="running"]', timeout_sec: 20}
 - assert_signed_vnc_daemon: running
 - click: '[data-testid="server-row-vnc-stop"]'
 - wait_for: '[data-testid="server-row-vnc"][data-status="stopped"]'
@@ -80,7 +81,7 @@ verification:
   requirements:
   - id: signed-daemon
     requirement: The signed module adopts the old VNC settings and starts its own X11 daemon after the Vault accepts the old password.
-    actions: [7, 9, 15, 21, 22, 26, 35, 42, 45, 50, 53, 62, 64]
+    actions: [7, 9, 15, 21, 22, 26, 35, 42, 45, 50, 53, 62, 65]
     checkpoints:
     - {step: 11, expectation: 'The installed host matches the signed archive, and migration recorded the old row without copying its plaintext password.'}
     - {step: 18, expectation: Local servers displays the port from the migrated configuration.}
@@ -92,10 +93,10 @@ verification:
     - {step: 52, expectation: Disabling the running module releases the writer lease and listener.}
     - {step: 60, expectation: The Servers tab has released the former instance.}
     - {step: 61, expectation: The view-only change survives re-enabling the module.}
-    - {step: 63, expectation: The module can start again with the saved credential in the same desktop process.}
-    - {step: 66, expectation: The final Stop releases the listener again.}
-    - {step: 67, expectation: The workflow completes without renderer errors.}
-    results: [11, 18, 19, 20, 29, 37, 44, 52, 60, 61, 63, 66, 67]
+    - {step: 64, expectation: The module starts again with the saved credential and reacquires its write lease in the same desktop process.}
+    - {step: 67, expectation: The final Stop releases the listener again.}
+    - {step: 68, expectation: The workflow completes without renderer errors.}
+    results: [11, 18, 19, 20, 29, 37, 44, 52, 60, 61, 64, 67, 68]
   visual:
   - check: The Servers row shows the current state, retained settings and daemon logs.
     method: automated

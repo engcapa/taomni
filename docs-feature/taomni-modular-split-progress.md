@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- 在 `d08c7a86f` 的 Linux Native 分片中，VNC Server 首次启动、运行中备份、停止和禁用均通过。重新启用后原用例在点击启动后立即探测写租约。失败截图保存时 daemon 已显示运行，日志也记录了新监听。用例先等运行状态，再保留真实端口、鉴权与写租约断言。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44945992713)
+- 三端 RDP Server 的签名工件改由各平台独立构建。TC-MODULES-065 新增 macOS 固定证书和 hardened runtime 验证，并复用独立桌面窗口检查实际远程输入与成像。正式 DMG 升级后的 TCC 授权复用仍按 G2 验证。
 - `8cabdb13b` 的三端 Browser 各通过 25/25，六个分片已下载并核对回执。四目标核心清单排除了 RDP Server 引擎和宿主。Linux 签名构建在链接时缺少 `libxkbcommon-dev`，QA 和发布工作流已补齐该依赖。原始构建日志和已下载工件仍保留。 [Browser 与构建](https://github.com/engcapa/taomni/actions/runs/44947624092) · [四目标清单](https://github.com/engcapa/taomni/actions/runs/44947656893) · [链接失败日志](https://github.com/engcapa/taomni/actions/runs/44947624092/job/136979405688)
 - RDP Server 0.1.1 将旧库的 RDP 行导入模块目录。旧明文口令在用户解锁 Vault 并保存时转成模块专用凭据引用。模块运行中的备份包含设置、TLS 文件和 Vault，归档的核心库在凭据迁移后移除 RDP 回滚行。TC-MODULES-065 增加真实连接与备份断言，TC-RDPS-UI-03 增加重开设置后的凭据隐藏检查。新版回执待收齐。
 - RDP Server 0.1.0 接入独立签名宿主。核心保留 Local servers、Vault 和本机控制审批，宿主负责接入、录屏、输入、剪贴板和音频。首次安装会在模块目录接管已有 TLS 证书和私钥。隔离 QA 保留原服务端版本覆盖已有用例，TC-MODULES-065 用签名包验证真实连接和停用。macOS 权限归属仍待闭合。
