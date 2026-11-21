@@ -168,8 +168,9 @@ steps:
 - wait_for: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
 - dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
 - wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
-- wait_for:
-    selector: '[data-testid="file-viewer"][data-readonly="true"] .cm-content:has-text("Mail attachment read-only fixture.")'
+- assert_text_equals:
+    selector: '[data-testid="file-viewer"][data-readonly="true"] .cm-content .cm-line:first-child'
+    equals: Mail attachment read-only fixture.
     timeout_sec: 30
 - assert_visible: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-readonly"]'
 - assert_disabled: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-save"]'
