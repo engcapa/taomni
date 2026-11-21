@@ -30,6 +30,11 @@ versioned native URL, real frame pixels, input, disable and enable, and a
 detached WebView that reattaches to the original main window. TC-MODULES-054
 checks the corresponding development preview flow.
 
+The migration journal records an in-place retention once the signed viewer and
+host are verified and enabled. Saved VNC settings and credential references
+stay in the core session database. TC-MODULES-027 checks the full original rows
+and opens the installed renderer for the old saved session.
+
 The Windows special-key helper builds from `key-helper/` without linking the
 desktop application. The current VNC adapter starts it by executable name and
 keeps the helper's input pipe open for the life of the owner. The helper

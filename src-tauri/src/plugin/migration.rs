@@ -17,6 +17,7 @@ use sha2::{Digest, Sha256};
 
 pub(crate) const MFA_MIGRATION_TARGET: &str = "plugins/mfa/data/mfa.db";
 pub(crate) const MAIL_MIGRATION_TARGET: &str = "plugins/mail/data";
+const VNC_RETAINED_DATABASE: &str = "taomni.db";
 pub(crate) const LEGACY_SOURCE_VERSION: &str = "0.5.x";
 
 /// The fixed Vault entries that the migration preflight can observe without
@@ -167,6 +168,16 @@ impl MigrationJournal {
             .any(|entry| entry.item == item && entry.state == MigrationStepState::Committed)
     }
 
+    pub(crate) fn retained_vnc_sessions(&self) -> bool {
+        let mut entries = self
+            .entries
+            .iter()
+            .filter(|entry| entry.item == MigrationItem::VncSessions);
+        entries.next().is_some_and(|entry| {
+            entry.state == MigrationStepState::Committed && valid_vnc_retention(entry)
+        }) && entries.next().is_none()
+    }
+
     pub(crate) fn committed_mfa(&self) -> Result<bool, String> {
         let mut entries = self
             .entries
@@ -208,6 +219,13 @@ pub(super) fn valid_mail_commit(entry: &MigrationJournalEntry) -> bool {
         && entry.source_path == Path::new("taomni.db")
         && source::valid_fingerprint(&entry.source_fingerprint)
         && entry.target == Path::new(MAIL_MIGRATION_TARGET)
+}
+
+fn valid_vnc_retention(entry: &MigrationJournalEntry) -> bool {
+    entry.item == MigrationItem::VncSessions
+        && entry.source_path == Path::new(VNC_RETAINED_DATABASE)
+        && entry.target == entry.source_path
+        && source::valid_fingerprint(&entry.source_fingerprint)
 }
 
 /// One filesystem migration operation. Database legacy tables are represented
@@ -298,6 +316,14 @@ impl MigrationExecutor {
         &self,
         snapshot: &LegacyInstallSnapshot,
     ) -> Result<MigrationExecutionResult, String> {
+        self.record_session_retention(snapshot, false)
+    }
+
+    pub(crate) fn record_session_retention(
+        &self,
+        snapshot: &LegacyInstallSnapshot,
+        retain_vnc: bool,
+    ) -> Result<MigrationExecutionResult, String> {
         let mut journal = MigrationJournal::load(&self.journal_path)?;
         if journal.from_version.is_empty() {
             journal.from_version = self.from_version.clone();
@@ -309,7 +335,7 @@ impl MigrationExecutor {
             return Err("migration journal version does not match this executor".into());
         }
 
-        let result = reconcile_pending(&mut journal, snapshot)?;
+        let result = reconcile_pending(&mut journal, snapshot, retain_vnc)?;
         journal.save_atomic(&self.journal_path)?;
         Ok(result)
     }
@@ -318,13 +344,16 @@ impl MigrationExecutor {
 fn reconcile_pending(
     journal: &mut MigrationJournal,
     snapshot: &LegacyInstallSnapshot,
+    retain_vnc: bool,
 ) -> Result<MigrationExecutionResult, String> {
     let mut committed = Vec::new();
     for entry in &journal.entries {
         match entry.state {
             MigrationStepState::Pending if entry.target.as_os_str().is_empty() => (),
             MigrationStepState::Committed
-                if (valid_mfa_commit(entry) || valid_mail_commit(entry))
+                if (valid_mfa_commit(entry)
+                    || valid_mail_commit(entry)
+                    || valid_vnc_retention(entry))
                     && !committed.contains(&entry.item) =>
             {
                 committed.push(entry.item);
@@ -356,14 +385,26 @@ fn reconcile_pending(
             .get(source_path.to_string_lossy().as_ref())
             .cloned()
             .ok_or_else(|| format!("missing source fingerprint for {}", source_path.display()))?;
-        entries.push(MigrationJournalEntry {
+        let mut entry = MigrationJournalEntry {
             item: candidate.item,
             state: MigrationStepState::Pending,
             source_fingerprint: fingerprint,
             source_path,
             target: PathBuf::new(),
-        });
-        pending.push(candidate.item);
+        };
+        if retain_vnc && candidate.item == MigrationItem::VncSessions {
+            entry.target = entry.source_path.clone();
+            if !valid_vnc_retention(&entry) {
+                return Err(
+                    "legacy VNC session source does not match the core-owned database".into(),
+                );
+            }
+            entry.state = MigrationStepState::Committed;
+            committed.push(candidate.item);
+        } else {
+            pending.push(candidate.item);
+        }
+        entries.push(entry);
     }
     journal.entries = entries;
     journal.status = if pending.is_empty() {

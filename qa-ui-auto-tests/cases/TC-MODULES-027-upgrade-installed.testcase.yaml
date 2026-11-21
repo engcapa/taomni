@@ -1,10 +1,12 @@
 id: TC-MODULES-027
-title: Installed 0.5.10 profile opens safely in the candidate with idempotent pending VNC upgrade
+title: Installed 0.5.10 sessions remain available after the signed VNC upgrade
 description: Installs the pinned public 0.5.10 deb/MSI/DMG on an owned GitHub runner and runs its headless entry twice in the
   candidate QA profile. The old binary creates the actual schema; SSH/VNC business rows are synthetic and must survive its
   reopening. The candidate then uses real Settings/IPC to recommend only VNC, retain old chat bytes and sidecars, and keep
   pending state through normal candidate restart. The main window then installs Hello and MFA from the signed release roster.
-  The oracle verifies that both packages, the original data and the pending VNC journal are present. Unix old processes must exit normally.
+  The oracle verifies that both packages, the original data and the pending VNC journal are present. Installing and
+  enabling the signed VNC client completes the original session entry in place and opens the original saved tab.
+  Unix old processes must exit normally.
   Windows GUI-subsystem old processes are forcibly stopped and recorded as crash input.
 covers:
 - F-Modules-1
@@ -20,6 +22,7 @@ fixtures:
 - module_legacy_install
 - module_signed_archive
 - module_legacy_roster
+- module_signed_vnc_archive
 timeout_sec: 900
 steps:
 - open: ${cfg.app.base_url}
@@ -107,6 +110,22 @@ steps:
 - module_upgrade_probe: {phase: after-first-install}
 - assert_no_runtime_errors: null
 - screenshot: module-upgrade-installed-0510-native.png
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.vnc_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.vnc_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- click: '[data-testid="module-action-enable-vnc-client"]'
+- wait_for: '[data-testid="module-action-disable-vnc-client"]'
+- press: {selector: '[data-testid="module-upgrade-migrate"]:not([disabled])', key: Enter}
+- wait_for: '[data-testid="module-upgrade-status"][data-state="empty"]'
+- assert_count: {selector: '[data-testid="module-upgrade-pending"]', equal: 0}
+- module_upgrade_probe: {phase: vnc-retained}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-upgrade-vnc"]'
+- wait_for: '[data-testid="vnc-panel"][data-frontend-source*="/__taomni_plugins__/vnc-client/${fixture.vnc_signed_version}/frontend/index.js"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="vnc"]', equal: 1}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -221,6 +240,17 @@ verification:
     - step: 45
       expectation: The renderer records no unhandled errors after the first installation.
     results: [39, 43, 44, 45]
+  - id: R3
+    requirement: The signed VNC module opens the original saved session and records retention without copying its database.
+    actions: [47, 48, 49, 51, 53, 57, 58, 59]
+    checkpoints:
+    - {step: 50, expectation: The production verifier accepts the VNC package.}
+    - {step: 54, expectation: The store no longer reports unfinished VNC session work.}
+    - {step: 56, expectation: The journal points to the original database and the full legacy session rows and historical file hashes match.}
+    - {step: 60, expectation: The original VNC session loads the installed renderer.}
+    - {step: 61, expectation: Reopening the original session creates one VNC tab.}
+    - {step: 62, expectation: Opening the retained session records no uncaught renderer errors.}
+    results: [50, 54, 56, 60, 61, 62]
   native:
   - check: Pinned real installer, two old app starts, candidate preflight and signed first installation, original sessions and chat bytes.
     method: automated

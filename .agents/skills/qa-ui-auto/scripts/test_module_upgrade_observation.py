@@ -112,7 +112,7 @@ class UpgradeObservationTests(unittest.TestCase):
     def test_false_completion_wrong_owner_and_changed_fingerprint_are_rejected(self):
         self.journal["status"] = "complete"
         self.write_journal()
-        with self.assertRaisesRegex(StepError, "incorrectly marked complete"):
+        with self.assertRaisesRegex(StepError, "Expected a pending upgrade journal"):
             observe(self.root, self.state, "pending")
         self.journal["status"] = "pending"
         self.journal["entries"][0]["item"] = "rdp-vnc-sessions"

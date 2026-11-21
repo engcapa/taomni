@@ -3951,6 +3951,7 @@ controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas su
 - `taomni-vnc-api` 提供核心与宿主共用的连接参数、错误和经认证的转发协议。关闭 `legacy-vnc-client` 的核心调用已启用的签名宿主。
 - 宿主专项检查转发凭据、连接探测、帧像素、取消和 TCP/WS 释放。TC-MODULES-053 验证签名安装、禁用时关闭连接及重新启用后恢复原标签。TC-156 验证关闭标签时释放原连接，重开后重新认证、绘制和发送输入。TC-151 和原有剪贴板用例继续覆盖认证与会话。
 - TC-MODULES-055 从 Windows 模块商店安装签名包，核对聚焦 VNC 画布后辅助进程的实际路径、摘要和父进程。禁用后检查宿主、辅助进程及 RFB 连接都已退出，原核心进程仍存活。
+- TC-MODULES-027 从正式 0.5.10 的 profile 核对签名 VNC 模块可读取原会话记录。启用后记录原位保留，journal 指向核心会话数据库。完整旧行和 LanChat 历史文件摘要参与检查。
 - Tauri 命令：`vnc_connect / vnc_cancel_connect / vnc_disconnect / vnc_test_connection / vnc_create_detach_claim / vnc_consume_detach_claim / vnc_set_special_key_capture / vnc_special_key_capture_status`
 - 本地动态端口 WebSocket relay：VNC server ↔ 前端 Canvas（前端不再直接持有 TCP 套接字）
 

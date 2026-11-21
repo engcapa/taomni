@@ -361,8 +361,17 @@ pub fn plugin_migration_inspect(
     from_version: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<crate::plugin::migration::LegacyInstallSnapshot, String> {
+    use crate::plugin::migration::{MigrationItem, MigrationJournal};
     let root = legacy_profile_root(&state);
-    inspect_legacy_profile(&root, from_version, &state)
+    let mut snapshot = inspect_legacy_profile(&root, from_version, &state)?;
+    if MigrationJournal::load(&root.join("migration/journal.json"))
+        .is_ok_and(|journal| journal.retained_vnc_sessions())
+    {
+        snapshot
+            .candidates
+            .retain(|candidate| candidate.item != MigrationItem::VncSessions);
+    }
+    Ok(snapshot)
 }
 
 fn inspect_legacy_profile(
@@ -380,10 +389,8 @@ fn inspect_legacy_profile(
     Ok(snapshot)
 }
 
-/// Record the upgrade preflight while the signed package installer and the
-/// core-owned legacy-table exporter are still being rolled out. Database and
-/// file candidates remain pending; this command deliberately does not copy
-/// source data, create a pseudo plugin version, or change an active pointer.
+/// Acknowledge sessions retained by the core after the signed VNC viewer is ready.
+/// Other candidates keep their journal state until their exporters run.
 #[tauri::command]
 pub fn plugin_migration_execute(
     from_version: Option<String>,
@@ -391,6 +398,10 @@ pub fn plugin_migration_execute(
 ) -> Result<crate::plugin::migration::MigrationExecutionResult, String> {
     let source_root = legacy_profile_root(&state);
     let snapshot = inspect_legacy_profile(&source_root, from_version, &state)?;
+    let retain_vnc =
+        snapshot.candidates.iter().any(|candidate| {
+            candidate.item == crate::plugin::migration::MigrationItem::VncSessions
+        }) && state.plugins.has_verified_vnc_client();
     let journal_path = source_root.join("migration").join("journal.json");
     let executor = crate::plugin::migration::MigrationExecutor::new(
         source_root,
@@ -399,7 +410,7 @@ pub fn plugin_migration_execute(
         snapshot.from_version.clone(),
         crate::plugin::CORE_API_VERSION,
     )?;
-    executor.record_pending(&snapshot)
+    executor.record_session_retention(&snapshot, retain_vnc)
 }
 
 #[tauri::command]

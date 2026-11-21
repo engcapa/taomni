@@ -12,6 +12,7 @@ from .fixtures.module_upgrade import CHAT_FILES, LEGACY_WAL_CASE
 from .steps import StepError
 
 AFTER_FIRST_INSTALL = "after-first-install"
+VNC_RETAINED = "vnc-retained"
 
 
 def wal_fingerprint(data, state):
@@ -72,8 +73,10 @@ def observe(data, state, phase):
             raise StepError("Opening a legacy profile without using Mail created default Mail storage")
         absent.append("mail")
     # The signed first-install probe has already verified the independent MFA package.
-    if phase != AFTER_FIRST_INSTALL:
+    if phase not in {AFTER_FIRST_INSTALL, VNC_RETAINED}:
         absent.append("mfa")
+    if phase == VNC_RETAINED:
+        absent.remove("vnc-client")
     for slug in absent:
         directory = data / "plugins" / slug
         if directory.exists() or directory.is_symlink():
@@ -101,8 +104,9 @@ def observe(data, state, phase):
         if journal_path.is_symlink():
             raise StepError("Upgrade observation refuses a linked journal")
         journal = json.loads(journal_path.read_text(encoding="utf-8"))
-        if journal.get("status") != "pending" or journal.get("to_core_api_version") != "1":
-            raise StepError("Unperformed upgrade was incorrectly marked complete")
+        expected_status = "complete" if phase == VNC_RETAINED else "pending"
+        if journal.get("status") != expected_status or journal.get("to_core_api_version") != "1":
+            raise StepError(f"Expected a {expected_status} upgrade journal")
         entries = journal.get("entries", [])
         expected_items = state.get("expected_items", ["vnc-sessions"])
         if len(entries) != len(expected_items):
@@ -110,8 +114,9 @@ def observe(data, state, phase):
         if [entry.get("item") for entry in entries] != expected_items:
             raise StepError("Pending migration has an incorrect owner or duplicate item")
         for entry in entries:
-            if (entry.get("state"), entry.get("source_path"), entry.get("target")) != ("pending", "taomni.db", ""):
-                raise StepError("Pending migration has an incorrect owner/source/state/target")
+            expected_entry = ("committed", "taomni.db", "taomni.db") if phase == VNC_RETAINED else ("pending", "taomni.db", "")
+            if (entry.get("state"), entry.get("source_path"), entry.get("target")) != expected_entry:
+                raise StepError("Upgrade journal has an incorrect owner/source/state/target")
             if not re.fullmatch(r"sha256:[0-9a-f]{64}:bytes:[0-9]+", entry.get("source_fingerprint", "")):
                 raise StepError("Pending migration lacks its actual source fingerprint")
             if expected_fingerprint and entry["source_fingerprint"] != expected_fingerprint:
@@ -124,7 +129,7 @@ def observe(data, state, phase):
 
 
 def run(ctx, args):
-    phases = {"preflight", "pending", "repeat", AFTER_FIRST_INSTALL, module_legacy_restore.PHASE}
+    phases = {"preflight", "pending", "repeat", AFTER_FIRST_INSTALL, VNC_RETAINED, module_legacy_restore.PHASE}
     if not isinstance(args, dict) or set(args) != {"phase"} or args["phase"] not in phases:
         raise StepError("module_upgrade_probe requires a fixed registered phase")
     owner = getattr(ctx, "fixture_context", None) or ctx
@@ -132,7 +137,7 @@ def run(ctx, args):
     case_id = getattr(owner, "case_id", None)
     if not state or case_id not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032", "TC-MODULES-049", module_legacy_restore.CASE_ID, LEGACY_WAL_CASE}:
         raise StepError("module_upgrade_probe requires its registered native legacy input fixture")
-    if args["phase"] == AFTER_FIRST_INSTALL and case_id != "TC-MODULES-027":
+    if args["phase"] in {AFTER_FIRST_INSTALL, VNC_RETAINED} and case_id != "TC-MODULES-027":
         raise StepError("After-first-install verification requires the installed legacy roster case")
     if (args["phase"] == module_legacy_restore.PHASE) != (case_id == module_legacy_restore.CASE_ID):
         raise StepError("The staged-restore observation belongs to its own legacy profile case")
@@ -145,6 +150,19 @@ def run(ctx, args):
             record.update(module_legacy_restore.observe(data, state["sessions"][0]))
         else:
             record.update(observe(data, state, args["phase"]))
+        if args["phase"] == VNC_RETAINED:
+            artifact = json.loads((Path(ctx.case_dir) / "signed-vnc/provenance.json").read_text(encoding="utf-8"))
+            module = data / "plugins/vnc-client"
+            pointer = json.loads((module / "active.json").read_text(encoding="utf-8"))
+            if pointer.get("activeVersion") != artifact["version"]:
+                raise StepError("The VNC migration used a different signed module version")
+            directory = module / "versions" / artifact["version"]
+            for name, digest in [(".taomni-trust/package.taomni-plugin", artifact["sha256"]),
+                                 ("frontend/index.js", artifact["frontendSha256"])]:
+                if hashlib.sha256((directory / name).read_bytes()).hexdigest() != digest:
+                    raise StepError("The VNC migration used a different signed payload")
+            record["signedVncVersion"] = artifact["version"]
+            record["signedVncSha256"] = artifact["sha256"]
         record["passed"] = True
         return "legacy upgrade " + args["phase"] + " verified"
     finally:

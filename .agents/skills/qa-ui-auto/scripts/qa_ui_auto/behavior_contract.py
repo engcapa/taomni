@@ -18,7 +18,7 @@ def is_check(step: dict) -> bool:
     verb, args = next(iter(step.items()))
     if verb == "module_upgrade_probe":
         return isinstance(args, dict) and args.get("phase") in {
-            "preflight", "pending", "repeat", "after-first-install", "legacy-restore-applied",
+            "preflight", "pending", "repeat", "after-first-install", "vnc-retained", "legacy-restore-applied",
         }
     if verb == "module_execution_probe":
         return isinstance(args, dict) and args.get("phase") in {"rejected", "recovered"}

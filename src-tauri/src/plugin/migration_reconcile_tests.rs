@@ -52,7 +52,7 @@ fn refreshing_candidates_keeps_original_mfa_commit_and_returns_only_remaining_it
     let original = journal.entries[0].clone();
     let mut scan = snapshot();
     for _ in 0..2 {
-        let result = reconcile_pending(&mut journal, &scan).unwrap();
+        let result = reconcile_pending(&mut journal, &scan, false).unwrap();
         assert_eq!(result.status, MigrationRunState::Pending);
         assert_eq!(result.committed, [MigrationItem::Mfa]);
         assert_eq!(result.pending, [MigrationItem::VncSessions]);
@@ -63,7 +63,7 @@ fn refreshing_candidates_keeps_original_mfa_commit_and_returns_only_remaining_it
         );
     }
     scan.candidates.truncate(1);
-    let result = reconcile_pending(&mut journal, &scan).unwrap();
+    let result = reconcile_pending(&mut journal, &scan, false).unwrap();
     assert_eq!(result.status, MigrationRunState::Complete);
     assert!(result.pending.is_empty() && result.pending_reason.is_none());
     assert_eq!(journal.entries, [original]);
@@ -80,10 +80,48 @@ fn an_unrecognized_target_or_duplicate_commit_requires_recovery_without_rewritin
         }
         let original = journal.entries.clone();
         assert!(
-            reconcile_pending(&mut journal, &snapshot())
+            reconcile_pending(&mut journal, &snapshot(), false)
                 .unwrap_err()
                 .contains("explicit recovery")
         );
         assert_eq!(journal.entries, original);
     }
+}
+
+#[test]
+fn keeps_existing_vnc_sessions_in_the_core_database_when_the_viewer_is_available() {
+    let mut journal = MigrationJournal::default();
+    let mut scan = snapshot();
+    assert_eq!(
+        reconcile_pending(&mut journal, &scan, false)
+            .unwrap()
+            .pending,
+        [MigrationItem::Mfa, MigrationItem::VncSessions]
+    );
+    let result = reconcile_pending(&mut journal, &scan, true).unwrap();
+    assert_eq!(result.status, MigrationRunState::Pending);
+    assert_eq!(result.pending, [MigrationItem::Mfa]);
+    assert_eq!(result.committed, [MigrationItem::VncSessions]);
+    assert!(journal.retained_vnc_sessions());
+    let retained = journal
+        .entries
+        .iter()
+        .find(|entry| entry.item == MigrationItem::VncSessions)
+        .unwrap()
+        .clone();
+    assert_eq!(retained.target, Path::new("taomni.db"));
+
+    scan.source_fingerprints.insert(
+        "taomni.db".into(),
+        format!("sha256:{}:bytes:31", "d".repeat(64)),
+    );
+    scan.candidates
+        .retain(|entry| entry.item != MigrationItem::Mfa);
+    assert_eq!(
+        reconcile_pending(&mut journal, &scan, false)
+            .unwrap()
+            .status,
+        MigrationRunState::Complete
+    );
+    assert_eq!(journal.entries, [retained]);
 }
