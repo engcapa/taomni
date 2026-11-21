@@ -50,7 +50,14 @@ function Find-Control($Root, $Type, [string]$Name) {
 
 function Invoke-Button($Root, [string]$Name) {
     $button = Wait-Element { Find-Control $Root $types::Button $Name } $Name
-    $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    [object]$pattern = $null
+    if ($button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
+        $pattern.Invoke()
+        return
+    }
+    $button.SetFocus()
+    if (-not $button.Current.HasKeyboardFocus) { throw 'The owned button did not receive keyboard focus' }
+    [System.Windows.Forms.SendKeys]::SendWait(' ')
 }
 
 function Set-Value($Element, [string]$Value) {
