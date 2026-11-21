@@ -18,6 +18,10 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-markdown-find
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace"}}'
+- reload_window: null
 - click: '[data-testid="ribbon-settings"]'
 - fill:
     selector: '[data-testid="settings-search-input"]'
@@ -109,67 +113,67 @@ verification:
     requirement: Ctrl+F searches the rendered Markdown without switching modes; closing and reopening restores focus. Native checks the packaged WebView
       shortcut path.
     actions:
-    - 6
-    - 7
     - 8
     - 9
     - 10
     - 11
+    - 12
     - 13
-    - 17
-    - 18
+    - 15
+    - 19
     - 20
-    - 23
-    - 24
+    - 22
+    - 25
     - 26
     - 28
-    - 31
-    - 33
-    - 34
-    - 36
-    - 37
-    - 39
-    - 40
-    - 41
-    - 43
-    - 46
-    - 47
-    - 48
-    results:
-    - 21
-    - 22
-    - 27
-    - 29
     - 30
+    - 33
+    - 35
+    - 36
     - 38
-    - 44
+    - 39
+    - 41
+    - 42
+    - 43
+    - 45
+    - 48
+    - 49
     - 50
-    - 51
+    results:
+    - 23
+    - 24
+    - 29
+    - 31
+    - 32
+    - 40
+    - 46
+    - 52
+    - 53
     checkpoints:
-    - step: 21
+    - step: 23
       expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-search-match\"]", "equal": 1}}'
-    - step: 22
+    - step: 24
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"markdown-search-count\"]", "equals": "1/1"}}'
-    - step: 27
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"markdown-search-count\"]", "equals": "0/0"}}'
     - step: 29
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"markdown-search-count\"]", "equals": "0/0"}}'
+    - step: 31
       expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-preview-search\"]", "equal": 0}}'
-    - step: 30
+    - step: 32
       expectation: '{"eval_readonly": {"expression": "document.activeElement.dataset.testid === \"code-workspace-markdown-preview\"", "expect_truthy": true}}'
-    - step: 38
+    - step: 40
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "# platform workspace root"}}'
-    - step: 44
+    - step: 46
       expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-search-match\"]", "equal": 1}}'
-    - step: 50
+    - step: 52
       expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-preview-search\"]", "equal": 0}}'
-    - step: 51
+    - step: 53
       expectation: '{"assert_no_runtime_errors": null}'
   - id: R2
     requirement: The shared appearance dropdown applies Dark to the rendered Workspace preview.
-    actions: [13, 14]
-    results: [15]
+    actions: [15, 16]
+    results: [17]
     checkpoints:
-    - step: 15
+    - step: 17
       expectation: The rendered Workspace preview reports the dark theme.
   visual:
   - check: Review markdown-preview-found.png and markdown-split-preview-found.png for actual highlighted text and unobstructed controls.

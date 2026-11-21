@@ -31,7 +31,7 @@ steps:
 - wait: 1
 - assert_text:
     selector: '[data-testid="welcome-panel"]'
-    contains: 本地终端
+    contains: Local terminal
 - screenshot: 062-welcome-active-connections.png
 verification:
   review: reviewed

@@ -31,6 +31,10 @@ steps:
       "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
 - reload_window:
 - wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace"}}'
+- reload_window: null
 - click: '[data-testid="nav-mode-workspaces"]'
 - click: '[data-testid="code-workspace-tree-root"]'
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
@@ -129,111 +133,111 @@ verification:
     - 2
     - 4
     - 5
-    - 7
-    - 8
     - 9
+    - 10
     - 11
-    - 12
+    - 13
     - 14
-    - 15
     - 16
     - 17
-    - 20
-    - 21
+    - 18
+    - 19
+    - 22
     - 23
-    - 24
+    - 25
     - 26
-    - 29
+    - 28
     - 31
-    - 35
+    - 33
     - 37
     - 39
     - 41
     - 43
     - 45
-    - 46
+    - 47
     - 48
-    - 49
+    - 50
     - 51
-    - 52
-    - 55
+    - 53
+    - 54
+    - 57
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 10
+    - step: 12
       expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
-    - step: 13
+    - step: 15
       expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"] .cm-content"}'
-    - step: 18
+    - step: 20
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
-    - step: 19
+    - step: 21
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
-    - step: 22
+    - step: 24
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
-    - step: 25
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
     - step: 27
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 29
       expectation: '{"wait_for": "[data-testid=\"tab-overview\"][data-scope=\"workspaces\"]"}'
-    - step: 28
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-overview-card\"]", "equal": 2}}'
     - step: 30
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-overview\"]", "name": "data-scope", "equals": "all"}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-overview-card\"]", "equal": 2}}'
     - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-overview\"]", "name": "data-scope", "equals": "all"}}'
+    - step: 34
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-overview\"]", "name": "data-scope", "equals": "workspaces"}}'
-    - step: 33
+    - step: 35
       expectation: '{"assert_text": {"selector": "[data-testid=\"tab-overview\"]", "contains": "previewUnsaved"}}'
-    - step: 36
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content", "contains": "platform workspace root"}}'
     - step: 38
-      expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content", "contains": "platform workspace root"}}'
     - step: 40
-      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
-    - step: 42
       expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
-    - step: 44
+    - step: 42
       expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
-    - step: 47
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
+    - step: 46
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
+    - step: 49
       expectation: '{"assert_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
-    - step: 50
+    - step: 52
       expectation: '{"assert_not_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
-    - step: 53
+    - step: 55
       expectation: '{"wait_for": "[data-testid=\"tab-overview\"][data-scope=\"all\"]"}'
-    - step: 54
+    - step: 56
       expectation: '{"assert_text": {"selector": "[data-testid=\"tab-overview\"]", "contains": "previewUnsaved"}}'
-    - step: 57
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"]", "name": "data-dirty", "equals": "true"}}'
-    - step: 58
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"] .cm-content", "contains": "previewUnsaved"}}'
     - step: 59
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"]", "name": "data-dirty", "equals": "true"}}'
+    - step: 60
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"] .cm-content", "contains": "previewUnsaved"}}'
+    - step: 61
       expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "equal": 0}}'
     results:
     - 3
     - 6
-    - 10
-    - 13
-    - 18
-    - 19
-    - 22
-    - 25
+    - 12
+    - 15
+    - 20
+    - 21
+    - 24
     - 27
-    - 28
+    - 29
     - 30
     - 32
-    - 33
-    - 36
+    - 34
+    - 35
     - 38
     - 40
     - 42
     - 44
-    - 47
-    - 50
-    - 53
-    - 54
-    - 57
-    - 58
+    - 46
+    - 49
+    - 52
+    - 55
+    - 56
     - 59
+    - 60
+    - 61
   visual:
   - check: 工具栏顺序、大预览卡片与画布无重叠或裁切，匹配原型。
     method: manual
