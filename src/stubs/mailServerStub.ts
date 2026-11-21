@@ -515,7 +515,7 @@ export interface StubMailQaControl {
   deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean, listUnsubscribe?: string | null, invite?: string | null, readReceipt?: boolean) => number[];
   expunge: (accountId: string, folder: string, uids: number[]) => void;
   setFlags: (accountId: string, folder: string, uid: number, flags: string[]) => void;
-  observe: (accountId: string, folder: string) => { server: number[]; cache: number[] };
+  observe: (accountId: string, folder: string) => { server: number[]; cache: number[]; flagged: number[] };
   unseen: (accountId: string, folder: string) => number;
   accounts: () => string[];
   idleClients: () => number;
@@ -593,6 +593,10 @@ export function installStubMailQaControl(seed: Seed): void {
       return {
         server: [...folder.server.keys()].sort((a, b) => a - b),
         cache: [...folder.cache.keys()].sort((a, b) => a - b),
+        flagged: [...folder.server.entries()]
+          .filter(([, message]) => message.flags.includes("\\Flagged"))
+          .map(([uid]) => uid)
+          .sort((a, b) => a - b),
       };
     },
     idleClients() {

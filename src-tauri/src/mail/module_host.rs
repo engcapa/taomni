@@ -1,13 +1,20 @@
 //! Bind the session's resolved mail route and grant it only to the verified host.
 
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    net::SocketAddr,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
 use lettre::address::Envelope;
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, FolderSubscription, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE,
-    ImapFolderTree, IncomingTest, SEARCH_IMAP, SEND_SMTP, SLUG, SMTP_DELIVERY_UNKNOWN,
-    SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
+    ImapFlagUpdate, ImapFolderTree, IncomingTest, SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, SLUG,
+    SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
     imap_exchange::{ImapExchange, read_frame, write_frame},
 };
 use taomni_mail_engine::imap_sync::{
@@ -44,6 +51,10 @@ pub(super) fn syncs_imap_round(registry: &PluginRegistry) -> bool {
 
 pub(super) fn searches_imap(registry: &PluginRegistry) -> bool {
     supports(registry, SEARCH_IMAP)
+}
+
+pub(super) fn sets_imap_flags(registry: &PluginRegistry) -> bool {
+    supports(registry, SET_IMAP_FLAGS)
 }
 
 pub(super) async fn sync_imap_headers(
@@ -99,6 +110,18 @@ pub(super) async fn search_imap(
         return Err("Mail module returned another folder's search results".into());
     }
     Ok(results)
+}
+
+pub(super) async fn set_imap_flags(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    update: &ImapFlagUpdate,
+) -> Result<(), String> {
+    let updated: usize = exchange_imap(registry, account, SET_IMAP_FLAGS, update).await?;
+    if updated != update.uids.len() {
+        return Err("Mail module returned an incomplete flag update".into());
+    }
+    Ok(())
 }
 
 async fn exchange_imap<T: DeserializeOwned + Send + 'static>(
@@ -303,14 +326,37 @@ async fn invoke_result<T: DeserializeOwned, P: Serialize + Send + 'static>(
     method: &'static str,
     request: P,
 ) -> Result<Result<T, String>, String> {
+    let call = PendingMailCall {
+        registry: registry.clone(),
+        id: uuid::Uuid::new_v4().to_string(),
+        cancelled: Arc::new(AtomicBool::new(false)),
+    };
+    let id = call.id.clone();
+    let cancelled = call.cancelled.clone();
     let result = tokio::task::spawn_blocking(move || {
         let payload = serde_json::to_value(request).map_err(|error| error.to_string())?;
         registry
-            .invoke(SLUG, method, payload)
+            .invoke_cancellable(SLUG, method, payload, &id, || {
+                cancelled.load(Ordering::Acquire)
+            })
             .map_err(|error| error.to_string())
     })
     .await
     .map_err(|error| format!("Mail module request failed: {error}"))??;
     serde_json::from_value::<Result<T, String>>(result)
         .map_err(|_| "Invalid Mail module response".to_owned())
+}
+
+struct PendingMailCall {
+    registry: Arc<PluginRegistry>,
+    id: String,
+    cancelled: Arc<AtomicBool>,
+}
+
+impl Drop for PendingMailCall {
+    fn drop(&mut self) {
+        // The blocking worker can still be queued when an IMAP transfer times out.
+        self.cancelled.store(true, Ordering::Release);
+        self.registry.cancel_request(SLUG, &self.id);
+    }
 }

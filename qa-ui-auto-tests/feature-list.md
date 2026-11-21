@@ -7810,6 +7810,7 @@ controls:
 - “Server”（或 Shift+Enter）对当前文件夹执行 IMAP `UID SEARCH`（非 ASCII 用 `CHARSET UTF-8`），结果与本地结果合并，不写入缓存。
 - 启用的签名 Mail 宿主执行 IMAP 搜索，核心核对结果的账户和文件夹。TC-MODULES-059 核对真实服务器返回的主题，TC-MAIL-SEARCH-01 覆盖本地索引和服务器搜索的现有流程。
 - 快捷过滤（未读/星标/附件）同时作用于普通列表与搜索结果；跨文件夹结果显示所在文件夹。
+- TC-MODULES-059 在已启用的签名 Mail 宿主中给选中邮件加星并取消星标。TC-MAIL-KEYS-01 同时检查列表焦点快捷键。两个用例都将可见星标邮件的 UID 与服务器状态对照。
 
 ---
 
@@ -7979,6 +7980,7 @@ controls:
 - 文件夹属性按 RFC 形式保存（`\Noselect`、`\Sent`），LSUB 报告的文件夹带 `\Subscribed`（RFC 5258）；服务器没有订阅数据时视为全部已订阅。
 - 文件夹栏 “Manage folder subscriptions” 对话框调用 SUBSCRIBE/UNSUBSCRIBE；“Show only subscribed folders”（按账户保存）开启后未订阅文件夹不在树中显示，也不参与全文件夹同步（INBOX 始终保留）。
 - TC-MODULES-059 从常规 Mail 标签加载 IMAP 文件夹，检查签名宿主的写租约，并通过订阅对话框在真实 IMAP 服务器上取消订阅。
+- TC-MAIL-FOLDER-01 检查选中文件夹抓取后仍保留 LIST/LSUB 返回的订阅属性。同步只更新邮件计数和 UID 状态。
 - 会话编辑器 “Special folders” 可手动指定 Sent/Drafts/Trash/Junk/Archive，优先于 SPECIAL-USE 属性与名称匹配（中文或自定义命名）。
 - 定时的全文件夹扫描在服务器支持 CONDSTORE 时先发 `STATUS (MESSAGES UNSEEN UIDNEXT UIDVALIDITY HIGHESTMODSEQ)`，未变化的文件夹只更新计数、跳过 EXAMINE/SEARCH；手动同步始终完整对账。
 

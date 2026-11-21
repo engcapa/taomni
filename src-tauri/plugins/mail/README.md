@@ -69,6 +69,11 @@ core grants the resolved IMAP route and verifies that the returned headers
 belong to the selected account and folder. The shared search engine keeps the
 local index, POP3 search and the result order consistent across versions.
 
+Version 0.1.9 sends IMAP message flag changes through the authorized host
+connection. The desktop updates the cached flags after the host acknowledges
+the full UID set. When the caller drops an in-flight request, the core cancels
+the corresponding host operation and releases the route.
+
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.
 It publishes the module data before activating the verified package and

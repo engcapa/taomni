@@ -3105,38 +3105,9 @@ def _do_mail_server_assert_smtp_contains(ctx: NativeStepContext, args: Any) -> s
 
 @_verb("mail_server_assert_list_matches")
 def _do_mail_server_assert_list_matches(ctx: NativeStepContext, args: Any) -> str:
-    args = args if isinstance(args, dict) else {}
-    folder = str(args.get("folder") or "INBOX")
-    state = _mail_server().state
-    deadline = time.time() + float(args.get("timeout_sec", 30))
-    observed: Any = None
-    while time.time() < deadline:
-        with state.lock:
-            messages = state.folders[folder].messages
-            server = len(messages)
-            server_unread = sum(1 for m in messages.values() if "\\Seen" not in m.flags)
-        observed = ctx.session.execute(
-            "const el = document.querySelector('[data-testid=\"mail-message-count\"]');"
-            "return {shown: el ? Number(el.getAttribute('data-count')) : -1,"
-            " hasMore: el ? el.getAttribute('data-has-more') : null,"
-            " unreadRows: document.querySelectorAll('[data-testid=\"mail-message-row\"][data-unread=\"true\"]').length};"
-        )
-        if (
-            isinstance(observed, dict)
-            and observed.get("shown") == server
-            and observed.get("hasMore") == "false"
-            and (not args.get("unread") or observed.get("unreadRows") == server_unread)
-        ):
-            return f"list matches server: {server} messages, {server_unread} unread"
-        if isinstance(observed, dict) and observed.get("hasMore") == "true":
-            # Like a user scrolling to the end: load the next cached page.
-            ctx.session.execute(
-                "document.querySelector('[data-testid=\"mail-load-more\"]:not([disabled])')?.click(); return true;"
-            )
-        time.sleep(0.5)
-    raise StepError(
-        f"mail_server_assert_list_matches: server={server} unread={server_unread} ui={observed!r}"
-    )
+    from .mail_list_observation import assert_list_matches
+
+    return assert_list_matches(ctx.session, _mail_server().state, args)
 
 
 # -- MFA authenticator fixtures (docs-feature/mfa-authenticator-design.md) ----

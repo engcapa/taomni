@@ -955,7 +955,7 @@
           "description": "Windows native signed VNC case only. Check exact installed host and helper bytes, process ownership and teardown while the original core stays running."
         },
         "assert_signed_mail_host": {
-          "enum": ["idle", "folder-tree", "running", "imap-search", "imap-delivery", "pop3-delivery", "disabled"],
+          "enum": ["idle", "folder-tree", "running", "imap-search", "imap-flags", "imap-delivery", "pop3-delivery", "disabled"],
           "description": "Native signed Mail case only. Match installed host bytes to the signed input and observe the module writer lease before, during and after using the Mail host."
         },
         "assert_signed_rdp_latency": {
@@ -1865,6 +1865,9 @@
                   "minLength": 1
                 },
                 "unread": {
+                  "type": "boolean"
+                },
+                "flagged": {
                   "type": "boolean"
                 },
                 "timeout_sec": {

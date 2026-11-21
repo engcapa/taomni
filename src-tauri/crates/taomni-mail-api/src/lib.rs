@@ -16,9 +16,19 @@ pub const IMAP_FOLDER_TREE: &str = "mail/imap-folder-tree";
 pub const SYNC_IMAP_HEADERS: &str = "mail/sync-imap-headers";
 pub const SYNC_IMAP_ROUND: &str = "mail/sync-imap-round";
 pub const SEARCH_IMAP: &str = "mail/search-imap";
+pub const SET_IMAP_FLAGS: &str = "mail/set-imap-flags";
 pub const SEND_SMTP: &str = "mail/send-smtp";
 pub const HOST_REQUEST_TIMEOUT: Duration = Duration::from_secs(70);
 pub const SMTP_DELIVERY_UNKNOWN: &str = "SMTP delivery status unknown";
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ImapFlagUpdate {
+    pub folder: String,
+    pub uids: Vec<u32>,
+    pub add: Vec<String>,
+    pub remove: Vec<String>,
+}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MailConnectionSecurity {

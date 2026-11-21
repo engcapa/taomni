@@ -2,6 +2,9 @@
 
 ## 2026-11-21 当前进展
 
+- `662d66d07` 的 Linux Native 为 36/37，Git Clone 和完整崩溃回归通过。TC-MODULES-059 的失败页面显示 Archive 在首次取消订阅前已丢失订阅标记。修复将 LIST/LSUB 文件夹属性与 EXAMINE/STATUS 同步数据分别写入，TC-MAIL-FOLDER-01 增加选中 Archive 抓取新邮件后的订阅断言。 [失败分片](https://github.com/engcapa/taomni/actions/runs/44904055836)
+- `662d66d07` 的 Linux、Windows 和 macOS 26 Browser 各 37/37。六个 Browser 分片在 Native 构建期间逐片下载，TC-MODULES-060 三端均已通过。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44904055836)
+- Mail 0.1.9 将 IMAP 星标、标签及已读标记更新交给签名宿主。客户端在收到确认后更新缓存。核心在异步请求中止时取消待执行或执行中的宿主调用。TC-MODULES-059 检查真实服务器的加星和取消星标，TC-MAIL-KEYS-01 比对 Browser 和 Native 的列表及星标 UID。
 - Mail 0.1.8 将当前文件夹的 IMAP 服务器搜索交给签名宿主。核心授权连接并核对返回的账户和文件夹。本地索引、POP3 搜索和旧版接入继续复用同一套查询逻辑。TC-MAIL-SEARCH-01 增加主题字段覆盖，TC-MODULES-059 用实际 IMAP 服务器核对返回主题及签名宿主的写租约。
 - 合并提交 `406431d6e` 的三端 Browser 各 33/34，TC-MODULES-060 停在首页不可见的会话标签选择器。Native 三端构建停在 Git Clone 的旧 Vault 字段。更新用例通过首页工具栏进入 Sessions，再核对原邮件标签。`662d66d07` 包含已有 Vault 修复与新入口，运行期间从 `live-shards/` 逐个采集工件。 [首次失败](https://github.com/engcapa/taomni/actions/runs/44899423260) · [三端复跑](https://github.com/engcapa/taomni/actions/runs/44904055836)
 - `406431d6e` 合入主线 #849–#851。保留 Git Clone 与模块用例注册，从合并后的功能清单重建 testid 目录。合并后的 Rust 检查发现新 Git Clone 调用仍引用原 `AppState.vault`。已接到 `CoreState.vault`，复查通过。TypeScript、7 项 Workspace 和标签单测、用例审计及重构边界均通过。 [合并提交](https://github.com/engcapa/taomni/commit/406431d6e) · [首轮验证](https://github.com/engcapa/taomni/actions/runs/44899423260)

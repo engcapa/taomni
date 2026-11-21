@@ -1,4 +1,5 @@
 use super::*;
+use taomni_mail_api::ImapFlagUpdate;
 
 #[tauri::command]
 pub async fn mail_mark_read(
@@ -96,36 +97,42 @@ pub async fn mail_set_flags(
 
     let account_id = config.session_id.clone();
     let account = resolve_config(&state, config)?;
-    let folder_for_task = folder.clone();
-    let uids_for_task = target_uids.clone();
-    let add_for_task = add.clone();
-    let remove_for_task = remove.clone();
-    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            ImapSessionOpts::default(),
-            |imap| {
-                imap.set_flags(
-                    &folder_for_task,
-                    &uids_for_task,
-                    &add_for_task,
-                    &remove_for_task,
-                )
-            },
-        )
-    })
-    .await
-    .map_err(|e| format!("mail set flags task failed: {e}"))??;
+    let update = ImapFlagUpdate {
+        folder: folder.clone(),
+        uids: target_uids,
+        add,
+        remove,
+    };
+    if module_host::sets_imap_flags(&state.plugins) {
+        module_host::set_imap_flags(state.plugins.clone(), &account, &update).await?;
+    } else {
+        let update = update.clone();
+        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::spawn_blocking(move || {
+            with_imap_session(
+                &pool,
+                &account,
+                &handle,
+                ImapSessionOpts::default(),
+                |imap| imap.set_flags(&update.folder, &update.uids, &update.add, &update.remove),
+            )
+        })
+        .await
+        .map_err(|e| format!("mail set flags task failed: {e}"))??;
+    }
 
-    let updated = target_uids.len();
-    let cached_folder = folder.clone();
+    let updated = update.uids.len();
     with_mail_db_async(&state, &account_id, move |db, account_id| {
         let tx = db.unchecked_transaction()?;
-        update_cached_flags(&tx, account_id, &cached_folder, &target_uids, &add, &remove)?;
+        update_cached_flags(
+            &tx,
+            account_id,
+            &update.folder,
+            &update.uids,
+            &update.add,
+            &update.remove,
+        )?;
         tx.commit()
     })
     .await?;

@@ -2,7 +2,7 @@
 
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
-    MailIncomingProtocol,
+    ImapFlagUpdate, MailIncomingProtocol,
     imap_exchange::{ImapExchange, read_frame, write_frame},
 };
 use taomni_mail_engine::imap_sync::{FolderRoundRequest, HeaderStepRequest};
@@ -58,6 +58,24 @@ pub(super) fn search(
         |session, query: ImapSearchRequest| {
             validate_folder(&query.account_id, &query.folder)?;
             session.search_imap(&query)
+        },
+    )
+}
+
+pub(super) fn set_flags(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: ImapExchange,
+) -> Result<Result<(), String>, RpcError> {
+    transfer(
+        runtime,
+        operation,
+        request,
+        |session, update: ImapFlagUpdate| {
+            if update.folder.trim().is_empty() || update.uids.contains(&0) {
+                return Err("IMAP flag update requires a folder and valid UIDs".into());
+            }
+            session.set_flags(&update)
         },
     )
 }

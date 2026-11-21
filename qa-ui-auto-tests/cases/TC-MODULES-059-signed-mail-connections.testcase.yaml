@@ -2,11 +2,11 @@ id: TC-MODULES-059
 title: Signed Mail manages IMAP folders and sends from IMAP and POP3 accounts
 description: >-
   Install and enable the matching signed Mail package. Use the regular Mail
-  tab to populate the IMAP folder tree, unsubscribe Archive, search the server
-  and send messages from IMAP and POP3 accounts. Check the installed renderer,
+  tab to populate the IMAP folder tree, unsubscribe Archive, search the server,
+  update message flags, and send messages from IMAP and POP3 accounts. Check the installed renderer,
   connection tests, SMTP delivery, Sent copies, and the signed host's data
   lease through disable.
-covers: [F-Modules-1, F-MAIL-3, F-MAIL-6, F-MAIL-7, F-MAIL-11, F-MAIL-17]
+covers: [F-Modules-1, F-MAIL-3, F-MAIL-6, F-MAIL-7, F-MAIL-11, F-MAIL-12, F-MAIL-17]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
 fixtures: [reset_db, mail_server, module_signed_mail_archive]
@@ -56,6 +56,15 @@ steps:
 - assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-message-row"]', contains: 'Signed full-account header 0001'}
 - assert_signed_mail_host: imap-search
 - fill: {selector: '[data-testid="mail-search-input"]', value: ''}
+- wait_for: {selector: '[data-testid="mail-search-server"]', state: detached}
+- click: '[data-testid="mail-message-row"][data-subject="Signed full-account header 0001"][data-flagged="false"]'
+- press: {selector: '[data-testid="mail-message-row"][aria-pressed="true"]', key: s}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Signed full-account header 0001"][data-flagged="true"]'
+- mail_server_assert_list_matches: {flagged: true, timeout_sec: 20}
+- press: {selector: '[data-testid="mail-message-row"][aria-pressed="true"]', key: s}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Signed full-account header 0001"][data-flagged="false"]'
+- mail_server_assert_list_matches: {flagged: true, timeout_sec: 20}
+- assert_signed_mail_host: imap-flags
 - click: '[data-testid="mail-subscriptions-open"]'
 - wait_for: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="false"]'
 - click: '[role="dialog"][aria-label="Folder subscriptions"] [aria-label="Close dialog"]'
@@ -101,7 +110,7 @@ verification:
   requirements:
   - id: R1
     requirement: Opening the Mail tab starts the signed host, lists the actual IMAP folders and changes the server subscription.
-    actions: [6, 7, 8, 10, 15, 16, 28, 30, 34, 45]
+    actions: [6, 7, 8, 10, 15, 16, 28, 30, 34, 54]
     checkpoints:
     - {step: 9, expectation: The module installer accepts the verified artifact.}
     - {step: 12, expectation: The signed module is installed and the host has no writer lease yet.}
@@ -112,37 +121,37 @@ verification:
     - {step: 31, expectation: The updated IMAP folder tree reports Archive as unsubscribed.}
     - {step: 35, expectation: Full synchronization reports its completed header counts.}
     - {step: 36, expectation: Synchronization through the signed host added the newly delivered header.}
-    - {step: 46, expectation: The refreshed server tree preserves the changed subscription.}
-    results: [9, 12, 17, 19, 20, 29, 31, 35, 36, 46]
+    - {step: 55, expectation: The refreshed server tree preserves the changed subscription.}
+    results: [9, 12, 17, 19, 20, 29, 31, 35, 36, 55]
   - id: R2
     requirement: The normal connection controls test IMAP, POP3 and SMTP using the installed Mail host.
-    actions: [47, 48, 61, 62, 65]
+    actions: [56, 57, 70, 71, 74]
     checkpoints:
-    - {step: 49, expectation: The hosted app reports working IMAP and SMTP connections.}
-    - {step: 50, expectation: The signed Mail host still holds its data lease.}
-    - {step: 66, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
-    results: [49, 50, 66]
+    - {step: 58, expectation: The hosted app reports working IMAP and SMTP connections.}
+    - {step: 59, expectation: The signed Mail host still holds its data lease.}
+    - {step: 75, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
+    results: [58, 59, 75]
   - id: R3
     requirement: The signature-verified package delivers from both account types and preserves the Sent-copy behavior.
-    actions: [51, 52, 53, 54, 55, 56, 67, 68, 69, 70, 71, 72]
+    actions: [60, 61, 62, 63, 64, 65, 76, 77, 78, 79, 80, 81]
     checkpoints:
-    - {step: 58, expectation: The SMTP server received the message sent from the IMAP account.}
-    - {step: 59, expectation: The IMAP Sent copy was stored.}
-    - {step: 60, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
-    - {step: 74, expectation: The SMTP server received the message sent from the POP3 account.}
-    - {step: 75, expectation: The POP3 copy was stored in local Sent.}
-    - {step: 76, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
-    results: [58, 59, 60, 74, 75, 76]
+    - {step: 67, expectation: The SMTP server received the message sent from the IMAP account.}
+    - {step: 68, expectation: The IMAP Sent copy was stored.}
+    - {step: 69, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
+    - {step: 83, expectation: The SMTP server received the message sent from the POP3 account.}
+    - {step: 84, expectation: The POP3 copy was stored in local Sent.}
+    - {step: 85, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
+    results: [67, 68, 69, 83, 84, 85]
   - id: R4
     requirement: Disabling the module releases its data lease without restarting the desktop.
-    actions: [77, 78, 79]
+    actions: [86, 87, 88]
     checkpoints:
-    - {step: 80, expectation: The disabled package can be re-enabled.}
-    - {step: 81, expectation: The verified module is still installed and the host released its writer lease.}
-    - {step: 82, expectation: Disabling unmounts both Mail account panes.}
-    - {step: 83, expectation: Both tabs remain open for reactivation.}
-    - {step: 84, expectation: The remaining application runs without uncaught errors.}
-    results: [80, 81, 82, 83, 84]
+    - {step: 89, expectation: The disabled package can be re-enabled.}
+    - {step: 90, expectation: The verified module is still installed and the host released its writer lease.}
+    - {step: 91, expectation: Disabling unmounts both Mail account panes.}
+    - {step: 92, expectation: Both tabs remain open for reactivation.}
+    - {step: 93, expectation: The remaining application runs without uncaught errors.}
+    results: [89, 90, 91, 92, 93]
   - id: R5
     requirement: The signed Mail host catches up the selected inbox after messages arrive while another folder is open.
     actions: [21, 23, 24]
@@ -161,6 +170,16 @@ verification:
     - {step: 42, expectation: The result row shows the newly received subject.}
     - {step: 43, expectation: The verified Mail package and writer lease remain active.}
     results: [40, 41, 42, 43]
+  - id: R7
+    requirement: Toggling the selected message star updates the IMAP flag and the visible message list.
+    actions: [46, 47, 50]
+    checkpoints:
+    - {step: 48, expectation: The selected message shows a star.}
+    - {step: 49, expectation: Starred UI rows match the IMAP server's flagged UIDs.}
+    - {step: 51, expectation: The selected message no longer shows a star.}
+    - {step: 52, expectation: Starred UI rows still match the server after removing the flag.}
+    - {step: 53, expectation: The installed signed host and its writer lease remain active.}
+    results: [48, 49, 51, 52, 53]
   visual:
   - check: The Mail pane shows the connection results for both accounts.
     method: automated

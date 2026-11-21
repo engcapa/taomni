@@ -11,6 +11,7 @@ use crate::cache::MailCacheSettings;
 use crate::imap_auth::{MailAuthMode, MailProvider, authenticate};
 use crate::imap_folders::{imap_list_folders, imap_set_subscription};
 use crate::imap_messages::Mailbox;
+use crate::imap_mutations::imap_set_flags;
 use crate::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest, StepParams,
     imap_has_capability, imap_sync_folder_step, sync_folder_round,
@@ -18,6 +19,7 @@ use crate::imap_sync::{
 use crate::search::{ImapSearchRequest, search_imap_messages};
 use crate::tls::{MailConnectionSecurity, certificate_error_hint, tls_connector};
 use crate::{MailFolder, MailMessageHeader};
+use taomni_mail_api::ImapFlagUpdate;
 
 pub struct ImapConnection<'a> {
     pub server_name: &'a str,
@@ -82,6 +84,19 @@ impl ImapSession {
         match self {
             Self::Plain(session) => search_imap_messages(session, request),
             Self::Tls(session) => search_imap_messages(session, request),
+        }
+    }
+
+    pub fn set_flags(&mut self, update: &ImapFlagUpdate) -> Result<usize, String> {
+        let ImapFlagUpdate {
+            folder,
+            uids,
+            add,
+            remove,
+        } = update;
+        match self {
+            Self::Plain(session) => imap_set_flags(session, folder, uids, add, remove),
+            Self::Tls(session) => imap_set_flags(session, folder, uids, add, remove),
         }
     }
 }
