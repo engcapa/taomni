@@ -34,6 +34,13 @@ blocks a second operation, which can retry after the first finishes. The
 reopened host reads the edited and newly created drafts.
 Linux, Windows and macOS run this check.
 
+The Mail toolbar's connection test uses the enabled 0.1.1 host for IMAP
+authentication and folder discovery or POP3 authentication. The core grants
+a route to the selected destination and resolves the account credential for
+that request. The host checks TLS against the original hostname, closes the
+socket on cancellation and releases its writer lease when disabled. The
+existing desktop path still supports profiles with no enabled Mail host.
+
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.
 It publishes the module data before activating the verified package and

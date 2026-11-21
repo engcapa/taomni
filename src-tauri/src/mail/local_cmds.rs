@@ -43,11 +43,16 @@ pub(super) async fn test_connection(
     config: MailAccountConfig,
 ) -> Result<MailTestConnectionResult, String> {
     let account = resolve_config(state, config)?;
+    let hosted = super::module_host::checks_incoming(&state.plugins);
+    if hosted {
+        super::module_host::check_incoming(state.plugins.clone(), &account).await?;
+    }
     let handle = tokio::runtime::Handle::current();
     let account_id = account.config.session_id.clone();
     let smtp_ok = tokio::task::spawn_blocking(move || {
-        let client = Pop3Client::connect(&account, &handle)?;
-        client.quit()?;
+        if !hosted {
+            Pop3Client::connect(&account, &handle)?.quit()?;
+        }
         Ok::<bool, String>(test_smtp(&account, &handle).is_ok())
     })
     .await

@@ -4,39 +4,9 @@ use std::io::{Read, Write};
 use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
-use serde::{Deserialize, Serialize};
+pub use taomni_mail_api::{MailAuthMode, MailProvider};
 
 const IMAP_LOGIN_RETRY_DELAYS_MS: [u64; 2] = [500, 1500];
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MailProvider {
-    #[serde(rename = "custom", alias = "Custom")]
-    Custom,
-    #[serde(rename = "gmail", alias = "Gmail")]
-    Gmail,
-    #[serde(rename = "outlook", alias = "Outlook", alias = "outlook.com")]
-    Outlook,
-}
-
-impl Default for MailProvider {
-    fn default() -> Self {
-        Self::Custom
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MailAuthMode {
-    #[serde(rename = "password", alias = "Password")]
-    Password,
-    #[serde(rename = "oauth2", alias = "OAuth2", alias = "oauth")]
-    OAuth2,
-}
-
-impl Default for MailAuthMode {
-    fn default() -> Self {
-        Self::Password
-    }
-}
 
 struct Xoauth2Authenticator<'a> {
     username: &'a str,

@@ -10941,6 +10941,7 @@ dependencies = [
  "subtle",
  "taomni-capture",
  "taomni-file-uri",
+ "taomni-mail-api",
  "taomni-mail-engine",
  "taomni-mfa-engine",
  "taomni-plugin-api",
@@ -11097,6 +11098,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-mail-api"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "taomni-plugin-stream",
+ "zeroize",
+]
+
+[[package]]
 name = "taomni-mail-engine"
 version = "0.1.0"
 dependencies = [
@@ -11116,6 +11127,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.0",
+ "taomni-mail-api",
  "taomni-sqlite-snapshot",
  "tempfile",
  "tokio-util 0.7.19",
@@ -11153,17 +11165,19 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-mail"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "libc",
  "rusqlite",
  "serde",
  "serde_json",
+ "taomni-mail-api",
  "taomni-mail-engine",
  "taomni-plugin-api",
  "taomni-plugin-sdk",
  "taomni-sqlite-snapshot",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]

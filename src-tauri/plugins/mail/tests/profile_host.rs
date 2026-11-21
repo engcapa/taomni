@@ -109,6 +109,7 @@ impl MailHost {
             env!("CARGO_PKG_VERSION"),
             "mail-profile-test-token",
             [
+                taomni_mail_api::CHECK_INCOMING,
                 "mail_list_cached_folders",
                 "mail_list_cached_messages",
                 "mail_get_cached_body",

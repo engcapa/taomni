@@ -7594,6 +7594,9 @@ controls:
   - id: sync-button
     selector: '[data-testid="mail-sync-button"]'
     kind: interactive
+  - id: test-connection
+    selector: '[data-testid="mail-test-connection"]'
+    kind: interactive
   - id: body-warming-progress
     selector: '[data-testid="mail-body-warming-progress"]'
     kind: display
@@ -7604,6 +7607,7 @@ controls:
 -->
 
 - 手工刷新、打开自动刷新和定时刷新默认只同步 headers；headers 写入缓存并重新加载列表后界面即可继续操作。
+- 邮件工具栏的连接测试在已启用的 Mail 0.1.1 宿主中完成 IMAP 登录和文件夹检查或 POP3 登录。TC-MODULES-059 验证签名宿主与真实协议，TC-MAIL-POP3-01 覆盖连接结果和后续同步。
 - 最近正文缓存按 `bodyRecentLimit` 遍历已缓存 headers，逐封调用 `mail_prefetch_message_body` 写入原生磁盘缓存，并用独立进度显示；预取不向前端传输或渲染正文，手动打开邮件使用独立于同步的 IMAP 连接。
 - 邮件正文读取按 `folder:uid` 缓存在前端内存中；点击已缓存正文优先使用内存/SQLite，自动标记已读不再等待正文加载完成。
 - 整个 IMAP 文件夹标记已读先查询服务器 UNSEEN，涵盖未下载历史；每批最多 250 个 UID，批间释放账号连接锁，网络断连只重试幂等标记。

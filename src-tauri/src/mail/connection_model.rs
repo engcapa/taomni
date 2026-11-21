@@ -2,19 +2,9 @@ use super::account_model::MailAccountConfig;
 use crate::terminal::network::NetworkSettings;
 use serde::Deserialize;
 use serde::Serialize;
-pub use taomni_mail_engine::{
-    imap_auth::{MailAuthMode, MailProvider},
-    tls::MailConnectionSecurity,
+pub use taomni_mail_api::{
+    MailAuthMode, MailConnectionSecurity, MailIncomingProtocol, MailProvider,
 };
-
-/// Incoming protocol of an account (TASK-21).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum MailIncomingProtocol {
-    #[default]
-    Imap,
-    Pop3,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

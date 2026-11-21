@@ -1,12 +1,13 @@
 [package]
 name = "taomni-plugin-mail"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.94"
 publish = false
 description = "Official Mail host"
 
 [dependencies]
+taomni-mail-api = { path = "../../crates/taomni-mail-api" }
 taomni-mail-engine = { path = "../../crates/taomni-mail-engine" }
 taomni-plugin-api = { path = "../../crates/taomni-plugin-api" }
 taomni-plugin-sdk = { path = "../../crates/taomni-plugin-sdk" }
@@ -14,6 +15,7 @@ rusqlite = { version = "0.40", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt", "time"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

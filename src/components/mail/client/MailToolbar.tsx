@@ -136,6 +136,7 @@ export function MailToolbar(viewProps: MailToolbarProps) {
           className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5"
           onClick={handleTest}
           disabled={testing}
+          data-testid="mail-test-connection"
           title="Test IMAP and SMTP"
         >
           {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}

@@ -1,4 +1,4 @@
-"""Read-only native proof of the official hello host's actual writer lease.
+"""Read-only native proof of a module host's writer lease.
 
 The fixed path belongs to the verified isolated profile. Briefly attempting an
 exclusive OS lock neither creates files nor changes registry/application data.
@@ -34,15 +34,15 @@ def _exclusive(descriptor: int) -> bool:
         raise
 
 
-def writer_lease(plugins: Path, *, enabled: bool) -> dict:
+def writer_lease(plugins: Path, *, enabled: bool, slug: str = "hello-plugin") -> dict:
     """No YAML path, PID text or renderer claim can satisfy this observation."""
     ordinary(plugins, directory=True)
-    path = plugins.parent / ".profile-locks/plugins/hello-plugin.lock"
+    path = plugins.parent / ".profile-locks/plugins" / f"{slug}.lock"
     try:
         metadata = path.lstat()
     except FileNotFoundError:
         if enabled:
-            raise StepError("Enabled hello host has no native writer lease file") from None
+            raise StepError(f"Running {slug} host has no native writer lease file") from None
         return {"exists": False, "held": False}
     ordinary(path)
     if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:

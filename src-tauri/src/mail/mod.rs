@@ -26,6 +26,7 @@ mod cache_access;
 pub use cache_access::*;
 
 mod message_commands;
+mod module_host;
 
 pub use message_commands::*;
 

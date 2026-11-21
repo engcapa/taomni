@@ -184,8 +184,10 @@ pub async fn plugin_invoke(
     request_id: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Value, taomni_plugin_api::RpcError> {
-    if slug == crate::vnc::MODULE_SLUG && command.starts_with("vnc/") {
-        // VNC network routes and credentials are resolved by the desktop commands.
+    if (slug == crate::vnc::MODULE_SLUG && command.starts_with("vnc/"))
+        || (slug == taomni_mail_api::SLUG && command == taomni_mail_api::CHECK_INCOMING)
+    {
+        // The desktop commands resolve these routes and credentials.
         return Err(taomni_plugin_api::RpcError::from_code(
             taomni_plugin_api::ErrorCode::MethodNotFound,
         ));

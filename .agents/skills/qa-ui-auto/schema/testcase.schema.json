@@ -102,6 +102,7 @@
           "module_signed_mfa_archive",
           "module_signed_vnc_archive",
           "module_signed_rdp_archive",
+          "module_signed_mail_archive",
           "module_execution",
           "module_backup_data",
           "vnc_required",
@@ -950,6 +951,10 @@
         "assert_vnc_key_helper": {
           "enum": ["running", "disabled"],
           "description": "Windows native signed VNC case only. Check exact installed host and helper bytes, process ownership and teardown while the original core stays running."
+        },
+        "assert_signed_mail_host": {
+          "enum": ["idle", "running", "disabled"],
+          "description": "Native signed Mail case only. Match installed host bytes to the signed input and observe the module writer lease before, during and after using the Mail host."
         },
         "module_upgrade_probe": {
           "type": "object", "additionalProperties": false, "required": ["phase"],

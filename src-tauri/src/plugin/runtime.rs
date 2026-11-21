@@ -160,7 +160,11 @@ impl PluginRegistry {
         let owner = taomni_profile_locks::PluginSlug::parse(verified.slug.clone())
             .map_err(|error| PluginError::HostRequest(error.to_string()))?;
         let mut supervisor = host::HostSupervisorConfig::default();
-        if verified.slug == crate::vnc::MODULE_SLUG {
+        if verified.slug == taomni_mail_api::SLUG
+            && verified.commands.contains(taomni_mail_api::CHECK_INCOMING)
+        {
+            supervisor.request_timeout = taomni_mail_api::HOST_REQUEST_TIMEOUT;
+        } else if verified.slug == crate::vnc::MODULE_SLUG {
             // Allow for the RFB security and authentication waits in the host.
             supervisor.request_timeout = Duration::from_secs(65);
         }

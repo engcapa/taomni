@@ -2,23 +2,7 @@
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use native_tls::{Certificate, TlsConnector};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MailConnectionSecurity {
-    #[serde(rename = "tls", alias = "TLS", alias = "Tls")]
-    Tls,
-    #[serde(rename = "starttls", alias = "STARTTLS", alias = "StartTls")]
-    Starttls,
-    #[serde(rename = "none", alias = "None", alias = "NONE")]
-    None,
-}
-
-impl Default for MailConnectionSecurity {
-    fn default() -> Self {
-        Self::Tls
-    }
-}
+pub use taomni_mail_api::MailConnectionSecurity;
 
 fn trusted_der(trusted: Option<&str>) -> Result<Option<Vec<u8>>, String> {
     let Some(value) = trusted.map(str::trim).filter(|value| !value.is_empty()) else {

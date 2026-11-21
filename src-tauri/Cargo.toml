@@ -22,6 +22,7 @@ members = [
     "crates/taomni-rdp-client-engine",
     "crates/taomni-rdp-probe",
     "crates/taomni-file-uri",
+    "crates/taomni-mail-api",
     "crates/taomni-mail-engine",
     "crates/taomni-mfa-engine",
     "crates/taomni-plugin-api",
@@ -169,6 +170,7 @@ imap = "2.4.1"
 # BODYSTRUCTURE / section types; same version `imap` already uses.
 imap-proto = "=0.10.2"
 lettre = "0.11.22"
+taomni-mail-api = { path = "crates/taomni-mail-api" }
 taomni-mail-engine = { path = "crates/taomni-mail-engine" }
 native-tls = "0.2"
 tokio-native-tls = "0.3"

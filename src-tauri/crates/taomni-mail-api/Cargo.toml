@@ -1,0 +1,15 @@
+[package]
+name = "taomni-mail-api"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "Mail module connection contract"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+taomni-plugin-stream = { path = "../taomni-plugin-stream" }
+zeroize = { version = "1", features = ["serde"] }
+
+[dev-dependencies]
+serde_json = "1"

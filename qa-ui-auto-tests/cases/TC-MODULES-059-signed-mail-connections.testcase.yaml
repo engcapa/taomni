@@ -1,0 +1,74 @@
+id: TC-MODULES-059
+title: The signed Mail module tests incoming mail connections
+description: >-
+  Install and enable the matching signed Mail package. Use the regular Mail
+  toolbar against the runner's IMAP, POP3 and SMTP servers. Check the host's
+  module data lease before the first test, after login and after disable.
+covers: [F-Modules-1, F-MAIL-3, F-MAIL-17]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, mail_server, module_signed_mail_archive]
+timeout_sec: 230
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches: {timeout_sec: 40}
+- click: '[data-testid="mail-test-connection"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: 'IMAP ok, SMTP ok', timeout_sec: 45}
+- assert_signed_mail_host: running
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_pop3_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 2}
+- mail_server_assert_list_matches: {timeout_sec: 40}
+- click: '[data-testid="mail-test-connection"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: 'POP3 ok, SMTP ok', timeout_sec: 45}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-mail"]'
+- wait_for: '[data-testid="module-action-enable-mail"]'
+- assert_signed_mail_host: disabled
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The normal connection controls test IMAP and POP3 using the installed Mail host.
+    actions: [6, 7, 8, 10, 15, 16, 19, 22, 23, 26]
+    checkpoints:
+    - {step: 9, expectation: The module installer accepts the verified artifact.}
+    - {step: 12, expectation: The signed module bytes are installed and the host has no writer lease yet.}
+    - {step: 20, expectation: The hosted app reports working IMAP and SMTP connections.}
+    - {step: 21, expectation: The signed Mail host now holds its data lease.}
+    - {step: 27, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
+    results: [9, 12, 20, 21, 27]
+  - id: R2
+    requirement: Disabling the module releases its data lease without restarting the desktop.
+    actions: [28, 29, 30]
+    checkpoints:
+    - {step: 31, expectation: The disabled package can be re-enabled.}
+    - {step: 32, expectation: The verified module is still installed and the host released its writer lease.}
+    - {step: 33, expectation: The same renderer is still running without uncaught errors.}
+    results: [31, 32, 33]
+  visual:
+  - check: The Mail pane shows the connection results for both accounts.
+    method: automated
+    reason: The case checks the visible status in each active Mail tab.
+  native:
+  - check: The production verifier, real Mail connection, host and data lease are observable.
+    method: automated
+    reason: Native execution uses the matching signed artifact and real protocol listeners in an isolated profile.

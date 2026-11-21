@@ -9,25 +9,34 @@ pub async fn mail_test_connection(
         return local_cmds::test_connection(&state, config).await;
     }
     let account = resolve_config(&state, config)?;
+    let hosted_folder_count = if module_host::checks_incoming(&state.plugins) {
+        Some(module_host::check_incoming(state.plugins.clone(), &account).await?)
+    } else {
+        None
+    };
     let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let folders = with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            ImapSessionOpts {
-                force_fresh: true,
-                retry_on_error: false,
-                ..ImapSessionOpts::default()
-            },
-            |imap| imap.list_folders(&account.config.session_id),
-        )?;
+        let folder_count = match hosted_folder_count {
+            Some(count) => count,
+            None => with_imap_session(
+                &pool,
+                &account,
+                &handle,
+                ImapSessionOpts {
+                    force_fresh: true,
+                    retry_on_error: false,
+                    ..ImapSessionOpts::default()
+                },
+                |imap| imap.list_folders(&account.config.session_id),
+            )?
+            .len(),
+        };
         test_smtp(&account, &handle)?;
         Ok(MailTestConnectionResult {
             imap_ok: true,
             smtp_ok: true,
-            folder_count: folders.len(),
+            folder_count,
         })
     })
     .await

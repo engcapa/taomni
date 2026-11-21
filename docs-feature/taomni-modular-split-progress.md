@@ -2,6 +2,10 @@
 
 ## 2026-11-21 当前进展
 
+- `49a3540bf` 合入 `main` 的 `6b8e350cb`（#846）。独立 Explorer 工作区保留主线的快速创建和递归 glob 搜索，也保留可编辑类型对话框。TC-EXPLORER-010/011 继续检查完整类型列表、实际编辑、保存与重开。Live 表格、HTML 预览用例迁到新入口。TypeScript 和 409 项前端单测通过。 [合并提交](https://github.com/engcapa/taomni/commit/49a3540bf)
+- RDP 旧版备份在启动时把证书记录提交给已拥有证书数据的模块。核心备份副本去掉旧回退表，单独还原核心时保留模块证书。还原复用写锁和原子 journal，既有旧库与退回单体版本所需数据保留。TC-MODULES-058 覆盖启动还原和未安装模块的保留数据。`1da944af4` 的三端 Browser 各 36/36，macOS 26 已通过签名 RDP 全流程 056。 [逐片复验](https://github.com/engcapa/taomni/actions/runs/44882903220)
+- Windows MSI 截图确认 Tools 列表与悬浮窗入口同名。限定 Tools 入口后，Vault 创建和 MFA 账号添加完成，第一次剪贴板读取超时。改用原生点击并等待实际剪贴板内容，沿用原 MSI 复验。候选源为 `bdb828ccf`，runner 为 `win25-vs2026` `20261116.315.1`。 [截图](https://github.com/engcapa/taomni/actions/runs/44882128241) · [账号添加](https://github.com/engcapa/taomni/actions/runs/44883995075) · [HOTP 复验](https://github.com/engcapa/taomni/actions/runs/44885819763)
+- Mail 0.1.1 接管工具栏连接测试中的 IMAP 和 POP3 登录。核心为当次请求解析凭据并绑定目标路由，Mail 宿主以原服务器名执行 TLS 校验，可在取消时关闭套接字。旧配置字段和 SMTP 流程延续现有行为。TC-MODULES-059 核对签名工件、实际协议及启禁后的写锁，TC-MAIL-POP3-01 核对连接状态。Mail 收发、同步、动态前端和核心依赖裁剪继续推进。
 - GitHub 的四个发布目标在 `b97d58d22` 通过默认核心依赖清单检查。各 Cargo 树保留 RDP/VNC 共享接口，排除两个客户端引擎、各自宿主和 Windows VNC 按键辅助程序。生产 Vite 清单也排除了 RDP/VNC 查看器。证据位于 `qa-ui-auto-report/github/44879692505/live-contracts/modular-core-build-inventory/`。G9 还需核对其他业务模块的裁剪及最终安装包。 [四目标清单](https://github.com/engcapa/taomni/actions/runs/44879692505)
 - RDP 0.1.2 在签名安装阶段只读导出旧 `taomni.db` 的证书表，并原子发布到 `plugins/rdp-client/data/data.db`。原会话留在核心。模块保存后续显式确认，备份通过宿主的 SQLite 快照。数据文件记录来源指纹，恢复可补写中断的 journal。TC-MODULES-056 同时核对旧表、迁移回执与新确认的真实证书。
 - Windows 的 `3209d2dd9` 签名 RDP TC-MODULES-056 已通过，验证了 0.1.0 的真实输入、停用释放和重复连接。Windows MSI 强退专项另一次复跑仍在创建 Vault 时超时，回执显示 MFA 入口可见且可访问性树有零个可见密码输入框。 [签名 RDP](https://github.com/engcapa/taomni/actions/runs/44876459274) · [MSI 实装](https://github.com/engcapa/taomni/actions/runs/44878760934)
