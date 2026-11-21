@@ -1,14 +1,18 @@
 type Glyph = { paint: Element; value: string; x: number; y: number };
 type TextLayout = { owner: SVGTextElement; glyphs: Glyph[] };
 
-const cjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 // Keep contextual shaping, bidi, combining marks and text paths owned by SVG.
 const contextual = /[\p{Mark}\p{Script=Arabic}\p{Script=Hebrew}\u0900-\u0fff\u200c\u200d]/u;
 const coordinates = new Set(["id", "class", "x", "y", "dx", "dy", "rotate", "transform", "textLength", "lengthAdjust", "text-anchor"]);
 
 function measureText(owner: SVGTextElement): TextLayout | undefined {
   const value = owner.textContent || "";
-  if (!cjk.test(value) || contextual.test(value) || owner.hasAttribute("rotate")
+  // Office-family SVG importers do not reliably honor text-anchor,
+  // dominant-baseline or relative tspan coordinate chains: C4-style row
+  // tspans center-anchored at x=0 render as start-anchored runs, pushing every
+  // label to the right half of its box. Pin the measured layout of every
+  // plain label, Latin or CJK alike.
+  if (!value.trim() || contextual.test(value) || owner.hasAttribute("rotate")
     || owner.querySelector("textPath,[rotate],[transform]") || typeof owner.getNumberOfChars !== "function") return;
   try {
     // Do not rewrite collapsed whitespace or text with unavailable geometry.
@@ -37,8 +41,11 @@ function measureText(owner: SVGTextElement): TextLayout | undefined {
 }
 
 /** Measure before freezing the CSS cascade; apply after presentation attributes
- * are available. Office fallback metrics can clip CJK runs that browsers render
- * correctly. Explicit glyph positions retain the measured font and placement. */
+ * are available. Office importers re-flow labels with their own fonts and do
+ * not reliably honor text-anchor, dominant-baseline or relative tspan
+ * coordinates: fallback metrics can clip CJK runs and importer bugs push
+ * anchor-agnostic labels off center. Explicit glyph positions retain the
+ * measured font and placement for every plain label. */
 export function captureWordTextLayout(svg: SVGSVGElement): () => void {
   const layouts = Array.from(svg.querySelectorAll<SVGTextElement>("text"))
     .map(measureText).filter((layout): layout is TextLayout => Boolean(layout));
