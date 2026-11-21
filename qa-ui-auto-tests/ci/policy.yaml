@@ -32,6 +32,9 @@ smoke:
 - TC-FILE-OPEN-006
 unavailable: {}
 cases:
+- TC-WS-GIT-CLONE-01-defaults-proxy-and-clone-browser
+- TC-WS-GIT-CLONE-02-background-close-cancel-retry-browser
+- TC-WS-GIT-CLONE-03-native-real-clone-config-and-tree
 - TC-FILE-OPEN-029
 - TC-FILE-OPEN-030
 - TC-FILE-OPEN-031

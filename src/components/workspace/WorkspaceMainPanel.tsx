@@ -11,6 +11,7 @@ import {
 } from "../../stores/workspacePlatformStore";
 import { createWorkspaceFileNode, createWorkspaceFolderNode } from "./workspaceFs";
 import { WorkspaceFsModals, type WorkspaceRootDestination } from "./WorkspaceFsModals";
+import { WorkspaceGitCloneModal } from "./WorkspaceGitCloneModal";
 import { WorkspaceGitPanel } from "./WorkspaceGitPanel";
 import { WorkspaceSessionPane } from "./WorkspaceSessionPane";
 import { WorkspaceSessionPickerModal } from "./WorkspaceSessionPickerModal";
@@ -39,6 +40,7 @@ export const WorkspaceMainPanel = memo(function WorkspaceMainPanel({ visible = t
       {workspaces.map((workspace) => (
         <WorkspaceCanvas key={workspace.id} workspaceId={workspace.id} visible={visible && workspace.id === activeId} onCommandsChange={onCommandsChange} onEditSession={onEditSession} />
       ))}
+      <WorkspaceGitCloneModal />
     </div>
   );
 });

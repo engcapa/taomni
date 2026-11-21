@@ -48,6 +48,10 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::git::git_delete_remote,
         crate::git::git_save_settings,
         crate::git::git_save_remote_auth,
+        crate::git::git_clone_defaults,
+        crate::git::git_clone_probe,
+        crate::git::git_clone_repository,
+        crate::git::git_clone_cancel,
     ];
     handler(invoke)
 }

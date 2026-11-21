@@ -9,6 +9,7 @@ import {
   useWorkspacePlatformStore,
   type PlatformWorkspace,
 } from "../../stores/workspacePlatformStore";
+import { useGitCloneStore } from "../../stores/gitCloneStore";
 
 export interface WorkspaceSwitcherProps {
   onAddFolder: () => void;
@@ -152,6 +153,12 @@ export function WorkspaceSwitcher({ onAddFolder }: WorkspaceSwitcherProps) {
               testId: "workspace-switcher-add-folder",
               disabled: active.id === NOTES_WORKSPACE_ID,
               onClick: onAddFolder,
+            },
+            {
+              label: t("gitClone.openAction"),
+              testId: "workspace-switcher-clone-git",
+              disabled: active.id === NOTES_WORKSPACE_ID,
+              onClick: () => useGitCloneStore.getState().openDialog(),
             },
             { label: "", separator: true, onClick: () => undefined },
             ...workspaceMenu(active),

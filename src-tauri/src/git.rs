@@ -1,5 +1,7 @@
 mod worktree_commands;
 pub use worktree_commands::*;
+mod clone;
+pub use clone::*;
 mod remote_commands;
 pub use remote_commands::*;
 mod branch_commands;

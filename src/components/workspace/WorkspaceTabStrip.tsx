@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, FilePlus2, FolderPlus, MonitorSmartphone, Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, FilePlus2, FolderPlus, GitBranch, MonitorSmartphone, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WorkspaceTabContextMenu } from "./WorkspaceTabContextMenu";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
@@ -19,6 +19,7 @@ import { createAndOpenWorkspaceNote } from "../../lib/notes/notesWorkspaceNaviga
 import { EMPTY_WORKSPACE_TAB_FILTER, filterWorkspaceTabs, hasWorkspaceTabFilter } from "../../lib/workspaceTabFilter";
 import { ExplorerTabIcon } from "../explorer/ExplorerTabIcon";
 import { ViewerDirtyIndicator } from "../viewer/ViewerDirtyIndicator";
+import { useGitCloneStore } from "../../stores/gitCloneStore";
 
 const KIND_LABEL: Record<WorkspaceTabKind, string> = {
   file: "FILE",
@@ -113,6 +114,12 @@ export function WorkspaceTabStrip() {
       testId: "workspace-plus-add-folder",
       icon: <FolderPlus className="h-3 w-3" />,
       onClick: () => openFsModal({ kind: "root", directory: "" }),
+    },
+    {
+      label: t("gitClone.openAction"),
+      testId: "workspace-plus-clone-git",
+      icon: <GitBranch className="h-3 w-3" />,
+      onClick: () => useGitCloneStore.getState().openDialog(),
     },
     { label: "", separator: true, onClick: () => undefined },
     {
