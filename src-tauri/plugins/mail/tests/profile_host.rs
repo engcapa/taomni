@@ -107,31 +107,21 @@ impl MailHost {
     }
 
     fn handshake(&mut self, context: &HostProfileContext) {
+        #[derive(serde::Deserialize)]
+        struct Manifest {
+            id: String,
+            version: String,
+            commands: Vec<String>,
+            permissions: Vec<String>,
+        }
+        // Use the signed package's command and permission list, like the core.
+        let manifest: Manifest = serde_json::from_str(include_str!("../module.json")).unwrap();
         let mut request = HandshakeRequest::new(
-            "taomni-plugin-mail",
-            env!("CARGO_PKG_VERSION"),
+            manifest.id,
+            manifest.version,
             "mail-profile-test-token",
-            [
-                taomni_mail_api::CHECK_INCOMING,
-                taomni_mail_api::CHECK_OUTGOING,
-                taomni_mail_api::IMAP_FOLDER_TREE,
-                "mail_list_cached_folders",
-                "mail_list_cached_messages",
-                "mail_get_cached_body",
-                "mail_list_drafts",
-                "mail_save_draft",
-                "mail_delete_draft",
-                "mail_list_address_book",
-                "mail_save_address_book_entry",
-                "mail_delete_address_book_entry",
-                "mail_search_contacts",
-                SNAPSHOT_PREPARE_METHOD,
-                SNAPSHOT_METHOD,
-                SNAPSHOT_RELEASE_METHOD,
-            ]
-            .map(String::from)
-            .to_vec(),
-            vec!["fs.dataDir".into()],
+            manifest.commands,
+            manifest.permissions,
         );
         request.profile = Some(context.clone());
         request.host_instance = Some(HostInstanceId::parse(HOST).unwrap());
