@@ -16,6 +16,11 @@ pub async fn save_server_config(
 ) -> Result<serde_json::Value, String> {
     let st = ServerType::from_str(&server_type)
         .ok_or_else(|| format!("unknown server type: {}", server_type))?;
+    if st == ServerType::Vnc
+        && let Some(saved) = super::vnc_config::save_if_managed(&state, &config).await?
+    {
+        return Ok(saved);
+    }
     if st == ServerType::Rdp {
         let legacy_password = {
             let db = state.core.db.lock().map_err(|e| e.to_string())?;
@@ -43,6 +48,10 @@ pub async fn load_server_configs(
         let db = state.core.db.lock().map_err(|e| e.to_string())?;
         db::load_server_configs(&db).map_err(|e| e.to_string())?
     };
+    if let Err(error) = super::vnc_config::project(&state, &mut configs) {
+        configs.remove(ServerType::Vnc.as_str());
+        tracing::warn!("load VNC Server settings: {error}");
+    }
 
     if let Some(config) = configs.get_mut(ServerType::Rdp.as_str()) {
         let legacy_password = rdp_plaintext_password(config).map(str::to_owned);

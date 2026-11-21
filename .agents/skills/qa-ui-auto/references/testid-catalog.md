@@ -3246,6 +3246,7 @@
 - `[data-testid="server-row-vnc-stop"]` — interactive [optional] — F-Servers-1.server-row-vnc-stop
 - `[data-testid="server-row-vnc-settings"]` — interactive [optional] — F-Servers-1.server-row-vnc-settings
 - `[data-testid="server-field-vnc-password"]` — interactive [optional] — F-Servers-1.server-field-vnc-password
+- `[data-testid="server-field-vnc-remove-password"]` — interactive [optional] — F-Servers-1.server-field-vnc-remove-password
 - `[data-testid="server-field-vnc-view-only"]` — interactive [optional] — F-Servers-1.server-field-vnc-view-only
 - `[data-testid="server-field-vnc-shared"]` — interactive [optional] — F-Servers-1.server-field-vnc-shared
 - `[data-testid="server-row-ssh-start"]` — interactive [optional] — F-Servers-1.server-row-ssh-start

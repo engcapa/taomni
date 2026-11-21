@@ -2,11 +2,15 @@
 
 use serde::{Deserialize, Serialize};
 
+mod settings;
+pub use settings::{CONFIG_FILENAME, CONFIG_PATH, Settings, SettingsFile, StoredSettings};
+
 pub const SLUG: &str = "vnc-server";
 pub const START: &str = "vnc-server/start";
 pub const STATUS: &str = "vnc-server/status";
 pub const STOP: &str = "vnc-server/stop";
-pub const COMMANDS: [&str; 3] = [START, STATUS, STOP];
+pub const SAVE_SETTINGS: &str = "vnc-server/save-settings";
+pub const COMMANDS: [&str; 4] = [START, STATUS, STOP, SAVE_SETTINGS];
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

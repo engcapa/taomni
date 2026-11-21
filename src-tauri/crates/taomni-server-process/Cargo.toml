@@ -8,6 +8,11 @@ publish = false
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
 tokio = { version = "1", features = ["io-util", "macros", "process", "rt"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 which = "8"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

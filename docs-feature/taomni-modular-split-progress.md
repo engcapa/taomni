@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- VNC Server 0.1.1 导入旧库的 VNC 配置到模块目录，保留旧库回滚行。首次使用时从旧配置读取密码并写入 Vault，后续由核心按 VNC 凭据类型解析。运行中的备份通过宿主快照保存配置及配套 Vault。TC-MODULES-063 核对旧行、迁移回执、实际鉴权、备份和停用后的资源回收。首轮 Browser 发现模块化标签容器漏掉原有标识，已恢复并让表单用例等待关联配置。 [首轮回执](https://github.com/engcapa/taomni/actions/runs/44940689515)
 - VNC Server 0.1.0 由签名宿主监督系统 daemon。核心通过原 Local servers 入口传递当前配置，并在宿主退出后释放本地服务的运行锁。默认 Cargo 闭包排除 VNC Server 宿主，签名打包已接入 QA 工作流。TC-MODULES-063 检查 Linux X11 的真实回环连接、停止和禁用，TC-MODULES-064 检查 Browser 的配置持久化。旧配置迁移、Windows 真实 daemon 与 macOS 系统指引仍待验收。
 - Screenshot 修复提交 `9d63c0b67` 已在三端复验。录制旧批次的 18 个分片已核对。三端 Browser 各 26/26，Linux 和 Windows Native 各 32/32。macOS Native 31/33，失败为 MP4 采集时间戳和此前出现过的系统文件面板超时。离线 OCR 旧批次的三个平台均已收到真实 WASM 识别文字，遮挡尚待修复版回执。 [录制原始分片](https://github.com/engcapa/taomni/actions/runs/44931597033) · [离线 OCR 原始分片](https://github.com/engcapa/taomni/actions/runs/44933996901) · [三端复验](https://github.com/engcapa/taomni/actions/runs/44938925840)
 - Windows 的签名包已从本地 WASM 与语言文件识别测试截图。WASM 返回无列标题的 TSV，遮挡解析此前只接受带标题的 CLI 输出。0.1.4 解析两种格式，单测检查实际词框，TC-MODULES-061 继续要求真实离线识别和 email 遮挡框均成功。 [Windows 原始回执](https://github.com/engcapa/taomni/actions/runs/44933996901)

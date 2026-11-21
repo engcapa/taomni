@@ -11,6 +11,7 @@ interface Props {
 export function VncSettings({ config, onChange }: Props) {
   const t = useT();
   const password = typeof config.password === "string" ? config.password : "";
+  const retainedPassword = Boolean(config.passwordRef) || config.credentialMigrationRequired === true;
   const viewOnly = config.viewOnly === true;
   const sharedDesktop = config.sharedDesktop !== false;
 
@@ -19,9 +20,20 @@ export function VncSettings({ config, onChange }: Props) {
       <PasswordField
         label={t("servers.fields.password")}
         testId="server-field-vnc-password"
+        placeholder={retainedPassword && config.removePassword !== true
+          ? t("servers.fields.vncPasswordRetained")
+          : undefined}
         value={password}
-        onChange={(v) => onChange({ password: v })}
+        onChange={(v) => onChange({ password: v, removePassword: false })}
       />
+      {retainedPassword && (
+        <CheckboxField
+          label={t("servers.fields.vncRemovePassword")}
+          testId="server-field-vnc-remove-password"
+          value={config.removePassword === true}
+          onChange={(removePassword) => onChange({ removePassword, password: "" })}
+        />
+      )}
       <CheckboxField
         label={t("servers.fields.viewOnly")}
         testId="server-field-vnc-view-only"

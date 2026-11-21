@@ -961,7 +961,7 @@
           "description": "Native signed Screenshot case only. Match the installed host to the signed archive and observe its writer lease."
         },
         "assert_signed_vnc_daemon": {
-          "enum": ["idle", "running", "stopped", "disabled"],
+          "enum": ["idle", "running", "backup", "stopped", "disabled"],
           "description": "Verify the signed VNC server host's installed bytes, lease and local daemon endpoint."
         },
         "assert_signed_mail_host": {

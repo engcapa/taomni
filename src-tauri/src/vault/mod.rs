@@ -278,6 +278,22 @@ impl Vault {
     ///   is locked (caller bubbles up so the UI can prompt for unlock).
     /// - other `Err(_)` for missing entries / decryption failures.
     pub fn resolve(&self, value: &str) -> Result<Option<Zeroizing<String>>, String> {
+        self.resolve_reference(value, None)
+    }
+
+    pub(crate) fn resolve_for_kind(
+        &self,
+        value: &str,
+        kind: &str,
+    ) -> Result<Option<Zeroizing<String>>, String> {
+        self.resolve_reference(value, Some(kind))
+    }
+
+    fn resolve_reference(
+        &self,
+        value: &str,
+        kind: Option<&str>,
+    ) -> Result<Option<Zeroizing<String>>, String> {
         let id = match value.strip_prefix(VAULT_REF_PREFIX) {
             Some(s) => s,
             None => return Ok(None),
@@ -289,6 +305,7 @@ impl Vault {
                 .ok_or_else(|| ERR_VAULT_LOCKED.to_string())?;
             let entry = db::get_entry(&inner.conn, id)
                 .map_err(|e| e.to_string())?
+                .filter(|entry| kind.is_none_or(|kind| entry.kind == kind))
                 .ok_or_else(|| ERR_VAULT_NOT_FOUND.to_string())?;
             let nonce: [u8; crypto::NONCE_LEN] = entry
                 .nonce

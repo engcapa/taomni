@@ -31,7 +31,12 @@ export function PluginTabPanels({ tabs, activeTabId, onOpenSettings, onClose, on
   const t = useT();
   useEffect(() => attachPluginTabPersistence(), []);
   return tabs.filter((tab) => tab.type === "plugin" || isLegacyPluginTab(tab)).map((tab) => (
-    <div key={tab.id} className="absolute inset-0" style={{ display: tab.id === activeTabId ? "block" : "none" }}>
+    <div
+      key={tab.id}
+      data-testid={tab.type === "servers" ? "servers-tab-panel" : undefined}
+      className="absolute inset-0"
+      style={{ display: tab.id === activeTabId ? "block" : "none" }}
+    >
       {tab.type !== "plugin" ? <LegacyPluginTabPane
         tab={tab}
         active={tab.id === activeTabId}

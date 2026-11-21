@@ -166,6 +166,8 @@ impl PluginRegistry {
         let result = (|| {
             super::migration_rdp_pins::prepare(&self.root, manifest)
                 .map_err(PluginError::HostRequest)?;
+            super::migration_vnc_server::prepare(&self.root, manifest)
+                .map_err(PluginError::HostRequest)?;
             activate()?;
             self.scan_locked()?;
             let record = self

@@ -29,6 +29,7 @@ pub(super) const LOG_HISTORY_LINES: usize = 500;
 pub struct ServerRegistry {
     pub running: AsyncMutex<HashMap<ServerType, ActiveServer>>,
     pub statuses: AsyncMutex<HashMap<ServerType, ServerStatus>>,
+    pub(super) vnc_settings: AsyncMutex<()>,
     pub(crate) rdp_approvals: std::sync::Arc<rdp::ApprovalBroker>,
     /// Recent `server://output/<type>` lines, oldest first.
     pub(super) logs: std::sync::Mutex<HashMap<ServerType, VecDeque<String>>>,

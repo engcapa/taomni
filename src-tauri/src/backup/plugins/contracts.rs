@@ -39,6 +39,7 @@ pub struct PluginDataSet {
 
 pub(crate) fn owner_requires_vault(slug: &str) -> bool {
     slug == taomni_plugin_services::MFA_FIXED_KEY_OWNER.slug
+        || slug == taomni_server_process::vnc::SLUG
 }
 
 impl PluginDataSet {

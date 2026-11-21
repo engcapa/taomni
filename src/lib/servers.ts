@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { isTauriRuntime } from "./runtime";
 
 export type ServerType =
   | "ssh"
@@ -23,6 +24,12 @@ export interface ServerConfig {
   startOnLaunch: boolean;
   /** server-specific fields (e.g. rootDir, password, cronExpr) */
   [key: string]: unknown;
+}
+
+export function vncSettingsNeedVault(config: ServerConfig): boolean {
+  return isTauriRuntime() &&
+    config.removePassword !== true &&
+    (Boolean(config.password) || Boolean(config.passwordRef) || config.credentialMigrationRequired === true);
 }
 
 export interface ServerStatus {

@@ -4,6 +4,7 @@ import {
   saveServerConfig,
   listenServerOutput,
   listenServerStatus,
+  vncSettingsNeedVault,
   type ServerType,
 } from "../../lib/servers";
 import { useServersStore } from "../../stores/serversStore";
@@ -97,6 +98,10 @@ export function ServersPanel({ onClose }: { onClose?: () => void }) {
           !(await ensureVaultReady(t("servers.notes.rdpVaultReason")))
         ) {
           appendLog(type, timestampLine(t("servers.notes.rdpVaultCancelled")));
+          continue;
+        }
+        if (type === "vnc" && vncSettingsNeedVault(cfg) &&
+          !(await ensureVaultReady(t("servers.notes.vncVaultReason")))) {
           continue;
         }
         cfg = await saveServerConfig(type, cfg);

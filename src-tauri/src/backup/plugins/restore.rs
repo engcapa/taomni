@@ -68,6 +68,14 @@ pub(crate) fn check_restore_dependencies(
             let slug = PluginSlug::parse(&owner).map_err(|e| e.to_string())?;
             let _lease = PluginDataLease::try_acquire(&root, &slug)
                 .map_err(|e| format!("Cannot check encrypted plugin data for {owner}: {e}"))?;
+            if owner == taomni_server_process::vnc::SLUG
+                && !taomni_server_process::vnc::SettingsFile::new(root.path())
+                    .load()
+                    .map_err(|error| error.to_string())?
+                    .is_some_and(|record| record.settings.password_ref.is_some())
+            {
+                continue;
+            }
             let data = retained_data::discover(&plugins, &owner, 1).map_err(|e| e.to_string())?;
             if !data.files.is_empty() {
                 return Err(format!(

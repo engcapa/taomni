@@ -11312,7 +11312,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-vnc-server"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -11460,7 +11460,10 @@ dependencies = [
 name = "taomni-server-process"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "serde",
+ "serde_json",
+ "tempfile",
  "tokio",
  "tokio-util 0.7.19",
  "which",

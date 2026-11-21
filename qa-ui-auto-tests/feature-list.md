@@ -6113,6 +6113,10 @@ controls:
     selector: '[data-testid="server-field-vnc-password"]'
     kind: interactive
     optional: true
+  - id: server-field-vnc-remove-password
+    selector: '[data-testid="server-field-vnc-remove-password"]'
+    kind: interactive
+    optional: true
   - id: server-field-vnc-view-only
     selector: '[data-testid="server-field-vnc-view-only"]'
     kind: interactive

@@ -36,6 +36,7 @@ pub mod telnet;
 pub mod tftp;
 
 pub mod vnc;
+mod vnc_config;
 
 use std::collections::{HashMap, VecDeque};
 

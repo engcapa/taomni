@@ -2080,6 +2080,8 @@ const dict = {
       rdpSecTls: "TLS only",
       rdpSecNone: "None (insecure)",
       rdpPasswordStored: "Stored securely — type to replace",
+      vncPasswordRetained: "Password retained. Enter a new password to replace it.",
+      vncRemovePassword: "Remove the saved VNC password",
       rdpPublicBind: "Allow binding all interfaces",
       rdpDisplay: "Shared display",
       rdpDisplayPrimary: "Primary display (automatic)",
@@ -2117,6 +2119,7 @@ const dict = {
       rdpHybridOnly:
         "Production mode requires NLA/CredSSP over TLS. The self-signed server certificate is stored in app data.",
       rdpVaultReason: "Unlock the credential vault to protect the RDP server password.",
+      vncVaultReason: "Unlock the credential vault to use the VNC server password.",
       rdpVaultCancelled: "RDP server settings were not saved because the credential vault is locked.",
       rdpPublicBind:
         "This exposes the RDP listener beyond this computer. Restrict it with a firewall and use only trusted networks.",

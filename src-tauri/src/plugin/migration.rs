@@ -383,7 +383,8 @@ fn reconcile_pending(
                 if (valid_mfa_commit(entry)
                     || valid_mail_commit(entry)
                     || valid_vnc_retention(entry)
-                    || valid_rdp_pin_commit(entry))
+                    || valid_rdp_pin_commit(entry)
+                    || super::migration_vnc_server::valid_commit(entry))
                     && !committed.contains(&entry.item) =>
             {
                 committed.push(entry.item);

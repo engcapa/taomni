@@ -11,21 +11,25 @@ use taomni_server_process::vnc;
 use tauri::Manager;
 
 pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted, String> {
+    let state = ctx.app.state::<crate::state::AppState>();
+    let plugins = state.plugins.clone();
+    let record = match plugins.get(vnc::SLUG) {
+        Some(record) if record.state == LifecycleState::Enabled => record,
+        Some(_) => return Err("Enable the VNC Server module in Settings → Module Store.".into()),
+        None => return Err("Install the VNC Server module from Settings → Module Store.".into()),
+    };
     let options = vnc::Config {
         port: config.port,
         bind_address: config.bind_address.clone(),
         view_only: config.bool_field("viewOnly", false),
         shared_desktop: config.bool_field("sharedDesktop", true),
-        password: config.str_field("password", "").to_owned(),
+        password: if record.manifest.commands.contains(vnc::SAVE_SETTINGS) {
+            super::vnc_config::resolve_password(&state)?
+        } else {
+            config.str_field("password", "").to_owned()
+        },
     };
-    let plugins = ctx.app.state::<crate::state::AppState>().plugins.clone();
-    match plugins.get(vnc::SLUG) {
-        Some(record) if record.state == LifecycleState::Enabled => {
-            start_installed(ctx, options, plugins).await
-        }
-        Some(_) => Err("Enable the VNC Server module in Settings → Module Store.".into()),
-        None => Err("Install the VNC Server module from Settings → Module Store.".into()),
-    }
+    start_installed(ctx, options, plugins).await
 }
 
 async fn start_installed(
@@ -68,7 +72,7 @@ async fn start_installed(
     Ok(ServerStarted { pid, task })
 }
 
-async fn call<T: DeserializeOwned>(
+pub(super) async fn call<T: DeserializeOwned>(
     plugins: &Arc<PluginRegistry>,
     method: &'static str,
     value: Value,

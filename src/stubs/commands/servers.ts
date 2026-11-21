@@ -163,6 +163,15 @@ export async function invokeServers<T>(cmd: string, args?: any): Promise<T> {
         delete saved.password;
         saved.passwordRef = "vault:stub-rdp-server-password";
       }
+      if (serverType === "vnc") {
+        if (saved.removePassword === true) {
+          delete saved.passwordRef;
+        } else if (typeof saved.password === "string" && saved.password) {
+          saved.passwordRef = "vault:stub-vnc-server-password";
+        }
+        delete saved.password;
+        delete saved.removePassword;
+      }
       const configs = readStubServerConfigs();
       configs[serverType] = saved;
       localStorage.setItem(STUB_SERVER_CONFIGS_KEY, JSON.stringify(configs));

@@ -43,7 +43,9 @@ pub(crate) fn stage(
     let profile = registry.data_profile().map_err(|e| e.to_string())?;
     let mut result = PluginSnapshots::default();
     for slug in super::discover_owners(registry.root())? {
-        if !flags.plugins && !(flags.mfa && super::contracts::owner_requires_vault(&slug)) {
+        if !flags.plugins
+            && !(flags.mfa && slug == taomni_plugin_services::MFA_FIXED_KEY_OWNER.slug)
+        {
             continue;
         }
         context.check()?;

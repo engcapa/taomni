@@ -6,6 +6,7 @@ Missing/mismatched artifacts are failures, never skips or invented installs.
 """
 from __future__ import annotations
 
+from contextlib import closing
 import hashlib
 import json
 import os
@@ -13,6 +14,7 @@ import platform
 from pathlib import Path
 import shutil
 import socket
+import sqlite3
 import subprocess
 import zipfile
 
@@ -20,6 +22,7 @@ from native_build import QA_APP_ID
 from tauri_webdriver import native_isolation_env
 
 from .module_mfa_restore import CASE_ID as MFA_RESTORE_CASE
+from .backup_policy import isolated_data_root
 
 
 def platform_key(system=None, machine=None):
@@ -195,7 +198,21 @@ def setup_vnc_server(ctx):
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         port = listener.getsockname()[1]
-    ctx.signed_vnc_daemon = {"host": host, "receipt": info, "port": port}
+    legacy_settings = json.dumps({
+        "port": port, "bindAddress": "127.0.0.1", "viewOnly": False,
+        "sharedDesktop": True, "password": "qaVNC7pw",
+    })
+    database = isolated_data_root(ctx) / "taomni.db"
+    with closing(sqlite3.connect(database)) as connection, connection:
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS server_configs "
+            "(server_type TEXT PRIMARY KEY, config_json TEXT NOT NULL, updated_at INTEGER NOT NULL)"
+        )
+        connection.executemany("INSERT INTO server_configs VALUES (?, ?, 1)", [
+            ("vnc", legacy_settings),
+            ("http", '{"port":18080}'),
+        ])
+    ctx.signed_vnc_daemon = {"host": host, "receipt": info, "port": port, "legacy_settings": legacy_settings}
     ctx.values.update(vnc_daemon_archive=destination.as_posix(), vnc_daemon_signature=signature,
                       vnc_daemon_port=port)
 
