@@ -83,14 +83,30 @@ function Wait-Element([scriptblock]$Find, [string]$Stage) {
     throw "Timed out waiting for $Stage in the installed Taomni window"
 }
 
-function Find-Control($Root, $Type, [string]$Name) {
+function Find-Control($Root, $Type, [string]$Name, [scriptblock]$Accept = { $true }) {
     $condition = [System.Windows.Automation.AndCondition]::new([System.Windows.Automation.Condition[]]@(
         [System.Windows.Automation.PropertyCondition]::new($automation::NameProperty, $Name),
         [System.Windows.Automation.PropertyCondition]::new($automation::ControlTypeProperty, $Type),
         [System.Windows.Automation.PropertyCondition]::new($automation::IsOffscreenProperty, $false)
     ))
     foreach ($item in $Root.FindAll($scope, $condition)) {
-        if ($item.Current.IsEnabled) { return $item }
+        if ($item.Current.IsEnabled -and (& $Accept $item)) { return $item }
+    }
+}
+
+function Find-ToolsMfa {
+    # The rail's floating MFA toggle has the same accessible name. Match the
+    # Tools list row by its position and alignment with the adjacent list row.
+    $networkTools = Find-Control $window $types::Button 'Network tools'
+    if ($null -eq $networkTools) { return }
+    $neighbor = $networkTools.Current.BoundingRectangle
+    Find-Control $window $types::Button 'MFA authenticator' {
+        param($candidate)
+        $row = $candidate.Current.BoundingRectangle
+        return (-not $row.IsEmpty -and -not $neighbor.IsEmpty -and
+            [Math]::Abs($row.Left - $neighbor.Left) -lt 2 -and
+            [Math]::Abs($row.Right - $neighbor.Right) -lt 2 -and
+            [Math]::Abs($row.Bottom - $neighbor.Top) -lt 2)
     }
 }
 
@@ -143,7 +159,7 @@ function Find-Passwords([int]$Count) {
 function Observe-Controls {
     return [pscustomobject]@{
         visiblePasswordFields = @(Get-VisiblePasswords).Count
-        mfaActionVisible = ($null -ne (Find-Control $window $types::Button 'MFA authenticator'))
+        mfaActionVisible = ($null -ne (Find-ToolsMfa))
         addAccountVisible = ($null -ne (Find-Control $window $types::Button 'Add MFA account'))
     }
 }
@@ -171,10 +187,10 @@ if ($Phase -ne 'seed') {
     Set-Value $fields[0] $fixture.password
     Invoke-Button $window 'Unlock' 'unlock-vault'
 }
-if (-not (Find-Control $window $types::Button 'MFA authenticator')) {
+if ($null -eq (Find-ToolsMfa)) {
     Invoke-Button $window 'Tools' 'open-tools' -Physical
 }
-Invoke-Button $window 'MFA authenticator' 'open-mfa' -Physical
+Click-Element (Wait-Element { Find-ToolsMfa } 'open-mfa')
 
 $codes = @()
 if ($Phase -eq 'seed') {
