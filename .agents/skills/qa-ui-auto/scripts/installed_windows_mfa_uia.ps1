@@ -14,6 +14,7 @@ trap {
         stage = $script:diagnosticStage
     }
     if ($null -ne $window) {
+        $diagnostic | Add-Member -NotePropertyName windowHandle -NotePropertyValue ($windowHandle.ToInt64())
         try {
             $diagnostic | Add-Member -NotePropertyName controls -NotePropertyValue (Observe-Controls)
         } catch {

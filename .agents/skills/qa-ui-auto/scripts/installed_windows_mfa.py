@@ -71,6 +71,13 @@ def verify_mfa_controls(owner, phase, evidence):
                     if isinstance(stage, str) and stage in UIA_STAGES:
                         result["stage"] = stage
                         failure += f", stage {stage}"
+                    handle = diagnostic.get("windowHandle")
+                    # Capture the owned window only before any seed password
+                    # has been entered. This records the visible renderer when
+                    # its accessibility tree reports no password fields.
+                    if (os.name == "nt" and phase == "seed" and stage == "vault-setup-fields"
+                            and type(handle) is int and 0 < handle < 2**63 and owner.poll() is None):
+                        result["windowScreenshot"] = capture_seed_window(handle, evidence)
                     controls = diagnostic.get("controls")
                     if isinstance(controls, dict):
                         count = controls.get("visiblePasswordFields")
@@ -91,3 +98,16 @@ def verify_mfa_controls(owner, phase, evidence):
         result.update(codes=payload["codes"], passed=True)
     finally:
         write_json(evidence / f"windows-mfa-{phase}.json", result)
+
+
+def capture_seed_window(handle, evidence):
+    from PIL import ImageGrab
+    name = "windows-mfa-before-vault-setup.png"
+    try:
+        image = ImageGrab.grab(window=handle)
+        if image.width < 100 or image.height < 100:
+            return None
+        image.save(evidence / name)
+    except (OSError, ValueError):
+        return None
+    return name
