@@ -110,6 +110,20 @@ function Find-ToolsMfa {
     }
 }
 
+function Find-ToolsRail {
+    $sessions = Find-Control $window $types::Button 'Sessions'
+    if ($null -eq $sessions) { return }
+    $anchor = $sessions.Current.BoundingRectangle
+    Find-Control $window $types::Button 'Tools' {
+        param($candidate)
+        $row = $candidate.Current.BoundingRectangle
+        return (-not $row.IsEmpty -and -not $anchor.IsEmpty -and
+            [Math]::Abs($row.Left - $anchor.Left) -lt 2 -and
+            [Math]::Abs($row.Right - $anchor.Right) -lt 2 -and
+            $row.Top -ge $anchor.Bottom -and $row.Top -lt $anchor.Bottom + 12)
+    }
+}
+
 function Click-Element($Element) {
     $rect = $Element.Current.BoundingRectangle
     if ($rect.IsEmpty) { throw 'The owned control has no visible rectangle' }
@@ -196,10 +210,11 @@ $window = $automation::FromHandle($windowHandle)
 if ($Phase -ne 'seed') {
     $fields = Wait-Element { Find-Passwords 1 } 'vault-unlock-field'
     Set-Value $fields[0] $fixture.password
-    Invoke-Button $window 'Unlock' 'unlock-vault'
+    Invoke-Button $window 'Unlock' 'unlock-vault' -Physical
+    $null = Wait-Element { if (@(Get-VisiblePasswords).Count -eq 0) { return $true } } 'unlock-vault'
 }
 if ($null -eq (Find-ToolsMfa)) {
-    Invoke-Button $window 'Tools' 'open-tools' -Physical
+    Click-Element (Wait-Element { Find-ToolsRail } 'open-tools')
 }
 Click-Element (Wait-Element { Find-ToolsMfa } 'open-mfa')
 
