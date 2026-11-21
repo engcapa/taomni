@@ -2,6 +2,11 @@
 
 ## 2026-11-21 当前进展
 
+- `007a2695a` 合入 `main` 的 `e439e9d20`（#845）。保留 Word 导出矢量标签定位和 300 DPI PNG 修复。导出相关 23 项 Vitest、27 项 Python 单测及 `check:refactor` 通过。后续三端选集加入 TC-FILE-OPEN-014/015。 [合并提交](https://github.com/engcapa/taomni/commit/007a2695a)
+- `61baec221` 的 18 个分片在汇总前全部收齐。三端 Browser 各 33/33。Linux、Windows、macOS 26 Native 分别为 39/39、40/40、39/41。TC-MODULES-053 三端通过，Windows 的 055 通过。macOS 剩余失败是 007 保存对话框识别和 009 HTML WebView 的 AppleScript 点击超时。选集、源码、用例摘要、构建标识及收据保存在 `qa-ui-auto-report/github/44859952031/live-shards/`。 [三端原始结果](https://github.com/engcapa/taomni/actions/runs/44859952031)
+- 同一批次的 RDP 实际性能用例三端通过。Linux、Windows、macOS 26 的输入到画面 p95 分别为 43.74、54.42、50.03 ms，每端 40/40 个样本，均低于 130 ms 的模块化上限。连接首帧分别为 98、46、136 ms。原始 `perf-latency.json`、`perf-connect.json` 和 `perf-throughput.json` 随 Native 分片保存。这批证据对应切换到签名 RDP 客户端前的版本。 [平台运行](https://github.com/engcapa/taomni/actions/runs/44859952031)
+- Windows MSI 的复跑 `44861301983` 在安装升级步骤中被取消，缺少该次回执。上一成功取得回执的 MSI 批次保留了安装替换、双向模式互斥和回滚证据，MFA 强退恢复仍需复验。 [取消的运行](https://github.com/engcapa/taomni/actions/runs/44861301983)
+
 - 合入 `main` 的 `44a9392d4`。深色 Markdown 选区和嵌套斜体修复沿用 main 的 TC-FILE-OPEN-045。分支的 Draw.io 旧资产用例改为 046，保留检查步骤。12 项 Markdown 单测、QA 审计及三端选集检查通过。 [合并提交](https://github.com/engcapa/taomni/commit/ce51d8820)
 - RDP 会话、图像解码、输入、剪贴板、驱动器和 WebSocket 中继已迁到 `taomni-rdp-client-engine`。桌面适配层提供首次连接和尺寸重连的路由，继续使用现有 Vault、证书确认、代理和 SSH 跳板。独立引擎 157 项单测通过，7 项外部目标测试保留为显式运行。TC-111 检查 Browser 重连后的画布，TC-RDPJ-01 增加原证书确认、NLA 和输入恢复。独立 RDP 宿主、签名前端和 GitHub 运行结果继续按 TASK-016 验收。
 - RDP 中继结束时现在回收握手任务和 WebSocket 读写任务。新增单测在握手进行中丢弃中继句柄，等待对端收到 EOF。独立引擎共 158 项单测通过，核心路由、证书表和现有 RDP 契约的定向单测共 15 项通过。

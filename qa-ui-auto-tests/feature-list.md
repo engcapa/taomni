@@ -333,6 +333,7 @@ controls:
     aliases:
     - '[data-testid="module-action-enable-mfa"]'
     - '[data-testid="module-action-enable-vnc-client"]'
+    - '[data-testid="module-action-enable-rdp-client"]'
   - id: module-status-mfa
     selector: '[data-testid="module-status-mfa"]'
     kind: display
@@ -342,6 +343,7 @@ controls:
     aliases:
     - '[data-testid="module-action-disable-mfa"]'
     - '[data-testid="module-action-disable-vnc-client"]'
+    - '[data-testid="module-action-disable-rdp-client"]'
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
@@ -368,6 +370,7 @@ controls:
     selector: '[data-testid="plugin-tab-unavailable"]'
     aliases:
       - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
     kind: display
   - id: plugin-tab-error
     selector: '[data-testid="plugin-tab-error"]'
@@ -379,6 +382,7 @@ controls:
     selector: '[data-testid="plugin-tab-settings"]'
     aliases:
       - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-settings"]'
+      - '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-settings"]'
     kind: interactive
   - id: plugin-tab-loading
     selector: '[data-testid="plugin-tab-loading"]'
