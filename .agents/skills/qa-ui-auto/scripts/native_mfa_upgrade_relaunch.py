@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from contextlib import closing
+import hashlib
 import json
 from pathlib import Path
 import platform
@@ -11,6 +12,7 @@ import time
 from native_build import QA_APP_ID
 from native_macos_process import listener_pid
 from native_restore_relaunch import attach_after_exit, expected_environment, require_process
+from qa_ui_auto.mfa_relaunch_owner import observe_foreign_executable
 
 CONFIRM = '[data-testid="module-upgrade-mfa-submit"]'
 STATE = """
@@ -48,6 +50,11 @@ def verify_commit(root, original):
             "journal_state": entries[0]["state"]}
 
 
+def executable_digest(application):
+    with application.open("rb") as binary:
+        return hashlib.file_digest(binary, "sha256").hexdigest()
+
+
 def confirm_mfa_upgrade_relaunch(driver, session, *, expected_issuer):
     observed = {"schema": "taomni.qa.mfa-upgrade-relaunch.v1", "passed": False,
                 "stage": "preflight", "manual_launch": False, "click_attempted": False}
@@ -70,6 +77,12 @@ def confirm_mfa_upgrade_relaunch(driver, session, *, expected_issuer):
     accounts = account_rows(root / "mfa.db")
     if len(accounts) != 1 or accounts[0][1:] != (expected_issuer, 1):
         raise RuntimeError("MFA upgrade needs the original counter-one test account")
+    observed["stage"] = "verify-executable-guard"
+    guard = observe_foreign_executable(application, root, driver.report_root)
+    observed["foreign_executable"] = guard
+    if not guard["rejected"]:
+        raise RuntimeError("The MFA upgrade helper did not reject a different executable")
+    observed["binary_sha256"] = executable_digest(application)
 
     observed.update(stage="click-confirm", click_attempted=True)
     try:
@@ -91,6 +104,8 @@ def confirm_mfa_upgrade_relaunch(driver, session, *, expected_issuer):
         raise RuntimeError("MFA upgrade requires a normal original exit")
     attach_after_exit(driver, session, application, expected_env, before, observed, end)
     observed.update(stage="verify-committed-data", passed=False)
+    if executable_digest(application) != observed["binary_sha256"]:
+        raise RuntimeError("The same core executable must own both sides of the relaunch")
     observed["committed_data"] = verify_commit(root, accounts)
     observed.update(stage="complete", passed=True)
     return observed

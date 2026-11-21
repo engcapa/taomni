@@ -85,7 +85,7 @@ verification:
     actions: [21, 23, 24, 25, 26, 27, 28, 31, 32]
     checkpoints:
     - {step: 29, expectation: The wrong Vault password leaves the original UI open.}
-    - {step: 32, expectation: The owned original process exits normally and the bridge attaches to its own new process.}
+    - {step: 32, expectation: The helper rejects a different binary. The original process exits normally and the bridge attaches to a new process from the same verified binary.}
     - {step: 41, expectation: Settings reports a committed MFA upgrade.}
     - {step: 42, expectation: The committed profile has no remaining MFA migration action.}
     results: [29, 32, 41, 42]

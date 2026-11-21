@@ -78,7 +78,7 @@ verification:
     - {step: 30, expectation: The upgrade form selects the installed package automatically.}
     - {step: 31, expectation: The upgrade form selects the installed detached signature automatically.}
     - {step: 34, expectation: The wrong Vault password leaves the original app open.}
-    - {step: 37, expectation: The app relaunches and keeps the installed pointer and legacy encrypted records while publishing the migrated database.}
+    - {step: 37, expectation: The helper rejects a different binary and relaunches the same verified core. The installed pointer and legacy encrypted records persist while the module database is published.}
     - {step: 46, expectation: Settings reports the completed migration.}
     - {step: 47, expectation: The profile has no pending MFA migration action.}
     results: [27, 30, 31, 34, 37, 46, 47]

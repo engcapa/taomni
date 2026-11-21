@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from .fixtures.backup_policy import isolated_data_root
 from .fixtures.core_profile_state import read_generation
 from .legacy_process import MODE_LEASE_DENIAL, headless_command, initialize_profile, observe_same_profile_contender
+from .mfa_relaunch_owner import observe_foreign_executable
 from .steps import StepError
 
 MFA_RECOVERY_DENIAL = {**MODE_LEASE_DENIAL, "recoveryRecordPreserved": True}
@@ -60,14 +61,20 @@ def assert_headless_profile_blocked(ctx, args):
     recovery = _observe_pending_mfa_contender(
         profile, command, desktop_alive, log_dir, "desktop-mode-lease-pending-mfa",
     )
-    passed = result == MODE_LEASE_DENIAL and recovery == MFA_RECOVERY_DENIAL
+    guard = observe_foreign_executable(application, profile, log_dir)
+    guard["ownerStillRunning"] = desktop_alive()
+    denied = result == MODE_LEASE_DENIAL and recovery == MFA_RECOVERY_DENIAL
+    passed = denied and guard["rejected"]
     (log_dir / "desktop-mode-lease.json").write_text(json.dumps({
         "application": str(application), "profile": str(profile), "generation": generation,
         "passed": passed, **result, "pendingMfaRecoveryContender": recovery,
+        "mfaRelaunchExecutableGuard": guard,
     }, indent=2) + "\n", encoding="utf-8")
-    if not passed:
+    if not denied:
         raise StepError("The active desktop must reject headless on the same profile before opening an endpoint")
-    return "headless startup exited with the profile-in-use error and the desktop is still ready"
+    if not guard["rejected"]:
+        raise StepError("The MFA upgrade helper accepted a different executable")
+    return "the active desktop rejects headless startup and the MFA upgrade helper rejects another executable"
 
 
 def assert_desktop_profile_blocked(ctx):

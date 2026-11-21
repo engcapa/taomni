@@ -113,6 +113,10 @@ pub fn run_mfa_restart_helper(args: impl IntoIterator<Item = OsString>) -> Resul
     else {
         return Err("Missing MFA upgrade handoff arguments".into());
     };
+    let executable = relaunch_executable(
+        &std::env::current_exe().map_err(message)?,
+        Path::new(&executable),
+    )?;
     let Some(password) = read_approval(io::stdin().lock())? else {
         return Ok(());
     };
@@ -137,6 +141,15 @@ pub fn run_mfa_restart_helper(args: impl IntoIterator<Item = OsString>) -> Resul
         .spawn()
         .map_err(message)?;
     Ok(())
+}
+
+fn relaunch_executable(owned: &Path, requested: &Path) -> Result<PathBuf, String> {
+    let owned = owned.canonicalize().map_err(message)?;
+    let requested = requested.canonicalize().map_err(message)?;
+    if requested != owned {
+        return Err("MFA upgrade must relaunch its own Taomni executable".into());
+    }
+    Ok(owned)
 }
 
 fn apply(
@@ -204,6 +217,23 @@ fn message(error: impl std::fmt::Display) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn upgrade_relaunch_requires_the_helpers_own_executable() {
+        let directory = tempfile::tempdir().unwrap();
+        let core = directory.path().join("taomni");
+        let other = directory.path().join("other");
+        std::fs::write(&core, b"Taomni candidate").unwrap();
+        std::fs::write(&other, b"Taomni candidate").unwrap();
+        assert_eq!(
+            relaunch_executable(&core, &directory.path().join(".").join("taomni")).unwrap(),
+            core.canonicalize().unwrap()
+        );
+        assert_eq!(
+            relaunch_executable(&core, &other).unwrap_err(),
+            "MFA upgrade must relaunch its own Taomni executable"
+        );
+    }
 
     #[test]
     fn cancelled_or_truncated_approval_cannot_start_mfa_upgrade() {

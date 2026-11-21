@@ -109,15 +109,19 @@ class CoreProfileStateTest(TestCase):
                 self.assertEqual(marker.exists(), label.endswith("pending-mfa"))
                 return outcome
 
-            with patch("qa_ui_auto.core_profile_observation.isolated_data_root", return_value=profile) as isolated:
+            with patch("qa_ui_auto.core_profile_observation.isolated_data_root", return_value=profile) as isolated, \
+                 patch("qa_ui_auto.core_profile_observation.observe_foreign_executable",
+                       return_value={"exitCode": 1, "rejected": True}) as guard:
                 with patch("qa_ui_auto.core_profile_observation.observe_same_profile_contender", side_effect=run_contender):
                     assert_headless_profile_blocked(ctx, None)
                     isolated.assert_called_once_with(owner)
-                    self.assertEqual(session.wait_for_app_ready.call_count, 2)
+                    guard.assert_called_once_with(application, profile, case)
+                    self.assertEqual(session.wait_for_app_ready.call_count, 3)
                     receipt = case / "desktop-mode-lease.json"
                     result = json.loads(receipt.read_text())
                     self.assertEqual(result["generation"], generation)
                     self.assertTrue(result["pendingMfaRecoveryContender"]["recoveryRecordPreserved"])
+                    self.assertTrue(result["mfaRelaunchExecutableGuard"]["ownerStillRunning"])
                     self.assertFalse(marker.exists())
                     outcome["openedEndpoint"] = True
                     with self.assertRaisesRegex(StepError, "before opening an endpoint"):

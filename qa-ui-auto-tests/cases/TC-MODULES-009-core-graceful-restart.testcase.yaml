@@ -23,6 +23,7 @@ description: Save a note through the production Notes UI, close the run-owned QA
   mounted to retain its content, so verify that it is hidden rather than requiring DOM removal. After normal desktop shutdown, an actual headless owner
   rejects a competing desktop on the same profile. After the headless owner releases it, the restored desktop rejects a headless contender.
   Verify both conflicts again with a pending MFA recovery record in the isolated profile and confirm that the contender preserves the record.
+  The MFA upgrade helper also rejects a different executable while the desktop stays responsive.
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
@@ -85,6 +86,13 @@ steps:
       pendingMfaRecoveryContender.ownerStillRunning: true
       pendingMfaRecoveryContender.openedEndpoint: false
       pendingMfaRecoveryContender.recoveryRecordPreserved: true
+- assert_json_file:
+    path: desktop-mode-lease.json
+    expect:
+      passed: true
+      mfaRelaunchExecutableGuard.exitCode: 1
+      mfaRelaunchExecutableGuard.rejected: true
+      mfaRelaunchExecutableGuard.ownerStillRunning: true
 verification:
   review: reviewed
   requirements:
@@ -125,6 +133,8 @@ verification:
       expectation: Closing the saved Notes overlay exposes the native window close button before normal restart.
     - step: 30
       expectation: Headless stays alive while the desktop exits with status 1 in both attempts. The pending MFA recovery record is preserved and the desktop reopens the same data after headless exits.
+    - step: 31
+      expectation: The helper rejects the different executable with status 1 while the desktop remains responsive.
     - step: 21
       expectation: After proving persisted notes, closing the overlay exposes Settings without discarding data.
     results:
@@ -140,6 +150,7 @@ verification:
     - 28
     - 29
     - 30
+    - 31
   native:
   - check: Normal exit, process ownership change, profile lock release and SQLite persistence.
     method: automated
