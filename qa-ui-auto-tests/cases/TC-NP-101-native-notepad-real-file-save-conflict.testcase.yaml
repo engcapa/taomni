@@ -17,7 +17,6 @@ tags:
 - native
 - file-open
 - conflict
-- crash-regression
 fixtures:
 - reset_db
 - file_open_files
