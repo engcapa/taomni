@@ -37,6 +37,10 @@ on:
         description: "Optional SemVer override for artifact-only upgrade tests; package.json is unchanged."
         required: false
         type: string
+      modules:
+        description: Comma-separated module slugs to build with the core
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -58,6 +62,7 @@ jobs:
       macos_aarch64: ${{ steps.plan.outputs.macos_aarch64 }}
       macos_x86_64: ${{ steps.plan.outputs.macos_x86_64 }}
       macos_runner: ${{ steps.plan.outputs.macos_runner }}
+      modules: ${{ steps.plan.outputs.modules }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -74,6 +79,7 @@ jobs:
           INPUT_MACOS_ARCH: ${{ inputs.macos_arch }}
           INPUT_MACOS_RUNNER: ${{ inputs.macos_runner }}
           RELEASE_TEST_VERSION: ${{ inputs.test_version }}
+          INPUT_RELEASE_MODULES: ${{ inputs.modules }}
         run: node scripts/resolve-release-build.mjs
 
   # ---------------------------------------------------------------------------
@@ -558,6 +564,28 @@ jobs:
         timeout-minutes: 3
         run: node scripts/configure-release-signing.mjs --cleanup-macos
 
+  package-modules:
+    needs: plan
+    if: needs.plan.outputs.modules != '[]'
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        module: ${{ fromJSON(needs.plan.outputs.modules) }}
+    uses: ./.github/workflows/release-modules.yml
+    with:
+      tag: ${{ needs.plan.outputs.tag }}
+      module: ${{ matrix.module }}
+      head: ${{ github.sha }}
+      macos_runner: ${{ needs.plan.outputs.macos_runner }}
+      package_only: true
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
   # ---------------------------------------------------------------------------
   # Compose a single, complete latest.json for tauri-plugin-updater.
   #
@@ -568,9 +596,9 @@ jobs:
   # ---------------------------------------------------------------------------
   finalize-updater-manifest:
     name: Publish verified bundles and latest.json
-    needs: [plan, build, build-macos]
+    needs: [plan, build, build-macos, package-modules]
     runs-on: ubuntu-22.04
-    if: needs.plan.outputs.tag != ''
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build.result == 'success' && needs.build-macos.result == 'success' && (needs.package-modules.result == 'success' || (needs.plan.outputs.modules == '[]' && needs.package-modules.result == 'skipped')) && needs.plan.outputs.tag != '' }}
     concurrency:
       group: taomni-release-catalog-publication
       cancel-in-progress: false
@@ -592,18 +620,21 @@ jobs:
         env:
           TAG: ${{ needs.plan.outputs.tag }}
           MODULES_LEGACY_UPGRADE_IDS: ${{ vars.TAOMNI_LEGACY_UPGRADE_IDS }}
+          MODULE_SELECTION: ${{ needs.plan.outputs.modules }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
           node scripts/stage-published-module-catalog.mjs carried-module-catalog --allow-missing >> "$GITHUB_OUTPUT"
-          if find artifacts -type f -name '*.taomni-plugin' -print -quit | grep -q .; then
+          if [[ "$MODULE_SELECTION" != '[]' ]]; then
             export MODULE_UPDATED_AT="$(git show -s --format=%cI HEAD)"
             if [[ -d carried-module-catalog ]]; then
               export MODULES_PUBLISHED_CATALOG=carried-module-catalog/modules.json
+              node scripts/compose-modules-manifest.mjs artifacts changed-module-catalog --delta
+            else
+              node scripts/compose-modules-manifest.mjs artifacts module-assets
             fi
-            node scripts/compose-modules-manifest.mjs artifacts module-assets
             echo 'present=true' >> "$GITHUB_OUTPUT"
           elif [[ -n "$MODULES_LEGACY_UPGRADE_IDS" && ! -d carried-module-catalog ]]; then
             echo 'The first modular release requires signed module packages.' >&2
@@ -616,6 +647,16 @@ jobs:
         run: |
           cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
           cargo build --manifest-path scripts/plugin-package/Cargo.toml --bin taomni-plugin-package --release --locked
+      - name: Combine changed module packages with the verified catalog
+        if: steps.module-catalog.outputs.present == 'true' && steps.module-catalog.outputs.source_tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog-signature carried-module-catalog
+          node scripts/fetch-published-module-assets.mjs carried-module-catalog carried-module-catalog
+          scripts/plugin-package/target/release/taomni-plugin-package \
+            --prepare-catalog-update carried-module-catalog changed-module-catalog module-assets > module-uploads.json
       - name: Verify the first-upgrade roster before signing
         if: steps.module-catalog.outputs.present == 'true'
         shell: bash
@@ -659,6 +700,10 @@ jobs:
             # A draft left by an interrupted earlier run is published only
             # after this run uploads the complete verified asset set.
             test "$publish_draft" = true || test "$publish_draft" = false
+            if [[ -d module-assets && "$publish_draft" != true ]]; then
+              echo 'Joint core and module assets must use a draft release.' >&2
+              exit 1
+            fi
           else
             release_args=(--draft --title "Taomni $TAG" --generate-notes --target "$GITHUB_SHA")
             if [[ "$TAG" == *-* ]]; then
@@ -687,9 +732,14 @@ jobs:
             # Publish packages and detached signatures first. The signed
             # catalogue is uploaded last so clients never observe references
             # to assets that are not present yet.
+            if [[ -f module-uploads.json ]]; then
+              module_uploads="$(node -e 'for (const name of require("./module-uploads.json")) console.log("module-assets/" + name)')"
+            else
+              module_uploads="$(find module-assets -maxdepth 1 -type f ! -name modules.json ! -name modules.json.minisig | sort)"
+            fi
             while IFS= read -r asset; do
               gh release upload "$TAG" "$asset" --clobber
-            done < <(find module-assets -maxdepth 1 -type f ! -name modules.json ! -name modules.json.minisig | sort)
+            done <<< "$module_uploads"
             gh release upload "$TAG" module-assets/modules.json.minisig --clobber
             gh release upload "$TAG" module-assets/modules.json --clobber
           elif [[ -d carried-module-catalog && "$MODULE_CATALOG_SOURCE_TAG" != "$TAG" ]]; then

@@ -42,6 +42,10 @@ on:
         required: false
         default: macos-15
         type: string
+      package_only:
+        description: Build and sign GitHub Actions artifacts for the calling core workflow
+        default: false
+        type: boolean
     secrets:
       TAURI_SIGNING_PRIVATE_KEY:
         required: true
@@ -62,7 +66,7 @@ defaults:
     shell: bash
 
 concurrency:
-  group: module-release-${{ inputs.tag || github.ref }}
+  group: module-release-${{ inputs.tag || github.ref }}-${{ inputs.module }}
   cancel-in-progress: false
 
 jobs:
@@ -88,6 +92,7 @@ jobs:
         env:
           MODULE_SLUG: ${{ inputs.module }}
           RELEASE_TAG: ${{ inputs.tag }}
+          PACKAGE_ONLY: ${{ inputs.package_only || false }}
           MACOS_RUNNER: ${{ inputs.macos_runner || 'macos-15' }}
         run: |
           python - <<'PY'
@@ -95,10 +100,11 @@ jobs:
 
           slug = os.environ['MODULE_SLUG'].strip()
           tag = os.environ['RELEASE_TAG'].strip()
+          package_only = os.environ['PACKAGE_ONLY'] == 'true'
           macos_runner = os.environ['MACOS_RUNNER']
           if not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]*[a-z0-9])?', slug):
               raise SystemExit('module must be a lowercase module slug')
-          if not re.fullmatch(r'v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)*', tag):
+          if (tag or not package_only) and not re.fullmatch(r'v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)*', tag):
               raise SystemExit('tag must be a semantic version prefixed with v')
           if macos_runner not in {'macos-15', 'macos-15-intel', 'macos-26', 'macos-latest'}:
               raise SystemExit('select a supported GitHub-hosted macOS runner')
@@ -108,7 +114,8 @@ jobs:
           manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
           if manifest.get('id') != f'taomni-plugin-{slug}':
               raise SystemExit('module id must match the selected slug')
-          if manifest.get('status') != 'stable':
+          status = manifest.get('status')
+          if status != 'stable' and not (package_only and not tag and status == 'provisional'):
               raise SystemExit('only stable modules can enter a production catalog')
           if not manifest.get('description', '').strip():
               raise SystemExit('stable modules require a store description')
@@ -129,8 +136,9 @@ jobs:
               {'os': macos_runner, 'target': 'x86_64-apple-darwin', 'platform': 'darwin-x86_64'},
           ]
           declared = set(manifest.get('platforms', []))
-          if {target['platform'] for target in targets} - declared:
-              raise SystemExit('manifest must declare every production release target')
+          if not declared or declared - {target['platform'] for target in targets}:
+              raise SystemExit('manifest must declare supported production release targets')
+          targets = [target for target in targets if target['platform'] in declared]
           output = os.environ['GITHUB_OUTPUT']
           with open(output, 'a', encoding='utf-8') as stream:
               stream.write(f"sha={subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()}\n")
@@ -146,7 +154,7 @@ jobs:
     uses: ./.github/workflows/build-vnc-frontend.yml
     with:
       source: ${{ needs.source.outputs.sha }}
-      artifact: release-desktop-frontend-${{ github.run_id }}
+      artifact: release-desktop-frontend-${{ needs.source.outputs.slug }}-${{ github.run_id }}
       module: ${{ needs.source.outputs.slug }}
 
   build:
@@ -225,7 +233,7 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: module-unsigned-${{ matrix.platform }}-${{ github.run_id }}
+          name: module-unsigned-${{ needs.source.outputs.slug }}-${{ matrix.platform }}-${{ github.run_id }}
           path: |
             unsigned-module/
             candidate-source.json
@@ -254,7 +262,7 @@ jobs:
           cargo build --manifest-path scripts/plugin-package/Cargo.toml --release --locked
       - uses: actions/download-artifact@v4
         with:
-          name: module-unsigned-${{ matrix.platform }}-${{ github.run_id }}
+          name: module-unsigned-${{ needs.source.outputs.slug }}-${{ matrix.platform }}-${{ github.run_id }}
           path: candidate
       - name: Check candidate identity against the trusted manifest
         id: candidate
@@ -262,6 +270,8 @@ jobs:
           MODULE_PLATFORM: ${{ matrix.platform }}
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
           MODULE_SLUG: ${{ needs.source.outputs.slug }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          PACKAGE_ONLY: ${{ inputs.package_only || false }}
         run: |
           python - <<'PY'
           import json, os, pathlib, re
@@ -278,8 +288,10 @@ jobs:
               trusted['entry']['host'] = host
           if trusted != candidate:
               raise SystemExit('candidate module metadata differs from trusted source')
-          if candidate.get('status') != 'stable' or candidate.get('id') != f"taomni-plugin-{os.environ['MODULE_SLUG']}":
-              raise SystemExit('candidate is not a stable official module')
+          status = candidate.get('status')
+          rehearsal = os.environ['PACKAGE_ONLY'] == 'true' and not os.environ['RELEASE_TAG'].strip()
+          if (status != 'stable' and not (rehearsal and status == 'provisional')) or candidate.get('id') != f"taomni-plugin-{os.environ['MODULE_SLUG']}":
+              raise SystemExit('candidate module status or identity is invalid for this release')
           if any(path.is_symlink() for path in root.rglob('*')):
               raise SystemExit('candidate payload contains a symlink')
           if os.environ['MODULE_SLUG'] == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
@@ -295,7 +307,7 @@ jobs:
       - uses: actions/download-artifact@v4
         if: needs.source.outputs.slug == 'vnc-client' || needs.source.outputs.slug == 'rdp-client' || needs.source.outputs.slug == 'mail' || needs.source.outputs.slug == 'screenshot'
         with:
-          name: release-desktop-frontend-${{ github.run_id }}
+          name: release-desktop-frontend-${{ needs.source.outputs.slug }}-${{ github.run_id }}
           path: trusted-desktop-frontend
       - name: Stage the verified module frontend bytes
         if: needs.source.outputs.slug == 'vnc-client' || needs.source.outputs.slug == 'rdp-client' || needs.source.outputs.slug == 'mail' || needs.source.outputs.slug == 'screenshot'
@@ -337,7 +349,7 @@ jobs:
             --output signed-module --source-sha "$MODULE_SOURCE_SHA"
       - uses: actions/upload-artifact@v4
         with:
-          name: module-signed-${{ matrix.platform }}-${{ github.run_id }}
+          name: module-signed-${{ needs.source.outputs.slug }}-${{ matrix.platform }}-${{ github.run_id }}
           path: |
             signed-module/
             macos-signing/
@@ -350,7 +362,7 @@ jobs:
   publish:
     name: Publish module catalog and packages
     needs: [source, sign]
-    if: needs.source.result == 'success' && needs.sign.result == 'success'
+    if: ${{ !inputs.package_only && needs.source.result == 'success' && needs.sign.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     concurrency:
@@ -382,7 +394,7 @@ jobs:
           cargo build --manifest-path scripts/plugin-package/Cargo.toml --release --locked
       - uses: actions/download-artifact@v4
         with:
-          pattern: module-signed-*-${{ github.run_id }}
+          pattern: module-signed-${{ needs.source.outputs.slug }}-*-${{ github.run_id }}
           path: signed-artifacts
           merge-multiple: false
       - name: Stage the signed public catalog baseline
@@ -406,12 +418,14 @@ jobs:
           MODULE_SEQUENCE: ${{ github.run_number }}
           MODULES_REQUIRE_SIGNATURE: '0'
           MODULE_UPDATED_AT: ${{ needs.source.outputs.committed_at }}
+          MODULE_TARGETS: ${{ needs.source.outputs.matrix }}
         run: |
           set -euo pipefail
           mkdir -p changed-modules
           find signed-artifacts -type f -name '*.taomni-plugin' -exec cp {} changed-modules/ \;
           find signed-artifacts -type f -name '*.taomni-plugin.minisig' -exec cp {} changed-modules/ \;
-          test "$(find changed-modules -type f -name '*.taomni-plugin' | wc -l)" = 4
+          expected="$(node -e 'console.log(JSON.parse(process.env.MODULE_TARGETS).include.length)')"
+          test "$(find changed-modules -type f -name '*.taomni-plugin' | wc -l)" = "$expected"
           node scripts/compose-modules-manifest.mjs changed-modules changed-catalog --delta
           scripts/plugin-package/target/release/taomni-plugin-package \
             --prepare-catalog-update current-catalog changed-catalog next-catalog > new-assets.json

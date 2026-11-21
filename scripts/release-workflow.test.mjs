@@ -32,8 +32,8 @@ test("artifact-only selection controls builders and cannot enter the publishing 
   assert(workflow.includes("        platform: ${{ fromJSON(needs.plan.outputs.desktop_platforms) }}"));
   assert(workflow.includes("    if: needs.plan.outputs.macos_aarch64 == 'true' || needs.plan.outputs.macos_x86_64 == 'true'"));
   const finalizer = workflow.split("  finalize-updater-manifest:\n")[1];
-  assert(finalizer.includes("    needs: [plan, build, build-macos]"));
-  assert(finalizer.includes("    if: needs.plan.outputs.tag != ''"));
+  assert(finalizer.includes("    needs: [plan, build, build-macos, package-modules]"));
+  assert.match(finalizer, /needs\.plan\.outputs\.tag != ''/);
   assert.equal((workflow.match(/RELEASE_TEST_VERSION: \$\{\{ needs.plan.outputs.test_version \}\}/g) ?? []).length, 2);
   for (const arch of ["aarch64", "x86_64"]) {
     for (const name of ["Stage and verify xray-core", "Build macOS bundle", "Verify fixed signature and updater app", "Collect workflow artifacts", "Upload workflow artifacts"]) {
@@ -41,6 +41,17 @@ test("artifact-only selection controls builders and cannot enter the publishing 
       assert(step?.includes(`        if: needs.plan.outputs.macos_${arch} == 'true'`), `${name} (${arch}) must follow the validated build selection`);
     }
   }
+});
+
+test("joint releases use the same source for core and selected modules and require all package jobs", () => {
+  const pack = workflow.split("  package-modules:\n")[1].split("  # ----")[0];
+  assert.match(pack, /module: \$\{\{ fromJSON\(needs\.plan\.outputs\.modules\) \}\}/);
+  assert.match(pack, /head: \$\{\{ github\.sha \}\}/);
+  assert.match(pack, /uses: \.\/\.github\/workflows\/release-modules\.yml/);
+  assert.match(pack, /package_only: true/);
+  const finalizer = workflow.split("  finalize-updater-manifest:\n")[1];
+  assert.match(finalizer, /needs\.package-modules\.result == 'success'/);
+  assert.match(finalizer, /needs\.plan\.outputs\.modules == '\[\]' && needs\.package-modules\.result == 'skipped'/);
 });
 const publishStep = workflow.split("      - name: Verify and publish release assets\n")[1];
 assert(publishStep, "the tested publishing step must exist in release.yml");
@@ -53,6 +64,10 @@ test("checks the previously published first-upgrade roster before signing new ca
   const verify = workflow.indexOf('--verify-release-roster module-assets "${previous[@]}"');
   const sign = workflow.indexOf("--sign-catalog module-assets");
   assert(stage > 0 && stage < assemble && assemble < verify && verify < sign);
+  const verifyPrevious = workflow.indexOf("--verify-catalog-signature carried-module-catalog");
+  const fetch = workflow.indexOf("node scripts/fetch-published-module-assets.mjs carried-module-catalog carried-module-catalog");
+  const merge = workflow.indexOf("--prepare-catalog-update carried-module-catalog changed-module-catalog module-assets");
+  assert(assemble < verifyPrevious && verifyPrevious < fetch && fetch < merge && merge < verify);
   const verificationStep = workflow.slice(workflow.indexOf("      - name: Verify the first-upgrade roster before signing"), verify);
   assert(verificationStep.includes("previous+=(carried-module-catalog)"));
   assert(!verificationStep.includes("TAURI_SIGNING_PRIVATE_KEY"));
@@ -139,6 +154,34 @@ test("verifies the detached module catalog and all its packages before any relea
   const published = f.calls().filter((args) => args[1] === "upload").slice(-5).map((args) => args[3]);
   assert.deepEqual(published, ["module-assets/example.taomni-plugin", "module-assets/example.taomni-plugin.minisig",
     "module-assets/modules.json.minisig", "module-assets/modules.json", "updater-assets/latest.json"]);
+});
+
+test("a joint release publishes only changed module assets from the verified catalog", (t) => {
+  const f = fixture(t);
+  const verifier = join(f.root, "scripts/plugin-package/target/release/taomni-plugin-package");
+  f.put(verifier, '#!/bin/sh\n[ "$1" = "--verify-catalog" ] && [ "$2" = "module-assets" ]\n');
+  chmodSync(verifier, 0o755);
+  for (const name of [
+    "unchanged.taomni-plugin", "unchanged.taomni-plugin.minisig",
+    "changed.taomni-plugin", "changed.taomni-plugin.minisig", "modules.json", "modules.json.minisig",
+  ]) {
+    f.put(join(f.root, "module-assets", name), name);
+  }
+  f.put(join(f.root, "module-uploads.json"), JSON.stringify(["changed.taomni-plugin", "changed.taomni-plugin.minisig"]));
+  assert.notEqual(f.run({ TEST_GH_EXISTING_RELEASE: "1" }).status, 0);
+  assert(f.calls().every((args) => args[1] === "view"));
+  rmSync(join(f.root, "updater-assets"), { recursive: true });
+  const result = f.run({ TEST_GH_EXISTING_DRAFT: "1" });
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  const uploads = f.calls().filter((args) => args[1] === "upload").map((args) => args[3]);
+  assert(!uploads.some((path) => path.includes("unchanged.taomni-plugin")));
+  assert.deepEqual(uploads.slice(-5), [
+    "module-assets/changed.taomni-plugin",
+    "module-assets/changed.taomni-plugin.minisig",
+    "module-assets/modules.json.minisig",
+    "module-assets/modules.json",
+    "updater-assets/latest.json",
+  ]);
 });
 
 test("validates and carries the signed catalog before a core-only release becomes visible", (t) => {

@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- Release Bundle 增加 `modules` 选项。选中的模块复用独立模块签名流程，并与核心安装件使用同一源码。联合发布核对已有目录的签名和包，再合并本次变更。未变更条目保留原 URL，首装名单继续冻结。空 `tag` 支持用当前候选模块演练构建，正式发布要求稳定模块与 draft Release。
 - 在 `d08c7a86f` 的 Linux Native 分片中，VNC Server 首次启动、运行中备份、停止和禁用均通过。重新启用后原用例在点击启动后立即探测写租约。失败截图保存时 daemon 已显示运行，日志也记录了新监听。用例先等运行状态，再保留真实端口、鉴权与写租约断言。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44945992713)
 - 三端 RDP Server 的签名工件改由各平台独立构建。TC-MODULES-065 新增 macOS 固定证书和 hardened runtime 验证，并复用独立桌面窗口检查实际远程输入与成像。正式 DMG 升级后的 TCC 授权复用仍按 G2 验证。
 - `8cabdb13b` 的三端 Browser 各通过 25/25，六个分片已下载并核对回执。四目标核心清单排除了 RDP Server 引擎和宿主。Linux 签名构建在链接时缺少 `libxkbcommon-dev`，QA 和发布工作流已补齐该依赖。原始构建日志和已下载工件仍保留。 [Browser 与构建](https://github.com/engcapa/taomni/actions/runs/44947624092) · [四目标清单](https://github.com/engcapa/taomni/actions/runs/44947656893) · [链接失败日志](https://github.com/engcapa/taomni/actions/runs/44947624092/job/136979405688)

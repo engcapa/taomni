@@ -25,6 +25,12 @@ export function releaseBuildPlan(env, packageVersion) {
   const arch = manual ? env.INPUT_MACOS_ARCH || "both" : "both";
   const macosRunner = manual && !tag ? env.INPUT_MACOS_RUNNER || "macos-15" : "macos-15";
   const testVersion = manual ? env.RELEASE_TEST_VERSION || "" : "";
+  const moduleInput = manual ? env.INPUT_RELEASE_MODULES?.trim() : "";
+  const modules = moduleInput ? moduleInput.split(",").map((slug) => slug.trim()) : [];
+  if (modules.some((slug) => !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(slug))
+    || new Set(modules).size !== modules.length) {
+    throw new Error("modules must be a comma-separated list of unique module slugs.");
+  }
   if (!["all", "macos", "windows"].includes(platforms) || !["both", "aarch64", "x86_64"].includes(arch)) {
     throw new Error("Unsupported build platform or macOS architecture.");
   }
@@ -48,6 +54,7 @@ export function releaseBuildPlan(env, packageVersion) {
     macos_aarch64: String(platforms !== "windows" && arch !== "x86_64"),
     macos_x86_64: String(platforms !== "windows" && arch !== "aarch64"),
     macos_runner: macosRunner,
+    modules: JSON.stringify(modules),
   };
 }
 

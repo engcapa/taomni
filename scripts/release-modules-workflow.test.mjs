@@ -13,10 +13,20 @@ test("module-only release builds every declared target and never invokes the cor
     assert.match(workflow, new RegExp(platform));
   }
   assert.match(workflow, /cargo build --manifest-path src-tauri\/Cargo\.toml/);
+  assert.match(workflow, /targets = \[target for target in targets if target\['platform'\] in declared\]/);
   assert.match(workflow, /--prepare-catalog-update current-catalog changed-catalog next-catalog/);
   assert.match(workflow, /--sign-catalog next-catalog/);
   assert.doesNotMatch(workflow, /gh release upload .*latest\.json/);
   assert.doesNotMatch(workflow, /tauri-apps\/tauri-action/);
+});
+
+test("reusable packaging keeps independent artifact names and skips standalone publication", () => {
+  assert.match(workflow, /module-unsigned-\$\{\{ needs\.source\.outputs\.slug \}\}-/);
+  assert.match(workflow, /module-signed-\$\{\{ needs\.source\.outputs\.slug \}\}-/);
+  assert.match(workflow, /release-desktop-frontend-\$\{\{ needs\.source\.outputs\.slug \}\}-/);
+  assert.match(workflow, /if: \$\{\{ !inputs\.package_only && needs\.source\.result == 'success'/);
+  assert.match(workflow, /package_only and not tag and status == 'provisional'/);
+  assert.match(workflow, /rehearsal = os\.environ\['PACKAGE_ONLY'\] == 'true' and not os\.environ\['RELEASE_TAG'\]\.strip\(\)/);
 });
 
 test("module-only publication uploads immutable packages before the signed catalog", () => {

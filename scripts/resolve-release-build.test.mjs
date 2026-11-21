@@ -8,7 +8,7 @@ const manual = { GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF_TYPE: "branc
 test("the default manual build collects all platforms without publishing", () => {
   assert.deepEqual(releaseBuildPlan(manual, version), {
     version, tag: "", test_version: "", build_desktop: "true", desktop_platforms: '["ubuntu-22.04","windows-latest"]',
-    macos_aarch64: "true", macos_x86_64: "true", macos_runner: "macos-15",
+    macos_aarch64: "true", macos_x86_64: "true", macos_runner: "macos-15", modules: "[]",
   });
 });
 
@@ -17,7 +17,7 @@ test("Intel-only upgrade tests resolve distinct versions without enabling releas
     const plan = releaseBuildPlan({ ...manual, INPUT_PLATFORMS: "macos", INPUT_MACOS_ARCH: "x86_64", RELEASE_TEST_VERSION: testVersion }, version);
     assert.deepEqual(plan, {
       version: testVersion, tag: "", test_version: testVersion, build_desktop: "false", desktop_platforms: "[]",
-      macos_aarch64: "false", macos_x86_64: "true", macos_runner: "macos-15",
+      macos_aarch64: "false", macos_x86_64: "true", macos_runner: "macos-15", modules: "[]",
     });
   }
   const arm = releaseBuildPlan({ ...manual, INPUT_MACOS_ARCH: "aarch64" }, version);
@@ -52,6 +52,16 @@ test("tag pushes and published releases keep the full build, ignoring manual inp
     assert.equal(plan.version, version);
     assert.equal(plan.macos_runner, "macos-15");
     for (const key of ["build_desktop", "macos_aarch64", "macos_x86_64"]) assert.equal(plan[key], "true");
+  }
+});
+
+test("manual joint builds select only the named module packages", () => {
+  const requested = { ...manual, INPUT_RELEASE_MODULES: "mfa, rdp-server" };
+  assert.deepEqual(JSON.parse(releaseBuildPlan(requested, version).modules), ["mfa", "rdp-server"]);
+  assert.equal(releaseBuildPlan(requested, version).tag, "");
+  assert.equal(releaseBuildPlan({ ...requested, INPUT_RELEASE_TAG: `v${version}` }, version).tag, `v${version}`);
+  for (const modules of ["../mfa", "mfa,mfa", "mfa,", "MFA", "mfa\nNAME=bad"]) {
+    assert.throws(() => releaseBuildPlan({ ...manual, INPUT_RELEASE_MODULES: modules }, version), /unique module slugs/);
   }
 });
 
