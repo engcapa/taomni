@@ -2,6 +2,9 @@
 
 ## 2026-11-21 当前进展
 
+- RDP 客户端 0.1.1 由独立宿主完成 RD Gateway 的双通道 TLS 和 MS-TSGU 握手。核心绑定指向同一已选网关的入站和出站 TCP 路由。直连、代理和 SSH 跳板保留原路由，RDP 引擎只在隔离 QA 开启兼容功能时进入核心构建。证书指纹仍由核心旧库读取，数据迁移待完成。RDP 引擎 159 项单测、50 项前端单测、23 项签名工具单测、默认和 QA 特性编译、类型与边界检查通过。TC-MODULES-057 增加网关控件路径，056 增加签名前端的网关配置错误检查。四目标 G9 清单检查同时核对 RDP 与 VNC。
+- 合并后的 `3209d2dd9` 三端 Browser 各通过 35/35。056 所在的 Linux Native 在构建前被 QA 工具单测阻断，原因是平台依赖契约遗漏了新增的签名 RDP 工作。已补齐契约的三端依赖预期。Windows 与 macOS Native 继续收取。 [三端运行](https://github.com/engcapa/taomni/actions/runs/44876459274) · [Linux 构建日志](https://github.com/engcapa/taomni/actions/runs/44876459274/job/136763080138)
+- Windows 实装复跑已定位到 Vault 创建密码字段等待超时。 `4a2cb7393` 让原生点击进入 MFA，并在失败时记录可见控件数量。复验沿用相同的 MSI 以比较驱动行为。 [原始回执](https://github.com/engcapa/taomni/actions/runs/44876631457)
 - `007a2695a` 合入 `main` 的 `e439e9d20`（#845）。保留 Word 导出矢量标签定位和 300 DPI PNG 修复。导出相关 23 项 Vitest、27 项 Python 单测及 `check:refactor` 通过。后续三端选集加入 TC-FILE-OPEN-014/015。 [合并提交](https://github.com/engcapa/taomni/commit/007a2695a)
 - `61baec221` 的 18 个分片在汇总前全部收齐。三端 Browser 各 33/33。Linux、Windows、macOS 26 Native 分别为 39/39、40/40、39/41。TC-MODULES-053 三端通过，Windows 的 055 通过。macOS 剩余失败是 007 保存对话框识别和 009 HTML WebView 的 AppleScript 点击超时。选集、源码、用例摘要、构建标识及收据保存在 `qa-ui-auto-report/github/44859952031/live-shards/`。 [三端原始结果](https://github.com/engcapa/taomni/actions/runs/44859952031)
 - 同一批次的 RDP 实际性能用例三端通过。Linux、Windows、macOS 26 的输入到画面 p95 分别为 43.74、54.42、50.03 ms，每端 40/40 个样本，均低于 130 ms 的模块化上限。连接首帧分别为 98、46、136 ms。原始 `perf-latency.json`、`perf-connect.json` 和 `perf-throughput.json` 随 Native 分片保存。这批证据对应切换到签名 RDP 客户端前的版本。 [平台运行](https://github.com/engcapa/taomni/actions/runs/44859952031)

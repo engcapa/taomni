@@ -300,12 +300,12 @@ jobs:
           assert observed == {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': module}
           assert not any(p.is_symlink() for p in root.rglob('*'))
 
-          def check_payload(slug, folder, version):
+          def check_payload(slug, folder, version=None):
               trusted_source = pathlib.Path('src-tauri/plugins') / slug
               expected = json.loads((trusted_source / 'module.json').read_text(encoding='utf-8'))
               if os.environ['MODULE_PLATFORM'].startswith('windows'):
                   expected['entry']['host'] += '.exe'
-              assert expected['id'] == 'taomni-plugin-' + slug and expected['version'] == '0.1.0'
+              assert expected['id'] == 'taomni-plugin-' + slug
               binaries = {expected['entry']['host']}
               if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
                   binaries.add('taomni-vnc-key-helper.exe')
@@ -319,18 +319,20 @@ jobs:
                           allowed.add(source.relative_to(trusted_source).as_posix())
               payload = root / folder
               manifest = json.loads((payload / 'module.json').read_text(encoding='utf-8'))
-              assert manifest == {**expected, 'version': version}, 'Candidate metadata differs from the trusted official contract'
+              expected_version = expected['version'] if version is None else version
+              assert manifest == {**expected, 'version': expected_version}, 'Candidate metadata differs from the trusted official contract'
               files = {p.relative_to(payload).as_posix() for p in payload.rglob('*') if p.is_file()}
               assert files == allowed, 'Unexpected files in official QA payload'
               for relative in allowed - {'module.json'} - binaries:
                   assert (payload / relative).read_bytes() == (trusted_source / relative).read_bytes(), 'Candidate changed official frontend without a trusted revision'
               return expected
 
-          expected = check_payload(module, 'unsigned-module', '0.1.0')
+          expected = check_payload(module, 'unsigned-module')
           if os.environ['MODULE_LEGACY_ROSTER'] == 'true':
               assert module == 'hello-plugin'
               check_payload('mfa', 'unsigned-roster-mfa', '0.1.0')
           if module == 'hello-plugin':
+              assert expected['version'] == '0.1.0', 'Update the lifecycle fixture versions together'
               check_payload(module, 'unsigned-previous', '0.0.9')
               # This signed test input deliberately changes only the declared
               # version. The binary will reject the host handshake, exercising

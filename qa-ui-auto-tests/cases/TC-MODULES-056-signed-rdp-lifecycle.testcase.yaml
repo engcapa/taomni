@@ -5,7 +5,8 @@ description: >-
   runner's local Taomni RDP server. Confirm its certificate and deliver a click
   to the host. Disable the client module, verify the server accepts another
   connection, and re-enable the module. The same tab must reconnect without
-  another certificate confirmation and deliver a second click.
+  another certificate confirmation and deliver a second click. A separate
+  session without a configured RD Gateway username shows the gateway validation error.
 covers: [F-Modules-1, F9.7, F-RdpServer-1]
 tags: [modules, rdp-client, rdp-server, lifecycle, native-boundary, p1]
 modes: [native]
@@ -95,6 +96,26 @@ steps:
 - rdp_canvas_click: {x: 280, y: 240}
 - assert_json_file: {path: target-state.json, timeout_sec: 20, expect: {flips: {min: 2}}}
 - assert_no_runtime_errors: null
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- click: '[data-testid="session-proto-rdp"]'
+- fill: {selector: '[data-testid="session-host"]', value: 127.0.0.1}
+- click: '[data-testid="session-section-rdp"]'
+- set_check: {selector: '[data-testid="rdp-gateway-enabled"]', checked: true}
+- fill: {selector: '[data-testid="rdp-gateway-host"]', value: gateway.example.test}
+- set_check: {selector: '[data-testid="rdp-gateway-use-session"]', checked: false}
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: qa-signed-rdp-gateway}
+- click: '[data-testid="session-save"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-signed-rdp-gateway"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill: {selector: '[data-testid="auth-password"]', value: '${env.QA_RDP_PASSWORD}'}
+- click: '[data-testid="auth-submit"]'
+- assert_text:
+    selector: '[data-testid="rdp-panel"][data-frontend-source*="/__taomni_plugins__/rdp-client/"] .rdp-overlay'
+    contains: 'rdg: gateway username is empty'
+    timeout_sec: 45
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -119,6 +140,13 @@ verification:
     - {step: 75, expectation: A second click reaches the same host target after enabling.}
     - {step: 76, expectation: The native renderer has no uncaught runtime errors.}
     results: [60, 61, 62, 69, 73, 75, 76]
+  - id: R3
+    requirement: The signed viewer reports an invalid gateway using its normal connection workflow.
+    actions: [78, 79, 81, 82, 83, 84, 87, 88, 90, 91]
+    checkpoints:
+    - {step: 92, expectation: The signed renderer shows the missing gateway username error.}
+    - {step: 93, expectation: The gateway validation produces no uncaught renderer errors.}
+    results: [92, 93]
   visual:
   - check: The signed viewer and the disabled state appear in the saved tab.
     method: automated

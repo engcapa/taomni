@@ -1,28 +1,51 @@
 //! Tauri commands and core-owned credentials, certificate pins, and routing
-//! for the RDP client engine.
+//! for the signed RDP client.
 
+#[cfg(feature = "legacy-rdp-client")]
+mod legacy;
 mod module_host;
 pub(crate) mod tls;
 mod transport;
 
 pub use taomni_rdp_client_api::RdpOptions;
-#[cfg(debug_assertions)]
+#[cfg(all(debug_assertions, feature = "legacy-rdp-client"))]
 pub(crate) use taomni_rdp_client_engine::qa_graphics_capture;
 
 use serde::Serialize;
-use taomni_rdp_client_engine::session::{RdpSessionConfig, test_ironrdp_connection};
 use tauri::State;
-use uuid::Uuid;
 
 use crate::state::AppState;
 use crate::terminal::network::NetworkSettings;
 use crate::vault::Vault;
+#[cfg(feature = "legacy-rdp-client")]
 use taomni_rdp_client_api::SLUG;
-use taomni_rdp_client_engine::ws::{RdpControl, RdpSession, RdpSpawnConfig, spawn_rdp_relay};
+#[cfg(feature = "legacy-rdp-client")]
+use taomni_rdp_client_engine::ws::{RdpControl, RdpSession};
+use tokio_util::sync::CancellationToken;
 
 pub(crate) enum DesktopRdpSession {
+    #[cfg(feature = "legacy-rdp-client")]
     Local(RdpSession),
     Module(module_host::ModuleSession),
+}
+
+impl DesktopRdpSession {
+    fn closed(&self) -> CancellationToken {
+        match self {
+            #[cfg(feature = "legacy-rdp-client")]
+            Self::Local(session) => session.cancel.clone(),
+            Self::Module(session) => session.closed(),
+        }
+    }
+}
+
+struct ConnectionSettings {
+    host: String,
+    port: u16,
+    username: Option<String>,
+    password: Option<String>,
+    options: RdpOptions,
+    network: Option<NetworkSettings>,
 }
 
 #[derive(Debug, Serialize)]
@@ -81,6 +104,60 @@ fn apply_stored_certificate_pins(
     Ok(())
 }
 
+fn resolve_connection(
+    state: &State<'_, AppState>,
+    host: String,
+    port: u16,
+    username: Option<String>,
+    password: Option<String>,
+    options_json: Option<&str>,
+    network_settings_json: Option<&str>,
+) -> Result<ConnectionSettings, String> {
+    let resolved_password = resolve_secret(&state.core.vault, password.as_deref())?;
+    let mut options = RdpOptions::from_json(options_json);
+    apply_stored_certificate_pins(state, &host, port, &mut options)?;
+    if let Some(g) = options.gateway.as_mut() {
+        if let Some(p) = g.password.as_deref() {
+            if let Some(plain) = state.core.vault.resolve(p)? {
+                g.password = Some((*plain).clone());
+            }
+        }
+    }
+    apply_session_credentials_to_gateway(&mut options, &username, &resolved_password);
+    let mut network = NetworkSettings::from_json(network_settings_json);
+    if let Some(n) = network.as_mut() {
+        crate::terminal::resolve_proxy_session(state, n)?;
+        n.resolve_proxy_pass(&state.core.vault)?;
+        crate::terminal::resolve_jump_credentials(state, n)?;
+    }
+
+    Ok(ConnectionSettings {
+        host,
+        port,
+        username,
+        password: resolved_password,
+        options,
+        network,
+    })
+}
+
+async fn start_session(
+    registry: &crate::plugin::PluginRegistry,
+    settings: ConnectionSettings,
+) -> Result<(RdpConnectResult, DesktopRdpSession), String> {
+    #[cfg(feature = "legacy-rdp-client")]
+    if registry.get(SLUG).is_none() {
+        return legacy::start(settings).await;
+    }
+    let session = module_host::start(registry, settings).await?;
+    let result = RdpConnectResult {
+        session_id: session.started.session_id.clone(),
+        ws_port: session.started.ws_port,
+        ws_token: session.started.ws_token.clone(),
+    };
+    Ok((result, DesktopRdpSession::Module(session)))
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn rdp_connect(
@@ -92,55 +169,17 @@ pub async fn rdp_connect(
     options_json: Option<String>,
     network_settings_json: Option<String>,
 ) -> Result<RdpConnectResult, String> {
-    let resolved_password = resolve_secret(&state.core.vault, password.as_deref())?;
-    let mut options = RdpOptions::from_json(options_json.as_deref());
-    apply_stored_certificate_pins(&state, &host, port, &mut options)?;
-    if let Some(g) = options.gateway.as_mut() {
-        if let Some(p) = g.password.as_deref() {
-            if let Some(plain) = state.core.vault.resolve(p)? {
-                g.password = Some((*plain).clone());
-            }
-        }
-    }
-    apply_session_credentials_to_gateway(&mut options, &username, &resolved_password);
-    let mut network = NetworkSettings::from_json(network_settings_json.as_deref());
-    if let Some(n) = network.as_mut() {
-        crate::terminal::resolve_proxy_session(&state, n)?;
-        n.resolve_proxy_pass(&state.core.vault)?;
-        crate::terminal::resolve_jump_credentials(&state, n)?;
-    }
-
-    let connect = transport::connector(host.clone(), port, network, options.gateway.clone());
-    let (result, session, reaper_cancel) = if state.plugins.get(SLUG).is_some() {
-        let (route, endpoint) = module_host::bind_route(connect).await?;
-        let request =
-            module_host::connection(host, port, username, resolved_password, options, endpoint);
-        let session = module_host::start(&state.plugins, request, route).await?;
-        let cancellation = session.route.closed();
-        let result = RdpConnectResult {
-            session_id: session.started.session_id.clone(),
-            ws_port: session.started.ws_port,
-            ws_token: session.started.ws_token.clone(),
-        };
-        (result, DesktopRdpSession::Module(session), cancellation)
-    } else {
-        let session = spawn_rdp_relay(RdpSpawnConfig {
-            host,
-            port,
-            username,
-            password: resolved_password,
-            options,
-            connect,
-        })
-        .await?;
-        let cancellation = session.cancel.clone();
-        let result = RdpConnectResult {
-            session_id: Uuid::new_v4().to_string(),
-            ws_port: session.ws_port,
-            ws_token: session.ws_token.clone(),
-        };
-        (result, DesktopRdpSession::Local(session), cancellation)
-    };
+    let settings = resolve_connection(
+        &state,
+        host,
+        port,
+        username,
+        password,
+        options_json.as_deref(),
+        network_settings_json.as_deref(),
+    )?;
+    let (result, session) = start_session(&state.plugins, settings).await?;
+    let reaper_cancel = session.closed();
 
     // Reap the session-map entry once the relay's cancellation token fires
     // (idle timeout, WS close, server disconnect, or explicit
@@ -173,6 +212,7 @@ pub async fn rdp_disconnect(state: State<'_, AppState>, session_id: String) -> R
         .await
         .remove(&session_id);
     match session {
+        #[cfg(feature = "legacy-rdp-client")]
         Some(DesktopRdpSession::Local(local)) => {
             let _ = local.control_tx.send(RdpControl::Disconnect);
         }
@@ -214,46 +254,16 @@ pub async fn rdp_test_connection(
     options_json: Option<String>,
     network_settings_json: Option<String>,
 ) -> Result<String, String> {
-    let resolved_password = resolve_secret(&state.core.vault, password.as_deref())?;
-    let mut options = RdpOptions::from_json(options_json.as_deref());
-    apply_stored_certificate_pins(&state, &host, port, &mut options)?;
-    if let Some(g) = options.gateway.as_mut() {
-        if let Some(p) = g.password.as_deref() {
-            if let Some(plain) = state.core.vault.resolve(p)? {
-                g.password = Some((*plain).clone());
-            }
-        }
-    }
-    apply_session_credentials_to_gateway(&mut options, &username, &resolved_password);
-    let mut network = NetworkSettings::from_json(network_settings_json.as_deref());
-    if let Some(n) = network.as_mut() {
-        crate::terminal::resolve_proxy_session(&state, n)?;
-        n.resolve_proxy_pass(&state.core.vault)?;
-        crate::terminal::resolve_jump_credentials(&state, n)?;
-    }
-
-    let reconnect = transport::connector(host.clone(), port, network, options.gateway.clone());
-    let result = if state.plugins.get(SLUG).is_some() {
-        let (route, endpoint) = module_host::bind_route(reconnect).await?;
-        let request =
-            module_host::connection(host, port, username, resolved_password, options, endpoint);
-        module_host::test(&state.plugins, request, route).await?
-    } else {
-        let transport = reconnect().await?;
-        test_ironrdp_connection(
-            RdpSessionConfig {
-                transport,
-                host,
-                port,
-                username,
-                password: resolved_password,
-                options,
-                reconnect,
-            },
-            std::time::Duration::from_secs(45),
-        )
-        .await?
-    };
+    let settings = resolve_connection(
+        &state,
+        host,
+        port,
+        username,
+        password,
+        options_json.as_deref(),
+        network_settings_json.as_deref(),
+    )?;
+    let result = test_session(&state.plugins, settings).await?;
 
     Ok(format!(
         "RDP connection OK — protocol={}, desktop={}x{}, server={}",
@@ -261,10 +271,21 @@ pub async fn rdp_test_connection(
     ))
 }
 
+async fn test_session(
+    registry: &crate::plugin::PluginRegistry,
+    settings: ConnectionSettings,
+) -> Result<taomni_rdp_client_api::ConnectionTestResult, String> {
+    #[cfg(feature = "legacy-rdp-client")]
+    if registry.get(SLUG).is_none() {
+        return legacy::test(settings).await;
+    }
+    module_host::test(registry, settings).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use taomni_rdp_client_engine::GatewayOpt;
+    use taomni_rdp_client_api::GatewayOpt;
 
     #[test]
     fn gateway_reuses_session_credentials_when_requested() {

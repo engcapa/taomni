@@ -53,7 +53,7 @@ pub use rpc::{
     parse_response_pdu,
 };
 pub use stream::GatewayStream;
-pub use tunnel::open_tunnel;
+pub use tunnel::{connector, open_tunnel};
 mod authentication;
 mod bootstrap;
 mod http;
@@ -64,6 +64,8 @@ mod stream;
 mod transport;
 mod tunnel;
 
+#[cfg(test)]
+mod route_tests;
 #[cfg(test)]
 mod tests;
 

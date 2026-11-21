@@ -89,7 +89,7 @@ taomni-sqlite-snapshot = { path = "crates/taomni-sqlite-snapshot" }
 taomni-capture = { path = "crates/taomni-capture" }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-rdp-client-api = { path = "crates/taomni-rdp-client-api" }
-taomni-rdp-client-engine = { path = "crates/taomni-rdp-client-engine" }
+taomni-rdp-client-engine = { path = "crates/taomni-rdp-client-engine", optional = true }
 taomni-file-uri = { path = "crates/taomni-file-uri" }
 taomni-mfa-engine = { path = "crates/taomni-mfa-engine" }
 taomni-vnc-api = { path = "crates/taomni-vnc-api" }
@@ -295,6 +295,7 @@ winscard = { path = "vendor/winscard" }
 default = ["hbase-kerberos", "rdp-server-audio", "voice-capture", "asr-whisper", "asr-sherpa"]
 # Isolated QA exercises both the pre-module relay and the signed host.
 legacy-vnc-client = ["dep:taomni-vnc-engine", "dep:taomni-vnc-key-protocol"]
+legacy-rdp-client = ["dep:taomni-rdp-client-engine"]
 # Dedicated hosted test harness: use the production pinned key on every thread
 # instead of the normal unit-fixture key. Production verification is unchanged.
 qa-release-trust-gates = []

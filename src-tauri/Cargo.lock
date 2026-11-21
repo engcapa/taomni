@@ -11184,12 +11184,13 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-rdp-client"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
  "taomni-plugin-api",
  "taomni-plugin-sdk",
+ "taomni-plugin-stream",
  "taomni-rdp-client-api",
  "taomni-rdp-client-engine",
  "tokio",
@@ -11284,6 +11285,7 @@ dependencies = [
  "serde",
  "serde_json",
  "taomni-plugin-stream",
+ "tokio",
  "tracing",
  "zeroize",
 ]

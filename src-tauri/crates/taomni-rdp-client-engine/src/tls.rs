@@ -14,6 +14,7 @@ use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, Server
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{DigitallySignedStruct, RootCertStore, SignatureScheme};
 use sha2::{Digest, Sha256};
+pub use taomni_rdp_client_api::normalize_fingerprint;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use x509_cert::der::{Decode, Encode};
 
@@ -24,20 +25,6 @@ pub struct VerifiedTls<S> {
     pub server_public_key: Vec<u8>,
     pub fingerprint: String,
     pub used_pin: bool,
-}
-
-pub fn normalize_fingerprint(value: &str) -> Result<String, String> {
-    let normalized: String = value
-        .chars()
-        .filter(|ch| !matches!(ch, ':' | '-' | ' ' | '\t' | '\r' | '\n'))
-        .flat_map(char::to_lowercase)
-        .collect();
-    if normalized.len() != 64 || !normalized.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return Err(
-            "RDP certificate fingerprint must contain exactly 64 SHA-256 hex digits".to_string(),
-        );
-    }
-    Ok(normalized)
 }
 
 pub fn format_fingerprint(value: &str) -> String {

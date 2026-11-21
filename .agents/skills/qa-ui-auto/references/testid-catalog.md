@@ -2919,6 +2919,10 @@
 
 - `[data-testid="rdp-panel"]` — display — F9.7.panel-root
 - `[data-testid="rdp-status"]` — display — F9.7.status
+- `[data-testid="rdp-panel"] .rdp-overlay` — display — F9.7.status-overlay
+- `[data-testid="rdp-gateway-enabled"]` — interactive — F9.7.gateway-enabled
+- `[data-testid="rdp-gateway-host"]` — interactive — F9.7.gateway-host
+- `[data-testid="rdp-gateway-use-session"]` — interactive — F9.7.gateway-use-session
 - `[data-testid="rdp-canvas"]` — display — F9.7.canvas
 - `.rdp-options-form input[type="number"][min="320"]` — interactive [optional] — F9.7.screen-width
 - `[data-testid="session-section-rdp"]` — interactive [optional] — F9.7.options-section

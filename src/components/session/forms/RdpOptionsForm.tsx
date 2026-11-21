@@ -229,6 +229,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
         <legend>{t("rdp.options.gateway")}</legend>
         <label style={row()}>
           <input
+            data-testid="rdp-gateway-enabled"
             type="checkbox"
             checked={!!opt.gateway}
             onChange={(e) =>
@@ -246,6 +247,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
             <label style={row()}>
               <span>{t("rdp.options.gatewayHost")}</span>
               <input
+                data-testid="rdp-gateway-host"
                 className="taomni-input"
                 type="text"
                 value={opt.gateway.host}
@@ -268,6 +270,7 @@ export function RdpOptionsForm({ options, onChange }: RdpOptionsFormProps) {
             </label>
             <label style={row()}>
               <input
+                data-testid="rdp-gateway-use-session"
                 type="checkbox"
                 checked={opt.gateway.useSessionCreds}
                 onChange={(e) => setGateway({ useSessionCreds: e.target.checked })}

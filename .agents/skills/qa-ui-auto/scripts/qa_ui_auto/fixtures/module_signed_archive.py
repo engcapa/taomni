@@ -124,7 +124,10 @@ def setup_desktop_client(ctx, protocol):
     if not raw:
         raise RuntimeError(f"{setting} is required to locate the signed artifact")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    receipt, archive, signature, frontend = load_artifact(Path(raw), source, platform_key(), f"{protocol}-client")
+    slug = f"{protocol}-client"
+    manifest = Path(__file__).resolve().parents[6] / "src-tauri" / "plugins" / slug / "module.json"
+    version = json.loads(manifest.read_text(encoding="utf-8"))["version"]
+    receipt, archive, signature, frontend = load_artifact(Path(raw), source, platform_key(), slug, version=version)
     if not frontend:
         raise RuntimeError("The signed package has no renderer bytes")
     receipt["frontendSha256"] = hashlib.sha256(frontend).hexdigest()

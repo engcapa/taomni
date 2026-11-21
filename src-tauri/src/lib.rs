@@ -221,7 +221,7 @@ pub fn run() {
                 if app.config().identifier == "com.taomni.app.qa"
                     && std::env::var("TAOMNI_QA_RDP_TRACE").as_deref() == Ok("1")
                 {
-                    #[cfg(debug_assertions)]
+                    #[cfg(all(debug_assertions, feature = "legacy-rdp-client"))]
                     if let Err(error) = rdp::qa_graphics_capture::enable(&app.path().app_log_dir()?)
                     {
                         eprintln!("QA RDP packet capture unavailable: {error}");

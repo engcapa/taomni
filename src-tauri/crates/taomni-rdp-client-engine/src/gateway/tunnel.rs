@@ -11,8 +11,43 @@ use super::stream::GatewayStream;
 use super::stream::spawn_gateway_stream;
 use super::transport::RpcHttpChannel;
 use super::transport::connect_authenticated_rpc_channel;
-use crate::GatewayOpt;
+use crate::{
+    GatewayOpt,
+    transport::{RdpConnector, RdpTransport},
+};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
+use taomni_rdp_client_api::transport::gateway_socket;
 use tokio::io::AsyncWriteExt as _;
+
+const GATEWAY_TIMEOUT: Duration = Duration::from_secs(45);
+
+/// Use the same authorized pair for the initial tunnel and subsequent resizes.
+pub fn connector(
+    gateway: GatewayOpt,
+    host: String,
+    port: u16,
+    inbound: RdpConnector,
+    outbound: RdpConnector,
+) -> RdpConnector {
+    let route = Arc::new((gateway, host, inbound, outbound));
+    Arc::new(move || {
+        let route = route.clone();
+        Box::pin(async move {
+            let (gateway, host, inbound, outbound) = route.as_ref();
+            let stream = tokio::time::timeout(
+                GATEWAY_TIMEOUT,
+                open_tunnel_with_routes(gateway, host, port, inbound, outbound),
+            )
+            .await
+            .map_err(|_| "RDP RD Gateway tunnel timed out after 45 seconds".to_owned())??;
+            Ok(RdpTransport::new(
+                stream,
+                SocketAddr::from(([0, 0, 0, 0], 0)),
+            ))
+        })
+    })
+}
+
 /// Open an RD Gateway tunnel to `target_host:target_port` through the
 /// gateway described by `g`.
 pub async fn open_tunnel(
@@ -20,18 +55,30 @@ pub async fn open_tunnel(
     target_host: &str,
     target_port: u16,
 ) -> Result<GatewayStream, String> {
+    let connect = gateway_socket(&g.host, g.port);
+    open_tunnel_with_routes(g, target_host, target_port, &connect, &connect).await
+}
+
+pub(super) async fn open_tunnel_with_routes(
+    g: &GatewayOpt,
+    target_host: &str,
+    target_port: u16,
+    inbound: &RdpConnector,
+    outbound: &RdpConnector,
+) -> Result<GatewayStream, String> {
     validate_gateway_base(g, target_host, target_port)?;
     let initial_packets = build_gateway_initial_packets(g)?;
 
     let mut in_stream =
-        connect_authenticated_rpc_channel(g, &initial_packets, RpcHttpChannel::In).await?;
+        connect_authenticated_rpc_channel(g, &initial_packets, RpcHttpChannel::In, inbound).await?;
     in_stream
         .write_all(&initial_packets.conn_b1_pdu)
         .await
         .map_err(|e| format!("rdg: write CONN/B1: {}", e))?;
 
     let mut out_stream =
-        connect_authenticated_rpc_channel(g, &initial_packets, RpcHttpChannel::Out).await?;
+        connect_authenticated_rpc_channel(g, &initial_packets, RpcHttpChannel::Out, outbound)
+            .await?;
     out_stream
         .write_all(&initial_packets.conn_a1_pdu)
         .await

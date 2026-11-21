@@ -8,9 +8,11 @@ use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_plugin_sdk::{HostConfig, Operation, PluginHandler, serve_stdio_with};
-use taomni_rdp_client_api::{CLOSE, Connection, START, SessionId, TEST};
+use taomni_rdp_client_api::{
+    CLOSE, Connection, GatewayConnection, START, START_GATEWAY, SessionId, TEST, TEST_GATEWAY,
+};
 
-const COMMANDS: [&str; 3] = [START, CLOSE, TEST];
+const COMMANDS: [&str; 5] = [START, CLOSE, TEST, START_GATEWAY, TEST_GATEWAY];
 
 pub fn serve_stdio() -> io::Result<()> {
     let config = HostConfig {
@@ -38,8 +40,20 @@ impl PluginHandler for sessions::Sessions {
     ) -> Result<Value, RpcError> {
         operation.check_current()?;
         match method {
-            START => response(self.start(request(params)?, &|| operation.check_current())?),
-            TEST => response(self.test(request(params)?, &|| operation.check_current())?),
+            START => response(self.start(request(params)?, None, &|| operation.check_current())?),
+            TEST => response(self.test(request(params)?, None, &|| operation.check_current())?),
+            START_GATEWAY => {
+                let request: GatewayConnection = request(params)?;
+                response(self.start(request.connection, Some(request.outbound), &|| {
+                    operation.check_current()
+                })?)
+            }
+            TEST_GATEWAY => {
+                let request: GatewayConnection = request(params)?;
+                response(self.test(request.connection, Some(request.outbound), &|| {
+                    operation.check_current()
+                })?)
+            }
             CLOSE => {
                 let request: SessionId = request(params)?;
                 response(self.close(&request.session_id)?)

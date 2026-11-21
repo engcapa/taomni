@@ -1,15 +1,14 @@
 //! Transport selection for an RDP session.
 //!
-//! Three modes converge on the same `Box<dyn AsyncRead + AsyncWrite + Unpin + Send>`:
+//! Direct TCP, proxies and SSH jumps use the core's network policy. RD Gateway
+//! uses two raw TCP routes to the same authorized gateway and negotiates HTTPS
+//! and MS-TSGU in the client host.
 //!
 //! - **Direct TCP** — same DNS / IP-version logic as SSH and VNC.
 //! - **HTTP CONNECT or SOCKS5 proxy / SSH jump host** — delegated to
 //!   [`crate::terminal::network::establish_transport`], which already
 //!   speaks both proxy protocols with auth, and
 //!   [`crate::terminal::ssh::build_ssh_transport`] for SSH jump hosts.
-//! - **RD Gateway (MS-TSGU)** — a hand-rolled RPC-over-HTTPS twin-channel
-//!   wrapper in [`taomni_rdp_client_engine::gateway`] that exposes its stream as
-//!   `AsyncRead + AsyncWrite`.
 //!
 //! Higher layers (X.224 negotiation, TLS upgrade, MCS, …) treat the
 //! transport opaquely.
@@ -20,8 +19,7 @@ use std::net::SocketAddr;
 
 use std::sync::Arc;
 
-use taomni_rdp_client_engine::transport::{RdpConnector, RdpTransport};
-use taomni_rdp_client_engine::{GatewayOpt, gateway};
+use taomni_rdp_client_api::transport::{RdpConnector, RdpTransport};
 use tokio::net::TcpStream;
 
 use crate::terminal::network::{NetworkSettings, establish_transport};
@@ -29,22 +27,14 @@ use crate::terminal::ssh::build_ssh_transport;
 
 const DIRECT_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 const ROUTED_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
-const GATEWAY_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(45);
+const SSH_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(45);
 
 /// Resolve each stream using the same route on the first connect and after a resize.
-pub(super) fn connector(
-    host: String,
-    port: u16,
-    network: Option<NetworkSettings>,
-    gateway: Option<GatewayOpt>,
-) -> RdpConnector {
+pub(super) fn connector(host: String, port: u16, network: Option<NetworkSettings>) -> RdpConnector {
     Arc::new(move || {
         let host = host.clone();
         let network = network.clone();
-        let gateway = gateway.clone();
-        Box::pin(
-            async move { open_transport(&host, port, network.as_ref(), gateway.as_ref()).await },
-        )
+        Box::pin(async move { open_transport(&host, port, network.as_ref()).await })
     })
 }
 
@@ -52,29 +42,14 @@ pub(super) fn connector(
 ///
 /// Selection rules:
 ///
-/// 1. If `gateway` is `Some`, route through the RD Gateway. The host/port
-///    arguments are the *target* RDP server inside the gateway tunnel.
-/// 2. Else, if `network` indicates a non-`none` route (`http` / `socks5` /
+/// 1. If `network` indicates a non-`none` route (`http` / `socks5` /
 ///    `ssh-tunnel`), route through the matching shared transport helper.
-/// 3. Else, direct TCP.
+/// 2. Else, direct TCP.
 async fn open_transport(
     host: &str,
     port: u16,
     network: Option<&NetworkSettings>,
-    gw: Option<&GatewayOpt>,
 ) -> Result<RdpTransport, String> {
-    if let Some(g) = gw {
-        let stream = with_timeout(
-            GATEWAY_CONNECT_TIMEOUT,
-            "RD Gateway tunnel",
-            gateway::open_tunnel(g, host, port),
-        )
-        .await?;
-        return Ok(RdpTransport::new(
-            stream,
-            SocketAddr::from(([0, 0, 0, 0], 0)),
-        ));
-    }
     let proxy_kind = network.map(|n| n.proxy_kind.as_str()).unwrap_or("none");
     match proxy_kind {
         "" | "none" => {
@@ -103,7 +78,7 @@ async fn open_transport(
         }
         "ssh-tunnel" => {
             let s = with_timeout(
-                GATEWAY_CONNECT_TIMEOUT,
+                SSH_CONNECT_TIMEOUT,
                 "SSH tunnel",
                 build_ssh_transport(host, port, network),
             )
@@ -156,7 +131,7 @@ mod tests {
         net.proxy_kind = "unknown-proxy".into();
         net.proxy_host = "127.0.0.1".into();
         net.proxy_port = 1080;
-        let res = open_transport("example.com", 3389, Some(&net), None).await;
+        let res = open_transport("example.com", 3389, Some(&net)).await;
         let err = match res {
             Ok(_) => panic!("should reject"),
             Err(e) => e,
@@ -173,7 +148,7 @@ mod tests {
         net.jump_user = "ops".into();
         net.jump_auth_kind = "Password".into();
 
-        let res = open_transport("rdp.internal", 3389, Some(&net), None).await;
+        let res = open_transport("rdp.internal", 3389, Some(&net)).await;
         let err = match res {
             Ok(_) => panic!("empty jump password should fail in shared SSH transport"),
             Err(err) => err,

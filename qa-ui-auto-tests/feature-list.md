@@ -4137,12 +4137,6 @@ files:
   - src/components/session/forms/RdpOptionsForm.tsx
   - src/lib/rdp.ts
   - src/types/rdp.ts
-  - src-tauri/src/rdp/mod.rs
-  - src-tauri/src/rdp/ws.rs
-  - src-tauri/src/rdp/session.rs
-  - src-tauri/src/rdp/transport.rs
-  - src-tauri/src/rdp/tls.rs
-  - src-tauri/crates/taomni-rdp-client-engine/
 controls:
   - id: panel-root
     selector: '[data-testid="rdp-panel"]'
@@ -4150,6 +4144,18 @@ controls:
   - id: status
     selector: '[data-testid="rdp-status"]'
     kind: display
+  - id: status-overlay
+    selector: '[data-testid="rdp-panel"] .rdp-overlay'
+    kind: display
+  - id: gateway-enabled
+    selector: '[data-testid="rdp-gateway-enabled"]'
+    kind: interactive
+  - id: gateway-host
+    selector: '[data-testid="rdp-gateway-host"]'
+    kind: interactive
+  - id: gateway-use-session
+    selector: '[data-testid="rdp-gateway-use-session"]'
+    kind: interactive
   - id: canvas
     selector: '[data-testid="rdp-canvas"]'
     kind: display       # browser-mode smoke verifies mount; live frame paint is covered by Rust live tests
@@ -4234,7 +4240,7 @@ controls:
 - 浏览器预览模式只提供 desktop-only stub；真实协议连接和画面验证必须在 Tauri/native 或 Rust live test 环境下执行
 - OS 全屏连接栏（仿 mstsc）：固定、连接质量（服务端 Network Characteristics Result 的 RTT/带宽 → 4 格）、主机名、Ctrl+Alt+Del、最小化、还原、断开；未固定时 2.5 s 后收起，顶部 4 px 热区、Tab 聚焦或 Ctrl+Alt+Home 重新显示；窗口模式工具栏也有 Ctrl+Alt+Del。TC-RDPJ-01 用同一 QA 构建的客户端连接自家服务端联合验证
 - TC-111 检查 Browser 重连操作后仍保留单个 RDP 画布。原生 TC-RDPJ-01-client-server-loopback 检查断开后的重连使用原证书确认，再次完成 NLA，并把第二次画布点击转给宿主桌面。
-- TC-MODULES-056 检查签名 RDP 模块从原标签建立连接、停用后释放连接、重新启用后沿用证书确认和恢复输入。TC-MODULES-057 检查浏览器预览沿用原标签启用和停用查看器。
+- TC-MODULES-056 检查签名 RDP 模块从原标签建立连接、停用后释放连接、重新启用后沿用证书确认和恢复输入，并显示未配置 RD Gateway 用户名的错误。TC-MODULES-057 检查网关选项与原标签启停。
 
 ### 9.8 WSL 会话类型（WSL session）✅
 

@@ -7,8 +7,10 @@ use std::{
 };
 
 use taomni_plugin_api::{ErrorCode, RpcError};
+use taomni_plugin_stream::routed_tcp::Endpoint;
 use taomni_rdp_client_api::{Connection, ConnectionTestResult, Started};
 use taomni_rdp_client_engine::{
+    gateway,
     session::{RdpSessionConfig, test_ironrdp_connection},
     transport::{RdpConnector, RdpTransport},
     ws::{RdpSession, RdpSpawnConfig, spawn_rdp_relay},
@@ -48,10 +50,11 @@ impl Sessions {
     pub(super) fn start(
         &self,
         input: Connection,
+        outbound: Option<Endpoint>,
         current: &dyn Fn() -> Result<(), RpcError>,
     ) -> Result<Result<Started, String>, RpcError> {
         super::validate_endpoint(&input)?;
-        let config = spawn_config(input);
+        let config = spawn_config(input, outbound)?;
         let slot = self.slot()?;
         let session = match self.run(current, spawn_rdp_relay(config))? {
             Ok(session) => session,
@@ -86,10 +89,11 @@ impl Sessions {
     pub(super) fn test(
         &self,
         input: Connection,
+        outbound: Option<Endpoint>,
         current: &dyn Fn() -> Result<(), RpcError>,
     ) -> Result<Result<ConnectionTestResult, String>, RpcError> {
         super::validate_endpoint(&input)?;
-        let config = spawn_config(input);
+        let config = spawn_config(input, outbound)?;
         let _slot = self.slot()?;
         self.run(current, async move {
             let transport = (config.connect)().await?;
@@ -143,22 +147,37 @@ impl Sessions {
     }
 }
 
-fn spawn_config(input: Connection) -> RdpSpawnConfig {
-    let connect: RdpConnector = Arc::new(move || {
-        let route = input.route.clone();
+fn route_connector(endpoint: Endpoint) -> RdpConnector {
+    Arc::new(move || {
+        let route = endpoint.clone();
         Box::pin(async move {
             let (stream, addr) = route.connect().await?;
             Ok(RdpTransport::new(stream, addr))
         })
-    });
-    RdpSpawnConfig {
+    })
+}
+
+fn spawn_config(input: Connection, outbound: Option<Endpoint>) -> Result<RdpSpawnConfig, RpcError> {
+    let inbound = route_connector(input.route);
+    let connect = match (input.options.gateway.as_ref(), outbound) {
+        (None, None) => inbound,
+        (Some(gateway), Some(outbound)) => gateway::connector(
+            gateway.clone(),
+            input.host.clone(),
+            input.port,
+            inbound,
+            route_connector(outbound),
+        ),
+        _ => return Err(RpcError::from_code(ErrorCode::InvalidParams)),
+    };
+    Ok(RdpSpawnConfig {
         host: input.host,
         port: input.port,
         username: input.username,
         password: input.password.map(|password| password.to_string()),
         options: input.options,
         connect,
-    }
+    })
 }
 
 fn lock_failed() -> RpcError {

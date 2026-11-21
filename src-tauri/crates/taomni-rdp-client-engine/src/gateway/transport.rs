@@ -12,14 +12,14 @@ use super::http::parse_http_response_head;
 use super::http::www_authenticate_token;
 use super::ntlm;
 use crate::GatewayOpt;
+use crate::transport::{RdpConnector, RdpTransport};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt as _;
 use tokio::io::AsyncWrite;
 use tokio::io::AsyncWriteExt as _;
-use tokio::net::TcpStream;
-pub(super) type GatewayTlsStream = crate::tls::TlsStream<TcpStream>;
+pub(super) type GatewayTlsStream = crate::tls::TlsStream<RdpTransport>;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) enum RpcHttpChannel {
@@ -72,8 +72,9 @@ pub(super) async fn connect_authenticated_rpc_channel(
     g: &GatewayOpt,
     initial_packets: &GatewayInitialPackets,
     channel: RpcHttpChannel,
+    connect: &RdpConnector,
 ) -> Result<GatewayTlsStream, String> {
-    let mut stream = connect_gateway_tls(g).await?;
+    let mut stream = connect_gateway_tls(g, connect().await?).await?;
     match g.auth.as_str() {
         "basic" => {
             let authorization =
@@ -183,13 +184,10 @@ where
         .map_err(|e| format!("rdg: write {} headers: {}", channel.label(), e))
 }
 
-pub(super) async fn connect_gateway_tls(g: &GatewayOpt) -> Result<GatewayTlsStream, String> {
-    let addr = format!("{}:{}", g.host.trim(), g.port);
-    let tcp = TcpStream::connect(&addr)
-        .await
-        .map_err(|e| format!("rdg: connect {}: {}", addr, e))?;
-    tcp.set_nodelay(true)
-        .map_err(|e| format!("rdg: set TCP_NODELAY: {}", e))?;
+async fn connect_gateway_tls(
+    g: &GatewayOpt,
+    tcp: RdpTransport,
+) -> Result<GatewayTlsStream, String> {
     let verified = crate::tls::upgrade(
         tcp,
         g.host.trim(),

@@ -109,7 +109,7 @@ jobs:
           git ls-files src-tauri/tauri.conf.json 'src-tauri/tauri.*.conf.json' > gate-inventory/bundle-configs.txt
           git grep -n -E -- '"--(headless|vnc-special-key-hook|sockscap-redirector-bridge)"' \
             -- src-tauri/src src-tauri/plugins > gate-inventory/entrypoints.txt || test "$?" -eq 1
-      - name: Check that the default core dependency graph excludes the VNC client
+      - name: Check that the default core dependency graph excludes the remote desktop clients
         shell: bash
         run: |
           python - <<'PY'
@@ -120,11 +120,11 @@ jobs:
                          "aarch64-apple-darwin", "x86_64-apple-darwin"):
               tree = Path(f"gate-inventory/cargo-tree-{target}.txt").read_text()
               packages = {line.split()[0] for line in tree.splitlines() if line.strip()}
-              assert "taomni-vnc-api" in packages, f"{target}: missing shared VNC types"
+              assert {"taomni-vnc-api", "taomni-rdp-client-api"} <= packages, f"{target}: missing shared client types"
               assert not packages.intersection({
                   "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-vnc-key-helper",
-                  "taomni-plugin-vnc-client",
-              }), f"{target}: the core still depends on the VNC client implementation"
+                  "taomni-plugin-vnc-client", "taomni-rdp-client-engine", "taomni-plugin-rdp-client",
+              }), f"{target}: the core still depends on a remote desktop client implementation"
           resources = json.loads(Path("src-tauri/tauri.windows.conf.json").read_text())["bundle"]["resources"]
           assert all("resources/vnc/" not in entry for entry in resources), "Core declares VNC module resources"
           PY
@@ -140,7 +140,7 @@ jobs:
           import { readFileSync } from 'node:fs';
           const manifest = JSON.parse(readFileSync('gate-inventory/vite-manifest.json', 'utf8'));
           for (const path of Object.keys(manifest)) {
-            assert(!path.includes('plugins/vnc-client/renderer/'), `Bundled VNC frontend ${path}`);
+            assert(!/plugins\/(vnc|rdp)-client\/renderer\//.test(path), `Bundled remote desktop frontend ${path}`);
           }
           JS
       - uses: actions/upload-artifact@v4
