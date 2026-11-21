@@ -61,6 +61,20 @@ fn prepare(
         }
         document["plugins"][id] = next.clone();
     }
+    if let Some(exceptions) = document
+        .get_mut("releaseExceptions")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        for id in updates.keys() {
+            exceptions.remove(id);
+        }
+        if exceptions.is_empty() {
+            document
+                .as_object_mut()
+                .expect("validated catalog object")
+                .remove("releaseExceptions");
+        }
+    }
     document["sequence"] = delta.sequence.into();
     document["updatedAt"] = updated_at.into();
 

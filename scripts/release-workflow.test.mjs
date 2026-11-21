@@ -77,7 +77,7 @@ function fixture(t, tag = "v0.4.30") {
   const root = mkdtempSync(join(tmpdir(), "taomni-release-workflow-unit-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const put = (path, bytes) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, bytes); };
-  for (const name of ["compose-updater-manifest.mjs", "verify-updater-signatures.mjs"]) {
+  for (const name of ["compose-updater-manifest.mjs", "compose-modules-manifest.mjs", "verify-updater-signatures.mjs"]) {
     const destination = join(root, "scripts", name);
     mkdirSync(dirname(destination), { recursive: true });
     copyFileSync(fileURLToPath(new URL(name, import.meta.url)), destination);
@@ -147,6 +147,7 @@ test("verifies the detached module catalog and all its packages before any relea
   assert.deepEqual(f.calls(), []);
   rmSync(join(f.root, "updater-assets"), { recursive: true });
   f.put(join(f.root, "module-assets/modules.json.minisig"), "verified exact catalog signature");
+  f.put(join(f.root, "module-assets/modules.json"), "{}");
   f.put(join(f.root, "module-assets/example.taomni-plugin"), "fixture only");
   f.put(join(f.root, "module-assets/example.taomni-plugin.minisig"), "fixture only");
   const result = f.run({ TEST_GH_EXISTING_DRAFT: "1" });
@@ -167,6 +168,9 @@ test("a joint release publishes only changed module assets from the verified cat
   ]) {
     f.put(join(f.root, "module-assets", name), name);
   }
+  f.put(join(f.root, "module-assets/modules.json"), JSON.stringify({
+    releaseExceptions: { "taomni-plugin-mobile": { placement: "core", notes: "Mobile remains in the core application." } },
+  }));
   f.put(join(f.root, "module-uploads.json"), JSON.stringify(["changed.taomni-plugin", "changed.taomni-plugin.minisig"]));
   assert.notEqual(f.run({ TEST_GH_EXISTING_RELEASE: "1" }).status, 0);
   assert(f.calls().every((args) => args[1] === "view"));
@@ -182,6 +186,9 @@ test("a joint release publishes only changed module assets from the verified cat
     "module-assets/modules.json",
     "updater-assets/latest.json",
   ]);
+  assert.match(readFileSync(join(f.root, "module-release-notes.md"), "utf8"),
+    /Release notes with literal \$\(content\)\n\nMobile remains in the core application\./);
+  assert.deepEqual(f.calls().at(-2), ["release", "edit", "v0.4.30", "--notes-file", "module-release-notes.md"]);
 });
 
 test("validates and carries the signed catalog before a core-only release becomes visible", (t) => {
@@ -189,7 +196,7 @@ test("validates and carries the signed catalog before a core-only release become
   const verifier = join(f.root, "scripts/plugin-package/target/release/taomni-plugin-package");
   f.put(verifier, '#!/bin/sh\n[ "$1" = "--verify-catalog-signature" ] && [ "$2" = "carried-module-catalog" ] && [ -f carried-module-catalog/modules.json.minisig ]\n');
   chmodSync(verifier, 0o755);
-  f.put(join(f.root, "carried-module-catalog/modules.json"), "exact verified catalog");
+  f.put(join(f.root, "carried-module-catalog/modules.json"), "{}");
   const env = { MODULE_CATALOG_SOURCE_TAG: "v0.6.1", TEST_GH_EXISTING_DRAFT: "1" };
   assert.notEqual(f.run(env).status, 0);
   assert.deepEqual(f.calls(), []);

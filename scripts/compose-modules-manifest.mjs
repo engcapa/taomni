@@ -21,6 +21,20 @@ export const MODULE_PLATFORMS = [
 
 const VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const PLATFORM_SET = new Set(MODULE_PLATFORMS);
+const MOBILE_ID = "taomni-plugin-mobile";
+const MOBILE_RELEASE_EXCEPTION = {
+  name: "Mobile",
+  placement: "core",
+  notes: "Mobile remains in the core application, including mobile connections, desktop control, Feishu integration, and headless mode.",
+};
+
+export function appendModuleReleaseNotes(notes, catalog) {
+  const exception = catalog?.releaseExceptions?.[MOBILE_ID];
+  if (exception?.placement !== "core" || !exception.notes || notes.includes(exception.notes)) {
+    return notes;
+  }
+  return [notes.trimEnd(), exception.notes].filter(Boolean).join("\n\n");
+}
 
 function filesIn(directory) {
   return readdirSync(directory, { withFileTypes: true })
@@ -224,6 +238,9 @@ export function composeModulesManifest({
     sequence: Number(sequence),
     updatedAt,
     ...(legacyUpgrade !== undefined ? { legacyUpgrade: [...legacyUpgrade].sort() } : {}),
+    ...(legacyUpgrade?.length && !plugins.has(MOBILE_ID) ? {
+      releaseExceptions: { [MOBILE_ID]: MOBILE_RELEASE_EXCEPTION },
+    } : {}),
     plugins: Object.fromEntries([...plugins].sort(([a], [b]) => a.localeCompare(b))),
   };
   mkdirSync(outputDir, { recursive: true });

@@ -60,6 +60,8 @@ TASK-027 要求在发布前完成 G1–G11。
 
 M0 必须用 hello-plugin 和一个真实原生插件完成 G1–G11：macOS/Windows/Linux 宿主执行与系统信任、TCC 归属（含 mobile 桌面输入与采集）、Linux `noexec`、帧吞吐、崩溃清扫、无重启生命周期、安装篡改/路径安全、核心-only 依赖闭包、RPC 超时/取消，以及多进程 profile 协同与入口模式。任一门失败时，受影响插件不得进入 M2；只有 DEC-2 允许的 mobile 或 macOS G2 例外可以暂缓，并必须同步到 `modules.json`、发布说明和设计修订记录。
 
+2026-11-22 按 DEC-2 确定 Mobile 首发由基座继续提供。终端、聊天和 Agent 仍依赖核心内的 Mobile 服务，现有证据覆盖实装模式互斥，独立 Mobile 宿主仍缺少 G2 和终端延迟回执。签名目录和 GitHub Release 说明记录此归属，核心回归保留 Mobile 用例。
+
 Linux `noexec` 采用显式拒绝与用户选择可执行 profile 的策略（只复制受支持的现用数据，历史 LanChat 库仍留原位）：不自动绕过挂载策略，不拆散 Vault/模块数据与原子 active 状态。内核标志与错误恢复、hello/MFA 在替代可执行目录的实验、deb/rpm/AppImage 真实安装及完整 profile 搬迁分别记录证据；隔离 QA 的 mount fault 恢复不冒充三种格式的升级验收。执行细节见设计 §5.0 的 G4 恢复策略。
 
 核心-only 依赖闭包是硬门：只把插件 crate 加入 workspace 不算拆分，根 `Cargo.toml` 的 optional dependencies、default features、bundle resources、Linux package dependencies、前端 chunks 和 helper 必须一起迁移并由 `cargo tree`/artifact 检查证明。

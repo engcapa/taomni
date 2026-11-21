@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { composeModulesManifest } from "./compose-modules-manifest.mjs";
+import { appendModuleReleaseNotes, composeModulesManifest } from "./compose-modules-manifest.mjs";
 
 const moduleManifest = (overrides = {}) => ({
   id: "taomni-plugin-hello",
@@ -146,6 +146,23 @@ test("cannot publish an incomplete first-upgrade module", (t) => {
   f.add("linux-x86_64", "linux", manifest);
   assert.throws(() => composeModulesManifest({ artifactsDir: f.artifacts, outputDir: f.output,
     tag: "v0.6.0", repository: "engcapa/taomni", legacyUpgrade: [manifest.id] }), /all declared platform assets/);
+});
+
+test("the first roster records Mobile as continuing in the core and adds the release note once", (t) => {
+  const f = fixture(t);
+  const module = moduleManifest({ platforms: ["linux-x86_64"], description: "First module" });
+  f.add("linux-x86_64", "first", module);
+  const config = { artifactsDir: f.artifacts, outputDir: f.output, tag: "v0.6.0", repository: "engcapa/taomni" };
+  const { manifest } = composeModulesManifest({ ...config, legacyUpgrade: [module.id] });
+  const mobile = manifest.releaseExceptions["taomni-plugin-mobile"];
+  assert.equal(mobile.placement, "core");
+  assert.deepEqual(manifest.legacyUpgrade, [module.id]);
+  const notes = appendModuleReleaseNotes("Modules are now available.", manifest);
+  assert.equal(notes, `Modules are now available.\n\n${mobile.notes}`);
+  assert.equal(appendModuleReleaseNotes(notes, manifest), notes);
+
+  const delta = composeModulesManifest({ ...config, outputDir: join(f.root, "delta") }).manifest;
+  assert.equal(delta.releaseExceptions, undefined);
 });
 
 test("a core release inherits the published roster and advances past a module-only sequence", (t) => {

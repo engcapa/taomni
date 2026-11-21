@@ -96,6 +96,23 @@ fn read_catalog(directory: &Path) -> Result<Catalog> {
         .as_u64()
         .filter(|n| *n > 0)
         .context("invalid module catalog sequence")?;
+    if let Some(exceptions) = document.get("releaseExceptions") {
+        let exceptions = exceptions
+            .as_object()
+            .context("invalid module release exceptions")?;
+        for (id, exception) in exceptions {
+            ensure!(
+                id == "taomni-plugin-mobile"
+                    && document["plugins"].get(id).is_none()
+                    && exception["placement"] == "core"
+                    && exception["name"] == "Mobile"
+                    && exception["notes"]
+                        .as_str()
+                        .is_some_and(|notes| !notes.trim().is_empty()),
+                "invalid module release exception for {id}"
+            );
+        }
+    }
     Ok(Catalog {
         path,
         sequence,

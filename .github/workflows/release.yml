@@ -716,10 +716,16 @@ jobs:
           RELEASE_NOTES="$(gh release view "$TAG" --json body --jq '.body // ""')"
           export RELEASE_NOTES
           node --input-type=module <<'NODE'
-          import { readFileSync, writeFileSync } from 'node:fs';
+          import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+          import { appendModuleReleaseNotes } from './scripts/compose-modules-manifest.mjs';
           const path = 'updater-assets/latest.json';
           const manifest = JSON.parse(readFileSync(path, 'utf8'));
-          if (process.env.RELEASE_NOTES) manifest.notes = process.env.RELEASE_NOTES;
+          const catalogPath = ['module-assets/modules.json', 'carried-module-catalog/modules.json'].find(existsSync);
+          const catalog = catalogPath ? JSON.parse(readFileSync(catalogPath, 'utf8')) : null;
+          const original = process.env.RELEASE_NOTES || '';
+          const notes = appendModuleReleaseNotes(original, catalog);
+          if (notes) manifest.notes = notes;
+          if (notes !== original) writeFileSync('module-release-notes.md', notes + '\n');
           writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`);
           NODE
 
@@ -750,6 +756,9 @@ jobs:
 
           # Publish the complete manifest only after every referenced asset exists.
           gh release upload "$TAG" updater-assets/latest.json --clobber
+          if [[ -f module-release-notes.md ]]; then
+            gh release edit "$TAG" --notes-file module-release-notes.md
+          fi
           if [ "$publish_draft" = true ]; then
             gh release edit "$TAG" --draft=false
           fi

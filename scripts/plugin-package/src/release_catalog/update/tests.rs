@@ -29,7 +29,17 @@ fn adds_a_new_module_and_keeps_the_verified_prior_assets_and_roster() {
     let root = tempfile::tempdir().unwrap();
     let root = root.path();
     let signer = ReleaseSigner::test_key();
-    let (baseline, original) = stage_module(root, &signer, "mfa", "1.1.0", "v0.6.0");
+    let (baseline, mut original) = stage_module(root, &signer, "mfa", "1.1.0", "v0.6.0");
+    original["releaseExceptions"] = serde_json::json!({
+        "taomni-plugin-mobile": {
+            "placement": "core", "name": "Mobile", "notes": "Mobile remains in the core application."
+        }
+    });
+    fs::write(
+        baseline.join(CATALOG),
+        serde_json::to_vec(&original).unwrap(),
+    )
+    .unwrap();
     sign(&baseline, &signer);
     let (new_assets, incoming) = delta(root, &signer, "vnc-client", "1.0.0");
     let output = root.join("next");
@@ -45,6 +55,7 @@ fn adds_a_new_module_and_keeps_the_verified_prior_assets_and_roster() {
     assert_eq!(next["sequence"], 22);
     assert_eq!(next["legacyUpgrade"], original["legacyUpgrade"]);
     assert_eq!(next["updatedAt"], incoming["updatedAt"]);
+    assert_eq!(next["releaseExceptions"], original["releaseExceptions"]);
     assert_eq!(
         next["plugins"]["taomni-plugin-mfa"],
         original["plugins"]["taomni-plugin-mfa"]
@@ -53,6 +64,12 @@ fn adds_a_new_module_and_keeps_the_verified_prior_assets_and_roster() {
         next["plugins"]["taomni-plugin-vnc-client"],
         incoming["plugins"]["taomni-plugin-vnc-client"]
     );
+    let (mobile, _) = delta(root, &signer, "mobile", "1.0.0");
+    let promoted = root.join("with-mobile");
+    prepare(&baseline, &mobile, &promoted, signer.test_verifier()).unwrap();
+    let catalog = inspect(&promoted, signer.test_verifier()).unwrap();
+    assert!(catalog.document.get("releaseExceptions").is_none());
+    assert_eq!(catalog.document["legacyUpgrade"], original["legacyUpgrade"]);
 }
 
 #[test]
