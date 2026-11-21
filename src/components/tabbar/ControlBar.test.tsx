@@ -1,6 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { openExplorer } from "../../lib/explorer/openExplorer";
 import { useAppStore } from "../../stores/appStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useTabOverviewStore } from "../../stores/tabOverviewStore";
 import { ControlBar } from "./ControlBar";
 import type { AppCommand } from "../menubar/commands";
@@ -111,6 +113,7 @@ describe("ControlBar settings button", () => {
   });
   afterEach(() => {
     cleanup();
+    useExplorerStore.setState({ tabs: [], activeTabId: null });
     vi.clearAllMocks();
     tabBarMocks.props.length = 0;
     openTabsMocks.props.length = 0;
@@ -150,13 +153,22 @@ describe("ControlBar settings button", () => {
     expect(onWorkspaceCommand).toHaveBeenCalledWith("workspace.findInFiles");
   });
 
-  it("shows main session tabs for Explorer opened from Tools instead of hiding them behind a mode title", () => {
-    useAppStore.setState({ activeSideTab: "tools", tabs: [{ id: "explorer", type: "file-browser", title: "Documents", closable: true, fileBrowser: { initialPath: "/docs", explorer: true } }], activeTabId: "explorer" });
+  it("switches from Tools to the dedicated Explorer tab strip and back", async () => {
+    useAppStore.setState({
+      activeSideTab: "tools",
+      tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }],
+      activeTabId: "welcome",
+    });
     renderControlBar(vi.fn());
-    expect(screen.getByTestId("tab-bar")).toBeInTheDocument();
-    expect(screen.queryByTestId("platform-mode-title")).not.toBeInTheDocument();
-    act(() => useAppStore.setState({ tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }], activeTabId: "welcome" }));
     expect(screen.getByTestId("platform-mode-title")).toHaveTextContent("Tools");
+    await act(async () => { await openExplorer("/docs", { title: "Documents" }); });
+    const explorer = screen.getByTestId("explorer-tab-strip");
+    expect(within(explorer).getByRole("tab", { name: /Documents/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("tab-bar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("platform-mode-title")).not.toBeInTheDocument();
+    act(() => useAppStore.getState().setActiveSideTab("tools"));
+    expect(screen.getByTestId("platform-mode-title")).toHaveTextContent("Tools");
+    expect(screen.queryByTestId("explorer-tab-strip")).not.toBeInTheDocument();
   });
 
   it("keeps the tab strip visible in Tools mode while the Local servers tab is open", () => {
