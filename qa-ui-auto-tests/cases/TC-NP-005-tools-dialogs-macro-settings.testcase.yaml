@@ -1,0 +1,255 @@
+id: TC-NP-005
+title: Notepad tools open real preference, shortcut-mapper, compare, hash and print dialogs; macro recording toggles; app Settings persists Notepad prefs
+description: >-
+  AC-37/43/45/46 browser slice. From a new untitled document the Tools menu opens the Preferences dialog (embedding the shared Notepad
+  settings panel), the Shortcut Mapper with a real bindable command list, the saved-version Compare overlay, the hash toolbox that
+  computes the known SHA-256 of the typed document, and the print setup dialog; every dialog closes with Escape. Toolbar macro record
+  shows the recording chip plus status chip and Stop clears them. Finally the app Settings tab shows the Notepad preferences section
+  and unchecking line numbers persists to the taomni.notepad.preferences.v1 localStorage key.
+modes:
+- browser
+covers:
+- F-NOTEPAD-4
+tags:
+- p0
+- notepad
+- tools
+- settings
+fixtures:
+- reset_db
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab-new-notepad"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="notepad-workbench"]'
+- click: '[data-testid="viewer-editor"]'
+- type: hash me
+- click: '[data-testid="notepad-menu-tools"]'
+- wait_for: '[data-testid="notepad-menu-item-tools.preferences"]'
+- click: '[data-testid="notepad-menu-item-tools.preferences"]'
+- wait_for: '[data-testid="notepad-preferences-dialog"]'
+- assert_visible: '[data-testid="notepad-settings"]'
+- assert_visible: '[data-testid="notepad-pref-eol"]'
+- assert_visible: '[data-testid="notepad-pref-encoding"]'
+- assert_visible: '[data-testid="notepad-pref-backup-mode"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="notepad-preferences-dialog"]'
+    state: detached
+- click: '[data-testid="notepad-menu-tools"]'
+- wait_for: '[data-testid="notepad-menu-item-tools.shortcutMapper"]'
+- click: '[data-testid="notepad-menu-item-tools.shortcutMapper"]'
+- wait_for: '[data-testid="notepad-shortcut-mapper-dialog"]'
+- assert_visible: '[data-testid="notepad-keymap-filter"]'
+- assert_count:
+    selector: '[data-testid^="notepad-keymap-bind-"]'
+    min: 50
+- press: Escape
+- wait_for:
+    selector: '[data-testid="notepad-shortcut-mapper-dialog"]'
+    state: detached
+- click: '[data-testid="notepad-menu-compare"]'
+- wait_for: '[data-testid="notepad-menu-item-tools.compareDisk"]'
+- click: '[data-testid="notepad-menu-item-tools.compareDisk"]'
+- wait_for: '[data-testid="notepad-compare-dialog"]'
+- assert_pattern:
+    selector: '[data-testid="notepad-compare-dialog"]'
+    regex: (Compare Documents|文档对比)
+- click: '[data-testid="notepad-compare-dialog"] .np-modal-header button'
+- wait_for:
+    selector: '[data-testid="notepad-compare-dialog"]'
+    state: detached
+- click: '[data-testid="notepad-menu-tools"]'
+- wait_for: '[data-testid="notepad-menu-item-tools.hashDialog"]'
+- click: '[data-testid="notepad-menu-item-tools.hashDialog"]'
+- wait_for: '[data-testid="notepad-hash-dialog"]'
+- click: '[data-testid="notepad-hash-generate"]'
+- wait_for: '[data-testid="notepad-hash-output"]'
+- assert_attribute:
+    selector: '[data-testid="notepad-hash-output"]'
+    name: value
+    equals: eb201af5aaf0d60629d3d2a61e466cfc0fedb517add831ecac5235e1daa963d6
+- press: Escape
+- wait_for:
+    selector: '[data-testid="notepad-hash-dialog"]'
+    state: detached
+- click: '[data-testid="notepad-menu-file"]'
+- wait_for: '[data-testid="notepad-menu-item-file.print"]'
+- click: '[data-testid="notepad-menu-item-file.print"]'
+- wait_for: '[data-testid="notepad-print-dialog"]'
+- assert_visible: '[data-testid="notepad-print-confirm"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="notepad-print-dialog"]'
+    state: detached
+- assert_attribute:
+    selector: '[data-testid="notepad-tool-macro-record"]'
+    name: aria-pressed
+    equals: 'false'
+- click: '[data-testid="notepad-tool-macro-record"]'
+- wait_for: '[data-testid="notepad-menubar-recording"]'
+- assert_visible: '[data-testid="notepad-status-rec"]'
+- assert_attribute:
+    selector: '[data-testid="notepad-tool-macro-record"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="notepad-tool-macro-stop"]'
+- wait_for:
+    selector: '[data-testid="notepad-menubar-recording"]'
+    state: detached
+- assert_count:
+    selector: '[data-testid="notepad-status-rec"]'
+    equal: 0
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: notepad
+- wait_for: '[data-testid="notepad-settings"]'
+- set_check:
+    selector: '[data-testid="notepad-pref-line-numbers"]'
+    checked: false
+- assert_localstorage:
+    key: taomni.notepad.preferences.v1
+    contains: '"showLineNumbers":false'
+- assert_no_runtime_errors: null
+- screenshot: np-005-tools-dialogs-settings.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Tools > Preferences opens the Notepad preferences dialog with the shared settings fields and closes with Escape.
+    actions:
+    - 9
+    - 11
+    checkpoints:
+    - step: 12
+      expectation: The preferences dialog opens.
+    - step: 13
+      expectation: The embedded Notepad settings panel renders.
+    - step: 14
+      expectation: The default EOL preference field is present.
+    - step: 15
+      expectation: The default encoding preference field is present.
+    - step: 16
+      expectation: The backup mode preference field is present.
+    - step: 18
+      expectation: Escape closes the dialog.
+    results:
+    - 13
+    - 15
+    - 18
+  - id: R2
+    requirement: Tools > Shortcut Mapper renders the real bindable command list and closes with Escape.
+    actions:
+    - 19
+    - 21
+    checkpoints:
+    - step: 22
+      expectation: The shortcut mapper dialog opens.
+    - step: 23
+      expectation: The command filter is rendered.
+    - step: 24
+      expectation: At least 50 real command binding rows are rendered.
+    - step: 26
+      expectation: Escape closes the mapper.
+    results:
+    - 24
+    - 26
+  - id: R3
+    requirement: The Compare menu opens the saved-version compare overlay with a real diff title; the overlay is closed through its
+      header control because it does not handle Escape (recorded product defect).
+    actions:
+    - 27
+    - 29
+    - 32
+    checkpoints:
+    - step: 30
+      expectation: The compare overlay opens.
+    - step: 31
+      expectation: The overlay shows the documents-compare heading.
+    - step: 33
+      expectation: The header close control removes the compare overlay.
+    results:
+    - 31
+    - 33
+  - id: R4
+    requirement: The hash toolbox computes the known SHA-256 digest of the current document text.
+    actions:
+    - 34
+    - 36
+    - 38
+    checkpoints:
+    - step: 37
+      expectation: The hash dialog opens.
+    - step: 39
+      expectation: Generating a hash renders the output field.
+    - step: 40
+      expectation: The output value equals the independent SHA-256 of the typed text.
+    results:
+    - 40
+  - id: R5
+    requirement: Print setup opens with its confirm control and closes with Escape.
+    actions:
+    - 43
+    - 45
+    checkpoints:
+    - step: 46
+      expectation: The print setup dialog opens.
+    - step: 47
+      expectation: The print confirm control is rendered.
+    - step: 49
+      expectation: Escape closes the print setup dialog.
+    results:
+    - 47
+    - 49
+  - id: R6
+    requirement: Macros can start recording with visible menubar and status chips and stop again from the toolbar.
+    actions:
+    - 51
+    - 55
+    checkpoints:
+    - step: 50
+      expectation: Recording starts disabled.
+    - step: 52
+      expectation: Starting recording shows the menubar recording chip.
+    - step: 53
+      expectation: The status bar shows the recording chip.
+    - step: 54
+      expectation: The record toolbar toggle reports aria-pressed=true.
+    - step: 56
+      expectation: Stopping recording removes the menubar chip.
+    - step: 57
+      expectation: No status recording chip remains.
+    results:
+    - 54
+    - 57
+  - id: R7
+    requirement: The app Settings tab exposes the Notepad preferences section and toggling line numbers persists the preference.
+    actions:
+    - 58
+    - 60
+    - 62
+    checkpoints:
+    - step: 59
+      expectation: The app Settings tab opens.
+    - step: 61
+      expectation: Searching for notepad reveals the real Notepad settings section.
+    - step: 63
+      expectation: The changed line-number preference is persisted under taomni.notepad.preferences.v1.
+    - step: 64
+      expectation: The tools workflow raises no uncaught runtime errors.
+    results:
+    - 63
+    - 64
+  visual:
+  - check: Dialog chrome, macro chips and settings section layout
+    method: manual
+    reason: The case asserts DOM state and persistence; visual fidelity of each dialog is reviewed manually.
+  native:
+  - check: Real native file dialogs, macro file integrity and native menu accelerators
+    method: external
+    reason: Browser mode uses renderer dialogs and localStorage; native boundary behavior belongs to native cases.

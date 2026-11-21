@@ -52,7 +52,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="notepad-save-as-input"]'
     name: value
-    contains: notes.txt
+    equals: ${fixture.file_open_root}/notes.txt
 - fill:
     selector: '[data-testid="notepad-save-as-input"]'
     value: ${fixture.file_open_root}/notepad-save-as.txt

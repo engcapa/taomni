@@ -66,10 +66,15 @@ steps:
 - assert_file_open_bytes:
     path: ${fixture.file_open_root}/notes.txt
     equals: Notepad native save
+- click: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+a
+    macos_key: Meta+a
+- type: 'Mine unsaved buffer'
 - host_write_file:
     path: ${fixture.file_open_root}/notes.txt
     text: 'External note version'
-- click: '[data-testid="viewer-editor"] .cm-content'
 - press:
     selector: '[data-testid="viewer-editor"] .cm-content'
     key: Control+s
@@ -78,23 +83,16 @@ steps:
 - assert_file_contains:
     path: ${fixture.file_open_root}/notes.txt
     contains: External note version
-- click: '[data-testid="viewer-reload"]'
-- assert_not_visible: '[data-testid="viewer-conflict"]'
 - assert_items:
     selector: '[data-testid="viewer-editor"] .cm-line'
     equals:
-    - External note version
-- click: '[data-testid="viewer-editor"] .cm-content'
-- press:
-    selector: '[data-testid="viewer-editor"] .cm-content'
-    key: Control+a
-    macos_key: Meta+a
-- type: 'Mine after reload'
+    - Mine unsaved buffer
+- click: '[data-testid="viewer-keep"]'
 - press:
     selector: '[data-testid="viewer-editor"] .cm-content'
     key: Control+s
     macos_key: Meta+s
 - assert_file_open_bytes:
     path: ${fixture.file_open_root}/notes.txt
-    equals: Mine after reload
+    equals: Mine unsaved buffer
 - assert_no_runtime_errors: null
