@@ -106,6 +106,7 @@
           "module_signed_mail_archive",
           "module_signed_screenshot_archive",
           "module_signed_vnc_server_archive",
+          "module_signed_rdp_server_archive",
           "module_execution",
           "module_backup_data",
           "vnc_required",
@@ -963,6 +964,10 @@
         "assert_signed_vnc_daemon": {
           "enum": ["idle", "running", "backup", "stopped", "disabled"],
           "description": "Verify the signed VNC server host's installed bytes, lease and local daemon endpoint."
+        },
+        "assert_signed_rdp_server": {
+          "enum": ["running", "disabled"],
+          "description": "Verify the signed RDP Server host identity, write lease and loopback listener state."
         },
         "assert_signed_mail_host": {
           "enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "disabled"],

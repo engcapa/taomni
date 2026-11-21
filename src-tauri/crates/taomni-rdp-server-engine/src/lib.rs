@@ -25,7 +25,7 @@ mod session;
 mod sound;
 mod tls;
 
-pub use approval::{ApprovalBroker, DesktopEvent, EventSink};
+pub use approval::{ApprovalBroker, EventSink};
 pub use lifetime::start;
 
 #[cfg(test)]

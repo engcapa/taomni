@@ -5,7 +5,6 @@ use std::{sync::Arc, time::Duration};
 use super::ServerConfig;
 use super::engine::{ServerCtx, ServerStarted};
 use crate::plugin::{LifecycleState, PluginRegistry};
-use serde::de::DeserializeOwned;
 use serde_json::Value;
 use taomni_server_process::vnc;
 use tauri::Manager;
@@ -37,8 +36,9 @@ async fn start_installed(
     options: vnc::Config,
     plugins: Arc<PluginRegistry>,
 ) -> Result<ServerStarted, String> {
-    let session: vnc::Session = call(
+    let session: vnc::Session = super::process::invoke(
         &plugins,
+        vnc::SLUG,
         vnc::START,
         serde_json::to_value(options).map_err(|error| error.to_string())?,
     )
@@ -53,7 +53,14 @@ async fn start_installed(
                 _ = interval.tick() => false,
             };
             let method = if stop { vnc::STOP } else { vnc::STATUS };
-            match call::<vnc::Status>(&plugins, method, Value::String(session.id.clone())).await {
+            match super::process::invoke::<vnc::Status>(
+                &plugins,
+                vnc::SLUG,
+                method,
+                Value::String(session.id.clone()),
+            )
+            .await
+            {
                 Ok(status) => {
                     for line in status.logs {
                         ctx.log.line(line);
@@ -70,18 +77,4 @@ async fn start_installed(
         }
     });
     Ok(ServerStarted { pid, task })
-}
-
-pub(super) async fn call<T: DeserializeOwned>(
-    plugins: &Arc<PluginRegistry>,
-    method: &'static str,
-    value: Value,
-) -> Result<T, String> {
-    let plugins = plugins.clone();
-    let response = tokio::task::spawn_blocking(move || plugins.invoke(vnc::SLUG, method, value))
-        .await
-        .map_err(|error| error.to_string())?
-        .map_err(|error| error.to_string())?;
-    serde_json::from_value(response)
-        .map_err(|error| format!("Invalid VNC server response: {error}"))
 }

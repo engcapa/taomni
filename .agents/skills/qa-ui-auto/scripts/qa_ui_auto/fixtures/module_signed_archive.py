@@ -217,6 +217,33 @@ def setup_vnc_server(ctx):
                       vnc_daemon_port=port)
 
 
+RDP_SERVER_CASE = "TC-MODULES-065"
+
+
+def setup_rdp_server(ctx):
+    if ctx.case_id != RDP_SERVER_CASE or (ctx.cfg.get("app") or {}).get("mode") != "native":
+        raise RuntimeError("Signed RDP Server input requires its registered native case")
+    raw = os.environ.get("QA_SIGNED_RDP_SERVER_ROOT")
+    if not raw:
+        raise RuntimeError("QA_SIGNED_RDP_SERVER_ROOT is required to locate the signed artifact")
+    source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    manifest = Path(__file__).resolve().parents[6] / "src-tauri/plugins/rdp-server/module.json"
+    package_version = json.loads(manifest.read_text(encoding="utf-8"))["version"]
+    receipt, archive, signature, _ = load_artifact(
+        Path(raw), source, platform_key(), "rdp-server", version=package_version,
+    )
+    host = "taomni-plugin-rdp-server.exe" if platform.system() == "Windows" else "taomni-plugin-rdp-server"
+    with zipfile.ZipFile(archive) as package, package.open(host) as binary:
+        receipt["hostSha256"] = hashlib.file_digest(binary, "sha256").hexdigest()
+    owned = Path(ctx.case_dir).resolve() / "signed-rdp-server"
+    owned.mkdir()
+    destination = owned / archive.name
+    shutil.copyfile(archive, destination)
+    (owned / "provenance.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    ctx.signed_rdp_server = {"host": host, "receipt": receipt}
+    ctx.values.update(rdp_server_archive=destination.as_posix(), rdp_server_signature=signature)
+
+
 def setup_desktop_client(ctx, protocol):
     if (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("The signed desktop client requires the native package verifier")

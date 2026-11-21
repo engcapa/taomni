@@ -19,6 +19,7 @@ mod migration_key_check;
 pub(crate) mod migration_mail;
 pub(crate) mod migration_mail_provision;
 pub(crate) mod migration_rdp_pins;
+mod migration_rdp_server_identity;
 mod migration_vnc_server;
 pub(crate) mod network;
 pub mod protocol;

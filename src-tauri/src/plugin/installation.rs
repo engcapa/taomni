@@ -168,6 +168,10 @@ impl PluginRegistry {
                 .map_err(PluginError::HostRequest)?;
             super::migration_vnc_server::prepare(&self.root, manifest)
                 .map_err(PluginError::HostRequest)?;
+            if previous.active_version.is_none() && !previous.was_uninstalled() {
+                super::migration_rdp_server_identity::prepare(&self.root, manifest)
+                    .map_err(PluginError::HostRequest)?;
+            }
             activate()?;
             self.scan_locked()?;
             let record = self

@@ -335,6 +335,7 @@ controls:
     - '[data-testid="module-action-enable-vnc-client"]'
     - '[data-testid="module-action-enable-vnc-server"]'
     - '[data-testid="module-action-enable-rdp-client"]'
+    - '[data-testid="module-action-enable-rdp-server"]'
     - '[data-testid="module-action-enable-mail"]'
     - '[data-testid="module-action-enable-screenshot"]'
   - id: module-status-mfa
@@ -348,6 +349,7 @@ controls:
     - '[data-testid="module-action-disable-vnc-client"]'
     - '[data-testid="module-action-disable-vnc-server"]'
     - '[data-testid="module-action-disable-rdp-client"]'
+    - '[data-testid="module-action-disable-rdp-server"]'
     - '[data-testid="module-action-disable-mail"]'
     - '[data-testid="module-action-disable-screenshot"]'
   - id: module-action-uninstall-hello-plugin
@@ -6193,6 +6195,8 @@ files:
   - src-tauri/src/servers/rdp.rs
   - src-tauri/crates/taomni-rdp-server-engine/src/
   - src-tauri/crates/taomni-server-process/src/system_rdp.rs
+  - src-tauri/plugins/rdp-server/module.json
+  - src-tauri/plugins/rdp-server/src/
   - src-tauri/src/bin/rdp-probe/
   - src-tauri/vendor/ironrdp-server/
   - src-tauri/vendor/ironrdp-acceptor/

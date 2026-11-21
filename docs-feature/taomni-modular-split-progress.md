@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- RDP Server 已接入独立签名宿主。核心保留 Local servers、Vault 和本机控制审批，宿主负责接入、录屏、输入、剪贴板和音频。首次安装会在模块目录接管已有 TLS 证书和私钥，默认基座已从四目标 Cargo 树移除 RDP Server 引擎。隔离 QA 保留原服务端版本覆盖原用例，TC-MODULES-065 用签名包验证真实连接和停用。服务端配置行迁移和 macOS 权限归属仍待闭合。
 - RDP Server 的认证、会话、输入、剪贴板、音频和显示引擎迁到 `taomni-rdp-server-engine`。核心仍持有窗口审批、系统 Remote Desktop 检测和原 TLS 路径，通过同一日志与事件契约调用独立库。Linux 核心编译及 NLA 策略单测通过，G5 真实桌面测量入口已指向拆分后的引擎用例。
 - VNC Server 0.1.1 三端 Browser 各通过 23/23，覆盖配置、单实例和完整崩溃回归。原生签名任务已完成构建和工件校验，打包步骤的条件遗漏了 VNC Server。已让通过清单校验的业务模块统一进入签名，保留原失败日志供复验。 [新版回执](https://github.com/engcapa/taomni/actions/runs/44943027023) · [原签名日志](https://github.com/engcapa/taomni/actions/runs/44940689515/job/136959079197)
 - 截图修复版在 Linux Native 通过 32/32。macOS GIF 的像素和时间轴比对通过，成片为 4330 ms，超过用例原有的 4200 ms 上限。录制改为以实际停止请求的时间收尾，慢取帧返回后的时间不计入成片。 [原始回执](https://github.com/engcapa/taomni/actions/runs/44938925840)

@@ -180,6 +180,7 @@ export function modularBoundaryViolations(root, { linuxTreeFile, mfaTreeFile, mf
     ...hostViolations(root, "mail", "Mail", mailHostTreeFile),
     ...hostViolations(root, "screenshot", "Screenshot"),
     ...hostViolations(root, "vnc-server", "VNC Server"),
+    ...hostViolations(root, "rdp-server", "RDP Server"),
   ];
   const consumers = ["screenshot", "mfa", "mobile"];
   for (const consumer of consumers) {

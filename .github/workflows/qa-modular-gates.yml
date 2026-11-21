@@ -126,6 +126,9 @@ jobs:
                   "taomni-plugin-vnc-client", "taomni-rdp-client-engine", "taomni-plugin-rdp-client",
               }), f"{target}: the core still depends on a remote desktop client implementation"
               assert "taomni-plugin-vnc-server" not in packages, f"{target}: the core depends on the VNC daemon host"
+              assert not packages.intersection({
+                  "taomni-plugin-rdp-server", "taomni-rdp-server-engine", "ironrdp-server",
+              }), f"{target}: the core depends on the RDP Server engine"
               assert "taomni-screenshot-api" in packages, f"{target}: missing shared screenshot contract"
               assert not packages.intersection({
                   "taomni-plugin-screenshot", "taomni-screenshot-ocr", "taomni-screenshot-recording",

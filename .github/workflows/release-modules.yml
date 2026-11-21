@@ -170,7 +170,7 @@ jobs:
           workspaces: src-tauri -> target
           shared-key: module-release-${{ needs.source.outputs.slug }}-${{ matrix.target }}
       - name: Prepare complete Perl for the Windows desktop client TLS build
-        if: (needs.source.outputs.slug == 'vnc-client' || needs.source.outputs.slug == 'rdp-client') && runner.os == 'Windows'
+        if: (needs.source.outputs.slug == 'vnc-client' || needs.source.outputs.slug == 'rdp-client' || needs.source.outputs.slug == 'rdp-server') && runner.os == 'Windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -180,6 +180,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
           "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
           'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
+      - name: Install Linux dependencies for the RDP Server host
+        if: needs.source.outputs.slug == 'rdp-server' && runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev libasound2-dev
       - name: Build the module host without signing credentials
         run: cargo build --manifest-path src-tauri/Cargo.toml -p '${{ needs.source.outputs.package }}' --release --target '${{ matrix.target }}' --locked
       - name: Build the Windows VNC key helper

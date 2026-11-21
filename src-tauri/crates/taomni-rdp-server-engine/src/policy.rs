@@ -1,10 +1,11 @@
 use super::approval::ControlGate;
-use super::approval::{DesktopEvent, EventSink, RdpSessionEvent};
+use super::approval::EventSink;
 use ironrdp::server::ConnectionHandler;
 use ironrdp::server::PostConnectionAction;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use taomni_capture::CaptureLogger;
+use taomni_server_process::rdp::{DesktopEvent, RdpSessionEvent};
 
 pub(super) struct ConnectionPolicy {
     pub(super) events: EventSink,

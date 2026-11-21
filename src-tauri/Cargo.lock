@@ -11220,6 +11220,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-plugin-rdp-server"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
+ "taomni-capture",
+ "taomni-plugin-api",
+ "taomni-plugin-sdk",
+ "taomni-rdp-server-engine",
+ "taomni-server-process",
+ "tokio",
+ "tokio-util 0.7.19",
+ "uuid",
+]
+
+[[package]]
 name = "taomni-plugin-screenshot"
 version = "0.1.4"
 dependencies = [

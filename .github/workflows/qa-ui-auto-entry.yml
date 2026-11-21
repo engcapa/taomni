@@ -492,7 +492,7 @@ jobs:
             qa-ui-auto-report/${{ matrix.id }}/
           retention-days: 14
       - name: Identify the native platform for the official module input
-        if: inputs.operation == 'run' && matrix.mode == 'native' && (contains(matrix.capabilities, 'signed-module') || contains(matrix.capabilities, 'signed-mfa') || contains(matrix.capabilities, 'signed-vnc') || contains(matrix.capabilities, 'signed-rdp') || contains(matrix.capabilities, 'signed-mail') || contains(matrix.capabilities, 'signed-screenshot') || contains(matrix.capabilities, 'signed-local-vnc'))
+        if: inputs.operation == 'run' && matrix.mode == 'native' && (contains(matrix.capabilities, 'signed-module') || contains(matrix.capabilities, 'signed-mfa') || contains(matrix.capabilities, 'signed-vnc') || contains(matrix.capabilities, 'signed-rdp') || contains(matrix.capabilities, 'signed-mail') || contains(matrix.capabilities, 'signed-screenshot') || contains(matrix.capabilities, 'signed-local-vnc') || contains(matrix.capabilities, 'signed-local-rdp'))
         id: module_platform
         run: |
           python - <<'PY'
@@ -508,6 +508,7 @@ jobs:
               stream.write('QA_SIGNED_MAIL_ROOT=' + os.path.abspath('qa-ui-auto-report/official-mail-input') + '\n')
               stream.write('QA_SIGNED_SCREENSHOT_ROOT=' + os.path.abspath('qa-ui-auto-report/official-screenshot-input') + '\n')
               stream.write('QA_SIGNED_VNC_SERVER_ROOT=' + os.path.abspath('qa-ui-auto-report/official-vnc-server-input') + '\n')
+              stream.write('QA_SIGNED_RDP_SERVER_ROOT=' + os.path.abspath('qa-ui-auto-report/official-rdp-server-input') + '\n')
           PY
       - name: Download this invocation's production-signed module
         if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-module')
@@ -551,6 +552,12 @@ jobs:
         with:
           name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-vnc-server
           path: qa-ui-auto-report/official-vnc-server-input
+      - name: Download this invocation's production-signed RDP Server module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-local-rdp')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-rdp-server
+          path: qa-ui-auto-report/official-rdp-server-input
       - name: Stage the pinned public legacy installer
         if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'legacy-installer')
         env:

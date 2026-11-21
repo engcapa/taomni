@@ -2751,6 +2751,7 @@
   ↳ `[data-testid="module-action-enable-vnc-client"]` — alias
   ↳ `[data-testid="module-action-enable-vnc-server"]` — alias
   ↳ `[data-testid="module-action-enable-rdp-client"]` — alias
+  ↳ `[data-testid="module-action-enable-rdp-server"]` — alias
   ↳ `[data-testid="module-action-enable-mail"]` — alias
   ↳ `[data-testid="module-action-enable-screenshot"]` — alias
 - `[data-testid="module-status-mfa"]` — display — F-Modules-1.module-status-mfa
@@ -2759,6 +2760,7 @@
   ↳ `[data-testid="module-action-disable-vnc-client"]` — alias
   ↳ `[data-testid="module-action-disable-vnc-server"]` — alias
   ↳ `[data-testid="module-action-disable-rdp-client"]` — alias
+  ↳ `[data-testid="module-action-disable-rdp-server"]` — alias
   ↳ `[data-testid="module-action-disable-mail"]` — alias
   ↳ `[data-testid="module-action-disable-screenshot"]` — alias
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin

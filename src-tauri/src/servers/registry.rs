@@ -30,7 +30,8 @@ pub struct ServerRegistry {
     pub running: AsyncMutex<HashMap<ServerType, ActiveServer>>,
     pub statuses: AsyncMutex<HashMap<ServerType, ServerStatus>>,
     pub(super) vnc_settings: AsyncMutex<()>,
-    pub(crate) rdp_approvals: std::sync::Arc<rdp::ApprovalBroker>,
+    #[cfg(feature = "legacy-rdp-server")]
+    pub(crate) rdp_approvals: std::sync::Arc<taomni_rdp_server_engine::ApprovalBroker>,
     /// Recent `server://output/<type>` lines, oldest first.
     pub(super) logs: std::sync::Mutex<HashMap<ServerType, VecDeque<String>>>,
 }
@@ -41,11 +42,7 @@ pub async fn resolve_rdp_connection_request(
     request_id: String,
     approved: bool,
 ) -> Result<bool, String> {
-    Ok(state
-        .legacy
-        .servers
-        .rdp_approvals
-        .resolve(&request_id, approved))
+    rdp::resolve_approval(&state, request_id, approved).await
 }
 
 impl ServerRegistry {

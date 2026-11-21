@@ -3,7 +3,7 @@
   "productName": "Taomni QA",
   "mainBinaryName": "taomni",
   "build": {
-    "features": ["legacy-vnc-client", "legacy-rdp-client", "legacy-screenshot-media"],
+    "features": ["legacy-vnc-client", "legacy-rdp-client", "legacy-rdp-server", "legacy-screenshot-media"],
     "beforeBuildCommand": "pnpm build --mode qa && bash scripts/bundle-krb5-macos.sh stage"
   }
 }

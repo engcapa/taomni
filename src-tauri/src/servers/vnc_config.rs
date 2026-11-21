@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use serde_json::Value;
 use taomni_server_process::vnc as contract;
 
-use super::{db, vnc};
+use super::{db, process};
 use crate::{plugin::LifecycleState, state::AppState};
 
 const SERVER_TYPE: &str = "vnc";
@@ -86,7 +86,13 @@ pub(super) async fn save_if_managed(
     };
     next.credential_migration_required = false;
     let value = serde_json::to_value(next).map_err(|error| error.to_string())?;
-    vnc::call::<()>(&state.plugins, contract::SAVE_SETTINGS, value.clone()).await?;
+    process::invoke::<()>(
+        &state.plugins,
+        contract::SLUG,
+        contract::SAVE_SETTINGS,
+        value.clone(),
+    )
+    .await?;
     Ok(Some(value))
 }
 

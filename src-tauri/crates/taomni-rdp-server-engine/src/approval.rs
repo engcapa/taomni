@@ -1,9 +1,9 @@
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::Mutex;
 use taomni_capture::CaptureLogger;
+use taomni_server_process::rdp::{ConnectionApprovalRequest, DesktopEvent};
 use tokio_util::sync::CancellationToken;
 
 pub(super) const CONTROL_APPROVAL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
@@ -38,34 +38,6 @@ impl ApprovalBroker {
             pending.remove(request_id);
         }
     }
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ConnectionApprovalRequest {
-    pub(super) request_id: String,
-    pub(super) peer: String,
-    pub(super) timeout_seconds: u64,
-    pub(super) expires_at: i64,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RdpSessionEvent {
-    pub(super) state: String,
-    pub(super) peer: String,
-    pub(super) view_only: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) duration_ms: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) reason: Option<String>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum DesktopEvent {
-    ConnectionRequest(ConnectionApprovalRequest),
-    Session(RdpSessionEvent),
 }
 
 pub type EventSink = Arc<dyn Fn(DesktopEvent) -> bool + Send + Sync>;

@@ -1,0 +1,83 @@
+id: TC-MODULES-065
+title: Signed RDP Server authenticates a loopback client and releases its listener on disable
+description: Install from the ordinary offline form. Start through Local servers using a Vault-backed test password. Verify decoded graphics through the real loopback client and release of the listener and writer lease when the module is disabled.
+covers: [F-Modules-1, F-Servers-1, F-RdpServer-1]
+tags: [modules, rdp, rdp-server, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows]
+fixtures: [reset_db, rdp_server_required, system_rdp_running, module_signed_rdp_server_archive]
+timeout_sec: 270
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.rdp_server_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.rdp_server_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-rdp-server"]'
+- wait_for: '[data-testid="module-action-disable-rdp-server"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-rdp"]'
+- wait_for: '[data-testid="rdp-field-username"]'
+- fill: {selector: '[data-testid="server-field-port"]', value: '${env.QA_RDP_PORT}'}
+- fill: {selector: '[data-testid="server-field-bind-address"]', value: '127.0.0.1'}
+- set_check: {selector: '[data-testid="rdp-field-view-only"]', checked: true}
+- fill: {selector: '[data-testid="rdp-field-username"]', value: '${env.QA_RDP_USER}'}
+- fill: {selector: '[data-testid="rdp-field-password"]', value: '${env.QA_RDP_PASSWORD}'}
+- click: '[data-testid="server-row-rdp-start"]'
+- platform_choice:
+    platforms: [Windows]
+    dialog: '[data-testid="choice-dialog"]'
+    click: '[data-testid="choice-dialog-secondary"]'
+- wait_for: {selector: '[data-testid="vault-setup-dialog"]', timeout_sec: 30}
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: '${env.QA_VAULT_PASSWORD}'}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: '${env.QA_VAULT_PASSWORD}'}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: {selector: '[data-testid="server-row-rdp"][data-status="running"]', timeout_sec: 45}
+- rdp_probe:
+    scenario: connect
+    artifact: signed-rdp-server-graphics
+    args: {seconds: 3, compression: none}
+    expect:
+      graphics_updates: {min: 1}
+      framebuffer.painted_share: {min: 0.95}
+      rfx.bulk.decompression_errors: 0
+- assert_signed_rdp_server: running
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-rdp-server"]'
+- wait_for: '[data-testid="module-action-enable-rdp-server"]'
+- assert_signed_rdp_server: disabled
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- wait_for: '[data-testid="server-row-rdp"][data-status="stopped"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-rdp-server
+    requirement: The signed host serves a native RDP session and disabling the module releases its listener without restarting the core.
+    actions: [7, 9, 14, 22, 27, 33, 39]
+    checkpoints:
+    - {step: 8, expectation: The normal offline installer selected the trusted candidate.}
+    - {step: 29, expectation: The real loopback client authenticates and decodes actual desktop frames.}
+    - {step: 30, expectation: The installed bytes match the archive and the running host owns its writer lease and TLS files.}
+    - {step: 35, expectation: The listener and write lease have been released while the TLS files remain.}
+    - {step: 40, expectation: The original server row shows stopped.}
+    - {step: 41, expectation: The local server and module store complete the workflow without runtime errors.}
+    results: [8, 29, 30, 35, 40, 41]
+  visual:
+  - check: The client decodes a real desktop image and Local servers reflects the lifecycle.
+    method: automated
+    reason: The probe records actual frames and the app row reports the transition.
+  native:
+  - check: The signed host owns the active TLS identity and its listener closes on disable.
+    method: automated
+    reason: The case reads the installed bytes and the independent OS lock and checks the runner loopback port.

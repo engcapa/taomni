@@ -77,9 +77,8 @@ pub(super) fn spawn_auto_stop(
 
 async fn finish_server(server_type: ServerType, mut active: ActiveServer) {
     active.cancel.cancel();
-    if server_type == ServerType::Vnc {
-        // The installed module's monitor forwards cancellation to its own
-        // daemon and waits until the underlying process has been reaped.
+    if matches!(server_type, ServerType::Vnc | ServerType::Rdp) {
+        // The monitor forwards cancellation and waits for the listener to close.
         if tokio::time::timeout(Duration::from_secs(12), &mut active.task)
             .await
             .is_ok()
@@ -90,14 +89,15 @@ async fn finish_server(server_type: ServerType, mut active: ActiveServer) {
     active.task.abort();
 }
 
-fn watch_vnc_exit(
+fn watch_desktop_server_exit(
     ctx: ServerCtx,
     registry: std::sync::Arc<ServerRegistry>,
     task: JoinHandle<()>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
+        let server_type = ctx.server_type;
         if let Err(error) = task.await {
-            ctx.log.line(format!("VNC server monitor stopped: {error}"));
+            ctx.log.line(format!("Server monitor stopped: {error}"));
         }
         // Manual and automatic stops already own the registry and publish
         // Stopped after the module has reaped its process.
@@ -106,11 +106,11 @@ fn watch_vnc_exit(
             _ = ctx.cancel.cancelled() => return,
             running = registry.running.lock() => running,
         };
-        if let Some(active) = running.remove(&ServerType::Vnc) {
+        if let Some(active) = running.remove(&server_type) {
             if let Some(timer) = &active.auto_stop_task {
                 timer.abort();
             }
-            set_status(&ctx.app, &registry, ServerStatus::stopped(ServerType::Vnc)).await;
+            set_status(&ctx.app, &registry, ServerStatus::stopped(server_type)).await;
         }
     })
 }
@@ -214,8 +214,8 @@ pub async fn start_local_server(
 
     {
         let mut running = state.legacy.servers.running.lock().await;
-        let task = if st == ServerType::Vnc {
-            watch_vnc_exit(ctx, state.legacy.servers.clone(), started.task)
+        let task = if matches!(st, ServerType::Vnc | ServerType::Rdp) {
+            watch_desktop_server_exit(ctx, state.legacy.servers.clone(), started.task)
         } else {
             started.task
         };

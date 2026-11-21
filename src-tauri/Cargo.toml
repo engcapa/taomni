@@ -44,6 +44,7 @@ members = [
     "plugins/mail",
     "plugins/mfa",
     "plugins/rdp-client",
+    "plugins/rdp-server",
     "plugins/screenshot",
     "plugins/sockscap/tools",
     "plugins/vnc-client",
@@ -99,7 +100,7 @@ taomni-screenshot-api = { path = "crates/taomni-screenshot-api" }
 taomni-screenshot-ocr = { path = "crates/taomni-screenshot-ocr", optional = true }
 taomni-screenshot-recording = { path = "crates/taomni-screenshot-recording", optional = true }
 taomni-server-process = { path = "crates/taomni-server-process" }
-taomni-rdp-server-engine = { path = "crates/taomni-rdp-server-engine" }
+taomni-rdp-server-engine = { path = "crates/taomni-rdp-server-engine", optional = true }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-rdp-client-api = { path = "crates/taomni-rdp-client-api" }
 taomni-rdp-client-engine = { path = "crates/taomni-rdp-client-engine", optional = true }
@@ -302,10 +303,11 @@ wry = { path = "vendor/wry" }
 winscard = { path = "vendor/winscard" }
 
 [features]
-default = ["hbase-kerberos", "rdp-server-audio", "voice-capture", "asr-whisper", "asr-sherpa"]
+default = ["hbase-kerberos", "voice-capture", "asr-whisper", "asr-sherpa"]
 # Isolated QA exercises both the pre-module relay and the signed host.
 legacy-vnc-client = ["dep:taomni-vnc-engine", "dep:taomni-vnc-key-protocol"]
 legacy-rdp-client = ["dep:taomni-rdp-client-engine"]
+legacy-rdp-server = ["dep:taomni-rdp-server-engine", "rdp-server-audio"]
 legacy-screenshot-media = ["dep:taomni-screenshot-ocr", "dep:taomni-screenshot-recording"]
 # Dedicated hosted test harness: use the production pinned key on every thread
 # instead of the normal unit-fixture key. Production verification is unchanged.
@@ -314,7 +316,7 @@ asr-whisper = ["dep:whisper-rs"]
 asr-sherpa = ["dep:sherpa-onnx"]
 # RDP server sound: WASAPI loopback / virtual-microphone playback through cpal
 # (macOS loopback uses ScreenCaptureKit; Linux uses PipeWire directly).
-rdp-server-audio = ["taomni-rdp-server-engine/rdp-server-audio"]
+rdp-server-audio = ["taomni-rdp-server-engine?/rdp-server-audio"]
 voice-capture = ["dep:cpal"]
 screen-capture = ["dep:xcap"]
 vulkan-detect = ["dep:ash"]

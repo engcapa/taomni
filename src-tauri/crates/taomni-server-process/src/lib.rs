@@ -13,6 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 mod config;
 pub use config::ServerConfig;
+pub mod rdp;
 pub mod system_rdp;
 pub mod vnc;
 

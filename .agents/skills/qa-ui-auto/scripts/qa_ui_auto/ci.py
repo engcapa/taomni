@@ -118,6 +118,8 @@ def capabilities(cases, mode: str) -> list[str]:
                 result.add("signed-screenshot")
             if "module_signed_vnc_server_archive" in fixtures:
                 result.add("signed-local-vnc")
+            if "module_signed_rdp_server_archive" in fixtures:
+                result.add("signed-local-rdp")
             if "module_signed_vnc_archive" in fixtures:
                 result.add("signed-vnc")
             if "module_signed_rdp_archive" in fixtures:
