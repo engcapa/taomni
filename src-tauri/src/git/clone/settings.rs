@@ -93,7 +93,7 @@ fn resolve_app_proxy(
 }
 
 fn vault_state(state: &AppState) -> String {
-    match state.vault.status() {
+    match state.core.vault.status() {
         Ok(status) => match status.state {
             VaultStateKind::Empty => "empty",
             VaultStateKind::Locked => "locked",
@@ -110,6 +110,7 @@ pub(super) fn build_defaults(state: &AppState) -> Result<GitCloneDefaults, Strin
     let vault_state = vault_state(state);
     let saved_token_available = vault_state == "unlocked"
         && state
+            .core
             .vault
             .get_fixed(GIT_CLONE_TOKEN_ID)
             .map(|entry| entry.is_some())
@@ -189,7 +190,7 @@ pub(super) fn resolve_token(
     if !use_saved_token {
         return Ok(None);
     }
-    match state.vault.get_fixed(GIT_CLONE_TOKEN_ID) {
+    match state.core.vault.get_fixed(GIT_CLONE_TOKEN_ID) {
         Ok(Some(token)) => Ok(Some((username, token))),
         Ok(None) => Err("No saved Git token is available; enter a token".into()),
         Err(error) if error == ERR_VAULT_LOCKED => {

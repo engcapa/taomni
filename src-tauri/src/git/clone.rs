@@ -69,12 +69,12 @@ pub async fn git_clone_repository(
         request.use_saved_token,
     )?;
     if request.remember_token {
-        let status = state.vault.status()?;
+        let status = state.core.vault.status()?;
         if status.state != VaultStateKind::Unlocked {
             return Err("Unlock the vault before saving the Git token".into());
         }
     }
-    let vault = state.vault.clone();
+    let vault = state.core.vault.clone();
     let cancel = register_task(&task_id, &destination)?;
     let result = blocking(move || {
         let runtime = CloneRuntime {
