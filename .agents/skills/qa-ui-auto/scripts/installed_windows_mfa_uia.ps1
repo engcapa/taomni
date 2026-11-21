@@ -166,10 +166,21 @@ function Observe-Controls {
 
 function Read-Code([string]$Expected) {
     [System.Windows.Forms.Clipboard]::Clear()
-    Invoke-Button $window "Copy code for $($fixture.issuer)" 'copy-hotp'
+    $button = Wait-Element { Find-Control $window $types::Button "Copy code for $($fixture.issuer)" } 'copy-hotp'
+    Click-Element $button
+    $retry = [Diagnostics.Stopwatch]::StartNew()
     Wait-Element {
-        $actual = [System.Windows.Forms.Clipboard]::GetText()
+        try {
+            $actual = [System.Windows.Forms.Clipboard]::GetText()
+        } catch [System.Runtime.InteropServices.ExternalException] {
+            return
+        }
         if ($actual -ceq $Expected) { return $actual }
+        if ($retry.Elapsed.TotalSeconds -ge 1) {
+            $current = Find-Control $window $types::Button "Copy code for $($fixture.issuer)"
+            if ($null -ne $current) { Click-Element $current }
+            $retry.Restart()
+        }
     } 'read-hotp'
 }
 
@@ -207,7 +218,7 @@ if ($Phase -eq 'seed') {
     $codes += Read-Code '287082'
 }
 if ($Phase -ne 'before') {
-    Invoke-Button $window "Generate the next code for $($fixture.issuer)" 'advance-hotp'
+    Invoke-Button $window "Generate the next code for $($fixture.issuer)" 'advance-hotp' -Physical
     $codes += Read-Code $(if ($Phase -eq 'seed') { '287082' } else { '359152' })
 }
 [System.Windows.Forms.Clipboard]::Clear()
