@@ -128,34 +128,6 @@ jobs:
       - name: Install the process observer for installed-app recovery
         if: inputs.upgrade_desktop
         run: python -m pip install psutil==7.2.2
-      - name: Install the adapter matching the installed WebView2 runtime
-        if: inputs.upgrade_desktop && runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $runtimeRoot = "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application"
-          $runtime = Get-ChildItem -LiteralPath $runtimeRoot -Directory | Where-Object Name -Match '^\d+\.\d+\.\d+\.\d+$' | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
-          if (-not $runtime) { throw 'WebView2 runtime unavailable' }
-          $zip = Join-Path $env:RUNNER_TEMP 'qa-edgedriver.zip'
-          $driver = Join-Path $env:RUNNER_TEMP 'qa-edgedriver'
-          Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
-          Expand-Archive -LiteralPath $zip -DestinationPath $driver -Force
-          $driver >> $env:GITHUB_PATH
-      - uses: dtolnay/rust-toolchain@stable
-        if: inputs.upgrade_desktop && runner.os == 'Windows'
-      - uses: actions/cache@v4
-        if: inputs.upgrade_desktop && runner.os == 'Windows'
-        with:
-          path: ~/.cache/taomni-qa/adapter
-          key: qa-tauri-driver-2.0.4-${{ runner.os }}-${{ runner.arch }}-${{ matrix.os }}
-      - name: Install the pinned Tauri WebDriver adapter
-        if: inputs.upgrade_desktop && runner.os == 'Windows'
-        run: |
-          adapter="$HOME/.cache/taomni-qa/adapter"
-          if ! "$adapter/bin/tauri-driver.exe" --help; then
-            cargo install tauri-driver --version 2.0.4 --locked --root "$adapter"
-          fi
-          cygpath -w "$adapter/bin" >> "$GITHUB_PATH"
       - name: Bind the selected package to its exact release producer
         id: source
         env:

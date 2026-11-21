@@ -9,7 +9,7 @@ import platform
 from types import SimpleNamespace
 
 from installed_macos_host_signature import observe_hardened_host
-from installed_windows_webview import installed_windows_desktop
+from installed_windows_mfa import installed_windows_desktop, verify_mfa_controls
 from modular_bundle_inventory import digest, write_json
 from qa_ui_auto.fixtures.module_legacy_mfa import (
     commit_mfa_upgrade, create_account, desktop_action, element, installed_desktop, open_unlocked_mfa,
@@ -48,7 +48,7 @@ def observe_abrupt_exit(launcher, executable, module, observation):
         core={"pid": core.pid, "createdAt": core.create_time(), "executable": str(executable)},
         host={"pid": host.pid, "createdAt": host.create_time(), "executable": str(module), "parent": core.pid},
         termination="TerminateProcess" if windows else "SIGKILL",
-        coreIdentity="owned-webview2-launch" if windows else "owned-wkwebview-launch",
+        coreIdentity="owned-windows-launch" if windows else "owned-wkwebview-launch",
     )
     if "macosHostExecution" in observation:
         observation["macosHostExecution"]["launched"] = True
@@ -64,8 +64,8 @@ def observe_abrupt_exit(launcher, executable, module, observation):
 @contextmanager
 def open_desktop(ctx, executable, work, evidence, label):
     if platform.system() == "Windows":
-        with installed_windows_desktop(ctx, executable, work, evidence, label) as desktop:
-            yield desktop
+        with installed_windows_desktop(executable, work, evidence, label) as owner:
+            yield owner, None
     else:
         with installed_desktop(ctx, executable, work, evidence, label, environment={}) as (driver, session):
             yield driver.proc, session
@@ -84,8 +84,11 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, work, *
     active_path = profile / "plugins/mfa/active.json"
     account = {"selector": element("mfa-account-code"), "equals": "287 082"}
     try:
-        with open_desktop(ctx, executable, work, evidence, "mfa-legacy-seed") as (_, session):
-            create_account(session, ctx, evidence)
+        with open_desktop(ctx, executable, work, evidence, "mfa-legacy-seed") as (launcher, session):
+            if session is None:
+                verify_mfa_controls(launcher, "seed", evidence)
+            else:
+                create_account(session, ctx, evidence)
         result["legacyDatabaseSha256"] = digest(profile / "mfa.db")
         commit_mfa_upgrade(executable, profile, archive, signature, evidence)
         installed = json.loads(active_path.read_text(encoding="utf-8"))
@@ -103,20 +106,27 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, work, *
                 executable, module, evidence, os.environ.get("MACOS_SIGNING_CERT_SHA1", "").upper(),
             )
         with open_desktop(ctx, executable, work, evidence, "mfa-before-kill") as (launcher, session):
-            steps = open_unlocked_mfa(ctx, session, evidence)
-            desktop_action(steps, "assert_text_equals", account)
+            if session is None:
+                verify_mfa_controls(launcher, "before", evidence)
+            else:
+                steps = open_unlocked_mfa(ctx, session, evidence)
+                desktop_action(steps, "assert_text_equals", account)
             active = json.loads(active_path.read_text(encoding="utf-8"))
             if active["activeVersion"] != installed["activeVersion"]:
                 raise RuntimeError("Opening MFA selected a different installed version")
             result.update(moduleBinarySha256=digest(module), hotpBeforeExit=account["equals"])
             observe_abrupt_exit(launcher, executable, module, result)
-            session.session_id = None
-        with open_desktop(ctx, executable, work, evidence, "mfa-after-kill") as (_, session):
-            steps = open_unlocked_mfa(ctx, session, evidence)
-            desktop_action(steps, "assert_text_equals", account)
-            desktop_action(steps, "click", element("mfa-account-hotp-next"))
-            desktop_action(steps, "assert_text_equals", {**account, "equals": "359 152"})
-            desktop_action(steps, "assert_no_runtime_errors", None)
+            if session is not None:
+                session.session_id = None
+        with open_desktop(ctx, executable, work, evidence, "mfa-after-kill") as (launcher, session):
+            if session is None:
+                verify_mfa_controls(launcher, "after", evidence)
+            else:
+                steps = open_unlocked_mfa(ctx, session, evidence)
+                desktop_action(steps, "assert_text_equals", account)
+                desktop_action(steps, "click", element("mfa-account-hotp-next"))
+                desktop_action(steps, "assert_text_equals", {**account, "equals": "359 152"})
+                desktop_action(steps, "assert_no_runtime_errors", None)
         if json.loads(active_path.read_text(encoding="utf-8")) != active or digest(module) != result["moduleBinarySha256"]:
             raise RuntimeError("Recovery changed the active MFA version or module binary")
         result.update(passed=True, hotpAfterReopen=account["equals"], nextHotp="359 152")

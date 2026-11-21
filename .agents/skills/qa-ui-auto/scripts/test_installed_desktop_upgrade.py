@@ -15,10 +15,8 @@ from installed_desktop_mfa_crash import observe_abrupt_exit
 from installed_desktop_upgrade import require_registration, select_candidate
 from installed_macos_host_signature import require_hardened_signature
 from installed_macos_permissions import compare_permissions, observe_hosted_screen_scan
-from installed_windows_webview import wait_for_owned_webview
+from installed_windows_mfa import verify_mfa_controls
 from modular_bundle_inventory import plan_targets
-from native_driver_lifecycle import session_payload
-from native_webdriver_transport import WebDriverError
 from qa_ui_auto.legacy_install import windows_install
 from qa_ui_auto.legacy_process import observe_same_profile_contender
 
@@ -27,17 +25,6 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
     old = {"ProductCode": "{bc571798-c76e-41ce-b022-ebdc0c5c33e1}",
            "UpgradeCode": "{cd0d07ef-a2b5-4a17-8d25-434297419ccd}", "InstalledState": 5}
     candidate = {**old, "ProductCode": "{a5e2ebb2-b24a-4a54-ae83-80154c4a8b0e}", "InstalledState": -1}
-
-    def test_installed_webview_options_attach_to_a_windows_loopback_port(self):
-        application = Path("installed-taomni.exe")
-        self.assertEqual(session_payload(application, "Windows", 65123)["capabilities"]["alwaysMatch"], {
-            "browserName": "webview2",
-            "ms:edgeChromium": True,
-            "ms:edgeOptions": {"debuggerAddress": "127.0.0.1:65123"},
-        })
-        for system, port in (("Windows", 0), ("Darwin", 65123)):
-            with self.assertRaises(WebDriverError):
-                session_payload(application, system, port)
 
     def test_requires_only_one_version_from_the_same_registered_msi_family(self):
         require_registration(self.old, self.candidate, upgraded=False)
@@ -219,38 +206,32 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
                         observe_abrupt_exit(launcher, application, module, result)
                 self.assertNotEqual(host_survives, result.get("hostExitedBeforeDriverCleanup", False))
                 self.assertTrue(result["coreExited"])
-                self.assertEqual(result["coreIdentity"], "owned-webview2-launch")
+                self.assertEqual(result["coreIdentity"], "owned-windows-launch")
                 self.assertEqual(result["termination"], "TerminateProcess")
                 core.kill.assert_not_called()
                 host.kill.assert_not_called()
                 launcher.kill.assert_called_once_with()
 
-    def test_webview_attachment_requires_an_owned_loopback_listener(self):
+    def test_windows_mfa_requires_the_owned_pid_and_updated_hotp(self):
         owner = Mock(pid=21)
         owner.poll.return_value = None
-        child = Mock(pid=22)
-        child.name.return_value = "msedgewebview2.exe"
-        core = Mock()
-        core.children.return_value = [child]
-        port = 65123
-        for ip, pid, error in (("127.0.0.1", 22, None), ("127.0.0.1", 23, "did not open"),
-                               ("0.0.0.0", 22, "must be local")):
-            with self.subTest(ip=ip, pid=pid):
-                endpoint = {"LocalAddress": ip, "LocalPort": port, "OwningProcess": pid}
-                observer = SimpleNamespace(Process=Mock(return_value=core), NoSuchProcess=ProcessLookupError)
-                observation = {}
-                with patch.dict(sys.modules, {"psutil": observer}), patch(
-                    "installed_windows_webview.time.monotonic", side_effect=[0, 1],
-                ), patch("installed_windows_webview.time.sleep"), patch(
-                    "installed_windows_webview.windows_listeners", return_value=[endpoint],
-                ):
-                    if error:
-                        with self.assertRaisesRegex(RuntimeError, error):
-                            wait_for_owned_webview(owner, port, 1, observation)
+        cases = [(21, ["287082", "359152"], True), (22, ["287082", "359152"], False),
+                 (21, ["287082", "287082"], False)]
+        for pid, codes, expected in cases:
+            with self.subTest(pid=pid, codes=codes), TemporaryDirectory() as directory:
+                report = Path(directory)
+                output = json.dumps({"phase": "after", "ownerPid": pid, "codes": codes})
+                completed = subprocess.CompletedProcess([], 0, stdout=output, stderr="")
+                with patch("installed_windows_mfa.subprocess.run", return_value=completed) as run:
+                    if expected:
+                        verify_mfa_controls(owner, "after", report)
                     else:
-                        self.assertEqual(wait_for_owned_webview(owner, port, 1, observation), child.pid)
-                self.assertEqual(observation["listeners"], [endpoint])
-                self.assertEqual(observation["children"], {22: "msedgewebview2.exe"})
+                        with self.assertRaisesRegex(RuntimeError, "expected HOTP values"):
+                            verify_mfa_controls(owner, "after", report)
+                    self.assertEqual(run.call_args.args[0][-4:], ["-OwnerId", "21", "-Phase", "after"])
+                    self.assertTrue(json.loads(run.call_args.kwargs["input"])["uri"].startswith("otpauth://hotp/"))
+                receipt = json.loads((report / "windows-mfa-after.json").read_text(encoding="utf-8"))
+                self.assertEqual(receipt["passed"], expected)
 
     def test_macos_uses_the_owned_bridge_and_matches_a_hardened_child_command(self):
         with TemporaryDirectory() as temporary:

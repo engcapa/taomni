@@ -30,7 +30,7 @@ from native_pointer import pointer_button_click, prepare_click_target
 from native_doubleclick import double_click
 from native_paced_input import type_paced_text
 from native_window_focus import NativeWindowFocus
-from native_driver_lifecycle import driver_start_environment, session_payload
+from native_driver_lifecycle import driver_start_environment
 
 
 ROOT = Path.cwd()
@@ -411,8 +411,29 @@ class NativeSession(WebDriverTransport):
         self.transport = "macOS WKWebView bridge" if platform.system() == "Darwin" else "tauri-driver"
         self._window_focus = NativeWindowFocus(self, os.environ)
 
-    def start(self, *, webview_debugger_port: int | None = None) -> None:
-        payload = session_payload(self.application, platform.system(), webview_debugger_port)
+    def start(self) -> None:
+        payload = {
+            "capabilities": {
+                "alwaysMatch": {
+                    "tauri:options": {
+                        "application": str(self.application.resolve())
+                    }
+                }
+            }
+        }
+        if platform.system() == "Windows":
+            # The QA app chooses an explicit WebView profile. EdgeDriver must
+            # watch that same directory for DevToolsActivePort instead of a
+            # separate temporary profile (which causes session init to hang).
+            data_root = os.environ.get("NEWMOB_DATA_DIR")
+            if not data_root:
+                raise WebDriverError("Windows WebView2 session requires the QA data directory")
+            payload["capabilities"]["alwaysMatch"]["tauri:options"]["webviewOptions"] = {
+                "userDataFolder": os.environ.get("TAOMNI_QA_WEBVIEW_DIR") or str(Path(data_root) / QA_APP_ID / "webview"),
+                # Canvas originals use sRGB. Host monitor ICC profiles must
+                # not recolor the QA renderer before native pixel comparison.
+                "additionalBrowserArguments": ["--force-color-profile=srgb"],
+            }
         value = self.request("POST", "/session", payload)
         sid = value.get("sessionId") if isinstance(value, dict) else None
         if not sid:
