@@ -48,8 +48,10 @@ mod drafts;
 
 pub use drafts::*;
 
+mod folder_commands;
 mod mutation_commands;
 
+pub use folder_commands::*;
 pub use mutation_commands::*;
 
 mod account_config;

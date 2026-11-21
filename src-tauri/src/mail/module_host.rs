@@ -17,9 +17,10 @@ use lettre::address::Envelope;
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, FETCH_IMAP_RAW,
-    FolderSubscription, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, ImapFlagUpdate, ImapFolderTree,
-    IncomingTest, LIST_IMAP_UNREAD, SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, SLUG,
-    SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
+    FolderSubscription, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, ImapFlagUpdate, ImapFolderChange,
+    ImapFolderMutation, ImapFolderTree, IncomingTest, LIST_IMAP_UNREAD, MUTATE_IMAP_FOLDER,
+    SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, SLUG, SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS,
+    SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
     imap_exchange::{ImapExchange, read_frame, write_frame},
 };
 use taomni_mail_engine::imap_sync::{
@@ -44,6 +45,10 @@ pub(super) fn checks_incoming(registry: &PluginRegistry) -> bool {
 
 pub(super) fn manages_imap_folders(registry: &PluginRegistry) -> bool {
     supports(registry, IMAP_FOLDER_TREE)
+}
+
+pub(super) fn changes_imap_folders(registry: &PluginRegistry) -> bool {
+    supports(registry, MUTATE_IMAP_FOLDER)
 }
 
 pub(super) fn syncs_imap_headers(registry: &PluginRegistry) -> bool {
@@ -295,6 +300,18 @@ pub(super) async fn imap_folder_tree(
         }
     })
     .await
+}
+
+pub(super) async fn change_imap_folder(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    change: ImapFolderChange,
+) -> Result<Vec<MailFolder>, String> {
+    let request = ImapFolderMutation {
+        account_id: account.config.session_id.clone(),
+        change,
+    };
+    exchange_imap(registry, account, MUTATE_IMAP_FOLDER, &request).await
 }
 
 async fn invoke_with_incoming<T: DeserializeOwned, P: Serialize + Send + 'static>(

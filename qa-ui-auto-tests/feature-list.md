@@ -7951,7 +7951,17 @@ files:
   - src/lib/mailFolders.ts
   - src/components/session/SessionEditor.tsx
   - src-tauri/src/mail/folders.rs
+  - src-tauri/src/mail/folder_commands.rs
 controls:
+  - id: mail-new-subfolder
+    selector: '[data-testid="context-menu-item-new-subfolder"]'
+    kind: interactive
+  - id: mail-rename-folder
+    selector: '[data-testid="context-menu-item-rename-folder"]'
+    kind: interactive
+  - id: mail-delete-folder
+    selector: '[data-testid="context-menu-item-delete-folder"]'
+    kind: interactive
   - id: subscriptions-open
     selector: '[data-testid="mail-subscriptions-open"]'
     kind: interactive
@@ -7983,6 +7993,7 @@ controls:
 - 文件夹属性按 RFC 形式保存（`\Noselect`、`\Sent`），LSUB 报告的文件夹带 `\Subscribed`（RFC 5258）；服务器没有订阅数据时视为全部已订阅。
 - 文件夹栏 “Manage folder subscriptions” 对话框调用 SUBSCRIBE/UNSUBSCRIBE；“Show only subscribed folders”（按账户保存）开启后未订阅文件夹不在树中显示，也不参与全文件夹同步（INBOX 始终保留）。
 - TC-MODULES-059 从常规 Mail 标签加载 IMAP 文件夹，检查签名宿主的写租约，并通过订阅对话框在真实 IMAP 服务器上取消订阅。
+- 签名 Mail 宿主负责创建、重命名和删除 IMAP 文件夹。核心在一个事务中提交服务器返回的文件夹列表。TC-MODULES-059/060 覆盖目录操作和删除取消，Native 核对服务器实际状态。
 - TC-MAIL-FOLDER-01 检查选中文件夹抓取后仍保留 LIST/LSUB 返回的订阅属性。同步只更新邮件计数和 UID 状态。
 - 会话编辑器 “Special folders” 可手动指定 Sent/Drafts/Trash/Junk/Archive，优先于 SPECIAL-USE 属性与名称匹配（中文或自定义命名）。
 - 定时的全文件夹扫描在服务器支持 CONDSTORE 时先发 `STATUS (MESSAGES UNSEEN UIDNEXT UIDVALIDITY HIGHESTMODSEQ)`，未变化的文件夹只更新计数、跳过 EXAMINE/SEARCH；手动同步始终完整对账。

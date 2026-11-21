@@ -1,8 +1,9 @@
 //! Execute IMAP requests over the authorized account route.
 
 use serde::{Serialize, de::DeserializeOwned};
+use taomni_mail_api::ImapFolderChange;
 use taomni_mail_api::{
-    ImapFlagUpdate, IncomingTest, MailIncomingProtocol,
+    ImapFlagUpdate, ImapFolderMutation, IncomingTest, MailIncomingProtocol,
     imap_exchange::{
         AttachmentReceipt, AttachmentRequest, ImapExchange, RawMessageRequest, read_frame,
         write_body_frame, write_frame,
@@ -98,6 +99,31 @@ pub(super) fn list_unread(
         }
         session.unread_uids(&folder)
     })
+}
+
+pub(super) fn mutate_folder(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: ImapExchange,
+) -> Result<Result<(), String>, RpcError> {
+    transfer(
+        runtime,
+        operation,
+        request,
+        |session, input: ImapFolderMutation| {
+            match &input.change {
+                ImapFolderChange::Create { name } | ImapFolderChange::Delete { name } => {
+                    validate_folder(&input.account_id, name)?;
+                }
+                ImapFolderChange::Rename { from, to } => {
+                    validate_folder(&input.account_id, from)?;
+                    validate_folder(&input.account_id, to)?;
+                }
+            }
+            session.change_folder(&input.change)?;
+            session.list_folders(&input.account_id)
+        },
+    )
 }
 
 pub(super) fn fetch_raw(

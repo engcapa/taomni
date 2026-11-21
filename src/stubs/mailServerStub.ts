@@ -158,7 +158,7 @@ export function stubMailListFolders(accountId: string, seed: Seed) {
 
 export function stubMailListCached(accountId: string, seed: Seed, folder: string, limit: number, offset: number) {
   const state = account(accountId, seed);
-  const rows = [...folderState(state, folder).cache.values()]
+  const rows = [...(state.folders.get(folder)?.cache.values() ?? [])]
     .sort((a, b) => (b.dateTs - a.dateTs) || (b.uid - a.uid));
   return rows.slice(offset, offset + limit);
 }
@@ -238,6 +238,42 @@ export function stubMailSetSubscription(accountId: string, seed: Seed, folder: s
   const state = account(accountId, seed);
   if (subscribed) state.unsubscribed.delete(folder);
   else state.unsubscribed.add(folder);
+  return stubMailListFolders(accountId, seed);
+}
+
+type StubFolderChange =
+  | { kind: "create"; name: string }
+  | { kind: "rename"; from: string; to: string }
+  | { kind: "delete"; name: string };
+
+export function stubMailChangeFolder(accountId: string, seed: Seed, change: StubFolderChange) {
+  const state = account(accountId, seed);
+  if (change.kind === "create") {
+    if (!change.name || state.folders.has(change.name)) throw new Error("Folder name is unavailable");
+    folderState(state, change.name);
+  } else {
+    const source = change.kind === "rename" ? change.from : change.name;
+    if (!state.folders.has(source)) throw new Error("Folder does not exist");
+    if (change.kind === "rename" && (!change.to || state.folders.has(change.to))) {
+      throw new Error("Folder name is unavailable");
+    }
+    const affected = state.meta.filter(({ name }) => name === source || name.startsWith(`${source}/`));
+    state.meta = state.meta.filter((folder) => !affected.includes(folder));
+    for (const { name } of affected) {
+      const folder = state.folders.get(name)!;
+      const unsubscribed = state.unsubscribed.delete(name);
+      state.folders.delete(name);
+      if (change.kind === "rename") {
+        const destination = change.to + name.slice(source.length);
+        for (const messages of [folder.server, folder.cache]) {
+          for (const message of messages.values()) message.folder = destination;
+        }
+        state.meta.push({ name: destination, displayName: destination });
+        state.folders.set(destination, folder);
+        if (unsubscribed) state.unsubscribed.add(destination);
+      }
+    }
+  }
   return stubMailListFolders(accountId, seed);
 }
 

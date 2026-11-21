@@ -5,10 +5,28 @@ use std::io::{Read, Write};
 
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use imap::types::NameAttribute;
+use taomni_mail_api::ImapFolderChange;
 
 use crate::{MailFolder, now_ts};
 
 pub const SUBSCRIBED_ATTRIBUTE: &str = "\\Subscribed";
+
+pub fn imap_change_folder<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    change: &ImapFolderChange,
+) -> Result<(), String> {
+    match change {
+        ImapFolderChange::Create { name } => session
+            .create(name)
+            .map_err(|error| format!("IMAP CREATE {name} failed: {error}")),
+        ImapFolderChange::Rename { from, to } => session
+            .rename(from, to)
+            .map_err(|error| format!("IMAP RENAME {from} -> {to} failed: {error}")),
+        ImapFolderChange::Delete { name } => session
+            .delete(name)
+            .map_err(|error| format!("IMAP DELETE {name} failed: {error}")),
+    }
+}
 
 /// RFC wire form of a LIST attribute (the `imap` crate only has Debug output).
 fn attribute_string(attribute: &NameAttribute<'_>) -> String {

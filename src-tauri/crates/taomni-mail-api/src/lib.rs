@@ -13,6 +13,7 @@ pub const SLUG: &str = "mail";
 pub const CHECK_INCOMING: &str = "mail/check-incoming";
 pub const CHECK_OUTGOING: &str = "mail/check-outgoing";
 pub const IMAP_FOLDER_TREE: &str = "mail/imap-folder-tree";
+pub const MUTATE_IMAP_FOLDER: &str = "mail/mutate-imap-folder";
 pub const SYNC_IMAP_HEADERS: &str = "mail/sync-imap-headers";
 pub const SYNC_IMAP_ROUND: &str = "mail/sync-imap-round";
 pub const SEARCH_IMAP: &str = "mail/search-imap";
@@ -122,6 +123,21 @@ pub struct ImapFolderTree {
 pub struct FolderSubscription {
     pub folder: String,
     pub subscribed: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub enum ImapFolderChange {
+    Create { name: String },
+    Rename { from: String, to: String },
+    Delete { name: String },
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ImapFolderMutation {
+    pub account_id: String,
+    pub change: ImapFolderChange,
 }
 
 #[cfg(test)]

@@ -94,6 +94,11 @@ large messages, the host requests the selected MIME section. The core checks
 the returned byte count and publishes the file atomically before updating the
 optional attachment cache.
 
+Version 0.1.14 performs IMAP folder creation, renaming, and deletion in the
+signed host. It returns the refreshed folder tree so the core can apply it
+in one cache transaction. The caller sees a lost response because the server
+may have accepted the mutation.
+
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.
 It publishes the module data before activating the verified package and

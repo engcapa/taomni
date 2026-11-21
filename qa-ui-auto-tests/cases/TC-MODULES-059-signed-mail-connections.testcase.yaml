@@ -110,6 +110,32 @@ steps:
     path: ${fixture.file_open_root}/mail-original.eml
 - assert_file_contains: {path: '${fixture.file_open_root}/mail-original.eml', contains: 'Subject: Seed 0030'}
 - assert_file_contains: {path: '${fixture.file_open_root}/mail-original.eml', contains: 'Body of Seed 0030'}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- click: '[data-testid="context-menu-item-new-subfolder"]'
+- fill: {selector: '[data-testid="text-input-dialog-input"]', value: QA module folder}
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module folder"]'
+- mail_server_assert_folder_count: {folder: INBOX/QA module folder, exists: true, equals: 0}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module folder"]'
+- click: '[data-testid="context-menu-item-rename-folder"]'
+- fill: {selector: '[data-testid="text-input-dialog-input"]', value: QA module renamed}
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- assert_count: {selector: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module folder"]', equal: 0}
+- mail_server_assert_folder_count: {folder: INBOX/QA module folder, exists: false}
+- mail_server_assert_folder_count: {folder: INBOX/QA module renamed, exists: true, equals: 0}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- click: '[data-testid="context-menu-item-delete-folder"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_visible: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- mail_server_assert_folder_count: {folder: INBOX/QA module renamed, exists: true, equals: 0}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- click: '[data-testid="context-menu-item-delete-folder"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: {selector: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]', state: detached}
+- assert_visible: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- mail_server_assert_folder_count: {folder: INBOX/QA module renamed, exists: false}
+- assert_signed_mail_host: folder-changes
 - click: '[data-testid="mail-test-connection"]'
 - assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'IMAP ok, SMTP ok', timeout_sec: 45}
 - assert_signed_mail_host: running
@@ -167,33 +193,33 @@ verification:
     results: [9, 12, 18, 20, 21, 48, 50, 54, 55, 78]
   - id: R2
     requirement: The normal connection controls test IMAP, POP3 and SMTP using the installed Mail host.
-    actions: [79, 84, 97, 98, 101]
+    actions: [79, 110, 123, 124, 127]
     checkpoints:
-    - {step: 85, expectation: The hosted app reports working IMAP and SMTP connections.}
-    - {step: 86, expectation: The signed Mail host still holds its data lease.}
-    - {step: 102, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
-    results: [85, 86, 102]
+    - {step: 111, expectation: The hosted app reports working IMAP and SMTP connections.}
+    - {step: 112, expectation: The signed Mail host still holds its data lease.}
+    - {step: 128, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
+    results: [111, 112, 128]
   - id: R3
     requirement: The signature-verified package delivers from both account types and preserves the Sent-copy behavior.
-    actions: [87, 88, 89, 90, 91, 92, 103, 104, 105, 106, 107, 108]
+    actions: [113, 114, 115, 116, 117, 118, 129, 130, 131, 132, 133, 134]
     checkpoints:
-    - {step: 94, expectation: The SMTP server received the message sent from the IMAP account.}
-    - {step: 95, expectation: The IMAP Sent copy was stored.}
-    - {step: 96, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
-    - {step: 110, expectation: The SMTP server received the message sent from the POP3 account.}
-    - {step: 111, expectation: The POP3 copy was stored in local Sent.}
-    - {step: 112, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
-    results: [94, 95, 96, 110, 111, 112]
+    - {step: 120, expectation: The SMTP server received the message sent from the IMAP account.}
+    - {step: 121, expectation: The IMAP Sent copy was stored.}
+    - {step: 122, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
+    - {step: 136, expectation: The SMTP server received the message sent from the POP3 account.}
+    - {step: 137, expectation: The POP3 copy was stored in local Sent.}
+    - {step: 138, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
+    results: [120, 121, 122, 136, 137, 138]
   - id: R4
     requirement: Disabling the module releases its data lease without restarting the desktop.
-    actions: [113, 114, 115]
+    actions: [139, 140, 141]
     checkpoints:
-    - {step: 116, expectation: The disabled package can be re-enabled.}
-    - {step: 117, expectation: The verified module is still installed and the host released its writer lease.}
-    - {step: 118, expectation: Disabling unmounts both Mail account panes.}
-    - {step: 119, expectation: Both tabs remain open for reactivation.}
-    - {step: 120, expectation: The remaining application runs without uncaught errors.}
-    results: [116, 117, 118, 119, 120]
+    - {step: 142, expectation: The disabled package can be re-enabled.}
+    - {step: 143, expectation: The verified module is still installed and the host released its writer lease.}
+    - {step: 144, expectation: Disabling unmounts both Mail account panes.}
+    - {step: 145, expectation: Both tabs remain open for reactivation.}
+    - {step: 146, expectation: The remaining application runs without uncaught errors.}
+    results: [142, 143, 144, 145, 146]
   - id: R5
     requirement: The signed Mail host catches up the selected inbox after messages arrive while another folder is open.
     actions: [29, 40, 41]
@@ -255,6 +281,19 @@ verification:
     - {step: 36, expectation: The new read-only viewer holds the exact attachment bytes.}
     - {step: 39, expectation: Closing the viewer removes the controlled temporary file.}
     results: [33, 36, 39]
+  - id: R12
+    requirement: The Mail module supports creating and renaming a folder, cancelling deletion and confirming deletion.
+    actions: [87, 93, 100, 105]
+    checkpoints:
+    - {step: 88, expectation: The new empty subfolder appears.}
+    - {step: 89, expectation: The fixture independently verifies the server result.}
+    - {step: 94, expectation: The renamed folder replaces its original row.}
+    - {step: 96, expectation: The fixture independently verifies the server result.}
+    - {step: 101, expectation: Cancelling deletion leaves the folder visible.}
+    - {step: 102, expectation: The fixture independently verifies the server result.}
+    - {step: 106, expectation: Confirmed deletion removes the folder and keeps its parent.}
+    - {step: 108, expectation: The fixture independently verifies the server result.}
+    results: [88, 89, 94, 96, 101, 102, 106, 108]
   visual:
   - check: The Mail pane shows the connection results for both accounts.
     method: automated

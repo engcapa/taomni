@@ -1,5 +1,6 @@
 use super::*;
-use taomni_mail_engine::imap_folders::imap_list_folders;
+use taomni_mail_api::ImapFolderChange;
+use taomni_mail_engine::imap_folders::{imap_change_folder, imap_list_folders};
 
 pub(super) enum ActiveImapSession {
     Tls {
@@ -188,36 +189,10 @@ impl ActiveImapSession {
         }
     }
 
-    pub(super) fn create_folder(&mut self, name: &str) -> Result<(), String> {
+    pub(super) fn change_folder(&mut self, change: &ImapFolderChange) -> Result<(), String> {
         match self {
-            Self::Tls { session, .. } => session
-                .create(name)
-                .map_err(|e| format!("IMAP CREATE {name} failed: {e}")),
-            Self::Plain { session, .. } => session
-                .create(name)
-                .map_err(|e| format!("IMAP CREATE {name} failed: {e}")),
-        }
-    }
-
-    pub(super) fn rename_folder(&mut self, from: &str, to: &str) -> Result<(), String> {
-        match self {
-            Self::Tls { session, .. } => session
-                .rename(from, to)
-                .map_err(|e| format!("IMAP RENAME {from} -> {to} failed: {e}")),
-            Self::Plain { session, .. } => session
-                .rename(from, to)
-                .map_err(|e| format!("IMAP RENAME {from} -> {to} failed: {e}")),
-        }
-    }
-
-    pub(super) fn delete_folder(&mut self, name: &str) -> Result<(), String> {
-        match self {
-            Self::Tls { session, .. } => session
-                .delete(name)
-                .map_err(|e| format!("IMAP DELETE {name} failed: {e}")),
-            Self::Plain { session, .. } => session
-                .delete(name)
-                .map_err(|e| format!("IMAP DELETE {name} failed: {e}")),
+            Self::Tls { session, .. } => imap_change_folder(session, change),
+            Self::Plain { session, .. } => imap_change_folder(session, change),
         }
     }
 

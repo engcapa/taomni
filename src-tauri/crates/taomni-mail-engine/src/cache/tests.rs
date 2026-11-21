@@ -89,3 +89,63 @@ fn migration_is_idempotent_and_keeps_rows() {
         Some("Saved body")
     );
 }
+
+#[test]
+fn purge_cached_folder_removes_folder_and_subfolders_only() {
+    let conn = Connection::open_in_memory().unwrap();
+    init_mail_tables(&conn).unwrap();
+    for name in ["Parent_%", "Parent_%/Child", "ParentX/Child", "Parent_%X"] {
+        upsert_message(
+            &conn,
+            &crate::parse_body_message("acct", name, 1, None, b"Subject: Cached\r\n\r\nbody", 4096),
+        )
+        .unwrap();
+        upsert_folder(
+            &conn,
+            &MailFolder {
+                account_id: "acct".into(),
+                name: name.into(),
+                display_name: name.into(),
+                delimiter: Some("/".into()),
+                flags: vec![],
+                uid_validity: None,
+                uid_next: None,
+                total: None,
+                unread: None,
+                updated_at: 1,
+                ..MailFolder::default()
+            },
+        )
+        .unwrap();
+    }
+
+    purge_cached_folder(&conn, "acct", "Parent_%").unwrap();
+
+    let names = list_cached_folders(&conn, "acct")
+        .unwrap()
+        .into_iter()
+        .map(|f| f.name)
+        .collect::<Vec<_>>();
+    assert!(names.contains(&"ParentX/Child".to_string()));
+    assert!(names.contains(&"Parent_%X".to_string()));
+    assert!(!names.contains(&"Parent_%".to_string()));
+    assert!(!names.contains(&"Parent_%/Child".to_string()));
+    assert_eq!(
+        list_cached_messages(&conn, "acct", "Parent_%", 20, 0)
+            .unwrap()
+            .len(),
+        0
+    );
+    assert_eq!(
+        list_cached_messages(&conn, "acct", "Parent_%/Child", 20, 0)
+            .unwrap()
+            .len(),
+        0
+    );
+    assert_eq!(
+        list_cached_messages(&conn, "acct", "ParentX/Child", 20, 0)
+            .unwrap()
+            .len(),
+        1
+    );
+}

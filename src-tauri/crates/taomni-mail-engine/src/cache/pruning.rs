@@ -112,22 +112,22 @@ pub fn purge_cached_folder(conn: &Connection, account_id: &str, folder: &str) ->
     // with the common IMAP hierarchy delimiters.
     conn.execute(
         "DELETE FROM mail_messages
-         WHERE account_id = ?1 AND (folder = ?2 OR folder LIKE ?3 OR folder LIKE ?4)",
+         WHERE account_id = ?1 AND (folder = ?2 OR substr(folder, 1, length(?2) + 1) IN (?3, ?4))",
         params![
             account_id,
             folder,
-            format!("{folder}/%"),
-            format!("{folder}.%")
+            format!("{folder}/"),
+            format!("{folder}.")
         ],
     )?;
     conn.execute(
         "DELETE FROM mail_folders
-         WHERE account_id = ?1 AND (name = ?2 OR name LIKE ?3 OR name LIKE ?4)",
+         WHERE account_id = ?1 AND (name = ?2 OR substr(name, 1, length(?2) + 1) IN (?3, ?4))",
         params![
             account_id,
             folder,
-            format!("{folder}/%"),
-            format!("{folder}.%")
+            format!("{folder}/"),
+            format!("{folder}.")
         ],
     )?;
     Ok(())

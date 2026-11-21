@@ -5,7 +5,7 @@ description: >-
   original of a newly received message. Refresh Unified Mail after delivering
   a separate message. Disable the module and check both retained tabs show the
   disabled state.
-covers: [F-Modules-1, F-MAIL-3, F-MAIL-15, F-MAIL-20, F-MAIL-23, F-FILEOPEN-1]
+covers: [F-Modules-1, F-MAIL-3, F-MAIL-11, F-MAIL-15, F-MAIL-20, F-MAIL-23, F-FILEOPEN-1]
 tags: [modules, mail, p1]
 modes: [browser]
 fixtures: [reset_db, module_mail_preview, file_open_mail, file_open_files]
@@ -39,6 +39,26 @@ steps:
 - click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - wait_for: {selector: '[data-testid="file-viewer"][data-readonly="true"]', state: detached}
 - assert_file_open_bytes: {remember: signed-mail-attachment, absent: true}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- click: '[data-testid="context-menu-item-new-subfolder"]'
+- fill: {selector: '[data-testid="text-input-dialog-input"]', value: QA module folder}
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module folder"]'
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module folder"]'
+- click: '[data-testid="context-menu-item-rename-folder"]'
+- fill: {selector: '[data-testid="text-input-dialog-input"]', value: QA module renamed}
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- assert_count: {selector: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module folder"]', equal: 0}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- click: '[data-testid="context-menu-item-delete-folder"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_visible: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- click: '[data-testid="context-menu-item-delete-folder"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: {selector: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]', state: detached}
+- assert_visible: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
 - mail_server_deliver: {count: 1, prefix: Module source}
 - click: '[data-testid="mail-sync-button"]:not([disabled])'
 - wait_for: '[data-testid="mail-message-row"][data-subject="Module source 0001"]'
@@ -87,42 +107,42 @@ verification:
   requirements:
   - id: R1
     requirement: Enabling Mail renders the account list in the original tab and the unified list in its own tab.
-    actions: [5, 6, 9, 10, 12, 14, 42, 43, 44, 46]
+    actions: [5, 6, 9, 10, 12, 14, 62, 63, 64, 66]
     checkpoints:
     - {step: 7, expectation: The first open shows the disabled module.}
     - {step: 8, expectation: The disabled module has no account pane.}
     - {step: 15, expectation: The existing tab mounts the account pane from the Mail module.}
     - {step: 16, expectation: The account shows the same inbox as its stub server.}
-    - {step: 45, expectation: The Unified Mail entry mounts the module's unified pane.}
-    - {step: 47, expectation: Refresh populates the unified pane with the new message.}
-    results: [7, 8, 15, 16, 45, 47]
+    - {step: 65, expectation: The Unified Mail entry mounts the module's unified pane.}
+    - {step: 67, expectation: Refresh populates the unified pane with the new message.}
+    results: [7, 8, 15, 16, 65, 67]
   - id: R2
     requirement: Disabling Mail unmounts both panes while preserving both tabs.
-    actions: [48, 49, 50, 53, 55, 58]
+    actions: [68, 69, 70, 73, 75, 78]
     checkpoints:
-    - {step: 52, expectation: Both module panes have unmounted.}
-    - {step: 56, expectation: The original account tab displays the disabled state.}
-    - {step: 57, expectation: Exactly one account tab remains.}
-    - {step: 59, expectation: The original unified tab displays the disabled state.}
-    - {step: 60, expectation: Exactly one unified tab remains.}
-    - {step: 61, expectation: The transitions produce no uncaught errors.}
-    results: [52, 56, 57, 59, 60, 61]
+    - {step: 72, expectation: Both module panes have unmounted.}
+    - {step: 76, expectation: The original account tab displays the disabled state.}
+    - {step: 77, expectation: Exactly one account tab remains.}
+    - {step: 79, expectation: The original unified tab displays the disabled state.}
+    - {step: 80, expectation: Exactly one unified tab remains.}
+    - {step: 81, expectation: The transitions produce no uncaught errors.}
+    results: [72, 76, 77, 79, 80, 81]
   - id: R3
     requirement: The Mail account context menu shows the selected message's full source and saves it to the chosen browser path.
-    actions: [26, 27, 31, 32, 35, 37, 38, 39, 40]
+    actions: [46, 47, 51, 52, 55, 57, 58, 59, 60]
     checkpoints:
-    - {step: 28, expectation: Sync adds the newly delivered message to the account.}
-    - {step: 33, expectation: The source dialog shows the selected subject header.}
-    - {step: 34, expectation: The source dialog also renders the body.}
-    - {step: 36, expectation: Closing the source dialog leaves the account available.}
-    - {step: 41, expectation: The browser saves the full source in the chosen virtual file.}
-    results: [28, 33, 34, 36, 41]
+    - {step: 48, expectation: Sync adds the newly delivered message to the account.}
+    - {step: 53, expectation: The source dialog shows the selected subject header.}
+    - {step: 54, expectation: The source dialog also renders the body.}
+    - {step: 56, expectation: Closing the source dialog leaves the account available.}
+    - {step: 61, expectation: The browser saves the full source in the chosen virtual file.}
+    results: [48, 53, 54, 56, 61]
   - id: R4
     requirement: Opening the newly delivered message shows its corresponding body before exporting.
-    actions: [29]
+    actions: [49]
     checkpoints:
-    - {step: 30, expectation: The reader displays the body for the message just selected.}
-    results: [30]
+    - {step: 50, expectation: The reader displays the body for the message just selected.}
+    results: [50]
   - id: R5
     requirement: The Mail account attachment opens as a read-only browser file and is removed after the viewer closes.
     actions: [18, 20, 23]
@@ -131,6 +151,15 @@ verification:
     - {step: 22, expectation: The new read-only viewer holds the exact attachment bytes.}
     - {step: 25, expectation: Closing the viewer removes the controlled temporary file.}
     results: [19, 22, 25]
+  - id: R6
+    requirement: The Mail module supports creating and renaming a folder, cancelling deletion and confirming deletion.
+    actions: [29, 34, 39, 43]
+    checkpoints:
+    - {step: 30, expectation: The new empty subfolder appears.}
+    - {step: 35, expectation: The renamed folder replaces its original row.}
+    - {step: 40, expectation: Cancelling deletion leaves the folder visible.}
+    - {step: 44, expectation: Confirmed deletion removes the folder and keeps its parent.}
+    results: [30, 35, 40, 44]
   visual:
   - check: The account and unified panes each show content when enabled and a status when disabled.
     method: automated

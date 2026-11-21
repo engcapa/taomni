@@ -1,5 +1,5 @@
 import { mailArchiveStub } from "../mailArchiveStub";
-import { stubMailAppend, stubMailClearCache, stubMailExpunge, stubMailFindHeader, stubMailListCached, stubMailListFolders, stubMailSearch, stubMailSyncAll, stubMailSyncFolder, stubMailIdleStart, stubMailSetSubscription, stubMailIdleStop, stubMailRecordSent, stubMailMutation, stubMailUpdateCachedFlags, stubMailMarkRead, type Seed as MailStubSeed, type StubMailSearchQuery } from "../mailServerStub";
+import { stubMailAppend, stubMailChangeFolder, stubMailClearCache, stubMailExpunge, stubMailFindHeader, stubMailListCached, stubMailListFolders, stubMailSearch, stubMailSyncAll, stubMailSyncFolder, stubMailIdleStart, stubMailSetSubscription, stubMailIdleStop, stubMailRecordSent, stubMailMutation, stubMailUpdateCachedFlags, stubMailMarkRead, type Seed as MailStubSeed, type StubMailSearchQuery } from "../mailServerStub";
 import { stubApplyFilters, stubListFilters, stubSaveFilters } from "../mailFiltersStub";
 import { stubAddressBookSuggestions, stubDeleteAddressBookEntry, stubListAddressBook, stubSaveAddressBookEntry } from "../mailContactsStub";
 import type { MailAddressBookEntry } from "../../lib/mailContacts";
@@ -357,6 +357,21 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
     case "mail_list_folders": {
       const invokeArgs = args as InvokeArgs | undefined;
       return stubMailListFolders(stubMailAccountId(invokeArgs), mailStubSeed) as T;
+    }
+
+    case "mail_create_folder":
+    case "mail_rename_folder":
+    case "mail_delete_folder": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      if (cmd === "mail_rename_folder") {
+        const from = String(invokeArgs?.from ?? "").trim();
+        const to = String(invokeArgs?.to ?? "").trim();
+        return stubMailChangeFolder(accountId, mailStubSeed, { kind: "rename", from, to }) as T;
+      }
+      const name = String(invokeArgs?.name ?? "").trim();
+      const kind = cmd === "mail_create_folder" ? "create" : "delete";
+      return stubMailChangeFolder(accountId, mailStubSeed, { kind, name }) as T;
     }
 
     case "mail_set_folder_subscription": {

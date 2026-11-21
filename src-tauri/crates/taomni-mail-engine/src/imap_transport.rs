@@ -9,7 +9,7 @@ use native_tls::TlsStream;
 
 use crate::cache::MailCacheSettings;
 use crate::imap_auth::{MailAuthMode, MailProvider, authenticate};
-use crate::imap_folders::{imap_list_folders, imap_set_subscription};
+use crate::imap_folders::{imap_change_folder, imap_list_folders, imap_set_subscription};
 use crate::imap_messages::{Mailbox, imap_fetch_attachment, imap_fetch_raw};
 use crate::imap_mutations::{imap_set_flags, unread_uids};
 use crate::imap_sync::{
@@ -20,7 +20,7 @@ use crate::search::{ImapSearchRequest, search_imap_messages};
 use crate::tls::{MailConnectionSecurity, certificate_error_hint, tls_connector};
 use crate::{DownloadedMailAttachment, MailFolder, MailMessageCached, MailMessageHeader};
 use serde::{Deserialize, Serialize};
-use taomni_mail_api::ImapFlagUpdate;
+use taomni_mail_api::{ImapFlagUpdate, ImapFolderChange};
 
 pub struct ImapConnection<'a> {
     pub server_name: &'a str,
@@ -74,6 +74,13 @@ impl ImapSession {
         match self {
             Self::Plain(session) => imap_set_subscription(session, folder, subscribed),
             Self::Tls(session) => imap_set_subscription(session, folder, subscribed),
+        }
+    }
+
+    pub fn change_folder(&mut self, change: &ImapFolderChange) -> Result<(), String> {
+        match self {
+            Self::Plain(session) => imap_change_folder(session, change),
+            Self::Tls(session) => imap_change_folder(session, change),
         }
     }
 

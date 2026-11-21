@@ -191,6 +191,7 @@ pub async fn plugin_invoke(
                 taomni_mail_api::CHECK_INCOMING
                     | taomni_mail_api::CHECK_OUTGOING
                     | taomni_mail_api::IMAP_FOLDER_TREE
+                    | taomni_mail_api::MUTATE_IMAP_FOLDER
                     | taomni_mail_api::SEND_SMTP
                     | taomni_mail_api::SYNC_IMAP_HEADERS
                     | taomni_mail_api::SYNC_IMAP_ROUND

@@ -1757,6 +1757,9 @@
 
 ## mail/folders (F-MAIL-11)
 
+- `[data-testid="context-menu-item-new-subfolder"]` — interactive — F-MAIL-11.mail-new-subfolder
+- `[data-testid="context-menu-item-rename-folder"]` — interactive — F-MAIL-11.mail-rename-folder
+- `[data-testid="context-menu-item-delete-folder"]` — interactive — F-MAIL-11.mail-delete-folder
 - `[data-testid="mail-subscriptions-open"]` — interactive — F-MAIL-11.subscriptions-open
 - `[data-testid="mail-subscriptions-dialog"]` — display — F-MAIL-11.subscriptions-dialog
 - `[role="dialog"][aria-label="Folder subscriptions"] [aria-label="Close dialog"]` — interactive — F-MAIL-11.subscriptions-close

@@ -2,6 +2,8 @@
 
 ## 2026-11-21 当前进展
 
+- Mail 0.1.14 将 IMAP 新建、改名和删除文件夹交给签名宿主。核心在同一事务中提交服务端目录树，目录名中的百分号和下划线按字面匹配。Browser 和 Native 检查新建、改名、取消删除及确认删除，Native 同时确认真实 IMAP 服务端状态。
+- `86379fe04` 的附件跨进程协议在 Linux、Windows、macOS ARM64 均通过，核对了整封提取及单独分段的原始二进制字节。Browser 和 Native 分片继续收集。 [附件协议](https://github.com/engcapa/taomni/actions/runs/44918175232) · [三端 UI](https://github.com/engcapa/taomni/actions/runs/44918072491)
 - Mail 0.1.13 将普通 IMAP 附件读取和大邮件的 MIME 分段下载交给签名宿主。核心验证收到的字节数并原子写入目标文件。签名原生用例和 Browser 预览用例核对附件的实际文件与关闭清理，Mail 宿主协议验证两种下载路径及原始二进制字节。
 - `4cf6d7774` 的 Linux、Windows、macOS ARM64 进程协议通过，含签名宿主读取正文、额外 EML 字节和既有数据及租约验证。原始日志与宿主身份保留在 `qa-ui-auto-report/github/44914039295/live-contracts/modular-protocol-*/`。 [三端协议](https://github.com/engcapa/taomni/actions/runs/44914039295)
 - `d67452ba8` 的 Mail 原文查看和 EML 在 Linux、Windows Native 通过。macOS 原文已通过，保存停在 AppKit 对话框识别。三端 Explorer 同轮失败页面已创建两个标签，原断言使用了仅 Playwright 支持的选择器。用例改为直接核对标签数量，macOS 保存驱动增加原生面板识别和失败证据。 [原分片](https://github.com/engcapa/taomni/actions/runs/44912118959)
