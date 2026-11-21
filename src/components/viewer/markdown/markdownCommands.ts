@@ -14,8 +14,17 @@ export function formatMarkdown(view: EditorView, action: MarkdownFormat): boolea
   const marker = markers[action];
   if (marker) {
     const [before, after] = marker;
-    if (range.from >= before.length && view.state.doc.sliceString(range.from - before.length, range.from) === before &&
-      view.state.doc.sliceString(range.to, range.to + after.length) === after) {
+    const surrounded = range.from >= before.length && view.state.doc.sliceString(range.from - before.length, range.from) === before &&
+      view.state.doc.sliceString(range.to, range.to + after.length) === after;
+    // Clicking Italic inside **bold** must produce ***bold italic*** rather than
+    // stripping one asterisk from the bold delimiter; clicking Italic inside ***
+    // still toggles italic off back to **bold**.
+    const onlyBoldAround = action === "italic" &&
+      range.from >= 2 && view.state.doc.sliceString(range.from - 2, range.from) === "**" &&
+      view.state.doc.sliceString(range.to, range.to + 2) === "**" &&
+      !(range.from >= 3 && view.state.doc.sliceString(range.from - 3, range.from) === "***" &&
+        view.state.doc.sliceString(range.to, range.to + 3) === "***");
+    if (surrounded && !onlyBoldAround) {
       view.dispatch({ changes: [{ from: range.from - before.length, to: range.from, insert: "" }, { from: range.to, to: range.to + after.length, insert: "" }],
         selection: { anchor: range.from - before.length, head: range.to - before.length }, annotations: Transaction.userEvent.of("input") });
     } else {

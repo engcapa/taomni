@@ -21,7 +21,7 @@
 .fv-md-resize-handle[hidden]{display:none}
 .fv-md-appearance{display:flex;align-items:center;white-space:nowrap;flex:none;font-size:11px;gap:3px;color:var(--muted)}
 .fv-md-live-pane{background:var(--bg);color:var(--text)}
-.fv-selection-active .cm-activeLine,.fv-selection-active .cm-activeLineGutter{background-color:transparent!important}
+.fv-selection-active .cm-activeLine,.fv-selection-active .cm-activeLineGutter,.fv-selection-active .fv-md-current-line{background-color:transparent!important}
 .fv-md-preview-pane{background:var(--bg);color:var(--text)}
 .fv-md-preview-pane{min-width:0;min-height:0;overflow:auto;border-left:1px solid var(--divider);position:relative}
 .fv-md-editor-pane,.fv-md-preview-pane{zoom:var(--fv-md-zoom,1)}

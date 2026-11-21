@@ -1330,6 +1330,9 @@
 - `[data-testid="markdown-mode-split"]` — interactive — F-FILEOPEN-1.markdown-mode-split
 - `[data-testid="markdown-focus"]` — interactive — F-FILEOPEN-1.markdown-focus
 - `[data-testid="markdown-format-bold"]` — interactive — F-FILEOPEN-1.markdown-format-bold
+- `[data-testid="markdown-format-italic"]` — interactive — F-FILEOPEN-1.markdown-format-italic
+- `[data-testid="markdown-format-quote"]` — interactive — F-FILEOPEN-1.markdown-format-quote
+- `[data-testid="markdown-insert-menu"]` — interactive — F-FILEOPEN-1.markdown-insert-menu
 - `[data-testid="markdown-outline"]` — interactive — F-FILEOPEN-1.markdown-outline
 - `[data-testid="markdown-outline-toggle"]` — interactive — F-FILEOPEN-1.markdown-outline-toggle
 - `[data-testid="markdown-preview"]` — display — F-FILEOPEN-1.markdown-preview
