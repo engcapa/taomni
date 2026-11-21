@@ -54,6 +54,7 @@ steps:
 - fill:
     selector: '[data-testid="markdown-image-custom-proxy-panel"] input[type="number"]'
     value: ${fixture.markdown_image_custom_port}
+- click: '[data-testid="side-tab-explorer"]'
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - assert_file_contains:
     path: ${fixture.markdown_image_log}
@@ -63,6 +64,7 @@ steps:
 - select_option:
     selector: '[data-testid="markdown-image-proxy-mode"]'
     value: none
+- click: '[data-testid="side-tab-explorer"]'
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - assert_file_contains:
     path: ${fixture.markdown_image_log}
@@ -71,6 +73,7 @@ steps:
 - set_check:
     selector: '[data-testid="file-open-markdown-restrict-remote"]'
     checked: true
+- click: '[data-testid="side-tab-explorer"]'
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - wait_for: '[data-testid="markdown-image-widget"] [data-testid="markdown-render-placeholder"][data-kind="image"]'
 - assert_text:

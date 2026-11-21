@@ -40,6 +40,7 @@ steps:
 - set_check:
     selector: '[data-testid="file-open-markdown-restrict-remote"]'
     checked: true
+- click: '[data-testid="side-tab-explorer"]'
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - wait_for: '[data-testid="markdown-image-widget"] [data-testid="markdown-render-placeholder"][data-kind="image"]'
 - assert_text:
@@ -57,6 +58,7 @@ steps:
 - set_check:
     selector: '[data-testid="file-open-markdown-restrict-remote"]'
     checked: false
+- click: '[data-testid="side-tab-explorer"]'
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - eval_readonly:
     expression: document.querySelector('.fv-md-preview-pane img')?.naturalWidth === 96

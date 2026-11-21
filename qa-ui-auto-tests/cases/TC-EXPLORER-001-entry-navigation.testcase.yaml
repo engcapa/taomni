@@ -66,10 +66,12 @@ steps:
 - assert_count: {selector: '[data-testid="workspace-tab"][data-tab-kind="explorer"]', equal: 0}
 - click: '[data-testid="nav-mode-workspaces"]'
 - click: '[data-testid="code-workspace-tool-rail-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"][data-path="${fixture.explorer_base}"]'
 - assert_count: {selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]', equal: 4}
 - click: '[data-testid="nav-mode-workspaces"]'
 - right_click: '[data-testid="code-workspace-tree-root"][data-root-id="root1"]'
 - click: '[data-testid="code-workspace-tree-open-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"][data-path="${fixture.explorer_base}"]'
 - assert_count: {selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]', equal: 4}
 - click: '[data-testid="nav-mode-workspaces"]'
 - right_click: '[data-testid="code-workspace-tree-root"][data-root-id="root1"]'
@@ -103,15 +105,15 @@ verification:
   requirements:
   - id: R1
     requirement: Tools has no Explorer launcher; initial rail entry opens one HOME browser and returning to the rail restores it without duplication.
-    actions: [5, 7, 11, 12, 81]
+    actions: [5, 7, 11, 12, 83]
     checkpoints:
     - {step: 6, expectation: The retired Tools-panel launcher is absent.}
     - {step: 9, expectation: Initial dedicated Explorer displays the browser VFS HOME.}
     - {step: 10, expectation: Exactly one dedicated directory tab exists.}
     - {step: 13, expectation: Returning from Sessions restores the same HOME pane.}
     - {step: 14, expectation: Rail restoration does not create another directory tab.}
-    - {step: 82, expectation: The Tools launcher remains absent after all global entry workflows.}
-    results: [6, 9, 10, 13, 14, 82]
+    - {step: 84, expectation: The Tools launcher remains absent after all global entry workflows.}
+    results: [6, 9, 10, 13, 14, 84]
   - id: R2
     requirement: List, address, breadcrumbs and selected navigation tree follow successful navigation; failed address keeps the current directory and can retry.
     actions: [15, 16, 17, 21, 23, 25, 27, 29, 31, 33, 34, 35, 38]
@@ -131,39 +133,39 @@ verification:
     results: [18, 19, 20, 22, 24, 26, 28, 30, 32, 36, 37, 39]
   - id: R3
     requirement: Main menu, Workspace rail and Project tree entries share the global Explorer; only explicit force-new adds directories and all tabs recover.
-    actions: [40, 43, 44, 45, 48, 50, 53, 54, 56, 57, 58, 60, 61, 62, 72]
+    actions: [40, 43, 44, 45, 48, 50, 53, 54, 57, 58, 59, 62, 63, 64, 74]
     checkpoints:
     - {step: 41, expectation: Explicit new-tab creates a second source directory.}
     - {step: 46, expectation: Main Tools menu routes to global Explorer HOME.}
     - {step: 47, expectation: HOME is added once without Workspace-owned Explorer tabs.}
     - {step: 51, expectation: Workspace rail opens its root in the dedicated Explorer.}
     - {step: 52, expectation: No Explorer tab is created inside Code Workspace.}
-    - {step: 55, expectation: Repeated Workspace rail activation deduplicates the root.}
-    - {step: 59, expectation: Project-tree open reuses the same global root.}
-    - {step: 63, expectation: Project-tree force-new creates the fifth directory.}
-    - {step: 64, expectation: Exactly five directory tabs exist before viewer recovery.}
-    - {step: 73, expectation: Reload restores the Explorer foreground.}
-    - {step: 75, expectation: All five directory tabs recover.}
-    - {step: 77, expectation: Workspace remains free of legacy Explorer tabs.}
-    results: [41, 46, 47, 51, 52, 55, 59, 63, 64, 73, 75, 77]
+    - {step: 56, expectation: Repeated Workspace rail activation deduplicates the root.}
+    - {step: 61, expectation: Project-tree open reuses the same global root.}
+    - {step: 65, expectation: Project-tree force-new creates the fifth directory.}
+    - {step: 66, expectation: Exactly five directory tabs exist before viewer recovery.}
+    - {step: 75, expectation: Reload restores the Explorer foreground.}
+    - {step: 77, expectation: All five directory tabs recover.}
+    - {step: 79, expectation: Workspace remains free of legacy Explorer tabs.}
+    results: [41, 46, 47, 51, 52, 56, 61, 65, 66, 75, 77, 79]
   - id: R4
     requirement: Supported double-clicks stay in the dedicated Explorer viewer and restore there, never in Sessions or Workspace.
-    actions: [66, 68]
+    actions: [68, 70]
     checkpoints:
-    - {step: 69, expectation: The text viewer is mounted inside Explorer.}
-    - {step: 70, expectation: The active dedicated tab is alpha.txt.}
-    - {step: 71, expectation: Sessions has no file-viewer tab.}
-    - {step: 74, expectation: The viewer itself restores inside Explorer.}
-    - {step: 76, expectation: Recovery retains exactly one dedicated viewer.}
-    - {step: 78, expectation: Open and recovery complete without runtime errors.}
-    - {step: 83, expectation: Final host transitions remain runtime-error free.}
-    results: [69, 70, 71, 74, 76, 78, 83]
+    - {step: 71, expectation: The text viewer is mounted inside Explorer.}
+    - {step: 72, expectation: The active dedicated tab is alpha.txt.}
+    - {step: 73, expectation: Sessions has no file-viewer tab.}
+    - {step: 76, expectation: The viewer itself restores inside Explorer.}
+    - {step: 78, expectation: Recovery retains exactly one dedicated viewer.}
+    - {step: 80, expectation: Open and recovery complete without runtime errors.}
+    - {step: 85, expectation: Final host transitions remain runtime-error free.}
+    results: [71, 72, 73, 76, 78, 80, 85]
   - id: R5
     requirement: Dedicated directory tabs retain the prototype folder SVG and theme-aware color token.
     actions: [7]
     checkpoints:
-    - {step: 80, expectation: The directory tab icon uses the Explorer folder color token.}
-    results: [80]
+    - {step: 82, expectation: The directory tab icon uses the Explorer folder color token.}
+    results: [82]
   visual:
   - check: Dedicated Explorer rail placement, global tab strip, viewer host and restored directory tabs.
     method: manual

@@ -59,6 +59,7 @@ steps:
     value: theme
 - click: '[data-testid="app-theme-select"]'
 - click: '[data-testid="app-theme-dark"]'
+- click: '[data-testid="side-tab-explorer"]'
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - assert_attribute:
     selector: html
@@ -152,22 +153,22 @@ verification:
     - 18
     - 19
     - 20
-    - 21
-    - 23
+    - 22
+    - 24
     checkpoints:
     - step: 14
       expectation: Selected content spans the bold and code nodes.
     - step: 15
       expectation: Light selection uses the inverse canvas colors.
-    - step: 24
-      expectation: Dark selection retains the rendered text range.
     - step: 25
+      expectation: Dark selection retains the rendered text range.
+    - step: 26
       expectation: Dark selection uses the inverse canvas colors.
     results:
     - 14
     - 15
-    - 24
     - 25
+    - 26
   - id: SOURCE-CONTRAST
     requirement: The dark application theme uses readable punctuation, high-contrast focused/unfocused source selection without active-line occlusion, and leaves the document clean.
     actions:
@@ -184,39 +185,39 @@ verification:
     - 18
     - 19
     - 20
-    - 21
-    - 23
-    - 27
-    - 31
+    - 22
+    - 24
+    - 28
     - 32
     - 33
     - 34
     - 35
-    - 38
-    - 41
-    checkpoints:
-    - step: 28
-      expectation: Heading marker uses the dark punctuation color.
-    - step: 29
-      expectation: List marker uses the dark punctuation color.
-    - step: 36
-      expectation: Focused dark source selection uses readable dark-theme blue fill instead of CodeMirror lavender and suppresses active-line occlusion.
-    - step: 39
-      expectation: Unfocused dark source selection uses softer dark-theme blue fill instead of pale gray.
-    - step: 42
-      expectation: Live mode returns to browse.
-    - step: 43
-      expectation: The viewer remains clean.
-    - step: 44
-      expectation: Original bytes match.
-    results:
-    - 28
-    - 29
     - 36
     - 39
     - 42
+    checkpoints:
+    - step: 29
+      expectation: Heading marker uses the dark punctuation color.
+    - step: 30
+      expectation: List marker uses the dark punctuation color.
+    - step: 37
+      expectation: Focused dark source selection uses readable dark-theme blue fill instead of CodeMirror lavender and suppresses active-line occlusion.
+    - step: 40
+      expectation: Unfocused dark source selection uses softer dark-theme blue fill instead of pale gray.
+    - step: 43
+      expectation: Live mode returns to browse.
+    - step: 44
+      expectation: The viewer remains clean.
+    - step: 45
+      expectation: Original bytes match.
+    results:
+    - 29
+    - 30
+    - 37
+    - 40
     - 43
     - 44
+    - 45
   native:
   - check: Packaged WebView drag and independent host-disk digest
     method: automated

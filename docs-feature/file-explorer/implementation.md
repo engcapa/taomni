@@ -46,6 +46,17 @@ Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS �
 - 新增 001/008/009 的 YAML 解析和三模式 dry-run 已通过；`python3 -m qa_ui_auto.audit --gate` 通过，832 个唯一用例 ID、5 个既有 orphan、coverage 无回归。全量 behavior contract 另有 44 个既有未评审/缺失契约，不能用全量红状态否定本轮已评审用例，也不宣称这些既有 gap 已解决。
 - 本轮完整 unit、Linux browser/native、完整 `crash-regression` 与 Windows/macOS hosted 证据仍待执行；迁移前下列 run 只证明当时旧宿主，不作为本轮通过证据。
 
+## 第一轮执行暴露的缺陷与修复（2026-11-21）
+
+本地 Linux browser 全量受影响用例与 GitHub run44873609125（旧提交 `456870395`）共同暴露以下缺陷，均已在源码或用例中修复：
+
+- `explorer_search_entries` 未注册进 browser stub dispatch（`src/stubs/tauri-core.ts`），浏览器模式搜索返回 undefined 并在 hook 内抛 TypeError；已注册并复核。
+- `ViewerCloseDialog` 同时挂载于 `ExplorerPlatformView` 与 `TabContentRouter`，同一全局 `documentStore.closeRequest` 渲染两层 backdrop，Explorer 内 dirty viewer 的关闭确认点击被遮挡；改为仅在 `MainLayoutView` 挂载单一宿主。
+- 独立 Explorer 承接 File 会话后，`useSessionResume` 的 restore waiter 只扫描 app 标签并以 app 标签为依赖，File 会话恢复永不成束并触发 60s guard；waiter 绑定与 settle 计时改为同时订阅并扫描 `explorerStore` 标签（`TC-WELCOME-RS-02` 复现）。
+- ControlBar 仅在 `activeSideTab === "explorer"` 时渲染 ExplorerTabStrip；主题/设置切换离开 Explorer 表面后直接点击 `explorer-workspace-tab` 的既有用例步骤（001 第二/三次入口、004 两轮主题、007 两轮、009 四轮、010、013、029、037、038）全部补上 `side-tab-explorer` rail 返回；001 另对异步入口后的计数断言补 wait。
+- 产品取消搜索后的状态为 `data-state="cancelled"` 而非用例误写的 `done`（stub 缺陷曾掩盖此路径）；008/009 断言已对齐真实状态机。
+- 008 扩展 R5：`Show hidden files` 偏好驱动搜索包含性，`.hidden*` 默认 0 结果、开启后 1 结果、关闭后重新排除；009 扩展 R4：`entry-*.txt` 在 10,000 真实文件上触发 1000 结果上限并显式提示截断。
+
 ## 迁移前历史证据
 
 ### 本地单元与静态检查

@@ -75,6 +75,7 @@ steps:
 - assert_localstorage:
     key: taomni.fileOpen.preferences.v1
     contains: '"htmlScripts":false'
+- click: '[data-testid="side-tab-explorer"]'
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="scripts.html"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
@@ -120,15 +121,15 @@ verification:
     results: [26, 28, 29]
   - id: R3
     requirement: Disabling author scripts persists while the nonce bridge continues mediating external links in an opaque frame.
-    actions: [34, 37, 43, 46]
+    actions: [34, 38, 44, 47]
     checkpoints:
     - {step: 35, expectation: Persisted preferences contain htmlScripts false.}
-    - {step: 40, expectation: Frame never gains allow-same-origin.}
-    - {step: 42, expectation: 'No author readiness/fetch marker and no independent scripts-phase request, held for a stable observation interval.'}
-    - {step: 45, expectation: Nonce bridge still routes an actual anchor click to parent confirmation with scripts disabled.}
-    - {step: 47, expectation: Cancel closes the confirmation.}
-    - {step: 48, expectation: Script-policy and confirmation transitions leave runtime healthy.}
-    results: [35, 40, 42, 45, 47, 48]
+    - {step: 41, expectation: Frame never gains allow-same-origin.}
+    - {step: 43, expectation: 'No author readiness/fetch marker and no independent scripts-phase request, held for a stable observation interval.'}
+    - {step: 46, expectation: Nonce bridge still routes an actual anchor click to parent confirmation with scripts disabled.}
+    - {step: 48, expectation: Cancel closes the confirmation.}
+    - {step: 49, expectation: Script-policy and confirmation transitions leave runtime healthy.}
+    results: [35, 41, 43, 46, 48, 49]
   visual:
   - check: Parent origin/URL and Cancel focus
     method: automated

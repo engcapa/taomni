@@ -34,6 +34,7 @@ import { UpdateDialog } from "../../components/UpdateDialog";
 import { ServersTabBlockedDialog } from "../../components/servers/ServersTabBlockedDialog";
 import { VaultUnlockDialog } from "../../components/vault/VaultUnlockDialog";
 import { WindowResizeHandles } from "../../components/window/WindowResizeHandles";
+import { ViewerCloseDialog } from "../../components/viewer/ViewerDialogs";
 import { startWindowDrag } from "../../lib/windowDrag";
 import { t as tr } from "../../lib/i18n";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
@@ -265,6 +266,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                       onClose={layout.toggleMultiExec}
                     />
                   )}
+                  <ViewerCloseDialog />
                   <div className="flex min-h-0 flex-1 flex-col" style={{ display: activeSideTab === "workspaces" ? "flex" : "none" }}>
                     <WorkspaceMainPanel onEditSession={sessionActions.handleEditSessionById} visible={activeSideTab === "workspaces"} onCommandsChange={layout.handleWorkspaceCommandsChange} />
                   </div>

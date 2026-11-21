@@ -3,7 +3,6 @@ import { FolderOpen } from "lucide-react";
 import { openExplorer } from "../../lib/explorer/openExplorer";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { ViewerShell } from "../viewer/ViewerShell";
-import { ViewerCloseDialog } from "../viewer/ViewerDialogs";
 import { ExplorerTabPane } from "./ExplorerTabPane";
 import { useExplorerLabels } from "./explorerLabels";
 
@@ -18,7 +17,6 @@ export function ExplorerPlatformView({ visible, onOpenTerminal }: {
   useEffect(() => { if (visible) setStarted(true); }, [visible]);
   if (!started && !visible) return null;
   return <div data-testid="explorer-platform-view" className="relative min-h-0 min-w-0 flex-1" style={{ display: visible ? "block" : "none" }}>
-    <ViewerCloseDialog />
     {tabs.map((tab) => <div key={tab.id} className="absolute inset-0" style={{ display: activeTabId === tab.id ? "block" : "none" }}>
       {tab.type === "file-browser" && tab.fileBrowser && <ExplorerTabPane
         tabId={tab.id}

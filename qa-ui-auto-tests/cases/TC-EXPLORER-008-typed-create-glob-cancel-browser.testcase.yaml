@@ -1,7 +1,8 @@
 id: TC-EXPLORER-008
 title: Explorer creates seven text types, searches recursive globs and cancels in-flight work
 description: Browser production-renderer coverage for every exposed text-creation control, in-surface Markdown viewing, shallow versus
-  recursive glob results, relative paths, POSIX and Windows separators, invalid-pattern recovery and deterministic in-flight cancellation.
+  recursive glob results, relative paths, POSIX and Windows separators, invalid-pattern recovery and deterministic in-flight cancellation. The shared Show-hidden-files preference
+  must exclude and re-include the hidden fixture file across searches.
   The delayed VFS stub proves renderer/controller behavior only; real native disk and IPC cancellation are covered by TC-EXPLORER-009.
 modes: [browser]
 covers: [F-EXPLORER-1, F-FILEOPEN-1]
@@ -88,11 +89,28 @@ steps:
 - wait_for: '[data-testid="explorer-search-status"][data-state="searching"]'
 - assert_pattern: {selector: '[data-testid="explorer-search-status"]', regex: '[1-9][0-9]* scanned', timeout_sec: 10}
 - click: '[data-testid="explorer-search-cancel"]'
-- wait_for: '[data-testid="explorer-search-status"][data-state="done"]'
+- wait_for: '[data-testid="explorer-search-status"][data-state="cancelled"]'
 - assert_text: {selector: '[data-testid="explorer-search-status"]', contains: Cancelled}
 - click: '[data-testid="explorer-search-clear"]'
 - wait_for: {selector: '[data-testid="explorer-search-status"]', state: detached}
 - wait_for: '[data-testid="explorer-file-row"][data-name="alpha.txt"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_previews}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- fill: {selector: '[data-testid="explorer-filter"]', value: '.hidden*'}
+- wait_for: '[data-testid="explorer-search-status"][data-state="done"]'
+- assert_text: {selector: '[data-testid="explorer-search-status"]', contains: '0 results'}
+- click: '[data-testid="explorer-cmd-view"]'
+- click: '[data-testid="explorer-view-hidden"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name=".hidden.txt"]'
+- assert_text: {selector: '[data-testid="explorer-search-status"]', contains: '1 results'}
+- click: '[data-testid="explorer-cmd-view"]'
+- click: '[data-testid="explorer-view-hidden"]'
+- wait_for: {selector: '[data-testid="explorer-file-row"][data-name=".hidden.txt"]', state: detached}
+- click: '[data-testid="explorer-search-clear"]'
+- wait_for: {selector: '[data-testid="explorer-search-status"]', state: detached}
+- wait_for: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
 - assert_no_runtime_errors: null
 - screenshot: explorer-typed-create-glob-cancel.png
 verification:
@@ -141,10 +159,23 @@ verification:
     - {step: 81, expectation: UI explicitly reports Cancelled.}
     - {step: 83, expectation: Clearing removes search status.}
     - {step: 84, expectation: Original directory rows return.}
-    - {step: 85, expectation: 'All creation, open, search and cancellation paths avoid runtime errors.'}
-    results: [72, 73, 75, 78, 80, 81, 83, 84, 85]
+    results: [72, 73, 75, 78, 80, 81, 83, 84]
+  - id: R5
+    requirement: The shared show-hidden preference controls search inclusion - hidden files are excluded by default, included while enabled and excluded again after the preference is turned back off.
+    actions: [85, 86, 87, 89, 92, 93, 96, 97, 99]
+    checkpoints:
+    - {step: 88, expectation: The previews directory lists its visible fixture files.}
+    - {step: 90, expectation: The hidden search settles without a match while hidden files are excluded.}
+    - {step: 91, expectation: The dotted hidden glob reports zero results while hidden files stay excluded.}
+    - {step: 94, expectation: Enabling Show hidden files makes the hidden fixture match.}
+    - {step: 95, expectation: The hidden search reports one result.}
+    - {step: 98, expectation: Disabling the preference re-excludes the hidden fixture.}
+    - {step: 100, expectation: Clearing removes the hidden search status.}
+    - {step: 101, expectation: The previews listing returns without the hidden row.}
+    - {step: 102, expectation: 'All creation, open, search, cancellation and hidden-preference paths avoid runtime errors.'}
+    results: [88, 90, 91, 94, 95, 98, 100, 101, 102]
   visual:
-  - check: Seven created file types, dedicated viewer tab, recursive result paths and final restored directory remain readable.
+  - check: Seven created file types, dedicated viewer tab, recursive result paths, hidden-preference search and final restored directory remain readable.
     method: manual
     reason: The retained screenshot supports UI review; selector assertions do not establish prototype pixel fidelity.
   native:

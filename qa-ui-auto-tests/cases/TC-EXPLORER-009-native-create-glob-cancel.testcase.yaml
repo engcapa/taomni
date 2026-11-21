@@ -2,7 +2,8 @@ id: TC-EXPLORER-009
 title: Native Explorer creates real documents, traverses globs and cancels a large-disk search
 description: Real Tauri IPC and host-disk acceptance for typed creation, in-surface Markdown/HTML viewers, shallow and recursive glob
   results, Windows/POSIX relative-path separators and cancellation after native progress. The cancellation search has no matches across
-  10,000 real files, so the 1000-result limit cannot terminate it early. WebView input is not physical OS keyboard evidence.
+  10,000 real files, so the 1000-result limit cannot terminate it early; a matching entry-*.txt query
+  separately proves the 1000-result cap stops the real traversal with explicit truncation feedback. WebView input is not physical OS keyboard evidence.
 modes: [native]
 covers: [F-EXPLORER-1, F-FILEOPEN-1]
 tags: [p0, explorer, file-creation, glob-search, cancellation, native-boundary, regression]
@@ -61,9 +62,12 @@ steps:
 - wait_for: '[data-testid="explorer-search-status"][data-state="searching"]'
 - assert_pattern: {selector: '[data-testid="explorer-search-status"]', regex: '[1-9][0-9]* scanned', timeout_sec: 15}
 - click: '[data-testid="explorer-search-cancel"]'
-- wait_for: '[data-testid="explorer-search-status"][data-state="done"]'
+- wait_for: '[data-testid="explorer-search-status"][data-state="cancelled"]'
 - assert_text: {selector: '[data-testid="explorer-search-status"]', contains: Cancelled}
 - assert_count: {selector: '[data-testid="explorer-file-row"]', equal: 0}
+- fill: {selector: '[data-testid="explorer-filter"]', value: 'entry-*.txt'}
+- wait_for: '[data-testid="explorer-search-status"][data-state="done"]'
+- assert_text: {selector: '[data-testid="explorer-search-status"]', contains: '1000-result limit reached'}
 - click: '[data-testid="explorer-search-clear"]'
 - wait_for: '[data-testid="explorer-file-row"][data-name="entry-00000.txt"]'
 - assert_file_exists: ${fixture.explorer_source}/native-search.md
@@ -99,18 +103,25 @@ verification:
     results: [36, 37, 39, 40, 42, 44]
   - id: R3
     requirement: A no-match search across 10000 real files reports progress and can be cancelled before completion; clearing restores the real listing.
-    actions: [45, 46, 47, 49, 52, 56]
+    actions: [45, 46, 47, 49, 52, 59]
     checkpoints:
     - {step: 48, expectation: The 10000-file native directory is listed before searching.}
     - {step: 51, expectation: Native progress confirms scanning started and the result cap cannot end this no-match query.}
     - {step: 53, expectation: Native cancellation settles the operation.}
     - {step: 54, expectation: UI explicitly reports Cancelled.}
     - {step: 55, expectation: The no-match query has no rows after cancellation.}
-    - {step: 57, expectation: Clearing restores the large real directory.}
-    - {step: 58, expectation: Markdown host file survives search and cancellation.}
-    - {step: 59, expectation: HTML host file survives search and cancellation.}
-    - {step: 60, expectation: Real create/open/search/cancel workflows complete without runtime errors.}
-    results: [48, 51, 53, 54, 55, 57, 58, 59, 60]
+    - {step: 60, expectation: Clearing after the capped query restores the large real directory.}
+    - {step: 61, expectation: 'Markdown host file survives search, cancellation and the capped query.'}
+    - {step: 62, expectation: 'HTML host file survives search, cancellation and the capped query.'}
+    - {step: 63, expectation: Real create/open/search/cancel workflows complete without runtime errors.}
+    results: [48, 51, 53, 54, 55, 60, 61, 62, 63]
+  - id: R4
+    requirement: A real 10000-entry match query stops at the 1000-result cap and surfaces explicit truncation feedback instead of scanning the whole directory.
+    actions: [56]
+    checkpoints:
+    - {step: 57, expectation: The capped native search settles into the done state without cancellation.}
+    - {step: 58, expectation: The status explicitly reports the 1000-result limit reached.}
+    results: [57, 58]
   visual:
   - check: Native created-file rows, dedicated viewers, relative search paths and restored large directory.
     method: manual

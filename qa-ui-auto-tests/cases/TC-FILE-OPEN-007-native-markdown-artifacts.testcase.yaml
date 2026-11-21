@@ -92,6 +92,7 @@ steps:
 - wait_for: '[data-testid="app-theme-select"]'
 - click: '[data-testid="app-theme-select"]'
 - click: '[data-testid="app-theme-light"]'
+- click: '[data-testid="side-tab-explorer"]'
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - assert_attribute:
     selector: html
@@ -116,6 +117,7 @@ steps:
     value: theme
 - click: '[data-testid="app-theme-select"]'
 - click: '[data-testid="app-theme-dark"]'
+- click: '[data-testid="side-tab-explorer"]'
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - assert_attribute:
     selector: html
@@ -270,97 +272,97 @@ verification:
     requirement: Real OS save/folder choosers produce self-contained HTML, nonblank PNG, valid DOCX XML/media and resolvable bundled
       Markdown images without changing source.
     actions:
-    - 49
-    - 50
-    - 54
-    - 55
-    - 58
-    - 59
+    - 51
+    - 52
+    - 56
+    - 57
+    - 60
     - 61
-    - 64
-    - 65
+    - 63
+    - 66
+    - 67
     checkpoints:
-    - step: 52
+    - step: 54
       expectation: HTML embeds original/pasted image pixels and contains real heading/body.
-    - step: 53
+    - step: 55
       expectation: HTML export leaves saved source exact.
-    - step: 57
+    - step: 59
       expectation: Host PNG decodes to a nonblank long document image.
-    - step: 63
+    - step: 65
       expectation: DOCX ZIP checksums/XML/body/media are independently valid; x squared and one half are editable Office Math equations exactly once, with no duplicate KaTeX HTML or TeX prose.
-    - step: 67
+    - step: 69
       expectation: Bundled Markdown references resolve to native saved image pixels.
-    - step: 68
+    - step: 70
       expectation: All exports leave the source hash unchanged.
     results:
-    - 52
-    - 53
-    - 57
-    - 63
-    - 67
-    - 68
+    - 54
+    - 55
+    - 59
+    - 65
+    - 69
+    - 70
   - id: R3
     requirement: Native chooser cancel, PDF/print setup cancel and missing-image placeholder export are explicit and never modify source.
     actions:
-    - 69
-    - 70
-    - 74
-    - 75
-    - 77
-    - 78
-    - 81
-    - 82
-    - 84
-    - 89
-    - 92
-    - 93
-    checkpoints:
-    - step: 71
-      expectation: Cancel returns the production cancelled state.
-    - step: 72
-      expectation: Cancel does not publish an output.
-    - step: 73
-      expectation: Cancel preserves saved source bytes.
-    - step: 79
-      expectation: PDF settings cancel closes its real dialog.
-    - step: 80
-      expectation: PDF settings cancellation leaves source exact.
-    - step: 85
-      expectation: Print settings cancel closes its real dialog.
-    - step: 86
-      expectation: Print settings cancellation leaves source exact.
-    - step: 91
-      expectation: The missing native image renders a visible placeholder.
-    - step: 94
-      expectation: Missing-image HTML export reports saved instead of failing.
-    - step: 95
-      expectation: Host-read HTML contains the image placeholder.
-    - step: 96
-      expectation: Host-read HTML retains the missing reference as diagnostic context.
-    - step: 97
-      expectation: Recoverable rendering failure does not surface an operation error.
-    - step: 98
-      expectation: Placeholder export preserves exact missing-image source bytes.
-    - step: 99
-      expectation: Export does not mark the source document dirty.
-    - step: 100
-      expectation: Native clipboard/chooser/export lifecycle has no unhandled runtime errors.
-    results:
     - 71
     - 72
-    - 73
+    - 76
+    - 77
     - 79
     - 80
-    - 85
+    - 83
+    - 84
     - 86
     - 91
     - 94
     - 95
+    checkpoints:
+    - step: 73
+      expectation: Cancel returns the production cancelled state.
+    - step: 74
+      expectation: Cancel does not publish an output.
+    - step: 75
+      expectation: Cancel preserves saved source bytes.
+    - step: 81
+      expectation: PDF settings cancel closes its real dialog.
+    - step: 82
+      expectation: PDF settings cancellation leaves source exact.
+    - step: 87
+      expectation: Print settings cancel closes its real dialog.
+    - step: 88
+      expectation: Print settings cancellation leaves source exact.
+    - step: 93
+      expectation: The missing native image renders a visible placeholder.
+    - step: 96
+      expectation: Missing-image HTML export reports saved instead of failing.
+    - step: 97
+      expectation: Host-read HTML contains the image placeholder.
+    - step: 98
+      expectation: Host-read HTML retains the missing reference as diagnostic context.
+    - step: 99
+      expectation: Recoverable rendering failure does not surface an operation error.
+    - step: 100
+      expectation: Placeholder export preserves exact missing-image source bytes.
+    - step: 101
+      expectation: Export does not mark the source document dirty.
+    - step: 102
+      expectation: Native clipboard/chooser/export lifecycle has no unhandled runtime errors.
+    results:
+    - 73
+    - 74
+    - 75
+    - 81
+    - 82
+    - 87
+    - 88
+    - 93
     - 96
     - 97
     - 98
     - 99
     - 100
+    - 101
+    - 102
   - id: R4
     requirement: Real native Mermaid flowchart and KaTeX math render with node/formula output and nonzero geometry in live/split; actual
       theme controls produce light/dark evidence; exported HTML/PNG/DOCX/MD retain diagram and rendered math.
@@ -371,13 +373,13 @@ verification:
     - 29
     - 31
     - 32
-    - 33
-    - 36
-    - 41
+    - 34
+    - 37
     - 42
     - 43
     - 44
     - 45
+    - 47
     checkpoints:
     - step: 26
       expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
@@ -385,29 +387,29 @@ verification:
     - step: 27
       expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
         for aesthetic review.
-    - step: 34
-      expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
-        for aesthetic review.
-    - step: 39
+    - step: 35
       expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
         for aesthetic review.
     - step: 40
       expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
         for aesthetic review.
-    - step: 46
+    - step: 41
       expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
         for aesthetic review.
-    - step: 47
+    - step: 48
+      expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
+        for aesthetic review.
+    - step: 49
       expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
         for aesthetic review.
     results:
     - 26
     - 27
-    - 34
-    - 39
+    - 35
     - 40
-    - 46
-    - 47
+    - 41
+    - 48
+    - 49
   visual:
   - check: Native chooser and Markdown export layout
     method: manual
