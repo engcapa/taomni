@@ -6,6 +6,7 @@ use russh::server::Session;
 use std::collections::HashMap;
 use std::io::Read;
 use std::sync::atomic::Ordering;
+use std::sync::{Arc, Mutex};
 
 impl SshConnection {
     /// Reserve a session slot for max-sessions accounting. Idempotent once held.
@@ -125,7 +126,22 @@ impl SshConnection {
             ..
         } = handle;
 
-        self.shells.insert(channel, ShellIo { writer, master });
+        let terminal = Arc::new(Mutex::new(Some(ShellIo { writer, master })));
+        #[cfg(windows)]
+        let on_child_exit = {
+            let terminal = Arc::downgrade(&terminal);
+            tokio::task::spawn_blocking(move || {
+                let status = child.wait();
+                // ConPTY keeps its output pipe open after the child exits.
+                // Release the console while the reader can still drain it.
+                if let Some(terminal) = terminal.upgrade() {
+                    let console = terminal.lock().ok().and_then(|mut io| io.take());
+                    drop(console);
+                }
+                status
+            })
+        };
+        self.shells.insert(channel, terminal);
 
         let handle = session.handle();
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
@@ -135,7 +151,7 @@ impl SshConnection {
                 match reader.read(&mut buf) {
                     Ok(0) => break,
                     Ok(n) => {
-                        if tx.send(buf[..n].to_vec()).is_err() {
+                        if tx.send(buf[..n].to_vec()).is_err() && !cfg!(windows) {
                             break;
                         }
                     }
@@ -162,10 +178,11 @@ impl SshConnection {
                                 }
                             }
                             None => {
-                                let code = match child.wait() {
-                                    Ok(status) => status.exit_code(),
-                                    Err(_) => 0,
-                                };
+                                #[cfg(windows)]
+                                let status = on_child_exit.await.ok().and_then(Result::ok);
+                                #[cfg(not(windows))]
+                                let status = child.wait().ok();
+                                let code = status.map_or(1, |status| status.exit_code());
                                 let _ = handle.exit_status_request(channel, code).await;
                                 let _ = handle.eof(channel).await;
                                 let _ = handle.close(channel).await;

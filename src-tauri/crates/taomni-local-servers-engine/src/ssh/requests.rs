@@ -404,7 +404,10 @@ impl ServerHandler for SshConnection {
         _session: &mut Session,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         async move {
-            if let Some(shell) = self.shells.get_mut(&channel) {
+            if let Some(terminal) = self.shells.get(&channel)
+                && let Ok(mut terminal) = terminal.lock()
+                && let Some(shell) = terminal.as_mut()
+            {
                 if let Err(e) = shell
                     .writer
                     .write_all(data)
@@ -427,7 +430,10 @@ impl ServerHandler for SshConnection {
         _session: &mut Session,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         async move {
-            if let Some(shell) = self.shells.get(&channel) {
+            if let Some(terminal) = self.shells.get(&channel)
+                && let Ok(terminal) = terminal.lock()
+                && let Some(shell) = terminal.as_ref()
+            {
                 let _ = taomni_pty::resize_pty(
                     shell.master.as_ref(),
                     col_width as u16,

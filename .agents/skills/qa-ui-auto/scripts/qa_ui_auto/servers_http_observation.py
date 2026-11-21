@@ -4,7 +4,9 @@ import hashlib
 import http.client
 import json
 from pathlib import Path
+import platform
 import socket
+import subprocess
 import time
 
 from .steps import StepError
@@ -42,8 +44,8 @@ def run(ctx, phase):
         finally:
             connection.close()
     elif phase == "stopped":
-        verify_listener_closed(HOST, PORT)
-        outcome = {"listener": False}
+        proof = verify_listener_closed(HOST, PORT)
+        outcome = {"listener": False, "proof": proof}
     else:
         raise StepError("Unknown Local HTTP observation phase")
     (ctx.case_dir / f"local-http-{phase}.json").write_text(
@@ -59,7 +61,20 @@ def verify_listener_closed(host, port):
             with socket.create_connection((host, port), timeout=1):
                 pass
         except ConnectionRefusedError:
-            return
+            return "connection-refused"
+        except TimeoutError:
+            if platform.system() == "Windows" and not windows_listener_exists(host, port):
+                return "absent-from-windows-listener-table"
         if time.monotonic() >= deadline:
             raise StepError(f"Local server at {host}:{port} still accepts connections after Stop")
         time.sleep(0.05)
+
+
+def windows_listener_exists(host, port):
+    output = subprocess.check_output(["netstat.exe", "-ano", "-p", "tcp"], timeout=5)
+    listening_addresses = {f"{address}:{port}" for address in (host, "0.0.0.0", "[::]")}
+    for line in output.decode("ascii", errors="replace").splitlines():
+        fields = line.split()
+        if len(fields) == 5 and fields[0] == "TCP" and fields[3] == "LISTENING" and fields[1] in listening_addresses:
+            return True
+    return False

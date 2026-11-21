@@ -1,6 +1,6 @@
 id: TC-SERVERS-004-local-ssh-sftp-native
 title: Local servers starts a native SSH/SFTP listener and releases it on Stop
-description: Start the normal desktop listener with an isolated document root. An independent client must authenticate, obtain a file via SFTP and receive output from a real PTY. Stop must close the listener.
+description: Start the normal desktop listener with an isolated document root. An independent client must authenticate, obtain a file via SFTP and receive output plus zero and nonzero exit statuses from a real PTY. Stop must close the listener.
 covers: [F-Servers-1]
 tags: [servers, native-boundary, p1]
 modes: [native]
@@ -35,7 +35,7 @@ verification:
     actions: [3, 5, 6, 7, 8, 9, 13, 16]
     checkpoints:
     - {step: 14, expectation: The application reports that the listener is running.}
-    - {step: 15, expectation: The independent client authenticates and receives fixed file and PTY bytes.}
+    - {step: 15, expectation: The independent client authenticates and receives fixed file and PTY bytes plus the requested exit statuses.}
     - {step: 17, expectation: The application reports that the listener stopped.}
     - {step: 18, expectation: An independent client observes that a new connection is refused.}
     - {step: 19, expectation: Start and Stop complete without runtime errors.}

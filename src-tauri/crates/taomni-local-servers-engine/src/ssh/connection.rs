@@ -64,7 +64,7 @@ pub(super) struct SshConnection {
     pub(super) log: LogEmitter,
     pub(super) cancel: CancellationToken,
     /// Active shells keyed by channel id (PTY writer + master for resize).
-    pub(super) shells: HashMap<ChannelId, ShellIo>,
+    pub(super) shells: HashMap<ChannelId, Arc<std::sync::Mutex<Option<ShellIo>>>>,
     /// Channels parked between `channel_open_session` and `subsystem_request`,
     /// so the SFTP subsystem can take ownership of the channel stream.
     pub(super) pending_channels: Arc<Mutex<HashMap<ChannelId, Channel<Msg>>>>,

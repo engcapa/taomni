@@ -3,6 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
+import re
 
 from .servers_http_observation import verify_listener_closed
 from .steps import StepError
@@ -34,8 +35,8 @@ def run(ctx, phase):
     if phase == "serving":
         receipt = observe()
     elif phase == "stopped":
-        verify_listener_closed(HOST, PORT)
-        receipt = {"listener": False}
+        proof = verify_listener_closed(HOST, PORT)
+        receipt = {"listener": False, "proof": proof}
     else:
         raise StepError("Unknown Local SSH observation phase")
     (ctx.case_dir / f"local-ssh-{phase}.json").write_text(
@@ -60,18 +61,29 @@ def observe():
             body = stream.read(len(CONTENT) + 1)
         if body != CONTENT:
             raise StepError("The local SSH server returned different SFTP file bytes")
-        stdin, stdout, stderr = client.exec_command("echo TAOMNI_LOCAL_SSH", get_pty=True, timeout=10)
-        try:
-            with stdin, stdout, stderr:
-                output = stdout.read(4096)
-                exit_code = stdout.channel.recv_exit_status()
-        finally:
-            stdout.channel.close()
-        if exit_code != 0 or MARKER not in output.splitlines():
+        output, exit_code = run_pty_command(client, "echo TAOMNI_LOCAL_SSH")
+        visible = re.sub(rb"\x1b\[[0-?]*[ -/]*[@-~]", b"", output)
+        if exit_code != 0 or MARKER not in visible.splitlines():
             raise StepError(f"The local SSH PTY did not return the expected marker (exit {exit_code})")
+        _, nonzero = run_pty_command(client, "exit 23")
+        if nonzero != 23:
+            raise StepError(f"The local SSH PTY returned exit {nonzero}, expected 23")
     return {
         "keyType": key.get_name(),
         "hostKeySha256": hashlib.sha256(key.asbytes()).hexdigest(),
         "fileSha256": hashlib.sha256(body).hexdigest(),
         "commandExit": exit_code,
+        "nonzeroCommandExit": nonzero,
     }
+
+
+def run_pty_command(client, command):
+    stdin, stdout, stderr = client.exec_command(command, get_pty=True, timeout=10)
+    try:
+        with stdin, stdout, stderr:
+            output = stdout.read(4096)
+            return output, stdout.channel.recv_exit_status()
+    except TimeoutError as error:
+        raise StepError("The SSH PTY did not finish producing output and an exit status") from error
+    finally:
+        stdout.channel.close()

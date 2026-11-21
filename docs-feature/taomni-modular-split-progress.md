@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- Local servers 0.1.1 收齐 18/18 分片。三端 Browser 各 24/24，Linux 与 macOS Native 各 31/31，Windows Native 27/30。Windows 已通过签名安装、真实鉴权和文件读取，两个 SSH 用例卡在 PTY 输出结束。0.1.2 在进程退出时释放 ConPTY，并继续转发剩余输出和退出码。第三个失败是 HTTP 停止后 TCP 连接超时，复验将同时核对 Windows 实际监听表。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44957237883)
 - 合入远程 `main` 的 `3dd574044`（#854）。合并提交 `6eed8689b` 保留新版记事本、不可用关联处理器的回退和模块设置，原生 Mail 附件崩溃回归沿用主线等待只读文本就绪的断言。
 - Windows MSI 修正 Tools 导航定位后完成同一候选的强退复验。MFA 宿主在验证工具清理前已退出，重开后使用旧账号并继续 HOTP。联合构建已收齐 Linux、Windows、macOS ARM64 和 Intel 安装件，以及四个目标的 RDP Server 签名包。 [Windows 复跑](https://github.com/engcapa/taomni/actions/runs/44960070675) · [联合构建](https://github.com/engcapa/taomni/actions/runs/44951621527)
 - macOS Intel DMG 通过同一候选的实装替换、回退、模式互斥、MFA 强退恢复和权限连续性观察。与 Linux、Windows、ARM64 共四个目标的回执均绑定安装件构建 `617bce843`。 [macOS Intel 实装](https://github.com/engcapa/taomni/actions/runs/44961742884)

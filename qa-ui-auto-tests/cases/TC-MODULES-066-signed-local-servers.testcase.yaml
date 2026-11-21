@@ -1,6 +1,6 @@
 id: TC-MODULES-066
 title: Signed Local servers migrates settings, serves HTTP and SSH, and stops both on disable
-description: Install the signed package, load old settings, use a legacy SSH password through Vault and disable the running host without restarting the core.
+description: Install the signed package, load old settings, use a legacy SSH password through Vault, verify PTY exit statuses and disable the running host without restarting the core.
 covers: [F-Modules-1, F-Servers-1, F-BACKUP-1]
 tags: [modules, servers, native-boundary, p1]
 modes: [native]

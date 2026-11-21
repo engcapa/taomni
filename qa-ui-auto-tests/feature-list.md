@@ -6222,7 +6222,7 @@ controls:
 - **e2e 测试覆盖**：`TC-SERVERS-001-tab-singleton-browser`、`TC-auto-F-Servers-1-servers-dialog` 覆盖浏览器单实例页签及跨上下文互斥，`TC-SERVERS-002-tab-singleton-native` 覆盖原生双进程 OS `ModuleLock` 与热路由切换，`TC-SERVERS-003-tab-functional-native` 核对真实 HTTP 文件内容、停止后端口关闭、日志、热改端口提示及配置持久化。
 - VNC 由签名 `vnc-server` 宿主启动和监督系统 daemon。Linux X11 的 `TC-MODULES-063` 验证离线安装、真实回环连接、停止及禁用后的端口与租约释放。`TC-MODULES-064` 在 Browser 核对端口、绑定地址、密码及两个选项的保存和恢复。
 - TC-SERVERS-004 从 Local servers 启动真实 SSH 监听器。独立客户端验证鉴权、SFTP 文件内容、PTY 命令完成和停止后的端口关闭。
-- TC-MODULES-066 验证签名模块接管原 HTTP 和 SSH 设置，原口令经 Vault 续用，停用后同时关闭两个监听。TC-SERVERS-005 验证 Browser 设置保存、重开和明确移除凭据。
+- TC-MODULES-066 验证签名模块接管原 HTTP 和 SSH 设置，原口令经 Vault 续用，停用后同时关闭两个监听。TC-SERVERS-004 及 066 核对 PTY 输出与零和非零退出码。TC-SERVERS-005 验证 Browser 设置保存、重开和明确移除凭据。
 
 ### 22.2 RDP Server（与 Windows 远程桌面对齐）🚧
 
