@@ -3,7 +3,7 @@ import { notifyDesktop } from "../../../lib/notifications";
 import { mailListFolders, type MailFolder, type MailMessageHeader, type MailSyncRequestMode } from "../../../lib/mail";
 import { folderLabel } from "../../../lib/mailFolders";
 import { mergeFolderMeta } from "../../../lib/mailSync";
-import { useTaoAlertStore } from "../../../stores/taoAlertStore";
+import { pushMailNotification } from "../../../lib/mail/rendererServices";
 import { NEW_MAIL_EXCLUDED_KINDS, folderMatchesSpecial } from "./folders";
 import { catchupStepSize, refreshBatchSize } from "./messages";
 import type { MailSubscriptionSnapshots } from "./subscriptionSnapshots";
@@ -89,7 +89,6 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
     };
   }, [info.sessionId]);
   const folderSelectSeqRef = useRef(0);
-  const pushMailNew = useTaoAlertStore((s) => s.pushMailNew);
   const batchSize = useMemo(() => refreshBatchSize(info), [info.sync.maxFetchPerSync]);
   const catchupBatchSize = useMemo(() => catchupStepSize(info), [info.sync.maxFetchPerSync]);
 
@@ -105,12 +104,12 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
   const notifyNewMail = useCallback((count: number) => {
     if (count <= 0) return;
     const title = info.displayName?.trim() || info.emailAddress || info.sessionId;
-    pushMailNew(tabId, info.sessionId, title, count);
+    pushMailNotification(tabId, info.sessionId, title, count);
     // Only while the tab is open (DEC-01); opt-in per account.
     if (info.sync.desktopNotify) {
       void notifyDesktop(title, count === 1 ? "1 new message" : `${count} new messages`);
     }
-  }, [info.displayName, info.emailAddress, info.sessionId, info.sync.desktopNotify, pushMailNew, tabId]);
+  }, [info.displayName, info.emailAddress, info.sessionId, info.sync.desktopNotify, tabId]);
 
   const applySyncedFolder = useCallback((folder: MailFolder, readRevision: number) => {
     const next = folderSnapshots.merge(mergeFolderMeta(foldersRef.current, folder), readRevision);

@@ -3,8 +3,8 @@ title: Signed Mail manages IMAP folders and sends from IMAP and POP3 accounts
 description: >-
   Install and enable the matching signed Mail package. Use the regular Mail
   tab to populate the IMAP folder tree, unsubscribe Archive, test connections
-  and send messages from IMAP and POP3 accounts. Check SMTP delivery, Sent
-  copies, and the signed host's data lease through disable.
+  and send messages from IMAP and POP3 accounts. Check the installed renderer,
+  SMTP delivery, Sent copies, and the signed host's data lease through disable.
 covers: [F-Modules-1, F-MAIL-3, F-MAIL-6, F-MAIL-11, F-MAIL-17]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
@@ -27,7 +27,7 @@ steps:
 - wait_for: '[data-testid="qc-input"]'
 - fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
 - click: '[data-testid="qc-submit"]'
-- wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]'
 - mail_server_assert_list_matches: {timeout_sec: 40}
 - wait_for: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
 - assert_signed_mail_host: folder-tree
@@ -75,6 +75,8 @@ steps:
 - click: '[data-testid="module-action-disable-mail"]'
 - wait_for: '[data-testid="module-action-enable-mail"]'
 - assert_signed_mail_host: disabled
+- wait_for: {selector: '[data-plugin-slug="mail"] [data-testid="mail-client-tab"]', state: detached}
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 2}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -85,13 +87,14 @@ verification:
     checkpoints:
     - {step: 9, expectation: The module installer accepts the verified artifact.}
     - {step: 12, expectation: The signed module is installed and the host has no writer lease yet.}
+    - {step: 17, expectation: Opening the account mounts the module's verified frontend.}
     - {step: 19, expectation: Opening the account shows Archive from the actual IMAP server.}
     - {step: 20, expectation: The signed Mail host holds its data lease before the connection test.}
     - {step: 22, expectation: The subscription dialog shows the initial subscribed state.}
     - {step: 24, expectation: The updated IMAP folder tree reports Archive as unsubscribed.}
     - {step: 27, expectation: Full synchronization finishes with the signed host supplying the folder tree.}
     - {step: 29, expectation: The refreshed server tree preserves the changed subscription.}
-    results: [9, 12, 19, 20, 22, 24, 27, 29]
+    results: [9, 12, 17, 19, 20, 22, 24, 27, 29]
   - id: R2
     requirement: The normal connection controls test IMAP, POP3 and SMTP using the installed Mail host.
     actions: [30, 31, 44, 45, 48]
@@ -117,8 +120,10 @@ verification:
     checkpoints:
     - {step: 63, expectation: The disabled package can be re-enabled.}
     - {step: 64, expectation: The verified module is still installed and the host released its writer lease.}
-    - {step: 65, expectation: The same renderer still runs without uncaught errors.}
-    results: [63, 64, 65]
+    - {step: 65, expectation: Disabling unmounts both Mail account panes.}
+    - {step: 66, expectation: Both tabs remain open for reactivation.}
+    - {step: 67, expectation: The remaining application runs without uncaught errors.}
+    results: [63, 64, 65, 66, 67]
   visual:
   - check: The Mail pane shows the connection results for both accounts.
     method: automated

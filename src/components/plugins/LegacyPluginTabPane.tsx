@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from "react";
 import type { VncSessionProperties } from "../../lib/vnc/viewerContract";
 import type { MailTabInfo, Tab } from "../../types";
 import { useT } from "../../lib/i18n";
+import MailSessionPane from "./MailSessionPane";
 import RdpSessionPane from "./RdpSessionPane";
 import VncSessionPane from "./VncSessionPane";
 
@@ -9,8 +10,6 @@ const LegacyMfaTab = lazy(() => import("../mfa/MfaTab").then((module) => ({ defa
 const LegacyServersPanel = lazy(() => import("../servers/ServersPanel").then((module) => ({ default: module.ServersPanel })));
 const LegacySocksCapPanel = lazy(() => import("../sockscap/SocksCapPanel").then((module) => ({ default: module.SocksCapPanel })));
 const LegacyProxyTestTab = lazy(() => import("../proxy/ProxyTestTab"));
-const LegacyMailClientTab = lazy(() => import("../mail/MailClientTab").then((module) => ({ default: module.MailClientTab })));
-const LegacyMailUnifiedTab = lazy(() => import("../mail/MailUnifiedTab").then((module) => ({ default: module.MailUnifiedTab })));
 
 export interface LegacyPluginTabPaneProps {
   tab: Tab;
@@ -61,10 +60,10 @@ export function LegacyPluginTabPane(props: LegacyPluginTabPaneProps) {
       content = tab.proxyTest ? <LegacyProxyTestTab info={tab.proxyTest} /> : <MissingPayload tab={tab} />;
       break;
     case "mail":
-      content = tab.mail ? <LegacyMailClientTab tabId={tab.id} info={tab.mail} visible={active} onEditSession={props.onEditMailSession} /> : <MissingPayload tab={tab} />;
+      content = tab.mail ? <MailSessionPane view="account" tabId={tab.id} info={tab.mail} active={active} onEditSession={props.onEditMailSession} /> : <MissingPayload tab={tab} />;
       break;
     case "mail-unified":
-      content = <LegacyMailUnifiedTab accounts={props.unifiedMailAccounts} visible={active} onOpenAccount={props.onOpenMailAccount} />;
+      content = <MailSessionPane view="unified" tabId={tab.id} accounts={props.unifiedMailAccounts} active={active} onOpenAccount={props.onOpenMailAccount} />;
       break;
     case "rdp": {
       const info = tab.rdp;

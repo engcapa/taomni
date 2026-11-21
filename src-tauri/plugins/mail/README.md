@@ -48,6 +48,13 @@ Outbox waits for a manual retry if a lost reply leaves delivery uncertain.
 The protocol job checks authentication, delivery to blind recipients, MIME
 framing, explicit rejection and loss of the final DATA reply.
 
+Version 0.1.5 adds a signed renderer for the account and unified inbox panes.
+Build it with `pnpm exec vite build --config src-tauri/plugins/mail/vite.config.ts`.
+The core shares its React runtime and specific file, dialog, theme and session
+services. The signer validates the renderer's source and digest before staging
+`frontend/index.js`. Production loads the signed renderer. Browser development
+and QA builds can also render the baseline for earlier packages.
+
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.
 It publishes the module data before activating the verified package and
@@ -55,6 +62,6 @@ records the result in the migration journal. The old account records and files
 support rollback. The signed installation workflow uses an isolated legacy
 profile and verifies contact queries for both default and custom caches.
 
-Production activation still requires the frontend bundle, scoped Vault,
-proxy and file-viewer services, and integration with the automatic upgrade
-flow in TASK-026. The production catalog follows the TASK-027 gates.
+Production activation still requires the host to own the full sync and cache
+lifecycle and use the module-scoped core services. TASK-026 covers the installed
+upgrade and rollback. The production catalog follows the TASK-027 gates.

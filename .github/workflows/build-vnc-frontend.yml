@@ -1,4 +1,4 @@
-name: Build an official remote desktop frontend
+name: Build an official module frontend
 
 on:
   workflow_call:
@@ -34,7 +34,8 @@ jobs:
           case "$MODULE_SLUG" in
             vnc-client) dependencies=(src/lib/vnc src/lib/vncOptions.ts src/lib/terminal/keyboardGuards.ts) ;;
             rdp-client) dependencies=(src/lib/rdpViewerHost.ts src/lib/rdpViewerContract.ts) ;;
-            *) echo 'Unknown remote desktop frontend' >&2; exit 1 ;;
+            mail) dependencies=(src/components/mail src/lib/mail src/lib/mailHtml ':(glob)src/lib/mail*.ts') ;;
+            *) echo 'Unknown module frontend' >&2; exit 1 ;;
           esac
           git diff --quiet HEAD "${MODULE_SOURCE}^{commit}" -- \
             package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc patches \

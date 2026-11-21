@@ -24,14 +24,22 @@ def run(ctx, phase):
     version = receipt["version"]
     if pointer.get("activeVersion") != version:
         raise StepError("The native Mail install selected another version")
-    host = module / "versions" / version / signed["host"]
+    version_root = module / "versions" / version
+    host = version_root / signed["host"]
     ordinary(host)
     with host.open("rb") as binary:
         digest = hashlib.file_digest(binary, "sha256").hexdigest()
     if digest != receipt["hostSha256"]:
         raise StepError("The installed Mail host differs from the verified package")
+    frontend = version_root / signed["frontend"]
+    ordinary(frontend)
+    with frontend.open("rb") as entry:
+        frontend_digest = hashlib.file_digest(entry, "sha256").hexdigest()
+    if frontend_digest != receipt["frontendSha256"]:
+        raise StepError("The installed Mail frontend differs from the verified package")
     observed = writer_lease(plugins, slug="mail", enabled=phase in active)
     report = {"phase": phase, "sourceSha": receipt["sourceSha"], "platform": receipt["platform"],
-              "packageSha256": receipt["sha256"], "hostSha256": digest, "writerLease": observed}
+              "packageSha256": receipt["sha256"], "hostSha256": digest,
+              "frontendSha256": frontend_digest, "writerLease": observed}
     (ctx.case_dir / f"signed-mail-{phase}.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return f"Mail {version} host lease verified ({phase})"

@@ -143,6 +143,7 @@ REGISTRY: dict[str, Fixture] = {
     "module_preview": Fixture("module_preview", module_preview.setup),
     "module_vnc_preview": Fixture("module_vnc_preview", module_preview.setup_vnc),
     "module_rdp_preview": Fixture("module_rdp_preview", module_preview.setup_rdp),
+    "module_mail_preview": Fixture("module_mail_preview", module_preview.setup_mail),
     "module_upgrade": Fixture("module_upgrade", module_upgrade.setup, module_upgrade.teardown),
     "module_legacy_install": Fixture("module_legacy_install", module_legacy_install.setup),
     "module_legacy_mfa": Fixture("module_legacy_mfa", module_legacy_mfa.setup),

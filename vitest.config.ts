@@ -19,6 +19,7 @@ export default defineConfig(({ mode }) => ({
     __TAOMNI_QA_UPDATER__: JSON.stringify(false),
     __TAOMNI_BUNDLED_VNC_VIEWER__: JSON.stringify(true),
     __TAOMNI_BUNDLED_RDP_VIEWER__: JSON.stringify(true),
+    __TAOMNI_BUNDLED_MAIL_RENDERER__: JSON.stringify(true),
     __TAOMNI_QA_OVERLAY_TIMING__: JSON.stringify(true),
   },
   test: {

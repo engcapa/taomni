@@ -1,4 +1,4 @@
-"""Add a verified remote desktop renderer to a validated signing payload."""
+"""Add a verified module renderer to a validated signing payload."""
 import hashlib
 import json
 from pathlib import Path
@@ -6,13 +6,13 @@ import sys
 
 
 def stage_frontend(built: Path, payload: Path, source: str, tooling: str, slug: str) -> None:
-    if slug not in {"rdp-client", "vnc-client"}:
-        raise ValueError("Unexpected remote desktop module")
+    if slug not in {"rdp-client", "vnc-client", "mail"}:
+        raise ValueError("Unexpected module")
     files = {path.name: path for path in built.iterdir()}
     if set(files) != {"index.js", "receipt.json"} or any(
         path.is_symlink() or not path.is_file() for path in files.values()
     ):
-        raise ValueError("Unexpected files in remote desktop frontend artifact")
+        raise ValueError("Unexpected files in module frontend artifact")
     javascript = files["index.js"].read_bytes()
     expected = {"sourceSha": source, "toolingSha": tooling, "slug": slug,
                 "sha256": hashlib.sha256(javascript).hexdigest()}

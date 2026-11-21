@@ -13,7 +13,7 @@ import { type MailFilter } from "../../lib/mailFilters";
 import { folderLabel, visibleFolders } from "../../lib/mailFolders";
 import { mailHtmlHasRemoteImages } from "../../lib/mailHtml";
 import { MailMutationSession } from "../../lib/mailMutations";
-import { useChatStore } from "../../stores/chatStore";
+import { openMailTabChat, sendMailContextToAi } from "../../lib/mail/rendererServices";
 import { useContextMenu } from "../ContextMenu";
 import { useConfirmDialog, useTextInputDialog } from "../sidebar/ConfirmDialog";
 import { aiPrompt } from "./client/ai";
@@ -69,9 +69,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const retryMailActionRef = useRef<(() => Promise<void>) | null>(null);
   const [mutationFailure, setMutationFailure] = useState<{ message: string; retryable: boolean; detail: string | null; } | null>(null);
   const [mutationProgress, setMutationProgress] = useState<string | null>(null);
-
-  const openTabChat = useChatStore((s) => s.openTabChat);
-  const sendMessageToAi = useChatStore((s) => s.sendMessage);
 
   const displayFolders = cacheOwner.folders.length > 0 ? cacheOwner.folders : [{ ...DEFAULT_FOLDER, accountId: info.sessionId }];
   const { subscribedOnly, subscribedOnlyRef, setSubscribedOnly, subscriptionsOpen,
@@ -434,10 +431,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       if (!confirmed) return;
     }
     try {
-      await openTabChat(tabId);
-      const threadId = useChatStore.getState().activeThreadId;
-      if (!threadId) throw new Error("No AI chat thread is available.");
-      await sendMessageToAi(threadId, aiPrompt(action, selectionOwner.selectedMessage, currentBody));
+      await sendMailContextToAi(tabId, aiPrompt(action, selectionOwner.selectedMessage, currentBody));
       setStatus("Sent mail context to AI");
     } catch (e) {
       setError(mailClientErrorMessage(e));
@@ -699,7 +693,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     idleState={idleState}
     activeFolder={activeFolder}
     searchInputRef={searchInputRef}
-    openTabChat={openTabChat}
+    openTabChat={openMailTabChat}
     tabId={tabId}
     mailMenu={mailMenu}
     messageMenuItems={messageMenuItems}

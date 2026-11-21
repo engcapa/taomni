@@ -22,3 +22,7 @@ def setup_vnc(ctx):
 
 def setup_rdp(ctx):
     _seed(ctx, "taomni.preview.modules.rdp.v1")
+
+
+def setup_mail(ctx):
+    _seed(ctx, "taomni.preview.modules.mail.v1")

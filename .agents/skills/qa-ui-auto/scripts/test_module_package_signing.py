@@ -30,7 +30,7 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
         if module == "vnc-client" and platform == "windows-x86_64":
             (payload / "taomni-vnc-key-helper.exe").write_bytes(b"inert unit helper")
         frontend = manifest["entry"].get("frontend")
-        if frontend and module != "vnc-client":
+        if frontend and module not in {"vnc-client", "rdp-client", "mail"}:
             shutil.copytree(ROOT / "src-tauri/plugins" / module / "frontend", trusted / "frontend")
             shutil.copytree(trusted / "frontend", payload / "frontend")
         (payload / "module.json").write_text(json.dumps(manifest))
@@ -142,6 +142,26 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
             (trusted / "index.js").write_bytes(entry)
             stage_frontend(trusted, payload, "a" * 40, "b" * 40, "vnc-client")
             self.assertEqual((candidate_frontend / "index.js").read_bytes(), entry)
+
+    def test_mail_stages_its_signed_renderer_from_the_matching_trusted_build(self):
+        stage_frontend = runpy.run_path(str(ROOT / "scripts/stage-vnc-frontend.py"))["stage_frontend"]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = self.seed(root, "mail", "linux-x86_64")
+            self.guard(root, "mail", "linux-x86_64")
+            trusted = root / "trusted-frontend"
+            trusted.mkdir()
+            entry = b"export default function MailView() {}\n"
+            (trusted / "index.js").write_bytes(entry)
+            receipt = {"sourceSha": "a" * 40, "toolingSha": "b" * 40, "slug": "mail",
+                       "sha256": hashlib.sha256(entry).hexdigest()}
+            (trusted / "receipt.json").write_text(json.dumps(receipt), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "receipt"):
+                stage_frontend(trusted, payload, "a" * 40, "d" * 40, "mail")
+            stage_frontend(trusted, payload, "a" * 40, "b" * 40, "mail")
+            self.assertEqual((payload / "frontend/index.js").read_bytes(), entry)
+            with self.assertRaisesRegex(AssertionError, "Unexpected files"):
+                self.guard(root, "mail", "linux-x86_64")
 
     def test_source_module_metadata_and_unsigned_file_changes_are_rejected(self):
         for change in ["source", "module", "permissions", "frontend-entry", "extra-file", "frontend-bytes", "secondary-chunk"]:

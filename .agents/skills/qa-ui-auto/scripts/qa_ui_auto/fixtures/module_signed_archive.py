@@ -124,17 +124,21 @@ def setup_mail(ctx):
         raise RuntimeError("QA_SIGNED_MAIL_ROOT is required to locate the signed artifact")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     manifest = Path(__file__).resolve().parents[6] / "src-tauri/plugins/mail/module.json"
-    version = json.loads(manifest.read_text(encoding="utf-8"))["version"]
+    expected = json.loads(manifest.read_text(encoding="utf-8"))
+    version, frontend = expected["version"], expected["entry"]["frontend"]
     receipt, archive, signature, _ = load_artifact(Path(raw), source, platform_key(), "mail", version=version)
     host = "taomni-plugin-mail.exe" if platform.system() == "Windows" else "taomni-plugin-mail"
-    with zipfile.ZipFile(archive) as package, package.open(host) as binary:
-        receipt["hostSha256"] = hashlib.file_digest(binary, "sha256").hexdigest()
+    with zipfile.ZipFile(archive) as package:
+        with package.open(host) as binary:
+            receipt["hostSha256"] = hashlib.file_digest(binary, "sha256").hexdigest()
+        with package.open(frontend) as entry:
+            receipt["frontendSha256"] = hashlib.file_digest(entry, "sha256").hexdigest()
     owned = Path(ctx.case_dir).resolve() / "signed-mail"
     owned.mkdir()
     destination = owned / archive.name
     shutil.copyfile(archive, destination)
     (owned / "provenance.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
-    ctx.signed_mail = {"host": host, "receipt": receipt}
+    ctx.signed_mail = {"host": host, "frontend": frontend, "receipt": receipt}
     ctx.values.update(mail_signed_archive=destination.as_posix(), mail_signed_signature=signature)
 
 

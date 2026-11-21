@@ -130,13 +130,13 @@ jobs:
               output.write('sign_matrix=' + json.dumps({'include': [
                   {'platform': target['platform'], 'legacy_roster': target['legacy_roster']} for target in targets
               ]}, separators=(',', ':')) + '\n')
-              if os.environ['QA_MODULE'] in {'vnc-client', 'rdp-client'}:
+              if os.environ['QA_MODULE'] in {'vnc-client', 'rdp-client', 'mail'}:
                   suffix = '-'.join(target['platform'] for target in targets)
                   output.write(f"frontend_artifact=qa-{os.environ['QA_MODULE']}-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
           PY
 
   desktop-frontend:
-    if: inputs.module == 'vnc-client' || inputs.module == 'rdp-client'
+    if: inputs.module == 'vnc-client' || inputs.module == 'rdp-client' || inputs.module == 'mail'
     needs: source
     uses: ./.github/workflows/build-vnc-frontend.yml
     with:
@@ -210,7 +210,7 @@ jobs:
               if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
                   helper = 'taomni-vnc-key-helper.exe'
                   shutil.copyfile(binaries / helper, output / helper)
-              if slug not in {'vnc-client', 'rdp-client'} and manifest['entry'].get('frontend'):
+              if slug not in {'vnc-client', 'rdp-client', 'mail'} and manifest['entry'].get('frontend'):
                   shutil.copytree(source / 'frontend', output / 'frontend')
 
           stage(os.environ['QA_MODULE'], 'unsigned-module')
@@ -261,7 +261,7 @@ jobs:
     needs: [source, build, desktop-frontend]
     # Fork pull requests cannot request a production signature. A manual or
     # reusable invocation runs the workflow revision trusted by its operator.
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'engcapa/taomni' && needs.build.result == 'success' && (needs.desktop-frontend.result == 'success' || (inputs.module != 'vnc-client' && inputs.module != 'rdp-client' && needs.desktop-frontend.result == 'skipped')) }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'engcapa/taomni' && needs.build.result == 'success' && (needs.desktop-frontend.result == 'success' || (inputs.module != 'vnc-client' && inputs.module != 'rdp-client' && inputs.module != 'mail' && needs.desktop-frontend.result == 'skipped')) }}
     runs-on: ${{ inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-') && needs.source.outputs.macos_runner || 'ubuntu-24.04' }}
     timeout-minutes: 20
     strategy:
@@ -311,7 +311,7 @@ jobs:
                   binaries.add('taomni-vnc-key-helper.exe')
               allowed = {'module.json', *binaries}
               frontend = expected['entry'].get('frontend')
-              if frontend and slug not in {'vnc-client', 'rdp-client'}:
+              if frontend and slug not in {'vnc-client', 'rdp-client', 'mail'}:
                   assert (trusted_source / frontend).is_file()
                   for source in (trusted_source / 'frontend').rglob('*'):
                       assert not source.is_symlink()
@@ -342,12 +342,12 @@ jobs:
               (failing / 'module.json').write_text(json.dumps({**expected, 'version': '0.1.1'}), encoding='utf-8')
           PY
       - uses: actions/download-artifact@v4
-        if: env.QA_MODULE == 'vnc-client' || env.QA_MODULE == 'rdp-client'
+        if: env.QA_MODULE == 'vnc-client' || env.QA_MODULE == 'rdp-client' || env.QA_MODULE == 'mail'
         with:
           name: ${{ needs.source.outputs.frontend_artifact }}
           path: trusted-desktop-frontend
-      - name: Stage the verified desktop frontend bytes
-        if: env.QA_MODULE == 'vnc-client' || env.QA_MODULE == 'rdp-client'
+      - name: Stage the verified module frontend bytes
+        if: env.QA_MODULE == 'vnc-client' || env.QA_MODULE == 'rdp-client' || env.QA_MODULE == 'mail'
         env:
           MODULE_SOURCE: ${{ needs.source.outputs.sha }}
           FRONTEND_TOOLING: ${{ github.workflow_sha }}

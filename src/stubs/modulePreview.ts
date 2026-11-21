@@ -1,4 +1,5 @@
 import type { PluginManifest, PluginRecord } from "../lib/pluginRegistry";
+import mailManifest from "../../src-tauri/plugins/mail/module.json";
 import rdpManifest from "../../src-tauri/plugins/rdp-client/module.json";
 import vncManifest from "../../src-tauri/plugins/vnc-client/module.json";
 
@@ -6,6 +7,7 @@ import vncManifest from "../../src-tauri/plugins/vnc-client/module.json";
 export const MODULE_PREVIEW_KEY = "taomni.preview.modules.v1";
 const VNC_PREVIEW_KEY = "taomni.preview.modules.vnc.v1";
 const RDP_PREVIEW_KEY = "taomni.preview.modules.rdp.v1";
+const MAIL_PREVIEW_KEY = "taomni.preview.modules.mail.v1";
 export const previewHelloManifest: PluginManifest = {
   id: "taomni-plugin-hello-plugin", slug: "hello-plugin", name: "Hello Plugin", version: "0.1.0",
   coreApiVersion: "1", kind: "collaboration", status: "provisional",
@@ -16,9 +18,10 @@ export const previewHelloManifest: PluginManifest = {
   permissions: [], dataDir: "plugins/hello-plugin", backupPaths: ["plugins/hello-plugin/data"],
   legacyTables: [], vaultFixedKeys: [], snapshot: "rpc",
 };
-const desktopModules = [
+const previewModules = [
   { manifest: vncManifest as PluginManifest, key: VNC_PREVIEW_KEY },
   { manifest: rdpManifest as PluginManifest, key: RDP_PREVIEW_KEY },
+  { manifest: mailManifest as PluginManifest, key: MAIL_PREVIEW_KEY },
 ];
 
 interface PreviewState { lifecycle: PluginRecord["lifecycle"]; values: string[]; version?: string; previousVersion?: string }
@@ -48,13 +51,13 @@ export function invokeModulePreview(command: string, args?: Record<string, unkno
     const hello = readModulePreview();
     return [
       ...(hello ? [previewModuleRecord(hello)] : []),
-      ...desktopModules.flatMap(({ manifest, key }) => {
+      ...previewModules.flatMap(({ manifest, key }) => {
         const state = readPreview(key);
         return state ? [previewModuleRecord(state, manifest)] : [];
       }),
     ];
   }
-  const { manifest, key } = desktopModules.find(({ manifest }) => manifest.slug === args?.slug)
+  const { manifest, key } = previewModules.find(({ manifest }) => manifest.slug === args?.slug)
     ?? { manifest: previewHelloManifest, key: MODULE_PREVIEW_KEY };
   const state = readPreview(key);
   if (!state || args?.slug !== manifest.slug) throw new Error(`Module operation requires the desktop app: ${command}`);

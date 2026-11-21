@@ -1,0 +1,79 @@
+id: TC-MODULES-060
+title: Mail account and unified panes follow the module selector
+description: >-
+  Enable the preview Mail module from an open account tab. Open Unified Mail
+  and refresh an actual stub message. Disable the module and check the two
+  retained tabs both show the disabled state.
+covers: [F-Modules-1, F-MAIL-3, F-MAIL-20]
+tags: [modules, mail, p1]
+modes: [browser]
+fixtures: [reset_db, module_mail_preview, mail_server]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="mail-client-tab"]', equal: 0}
+- click: '[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]'
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]'
+- mail_server_assert_list_matches: {timeout_sec: 30}
+- mail_server_deliver: {count: 1, prefix: Module frontend}
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mail-unified"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="mail-unified-tab"]'
+- click: '[data-testid="mail-unified-refresh"]'
+- assert_text: {selector: '[data-testid="mail-unified-row"]', contains: 'Module frontend 0001', timeout_sec: 30}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-mail"]'
+- wait_for: '[data-testid="module-action-enable-mail"]'
+- wait_for: {selector: '[data-testid="mail-client-tab"], [data-testid="mail-unified-tab"]', state: detached}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 1}
+- click: '[data-testid="tab-item"][data-tab-type="mail-unified"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail-unified"]', equal: 1}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Enabling Mail renders the account list in the original tab and the unified list in its own tab.
+    actions: [5, 6, 9, 10, 12, 13, 16, 17, 18, 20]
+    checkpoints:
+    - {step: 7, expectation: The first open shows the disabled module.}
+    - {step: 8, expectation: The disabled module has no account pane.}
+    - {step: 14, expectation: The existing tab mounts the account pane from the Mail module.}
+    - {step: 15, expectation: The account shows the same inbox as its stub server.}
+    - {step: 19, expectation: The Unified Mail entry mounts the module's unified pane.}
+    - {step: 21, expectation: Refresh populates the unified pane with the new message.}
+    results: [7, 8, 14, 15, 19, 21]
+  - id: R2
+    requirement: Disabling Mail unmounts both panes while preserving both tabs.
+    actions: [22, 23, 24, 27, 28, 31]
+    checkpoints:
+    - {step: 26, expectation: Both module panes have unmounted.}
+    - {step: 29, expectation: The original account tab displays the disabled state.}
+    - {step: 30, expectation: Exactly one account tab remains.}
+    - {step: 32, expectation: The original unified tab displays the disabled state.}
+    - {step: 33, expectation: Exactly one unified tab remains.}
+    - {step: 34, expectation: The transitions produce no uncaught errors.}
+    results: [26, 29, 30, 32, 33, 34]
+  visual:
+  - check: The account and unified panes each show content when enabled and a status when disabled.
+    method: automated
+    reason: The assertions observe both renderer paths and their disabled placeholders.
+  native:
+  - check: Native uses a verified package and SMTP instead of the browser model.
+    method: not-applicable
+    reason: TC-MODULES-059 verifies the signed artifact, host lease and delivery in the desktop app.
