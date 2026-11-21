@@ -2,6 +2,7 @@
 //! mailbox store uses only paths derived from that profile and account IDs.
 
 mod commands;
+mod header_sync;
 mod incoming;
 mod outgoing;
 mod snapshot;
@@ -12,6 +13,7 @@ use std::{collections::BTreeSet, io, sync::Arc, time::Duration};
 use serde_json::Value;
 use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, SEND_SMTP,
+    SYNC_IMAP_HEADERS,
 };
 use taomni_plugin_api::{
     ErrorCode, RpcError,
@@ -34,6 +36,7 @@ fn host_config() -> HostConfig {
                 CHECK_OUTGOING,
                 IMAP_FOLDER_TREE,
                 SEND_SMTP,
+                SYNC_IMAP_HEADERS,
                 SNAPSHOT_PREPARE_METHOD,
                 SNAPSHOT_METHOD,
                 SNAPSHOT_RELEASE_METHOD,
@@ -97,6 +100,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(incoming::imap_folder_tree(&self.io, operation, input)?)
+            }
+            SYNC_IMAP_HEADERS => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(header_sync::run(&self.io, operation, input)?)
             }
             _ => {
                 return commands::invoke(&self.store, method, params, &|| {

@@ -2,13 +2,19 @@
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use imap::{Client, Session};
 use native_tls::TlsStream;
 
 use crate::MailFolder;
+use crate::cache::MailCacheSettings;
 use crate::imap_auth::{MailAuthMode, MailProvider, authenticate};
 use crate::imap_folders::{imap_list_folders, imap_set_subscription};
+use crate::imap_messages::Mailbox;
+use crate::imap_sync::{
+    FolderStepOutcome, HeaderStepRequest, StepParams, imap_has_capability, imap_sync_folder_step,
+};
 use crate::tls::{MailConnectionSecurity, certificate_error_hint, tls_connector};
 
 pub struct ImapConnection<'a> {
@@ -26,6 +32,14 @@ pub enum ImapSession {
     Tls(Session<TlsStream<TcpStream>>),
 }
 
+/// Discard a session after the IMAP library detects an out-of-sequence reply.
+pub fn imap_catch_result<T>(work: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    match catch_unwind(AssertUnwindSafe(work)) {
+        Ok(result) => result,
+        Err(_) => Err("IMAP protocol desync".into()),
+    }
+}
+
 impl ImapSession {
     pub fn list_folders(&mut self, account_id: &str) -> Result<Vec<MailFolder>, String> {
         match self {
@@ -40,6 +54,35 @@ impl ImapSession {
             Self::Tls(session) => imap_set_subscription(session, folder, subscribed),
         }
     }
+
+    pub fn sync_headers(
+        &mut self,
+        request: &HeaderStepRequest,
+    ) -> Result<FolderStepOutcome, String> {
+        match self {
+            Self::Plain(session) => sync_headers(session, request),
+            Self::Tls(session) => sync_headers(session, request),
+        }
+    }
+}
+
+fn sync_headers<T: Read + Write>(
+    session: &mut Session<T>,
+    step: &HeaderStepRequest,
+) -> Result<FolderStepOutcome, String> {
+    let params = StepParams {
+        request: step.mode,
+        limit: step.limit,
+        include_bodies: false,
+        condstore: imap_has_capability(session, "CONDSTORE"),
+    };
+    let mut mailbox = Mailbox {
+        account_id: &step.account_id,
+        name: &step.folder,
+        cache: &MailCacheSettings::default(),
+        save_original: |_, _: &[u8]| Err("A header step cannot store message originals".into()),
+    };
+    imap_sync_folder_step(session, &mut mailbox, &step.state, &params)
 }
 
 impl ImapConnection<'_> {

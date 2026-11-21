@@ -454,14 +454,7 @@ pub(super) fn is_imap_transport_error(message: &str) -> bool {
         || message.contains("desync")
 }
 
-/// Run an IMAP operation that may panic inside the imap crate (tag asserts)
-/// and convert panics into transport errors so the pool can reconnect.
-pub(super) fn imap_catch_result<R>(op: impl FnOnce() -> Result<R, String>) -> Result<R, String> {
-    match catch_unwind(AssertUnwindSafe(op)) {
-        Ok(result) => result,
-        Err(_) => Err("IMAP protocol desync".into()),
-    }
-}
+pub(super) use taomni_mail_engine::imap_transport::imap_catch_result;
 
 /// Checkout or connect an IMAP session, run `f`, then return the session to
 /// the pool on success (unless `force_fresh`).

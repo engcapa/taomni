@@ -7,10 +7,13 @@ use serde::{Deserialize, Serialize};
 use taomni_plugin_stream::routed_tcp::Endpoint;
 use zeroize::Zeroizing;
 
+pub mod folder_sync;
+
 pub const SLUG: &str = "mail";
 pub const CHECK_INCOMING: &str = "mail/check-incoming";
 pub const CHECK_OUTGOING: &str = "mail/check-outgoing";
 pub const IMAP_FOLDER_TREE: &str = "mail/imap-folder-tree";
+pub const SYNC_IMAP_HEADERS: &str = "mail/sync-imap-headers";
 pub const SEND_SMTP: &str = "mail/send-smtp";
 pub const HOST_REQUEST_TIMEOUT: Duration = Duration::from_secs(70);
 pub const SMTP_DELIVERY_UNKNOWN: &str = "SMTP delivery status unknown";

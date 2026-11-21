@@ -2,6 +2,11 @@
 
 ## 2026-11-21 当前进展
 
+- `406431d6e` 合入主线 #849–#851。保留 Git Clone 与模块用例注册，从合并后的功能清单重建 testid 目录。合并后的 Rust 检查发现新 Git Clone 调用仍引用原 `AppState.vault`。已接到 `CoreState.vault`，复查通过。TypeScript、7 项 Workspace 和标签单测、用例审计及重构边界均通过。 [合并提交](https://github.com/engcapa/taomni/commit/406431d6e) · [首轮验证](https://github.com/engcapa/taomni/actions/runs/44899423260)
+- Mail 0.1.5 的签名包携带账户和统一收件箱入口。Sessions 与 Workspace 从同一个模块入口加载，停用时卸载视图并保留标签。独立前端构建通过，生产基座清单排除了 `MailView`、`MailClientTab` 和 `MailUnifiedTab`。GitHub 测试包把前端摘要和宿主摘要写入同一原始回执。同步、账户缓存和备份写入仍按 TASK-026 迁移。 [前端提交](https://github.com/engcapa/taomni/commit/4367199a9)
+- `57696943b` 的 Linux、Windows、macOS ARM64 真实 Mail 宿主协议均通过，包含 SMTP 接受、明确拒绝、未收到 DATA 回执及缓存续用。原始日志和源码及镜像回执位于 `qa-ui-auto-report/github/44896966910/live-contracts/modular-protocol-*/mail-host-native.log` 和同目录的 `mail-host-receipt.json`。 [协议运行](https://github.com/engcapa/taomni/actions/runs/44896966910)
+- Mail 0.1.6 将选中文件夹的 IMAP 邮件头同步交给签名宿主。核心授权目标路由，并通过独立的本机连接传入缓存水位、接收邮件头和标记。核心过渡仓储继续按原有策略提交结果。TC-MODULES-059 增加切换文件夹后补齐真实邮件的校验。包含正文的步骤及全账户同步仍由过渡入口执行。
+- `10536bce8` 的 macOS Native 最终为 30/31。TC-MODULES-009、038、044、059 均通过。唯一失败在 TC-FILE-OPEN-007 的系统保存对话框识别，原始回执保留。同轮 Linux 与 Windows Native 均为 29/29。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44892575348)
 - `10536bce8` 的三端 Browser 各通过 23/23。Linux Native 29/29，Windows Native 29/29，包含 POP3 正文、Mail 签名连接和 TC-MODULES-009 的重启入口所有权。macOS 已采集 TC-MODULES-044 和 TC-MODULES-059 的通过分片，完整运行继续采集。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44892575348)
 - Mail 的 POP3 批量同步已移入共享邮件引擎。每封邮件的原件、列表记录和 UIDL 同事务提交，遇到写入错误可重试，重复 UIDL 保留原先的记录。六项 POP3 单测通过。TC-MAIL-POP3-01 新增关标签、重开和检查同一邮件只出现一次的步骤。核心过渡入口仍打开现有账户缓存。
 - Mail 0.1.4 的首轮真实宿主协议在握手时发现测试夹具遗漏新声明的 SMTP 方法。测试启动参数改读模块清单，继续对实际宿主执行原有认证检查和新增 DATA 场景。 [失败回执](https://github.com/engcapa/taomni/actions/runs/44895795316)

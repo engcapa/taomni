@@ -9,6 +9,7 @@ description = "Mail module connection contract"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 taomni-plugin-stream = { path = "../taomni-plugin-stream" }
+tokio = { version = "1", features = ["io-util"] }
 zeroize = { version = "1", features = ["serde"] }
 
 [dev-dependencies]

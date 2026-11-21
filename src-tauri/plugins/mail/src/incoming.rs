@@ -44,7 +44,7 @@ pub(super) fn imap_folder_tree(
     })
 }
 
-fn with_socket<T: Send + 'static>(
+pub(super) fn with_socket<T: Send + 'static>(
     runtime: &Runtime,
     operation: &Operation,
     input: IncomingTest,
@@ -107,7 +107,7 @@ fn socket_error() -> RpcError {
     RpcError::new(ErrorCode::InternalError, "MAIL_ROUTE_SOCKET_UNAVAILABLE")
 }
 
-fn open_imap(stream: TcpStream, input: &IncomingTest) -> Result<ImapSession, String> {
+pub(super) fn open_imap(stream: TcpStream, input: &IncomingTest) -> Result<ImapSession, String> {
     ImapConnection {
         server_name: &input.server_name,
         security: input.security,

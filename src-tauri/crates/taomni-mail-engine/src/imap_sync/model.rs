@@ -7,7 +7,7 @@ use serde::Serialize;
 use std::collections::HashSet;
 
 /// Which work a `mail_sync_folder` call should do.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum MailSyncRequestMode {
     /// Initialise / repair / fetch new mail, whichever the stored state needs.
@@ -23,7 +23,7 @@ pub enum MailSyncRequestMode {
 }
 
 /// The work a step actually performed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum MailSyncMode {
     Initial,
@@ -60,7 +60,7 @@ pub struct MailFolderSyncResult {
 }
 
 /// Persisted per-folder sync state plus the cached UID set.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FolderSyncState {
     pub uid_validity: Option<u32>,
     pub low: Option<u32>,
@@ -74,7 +74,7 @@ pub struct FolderSyncState {
     pub cached_uids: Vec<u32>,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Watermark {
     pub low: Option<u32>,
     pub high: Option<u32>,
@@ -83,7 +83,7 @@ pub struct Watermark {
 }
 
 /// Result of one IMAP step before it is written to the cache.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FolderStepOutcome {
     pub folder: MailFolder,
     pub mode: MailSyncMode,
@@ -98,6 +98,16 @@ pub struct FolderStepOutcome {
     pub remaining: usize,
     pub more: bool,
     pub new_unseen: usize,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HeaderStepRequest {
+    pub account_id: String,
+    pub folder: String,
+    pub state: FolderSyncState,
+    pub mode: MailSyncRequestMode,
+    pub limit: usize,
 }
 
 pub struct AppliedStep {

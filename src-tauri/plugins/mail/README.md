@@ -55,6 +55,13 @@ services. The signer validates the renderer's source and digest before staging
 `frontend/index.js`. Production loads the signed renderer. Browser development
 and QA builds can also render the baseline for earlier packages.
 
+Version 0.1.6 runs the selected IMAP folder's header-only step in the signed
+host. The core supplies the cached UID snapshot and receives the resulting
+headers, flags and watermark through a private one-use connection. The cache
+adapter commits the result using its existing stale-state and retention rules.
+Sync steps that store message bodies and whole-account refresh keep using the
+desktop cache adapter during the migration.
+
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.
 It publishes the module data before activating the verified package and

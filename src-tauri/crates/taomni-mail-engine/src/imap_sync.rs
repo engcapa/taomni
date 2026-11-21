@@ -21,8 +21,8 @@ mod protocol;
 pub use folder_step::imap_sync_folder_step;
 pub use limits::FLAG_RECONCILE_WINDOW;
 pub use model::{
-    AppliedStep, FolderStepOutcome, FolderSyncState, MailFolderSyncResult, MailSyncMode,
-    MailSyncRequestMode, StepParams, Watermark, advance_state, step_result,
+    AppliedStep, FolderStepOutcome, FolderSyncState, HeaderStepRequest, MailFolderSyncResult,
+    MailSyncMode, MailSyncRequestMode, StepParams, Watermark, advance_state, step_result,
 };
 pub use protocol::imap_has_capability;
 

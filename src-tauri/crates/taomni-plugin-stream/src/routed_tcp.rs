@@ -12,7 +12,7 @@ use rand::RngCore;
 use ring::hmac;
 use serde::{Deserialize, Serialize};
 use tokio::{
-    io::{self as transport, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    io::{self as transport, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream},
     net::{TcpListener, TcpStream},
     task::JoinHandle,
     time::{Instant, timeout, timeout_at},
@@ -69,6 +69,23 @@ impl Route {
             )
         })
         .await
+    }
+
+    /// Create an authenticated one-use stream to a local caller. The caller
+    /// holds the peer while both directions of the exchange are active.
+    pub async fn pair() -> io::Result<(Self, Endpoint, DuplexStream)> {
+        let (peer, stream) = transport::duplex(crate::CHUNK_BYTES);
+        let mut stream = Some(stream);
+        let (route, endpoint) = Self::bind(move || {
+            std::future::ready(
+                stream
+                    .take()
+                    .map(|stream| (stream, SocketAddr::from((Ipv4Addr::LOCALHOST, 0))))
+                    .ok_or_else(|| "The local stream is already connected".to_owned()),
+            )
+        })
+        .await?;
+        Ok((route, endpoint, peer))
     }
 
     pub async fn bind<Stream, Dial, Opening>(mut dial: Dial) -> io::Result<(Self, Endpoint)>

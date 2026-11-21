@@ -102,7 +102,7 @@ pub struct MailMessageBody {
     pub source: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MailMessageCached {
     pub header: MailMessageHeader,
     pub body_text: Option<String>,

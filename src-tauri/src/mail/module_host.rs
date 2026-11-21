@@ -1,13 +1,16 @@
 //! Bind the session's resolved mail route and grant it only to the verified host.
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use lettre::address::Envelope;
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
-    CHECK_INCOMING, CHECK_OUTGOING, FolderSubscription, IMAP_FOLDER_TREE, ImapFolderTree,
-    IncomingTest, SEND_SMTP, SLUG, SMTP_DELIVERY_UNKNOWN, SmtpConnection, SmtpDelivery,
+    CHECK_INCOMING, CHECK_OUTGOING, FolderSubscription, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE,
+    ImapFolderTree, IncomingTest, SEND_SMTP, SLUG, SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS,
+    SmtpConnection, SmtpDelivery,
+    folder_sync::{HeaderSync, read_frame, write_frame},
 };
+use taomni_mail_engine::imap_sync::{FolderStepOutcome, HeaderStepRequest};
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
 
 use crate::{
@@ -26,6 +29,50 @@ pub(super) fn checks_incoming(registry: &PluginRegistry) -> bool {
 
 pub(super) fn manages_imap_folders(registry: &PluginRegistry) -> bool {
     supports(registry, IMAP_FOLDER_TREE)
+}
+
+pub(super) fn syncs_imap_headers(registry: &PluginRegistry) -> bool {
+    supports(registry, SYNC_IMAP_HEADERS)
+}
+
+pub(super) async fn sync_imap_headers(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    step: &HeaderStepRequest,
+) -> Result<FolderStepOutcome, String> {
+    let bytes = serde_json::to_vec(step).map_err(|error| error.to_string())?;
+    let (_data_route, endpoint, mut peer) =
+        Route::pair().await.map_err(|error| error.to_string())?;
+    let exchange = async {
+        write_frame(&mut peer, &bytes)
+            .await
+            .map_err(|error| error.to_string())?;
+        read_frame(&mut peer)
+            .await
+            .map_err(|error| error.to_string())
+    };
+    let invoke =
+        invoke_with_incoming::<(), _>(registry, account, SYNC_IMAP_HEADERS, |connection| {
+            HeaderSync {
+                connection,
+                exchange: endpoint,
+            }
+        });
+    let (_, frame) = tokio::time::timeout(HOST_REQUEST_TIMEOUT + Duration::from_secs(5), async {
+        tokio::try_join!(invoke, exchange)
+    })
+    .await
+    .map_err(|_| "Mail module sync timed out".to_owned())??;
+    let outcome: Result<FolderStepOutcome, String> = tokio::task::spawn_blocking(move || {
+        serde_json::from_slice(&frame).map_err(|_| "Invalid Mail sync result".to_owned())
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    let outcome = outcome?;
+    if outcome.folder.account_id != step.account_id || outcome.folder.name != step.folder {
+        return Err("Mail module returned another folder's result".into());
+    }
+    Ok(outcome)
 }
 
 pub(super) async fn test_smtp(

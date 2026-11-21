@@ -31,6 +31,13 @@ steps:
 - mail_server_assert_list_matches: {timeout_sec: 40}
 - wait_for: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
 - assert_signed_mail_host: folder-tree
+- click: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="Archive"][data-active="true"]'
+- mail_server_deliver: {count: 3, prefix: Signed header}
+- click: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="INBOX"][data-active="true"]'
+- wait_for: {selector: '[data-testid="mail-message-row"][data-subject="Signed header 0003"]', timeout_sec: 40}
+- mail_server_assert_list_matches: {timeout_sec: 40}
 - click: '[data-testid="mail-subscriptions-open"]'
 - wait_for: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="true"]'
 - click: '[data-testid="mail-subscription-row"][data-folder-name="Archive"] [data-testid="mail-subscription-toggle"]'
@@ -83,47 +90,56 @@ verification:
   requirements:
   - id: R1
     requirement: Opening the Mail tab starts the signed host, lists the actual IMAP folders and changes the server subscription.
-    actions: [6, 7, 8, 10, 15, 16, 21, 23, 26, 28]
+    actions: [6, 7, 8, 10, 15, 16, 28, 30, 33, 35]
     checkpoints:
     - {step: 9, expectation: The module installer accepts the verified artifact.}
     - {step: 12, expectation: The signed module is installed and the host has no writer lease yet.}
     - {step: 17, expectation: Opening the account mounts the module's verified frontend.}
     - {step: 19, expectation: Opening the account shows Archive from the actual IMAP server.}
     - {step: 20, expectation: The signed Mail host holds its data lease before the connection test.}
-    - {step: 22, expectation: The subscription dialog shows the initial subscribed state.}
-    - {step: 24, expectation: The updated IMAP folder tree reports Archive as unsubscribed.}
-    - {step: 27, expectation: Full synchronization finishes with the signed host supplying the folder tree.}
-    - {step: 29, expectation: The refreshed server tree preserves the changed subscription.}
-    results: [9, 12, 17, 19, 20, 22, 24, 27, 29]
+    - {step: 29, expectation: The subscription dialog shows the initial subscribed state.}
+    - {step: 31, expectation: The updated IMAP folder tree reports Archive as unsubscribed.}
+    - {step: 34, expectation: Full synchronization finishes with the signed host supplying the folder tree.}
+    - {step: 36, expectation: The refreshed server tree preserves the changed subscription.}
+    results: [9, 12, 17, 19, 20, 29, 31, 34, 36]
   - id: R2
     requirement: The normal connection controls test IMAP, POP3 and SMTP using the installed Mail host.
-    actions: [30, 31, 44, 45, 48]
+    actions: [37, 38, 51, 52, 55]
     checkpoints:
-    - {step: 32, expectation: The hosted app reports working IMAP and SMTP connections.}
-    - {step: 33, expectation: The signed Mail host still holds its data lease.}
-    - {step: 49, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
-    results: [32, 33, 49]
+    - {step: 39, expectation: The hosted app reports working IMAP and SMTP connections.}
+    - {step: 40, expectation: The signed Mail host still holds its data lease.}
+    - {step: 56, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
+    results: [39, 40, 56]
   - id: R3
     requirement: The signature-verified package delivers from both account types and preserves the Sent-copy behavior.
-    actions: [34, 35, 36, 37, 38, 39, 50, 51, 52, 53, 54, 55]
+    actions: [41, 42, 43, 44, 45, 46, 57, 58, 59, 60, 61, 62]
     checkpoints:
-    - {step: 41, expectation: The SMTP server received the message sent from the IMAP account.}
-    - {step: 42, expectation: The IMAP Sent copy was stored.}
-    - {step: 43, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
-    - {step: 57, expectation: The SMTP server received the message sent from the POP3 account.}
-    - {step: 58, expectation: The POP3 copy was stored in local Sent.}
-    - {step: 59, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
-    results: [41, 42, 43, 57, 58, 59]
+    - {step: 48, expectation: The SMTP server received the message sent from the IMAP account.}
+    - {step: 49, expectation: The IMAP Sent copy was stored.}
+    - {step: 50, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
+    - {step: 64, expectation: The SMTP server received the message sent from the POP3 account.}
+    - {step: 65, expectation: The POP3 copy was stored in local Sent.}
+    - {step: 66, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
+    results: [48, 49, 50, 64, 65, 66]
   - id: R4
     requirement: Disabling the module releases its data lease without restarting the desktop.
-    actions: [60, 61, 62]
+    actions: [67, 68, 69]
     checkpoints:
-    - {step: 63, expectation: The disabled package can be re-enabled.}
-    - {step: 64, expectation: The verified module is still installed and the host released its writer lease.}
-    - {step: 65, expectation: Disabling unmounts both Mail account panes.}
-    - {step: 66, expectation: Both tabs remain open for reactivation.}
-    - {step: 67, expectation: The remaining application runs without uncaught errors.}
-    results: [63, 64, 65, 66, 67]
+    - {step: 70, expectation: The disabled package can be re-enabled.}
+    - {step: 71, expectation: The verified module is still installed and the host released its writer lease.}
+    - {step: 72, expectation: Disabling unmounts both Mail account panes.}
+    - {step: 73, expectation: Both tabs remain open for reactivation.}
+    - {step: 74, expectation: The remaining application runs without uncaught errors.}
+    results: [70, 71, 72, 73, 74]
+  - id: R5
+    requirement: The signed Mail host catches up the selected inbox after messages arrive while another folder is open.
+    actions: [21, 23, 24]
+    checkpoints:
+    - {step: 22, expectation: Archive becomes the selected folder.}
+    - {step: 25, expectation: Inbox becomes the selected folder again.}
+    - {step: 26, expectation: The newest header appears in the inbox.}
+    - {step: 27, expectation: The complete visible list matches the server.}
+    results: [22, 25, 26, 27]
   visual:
   - check: The Mail pane shows the connection results for both accounts.
     method: automated

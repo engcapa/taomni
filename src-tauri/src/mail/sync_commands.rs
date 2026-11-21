@@ -157,27 +157,46 @@ pub async fn mail_sync_folder(
         FolderSyncState::default()
     };
 
-    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    let step_folder = folder.clone();
     let started_ms = sync::now_ms();
-    let result = tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            ImapSessionOpts::background(),
-            |imap| {
-                let params = StepParams {
-                    condstore: imap.has_capability("CONDSTORE"),
-                    ..params
-                };
-                imap.sync_folder_step(&account, &step_folder, &sync_state, &params)
-            },
-        )
-    })
-    .await
-    .map_err(|e| format!("mail sync task failed: {e}"))?;
+    let result = if !params.include_bodies && module_host::syncs_imap_headers(&state.plugins) {
+        let step = taomni_mail_engine::imap_sync::HeaderStepRequest {
+            account_id: account_id.clone(),
+            folder: folder.clone(),
+            state: sync_state,
+            mode: params.request,
+            limit: params.limit,
+        };
+        let first = module_host::sync_imap_headers(state.plugins.clone(), &account, &step).await;
+        if first
+            .as_ref()
+            .is_err_and(|error| is_imap_transport_error(error))
+        {
+            module_host::sync_imap_headers(state.plugins.clone(), &account, &step).await
+        } else {
+            first
+        }
+    } else {
+        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+        let handle = tokio::runtime::Handle::current();
+        let step_folder = folder.clone();
+        tokio::task::spawn_blocking(move || {
+            with_imap_session(
+                &pool,
+                &account,
+                &handle,
+                ImapSessionOpts::background(),
+                |imap| {
+                    let params = StepParams {
+                        condstore: imap.has_capability("CONDSTORE"),
+                        ..params
+                    };
+                    imap.sync_folder_step(&account, &step_folder, &sync_state, &params)
+                },
+            )
+        })
+        .await
+        .map_err(|e| format!("mail sync task failed: {e}"))?
+    };
 
     let mut outcome = match result {
         Ok(outcome) => outcome,
