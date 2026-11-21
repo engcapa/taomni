@@ -1,6 +1,6 @@
 use super::connection::Pop3Client;
 use super::local_raw;
-use super::synchronization::sync_inbox;
+use super::sync_inbox;
 use crate::mail::MailAccountConfig;
 use crate::mail::MailAuthMode;
 use crate::mail::ResolvedMailAccount;

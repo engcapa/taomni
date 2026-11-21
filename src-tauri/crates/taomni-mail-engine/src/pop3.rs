@@ -1,6 +1,9 @@
 //! POP3 command, authentication and synchronization planning.
 
 pub mod local_store;
+mod synchronization;
+
+pub use synchronization::{Pop3SyncOutcome, sync_inbox};
 
 use std::collections::HashMap;
 use std::io::{BufRead as _, BufReader, Read, Write};

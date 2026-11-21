@@ -9,7 +9,8 @@ description: 'TASK-21 (docs-feature/mail-thunderbird-parity-design.md AC-65).
   and requires the list to still match the server exactly (UIDL de-duplication,
 
   no repeated downloads). Opens a newly downloaded message and checks its
-  rendered text.
+  rendered text. Reopens the same account and checks the complete list and
+  a single row for the most recent message.
 
   Browser mode drives the stub server model (renderer orchestration only);
 
@@ -32,7 +33,7 @@ modes:
 fixtures:
 - reset_db
 - mail_server
-timeout_sec: 150
+timeout_sec: 210
 steps:
 - open: ${cfg.app.base_url}
 - seed_storage:
@@ -83,6 +84,14 @@ steps:
     timeout_sec: 30
 - assert_no_runtime_errors: null
 - screenshot: mail-pop3-01-local-inbox.png
+- right_click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- click: '[data-testid="context-menu-item-close"]'
+- wait_for: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', state: detached}
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_pop3_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
+- mail_server_assert_list_matches: {timeout_sec: 45}
+- assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Pop3-added 0003"]', equal: 1}
 - click: '[data-testid="mail-test-connection"]'
 - assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'POP3 ok, SMTP ok'}
 - assert_no_runtime_errors: null
@@ -132,12 +141,20 @@ verification:
     - 20
     - 21
   - id: R3
-    requirement: The Mail pane shows the POP3 and SMTP connection test status.
-    actions: [23]
+    requirement: Reopening the same account preserves the downloaded message and its deduplication state.
+    actions: [23, 24, 26, 27]
     checkpoints:
-    - {step: 24, expectation: The visible status reports both connections succeeded.}
-    - {step: 25, expectation: The connection test produces no uncaught renderer error.}
-    results: [24, 25]
+    - {step: 25, expectation: The original Mail tab has closed.}
+    - {step: 29, expectation: The reopened account contains the complete local copy of the server inbox.}
+    - {step: 30, expectation: The newest downloaded message appears once after reopen.}
+    results: [25, 29, 30]
+  - id: R4
+    requirement: The Mail pane shows the POP3 and SMTP connection test status.
+    actions: [31]
+    checkpoints:
+    - {step: 32, expectation: The visible status reports both connections succeeded.}
+    - {step: 33, expectation: The connection test produces no uncaught renderer error.}
+    results: [32, 33]
   visual:
   - check: 截图中本地文件夹（INBOX/Sent/Drafts/Trash/Junk）与 POP3 状态显示正确。
     method: manual

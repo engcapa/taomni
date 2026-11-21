@@ -2,6 +2,9 @@
 
 ## 2026-11-21 当前进展
 
+- `10536bce8` 的三端 Browser 各通过 23/23。Linux Native 29/29，Windows Native 29/29，包含 POP3 正文、Mail 签名连接和 TC-MODULES-009 的重启入口所有权。macOS 已采集 TC-MODULES-044 和 TC-MODULES-059 的通过分片，完整运行继续采集。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44892575348)
+- Mail 的 POP3 批量同步已移入共享邮件引擎。每封邮件的原件、列表记录和 UIDL 同事务提交，遇到写入错误可重试，重复 UIDL 保留原先的记录。六项 POP3 单测通过。TC-MAIL-POP3-01 新增关标签、重开和检查同一邮件只出现一次的步骤。核心过渡入口仍打开现有账户缓存。
+- Mail 0.1.4 的首轮真实宿主协议在握手时发现测试夹具遗漏新声明的 SMTP 方法。测试启动参数改读模块清单，继续对实际宿主执行原有认证检查和新增 DATA 场景。 [失败回执](https://github.com/engcapa/taomni/actions/runs/44895795316)
 - GitHub 的三端签名 RDP 各收到 40/40 帧。Linux p95 为 84.00 ms，Windows 为 46.90 ms，macOS 26 为 76.00 ms，均低于 130 ms。独立探针的首帧、动画帧率和带宽也通过既有用例。Linux 绑定 `d3803b336`，另外两端绑定 `cd8756948`。各平台在 `live-shards/` 的 TC-MODULES-056 子目录保存签名包 SHA-256、浏览器输入时间及逐帧配对；正式候选需要重新绑定同一 SHA。 [Linux](https://github.com/engcapa/taomni/actions/runs/44890131445) · [Windows 和 macOS](https://github.com/engcapa/taomni/actions/runs/44888211385)
 - Linux 旧备份恢复 TC-MODULES-058 通过。Linux 同轮两项 Mail 失败发生在修复前的 POP3 标签和正文断言。修复版各端 Browser 已通过 23/23，Native 继续按分片核验。macOS 此前的两项失败停在系统保存对话框与 HTML 原生指针探针，保留各自的截图和报错。 [Linux 原始分片](https://github.com/engcapa/taomni/actions/runs/44890131445) · [修复版分片](https://github.com/engcapa/taomni/actions/runs/44892575348) · [SMTP 0.1.3 与 Explorer](https://github.com/engcapa/taomni/actions/runs/44894455514)
 - Mail 0.1.4 的签名宿主负责普通邮件、发件箱、阅读回执和邀请回复的 SMTP 发送。核心解析已选附件，按请求授权本机 MIME 数据流和目标路由。发送与 Sent 副本分别返回结果。服务器可能已接收时，发件箱保留邮件并等待人工处理。TC-MODULES-059 增加两种账户的正常发送和 Sent 检查，TC-MAIL-SEND-01 增加正文断言。三端真实宿主协议验证覆盖 Bcc、MIME、服务器拒收和 DATA 回复丢失。

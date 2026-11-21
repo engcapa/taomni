@@ -101,30 +101,11 @@ pub(super) mod fake {
     }
 }
 
-use std::collections::{HashMap, HashSet};
-
-use std::io::{BufRead, BufReader, Read, Write};
-
-use std::net::TcpStream;
-
-use std::time::Duration;
-
-use base64::Engine as _;
-
-use base64::engine::general_purpose::STANDARD as BASE64;
-
-use rusqlite::{Connection, OptionalExtension, Result as SqlResult, params};
-
-use super::{
-    MailAccountConfig, MailFolder, MailMessageCached, list_cached_folders, now_ts,
-    parse_body_message, upsert_folder, upsert_message,
-};
+use super::MailAccountConfig;
 
 mod limits;
 
 mod connection;
-
-mod synchronization;
 
 #[cfg(test)]
 mod tests;
@@ -140,4 +121,4 @@ pub(super) fn is_pop3(config: &MailAccountConfig) -> bool {
 
 pub(super) use connection::Pop3Client;
 
-pub(super) use synchronization::sync_inbox;
+pub(super) use taomni_mail_engine::pop3::sync_inbox;
