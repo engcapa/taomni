@@ -101,6 +101,12 @@ export function WorkspaceGitCloneModal() {
     if ("url" in patch || "proxyMode" in patch || "token" in patch) {
       setProbeError(null);
     }
+    if ("url" in patch) {
+      // Invalidate an in-flight branch probe so a late response cannot replace
+      // the branch for a URL the user has already changed.
+      probeGeneration.current += 1;
+      setProbing(false);
+    }
   }, [defaults]);
 
   const runProbe = useCallback(async () => {

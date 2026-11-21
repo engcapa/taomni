@@ -85,7 +85,10 @@ pub(super) fn default_remote_branch(destination: &Path) -> Option<String> {
 
 pub(super) fn cleanup_failed_clone(destination: &Path, created: bool) -> Option<String> {
     if !created {
-        return None;
+        return Some(format!(
+            "Incomplete clone remains in the pre-existing directory: {}",
+            destination.display()
+        ));
     }
     match fs::remove_dir_all(destination) {
         Ok(()) => None,

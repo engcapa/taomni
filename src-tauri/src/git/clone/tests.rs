@@ -200,6 +200,31 @@ fn failed_clone_removes_only_a_directory_it_created() {
 }
 
 #[test]
+fn failed_clone_keeps_a_pre_existing_empty_destination_and_reports_it() {
+    let temp = TempDir::new().expect("temp");
+    let missing_source = temp.path().join("missing-source");
+    let destination = temp.path().join("pre-existing-empty");
+    fs::create_dir_all(&destination).expect("destination");
+    let (runtime, _) = runtime_with_events();
+
+    let error = run_clone(
+        request(&destination, &missing_source, None),
+        (None, None),
+        None,
+        runtime,
+    )
+    .expect_err("missing source must fail");
+    assert!(
+        destination.exists(),
+        "a pre-existing directory must be kept"
+    );
+    assert!(
+        error.contains("pre-existing directory"),
+        "failure must explain the retained directory: {error}"
+    );
+}
+
+#[test]
 fn refuses_to_overwrite_a_non_empty_destination() {
     let temp = TempDir::new().expect("temp");
     let source = create_source_repository(temp.path());
