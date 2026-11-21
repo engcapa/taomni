@@ -128,7 +128,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
           document = { ...document, large: (large || data.truncated) && !forceEdit, readOnly: !!readOnlyReason || data.truncated || (large && !forceEdit), readOnlyReason,
             nextOffset: data.nextOffset ?? (data.truncated ? VIEWER_TEXT_CHUNK_SIZE : stat.size) };
           let draft = !readOnlyReason && !document.large ? readViewerDrafts()[key] : undefined;
-          if (!readOnlyReason && !document.large && document.kind === "text") {
+          // The legacy draft is the freshest buffer across a renderer reload
+          // (flushDrafts rewrites it on every flush), so it wins over a periodic
+          // Notepad disk snapshot. Disk backups only fill the gap when there is
+          // no draft at all (crash after a large-file or migrated document).
+          if (!draft && !readOnlyReason && !document.large && document.kind === "text") {
             try {
               const backups = await notepadBackupList();
               const match = backups.find((b) => b.docId === key || (b.path && documentPathKey(b.path) === key));
@@ -290,6 +294,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
             return { ...next, dirty: isDirty(next) };
           });
           get().flushDrafts();
+          // A saved buffer makes its periodic crash snapshot obsolete.
+          void notepadBackupPrune(key).catch(() => {});
         } catch (error) {
           if (generations.get(key) === generation) {
             update(path, (document) => ({ ...document, saving: false, error: message(error) }));
