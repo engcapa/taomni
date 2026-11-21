@@ -20,8 +20,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-markdown-browse-resize-theme
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -167,7 +167,7 @@ steps:
 - wait_for: '[data-testid="app-theme-select"]'
 - click: '[data-testid="app-theme-select"]'
 - click: '[data-testid="app-theme-dark"]'
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - assert_attribute:
     selector: html
     name: data-app-theme
@@ -264,7 +264,7 @@ steps:
       flowchart LR
         Explorer --> OpenFile --> Viewer
       ```
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
 - wait_for: '[data-testid="markdown-editor"][data-editing="false"]'
 - click: '[data-testid="markdown-mode-split"]'

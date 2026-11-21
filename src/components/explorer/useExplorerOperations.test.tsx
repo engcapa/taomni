@@ -6,7 +6,7 @@ import { useSftpStore } from "../../stores/sftpStore";
 import { freshSession, emptyPane } from "../../stores/sftp/listing";
 import { readFilesResult } from "../../lib/clipboard";
 import { notifyClipboardWritten } from "../../lib/clipboardOwnership";
-import { explorerCancelOperation, explorerWriteClipboardFiles, explorerUpdateCutClipboard, explorerSameVolume, localCopyEntries, localMoveEntries, localTrashEntries, localTrashRestore, localRenameEntry } from "../../lib/explorer";
+import { explorerCancelOperation, explorerWriteClipboardFiles, explorerUpdateCutClipboard, explorerSameVolume, localCopyEntries, localMoveEntries, localTrashEntries, localTrashRestore, localRenameEntry, localCreateEntry } from "../../lib/explorer";
 import { sftpRemove, type FileEntry } from "../../lib/sftp";
 
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}) }));
@@ -136,6 +136,14 @@ describe("Explorer recoverable deletion and drop semantics", () => {
     expect(explorerCancelOperation).toHaveBeenCalled();
     expect(localMoveEntries).toHaveBeenCalledTimes(1);
     expect(result.current.toast?.message).toContain("Cancelled");
+  });
+  it("creates independent Markdown and HTML names with collision suffixes", async () => {
+    vi.mocked(localCreateEntry).mockResolvedValue("/target/New Markdown document.md");
+    const { result } = renderHook(() => useExplorerOperations("tab"));
+    await act(async () => { await result.current.create(false, "md"); });
+    expect(localCreateEntry).toHaveBeenCalledWith("/target", "New Markdown document.md", false);
+    await act(async () => { await result.current.create(false, "html"); });
+    expect(localCreateEntry).toHaveBeenCalledWith("/target", "New HTML document.html", false);
   });
   it("failed inline rename keeps editing and selection, successful rename selects the backend returned spelling", async () => {
     const { result } = renderHook(() => useExplorerOperations("tab"));

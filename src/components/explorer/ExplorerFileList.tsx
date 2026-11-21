@@ -22,7 +22,7 @@ interface Rubber { left: number; top: number; width: number; height: number }
 /** Explorer presentation; FilePanel still owns sorting, filtering and pane selection. */
 export function ExplorerFileList(inputs: FilePanelViewProps) {
   const { pane, sortedEntries: entries, interactions } = inputs;
-  const { operations, dropPath } = useExplorerContext();
+  const { operations, dropPath, searchActive, searchPaths } = useExplorerContext();
   const preferences = useExplorerPreferences();
   const label = useExplorerLabels();
   const clipboard = useExplorerClipboard();
@@ -149,7 +149,7 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
       onKeyDown={handleKeys} onPointerDown={rubberStart} onContextMenu={interactions.handleEmptyContext}>
       {!icons && <ExplorerFileColumns details={details} inputs={inputs} columns={columnSizing} label={label} />}
       {inputs.skippedEntryCount > 0 && <div className="ex-warning" role="status" title={inputs.diagnosticTitle}>{label(`${inputs.skippedEntryCount} 个项目无法读取`, `${inputs.skippedEntryCount} unreadable items`)}</div>}
-      {!entries.length && !pane.loading && !pane.error && <div className="ex-empty">{label(inputs.filterActive ? "没有匹配的项目" : "此文件夹为空", inputs.filterActive ? "No matching items" : "This folder is empty")}<br /><small>{label("右键可新建文件夹/文件，或把文件拖到这里", "Right-click to create a file or folder, or drag files here")}</small></div>}
+      {!entries.length && !pane.loading && !pane.error && <div className="ex-empty">{label(inputs.filterActive || searchActive ? "没有匹配的项目" : "此文件夹为空", inputs.filterActive || searchActive ? "No matching items" : "This folder is empty")}<br /><small>{label("右键可新建文件夹/文件，或把文件拖到这里", "Right-click to create a file or folder, or drag files here")}</small></div>}
       {pane.loading && !entries.length && <div className="ex-empty" role="status">{label("正在加载…", "Loading…")}</div>}
       <div style={{ height: virtual.getTotalSize() + (icons ? 16 : 0), position: "relative", minWidth: details ? columnSizing.minWidth : undefined }}>
         {rows.flatMap((row) => Array.from({ length: columns }, (_, col) => {
@@ -172,7 +172,7 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
             onClick={(event) => { if (renaming) return; interactions.handleRowClick(entry, event); setFocused(entry.path); if (!event.shiftKey) anchor.current = entry.path; scroll.current?.focus(); }}
             onDoubleClick={(event) => { if (!renaming) { if (event.ctrlKey || event.metaKey) { void operations.open(entry, true); } else inputs.onItemDoubleClick(entry); } }} onContextMenu={(event) => interactions.handleRowContext(entry, event)}>
             {icons ? <><ExplorerFileIcon entry={entry} /><div className="ex-tile-name">{renaming ? <ExplorerRenameInput entry={entry} /> : entry.name}</div></> : <>
-              <div className="ex-name"><ExplorerFileIcon entry={entry} /><span className="truncate flex-1">{renaming ? <ExplorerRenameInput entry={entry} /> : entry.name}</span></div>
+              <div className="ex-name"><ExplorerFileIcon entry={entry} /><span className="truncate flex-1">{renaming ? <ExplorerRenameInput entry={entry} /> : entry.name}</span>{searchActive && <span data-testid="explorer-search-result-path" className="ex-result-path" title={searchPaths[entry.path]}>{searchPaths[entry.path]}</span>}</div>
               <div className="ex-mod">{explorerColumnText(entry, "mtime", label)}</div>
               <div className="ex-type">{explorerColumnText(entry, "type", label)}</div>
               <div className="ex-size">{explorerColumnText(entry, "size", label)}</div>

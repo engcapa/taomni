@@ -92,7 +92,7 @@ export function openFile(target: OpenFileTarget | string, options: OpenFileOptio
     const key = documentPathKey(path);
     const readOnlyReason = input.readOnlyReason ?? (input.source && input.source !== "local" ? "只读副本 / Read-only copy" : undefined);
     const explorerHost = options.host === "explorer" || (!options.workspaceId && useAppStore.getState().activeSideTab === "explorer");
-    if (explorerHost && mode !== "workspace") {
+    if (explorerHost && (mode !== "workspace" || !options.mode)) {
       const explorer = useExplorerStore.getState();
       const existing = explorer.tabs.find((tab) => tab.type === "file-viewer" && tab.fileViewer && documentPathKey(tab.fileViewer.path) === key);
       if (existing) {

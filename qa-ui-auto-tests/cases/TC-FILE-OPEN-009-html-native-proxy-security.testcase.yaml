@@ -24,8 +24,8 @@ timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-html-native-network
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -72,7 +72,7 @@ steps:
 - eval_readonly:
     expression: document.querySelector('.html-address input').value.endsWith('/next.html')
     expect_truthy: true
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="ribbon-settings"]'
 - fill:
     selector: '[data-testid="settings-search-input"]'
@@ -87,7 +87,7 @@ steps:
 - fill:
     selector: '[data-testid="html-preview-custom-proxy-panel"] input[type="number"]'
     value: ${fixture.html_network_custom_port}
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="custom.html"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
 - click: '[data-testid="html-console-toggle"]'
@@ -99,7 +99,7 @@ steps:
     equals: custom
 - assert_html_network:
     state: custom
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="ribbon-settings"]'
 - fill:
     selector: '[data-testid="settings-search-input"]'
@@ -107,7 +107,7 @@ steps:
 - select_option:
     selector: '[data-testid="html-preview-proxy-mode"]'
     value: none
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="none.html"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
 - click: '[data-testid="html-console-toggle"]'
@@ -119,7 +119,7 @@ steps:
     equals: none
 - assert_html_network:
     state: none
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="ribbon-settings"]'
 - fill:
     selector: '[data-testid="settings-search-input"]'
@@ -130,7 +130,7 @@ steps:
 - fill:
     selector: '[data-testid="html-preview-custom-proxy-panel"] input[type="number"]'
     value: ${fixture.html_network_invalid_port}
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="invalid.html"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
 - click: '[data-testid="html-console-toggle"]'
@@ -138,7 +138,7 @@ steps:
 - wait_for: '[data-testid="html-network-proxy"]'
 - assert_html_network:
     state: invalid
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="ribbon-settings"]'
 - fill:
     selector: '[data-testid="settings-search-input"]'
@@ -146,7 +146,7 @@ steps:
 - select_option:
     selector: '[data-testid="html-preview-proxy-mode"]'
     value: none
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="security.html"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
 - click: '[data-testid="html-console-toggle"]'
@@ -170,8 +170,8 @@ steps:
 - assert_text:
     selector: '[data-testid="html-console"]'
     contains: HTML_QA SECURITY DONE
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - wait_for: '[data-testid="explorer-file-row"][data-name="slow.html"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="slow.html"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
@@ -182,7 +182,7 @@ steps:
     target: slow
 - assert_html_network:
     state: slow-started
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - assert_html_network:
     state: cancelled
 - assert_no_runtime_errors: null

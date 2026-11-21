@@ -4,6 +4,7 @@ mod inspection;
 mod model;
 mod operation;
 mod paths;
+mod search;
 mod transfer;
 mod trash;
 #[cfg(windows)]
@@ -13,6 +14,7 @@ pub use model::{
     EntryOperationResult, LocalProperties, PreviewBytes, PreviewText, TrashRef, TrashResult,
 };
 use operation::Operation;
+pub use search::{ExplorerSearchResults, SearchOptions};
 use std::path::Path;
 
 async fn blocking<T: Send + 'static>(
@@ -85,6 +87,33 @@ async fn start_transfer(
             moving,
             &mut operation,
         ))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn explorer_search_entries(
+    root: String,
+    query: String,
+    recursive: bool,
+    include_hidden: bool,
+    operation_id: Option<String>,
+    app_handle: tauri::AppHandle,
+) -> Result<ExplorerSearchResults, String> {
+    let mut operation =
+        Operation::register(operation_id, Some(app_handle)).map_err(|e| e.to_string())?;
+    blocking(move || {
+        search::search_entries(
+            Path::new(&root),
+            &query,
+            SearchOptions {
+                recursive,
+                include_hidden,
+                max_results: 1000,
+            },
+            &mut operation,
+        )
+        .map_err(|e| e.to_string())
     })
     .await
 }

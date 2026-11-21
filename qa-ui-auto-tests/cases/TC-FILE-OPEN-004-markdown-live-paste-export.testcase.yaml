@@ -28,8 +28,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-file-open-markdown
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -130,7 +130,7 @@ steps:
 - wait_for: '[data-testid="app-theme-select"]'
 - click: '[data-testid="app-theme-select"]'
 - click: '[data-testid="app-theme-dark"]'
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - assert_attribute:
     selector: html
     name: data-app-theme
@@ -158,7 +158,7 @@ steps:
     value: theme
 - click: '[data-testid="app-theme-select"]'
 - click: '[data-testid="app-theme-light"]'
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - assert_attribute:
     selector: html
     name: data-app-theme
@@ -384,10 +384,10 @@ steps:
 - assert_count:
     selector: '[data-testid="file-viewer"][data-dirty="true"]'
     equal: 0
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - assert_attribute:
-    selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
     name: data-active
     equals: 'true'
 - dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
@@ -791,7 +791,7 @@ verification:
       expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="markdown-preview"] .fv-md-task-state'',
         ''equals'': ''☐''}}'
     - step: 164
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="tab-item"][data-tab-type="file-browser"]'',
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'',
         ''name'': ''data-active'', ''equals'': ''true''}}'
     results:
     - 22

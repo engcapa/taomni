@@ -23,6 +23,7 @@ import { useAiStore } from "../../stores/aiStore";
 import { LanguageSwitcher } from "../window/LanguageSwitcher";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 import { openExplorer } from "../../lib/explorer/openExplorer";
+import { useExplorerStore } from "../../stores/explorerStore";
 
 const THEME_ORDER = ["light", "dark", "system"] as const;
 
@@ -58,6 +59,7 @@ export function PrimaryNavigationRail({
   const { mode: themeMode, setMode: setThemeMode } = useAppTheme();
   const themeLabel = useAppThemeI18nLabel();
   const activeSideTab = useAppStore((s) => s.activeSideTab);
+  const hasExplorerTabs = useExplorerStore((s) => s.tabs.length > 0);
   const setActiveSideTab = useAppStore((s) => s.setActiveSideTab);
   const setSidebarCollapsed = useAppStore((s) => s.setSidebarCollapsed);
   const toggleFloatingMfa = useAppStore((s) => s.toggleFloatingMfa);
@@ -83,7 +85,12 @@ export function PrimaryNavigationRail({
 
   const activateMode = (mode: PrimaryNavMode, clickCount = 0) => {
     if (mode === "explorer") {
-      void openExplorer().catch((error) => useAppStore.getState().setStatusMessage(String(error)));
+      if (hasExplorerTabs) {
+        setActiveSideTab("explorer");
+        setSidebarCollapsed(false);
+      } else {
+        void openExplorer().catch((error) => useAppStore.getState().setStatusMessage(String(error)));
+      }
       return;
     }
     if (mode === "home") {

@@ -44,7 +44,8 @@ export function ExplorerTabStrip() {
         data-testid="explorer-workspace-tab"
         data-tab-id={tab.id}
         data-tab-type={tab.type}
-        data-active={activeTabId === tab.id || undefined}
+        data-tab-title={tab.title}
+        data-active={activeTabId === tab.id}
         title={tab.fileBrowser?.initialPath ?? tab.fileViewer?.path ?? tab.title}
         className="taomni-workspace-tab group flex max-w-[190px] shrink-0 items-center gap-1 px-2 text-[12px]"
         onClick={() => activate(tab.id)}
@@ -61,7 +62,7 @@ export function ExplorerTabStrip() {
         {tab.type === "file-browser" ? <ExplorerTabIcon /> : <FileText className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-accent)]" />}
         <span className="truncate">{tab.title}</span>
         {tab.fileViewer && <ViewerDirtyIndicator path={tab.fileViewer.path} />}
-        <button type="button" data-testid="explorer-workspace-tab-close" aria-label={label("关闭标签", "Close tab")} className="ml-0.5 shrink-0 rounded px-0.5 opacity-50 hover:opacity-100" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }}><X className="h-3 w-3" /></button>
+        <button type="button" data-testid="tab-close" aria-label={label("关闭标签", "Close tab")} className="ml-0.5 shrink-0 rounded px-0.5 opacity-50 hover:opacity-100" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }}><X className="h-3 w-3" /></button>
       </div>)}
     </div>
     <button type="button" data-testid="explorer-tab-new-home" title={label("新建主目录标签", "New home tab")} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => {

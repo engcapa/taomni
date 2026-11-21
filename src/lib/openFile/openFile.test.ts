@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openFile } from "./index";
+import { openPlatformCodeWorkspace } from "../openPlatformCodeWorkspace";
 import { useAppStore } from "../../stores/appStore";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { useWorkspacePlatformStore, DEFAULT_WORKSPACE_ID } from "../../stores/workspacePlatformStore";
@@ -87,5 +88,21 @@ describe("global open file routing", () => {
     expect(useAppStore.getState()).toMatchObject({ activeSideTab: "explorer", tabs: [] });
     expect(await openFile({ path: "/docs/example.rs" }, { context: "explorer", mode: "source" })).toBe(source);
     expect(useExplorerStore.getState().tabs).toHaveLength(2);
+  });
+  it("does not reroute Explorer double-clicks through a saved workspace association", async () => {
+    useAppStore.setState({ activeSideTab: "explorer" });
+    setFileOpenPreferences({ associations: { rs: "workspace", md: "workspace", html: "workspace" } });
+    for (const path of ["/docs/example.rs", "/docs/readme.md", "/docs/page.html", "/docs/image.png"]) {
+      await openFile({ path }, { context: "explorer" });
+    }
+    expect(useExplorerStore.getState().tabs.map((tab) => tab.fileViewer?.kind)).toEqual(["source", "markdown", "html", "image"]);
+    expect(useExplorerStore.getState().tabs).toHaveLength(4);
+    expect(useAppStore.getState()).toMatchObject({ activeSideTab: "explorer", tabs: [] });
+  });
+  it("honors only an explicit Code Workspace choice from the Explorer open-with menu", async () => {
+    useAppStore.setState({ activeSideTab: "explorer" });
+    await openFile({ path: "/project/example.rs" }, { context: "explorer", mode: "workspace" });
+    expect(useExplorerStore.getState().tabs).toHaveLength(0);
+    expect(openPlatformCodeWorkspace).toHaveBeenCalled();
   });
 });
