@@ -2,8 +2,7 @@ use super::frames::FrameQueue;
 use crate::screenshot::capture::DisplayInfo;
 use crate::screenshot::capture::FrameSource;
 use anyhow::Context;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
+use std::sync::OnceLock;
 use std::sync::mpsc::SyncSender;
 use std::thread;
 use std::time::Duration;
@@ -31,7 +30,7 @@ pub(super) fn capture_loop(
     region: (u32, u32, u32, u32),
     format: RecordFormat,
     fps: u32,
-    stop: &AtomicBool,
+    stop: &OnceLock<Instant>,
     tx: SyncSender<TimedFrame>,
     ready: std::sync::mpsc::Sender<anyhow::Result<()>>,
 ) -> anyhow::Result<()> {
@@ -53,7 +52,7 @@ pub(super) fn capture_loop(
     let mut queue = FrameQueue::default();
     let mut failures = 0u32;
 
-    while !stop.load(Ordering::SeqCst) && Instant::now() < deadline {
+    while stop.get().is_none() && Instant::now() < deadline {
         let tick = Instant::now();
         let polled = if let Some(image) = initial.take() {
             Ok(Some(image))
@@ -62,6 +61,10 @@ pub(super) fn capture_loop(
         };
         match polled {
             Ok(Some(mut image)) => {
+                let captured = source.captured_at().unwrap_or_else(Instant::now);
+                if captured > stop.get().copied().unwrap_or(deadline).min(deadline) {
+                    break;
+                }
                 failures = 0;
                 if image.dimensions() != (out_w, out_h) {
                     image = image::imageops::resize(
@@ -74,11 +77,7 @@ pub(super) fn capture_loop(
                 let at_ms = if queue.previous.is_none() {
                     0
                 } else {
-                    source
-                        .captured_at()
-                        .unwrap_or_else(Instant::now)
-                        .saturating_duration_since(start)
-                        .as_millis() as u64
+                    captured.saturating_duration_since(start).as_millis() as u64
                 };
                 queue.update(image, at_ms);
             }
@@ -97,7 +96,21 @@ pub(super) fn capture_loop(
             thread::sleep(interval - elapsed);
         }
     }
-    // The end timestamp closes the last frame's duration.
-    let end_ms = start.elapsed().as_millis() as u64;
+    // A blocked screen read may finish after Stop. Only time through the
+    // actual stop request (or the recording limit) belongs to the clip.
+    let end_ms = clip_end_ms(start, deadline, stop.get().copied(), Instant::now());
     queue.finish(&tx, end_ms)
+}
+
+pub(super) fn clip_end_ms(
+    start: Instant,
+    deadline: Instant,
+    stopped: Option<Instant>,
+    completed: Instant,
+) -> u64 {
+    stopped
+        .unwrap_or(completed)
+        .min(deadline)
+        .saturating_duration_since(start)
+        .as_millis() as u64
 }

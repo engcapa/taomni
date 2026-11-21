@@ -15,7 +15,7 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc::sync_channel;
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use taomni_screenshot_api::{RecordFormat, RecordingInfo, TimedFrame};
 use tauri::AppHandle;
 use tauri::Emitter;
@@ -25,7 +25,7 @@ use tauri::Manager;
 pub const RECORDING_ENDED_EVENT: &str = "screenshot://recording-ended";
 
 pub(super) struct Session {
-    pub(super) stop: Arc<AtomicBool>,
+    pub(super) stop: Arc<OnceLock<Instant>>,
     pub(super) capture: Option<JoinHandle<anyhow::Result<()>>>,
     pub(super) encoder: Option<JoinHandle<anyhow::Result<RecordingInfo>>>,
     pub(super) output_path: PathBuf,
@@ -35,7 +35,7 @@ pub(super) struct Session {
 // Stop, renderer failure and preview closure can race. Share one finalization
 // result; only the registry owner may cancel/delete the artifact.
 pub(in crate::screenshot) struct Recording {
-    pub(super) stop: Arc<AtomicBool>,
+    pub(super) stop: Arc<OnceLock<Instant>>,
     pub(super) output_path: PathBuf,
     pub(super) finished: AtomicBool,
     pub(super) inner: Mutex<(Option<Session>, Option<Result<RecordingInfo, String>>)>,
@@ -54,7 +54,7 @@ impl From<Session> for Recording {
 
 impl Recording {
     pub(in crate::screenshot) fn finish(&self) -> anyhow::Result<RecordingInfo> {
-        self.stop.store(true, Ordering::SeqCst);
+        self.stop.get_or_init(Instant::now);
         let mut inner = self.inner.lock().unwrap();
         if let Some(session) = inner.0.take() {
             inner.1 = Some(finish_session(session).map_err(|error| format!("{error:#}")));
@@ -101,7 +101,7 @@ pub fn request_stop(id: &str) -> anyhow::Result<()> {
     let session = sessions
         .get(id)
         .ok_or_else(|| anyhow::anyhow!("unknown recording id"))?;
-    session.stop.store(true, Ordering::SeqCst);
+    session.stop.get_or_init(Instant::now);
     Ok(())
 }
 
@@ -121,7 +121,7 @@ pub fn recording_status(id: &str) -> (bool, bool) {
                                 .is_none_or(|thread| thread.is_finished())
                         })
                     }),
-                session.stop.load(Ordering::SeqCst),
+                session.stop.get().is_some(),
             )
         })
         .unwrap_or((true, false))
@@ -151,7 +151,7 @@ pub fn start_recording(
         .transpose()?;
     let id = format!("rec-{}", nano_id());
     let output_path = temp_artifact_path("rec", format.extension())?;
-    let stop = Arc::new(AtomicBool::new(false));
+    let stop = Arc::new(OnceLock::new());
     let (tx, rx) = sync_channel::<TimedFrame>(FRAME_QUEUE);
     let (ready_tx, ready_rx) = std::sync::mpsc::channel::<anyhow::Result<()>>();
 
@@ -185,7 +185,7 @@ pub fn start_recording(
                     serde_json::json!({
                         "recordingId": id,
                         "error": result.as_ref().err().map(|e| format!("{e:#}")),
-                        "stoppedByUser": stop.load(Ordering::SeqCst),
+                        "stoppedByUser": stop.get().is_some(),
                     }),
                 );
                 result
@@ -204,14 +204,14 @@ pub fn start_recording(
     match ready_rx.recv_timeout(Duration::from_secs(15)) {
         Ok(Ok(())) => {}
         Ok(Err(e)) => {
-            stop.store(true, Ordering::SeqCst);
+            stop.get_or_init(Instant::now);
             let _ = capture.join();
             let _ = encoder.join();
             std::fs::remove_file(&output_path).ok();
             return Err(e);
         }
         Err(_) => {
-            stop.store(true, Ordering::SeqCst);
+            stop.get_or_init(Instant::now);
             // A platform capture API may still be blocked. Reap it without
             // blocking the UI and keep the lease until both threads exit.
             thread::spawn(move || {
@@ -264,13 +264,13 @@ pub fn stop_recording(recording_id: &str) -> anyhow::Result<RecordingInfo> {
 /// temp files. Taking ownership also excludes cancel_all during app exit.
 pub(in crate::screenshot) fn take_for_recovery(recording_id: &str) -> Option<Arc<Recording>> {
     let recording = sessions().lock().unwrap().remove(recording_id)?;
-    recording.stop.store(true, Ordering::SeqCst);
+    recording.stop.get_or_init(Instant::now);
     super::super::capture::untrack_artifact(&recording.output_path);
     Some(recording)
 }
 
 pub(super) fn finish_session(mut session: Session) -> anyhow::Result<RecordingInfo> {
-    session.stop.store(true, Ordering::SeqCst);
+    session.stop.get_or_init(Instant::now);
     let capture_result = session.capture.take().map(|h| {
         h.join()
             .unwrap_or_else(|_| Err(anyhow::anyhow!("capture thread panicked")))
