@@ -55,6 +55,7 @@ jobs:
       macos_runner: ${{ steps.macos_runner.outputs.runner }}
       build_matrix: ${{ steps.macos_runner.outputs.build_matrix }}
       sign_matrix: ${{ steps.macos_runner.outputs.sign_matrix }}
+      frontend_artifact: ${{ steps.macos_runner.outputs.frontend_artifact }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -87,6 +88,7 @@ jobs:
         env:
           PACKAGE_MACOS_RUNNER: ${{ inputs.macos_runner || 'macos-latest' }}
           PACKAGE_NATIVE_BUILDS: ${{ inputs.native_builds }}
+          PACKAGE_ARTIFACT_KEY: ${{ inputs.artifact_key || github.run_id }}
         run: |
           python - <<'PY'
           import json, os
@@ -128,6 +130,9 @@ jobs:
               output.write('sign_matrix=' + json.dumps({'include': [
                   {'platform': target['platform'], 'legacy_roster': target['legacy_roster']} for target in targets
               ]}, separators=(',', ':')) + '\n')
+              if os.environ['QA_MODULE'] == 'vnc-client':
+                  suffix = '-'.join(target['platform'] for target in targets)
+                  output.write(f"frontend_artifact=qa-vnc-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
           PY
 
   vnc-frontend:
@@ -136,7 +141,7 @@ jobs:
     uses: ./.github/workflows/build-vnc-frontend.yml
     with:
       source: ${{ needs.source.outputs.sha }}
-      artifact: qa-vnc-frontend-${{ inputs.artifact_key || github.run_id }}
+      artifact: ${{ needs.source.outputs.frontend_artifact }}
 
   build:
     name: Build unsigned ${{ inputs.module || 'hello-plugin' }} (${{ matrix.platform }})
@@ -336,7 +341,7 @@ jobs:
       - uses: actions/download-artifact@v4
         if: env.QA_MODULE == 'vnc-client'
         with:
-          name: qa-vnc-frontend-${{ inputs.artifact_key || github.run_id }}
+          name: ${{ needs.source.outputs.frontend_artifact }}
           path: trusted-vnc-frontend
       - name: Stage the verified VNC frontend bytes
         if: env.QA_MODULE == 'vnc-client'

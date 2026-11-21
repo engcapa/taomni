@@ -20,7 +20,8 @@ class OfficialPackageRunnerTests(unittest.TestCase):
 
     def admit(self, label, output, native_builds="", module="hello-plugin"):
         with patch.dict(os.environ, {"PACKAGE_MACOS_RUNNER": label, "GITHUB_OUTPUT": str(output),
-                                    "PACKAGE_NATIVE_BUILDS": native_builds, "QA_MODULE": module}):
+                                    "PACKAGE_NATIVE_BUILDS": native_builds, "QA_MODULE": module,
+                                    "PACKAGE_ARTIFACT_KEY": "test-vnc"}):
             exec(compile(self.guard, "trusted-package-runner-admission", "exec"), {})
         return dict(line.split("=", 1) for line in output.read_text().splitlines())
 
@@ -114,6 +115,15 @@ class OfficialPackageRunnerTests(unittest.TestCase):
             values = self.admit("macos-26", Path(directory) / "output", json.dumps(builds), "mfa")
         self.assertEqual(json.loads(values["build_matrix"])["include"][0]["target"], "aarch64-apple-darwin")
         self.assertEqual(self.roster_targets(values, "sign_matrix"), {"darwin-aarch64": False})
+
+    def test_parallel_vnc_builds_use_distinct_frontend_artifacts(self):
+        for platform, arch, target in [("linux", "X64", "linux-x86_64"),
+                                       ("windows", "X64", "windows-x86_64"),
+                                       ("macos", "ARM64", "darwin-aarch64")]:
+            builds = {"include": [{"platform_key": platform, "arch": arch, "capabilities": ["signed-vnc"]}]}
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as directory:
+                values = self.admit("macos-26", Path(directory) / "output", json.dumps(builds), "vnc-client")
+            self.assertEqual(values["frontend_artifact"], f"qa-vnc-frontend-test-vnc-{target}")
 
 
 if __name__ == "__main__":
