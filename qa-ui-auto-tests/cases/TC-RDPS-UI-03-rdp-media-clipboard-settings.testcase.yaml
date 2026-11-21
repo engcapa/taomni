@@ -105,6 +105,19 @@ steps:
     selector: '[data-testid="rdp-field-clipboard-file-max-mb"]'
     name: value
     equals: '512'
+- set_check: {selector: '[data-testid="rdp-field-view-only"]', checked: true}
+- fill: {selector: '[data-testid="rdp-field-password"]', value: 'qa-disposable-rdp-password'}
+- click: '[data-testid="servers-dialog-apply"]'
+- assert_localstorage:
+    key: taomni.stub.serverConfigs.v1
+    contains: '"passwordRef":"vault:stub-rdp-server-password"'
+- reload: null
+- wait_for: '[data-testid="servers-dialog"]'
+- click: '[data-testid="server-row-rdp"]'
+- wait_for: '[data-testid="rdp-field-password"][placeholder]'
+- assert_attribute: {selector: '[data-testid="rdp-field-password"]', name: value, equals: ''}
+- assert_visible: '[data-testid="rdp-field-view-only"]:checked'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -181,6 +194,16 @@ verification:
     - 30
     - 31
     - 33
+  - id: R4
+    requirement: Saving and reopening the form retains view-only mode and only a credential reference in the Browser stub.
+    actions: [34, 35, 36, 38, 40]
+    checkpoints:
+    - {step: 37, expectation: The stub stored a credential reference.}
+    - {step: 41, expectation: The reopened password input shows the saved-password hint.}
+    - {step: 42, expectation: The reopened input does not expose the submitted password.}
+    - {step: 43, expectation: The reopened form preserves view-only mode.}
+    - {step: 44, expectation: Saving and reopening complete without renderer errors.}
+    results: [37, 41, 42, 43, 44]
   native:
   - check: The saved configuration reaching the real server is covered by TC-RDPS-NAT-09 (levels) and TC-RDPS-NAT-04/05 (sound, microphone).
     method: automated

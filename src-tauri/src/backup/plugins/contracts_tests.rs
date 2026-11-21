@@ -90,6 +90,28 @@ fn data_metadata_cannot_omit_vault_or_mix_generations_or_sidecars() {
 }
 
 #[test]
+fn rdp_backup_with_settings_requires_vault_and_tls_only_archives_still_open() {
+    let identity = [
+        ("cert.pem", PluginDataFileKind::File),
+        ("key.pem", PluginDataFileKind::File),
+    ];
+    assert!(validate_manifest(&manifest(dataset("rdp-server", &identity))).is_ok());
+
+    let mut files = identity.to_vec();
+    files.push(("config.json", PluginDataFileKind::File));
+    let mut settings = manifest(dataset("rdp-server", &files));
+    assert!(validate_manifest(&settings).is_ok());
+    settings
+        .files
+        .retain(|file| file.path != "databases/vault.db");
+    assert!(
+        validate_manifest(&settings)
+            .unwrap_err()
+            .contains("requires vault.db")
+    );
+}
+
+#[test]
 fn payloads_and_datasets_must_match_and_legacy_cannot_hide_plugin_data() {
     let mut value = manifest(dataset("hello", &[("blob", PluginDataFileKind::File)]));
     value.files.clear();

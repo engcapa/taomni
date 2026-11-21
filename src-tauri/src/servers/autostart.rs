@@ -45,6 +45,10 @@ pub async fn autostart_servers(app: AppHandle) {
         configs.remove("vnc");
         tracing::warn!("autostart VNC Server: {error}");
     }
+    if let Err(error) = super::rdp_config::project(&app.state::<AppState>(), &mut configs) {
+        configs.remove(ServerType::Rdp.as_str());
+        tracing::warn!("autostart RDP Server: {error}");
+    }
 
     for (type_str, value) in configs {
         // Only autostart entries explicitly flagged for it.

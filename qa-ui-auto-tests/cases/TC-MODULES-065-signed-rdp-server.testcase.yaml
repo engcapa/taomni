@@ -1,12 +1,12 @@
 id: TC-MODULES-065
-title: Signed RDP Server authenticates a loopback client and releases its listener on disable
-description: Install from the ordinary offline form. Start through Local servers using a Vault-backed test password. Verify decoded graphics through the real loopback client and release of the listener and writer lease when the module is disabled.
-covers: [F-Modules-1, F-Servers-1, F-RdpServer-1]
+title: Signed RDP Server migrates and backs up its settings and closes its listener on disable
+description: Install through the offline form. Start from the migrated listener settings and use the legacy password through Vault. Check real graphics, the running module snapshot and shutdown.
+covers: [F-Modules-1, F-Servers-1, F-RdpServer-1, F-BACKUP-1]
 tags: [modules, rdp, rdp-server, native-boundary, p1]
 modes: [native]
 native_platforms: [Linux, Windows]
 fixtures: [reset_db, rdp_server_required, system_rdp_running, module_signed_rdp_server_archive]
-timeout_sec: 270
+timeout_sec: 360
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
@@ -18,17 +18,20 @@ steps:
 - wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
 - click: '[data-testid="module-action-enable-rdp-server"]'
 - wait_for: '[data-testid="module-action-disable-rdp-server"]'
+- assert_signed_rdp_server: idle
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="global-search-trigger"]'
 - fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
 - click: '[data-testid="global-search-result"][data-result-id="servers"]'
 - click: '[data-testid="server-row-rdp"]'
 - wait_for: '[data-testid="rdp-field-username"]'
-- fill: {selector: '[data-testid="server-field-port"]', value: '${env.QA_RDP_PORT}'}
-- fill: {selector: '[data-testid="server-field-bind-address"]', value: '127.0.0.1'}
-- set_check: {selector: '[data-testid="rdp-field-view-only"]', checked: true}
-- fill: {selector: '[data-testid="rdp-field-username"]', value: '${env.QA_RDP_USER}'}
-- fill: {selector: '[data-testid="rdp-field-password"]', value: '${env.QA_RDP_PASSWORD}'}
+- assert_attribute: {selector: '[data-testid="server-field-port"]', name: value, equals: '${env.QA_RDP_PORT}'}
+- assert_attribute: {selector: '[data-testid="server-field-bind-address"]', name: value, equals: '127.0.0.1'}
+- assert_visible: '[data-testid="rdp-field-view-only"]:checked'
+- assert_attribute: {selector: '[data-testid="rdp-field-username"]', name: value, equals: '${env.QA_RDP_USER}'}
+- assert_attribute: {selector: '[data-testid="rdp-field-password"]', name: value, equals: ''}
+- wait_for: {selector: '[data-testid="rdp-field-clipboard-to-client"] option[value="text"]:checked', state: attached}
+- wait_for: '[data-testid="rdp-field-microphone"]:not(:checked)'
 - click: '[data-testid="server-row-rdp-start"]'
 - platform_choice:
     platforms: [Windows]
@@ -49,6 +52,14 @@ steps:
       rfx.bulk.decompression_errors: 0
 - assert_signed_rdp_server: running
 - click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: backup}
+- wait_for: '[data-testid="backup-global-includePlugins"]'
+- assert_attribute: {selector: '[data-testid="backup-global-includePlugins"]', name: aria-checked, equals: 'true'}
+- set_check: {selector: '[data-testid="backup-local-select"]', checked: true}
+- click: '[data-testid="backup-selected-start"]'
+- wait_for: {selector: '[data-testid="backup-action-success"]', timeout_sec: 90}
+- assert_signed_rdp_server: backup
+- click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
 - click: '[data-testid="module-action-disable-rdp-server"]'
 - wait_for: '[data-testid="module-action-enable-rdp-server"]'
@@ -63,16 +74,20 @@ verification:
   review: reviewed
   requirements:
   - id: signed-rdp-server
-    requirement: The signed host serves a native RDP session and disabling the module releases its listener without restarting the core.
-    actions: [7, 9, 14, 22, 27, 33, 39]
+    requirement: The signed host serves a native RDP session using the migrated settings and stopping the module releases its listener without restarting the core.
+    actions: [7, 9, 15, 25, 30, 39, 44, 50]
     checkpoints:
     - {step: 8, expectation: The normal offline installer selected the trusted candidate.}
-    - {step: 29, expectation: The real loopback client authenticates and decodes actual desktop frames.}
-    - {step: 30, expectation: The installed bytes match the archive and the running host owns its writer lease and TLS files.}
-    - {step: 35, expectation: The listener and write lease have been released while the TLS files remain.}
-    - {step: 40, expectation: The original server row shows stopped.}
-    - {step: 41, expectation: The local server and module store complete the workflow without runtime errors.}
-    results: [8, 29, 30, 35, 40, 41]
+    - {step: 11, expectation: Module data holds the migrated settings and the original row remains available for rollback.}
+    - {step: 18, expectation: The form shows the migrated port.}
+    - {step: 22, expectation: The form hides the legacy password.}
+    - {step: 32, expectation: The real loopback client uses the legacy password and decodes actual desktop frames.}
+    - {step: 33, expectation: The signed host owns the writer lease and its settings now point to Vault.}
+    - {step: 41, expectation: The running module backs up its settings and TLS files with Vault.}
+    - {step: 46, expectation: The listener and write lease have been released while the data files remain.}
+    - {step: 51, expectation: The original server row shows stopped.}
+    - {step: 52, expectation: The local server and module store complete the workflow without runtime errors.}
+    results: [8, 11, 18, 22, 32, 33, 41, 46, 51, 52]
   visual:
   - check: The client decodes a real desktop image and Local servers reflects the lifecycle.
     method: automated

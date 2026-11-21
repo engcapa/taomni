@@ -2,7 +2,9 @@
 
 ## 2026-11-22 当前进展
 
-- RDP Server 已接入独立签名宿主。核心保留 Local servers、Vault 和本机控制审批，宿主负责接入、录屏、输入、剪贴板和音频。首次安装会在模块目录接管已有 TLS 证书和私钥，默认基座已从四目标 Cargo 树移除 RDP Server 引擎。隔离 QA 保留原服务端版本覆盖原用例，TC-MODULES-065 用签名包验证真实连接和停用。服务端配置行迁移和 macOS 权限归属仍待闭合。
+- `8cabdb13b` 的三端 Browser 各通过 25/25，六个分片已下载并核对回执。四目标核心清单排除了 RDP Server 引擎和宿主。Linux 签名构建在链接时缺少 `libxkbcommon-dev`，QA 和发布工作流已补齐该依赖。原始构建日志和已下载工件仍保留。 [Browser 与构建](https://github.com/engcapa/taomni/actions/runs/44947624092) · [四目标清单](https://github.com/engcapa/taomni/actions/runs/44947656893) · [链接失败日志](https://github.com/engcapa/taomni/actions/runs/44947624092/job/136979405688)
+- RDP Server 0.1.1 将旧库的 RDP 行导入模块目录。旧明文口令在用户解锁 Vault 并保存时转成模块专用凭据引用。模块运行中的备份包含设置、TLS 文件和 Vault，归档的核心库在凭据迁移后移除 RDP 回滚行。TC-MODULES-065 增加真实连接与备份断言，TC-RDPS-UI-03 增加重开设置后的凭据隐藏检查。新版回执待收齐。
+- RDP Server 0.1.0 接入独立签名宿主。核心保留 Local servers、Vault 和本机控制审批，宿主负责接入、录屏、输入、剪贴板和音频。首次安装会在模块目录接管已有 TLS 证书和私钥。隔离 QA 保留原服务端版本覆盖已有用例，TC-MODULES-065 用签名包验证真实连接和停用。macOS 权限归属仍待闭合。
 - RDP Server 的认证、会话、输入、剪贴板、音频和显示引擎迁到 `taomni-rdp-server-engine`。核心仍持有窗口审批、系统 Remote Desktop 检测和原 TLS 路径，通过同一日志与事件契约调用独立库。Linux 核心编译及 NLA 策略单测通过，G5 真实桌面测量入口已指向拆分后的引擎用例。
 - VNC Server 0.1.1 三端 Browser 各通过 23/23，覆盖配置、单实例和完整崩溃回归。原生签名任务已完成构建和工件校验，打包步骤的条件遗漏了 VNC Server。已让通过清单校验的业务模块统一进入签名，保留原失败日志供复验。 [新版回执](https://github.com/engcapa/taomni/actions/runs/44943027023) · [原签名日志](https://github.com/engcapa/taomni/actions/runs/44940689515/job/136959079197)
 - 截图修复版在 Linux Native 通过 32/32。macOS GIF 的像素和时间轴比对通过，成片为 4330 ms，超过用例原有的 4200 ms 上限。录制改为以实际停止请求的时间收尾，慢取帧返回后的时间不计入成片。 [原始回执](https://github.com/engcapa/taomni/actions/runs/44938925840)
@@ -577,7 +579,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-014 MFA | 签名安装门通过；已提交 profile 的业务接管待复验 | 独立 store actor、作用域 KeyProvider、snapshot、可信包安装已有三端结果。`76c3f94e9` 接入已提交 profile 的宿主命令和旧归档恢复。新装 profile 的模块入口、实际旧安装的升级触发、capture RPC、动态 UI、相关 G 门与迁出后三态还原待闭合。 |
 | TASK-015 | 已取消 | 历史设计 `7bc498b35` 中为 LanChat 迁移，已由用户明确删除决定取消；主设计已保留编号并清理前置依赖。旧库保持原位，不读取、迁移或删除，不创建替代插件。 |
 | TASK-016 RDP/VNC 客户端 | 独立宿主、签名前端与核心依赖裁剪已接入 | VNC 的 Windows 按键辅助进程已有回执。RDP 签名包验证原会话、实际输入、证书迁移与读取旧备份，三端阶段性 p95 均低于 130 ms。最终安装包、新旧版本连续升级和同一候选的三端生命周期继续验收。 |
-| TASK-017 RDP/VNC 服务端 | 实施中 | VNC Server 迁出 daemon 监督，开始 Native 验证。服务端配置与备份迁移、RDP Server 宿主、系统权限和其余平台验证仍待完成。 |
+| TASK-017 RDP/VNC 服务端 | 已接入签名宿主与配置迁移，原生验收进行中 | 完成签名包的真实连接、停用和备份验收，并补 macOS 系统权限、Windows 和 macOS 的 VNC 系统服务以及正式安装件升级结果。 |
 | TASK-018 Servers | 待前置闭合 | 配置迁移、服务生命周期、目录与原有功能等价。 |
 | TASK-019 SocksCap | 待前置闭合 | 提权/驱动/辅助进程、文件与恢复日志、卸载清理迁出。 |
 | TASK-020 截图 OCR/录制 | 待前置闭合 | OCR/录制插件；截图入口、滚动截图与采集保持核心归属。 |

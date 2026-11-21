@@ -6193,6 +6193,8 @@ files:
   - src/components/servers/fields.tsx
   - src/components/servers/RdpServerApprovalBridge.tsx
   - src-tauri/src/servers/rdp.rs
+  - src-tauri/src/servers/rdp_config.rs
+  - src-tauri/src/plugin/migration_rdp_server.rs
   - src-tauri/crates/taomni-rdp-server-engine/src/
   - src-tauri/crates/taomni-server-process/src/system_rdp.rs
   - src-tauri/plugins/rdp-server/module.json
@@ -6316,6 +6318,7 @@ controls:
 - `TC-RDPJ-02-joint-clipboard-no-echo` 保留联合客户端/服务端 Unicode 文本与无回环校验；`TC-RDPJ-03-deferred-clipboard-publication` 在 macOS 真实 AppKit 中分离类型声明与数据发布（间隔至少 1.2 秒、同一 changeCount），校验迟到文本不会丢失，公告不超过两次、六秒无回环并正常停止。空快照每秒复核一次；非空稳定快照保持廉价变更标记检查。
 - CI：`rdp_server_required` → capability `rdp`；`system_rdp_running`（Windows 系统远程桌面运行中）→ `rdp`；`release_build_required`（性能用例）→ `release`（该条目改用 release QA 构建）；音频/TermService 基线/xrdp 参考服务器分别为 `audio`/`rdp-baseline`/`xrdp`
 - Windows：NAT-01/PERF-01 三端运行，Windows 上经 `platform_choice` 在系统远程桌面提示中选 Taomni；系统远程桌面分支由 TC-RDPS-NAT-06 覆盖，TermService 基线由 TC-RDPS-PERF-02 测量
+- TC-MODULES-065 安装签名模块后读取旧 RDP 设置和 Vault 凭据，验证原生图像、备份的设置与 TLS 文件，以及停用后的监听和写租约回收。TC-RDPS-UI-03 覆盖 Browser 保存凭据引用及重开后的密码输入框。
 - 声音（RDPSND 播放）：服务器回采本机默认输出（Windows WASAPI loopback、Linux PipeWire sink monitor），按客户端格式重采样为 PCM 下发；macOS 13+ 用 ScreenCaptureKit 系统音频（排除 Taomni 自身声音）；TC-RDPS-NAT-04 在宿主播放单音、由探针经 RDPSND 接收并判定频率。CI `audio`：Linux 为 PipeWire null sink，Windows 为 VB-CABLE，macOS 为 BlackHole 虚拟设备
 
 ---

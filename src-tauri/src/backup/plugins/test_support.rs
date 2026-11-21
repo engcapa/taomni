@@ -10,20 +10,21 @@ use std::{fs, path::Path};
 use taomni_plugin_api::services::{ProfileGeneration, SnapshotJobId};
 
 pub(super) fn dataset(slug: &str, files: &[(&str, PluginDataFileKind)]) -> PluginDataSet {
+    let files: Vec<_> = files
+        .iter()
+        .map(|(path, kind)| PluginDataFile {
+            path: (*path).into(),
+            kind: *kind,
+        })
+        .collect();
     PluginDataSet {
         slug: slug.into(),
         data_schema_version: 7,
-        requires_vault: super::contracts::owner_requires_vault(slug),
+        requires_vault: super::contracts::dataset_requires_vault(slug, &files),
         job: SnapshotJobId::parse("018f6811-b7b1-7000-8000-000000000001").unwrap(),
         profile_generation: ProfileGeneration::parse("018f6811-b7b1-7000-8000-000000000002")
             .unwrap(),
-        files: files
-            .iter()
-            .map(|(path, kind)| PluginDataFile {
-                path: (*path).into(),
-                kind: *kind,
-            })
-            .collect(),
+        files,
     }
 }
 

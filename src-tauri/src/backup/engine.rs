@@ -237,20 +237,8 @@ fn create_backup_locked(
         flags,
         context,
     )?;
-    let contains_migrated_vnc = protected
-        .files
-        .iter()
-        .find(|file| file.archive_path == taomni_server_process::vnc::CONFIG_PATH)
-        .map(|file| {
-            std::fs::File::open(&file.disk_path)
-                .map_err(|error| error.to_string())
-                .and_then(|data| {
-                    serde_json::from_reader::<_, taomni_server_process::vnc::StoredSettings>(data)
-                        .map_err(|error| error.to_string())
-                })
-        })
-        .transpose()?
-        .is_some_and(|record| !record.settings.credential_migration_required);
+    let module_owned_rows =
+        super::server_configs::module_owned_rows(&protected.files, flags.sessions)?;
     staged_files.extend(protected.files);
 
     let mail_paths = if flags.mail {
@@ -268,14 +256,7 @@ fn create_backup_locked(
         drop(conn);
         let snapshot = rusqlite::Connection::open(&snap_dest).map_err(|e| e.to_string())?;
         portable_mail_paths(&snapshot)?;
-        if contains_migrated_vnc {
-            snapshot
-                .pragma_update(None, "secure_delete", true)
-                .map_err(|error| error.to_string())?;
-            snapshot
-                .execute("DELETE FROM server_configs WHERE server_type = 'vnc'", [])
-                .map_err(|error| error.to_string())?;
-        }
+        super::server_configs::omit_rollback_rows(&snapshot, module_owned_rows)?;
         let profile = state
             .plugins
             .data_profile()

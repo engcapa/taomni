@@ -92,6 +92,10 @@ impl PluginHandler for Host {
             .lock()
             .map_err(|_| failed("RDP Server session is unavailable"))?;
         match method {
+            rdp::SAVE_SETTINGS => {
+                self.storage.save_settings(decode(params)?, operation)?;
+                Ok(Value::Null)
+            }
             rdp::START => {
                 if active
                     .as_ref()

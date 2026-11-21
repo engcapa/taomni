@@ -22,6 +22,9 @@ pub async fn save_server_config(
         return Ok(saved);
     }
     if st == ServerType::Rdp {
+        if let Some(saved) = super::rdp_config::save_if_managed(&state, &config).await? {
+            return Ok(saved);
+        }
         let legacy_password = {
             let db = state.core.db.lock().map_err(|e| e.to_string())?;
             db::load_server_config(&db, st.as_str())
@@ -53,9 +56,21 @@ pub async fn load_server_configs(
         tracing::warn!("load VNC Server settings: {error}");
     }
 
-    if let Some(config) = configs.get_mut(ServerType::Rdp.as_str()) {
+    let managed = match super::rdp_config::project(&state, &mut configs) {
+        Ok(managed) => managed,
+        Err(error) => {
+            configs.remove(ServerType::Rdp.as_str());
+            tracing::warn!("load RDP Server settings: {error}");
+            true
+        }
+    };
+    if !managed && let Some(config) = configs.get_mut(ServerType::Rdp.as_str()) {
         let legacy_password = rdp_plaintext_password(config).map(str::to_owned);
         if legacy_password.is_some() {
+            if !cfg!(feature = "legacy-rdp-server") {
+                redact_legacy_rdp_password(config);
+                return Ok(configs);
+            }
             match secure_rdp_config(
                 state.core.vault.as_ref(),
                 config,

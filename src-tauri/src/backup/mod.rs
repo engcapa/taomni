@@ -24,6 +24,7 @@ pub mod qa;
 pub mod range;
 pub mod restore;
 pub mod scheduler;
+mod server_configs;
 pub mod settings;
 pub mod settings_model;
 pub(crate) mod snapshot_context;

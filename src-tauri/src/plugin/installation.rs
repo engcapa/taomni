@@ -172,6 +172,10 @@ impl PluginRegistry {
                 super::migration_rdp_server_identity::prepare(&self.root, manifest)
                     .map_err(PluginError::HostRequest)?;
             }
+            if !previous.was_uninstalled() {
+                super::migration_rdp_server::prepare(&self.root, manifest)
+                    .map_err(PluginError::HostRequest)?;
+            }
             activate()?;
             self.scan_locked()?;
             let record = self

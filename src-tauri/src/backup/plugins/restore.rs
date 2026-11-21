@@ -63,7 +63,15 @@ pub(crate) fn check_restore_dependencies(
     let restored: BTreeSet<_> = restore_owners(profile, manifest)?.into_iter().collect();
     let plugins = profile.join("plugins");
     for owner in discover_owners(&plugins)? {
-        if owner_requires_vault(&owner) && !restored.contains(owner.as_str()) {
+        let restored_with_vault = if owner == taomni_server_process::rdp::SLUG {
+            manifest
+                .plugin_datasets
+                .iter()
+                .any(|dataset| dataset.slug == owner && dataset.requires_vault)
+        } else {
+            restored.contains(owner.as_str())
+        };
+        if owner_requires_vault(&owner) && !restored_with_vault {
             let root = ProfileRoot::prepare(profile).map_err(|e| e.to_string())?;
             let slug = PluginSlug::parse(&owner).map_err(|e| e.to_string())?;
             let _lease = PluginDataLease::try_acquire(&root, &slug)
@@ -73,6 +81,14 @@ pub(crate) fn check_restore_dependencies(
                     .load()
                     .map_err(|error| error.to_string())?
                     .is_some_and(|record| record.settings.password_ref.is_some())
+            {
+                continue;
+            }
+            if owner == taomni_server_process::rdp::SLUG
+                && !taomni_server_process::rdp::SettingsFile::new(root.path())
+                    .load()
+                    .map_err(|error| error.to_string())?
+                    .is_some_and(|record| record.password_ref().is_some())
             {
                 continue;
             }

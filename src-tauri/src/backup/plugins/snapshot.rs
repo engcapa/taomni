@@ -75,7 +75,7 @@ pub(crate) fn stage(
         let dataset = PluginDataSet {
             slug: slug.clone(),
             data_schema_version: snapshot.schema,
-            requires_vault: super::contracts::owner_requires_vault(&slug),
+            requires_vault: super::contracts::dataset_requires_vault(&slug, &snapshot.inventory),
             job: job.clone(),
             profile_generation: generation.clone(),
             files: snapshot.inventory,

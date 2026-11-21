@@ -179,7 +179,7 @@ jobs:
           'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
       - name: Install Linux dependencies for the RDP Server host
         if: env.QA_MODULE == 'rdp-server' && runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev libasound2-dev
+        run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev libasound2-dev libxkbcommon-dev
       # Candidate code, Cargo build scripts and host binaries never share a
       # runner/job with signing secrets. Nothing from this job is executed by
       # the signing job; it receives only an inert payload directory.

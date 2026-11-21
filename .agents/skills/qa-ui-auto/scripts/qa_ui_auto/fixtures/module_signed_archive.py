@@ -240,7 +240,29 @@ def setup_rdp_server(ctx):
     destination = owned / archive.name
     shutil.copyfile(archive, destination)
     (owned / "provenance.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
-    ctx.signed_rdp_server = {"host": host, "receipt": receipt}
+    port = int(os.environ["QA_RDP_PORT"])
+    legacy_settings = json.dumps({
+        "port": port,
+        "bindAddress": "127.0.0.1",
+        "username": os.environ["QA_RDP_USER"],
+        "password": os.environ["QA_RDP_PASSWORD"],
+        "viewOnly": True,
+        "clipboardServerToClient": "text",
+        "microphone": False,
+    })
+    database = isolated_data_root(ctx) / "taomni.db"
+    with closing(sqlite3.connect(database)) as connection, connection:
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS server_configs "
+            "(server_type TEXT PRIMARY KEY, config_json TEXT NOT NULL, updated_at INTEGER NOT NULL)"
+        )
+        connection.executemany("INSERT INTO server_configs VALUES (?, ?, 1)", [
+            ("rdp", legacy_settings),
+            ("http", '{"port":18080}'),
+        ])
+    ctx.signed_rdp_server = {
+        "host": host, "receipt": receipt, "port": port, "legacy_settings": legacy_settings,
+    }
     ctx.values.update(rdp_server_archive=destination.as_posix(), rdp_server_signature=signature)
 
 

@@ -40,6 +40,19 @@ pub struct PluginDataSet {
 pub(crate) fn owner_requires_vault(slug: &str) -> bool {
     slug == taomni_plugin_services::MFA_FIXED_KEY_OWNER.slug
         || slug == taomni_server_process::vnc::SLUG
+        || slug == taomni_server_process::rdp::SLUG
+}
+
+pub(crate) fn dataset_requires_vault(slug: &str, files: &[PluginDataFile]) -> bool {
+    use taomni_server_process::rdp;
+
+    if slug == rdp::SLUG {
+        // Earlier RDP Server archives contained just the TLS identity.
+        return files
+            .iter()
+            .any(|file| file.path.eq_ignore_ascii_case(rdp::CONFIG_FILENAME));
+    }
+    owner_requires_vault(slug)
 }
 
 impl PluginDataSet {
@@ -52,7 +65,7 @@ impl PluginDataSet {
         if self.data_schema_version == 0 || self.files.is_empty() || self.files.len() > 16_384 {
             return Err("Invalid plugin backup schema or file count".into());
         }
-        if self.requires_vault != owner_requires_vault(&self.slug) {
+        if self.requires_vault != dataset_requires_vault(&self.slug, &self.files) {
             return Err("Plugin backup Vault dependency disagrees with core policy".into());
         }
         let mut paths = BTreeSet::new();

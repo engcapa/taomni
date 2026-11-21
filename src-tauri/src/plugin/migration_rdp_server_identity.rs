@@ -27,6 +27,14 @@ pub(super) fn prepare(plugins: &Path, manifest: &ModuleManifest) -> Result<(), S
     let slug = PluginSlug::parse(rdp::SLUG).map_err(|error| error.to_string())?;
     let _lease =
         PluginDataLease::try_acquire(&profile, &slug).map_err(|error| error.to_string())?;
+    if rdp::SettingsFile::new(profile.path())
+        .load()
+        .map_err(|error| error.to_string())?
+        .is_some()
+    {
+        // A module dataset may have arrived through backup restore.
+        return Ok(());
+    }
     let module = profile.path().join("plugins").join(rdp::SLUG);
     import_identity(&profile.path().join(rdp::SLUG), &module)
 }

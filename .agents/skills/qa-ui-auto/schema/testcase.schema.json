@@ -966,8 +966,8 @@
           "description": "Verify the signed VNC server host's installed bytes, lease and local daemon endpoint."
         },
         "assert_signed_rdp_server": {
-          "enum": ["running", "disabled"],
-          "description": "Verify the signed RDP Server host identity, write lease and loopback listener state."
+          "enum": ["idle", "running", "backup", "disabled"],
+          "description": "Verify the signed RDP Server host identity, migrated configuration, write lease and loopback listener. The backup phase also checks the module dataset and Vault."
         },
         "assert_signed_mail_host": {
           "enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "disabled"],

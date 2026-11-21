@@ -182,7 +182,7 @@ jobs:
           'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
       - name: Install Linux dependencies for the RDP Server host
         if: needs.source.outputs.slug == 'rdp-server' && runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev libasound2-dev
+        run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev libasound2-dev libxkbcommon-dev
       - name: Build the module host without signing credentials
         run: cargo build --manifest-path src-tauri/Cargo.toml -p '${{ needs.source.outputs.package }}' --release --target '${{ matrix.target }}' --locked
       - name: Build the Windows VNC key helper

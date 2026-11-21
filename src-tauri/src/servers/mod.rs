@@ -28,6 +28,7 @@ pub mod nfs;
 pub mod process;
 
 pub mod rdp;
+mod rdp_config;
 
 pub mod ssh;
 

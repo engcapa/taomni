@@ -5,6 +5,7 @@ use std::{
 };
 use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_plugin_sdk::{Operation, SnapshotExport, SnapshotProvider};
+use taomni_server_process::{ServerConfig, rdp};
 
 pub(super) struct Identity(PathBuf);
 
@@ -40,6 +41,24 @@ impl Identity {
         open_identity(&directory.join("key.pem"))?;
         Ok(directory)
     }
+
+    pub(super) fn save_settings(
+        &self,
+        settings: ServerConfig,
+        operation: &Operation,
+    ) -> Result<(), RpcError> {
+        let file = rdp::SettingsFile::new(&self.0);
+        let legacy_source = file
+            .load()
+            .map_err(error)?
+            .and_then(|record| record.legacy_source);
+        operation.check_current()?;
+        file.save(&rdp::StoredSettings {
+            settings,
+            legacy_source,
+        })
+        .map_err(error)
+    }
 }
 
 impl SnapshotProvider for Identity {
@@ -49,6 +68,9 @@ impl SnapshotProvider for Identity {
 
     fn export(&self, export: &mut SnapshotExport, operation: &Operation) -> Result<(), RpcError> {
         operation.check_current()?;
+        if let Some(file) = rdp::SettingsFile::new(&self.0).open().map_err(error)? {
+            export.file(rdp::CONFIG_FILENAME, file)?;
+        }
         if let Some(directory) = self.directory(false).map_err(error)? {
             let cert = open_identity(&directory.join("cert.pem")).map_err(error)?;
             let key = open_identity(&directory.join("key.pem")).map_err(error)?;

@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::Connection;
 use taomni_profile_locks::{PluginDataLease, PluginSlug, ProfileRoot};
 use taomni_server_process::vnc;
 
@@ -13,10 +13,8 @@ use super::{
         LEGACY_SOURCE_VERSION, MigrationItem, MigrationJournal, MigrationJournalEntry,
         MigrationRunState, MigrationStepState, paths, source,
     },
+    migration_server_config::{self, LEGACY_DATABASE, TABLE},
 };
-
-const LEGACY_DATABASE: &str = "taomni.db";
-const TABLE: &str = "server_configs";
 
 pub(super) fn valid_commit(entry: &MigrationJournalEntry) -> bool {
     entry.item == MigrationItem::VncServerConfigs
@@ -124,37 +122,18 @@ fn import(profile: &Path) -> Result<(), String> {
 }
 
 fn read_config(connection: &Connection) -> Result<Option<vnc::Settings>, String> {
-    let table_exists: bool = connection
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = ?1)",
-            [TABLE],
-            |row| row.get(0),
-        )
-        .map_err(|error| error.to_string())?;
-    if !table_exists {
-        return Ok(None);
-    }
-    let row: Option<String> = connection
-        .query_row(
-            "SELECT config_json FROM server_configs WHERE server_type = 'vnc'",
-            [],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(|error| error.to_string())?;
-    row.map(|json| {
-        let value: serde_json::Value =
-            serde_json::from_str(&json).map_err(|error| error.to_string())?;
-        let mut settings: vnc::Settings =
-            serde_json::from_value(value.clone()).map_err(|error| error.to_string())?;
-        settings.password_ref = None;
-        settings.credential_migration_required = value
-            .get("password")
-            .and_then(serde_json::Value::as_str)
-            .is_some_and(|password| !password.is_empty());
-        Ok(settings)
-    })
-    .transpose()
+    migration_server_config::read(connection, "vnc")?
+        .map(|value| {
+            let mut settings: vnc::Settings =
+                serde_json::from_value(value.clone()).map_err(|error| error.to_string())?;
+            settings.password_ref = None;
+            settings.credential_migration_required = value
+                .get("password")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|password| !password.is_empty());
+            Ok(settings)
+        })
+        .transpose()
 }
 
 #[cfg(test)]

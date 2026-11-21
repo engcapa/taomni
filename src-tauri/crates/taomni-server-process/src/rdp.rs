@@ -2,12 +2,17 @@
 
 use serde::{Deserialize, Serialize};
 
+mod settings;
+pub use settings::{CONFIG_FILENAME, CONFIG_PATH, SettingsFile, StoredSettings};
+
 pub const SLUG: &str = "rdp-server";
+pub const SERVER_TYPE: &str = "rdp";
 pub const START: &str = "rdp-server/start";
 pub const STATUS: &str = "rdp-server/status";
 pub const STOP: &str = "rdp-server/stop";
 pub const APPROVE: &str = "rdp-server/approve";
-pub const COMMANDS: [&str; 4] = [START, STATUS, STOP, APPROVE];
+pub const SAVE_SETTINGS: &str = "rdp-server/save-settings";
+pub const COMMANDS: [&str; 5] = [START, STATUS, STOP, APPROVE, SAVE_SETTINGS];
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
