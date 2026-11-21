@@ -24,11 +24,18 @@ use taomni_mail_engine::imap_folders::imap_list_folders;
 pub(super) use taomni_mail_engine::imap_folders::{
     SUBSCRIBED_ATTRIBUTE, folder_visible, imap_set_subscription,
 };
+
 #[cfg(test)]
 use taomni_mail_engine::{
     imap_folders::{FolderStatus, imap_folder_status},
     imap_sync::{FolderSyncState, folder_unchanged},
 };
+
+pub(super) fn merge_folder_status(previous: &MailFolder, mut status: MailFolder) -> MailFolder {
+    status.flags.clone_from(&previous.flags);
+    status.delimiter.clone_from(&previous.delimiter);
+    status
+}
 
 /// Special-folder override from the account settings (`sent`, `drafts`, ...).
 pub(super) fn special_folder_override(

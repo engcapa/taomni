@@ -1,4 +1,7 @@
-use taomni_mail_engine::imap_sync::{FolderRoundOutcome, FolderRoundRequest};
+use taomni_mail_engine::{
+    cache::upsert_folder_status,
+    imap_sync::{FolderRoundOutcome, FolderRoundRequest},
+};
 
 use super::*;
 
@@ -84,6 +87,7 @@ pub async fn mail_sync_headers(
                 &result.2,
                 &result.1.name,
                 &cache_settings,
+                result.5,
             )?;
             Ok(result)
         })
@@ -329,7 +333,7 @@ pub async fn mail_sync_all_folders(
             if outcome.new_unseen > 0 {
                 *new_unseen_by_folder.entry(name.clone()).or_default() += outcome.new_unseen;
             }
-            *folder = outcome.folder.clone();
+            *folder = folders::merge_folder_status(folder, outcome.folder.clone());
         }
         if let Some(error) = &error {
             failed.push(MailFolderError {
@@ -341,7 +345,7 @@ pub async fn mail_sync_all_folders(
             let cache_settings = cache_settings.clone();
             let metadata = folder.clone();
             with_mail_db_async(&state, &account_id, move |db, account_id| {
-                upsert_folder(db, &metadata)?;
+                upsert_folder_status(db, &metadata)?;
                 for outcome in &outcomes {
                     sync::apply_folder_step(db, account_id, outcome, &cache_settings, started_ms)?;
                 }

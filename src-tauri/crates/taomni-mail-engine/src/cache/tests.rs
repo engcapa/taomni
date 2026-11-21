@@ -1,4 +1,57 @@
 use super::*;
+use crate::{
+    MailFolder,
+    imap_sync::{FolderStepOutcome, MailSyncMode, Watermark},
+};
+
+#[test]
+fn folder_step_keeps_current_list_metadata_across_a_subscription_change() {
+    let conn = Connection::open_in_memory().unwrap();
+    init_mail_tables(&conn).unwrap();
+    let mut listed = MailFolder {
+        account_id: "acct".into(),
+        name: "Archive".into(),
+        delimiter: Some("/".into()),
+        flags: vec!["\\Archive".into(), "\\Subscribed".into()],
+        ..Default::default()
+    };
+    upsert_folder(&conn, &listed).unwrap();
+    let outcome = FolderStepOutcome {
+        folder: MailFolder {
+            delimiter: None,
+            flags: vec!["\\Seen".into()],
+            total: Some(1),
+            ..listed.clone()
+        },
+        mode: MailSyncMode::Catchup,
+        messages: Vec::new(),
+        vanished: Vec::new(),
+        flag_updates: Vec::new(),
+        watermark: Watermark::default(),
+        highest_modseq: None,
+        reconciled: false,
+        uid_validity_reset: false,
+        remaining: 0,
+        more: false,
+        new_unseen: 0,
+    };
+    let cache = MailCacheSettings::default();
+    let cached = apply_folder_step(&conn, "acct", &outcome, &cache, 1)
+        .unwrap()
+        .folder
+        .unwrap();
+    assert_eq!(cached.flags, listed.flags);
+    assert_eq!(cached.delimiter.as_deref(), Some("/"));
+    assert_eq!(cached.total, Some(1));
+
+    listed.flags.pop();
+    upsert_folder(&conn, &listed).unwrap();
+    let cached = apply_folder_step(&conn, "acct", &outcome, &cache, 2)
+        .unwrap()
+        .folder
+        .unwrap();
+    assert_eq!(cached.flags, ["\\Archive"]);
+}
 
 #[test]
 fn migration_is_idempotent_and_keeps_rows() {

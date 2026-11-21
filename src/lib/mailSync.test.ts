@@ -170,10 +170,14 @@ describe("countNewMail", () => {
 });
 
 describe("mergeFolderMeta", () => {
-  it("replaces an existing folder and appends unknown ones", () => {
-    const merged = mergeFolderMeta([folder("INBOX", { unread: 1 })], folder("INBOX", { unread: 4, lastError: null }));
+  it("updates an existing folder's counts while keeping its tree attributes", () => {
+    const listed = folder("INBOX", { unread: 1, flags: ["\\Subscribed"] });
+    const status = folder("INBOX", { unread: 4, lastError: null, delimiter: null, flags: ["\\Seen"] });
+    const merged = mergeFolderMeta([listed], status);
     expect(merged).toHaveLength(1);
     expect(merged[0].unread).toBe(4);
+    expect(merged[0].flags).toEqual(["\\Subscribed"]);
+    expect(merged[0].delimiter).toBe("/");
     expect(mergeFolderMeta(merged, folder("Work"))).toHaveLength(2);
   });
 });

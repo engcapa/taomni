@@ -122,6 +122,7 @@ fn cache_roundtrips_folders_messages_and_body() {
             header_retention_days: 0,
             ..MailCacheSettings::default()
         },
+        true,
     )
     .unwrap();
 

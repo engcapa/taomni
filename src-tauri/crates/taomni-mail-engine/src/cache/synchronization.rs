@@ -4,6 +4,7 @@ use super::contacts::reindex_cached_contacts;
 use super::contacts::upsert_contact;
 use super::pruning::prune_mail_cache;
 use super::upsert::upsert_folder;
+use super::upsert::upsert_folder_status;
 use super::upsert::upsert_message;
 use super::upsert::upsert_message_at;
 use super::watermarks::reset_folder_cache;
@@ -23,11 +24,19 @@ pub fn cache_sync_result(
     messages: &[MailMessageCached],
     folder: &str,
     cache: &MailCacheSettings,
+    listed: bool,
 ) -> SqlResult<()> {
     let tx = conn.unchecked_transaction()?;
-    for folder in folders {
-        reset_folder_if_uid_validity_changed(&tx, folder)?;
-        upsert_folder(&tx, folder)?;
+    for entry in folders
+        .iter()
+        .filter(|entry| listed || entry.name == folder)
+    {
+        reset_folder_if_uid_validity_changed(&tx, entry)?;
+        if listed {
+            upsert_folder(&tx, entry)?;
+        } else {
+            upsert_folder_status(&tx, entry)?;
+        }
     }
     for message in messages {
         upsert_message(&tx, message)?;

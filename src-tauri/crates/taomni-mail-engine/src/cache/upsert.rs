@@ -6,14 +6,32 @@ use rusqlite::Result as SqlResult;
 use rusqlite::params;
 
 pub fn upsert_folder(conn: &Connection, folder: &MailFolder) -> SqlResult<()> {
-    let flags_json = serde_json::to_string(&folder.flags).unwrap_or_else(|_| "[]".into());
+    store_folder(conn, folder, true)
+}
+
+/// EXAMINE and STATUS observe counts and UIDs. LIST and LSUB own tree attributes.
+pub fn upsert_folder_status(conn: &Connection, folder: &MailFolder) -> SqlResult<()> {
+    store_folder(conn, folder, false)
+}
+
+fn store_folder(conn: &Connection, folder: &MailFolder, listed: bool) -> SqlResult<()> {
+    let flags_json = if listed {
+        serde_json::to_string(&folder.flags).unwrap_or_else(|_| "[]".into())
+    } else {
+        "[]".into()
+    };
+    let delimiter = if listed {
+        folder.delimiter.as_deref()
+    } else {
+        None
+    };
     conn.execute(
         "INSERT INTO mail_folders
          (account_id, name, delimiter, flags_json, uid_validity, uid_next, total, unread, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
          ON CONFLICT(account_id, name) DO UPDATE SET
-            delimiter = excluded.delimiter,
-            flags_json = excluded.flags_json,
+            delimiter = CASE WHEN ?10 THEN excluded.delimiter ELSE mail_folders.delimiter END,
+            flags_json = CASE WHEN ?10 THEN excluded.flags_json ELSE mail_folders.flags_json END,
             uid_validity = COALESCE(excluded.uid_validity, mail_folders.uid_validity),
             uid_next = COALESCE(excluded.uid_next, mail_folders.uid_next),
             total = COALESCE(excluded.total, mail_folders.total),
@@ -22,13 +40,14 @@ pub fn upsert_folder(conn: &Connection, folder: &MailFolder) -> SqlResult<()> {
         params![
             folder.account_id,
             folder.name,
-            folder.delimiter,
+            delimiter,
             flags_json,
             folder.uid_validity,
             folder.uid_next,
             folder.total,
             folder.unread,
             folder.updated_at,
+            listed,
         ],
     )?;
     Ok(())

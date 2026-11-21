@@ -2,7 +2,7 @@ use super::MailCacheSettings;
 use super::cache_synced_messages;
 use super::prune_mail_cache;
 use super::reindex_cached_contacts;
-use super::upsert_folder;
+use super::upsert_folder_status;
 use crate::imap_sync::AppliedStep;
 use crate::imap_sync::FolderStepOutcome;
 use crate::imap_sync::FolderSyncState;
@@ -139,7 +139,7 @@ pub fn apply_folder_step(
     if outcome.uid_validity_reset {
         reset_folder_cache(&tx, account_id, folder_name)?;
     }
-    upsert_folder(&tx, &outcome.folder)?;
+    upsert_folder_status(&tx, &outcome.folder)?;
     let replaced = cache_synced_messages(&tx, &outcome.messages, started_ms)?;
     if !outcome.vanished.is_empty() {
         let mut stmt = tx.prepare(
