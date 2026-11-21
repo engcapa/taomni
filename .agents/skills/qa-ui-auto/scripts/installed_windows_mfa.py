@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 from urllib.parse import quote, urlencode
 
@@ -46,10 +47,20 @@ def verify_mfa_controls(owner, phase, evidence):
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=85, check=False,
         )
         if observed.returncode:
-            # Avoid printing runner output containing controls or fixture inputs.
-            error = observed.stderr.partition("\n")[0].strip()
-            result["error"] = error
-            raise RuntimeError(f"Installed Windows MFA UI Automation {phase} failed: {error}")
+            failure = f"PowerShell exit {observed.returncode}"
+            try:
+                diagnostic = json.loads(observed.stderr)
+            except ValueError:
+                diagnostic = None
+            if isinstance(diagnostic, dict):
+                exception = diagnostic.get("exception")
+                code = diagnostic.get("hresult")
+                line = diagnostic.get("line")
+                if (isinstance(exception, str) and re.fullmatch(r"[.\w+]{1,120}", exception)
+                        and type(code) is int and type(line) is int and 0 <= line <= 1000):
+                    failure = f"{exception}, HRESULT 0x{code & 0xffffffff:08X}, script line {line}"
+            result["error"] = failure
+            raise RuntimeError(f"Installed Windows MFA UI Automation {phase} failed ({failure})")
         payload = json.loads(observed.stdout)
         if payload != expected or owner.poll() is not None:
             raise RuntimeError("The installed Windows MFA did not return the expected HOTP values")

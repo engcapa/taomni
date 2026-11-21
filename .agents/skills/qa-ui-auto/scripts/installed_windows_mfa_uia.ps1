@@ -4,6 +4,16 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+trap {
+    $failure = $_.Exception.GetBaseException()
+    $diagnostic = [pscustomobject]@{
+        exception = $failure.GetType().FullName
+        hresult = $failure.HResult
+        line = $_.InvocationInfo.ScriptLineNumber
+    }
+    [Console]::Error.WriteLine(($diagnostic | ConvertTo-Json -Compress))
+    exit 1
+}
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Windows.Forms
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $fixture = [Console]::In.ReadToEnd() | ConvertFrom-Json

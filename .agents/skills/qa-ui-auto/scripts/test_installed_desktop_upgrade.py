@@ -233,6 +233,24 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
                 receipt = json.loads((report / "windows-mfa-after.json").read_text(encoding="utf-8"))
                 self.assertEqual(receipt["passed"], expected)
 
+    def test_windows_mfa_failure_keeps_script_location_without_raw_output(self):
+        owner = Mock(pid=21)
+        cases = [
+            ('{"exception":"System.InvalidOperationException","hresult":-2146233079,"line":52}',
+             "System.InvalidOperationException, HRESULT 0x80131509, script line 52"),
+            ('Sensitive WebView or fixture output', "PowerShell exit 1"),
+        ]
+        for stderr, expected in cases:
+            with self.subTest(expected=expected), TemporaryDirectory() as directory:
+                report = Path(directory)
+                completed = subprocess.CompletedProcess([], 1, stdout="", stderr=stderr)
+                with patch("installed_windows_mfa.subprocess.run", return_value=completed):
+                    with self.assertRaisesRegex(RuntimeError, expected):
+                        verify_mfa_controls(owner, "seed", report)
+                receipt = json.loads((report / "windows-mfa-seed.json").read_text(encoding="utf-8"))
+                self.assertFalse(receipt["passed"])
+                self.assertEqual(receipt["error"], expected)
+
     def test_macos_uses_the_owned_bridge_and_matches_a_hardened_child_command(self):
         with TemporaryDirectory() as temporary:
             application = Path(temporary).resolve() / "Taomni"
