@@ -70,6 +70,7 @@ steps:
 - press: {key: b, selector: '[data-testid="vnc-canvas"]'}
 - assert_file_contains: {path: '${fixture.vnc_events}', contains: '"keysym": 98, "keysym_hex": "0x62"'}
 - assert_no_runtime_errors: null
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="vnc-detach"]'
 - switch_window: {selector: '[data-testid="detached-session-window"]'}
 - wait_for: '[data-testid="vnc-panel"][data-frontend-source*="/__taomni_plugins__/vnc-client/${fixture.vnc_signed_version}/frontend/index.js"]'
@@ -124,16 +125,16 @@ verification:
     results: [31, 32, 36, 37, 38, 42, 50, 52, 53]
   - id: R3
     requirement: The detached WebView authenticates with the signed viewer and reattachment restores exactly one working main-window tab.
-    actions: [54, 55, 57, 58, 59, 62, 65, 68, 69, 70]
+    actions: [54, 55, 56, 58, 59, 60, 63, 66, 69, 70, 71]
     checkpoints:
-    - {step: 56, expectation: The detached WebView loads the installed frontend path.}
-    - {step: 61, expectation: The detached canvas paints fixture pixels.}
-    - {step: 63, expectation: The fixture receives a key sent from the detached canvas.}
-    - {step: 66, expectation: Reattachment returns to a single VNC tab.}
-    - {step: 67, expectation: The returned tab uses the installed frontend path.}
-    - {step: 72, expectation: The returned session paints the framebuffer.}
-    - {step: 73, expectation: The reattached window has no runtime errors.}
-    results: [56, 61, 63, 66, 67, 72, 73]
+    - {step: 57, expectation: The detached WebView loads the installed frontend path.}
+    - {step: 62, expectation: The detached canvas paints fixture pixels.}
+    - {step: 64, expectation: The fixture receives a key sent from the detached canvas.}
+    - {step: 67, expectation: Reattachment returns to a single VNC tab.}
+    - {step: 68, expectation: The returned tab uses the installed frontend path.}
+    - {step: 73, expectation: The returned session paints the framebuffer.}
+    - {step: 74, expectation: The reattached window has no runtime errors.}
+    results: [57, 62, 64, 67, 68, 73, 74]
   visual:
   - check: The connected viewer paints the fixture before disable and after re-enable.
     method: automated
