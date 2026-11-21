@@ -1,5 +1,5 @@
 use super::ntlm;
-use crate::rdp::GatewayOpt;
+use crate::GatewayOpt;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
 use std::time::Duration;

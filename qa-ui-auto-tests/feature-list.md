@@ -4133,7 +4133,8 @@ files:
   - src-tauri/src/rdp/ws.rs
   - src-tauri/src/rdp/session.rs
   - src-tauri/src/rdp/transport.rs
-  - src-tauri/src/rdp/gateway/mod.rs
+  - src-tauri/src/rdp/tls.rs
+  - src-tauri/crates/taomni-rdp-client-engine/
 controls:
   - id: panel-root
     selector: '[data-testid="rdp-panel"]'

@@ -11,7 +11,7 @@ use super::stream::GatewayStream;
 use super::stream::spawn_gateway_stream;
 use super::transport::RpcHttpChannel;
 use super::transport::connect_authenticated_rpc_channel;
-use crate::rdp::GatewayOpt;
+use crate::GatewayOpt;
 use tokio::io::AsyncWriteExt as _;
 /// Open an RD Gateway tunnel to `target_host:target_port` through the
 /// gateway described by `g`.

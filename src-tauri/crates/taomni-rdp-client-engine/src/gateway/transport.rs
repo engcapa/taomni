@@ -11,7 +11,7 @@ use super::http::build_rpc_out_request_with_auth;
 use super::http::parse_http_response_head;
 use super::http::www_authenticate_token;
 use super::ntlm;
-use crate::rdp::GatewayOpt;
+use crate::GatewayOpt;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
 use tokio::io::AsyncRead;
@@ -19,7 +19,7 @@ use tokio::io::AsyncReadExt as _;
 use tokio::io::AsyncWrite;
 use tokio::io::AsyncWriteExt as _;
 use tokio::net::TcpStream;
-pub(super) type GatewayTlsStream = crate::rdp::tls::TlsStream<TcpStream>;
+pub(super) type GatewayTlsStream = crate::tls::TlsStream<TcpStream>;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) enum RpcHttpChannel {
@@ -190,7 +190,7 @@ pub(super) async fn connect_gateway_tls(g: &GatewayOpt) -> Result<GatewayTlsStre
         .map_err(|e| format!("rdg: connect {}: {}", addr, e))?;
     tcp.set_nodelay(true)
         .map_err(|e| format!("rdg: set TCP_NODELAY: {}", e))?;
-    let verified = crate::rdp::tls::upgrade(
+    let verified = crate::tls::upgrade(
         tcp,
         g.host.trim(),
         g.port,

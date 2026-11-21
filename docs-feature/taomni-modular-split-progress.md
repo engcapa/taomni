@@ -2,6 +2,7 @@
 
 ## 2026-11-21 当前进展
 
+- RDP 客户端的 RD Gateway 和 TLS 校验迁入 `taomni-rdp-client-engine`。核心继续持有证书确认和指纹数据库。迁移保留配置序列化、错误文本、系统信任和显式 pin 校验。现有 TC-111、TC-RDPJ-01、TC-MODULES-030/031 继续覆盖入口、会话、真实端到端连接及升级保留，RD Gateway 的既有协议单测随新 crate 迁移。生产宿主和签名前端按 TASK-016 继续。
 - 再次拉取的 `origin/main` 为 `349dc9268`，当前分支已包含。`f04017cf0` 把 VNC 查看器、绘制和前端状态迁入模块，签名包携带独立 ESM。会话仍从 Sessions、Workspace 和分离窗口打开。TC-MODULES-053 核对实际签名路径、帧、禁用、恢复和分离回挂，TC-MODULES-054 核对开发预览。Linux、Windows、macOS 26 的六个 Browser 分片已在原生运行期间下载。 [VNC 三端复验](https://github.com/engcapa/taomni/actions/runs/44852430063)
 - `9b2973d84` 的 G9 子项在 GitHub 对照四个发布目标。默认核心 Cargo 树均保留 `taomni-vnc-api`，排除 VNC 引擎、Windows 按键协议和宿主。生产 Vite 清单无 VNC 查看器，Windows 配置也移除了辅助程序资源。原始清单在 `qa-ui-auto-report/github/44853523906/live-contracts/modular-core-build-inventory/`。实际新 MSI 和其他业务模块依赖闭包继续验证。 [G9 清单](https://github.com/engcapa/taomni/actions/runs/44853523906)
 - `7df8acaa0` 的三端 Browser 各 23/23，Linux、Windows、macOS Native 分别 26/27、27/28、25/27。18 个分片均已下载。三端 TC-FILE-OPEN-006 的失败页都显示正确附件，原断言把 Playwright 私有选择器传给原生驱动。`d30e2902b` 改用现有的跨 WebView 精确文本断言并保留只读、精确字节和临时文件清理检查。macOS TC-FILE-OPEN-007 的 HTML 导出保存对话框仍按同一 main 用例和原生驱动问题记录。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44845816871)

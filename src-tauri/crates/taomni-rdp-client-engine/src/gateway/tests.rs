@@ -42,7 +42,7 @@ use super::rpc::parse_response_pdu;
 use super::rpch;
 use super::stream::close_gateway_contexts;
 use super::tunnel::open_tunnel;
-use crate::rdp::GatewayOpt;
+use crate::GatewayOpt;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
 use std::io;

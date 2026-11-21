@@ -18,6 +18,7 @@ members = [
     "crates/taomni-download-gates",
     "crates/taomni-host-gates",
     "crates/taomni-rdp-common",
+    "crates/taomni-rdp-client-engine",
     "crates/taomni-rdp-probe",
     "crates/taomni-file-uri",
     "crates/taomni-mail-engine",
@@ -85,6 +86,7 @@ taomni-redirector = { path = "crates/taomni-redirector" }
 taomni-sqlite-snapshot = { path = "crates/taomni-sqlite-snapshot" }
 taomni-capture = { path = "crates/taomni-capture" }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
+taomni-rdp-client-engine = { path = "crates/taomni-rdp-client-engine" }
 taomni-file-uri = { path = "crates/taomni-file-uri" }
 taomni-mfa-engine = { path = "crates/taomni-mfa-engine" }
 taomni-vnc-api = { path = "crates/taomni-vnc-api" }

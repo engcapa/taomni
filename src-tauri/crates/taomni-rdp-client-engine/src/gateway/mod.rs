@@ -14,7 +14,7 @@
 //!
 //! Public API preserved here; implementation is split by protocol responsibility:
 //!
-//! - The public [`GatewayOpt`] config + thin re-export from `crate::rdp`.
+//! - The public [`GatewayOpt`] config + thin re-export from the engine.
 //! - DCE/RPC common header (`rpc_pdu_header`), used by every TsProxy call.
 //! - PDU constructors for Bind, BindAck, AlterContext, Request, Response.
 //! - HTTP request line builders for RPC_IN_DATA and RPC_OUT_DATA.
@@ -28,7 +28,7 @@
 //!   HTTPS pair, completes the RTS bootstrap, runs the TsProxy handshake,
 //!   and exposes the resulting channel as a byte stream.
 
-pub use crate::rdp::GatewayOpt;
+pub use crate::GatewayOpt;
 pub use bootstrap::{
     GatewayInitialPackets, RPC_HTTP_CONTENT_LENGTH, build_gateway_initial_packets, gateway_rpc_path,
 };

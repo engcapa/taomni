@@ -6,7 +6,7 @@ use super::ndr;
 use super::rpc::build_tsproxy_bind_pdu;
 use super::rpch;
 use super::tunnel::validate_gateway_base;
-use crate::rdp::GatewayOpt;
+use crate::GatewayOpt;
 pub const RPC_HTTP_CONTENT_LENGTH: u64 = 0x4000_0000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

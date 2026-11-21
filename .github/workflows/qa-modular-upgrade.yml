@@ -531,7 +531,7 @@ jobs:
         run: |
           mkdir -p modular-evidence
           set -o pipefail
-          cargo check --manifest-path src-tauri/Cargo.toml -p taomni-rdp-common -p taomni-file-uri --target '${{ matrix.target }}' --all-targets --all-features --locked 2>&1 | tee modular-evidence/rdp-shared-check.log
+          cargo check --manifest-path src-tauri/Cargo.toml -p taomni-rdp-common -p taomni-rdp-client-engine -p taomni-file-uri --target '${{ matrix.target }}' --all-targets --all-features --locked 2>&1 | tee modular-evidence/rdp-shared-check.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -565,7 +565,7 @@ jobs:
         run: |
           mkdir -p modular-evidence
           set -o pipefail
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-rdp-common -p taomni-file-uri --all-features --locked 2>&1 | tee modular-evidence/rdp-shared-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-rdp-common -p taomni-rdp-client-engine -p taomni-file-uri --all-features --locked 2>&1 | tee modular-evidence/rdp-shared-unit.log
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-rdp-common --no-default-features --locked 2>&1 | tee modular-evidence/rdp-shared-minimal-unit.log
       - name: Verify protocol-free URI and minimal shared dependencies
         run: |

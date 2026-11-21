@@ -10947,6 +10947,7 @@ dependencies = [
  "taomni-plugin-services",
  "taomni-plugin-stream",
  "taomni-profile-locks",
+ "taomni-rdp-client-engine",
  "taomni-rdp-common",
  "taomni-redirector",
  "taomni-sqlite-snapshot",
@@ -11257,6 +11258,25 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "tempfile",
+]
+
+[[package]]
+name = "taomni-rdp-client-engine"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "hex",
+ "rand 0.10.2",
+ "rcgen",
+ "rustls 0.23.44",
+ "rustls-native-certs 0.8.4",
+ "serde",
+ "sha2 0.11.0",
+ "tokio",
+ "tokio-rustls 0.26.5",
+ "tracing",
+ "uuid",
+ "x509-cert",
 ]
 
 [[package]]
