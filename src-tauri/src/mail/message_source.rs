@@ -116,23 +116,7 @@ fn publish_original(
     bytes: &[u8],
 ) -> Result<MailDownloadAttachmentResult, String> {
     let path = Path::new(target_path);
-    let parent = match path.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => parent,
-        _ => Path::new("."),
-    };
-    std::fs::create_dir_all(parent).map_err(|error| format!("failed to create folder: {error}"))?;
-    let mut staging = tempfile::NamedTempFile::new_in(parent)
-        .map_err(|error| format!("failed to stage .eml file: {error}"))?;
-    staging
-        .write_all(bytes)
-        .map_err(|error| format!("failed to write .eml file: {error}"))?;
-    staging
-        .as_file()
-        .sync_all()
-        .map_err(|error| format!("failed to flush .eml file: {error}"))?;
-    staging
-        .persist(path)
-        .map_err(|error| format!("failed to save .eml file: {}", error.error))?;
+    attachment_files::publish_mail_bytes(path, bytes)?;
     Ok(MailDownloadAttachmentResult {
         path: path.to_string_lossy().into_owned(),
         name: path

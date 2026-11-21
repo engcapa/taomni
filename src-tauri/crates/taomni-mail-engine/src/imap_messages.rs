@@ -335,3 +335,33 @@ pub fn imap_fetch_raw<T: Read + Write>(
         .ok_or_else(|| format!("message UID {uid} did not include a body"))?;
     Ok(body.to_vec())
 }
+
+pub fn imap_fetch_attachment<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    folder: &str,
+    uid: u32,
+    index: usize,
+    section: Option<&str>,
+) -> Result<crate::DownloadedMailAttachment, String> {
+    session
+        .examine(folder)
+        .map_err(|error| format!("IMAP EXAMINE {folder} failed: {error}"))?;
+    if let Some(section) = section {
+        return Ok(crate::DownloadedMailAttachment {
+            name: None,
+            content_type: None,
+            bytes: crate::imap_parts::imap_fetch_section(session, uid, section)?,
+        });
+    }
+    let fetches = session
+        .uid_fetch(uid.to_string(), "(UID BODY.PEEK[])")
+        .map_err(|error| format!("IMAP UID FETCH attachment failed: {error}"))?;
+    let fetch = fetches
+        .iter()
+        .next()
+        .ok_or_else(|| format!("message UID {uid} not found in {folder}"))?;
+    let body = fetch
+        .body()
+        .ok_or_else(|| format!("message UID {uid} did not include a body"))?;
+    crate::extract_attachment(body, index)
+}

@@ -8162,6 +8162,7 @@ components: [MailClientTab]
 files:
   - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailAttachReminder.ts
+  - src-tauri/src/mail/message_attachment.rs
   - src-tauri/src/mail/parts.rs
   - src-tauri/src/mail/mod.rs
 controls:
@@ -8180,6 +8181,7 @@ controls:
 -->
 
 - 超过正文部分拉取上限的邮件，打开时先取 `BODYSTRUCTURE`，只拉 text/plain 与 text/html 分段（完整、不截断），并列出全部附件及其 IMAP 分段号；下载时只取该分段（`BODY.PEEK[<section>]`），不再拉整封邮件。
+- 签名 Mail 宿主读取未归档、未缓存的 IMAP 附件，核心验证字节数后写入目标。TC-MODULES-059/060 核对只读预览的文件字节与关闭后的清理，宿主协议用例检查整封邮件提取和 IMAP 分段下载。
 - 会话设置 “Attachment cache” 开启后，下载过的附件写入 `<app_data>/mail-cache/attachments/`，再次打开直接使用本地副本。
 - 发送被服务器以大小拒绝（552 / SIZE）时给出明确提示。
 - 附件提醒：正文（不含引用部分）或主题提到 “attached/附件” 而没有附件时，发送前提醒，可 “Attach…” 或 “Send anyway”。

@@ -2,6 +2,9 @@
 
 ## 2026-11-21 当前进展
 
+- Mail 0.1.13 将普通 IMAP 附件读取和大邮件的 MIME 分段下载交给签名宿主。核心验证收到的字节数并原子写入目标文件。签名原生用例和 Browser 预览用例核对附件的实际文件与关闭清理，Mail 宿主协议验证两种下载路径及原始二进制字节。
+- `4cf6d7774` 的 Linux、Windows、macOS ARM64 进程协议通过，含签名宿主读取正文、额外 EML 字节和既有数据及租约验证。原始日志与宿主身份保留在 `qa-ui-auto-report/github/44914039295/live-contracts/modular-protocol-*/`。 [三端协议](https://github.com/engcapa/taomni/actions/runs/44914039295)
+- `d67452ba8` 的 Mail 原文查看和 EML 在 Linux、Windows Native 通过。macOS 原文已通过，保存停在 AppKit 对话框识别。三端 Explorer 同轮失败页面已创建两个标签，原断言使用了仅 Playwright 支持的选择器。用例改为直接核对标签数量，macOS 保存驱动增加原生面板识别和失败证据。 [原分片](https://github.com/engcapa/taomni/actions/runs/44912118959)
 - Mail 0.1.12 将用户打开的未缓存 IMAP 正文交给签名宿主读取和解析，继续支持大邮件分段及额外 EML 副本。核心保留归档优先、过渡期缓存提交和文件路径所有权。后台预热暂时复用原连接，避免每封邮件重新登录。现有签名操作和预览用例增加阅读区断言，跨进程协议检查正文及 MIME 原件的字节。
 - Mail 0.1.11 由签名宿主读取未归档邮件的 IMAP 原文。核心通过授权连接接收 MIME 字节并核对长度，查看时沿用原文对话框，保存时原子替换目标 EML。已归档邮件继续读取已校验的本机原件。TC-MODULES-059 核对实际 IMAP 原文和本机落盘，TC-MODULES-060 核对 Browser 对话框及导出文件字节。
 - `38eb4d116` 的 18 个 Browser 与 Native 分片已在汇总前收齐。Linux、Windows、macOS 26 Browser 各通过 37/37，Native 分别通过 39/39、39/39、38/39，三端 TC-MODULES-059 均通过。macOS 唯一失败是 TC-FILE-OPEN-007 的系统保存对话框识别，同一路径在该 Mail 修复前已有相同失败。 [订阅与星标回执](https://github.com/engcapa/taomni/actions/runs/44908352214) · [原失败](https://github.com/engcapa/taomni/actions/runs/44905615485)
@@ -556,7 +559,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-023 发布验收 | 目录签名、首装名单和独立模块发布准备已验证 | 发布工具覆盖已暂存模块的签名、声明平台、描述和摘要。核心发布继承签名目录，独立发布保留原模块的资产地址。正式模块构建矩阵、系统签名、首批目录及最终两种安装集合的回归和性能仍待交付。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
 | TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
-| TASK-026 Mail | 签名前端及部分原生业务已迁入独立宿主 | 签名宿主负责连接测试、SMTP 发送、IMAP 文件夹、邮件头、搜索、标记，以及原文和按需正文读取。后台预热、归档、附件和过渡缓存仍待迁出，需完成正式安装升级、数据接管和回滚验收。 |
+| TASK-026 Mail | 签名前端及部分原生业务已迁入独立宿主 | 签名宿主负责连接测试、SMTP 发送、IMAP 文件夹、邮件头、搜索、标记，以及原文、按需正文和附件读取。后台预热、归档和过渡缓存仍待迁出，需完成正式安装升级、数据接管和回滚验收。 |
 | TASK-027 G1–G11 全门禁收口 | 新增任务，未闭合 | G1–G11 的当前证据仍存在正式发行包、业务模块、核心依赖闭包、系统信任和完整入口矩阵缺口；必须用匹配源码的 GitHub runner receipt 逐项闭合后才能进入生产发布。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。

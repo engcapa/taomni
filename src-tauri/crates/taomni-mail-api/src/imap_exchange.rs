@@ -26,6 +26,25 @@ pub struct RawMessageRequest {
     pub uid: u32,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AttachmentRequest {
+    pub connection: IncomingTest,
+    pub exchange: Endpoint,
+    pub folder: String,
+    pub uid: u32,
+    pub index: usize,
+    pub section: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AttachmentReceipt {
+    pub name: Option<String>,
+    pub content_type: Option<String>,
+    pub size: usize,
+}
+
 pub async fn read_frame(stream: &mut (impl AsyncRead + Unpin)) -> io::Result<Vec<u8>> {
     let size = stream.read_u32().await? as usize;
     validate_size(size)?;

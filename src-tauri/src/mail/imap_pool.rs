@@ -130,7 +130,6 @@ impl ActiveImapSession {
 
     pub(super) fn download_attachment(
         &mut self,
-        account: &ResolvedMailAccount,
         folder: &str,
         uid: u32,
         attachment_index: usize,
@@ -140,7 +139,6 @@ impl ActiveImapSession {
         match self {
             Self::Tls { session, .. } => imap_download_attachment(
                 session,
-                account,
                 folder,
                 uid,
                 attachment_index,
@@ -149,7 +147,6 @@ impl ActiveImapSession {
             ),
             Self::Plain { session, .. } => imap_download_attachment(
                 session,
-                account,
                 folder,
                 uid,
                 attachment_index,

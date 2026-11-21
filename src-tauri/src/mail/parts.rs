@@ -3,8 +3,6 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-pub(super) use taomni_mail_engine::imap_parts::imap_fetch_section;
-
 /// On-disk attachment cache path: `<root>/<uid>-<key>.bin` under a folder dir.
 pub(super) fn attachment_cache_path(
     root: &Path,
@@ -50,6 +48,7 @@ pub(super) fn write_cache_file(path: &Path, bytes: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use taomni_mail_engine::imap_parts::imap_fetch_section;
     use taomni_mail_engine::{cache::MailCacheSettings, imap_messages::Mailbox};
 
     #[test]

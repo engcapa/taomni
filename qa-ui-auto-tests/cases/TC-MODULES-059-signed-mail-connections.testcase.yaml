@@ -7,10 +7,10 @@ description: >-
   messages from IMAP and POP3 accounts. Check the installed renderer,
   connection tests, SMTP delivery, Sent copies, and the signed host's data
   lease through disable.
-covers: [F-Modules-1, F-MAIL-3, F-MAIL-6, F-MAIL-7, F-MAIL-11, F-MAIL-12, F-MAIL-17, F-MAIL-23]
+covers: [F-Modules-1, F-MAIL-3, F-MAIL-6, F-MAIL-7, F-MAIL-11, F-MAIL-12, F-MAIL-15, F-MAIL-17, F-MAIL-23, F-FILEOPEN-1]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
-fixtures: [reset_db, mail_server, module_signed_mail_archive, file_open_files]
+fixtures: [reset_db, file_open_mail, module_signed_mail_archive, file_open_files]
 timeout_sec: 310
 steps:
 - open: ${cfg.app.base_url}
@@ -43,12 +43,30 @@ steps:
 - wait_for: {selector: '[role="dialog"][aria-label="Message source"]', state: detached}
 - click: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
 - wait_for: '[data-testid="mail-folder-row"][data-folder-name="Archive"][data-active="true"]'
+- wait_for: '[data-testid="mail-message-row"][data-subject="${fixture.file_open_mail_subject}"]'
+- click: '[data-testid="mail-message-row"][data-subject="${fixture.file_open_mail_subject}"]'
+- wait_for: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
+- assert_file_open_bytes:
+    selector: '[data-testid="file-viewer"][data-readonly="true"]'
+    remember: signed-mail-attachment
+    equals: ${fixture.file_open_mail_text}
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-readonly="true"]', state: detached}
+- assert_file_open_bytes: {remember: signed-mail-attachment, absent: true}
 - mail_server_deliver: {count: 3, prefix: Signed header}
 - click: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
 - wait_for: '[data-testid="mail-folder-row"][data-folder-name="INBOX"][data-active="true"]'
 - wait_for: {selector: '[data-testid="mail-message-row"][data-subject="Signed header 0003"]', timeout_sec: 40}
 - click: '[data-testid="mail-message-row"][data-subject="Signed header 0003"]'
-- assert_text: {selector: '[data-testid="mail-reader-text"]', contains: 'Body of Signed header 0003', timeout_sec: 30}
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent
+      ?? document.querySelector('.taomni-mail-reader-text')?.textContent
+      ?? '').includes('Body of Signed header 0003')
+    expect_truthy: true
+    timeout_sec: 30
 - mail_server_assert_list_matches: {timeout_sec: 40}
 - click: '[data-testid="mail-subscriptions-open"]'
 - wait_for: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="true"]'
@@ -134,101 +152,109 @@ verification:
   requirements:
   - id: R1
     requirement: Opening the Mail tab starts the signed host, lists the actual IMAP folders and changes the server subscription.
-    actions: [6, 7, 8, 10, 15, 17, 38, 40, 44, 68]
+    actions: [6, 7, 8, 10, 15, 17, 47, 49, 53, 77]
     checkpoints:
     - {step: 9, expectation: The module installer accepts the verified artifact.}
     - {step: 12, expectation: The signed module is installed and the host has no writer lease yet.}
     - {step: 18, expectation: Opening the account mounts the module's verified frontend.}
     - {step: 20, expectation: Opening the account shows Archive from the actual IMAP server.}
     - {step: 21, expectation: The signed Mail host holds its data lease before the connection test.}
-    - {step: 39, expectation: The subscription dialog shows the initial subscribed state.}
-    - {step: 41, expectation: The updated IMAP folder tree reports Archive as unsubscribed.}
-    - {step: 45, expectation: Full synchronization reports its completed header counts.}
-    - {step: 46, expectation: Synchronization through the signed host added the newly delivered header.}
-    - {step: 69, expectation: The refreshed server tree preserves the changed subscription.}
-    results: [9, 12, 18, 20, 21, 39, 41, 45, 46, 69]
+    - {step: 48, expectation: The subscription dialog shows the initial subscribed state.}
+    - {step: 50, expectation: The updated IMAP folder tree reports Archive as unsubscribed.}
+    - {step: 54, expectation: Full synchronization reports its completed header counts.}
+    - {step: 55, expectation: Synchronization through the signed host added the newly delivered header.}
+    - {step: 78, expectation: The refreshed server tree preserves the changed subscription.}
+    results: [9, 12, 18, 20, 21, 48, 50, 54, 55, 78]
   - id: R2
     requirement: The normal connection controls test IMAP, POP3 and SMTP using the installed Mail host.
-    actions: [70, 75, 88, 89, 92]
+    actions: [79, 84, 97, 98, 101]
     checkpoints:
-    - {step: 76, expectation: The hosted app reports working IMAP and SMTP connections.}
-    - {step: 77, expectation: The signed Mail host still holds its data lease.}
-    - {step: 93, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
-    results: [76, 77, 93]
+    - {step: 85, expectation: The hosted app reports working IMAP and SMTP connections.}
+    - {step: 86, expectation: The signed Mail host still holds its data lease.}
+    - {step: 102, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
+    results: [85, 86, 102]
   - id: R3
     requirement: The signature-verified package delivers from both account types and preserves the Sent-copy behavior.
-    actions: [78, 79, 80, 81, 82, 83, 94, 95, 96, 97, 98, 99]
+    actions: [87, 88, 89, 90, 91, 92, 103, 104, 105, 106, 107, 108]
     checkpoints:
-    - {step: 85, expectation: The SMTP server received the message sent from the IMAP account.}
-    - {step: 86, expectation: The IMAP Sent copy was stored.}
-    - {step: 87, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
-    - {step: 101, expectation: The SMTP server received the message sent from the POP3 account.}
-    - {step: 102, expectation: The POP3 copy was stored in local Sent.}
-    - {step: 103, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
-    results: [85, 86, 87, 101, 102, 103]
+    - {step: 94, expectation: The SMTP server received the message sent from the IMAP account.}
+    - {step: 95, expectation: The IMAP Sent copy was stored.}
+    - {step: 96, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
+    - {step: 110, expectation: The SMTP server received the message sent from the POP3 account.}
+    - {step: 111, expectation: The POP3 copy was stored in local Sent.}
+    - {step: 112, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
+    results: [94, 95, 96, 110, 111, 112]
   - id: R4
     requirement: Disabling the module releases its data lease without restarting the desktop.
-    actions: [104, 105, 106]
+    actions: [113, 114, 115]
     checkpoints:
-    - {step: 107, expectation: The disabled package can be re-enabled.}
-    - {step: 108, expectation: The verified module is still installed and the host released its writer lease.}
-    - {step: 109, expectation: Disabling unmounts both Mail account panes.}
-    - {step: 110, expectation: Both tabs remain open for reactivation.}
-    - {step: 111, expectation: The remaining application runs without uncaught errors.}
-    results: [107, 108, 109, 110, 111]
+    - {step: 116, expectation: The disabled package can be re-enabled.}
+    - {step: 117, expectation: The verified module is still installed and the host released its writer lease.}
+    - {step: 118, expectation: Disabling unmounts both Mail account panes.}
+    - {step: 119, expectation: Both tabs remain open for reactivation.}
+    - {step: 120, expectation: The remaining application runs without uncaught errors.}
+    results: [116, 117, 118, 119, 120]
   - id: R5
     requirement: The signed Mail host catches up the selected inbox after messages arrive while another folder is open.
-    actions: [29, 31, 32]
+    actions: [29, 40, 41]
     checkpoints:
     - {step: 30, expectation: Archive becomes the selected folder.}
-    - {step: 33, expectation: Inbox becomes the selected folder again.}
-    - {step: 34, expectation: The newest header appears in the inbox.}
-    - {step: 37, expectation: The complete visible list matches the server.}
-    results: [30, 33, 34, 37]
+    - {step: 42, expectation: Inbox becomes the selected folder again.}
+    - {step: 43, expectation: The newest header appears in the inbox.}
+    - {step: 46, expectation: The complete visible list matches the server.}
+    results: [30, 42, 43, 46]
   - id: R6
     requirement: Subject search in the signed Mail renderer returns the matching header from the selected IMAP folder.
-    actions: [47, 48, 49]
+    actions: [56, 57, 58]
     checkpoints:
-    - {step: 50, expectation: The IMAP server reports exactly one match in INBOX.}
-    - {step: 51, expectation: The result list contains one row.}
-    - {step: 52, expectation: The result row shows the newly received subject.}
-    - {step: 53, expectation: The verified Mail package and writer lease remain active.}
-    results: [50, 51, 52, 53]
+    - {step: 59, expectation: The IMAP server reports exactly one match in INBOX.}
+    - {step: 60, expectation: The result list contains one row.}
+    - {step: 61, expectation: The result row shows the newly received subject.}
+    - {step: 62, expectation: The verified Mail package and writer lease remain active.}
+    results: [59, 60, 61, 62]
   - id: R7
     requirement: Toggling the selected message star updates the IMAP flag and the visible message list.
-    actions: [56, 57, 60]
+    actions: [65, 66, 69]
     checkpoints:
-    - {step: 58, expectation: The selected message shows a star.}
-    - {step: 59, expectation: Starred UI rows match the IMAP server's flagged UIDs.}
-    - {step: 61, expectation: The selected message no longer shows a star.}
-    - {step: 62, expectation: Starred UI rows still match the server after removing the flag.}
-    - {step: 67, expectation: The installed signed host and its writer lease remain active.}
-    results: [58, 59, 61, 62, 67]
+    - {step: 67, expectation: The selected message shows a star.}
+    - {step: 68, expectation: Starred UI rows match the IMAP server's flagged UIDs.}
+    - {step: 70, expectation: The selected message no longer shows a star.}
+    - {step: 71, expectation: Starred UI rows still match the server after removing the flag.}
+    - {step: 76, expectation: The installed signed host and its writer lease remain active.}
+    results: [67, 68, 70, 71, 76]
   - id: R8
     requirement: Marking the entire inbox as read updates the actual IMAP mailbox and the cached list.
-    actions: [63]
+    actions: [72]
     checkpoints:
-    - {step: 64, expectation: The whole-folder operation reports its success.}
-    - {step: 65, expectation: No displayed message is still unread.}
-    - {step: 66, expectation: The unread count and flagged UID set agree with the live IMAP server.}
-    results: [64, 65, 66]
+    - {step: 73, expectation: The whole-folder operation reports its success.}
+    - {step: 74, expectation: No displayed message is still unread.}
+    - {step: 75, expectation: The unread count and flagged UID set agree with the live IMAP server.}
+    results: [73, 74, 75]
   - id: R9
     requirement: The signed Mail module opens and saves the original MIME of a message whose partial archive fetch returns no bytes.
-    actions: [16, 22, 23, 27, 71, 72]
+    actions: [16, 22, 23, 27, 80, 81]
     checkpoints:
     - {step: 24, expectation: The raw message shows the exact IMAP subject header.}
     - {step: 25, expectation: The raw message also includes the IMAP body.}
     - {step: 26, expectation: The installed signed host holds the Mail writer lease while serving the account.}
     - {step: 28, expectation: Closing the source dialog returns to the folder list.}
-    - {step: 73, expectation: The native file contains the original IMAP subject header.}
-    - {step: 74, expectation: The native file contains the original IMAP body.}
-    results: [24, 25, 26, 28, 73, 74]
+    - {step: 82, expectation: The native file contains the original IMAP subject header.}
+    - {step: 83, expectation: The native file contains the original IMAP body.}
+    results: [24, 25, 26, 28, 82, 83]
   - id: R10
     requirement: A newly delivered IMAP message opens with its plain-text body in the installed Mail renderer.
-    actions: [35]
+    actions: [44]
     checkpoints:
-    - {step: 36, expectation: The reader shows the actual body from the IMAP fixture.}
-    results: [36]
+    - {step: 45, expectation: The reader shows the actual body from the IMAP fixture.}
+    results: [45]
+  - id: R11
+    requirement: The signed Mail renderer opens its Archive attachment as a read-only temporary file and releases it on close.
+    actions: [32, 34, 37]
+    checkpoints:
+    - {step: 33, expectation: The selected message exposes the expected attachment.}
+    - {step: 36, expectation: The new read-only viewer holds the exact attachment bytes.}
+    - {step: 39, expectation: Closing the viewer removes the controlled temporary file.}
+    results: [33, 36, 39]
   visual:
   - check: The Mail pane shows the connection results for both accounts.
     method: automated

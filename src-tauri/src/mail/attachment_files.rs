@@ -68,3 +68,24 @@ pub(super) fn write_attachment_file(target_path: &str, bytes: &[u8]) -> Result<S
     std::fs::write(&path, bytes).map_err(|e| format!("failed to write attachment: {e}"))?;
     Ok(path.to_string_lossy().to_string())
 }
+
+pub(super) fn publish_mail_bytes(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    std::fs::create_dir_all(parent).map_err(|error| format!("failed to create folder: {error}"))?;
+    let mut staging = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|error| format!("failed to stage mail file: {error}"))?;
+    staging
+        .write_all(bytes)
+        .map_err(|error| format!("failed to write mail file: {error}"))?;
+    staging
+        .as_file()
+        .sync_all()
+        .map_err(|error| format!("failed to flush mail file: {error}"))?;
+    staging
+        .persist(path)
+        .map_err(|error| format!("failed to save mail file: {}", error.error))?;
+    Ok(())
+}

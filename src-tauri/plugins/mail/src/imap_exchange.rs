@@ -2,8 +2,11 @@
 
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
-    ImapFlagUpdate, MailIncomingProtocol,
-    imap_exchange::{ImapExchange, RawMessageRequest, read_frame, write_body_frame, write_frame},
+    ImapFlagUpdate, IncomingTest, MailIncomingProtocol,
+    imap_exchange::{
+        AttachmentReceipt, AttachmentRequest, ImapExchange, RawMessageRequest, read_frame,
+        write_body_frame, write_frame,
+    },
 };
 use taomni_mail_engine::imap_sync::{FolderRoundRequest, HeaderStepRequest};
 use taomni_mail_engine::imap_transport::{
@@ -12,6 +15,7 @@ use taomni_mail_engine::imap_transport::{
 use taomni_mail_engine::search::ImapSearchRequest;
 use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_plugin_sdk::Operation;
+use taomni_plugin_stream::routed_tcp::Endpoint;
 use tokio::io::AsyncWriteExt;
 use tokio::runtime::Runtime;
 
@@ -110,20 +114,60 @@ pub(super) fn fetch_raw(
     if connection.protocol != MailIncomingProtocol::Imap || folder.trim().is_empty() || uid == 0 {
         return Err(RpcError::from_code(ErrorCode::InvalidParams));
     }
+    send_download(runtime, operation, connection, exchange, move |session| {
+        session.fetch_raw(&folder, uid).map(|raw| (raw.len(), raw))
+    })
+}
+
+pub(super) fn fetch_attachment(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: AttachmentRequest,
+) -> Result<Result<AttachmentReceipt, String>, RpcError> {
+    let AttachmentRequest {
+        connection,
+        exchange,
+        folder,
+        uid,
+        index,
+        section,
+    } = request;
+    if connection.protocol != MailIncomingProtocol::Imap || folder.trim().is_empty() || uid == 0 {
+        return Err(RpcError::from_code(ErrorCode::InvalidParams));
+    }
+    send_download(runtime, operation, connection, exchange, move |session| {
+        let attachment = session.fetch_attachment(&folder, uid, index, section.as_deref())?;
+        let receipt = AttachmentReceipt {
+            name: attachment.name,
+            content_type: attachment.content_type,
+            size: attachment.bytes.len(),
+        };
+        Ok((receipt, attachment.bytes))
+    })
+}
+
+fn send_download<T: Send + 'static>(
+    runtime: &Runtime,
+    operation: &Operation,
+    connection: IncomingTest,
+    exchange: Endpoint,
+    fetch: impl FnOnce(&mut ImapSession) -> Result<(T, Vec<u8>), String> + Send + 'static,
+) -> Result<Result<T, String>, RpcError> {
     let mut output = match runtime.block_on(while_current(operation, exchange.connect()))? {
         Ok((output, _)) => output,
         Err(error) => return Ok(Err(error)),
     };
-    let raw = match with_socket(runtime, operation, connection, move |stream, input| {
-        imap_catch_result(|| open_imap(stream, &input)?.fetch_raw(&folder, uid))
-    })? {
-        Ok(raw) => raw,
-        Err(error) => return Ok(Err(error)),
-    };
-    let written = runtime.block_on(while_current(operation, output.write_all(&raw)))?;
+    let (receipt, bytes) =
+        match with_socket(runtime, operation, connection, move |stream, input| {
+            imap_catch_result(|| fetch(&mut open_imap(stream, &input)?))
+        })? {
+            Ok(download) => download,
+            Err(error) => return Ok(Err(error)),
+        };
+    let written = runtime.block_on(while_current(operation, output.write_all(&bytes)))?;
     Ok(written
-        .map(|()| raw.len())
-        .map_err(|error| format!("Return original message: {error}")))
+        .map(|()| receipt)
+        .map_err(|error| format!("Return Mail download: {error}")))
 }
 
 pub(super) fn fetch_body(

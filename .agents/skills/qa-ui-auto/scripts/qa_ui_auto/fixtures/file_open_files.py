@@ -93,15 +93,17 @@ def setup_mail(ctx: Any) -> None:
     server = mail_fake_server.ACTIVE
     if server is None:
         raise RuntimeError("file_open_mail requires the local fake mail server")
+    signed_mail = ctx.case_id == "TC-MODULES-059"
     with server.state.lock:
-        for folder in server.state.folders.values():
-            folder.messages.clear()
+        if not signed_mail:
+            for folder in server.state.folders.values():
+                folder.messages.clear()
         raw = ("From: QA <qa@example.com>\r\nTo: reader@example.com\r\nSubject: Account-level AI policy\r\n"
                "MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=file-open\r\n\r\n"
                "--file-open\r\nContent-Type: text/plain\r\n\r\nRead-only attachment fixture\r\n"
                "--file-open\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Disposition: attachment; filename=policy.txt\r\n"
                "Content-Transfer-Encoding: base64\r\n\r\n").encode() + base64.b64encode(MAIL_TEXT.encode()) + b"\r\n--file-open--\r\n"
-        server.state.append_raw("INBOX", raw, [])
+        server.state.append_raw("Archive" if signed_mail else "INBOX", raw, [])
 
 
 def teardown(ctx: Any) -> None:

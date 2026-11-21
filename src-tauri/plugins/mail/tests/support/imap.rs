@@ -1,14 +1,17 @@
 use std::net::Ipv4Addr;
 
 use taomni_mail_api::{
-    FETCH_IMAP_BODY, IncomingTest, MailAuthMode, MailConnectionSecurity, MailIncomingProtocol,
-    MailProvider,
-    imap_exchange::{ImapExchange, read_body_frame, read_frame, write_frame},
+    FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, IncomingTest, MailAuthMode, MailConnectionSecurity,
+    MailIncomingProtocol, MailProvider,
+    imap_exchange::{
+        AttachmentReceipt, AttachmentRequest, ImapExchange, read_body_frame, read_frame,
+        write_frame,
+    },
 };
 use taomni_mail_engine::imap_transport::{ImapBodyReply, ImapBodyRequest};
-use taomni_plugin_stream::routed_tcp::Route;
+use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream},
     sync::oneshot,
 };
@@ -26,29 +29,10 @@ pub(super) fn check_routed_body(host: &mut MailHost) {
         .unwrap();
     std::thread::scope(|scope| {
         runtime.block_on(async {
-            let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
-            let address = listener.local_addr().unwrap();
-            let (_route, endpoint) = Route::bind(move || async move {
-                let stream = TcpStream::connect(address)
-                    .await
-                    .map_err(|error| error.to_string())?;
-                Ok((stream, address))
-            })
-            .await
-            .unwrap();
+            let (listener, _route, connection) = routed_mailbox().await;
             let (_exchange, exchange, mut peer) = Route::pair().await.unwrap();
             let request = ImapExchange {
-                connection: IncomingTest {
-                    route: endpoint,
-                    server_name: "imap.test".into(),
-                    security: MailConnectionSecurity::None,
-                    trusted_certificate: None,
-                    protocol: MailIncomingProtocol::Imap,
-                    provider: MailProvider::Custom,
-                    authentication: MailAuthMode::Password,
-                    username: "qa".into(),
-                    secret: "fixture-password".to_owned().into(),
-                },
+                connection,
                 exchange,
             };
             let (publish, response) = oneshot::channel();
@@ -87,7 +71,8 @@ pub(super) fn check_routed_body(host: &mut MailHost) {
                     assert_eq!(reply.original_size, Some(original.len()));
                     assert_eq!(original, format!("{HEADER}{TEXT}").as_bytes());
                 };
-                let (response, (), ()) = tokio::join!(response, read, serve(listener));
+                let (response, (), ()) =
+                    tokio::join!(response, read, serve(listener, FixtureFetch::Body));
                 serde_json::from_value::<Result<(), String>>(response.unwrap())
                     .unwrap()
                     .unwrap();
@@ -98,7 +83,139 @@ pub(super) fn check_routed_body(host: &mut MailHost) {
     });
 }
 
-async fn serve(listener: TcpListener) {
+pub(super) fn check_routed_attachment(host: &mut MailHost) {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    for section in [None, Some("2")] {
+        std::thread::scope(|scope| {
+            runtime.block_on(async {
+                let (listener, _route, connection) = routed_mailbox().await;
+                let (_exchange, exchange, mut peer) = Route::pair().await.unwrap();
+                let request = AttachmentRequest {
+                    connection,
+                    exchange,
+                    folder: "INBOX".into(),
+                    uid: 23,
+                    index: 0,
+                    section: section.map(str::to_owned),
+                };
+                let (publish, response) = oneshot::channel();
+                let host = &mut *host;
+                scope.spawn(move || {
+                    let value = host.call(
+                        FETCH_IMAP_ATTACHMENT,
+                        serde_json::to_value(request).unwrap(),
+                    );
+                    publish.send(value).unwrap();
+                });
+                let fixture = if section.is_some() {
+                    FixtureFetch::Section
+                } else {
+                    FixtureFetch::Attachment
+                };
+                let (value, bytes, ()) = tokio::time::timeout(WAIT, async {
+                    let read = async {
+                        let mut bytes = Vec::new();
+                        peer.read_to_end(&mut bytes).await.unwrap();
+                        bytes
+                    };
+                    tokio::join!(response, read, serve(listener, fixture))
+                })
+                .await
+                .expect("the attachment transfer terminates within the fixture timeout");
+                let receipt: Result<AttachmentReceipt, String> =
+                    serde_json::from_value(value.unwrap()).unwrap();
+                let receipt = receipt.unwrap();
+                assert_eq!(receipt.size, bytes.len());
+                assert_eq!(bytes, b"%QA\xff\0");
+                if section.is_some() {
+                    assert!(receipt.name.is_none());
+                } else {
+                    assert_eq!(receipt.name.as_deref(), Some("fixture.bin"));
+                    assert_eq!(
+                        receipt.content_type.as_deref(),
+                        Some("application/octet-stream")
+                    );
+                }
+            });
+        });
+    }
+}
+
+async fn routed_mailbox() -> (TcpListener, Route, IncomingTest) {
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let (route, endpoint): (Route, Endpoint) = Route::bind(move || async move {
+        let stream = TcpStream::connect(address)
+            .await
+            .map_err(|error| error.to_string())?;
+        Ok((stream, address))
+    })
+    .await
+    .unwrap();
+    let connection = IncomingTest {
+        route: endpoint,
+        server_name: "imap.test".into(),
+        security: MailConnectionSecurity::None,
+        trusted_certificate: None,
+        protocol: MailIncomingProtocol::Imap,
+        provider: MailProvider::Custom,
+        authentication: MailAuthMode::Password,
+        username: "qa".into(),
+        secret: "fixture-password".to_owned().into(),
+    };
+    (listener, route, connection)
+}
+
+enum FixtureFetch {
+    Body,
+    Attachment,
+    Section,
+}
+
+impl FixtureFetch {
+    fn reply(&self, request: &str) -> String {
+        const MIME: &str = concat!(
+            "Content-Type: application/octet-stream\r\n",
+            "Content-Disposition: attachment; filename=fixture.bin\r\n",
+            "Content-Transfer-Encoding: base64\r\n\r\n",
+        );
+        const BINARY: &str = "JVFB/wA=\r\n";
+        match self {
+            Self::Body => {
+                assert!(request.contains("BODY.PEEK[]<0.1024>"));
+                format!(
+                    "* 1 FETCH (UID 23 FLAGS () RFC822.SIZE {} BODY[HEADER] {{{}}}\r\n{HEADER} BODY[]<0> {{{}}}\r\n{HEADER}{TEXT})\r\n",
+                    HEADER.len() + TEXT.len(),
+                    HEADER.len(),
+                    HEADER.len() + TEXT.len()
+                )
+            }
+            Self::Attachment => {
+                assert!(request.ends_with("(UID BODY.PEEK[])"));
+                let message = format!(
+                    "From: sender@example.test\r\nSubject: Attachment fixture\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=mail-qa\r\n\r\n--mail-qa\r\nContent-Type: text/plain\r\n\r\nOpen the attachment.\r\n--mail-qa\r\n{MIME}{BINARY}--mail-qa--\r\n"
+                );
+                format!(
+                    "* 1 FETCH (UID 23 BODY[] {{{}}}\r\n{message})\r\n",
+                    message.len()
+                )
+            }
+            Self::Section => {
+                assert!(request.ends_with("(UID BODY.PEEK[2.MIME] BODY.PEEK[2])"));
+                format!(
+                    "* 1 FETCH (UID 23 BODY[2.MIME] {{{}}}\r\n{MIME} BODY[2] {{{}}}\r\n{BINARY})\r\n",
+                    MIME.len(),
+                    BINARY.len()
+                )
+            }
+        }
+    }
+}
+
+async fn serve(listener: TcpListener, fixture: FixtureFetch) {
     let (stream, _) = listener.accept().await.unwrap();
     let mut stream = BufReader::new(stream);
     stream
@@ -120,14 +237,8 @@ async fn serve(listener: TcpListener) {
             }
             "UID" => {
                 assert!(input.starts_with("UID FETCH 23 "));
-                assert!(input.contains("BODY.PEEK[]<0.1024>"));
                 fetches += 1;
-                format!(
-                    "* 1 FETCH (UID 23 FLAGS () RFC822.SIZE {} BODY[HEADER] {{{}}}\r\n{HEADER} BODY[]<0> {{{}}}\r\n{HEADER}{TEXT})\r\n",
-                    HEADER.len() + TEXT.len(),
-                    HEADER.len(),
-                    HEADER.len() + TEXT.len()
-                )
+                fixture.reply(&input)
             }
             "LOGOUT" => "* BYE goodbye\r\n".to_owned(),
             _ => panic!("unexpected IMAP command {command}"),

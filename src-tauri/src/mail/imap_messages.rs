@@ -51,37 +51,19 @@ pub(super) fn imap_fetch_body<T: Read + Write>(
 
 pub(super) fn imap_download_attachment<T: Read + Write>(
     session: &mut imap::Session<T>,
-    _account: &ResolvedMailAccount,
     folder: &str,
     uid: u32,
     attachment_index: usize,
     target_path: &str,
     section: Option<&str>,
 ) -> Result<MailDownloadAttachmentResult, String> {
-    session
-        .examine(folder)
-        .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
-    if let Some(section) = section {
-        let bytes = parts::imap_fetch_section(session, uid, section)?;
-        let path = write_attachment_file(target_path, &bytes)?;
-        return Ok(MailDownloadAttachmentResult {
-            path,
-            name: None,
-            content_type: None,
-            size: bytes.len(),
-        });
-    }
-    let fetches = session
-        .uid_fetch(uid.to_string(), "(UID BODY.PEEK[])")
-        .map_err(|e| format!("IMAP UID FETCH attachment failed: {e}"))?;
-    let fetch = fetches
-        .iter()
-        .next()
-        .ok_or_else(|| format!("message UID {uid} not found in {folder}"))?;
-    let body = fetch
-        .body()
-        .ok_or_else(|| format!("message UID {uid} did not include a body"))?;
-    let attachment = extract_attachment(body, attachment_index)?;
+    let attachment = taomni_mail_engine::imap_messages::imap_fetch_attachment(
+        session,
+        folder,
+        uid,
+        attachment_index,
+        section,
+    )?;
     let path = write_attachment_file(target_path, &attachment.bytes)?;
     Ok(MailDownloadAttachmentResult {
         path,

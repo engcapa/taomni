@@ -89,6 +89,11 @@ bytes when the account requests extra EML copies. The core resolves the target
 directory and commits the compatible body cache. Background prefetch keeps its
 pooled connection until the host can reuse a connection across a batch.
 
+Version 0.1.13 downloads uncached IMAP attachments in the signed host. For
+large messages, the host requests the selected MIME section. The core checks
+the returned byte count and publishes the file atomically before updating the
+optional attachment cache.
+
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.
 It publishes the module data before activating the verified package and

@@ -10,7 +10,7 @@ use native_tls::TlsStream;
 use crate::cache::MailCacheSettings;
 use crate::imap_auth::{MailAuthMode, MailProvider, authenticate};
 use crate::imap_folders::{imap_list_folders, imap_set_subscription};
-use crate::imap_messages::{Mailbox, imap_fetch_raw};
+use crate::imap_messages::{Mailbox, imap_fetch_attachment, imap_fetch_raw};
 use crate::imap_mutations::{imap_set_flags, unread_uids};
 use crate::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest, StepParams,
@@ -18,7 +18,7 @@ use crate::imap_sync::{
 };
 use crate::search::{ImapSearchRequest, search_imap_messages};
 use crate::tls::{MailConnectionSecurity, certificate_error_hint, tls_connector};
-use crate::{MailFolder, MailMessageCached, MailMessageHeader};
+use crate::{DownloadedMailAttachment, MailFolder, MailMessageCached, MailMessageHeader};
 use serde::{Deserialize, Serialize};
 use taomni_mail_api::ImapFlagUpdate;
 
@@ -157,6 +157,19 @@ impl ImapSession {
             Self::Tls(session) => mailbox.fetch_body(session, request.uid),
         }?;
         Ok((message, original))
+    }
+
+    pub fn fetch_attachment(
+        &mut self,
+        folder: &str,
+        uid: u32,
+        index: usize,
+        section: Option<&str>,
+    ) -> Result<DownloadedMailAttachment, String> {
+        match self {
+            Self::Plain(session) => imap_fetch_attachment(session, folder, uid, index, section),
+            Self::Tls(session) => imap_fetch_attachment(session, folder, uid, index, section),
+        }
     }
 }
 

@@ -5,10 +5,10 @@ description: >-
   original of a newly received message. Refresh Unified Mail after delivering
   a separate message. Disable the module and check both retained tabs show the
   disabled state.
-covers: [F-Modules-1, F-MAIL-3, F-MAIL-20, F-MAIL-23]
+covers: [F-Modules-1, F-MAIL-3, F-MAIL-15, F-MAIL-20, F-MAIL-23, F-FILEOPEN-1]
 tags: [modules, mail, p1]
 modes: [browser]
-fixtures: [reset_db, module_mail_preview, mail_server, file_open_files]
+fixtures: [reset_db, module_mail_preview, file_open_mail, file_open_files]
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
@@ -27,11 +27,28 @@ steps:
 - click: '[data-testid="tab-item"][data-tab-type="mail"]'
 - wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]'
 - mail_server_assert_list_matches: {timeout_sec: 30}
+- wait_for: '[data-testid="mail-message-row"][data-subject="${fixture.file_open_mail_subject}"]'
+- click: '[data-testid="mail-message-row"][data-subject="${fixture.file_open_mail_subject}"]'
+- wait_for: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
+- assert_file_open_bytes:
+    selector: '[data-testid="file-viewer"][data-readonly="true"]'
+    remember: signed-mail-attachment
+    equals: ${fixture.file_open_mail_text}
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-readonly="true"]', state: detached}
+- assert_file_open_bytes: {remember: signed-mail-attachment, absent: true}
 - mail_server_deliver: {count: 1, prefix: Module source}
 - click: '[data-testid="mail-sync-button"]:not([disabled])'
 - wait_for: '[data-testid="mail-message-row"][data-subject="Module source 0001"]'
 - click: '[data-testid="mail-message-row"][data-subject="Module source 0001"]'
-- assert_text: {selector: '[data-testid="mail-reader-text"]', contains: 'Subject: Module source 0001'}
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent
+      ?? document.querySelector('.taomni-mail-reader-text')?.textContent
+      ?? '').includes('Subject: Module source 0001')
+    expect_truthy: true
 - right_click: '[data-testid="mail-message-row"][data-subject="Module source 0001"]'
 - click: '[data-testid="context-menu-item-view-source"]'
 - assert_text: {selector: '[role="dialog"][aria-label="Message source"] pre', contains: 'Subject: Module source 0001'}
@@ -70,42 +87,50 @@ verification:
   requirements:
   - id: R1
     requirement: Enabling Mail renders the account list in the original tab and the unified list in its own tab.
-    actions: [5, 6, 9, 10, 12, 14, 33, 34, 35, 37]
+    actions: [5, 6, 9, 10, 12, 14, 42, 43, 44, 46]
     checkpoints:
     - {step: 7, expectation: The first open shows the disabled module.}
     - {step: 8, expectation: The disabled module has no account pane.}
     - {step: 15, expectation: The existing tab mounts the account pane from the Mail module.}
     - {step: 16, expectation: The account shows the same inbox as its stub server.}
-    - {step: 36, expectation: The Unified Mail entry mounts the module's unified pane.}
-    - {step: 38, expectation: Refresh populates the unified pane with the new message.}
-    results: [7, 8, 15, 16, 36, 38]
+    - {step: 45, expectation: The Unified Mail entry mounts the module's unified pane.}
+    - {step: 47, expectation: Refresh populates the unified pane with the new message.}
+    results: [7, 8, 15, 16, 45, 47]
   - id: R2
     requirement: Disabling Mail unmounts both panes while preserving both tabs.
-    actions: [39, 40, 41, 44, 46, 49]
+    actions: [48, 49, 50, 53, 55, 58]
     checkpoints:
-    - {step: 43, expectation: Both module panes have unmounted.}
-    - {step: 47, expectation: The original account tab displays the disabled state.}
-    - {step: 48, expectation: Exactly one account tab remains.}
-    - {step: 50, expectation: The original unified tab displays the disabled state.}
-    - {step: 51, expectation: Exactly one unified tab remains.}
-    - {step: 52, expectation: The transitions produce no uncaught errors.}
-    results: [43, 47, 48, 50, 51, 52]
+    - {step: 52, expectation: Both module panes have unmounted.}
+    - {step: 56, expectation: The original account tab displays the disabled state.}
+    - {step: 57, expectation: Exactly one account tab remains.}
+    - {step: 59, expectation: The original unified tab displays the disabled state.}
+    - {step: 60, expectation: Exactly one unified tab remains.}
+    - {step: 61, expectation: The transitions produce no uncaught errors.}
+    results: [52, 56, 57, 59, 60, 61]
   - id: R3
     requirement: The Mail account context menu shows the selected message's full source and saves it to the chosen browser path.
-    actions: [17, 18, 22, 23, 26, 28, 29, 30, 31]
+    actions: [26, 27, 31, 32, 35, 37, 38, 39, 40]
     checkpoints:
-    - {step: 19, expectation: Sync adds the newly delivered message to the account.}
-    - {step: 24, expectation: The source dialog shows the selected subject header.}
-    - {step: 25, expectation: The source dialog also renders the body.}
-    - {step: 27, expectation: Closing the source dialog leaves the account available.}
-    - {step: 32, expectation: The browser saves the full source in the chosen virtual file.}
-    results: [19, 24, 25, 27, 32]
+    - {step: 28, expectation: Sync adds the newly delivered message to the account.}
+    - {step: 33, expectation: The source dialog shows the selected subject header.}
+    - {step: 34, expectation: The source dialog also renders the body.}
+    - {step: 36, expectation: Closing the source dialog leaves the account available.}
+    - {step: 41, expectation: The browser saves the full source in the chosen virtual file.}
+    results: [28, 33, 34, 36, 41]
   - id: R4
     requirement: Opening the newly delivered message shows its corresponding body before exporting.
-    actions: [20]
+    actions: [29]
     checkpoints:
-    - {step: 21, expectation: The reader displays the body for the message just selected.}
-    results: [21]
+    - {step: 30, expectation: The reader displays the body for the message just selected.}
+    results: [30]
+  - id: R5
+    requirement: The Mail account attachment opens as a read-only browser file and is removed after the viewer closes.
+    actions: [18, 20, 23]
+    checkpoints:
+    - {step: 19, expectation: The selected message exposes the expected attachment.}
+    - {step: 22, expectation: The new read-only viewer holds the exact attachment bytes.}
+    - {step: 25, expectation: Closing the viewer removes the controlled temporary file.}
+    results: [19, 22, 25]
   visual:
   - check: The account and unified panes each show content when enabled and a status when disabled.
     method: automated
