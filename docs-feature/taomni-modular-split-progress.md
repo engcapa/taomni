@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- HTTP、FTP、TFTP、Cron、iperf 和 NFS 的实现迁入 `taomni-local-servers-engine`。Local servers 继续经原 IPC 使用这六种实现。TC-SERVERS-003 增加回环 HTTP 文件字节和停止后端口关闭检查。SSH/SFTP、Telnet 与签名 Servers 宿主继续按 TASK-018 迁移。
+- `7057ee03f` 的 Browser 三端各通过 26/26，全部 Browser 分片已在 Native 构建期间收取。联合发布演练从 `617bce843` 构建四目标候选与 RDP Server 包，版本为 0.6.0，已通过工作流选集和模块清单检查。 [三端 QA](https://github.com/engcapa/taomni/actions/runs/44950797093) · [联合构建](https://github.com/engcapa/taomni/actions/runs/44951621527)
 - Release Bundle 增加 `modules` 选项。选中的模块复用独立模块签名流程，并与核心安装件使用同一源码。联合发布核对已有目录的签名和包，再合并本次变更。未变更条目保留原 URL，首装名单继续冻结。空 `tag` 支持用当前候选模块演练构建，正式发布要求稳定模块与 draft Release。
 - 在 `d08c7a86f` 的 Linux Native 分片中，VNC Server 首次启动、运行中备份、停止和禁用均通过。重新启用后原用例在点击启动后立即探测写租约。失败截图保存时 daemon 已显示运行，日志也记录了新监听。用例先等运行状态，再保留真实端口、鉴权与写租约断言。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44945992713)
 - 三端 RDP Server 的签名工件改由各平台独立构建。TC-MODULES-065 新增 macOS 固定证书和 hardened runtime 验证，并复用独立桌面窗口检查实际远程输入与成像。正式 DMG 升级后的 TCC 授权复用仍按 G2 验证。
@@ -583,7 +585,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-015 | 已取消 | 历史设计 `7bc498b35` 中为 LanChat 迁移，已由用户明确删除决定取消；主设计已保留编号并清理前置依赖。旧库保持原位，不读取、迁移或删除，不创建替代插件。 |
 | TASK-016 RDP/VNC 客户端 | 独立宿主、签名前端与核心依赖裁剪已接入 | VNC 的 Windows 按键辅助进程已有回执。RDP 签名包验证原会话、实际输入、证书迁移与读取旧备份，三端阶段性 p95 均低于 130 ms。最终安装包、新旧版本连续升级和同一候选的三端生命周期继续验收。 |
 | TASK-017 RDP/VNC 服务端 | 已接入签名宿主与配置迁移，原生验收进行中 | 完成签名包的真实连接、停用和备份验收，并补 macOS 系统权限、Windows 和 macOS 的 VNC 系统服务以及正式安装件升级结果。 |
-| TASK-018 Servers | 待前置闭合 | 配置迁移、服务生命周期、目录与原有功能等价。 |
+| TASK-018 Servers | 六种实现已抽取，仍由原入口运行 | SSH/SFTP、Telnet、签名宿主、配置迁移、服务生命周期和原有功能等价待闭合。 |
 | TASK-019 SocksCap | 待前置闭合 | 提权/驱动/辅助进程、文件与恢复日志、卸载清理迁出。 |
 | TASK-020 截图 OCR/录制 | 待前置闭合 | OCR/录制插件；截图入口、滚动截图与采集保持核心归属。 |
 | TASK-021 本地语音 | 待前置闭合 | 本地 ASR/FIM 引擎和模型插件；云 ASR/麦克风保持核心归属。 |

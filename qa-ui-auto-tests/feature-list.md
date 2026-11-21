@@ -6011,6 +6011,7 @@ files:
   - src/components/servers/ServerRow.tsx
   - src/components/servers/ServerSettings.tsx
   - src/components/servers/CommonSettings.tsx
+  - src/components/servers/settings/HttpSettings.tsx
   - src/components/servers/settings/VncSettings.tsx
   - src/components/servers/ServerOutputLog.tsx
   - src/components/servers/fields.tsx
@@ -6023,11 +6024,16 @@ files:
   - src-tauri/src/servers/tab_lock.rs
   - src-tauri/src/servers/vnc.rs
   - src-tauri/src/servers/lifetime.rs
+  - src-tauri/crates/taomni-local-servers-engine/src/
   - src-tauri/plugins/vnc-server/module.json
   - src-tauri/plugins/vnc-server/src/daemon.rs
   - src-tauri/src/servers/mod.rs
   - src-tauri/src/windowing/mod.rs
 controls:
+  - id: server-field-http-root-dir
+    selector: '[data-testid="server-field-http-root-dir"]'
+    kind: interactive
+    optional: true
   # Single-instance tab ("servers") opened by Tools sidebar, Tools menu, Ctrl+Shift+S,
   # or ?servers=main. Protected within a window and across running Taomni instances.
   - id: sidebar-tool-servers
@@ -6174,7 +6180,7 @@ controls:
 - 后端 `src-tauri/src/servers/`：`ServerRegistry` 镜像 Tunnel 架构，`tab_lock.rs` 提供 `claim_servers_tab` / `release_servers_tab` 进程级锁管理并在窗口关闭/销毁及导航清理中释放；配置持久化到 SQLite `server_configs` 表并在启动时 `autostart_servers()`；in-process 纯 Rust（ssh/sftp/http/ftp/tftp/telnet/cron）与受监管系统二进制（vnc/nfs/iperf 经 `which` + `spawn_supervised`，缺工具返回明确错误而非假「运行中」）
 - 输出/状态分别通过 `server://output/<type>` / `server://status/<type>` 事件流推送；后端 `ServerRegistry` 另按类型保留最近 500 行输出（`list_server_logs`），重新打开页签可恢复日志，清空按钮同时清空后端历史（`clear_server_log`）；Apply 保存所有 dirty 配置，对运行中且端口已改的服务器提示 `Restart server to apply port change`；有未保存修改时 Cancel 会确认丢弃，切换到其他页签再切回会保留未保存草稿
 - i18n key 在 `servers.*`（en / zh-CN 双语）；前端 store 为 `serversStore`，IPC + 类型 + `SERVER_DEFS` 在 `src/lib/servers.ts`，单实例页签协调逻辑在 `src/lib/serversTab.ts`
-- **e2e 测试覆盖**：`TC-SERVERS-001-tab-singleton-browser`、`TC-auto-F-Servers-1-servers-dialog` 覆盖浏览器单实例页签及跨上下文互斥，`TC-SERVERS-002-tab-singleton-native` 覆盖原生双进程 OS `ModuleLock` 与热路由切换，`TC-SERVERS-003-tab-functional-native` 覆盖原生 HTTP 启停、日志、热改端口提示及配置持久化
+- **e2e 测试覆盖**：`TC-SERVERS-001-tab-singleton-browser`、`TC-auto-F-Servers-1-servers-dialog` 覆盖浏览器单实例页签及跨上下文互斥，`TC-SERVERS-002-tab-singleton-native` 覆盖原生双进程 OS `ModuleLock` 与热路由切换，`TC-SERVERS-003-tab-functional-native` 核对真实 HTTP 文件内容、停止后端口关闭、日志、热改端口提示及配置持久化。
 - VNC 由签名 `vnc-server` 宿主启动和监督系统 daemon。Linux X11 的 `TC-MODULES-063` 验证离线安装、真实回环连接、停止及禁用后的端口与租约释放。`TC-MODULES-064` 在 Browser 核对端口、绑定地址、密码及两个选项的保存和恢复。
 
 ### 22.2 RDP Server（与 Windows 远程桌面对齐）🚧

@@ -57,6 +57,7 @@ from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from . import mobile_web, mobile_service, mobile_openssh
+from .. import servers_http_observation
 from . import ard_required, editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_desktop_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, vnc_required, welcome_recents, workspace_root
 from . import platform_workspace_root
 from . import workspace_restore_sessions
@@ -163,6 +164,7 @@ REGISTRY: dict[str, Fixture] = {
     "module_signed_screenshot_archive": Fixture("module_signed_screenshot_archive", module_signed_archive.setup_screenshot),
     "module_signed_vnc_server_archive": Fixture("module_signed_vnc_server_archive", module_signed_archive.setup_vnc_server),
     "module_signed_rdp_server_archive": Fixture("module_signed_rdp_server_archive", module_signed_archive.setup_rdp_server),
+    "local_servers_http": Fixture("local_servers_http", servers_http_observation.setup),
     "module_execution": Fixture("module_execution", module_execution.setup, module_execution.teardown),
     "markdown_testing": Fixture("markdown_testing", markdown_testing.setup, markdown_testing.teardown),
     "markdown_quality": Fixture("markdown_quality", markdown_quality.setup, markdown_quality.teardown),

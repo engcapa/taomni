@@ -39,6 +39,13 @@ impl ServerCtx {
     }
 }
 
+impl From<ServerCtx> for taomni_local_servers_engine::ServerCtx {
+    fn from(ctx: ServerCtx) -> Self {
+        let log = ctx.log;
+        Self::new(ctx.cancel, move |line| log.line(line))
+    }
+}
+
 /// Emits human-readable log lines to the frontend on
 /// `server://output/<type>`. Each line is prefixed with a `[HH:MM:SS]`
 /// local-time timestamp.
@@ -82,6 +89,15 @@ pub struct ServerStarted {
     /// The running accept-loop / supervisor task. Must exit when the
     /// context's `cancel` token is cancelled.
     pub task: JoinHandle<()>,
+}
+
+impl From<taomni_local_servers_engine::ServerStarted> for ServerStarted {
+    fn from(started: taomni_local_servers_engine::ServerStarted) -> Self {
+        Self {
+            pid: started.pid,
+            task: started.task,
+        }
+    }
 }
 
 /// Update the registry's status map for `status.server_type` and emit the new

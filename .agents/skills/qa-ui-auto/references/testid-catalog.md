@@ -3227,6 +3227,7 @@
 
 ## servers (F-Servers-1)
 
+- `[data-testid="server-field-http-root-dir"]` — interactive [optional] — F-Servers-1.server-field-http-root-dir
 - `[data-testid="sidebar-tool-servers"]` — interactive [optional] — F-Servers-1.sidebar-tool-servers
 - `[data-testid="servers-tab-panel"]` — display [optional] — F-Servers-1.servers-tab-panel
 - `[data-testid="tab-item"][data-tab-type="servers"]` — display [optional] — F-Servers-1.tab-servers

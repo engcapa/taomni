@@ -10939,6 +10939,7 @@ dependencies = [
  "subtle",
  "taomni-capture",
  "taomni-file-uri",
+ "taomni-local-servers-engine",
  "taomni-mail-api",
  "taomni-mail-engine",
  "taomni-mfa-engine",
@@ -11098,6 +11099,18 @@ dependencies = [
  "tokio",
  "windows 0.62.2",
  "zeroize",
+]
+
+[[package]]
+name = "taomni-local-servers-engine"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dirs 6.0.0",
+ "taomni-server-process",
+ "tokio",
+ "tokio-util 0.7.19",
+ "which",
 ]
 
 [[package]]

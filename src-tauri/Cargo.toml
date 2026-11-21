@@ -36,6 +36,7 @@ members = [
     "crates/taomni-screenshot-ocr",
     "crates/taomni-screenshot-recording",
     "crates/taomni-server-process",
+    "crates/taomni-local-servers-engine",
     "crates/taomni-sqlite-snapshot",
     "crates/taomni-vnc-api",
     "crates/taomni-vnc-engine",
@@ -100,6 +101,7 @@ taomni-screenshot-api = { path = "crates/taomni-screenshot-api" }
 taomni-screenshot-ocr = { path = "crates/taomni-screenshot-ocr", optional = true }
 taomni-screenshot-recording = { path = "crates/taomni-screenshot-recording", optional = true }
 taomni-server-process = { path = "crates/taomni-server-process" }
+taomni-local-servers-engine = { path = "crates/taomni-local-servers-engine" }
 taomni-rdp-server-engine = { path = "crates/taomni-rdp-server-engine", optional = true }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-rdp-client-api = { path = "crates/taomni-rdp-client-api" }

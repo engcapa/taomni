@@ -18,6 +18,7 @@ export function HttpSettings({ config, onChange }: Props) {
     <div className="flex flex-col">
       <PathField
         label={t("servers.fields.rootDir")}
+        testId="server-field-http-root-dir"
         value={rootDir}
         mode="folder"
         browseLabel={t("servers.fields.browse")}

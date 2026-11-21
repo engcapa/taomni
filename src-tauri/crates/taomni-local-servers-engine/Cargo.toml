@@ -1,0 +1,15 @@
+[package]
+name = "taomni-local-servers-engine"
+version = "0.1.0"
+description = "Local file, scheduling and system daemon servers for Taomni"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[dependencies]
+chrono = "0.4"
+dirs = "6"
+taomni-server-process = { path = "../taomni-server-process" }
+tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "process", "rt", "time"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+which = "8"

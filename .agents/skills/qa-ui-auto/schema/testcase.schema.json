@@ -107,6 +107,7 @@
           "module_signed_screenshot_archive",
           "module_signed_vnc_server_archive",
           "module_signed_rdp_server_archive",
+          "local_servers_http",
           "module_execution",
           "module_backup_data",
           "vnc_required",
@@ -968,6 +969,10 @@
         "assert_signed_rdp_server": {
           "enum": ["idle", "running", "backup", "disabled"],
           "description": "Verify the signed RDP Server host identity, migrated configuration, write lease and loopback listener. The backup phase also checks the module dataset and Vault."
+        },
+        "assert_local_servers_http": {
+          "enum": ["serving", "stopped"],
+          "description": "Native Local servers HTTP case. Check an actual file response or the closed listener on its registered loopback port."
         },
         "assert_signed_mail_host": {
           "enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "disabled"],
