@@ -18,7 +18,8 @@ use crate::imap_sync::{
 };
 use crate::search::{ImapSearchRequest, search_imap_messages};
 use crate::tls::{MailConnectionSecurity, certificate_error_hint, tls_connector};
-use crate::{MailFolder, MailMessageHeader};
+use crate::{MailFolder, MailMessageCached, MailMessageHeader};
+use serde::{Deserialize, Serialize};
 use taomni_mail_api::ImapFlagUpdate;
 
 pub struct ImapConnection<'a> {
@@ -34,6 +35,23 @@ pub struct ImapConnection<'a> {
 pub enum ImapSession {
     Plain(Session<TcpStream>),
     Tls(Session<TlsStream<TcpStream>>),
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ImapBodyRequest {
+    pub account_id: String,
+    pub folder: String,
+    pub uid: u32,
+    pub body_max_bytes: u32,
+    pub save_original: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ImapBodyReply {
+    pub message: MailMessageCached,
+    pub original_size: Option<usize>,
 }
 
 /// Discard a session after the IMAP library detects an out-of-sequence reply.
@@ -112,6 +130,33 @@ impl ImapSession {
             Self::Plain(session) => imap_fetch_raw(session, folder, uid),
             Self::Tls(session) => imap_fetch_raw(session, folder, uid),
         }
+    }
+
+    pub fn fetch_body(
+        &mut self,
+        request: &ImapBodyRequest,
+    ) -> Result<(MailMessageCached, Option<Vec<u8>>), String> {
+        let cache = MailCacheSettings {
+            body_max_bytes: request.body_max_bytes,
+            ..MailCacheSettings::default()
+        };
+        let mut original = None;
+        let mut mailbox = Mailbox {
+            account_id: &request.account_id,
+            name: &request.folder,
+            cache: &cache,
+            save_original: |_, bytes: &[u8]| {
+                if request.save_original {
+                    original = Some(bytes.to_vec());
+                }
+                Ok(())
+            },
+        };
+        let message = match self {
+            Self::Plain(session) => mailbox.fetch_body(session, request.uid),
+            Self::Tls(session) => mailbox.fetch_body(session, request.uid),
+        }?;
+        Ok((message, original))
     }
 }
 

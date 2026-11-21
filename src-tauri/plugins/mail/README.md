@@ -83,6 +83,12 @@ absent from the local archive. The host transfers the original bytes over
 the authorized companion socket. The desktop checks the reported length
 before displaying the source or publishing the user-selected EML file.
 
+Version 0.1.12 fetches and decodes uncached bodies opened by the reader in
+the signed host. It preserves large-message part selection and returns MIME
+bytes when the account requests extra EML copies. The core resolves the target
+directory and commits the compatible body cache. Background prefetch keeps its
+pooled connection until the host can reuse a connection across a batch.
+
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.
 It publishes the module data before activating the verified package and

@@ -2,8 +2,10 @@
 
 ## 2026-11-21 当前进展
 
+- Mail 0.1.12 将用户打开的未缓存 IMAP 正文交给签名宿主读取和解析，继续支持大邮件分段及额外 EML 副本。核心保留归档优先、过渡期缓存提交和文件路径所有权。后台预热暂时复用原连接，避免每封邮件重新登录。现有签名操作和预览用例增加阅读区断言，跨进程协议检查正文及 MIME 原件的字节。
 - Mail 0.1.11 由签名宿主读取未归档邮件的 IMAP 原文。核心通过授权连接接收 MIME 字节并核对长度，查看时沿用原文对话框，保存时原子替换目标 EML。已归档邮件继续读取已校验的本机原件。TC-MODULES-059 核对实际 IMAP 原文和本机落盘，TC-MODULES-060 核对 Browser 对话框及导出文件字节。
-- `38eb4d116` 的 Browser 分片已在 Native 执行期间收齐，Linux、Windows 和 macOS 26 各通过 37/37。三个平台的 Native 仍在逐片复验订阅和星标。 [Browser 与 Native 回执](https://github.com/engcapa/taomni/actions/runs/44908352214)
+- `38eb4d116` 的 18 个 Browser 与 Native 分片已在汇总前收齐。Linux、Windows、macOS 26 Browser 各通过 37/37，Native 分别通过 39/39、39/39、38/39，三端 TC-MODULES-059 均通过。macOS 唯一失败是 TC-FILE-OPEN-007 的系统保存对话框识别，同一路径在该 Mail 修复前已有相同失败。 [订阅与星标回执](https://github.com/engcapa/taomni/actions/runs/44908352214) · [原失败](https://github.com/engcapa/taomni/actions/runs/44905615485)
+- `d67452ba8` 合入 `main` 的 #852。三端 Browser 各通过 27/27，原文与 EML 用例已通过。Native 与完整崩溃回归继续逐片下载至 `qa-ui-auto-report/github/44912118959/live-shards/`。 [合并提交](https://github.com/engcapa/taomni/commit/986c63b17) · [原始分片](https://github.com/engcapa/taomni/actions/runs/44912118959)
 - Mail 0.1.10 将全部已读的未读 UID 查询和标记批次交给签名宿主。核心逐批提交缓存，结束时用服务器剩余未读修正计数。TC-MODULES-059 核对真实服务器和列表均清除未读，TC-MAIL-BULK-01 检查收到确认后按钮变为不可用。
 - `662d66d07` 的 Linux Native 为 36/37，Git Clone 和完整崩溃回归通过。TC-MODULES-059 的失败页面显示 Archive 在首次取消订阅前已丢失订阅标记。修复将 LIST/LSUB 文件夹属性与 EXAMINE/STATUS 同步数据分别写入，TC-MAIL-FOLDER-01 增加选中 Archive 抓取新邮件后的订阅断言。 [失败分片](https://github.com/engcapa/taomni/actions/runs/44904055836)
 - `662d66d07` 的 Linux、Windows 和 macOS 26 Browser 各 37/37。六个 Browser 分片在 Native 构建期间逐片下载，TC-MODULES-060 三端均已通过。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44904055836)
@@ -534,7 +536,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-003 共享采集 | 引擎与私有 still 服务已集成 | 引擎/权限/像素/一次性采集已下沉，核心持有显示器、帧源和窗口生命周期；四目标库 check、真实 X11 与三端 SDK still 场景已有证据。真实 MFA facade 尚未调用新的私有入口；物理屏幕经宿主路径、macOS TCC 与 RDP 性能仍待验证。当前 matching UI/crash 继续收证。 |
 | TASK-004 RDP 公共库 | 已集成，公共库门已有证据 | `taomni-rdp-common` 与零依赖 `taomni-file-uri` 已被原调用方使用。`237e35f5f` 的 #43978893008 已取得四目标 check、三端 full/minimal unit/tree 与 Linux 原调用方单元；整轮其它失败保留，不称全 run 成功。精确保留 UI/剪贴板与发布性能仍按下方场景收口。 |
 | TASK-005 核心状态 | 005-A 已集成验证；005-B 待迁出 | CoreState/LegacyFeatureRuntime、统一 bootstrap、服务准入/Vault 协调、弱观察器与退出清理已有契约和 TC-MODULES-008/009 证据；业务状态和依赖尚在 LegacyFeatureRuntime，005-B 未完成。 |
-| TASK-006 核心依赖闭包 | VNC 已裁剪，其他模块继续 | 四个目标的默认 Cargo 树及 Vite 产物已排除 VNC 引擎、辅助程序和查看器。其余业务依赖、安装包资源和最终四目标回执待补。 [VNC 清单](https://github.com/engcapa/taomni/actions/runs/44853523906) |
+| TASK-006 核心依赖闭包 | RDP/VNC 客户端已裁剪，其他模块继续 | 四个目标的默认 Cargo 树及生产 Vite 清单已排除 RDP/VNC 客户端引擎、宿主及查看器，Windows VNC 按键辅助程序也已迁出。其余业务依赖、安装包资源和最终四目标回执待补。 [四目标清单](https://github.com/engcapa/taomni/actions/runs/44879692505) |
 | TASK-007 前端注册和路由 | 运行时已有 native 证据；业务前端待迁出 | 主窗/分离窗真实动态 ESM、共享 SDK、owner 失效/取消、locator 恢复和篡改拒绝已接入，TC-MODULES-016/018 有 matching native 结果；十个业务前端与各独立入口的完整等价验证尚未完成。 |
 | TASK-008 宿主监督 | 生产 adapter 已接入，三端 37 项门通过 | 主动心跳、重启预算、取消/revoke、确认进程树退出、双向服务、profile 与 snapshot 已接入；最新产品源码 #44020928836 三端各 37/37。完整已安装发行包的强杀/下次清扫与业务资源仍按 G6/G11 验证。 |
 | TASK-009 生命周期 | 已验证签名模块无重启更新与回滚 | Linux、Windows、macOS Intel 的 TC-MODULES-042 通过，含禁用偏好、原数据、切换后真实宿主与握手失败恢复。各正式业务模块仍需核对其资源释放和数据。 [三端 #44287815253](https://github.com/engcapa/taomni/actions/runs/44287815253) |
@@ -544,7 +546,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-013 原型与 G 门 | hello/MFA 真宿主与签名包已有证据；G 门未闭合 | 三端实际进程、四目标签名包及三端正式安装门已有结果；G1/G3 系统实验、Linux noexec 已保留通过项与限制。完整安装包、hardened runtime/签名信任、性能、core-only 与真实升级仍有缺口，不能宣布 G1–G11 全过。 |
 | TASK-014 MFA | 签名安装门通过；已提交 profile 的业务接管待复验 | 独立 store actor、作用域 KeyProvider、snapshot、可信包安装已有三端结果。`76c3f94e9` 接入已提交 profile 的宿主命令和旧归档恢复。新装 profile 的模块入口、实际旧安装的升级触发、capture RPC、动态 UI、相关 G 门与迁出后三态还原待闭合。 |
 | TASK-015 | 已取消 | 历史设计 `7bc498b35` 中为 LanChat 迁移，已由用户明确删除决定取消；主设计已保留编号并清理前置依赖。旧库保持原位，不读取、迁移或删除，不创建替代插件。 |
-| TASK-016 RDP/VNC 客户端 | 已接入独立宿主与签名前端，三端验收进行中 | VNC 的 Windows 按键辅助进程用例已通过。RDP 的原会话、生命周期和端到端输入进入签名包 QA，证书表迁移及核心 Rust 依赖裁剪待完成。 |
+| TASK-016 RDP/VNC 客户端 | 独立宿主、签名前端与核心依赖裁剪已接入 | VNC 的 Windows 按键辅助进程已有回执。RDP 签名包验证原会话、实际输入、证书迁移与读取旧备份，三端阶段性 p95 均低于 130 ms。最终安装包、新旧版本连续升级和同一候选的三端生命周期继续验收。 |
 | TASK-017 RDP/VNC 服务端 | 待前置闭合 | 两个插件宿主、共享采集/公共库、系统权限和平台边界。 |
 | TASK-018 Servers | 待前置闭合 | 配置迁移、服务生命周期、目录与原有功能等价。 |
 | TASK-019 SocksCap | 待前置闭合 | 提权/驱动/辅助进程、文件与恢复日志、卸载清理迁出。 |
@@ -554,7 +556,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-023 发布验收 | 目录签名、首装名单和独立模块发布准备已验证 | 发布工具覆盖已暂存模块的签名、声明平台、描述和摘要。核心发布继承签名目录，独立发布保留原模块的资产地址。正式模块构建矩阵、系统签名、首批目录及最终两种安装集合的回归和性能仍待交付。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
 | TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
-| TASK-026 Mail | 签名前端及部分原生业务已迁入独立宿主 | 独立宿主提供签名页面、连接测试、SMTP 发送、IMAP 文件夹与邮件头同步、搜索和标记，已接入只读导入及备份导出。正文同步和归档、核心过渡缓存与完整后台任务、首发安装升级和回滚验收继续推进。 |
+| TASK-026 Mail | 签名前端及部分原生业务已迁入独立宿主 | 签名宿主负责连接测试、SMTP 发送、IMAP 文件夹、邮件头、搜索、标记，以及原文和按需正文读取。后台预热、归档、附件和过渡缓存仍待迁出，需完成正式安装升级、数据接管和回滚验收。 |
 | TASK-027 G1–G11 全门禁收口 | 新增任务，未闭合 | G1–G11 的当前证据仍存在正式发行包、业务模块、核心依赖闭包、系统信任和完整入口矩阵缺口；必须用匹配源码的 GitHub runner receipt 逐项闭合后才能进入生产发布。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。

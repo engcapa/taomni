@@ -3,10 +3,12 @@
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     ImapFlagUpdate, MailIncomingProtocol,
-    imap_exchange::{ImapExchange, RawMessageRequest, read_frame, write_frame},
+    imap_exchange::{ImapExchange, RawMessageRequest, read_frame, write_body_frame, write_frame},
 };
 use taomni_mail_engine::imap_sync::{FolderRoundRequest, HeaderStepRequest};
-use taomni_mail_engine::imap_transport::{ImapSession, imap_catch_result};
+use taomni_mail_engine::imap_transport::{
+    ImapBodyReply, ImapBodyRequest, ImapSession, imap_catch_result,
+};
 use taomni_mail_engine::search::ImapSearchRequest;
 use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_plugin_sdk::Operation;
@@ -124,6 +126,31 @@ pub(super) fn fetch_raw(
         .map_err(|error| format!("Return original message: {error}")))
 }
 
+pub(super) fn fetch_body(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: ImapExchange,
+) -> Result<Result<(), String>, RpcError> {
+    transfer_with_original(
+        runtime,
+        operation,
+        request,
+        ReplyEncoding::MessageBody,
+        |session, input: ImapBodyRequest| {
+            validate_folder(&input.account_id, &input.folder)?;
+            if input.uid == 0 {
+                return Err("IMAP body lookup requires a valid UID".into());
+            }
+            let (message, original) = session.fetch_body(&input)?;
+            let reply = ImapBodyReply {
+                message,
+                original_size: original.as_ref().map(Vec::len),
+            };
+            Ok((reply, original))
+        },
+    )
+}
+
 fn validate_folder(account_id: &str, folder: &str) -> Result<(), String> {
     if account_id.trim().is_empty() || folder.trim().is_empty() {
         return Err("Mail IMAP requests require an account and folder".into());
@@ -136,6 +163,27 @@ fn transfer<T: DeserializeOwned + Send + 'static, R: Serialize + Send + 'static>
     operation: &Operation,
     request: ImapExchange,
     work: impl FnOnce(&mut ImapSession, T) -> Result<R, String> + Send + 'static,
+) -> Result<Result<(), String>, RpcError> {
+    transfer_with_original(
+        runtime,
+        operation,
+        request,
+        ReplyEncoding::Standard,
+        move |session, input| work(session, input).map(|result| (result, None)),
+    )
+}
+
+enum ReplyEncoding {
+    Standard,
+    MessageBody,
+}
+
+fn transfer_with_original<T: DeserializeOwned + Send + 'static, R: Serialize + Send + 'static>(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: ImapExchange,
+    encoding: ReplyEncoding,
+    work: impl FnOnce(&mut ImapSession, T) -> Result<(R, Option<Vec<u8>>), String> + Send + 'static,
 ) -> Result<Result<(), String>, RpcError> {
     if request.connection.protocol != MailIncomingProtocol::Imap {
         return Err(RpcError::from_code(ErrorCode::InvalidParams));
@@ -156,8 +204,21 @@ fn transfer<T: DeserializeOwned + Send + 'static, R: Serialize + Send + 'static>
         request.connection,
         move |stream, input| imap_catch_result(|| work(&mut open_imap(stream, &input)?, step)),
     )?;
+    let (outcome, original) = match outcome {
+        Ok((result, original)) => (Ok(result), original),
+        Err(error) => (Err(error), None),
+    };
     let frame =
         serde_json::to_vec(&outcome).map_err(|_| RpcError::from_code(ErrorCode::InternalError))?;
-    let sent = runtime.block_on(while_current(operation, write_frame(&mut exchange, &frame)))?;
+    let sent = runtime.block_on(while_current(operation, async {
+        match encoding {
+            ReplyEncoding::Standard => write_frame(&mut exchange, &frame).await?,
+            ReplyEncoding::MessageBody => write_body_frame(&mut exchange, &frame).await?,
+        }
+        if let Some(original) = original {
+            write_frame(&mut exchange, &original).await?;
+        }
+        Ok::<_, std::io::Error>(())
+    }))?;
     Ok(sent.map_err(|error| format!("Return Mail IMAP result: {error}")))
 }

@@ -25,10 +25,12 @@ mod cache_access;
 
 pub use cache_access::*;
 
+mod message_body;
 mod message_commands;
 mod message_source;
 mod module_host;
 
+pub use message_body::*;
 pub use message_commands::*;
 pub use message_source::*;
 

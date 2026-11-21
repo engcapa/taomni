@@ -19,6 +19,7 @@ pub const SEARCH_IMAP: &str = "mail/search-imap";
 pub const SET_IMAP_FLAGS: &str = "mail/set-imap-flags";
 pub const LIST_IMAP_UNREAD: &str = "mail/list-imap-unread";
 pub const FETCH_IMAP_RAW: &str = "mail/fetch-imap-raw";
+pub const FETCH_IMAP_BODY: &str = "mail/fetch-imap-body";
 pub const SEND_SMTP: &str = "mail/send-smtp";
 pub const HOST_REQUEST_TIMEOUT: Duration = Duration::from_secs(70);
 pub const SMTP_DELIVERY_UNKNOWN: &str = "SMTP delivery status unknown";

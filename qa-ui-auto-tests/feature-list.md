@@ -7596,6 +7596,7 @@ files:
   - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mail.ts
   - src-tauri/src/mail/mod.rs
+  - src-tauri/src/mail/message_body.rs
   - src-tauri/src/mail/imap_transport.rs
   - src-tauri/crates/taomni-mail-engine/src/imap_auth.rs
 controls:
@@ -7619,6 +7620,7 @@ controls:
 - Sessions 与 Workspace 使用同一个 Mail 模块入口。已启用的签名前端提供账户和统一收件箱。TC-MODULES-059 比对实际宿主与前端摘要，TC-MODULES-060 覆盖两个标签的启用和停用。
 - 最近正文缓存按 `bodyRecentLimit` 遍历已缓存 headers，逐封调用 `mail_prefetch_message_body` 写入原生磁盘缓存，并用独立进度显示；预取不向前端传输或渲染正文，手动打开邮件使用独立于同步的 IMAP 连接。
 - 邮件正文读取按 `folder:uid` 缓存在前端内存中；点击已缓存正文优先使用内存/SQLite，自动标记已读不再等待正文加载完成。
+- 已启用的 Mail 宿主读取并解码用户打开的未缓存正文，保留大邮件分段和额外 EML 副本。TC-MODULES-059/060 检查实际阅读区，Mail 宿主协议用例核对解析后的内容及服务器原始字节。
 - 整个 IMAP 文件夹标记已读先查询服务器 UNSEEN，涵盖未下载历史；每批最多 250 个 UID，批间释放账号连接锁，网络断连只重试幂等标记。
 - 标记、移动、删除的 SQLite 写入使用后台线程中的批量事务；本地搜索也在后台线程执行。
 - 同步缓存与联系人索引的数据库工作在阻塞线程池执行；新增历史邮件增量收集联系人，正文清理仅更新实际有正文的记录。

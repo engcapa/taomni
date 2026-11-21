@@ -12,15 +12,16 @@ use std::{
 use lettre::address::Envelope;
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
-    CHECK_INCOMING, CHECK_OUTGOING, FETCH_IMAP_RAW, FolderSubscription, HOST_REQUEST_TIMEOUT,
-    IMAP_FOLDER_TREE, ImapFlagUpdate, ImapFolderTree, IncomingTest, LIST_IMAP_UNREAD, SEARCH_IMAP,
-    SEND_SMTP, SET_IMAP_FLAGS, SLUG, SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND,
-    SmtpConnection, SmtpDelivery,
-    imap_exchange::{ImapExchange, RawMessageRequest, read_frame, write_frame},
+    CHECK_INCOMING, CHECK_OUTGOING, FETCH_IMAP_BODY, FETCH_IMAP_RAW, FolderSubscription,
+    HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, ImapFlagUpdate, ImapFolderTree, IncomingTest,
+    LIST_IMAP_UNREAD, SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, SLUG, SMTP_DELIVERY_UNKNOWN,
+    SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
+    imap_exchange::{ImapExchange, RawMessageRequest, read_body_frame, read_frame, write_frame},
 };
 use taomni_mail_engine::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest,
 };
+use taomni_mail_engine::imap_transport::{ImapBodyReply, ImapBodyRequest};
 use taomni_mail_engine::search::ImapSearchRequest;
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
 use tokio::io::AsyncReadExt;
@@ -33,7 +34,7 @@ use crate::{
     },
 };
 
-use super::{MailFolder, MailMessageHeader, ResolvedMailAccount};
+use super::{MailFolder, MailMessageCached, MailMessageHeader, ResolvedMailAccount};
 
 pub(super) fn checks_incoming(registry: &PluginRegistry) -> bool {
     supports(registry, CHECK_INCOMING)
@@ -65,6 +66,10 @@ pub(super) fn lists_imap_unread(registry: &PluginRegistry) -> bool {
 
 pub(super) fn fetches_imap_raw(registry: &PluginRegistry) -> bool {
     supports(registry, FETCH_IMAP_RAW)
+}
+
+pub(super) fn fetches_imap_body(registry: &PluginRegistry) -> bool {
+    supports(registry, FETCH_IMAP_BODY)
 }
 
 pub(super) async fn sync_imap_headers(
@@ -177,6 +182,67 @@ pub(super) async fn fetch_imap_raw(
     Ok(bytes)
 }
 
+pub(super) async fn fetch_imap_body(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    folder: &str,
+    uid: u32,
+) -> Result<(MailMessageCached, Option<Vec<u8>>), String> {
+    let request = ImapBodyRequest {
+        account_id: account.config.session_id.clone(),
+        folder: folder.to_owned(),
+        uid,
+        body_max_bytes: account.config.cache.body_max_bytes,
+        save_original: account
+            .config
+            .cache
+            .save_directory
+            .as_deref()
+            .is_some_and(|directory| !directory.trim().is_empty()),
+    };
+    let bytes = serde_json::to_vec(&request).map_err(|error| error.to_string())?;
+    let (_route, exchange, mut peer) = Route::pair().await.map_err(|error| error.to_string())?;
+    let receive = async {
+        write_frame(&mut peer, &bytes)
+            .await
+            .map_err(|error| error.to_string())?;
+        let frame = read_body_frame(&mut peer)
+            .await
+            .map_err(|error| error.to_string())?;
+        let reply: ImapBodyReply = decode_imap_reply(frame).await?;
+        let header = &reply.message.header;
+        if header.account_id != request.account_id || header.folder != folder || header.uid != uid {
+            return Err("Mail module returned a different message".into());
+        }
+        let original = match reply.original_size {
+            Some(size) if request.save_original => {
+                let original = read_frame(&mut peer)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                if original.len() != size {
+                    return Err("Mail module returned an incomplete original message".into());
+                }
+                Some(original)
+            }
+            Some(_) => return Err("Mail module returned an unsolicited original message".into()),
+            None => None,
+        };
+        Ok((reply.message, original))
+    };
+    let invoke = invoke_with_incoming::<(), _>(registry, account, FETCH_IMAP_BODY, |connection| {
+        ImapExchange {
+            connection,
+            exchange,
+        }
+    });
+    let (_, result) = tokio::time::timeout(HOST_REQUEST_TIMEOUT + Duration::from_secs(5), async {
+        tokio::try_join!(invoke, receive)
+    })
+    .await
+    .map_err(|_| "Mail module IMAP body request timed out".to_owned())??;
+    Ok(result)
+}
+
 async fn exchange_imap<T: DeserializeOwned + Send + 'static>(
     registry: Arc<PluginRegistry>,
     account: &ResolvedMailAccount,
@@ -204,6 +270,12 @@ async fn exchange_imap<T: DeserializeOwned + Send + 'static>(
     })
     .await
     .map_err(|_| "Mail module IMAP request timed out".to_owned())??;
+    decode_imap_reply(frame).await
+}
+
+async fn decode_imap_reply<T: DeserializeOwned + Send + 'static>(
+    frame: Vec<u8>,
+) -> Result<T, String> {
     tokio::task::spawn_blocking(move || {
         serde_json::from_slice::<Result<T, String>>(&frame)
             .map_err(|_| "Invalid Mail IMAP result".to_owned())?
