@@ -364,12 +364,16 @@ pub fn plugin_migration_inspect(
     use crate::plugin::migration::{MigrationItem, MigrationJournal};
     let root = legacy_profile_root(&state);
     let mut snapshot = inspect_legacy_profile(&root, from_version, &state)?;
-    if MigrationJournal::load(&root.join("migration/journal.json"))
-        .is_ok_and(|journal| journal.retained_vnc_sessions())
-    {
+    if let Ok(journal) = MigrationJournal::load(&root.join("migration/journal.json")) {
+        let retained_vnc = journal.retained_vnc_sessions();
+        let migrated_rdp_pins = journal.committed_rdp_pins().unwrap_or(false);
         snapshot
             .candidates
-            .retain(|candidate| candidate.item != MigrationItem::VncSessions);
+            .retain(|candidate| match candidate.item {
+                MigrationItem::VncSessions => !retained_vnc,
+                MigrationItem::RdpCertificatePins => !migrated_rdp_pins,
+                _ => true,
+            });
     }
     Ok(snapshot)
 }
@@ -410,7 +414,9 @@ pub fn plugin_migration_execute(
         snapshot.from_version.clone(),
         crate::plugin::CORE_API_VERSION,
     )?;
-    executor.record_session_retention(&snapshot, retain_vnc)
+    state
+        .plugins
+        .record_legacy_migration(&executor, &snapshot, retain_vnc)
 }
 
 #[tauri::command]

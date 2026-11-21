@@ -115,7 +115,9 @@ fn resolve_connection(
 ) -> Result<ConnectionSettings, String> {
     let resolved_password = resolve_secret(&state.core.vault, password.as_deref())?;
     let mut options = RdpOptions::from_json(options_json);
-    apply_stored_certificate_pins(state, &host, port, &mut options)?;
+    if !module_host::owns_certificate_pins(&state.plugins) {
+        apply_stored_certificate_pins(state, &host, port, &mut options)?;
+    }
     if let Some(g) = options.gateway.as_mut() {
         if let Some(p) = g.password.as_deref() {
             if let Some(plain) = state.core.vault.resolve(p)? {
@@ -237,6 +239,9 @@ pub async fn rdp_trust_certificate(
     let host = host.trim();
     if host.is_empty() || port == 0 {
         return Err("RDP certificate trust requires a valid host and port".to_string());
+    }
+    if module_host::owns_certificate_pins(&state.plugins) {
+        return module_host::trust_certificate(&state.plugins, host, port, fingerprint).await;
     }
     let db = state.core.db.lock().map_err(|e| e.to_string())?;
     tls::save_pin(&db, host, port, &fingerprint)

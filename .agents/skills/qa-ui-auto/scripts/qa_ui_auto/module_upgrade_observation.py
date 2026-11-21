@@ -8,11 +8,13 @@ import sqlite3
 
 from .fixtures.backup_policy import isolated_data_root
 from .fixtures import module_legacy_restore
-from .fixtures.module_upgrade import CHAT_FILES, LEGACY_WAL_CASE
+from .fixtures.module_upgrade import CHAT_FILES, LEGACY_WAL_CASE, RDP_PIN_CASE
 from .steps import StepError
 
 AFTER_FIRST_INSTALL = "after-first-install"
 VNC_RETAINED = "vnc-retained"
+RDP_PINS_RETAINED = "rdp-pins-retained"
+RDP_PINS_DATABASE = "plugins/rdp-client/data/data.db"
 
 
 def wal_fingerprint(data, state):
@@ -62,6 +64,10 @@ def observe(data, state, phase):
             full_rows = [dict(row) for row in connection.execute("SELECT * FROM sessions ORDER BY id")]
             if full_rows != state["full_sessions"]:
                 raise StepError("Upgrade changed complete old-version session records")
+    if phase == RDP_PINS_RETAINED:
+        # The lifecycle case adds two sessions from the normal editor.
+        known_ids = {row["id"] for row in state["sessions"]}
+        rows = [row for row in rows if row[0] in known_ids]
     expected = sorted((row["id"], row["session_type"], row["options_json"]) for row in state["sessions"])
     if rows != expected:
         raise StepError("Upgrade preflight/pending changed the original session records")
@@ -77,6 +83,8 @@ def observe(data, state, phase):
         absent.append("mfa")
     if phase == VNC_RETAINED:
         absent.remove("vnc-client")
+    if phase == RDP_PINS_RETAINED:
+        absent.remove("rdp-client")
     for slug in absent:
         directory = data / "plugins" / slug
         if directory.exists() or directory.is_symlink():
@@ -108,13 +116,16 @@ def observe(data, state, phase):
         if journal.get("status") != expected_status or journal.get("to_core_api_version") != "1":
             raise StepError(f"Expected a {expected_status} upgrade journal")
         entries = journal.get("entries", [])
-        expected_items = state.get("expected_items", ["vnc-sessions"])
+        expected_items = (["rdp-certificate-pins"] if phase == RDP_PINS_RETAINED
+                          else state.get("expected_items", ["vnc-sessions"]))
         if len(entries) != len(expected_items):
             raise StepError(f"Upgrade must have exactly one journal entry per item (expected {len(expected_items)})")
         if [entry.get("item") for entry in entries] != expected_items:
             raise StepError("Pending migration has an incorrect owner or duplicate item")
         for entry in entries:
             expected_entry = ("committed", "taomni.db", "taomni.db") if phase == VNC_RETAINED else ("pending", "taomni.db", "")
+            if phase == RDP_PINS_RETAINED:
+                expected_entry = ("committed", "taomni.db", RDP_PINS_DATABASE)
             if (entry.get("state"), entry.get("source_path"), entry.get("target")) != expected_entry:
                 raise StepError("Upgrade journal has an incorrect owner/source/state/target")
             if not re.fullmatch(r"sha256:[0-9a-f]{64}:bytes:[0-9]+", entry.get("source_fingerprint", "")):
@@ -128,19 +139,44 @@ def observe(data, state, phase):
     return result
 
 
+def observe_rdp_pins(data, state, journal):
+    database = data / RDP_PINS_DATABASE
+    if database.resolve() != database or not database.is_file():
+        raise StepError("The signed RDP module did not create its own database")
+    with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as connection:
+        pins = connection.execute(
+            "SELECT endpoint, fingerprint, updated_at FROM rdp_certificate_pins ORDER BY endpoint"
+        ).fetchall()
+        fingerprint, = connection.execute("SELECT fingerprint FROM legacy_rdp_pin_source").fetchone()
+    if fingerprint != journal["entries"][0]["source_fingerprint"]:
+        raise StepError("The committed RDP migration does not match the imported SQLite file")
+    legacy = state["certificate_pins"]
+    if not set(legacy).issubset(pins):
+        raise StepError("The module database did not preserve the original certificate decisions")
+    observed = [row for row in pins if row not in legacy]
+    if len(observed) != 1 or not re.fullmatch(r"127\.0\.0\.1:[1-9][0-9]*", observed[0][0]):
+        raise StepError("Accepting the live certificate did not write its own module pin")
+    if not re.fullmatch(r"[0-9a-f]{64}", observed[0][1]) or observed[0][2] <= 1:
+        raise StepError("The saved live certificate fingerprint is invalid")
+    return {"legacyPinCount": len(legacy), "ownedPinCount": len(pins),
+            "pinDatabase": RDP_PINS_DATABASE, "sourceFingerprint": fingerprint}
+
+
 def run(ctx, args):
-    phases = {"preflight", "pending", "repeat", AFTER_FIRST_INSTALL, VNC_RETAINED, module_legacy_restore.PHASE}
+    phases = {"preflight", "pending", "repeat", AFTER_FIRST_INSTALL, VNC_RETAINED, RDP_PINS_RETAINED, module_legacy_restore.PHASE}
     if not isinstance(args, dict) or set(args) != {"phase"} or args["phase"] not in phases:
         raise StepError("module_upgrade_probe requires a fixed registered phase")
     owner = getattr(ctx, "fixture_context", None) or ctx
     state = getattr(owner, "module_upgrade", None)
     case_id = getattr(owner, "case_id", None)
-    if not state or case_id not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032", "TC-MODULES-049", module_legacy_restore.CASE_ID, LEGACY_WAL_CASE}:
+    if not state or case_id not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032", "TC-MODULES-049", module_legacy_restore.CASE_ID, LEGACY_WAL_CASE, RDP_PIN_CASE}:
         raise StepError("module_upgrade_probe requires its registered native legacy input fixture")
     if args["phase"] in {AFTER_FIRST_INSTALL, VNC_RETAINED} and case_id != "TC-MODULES-027":
         raise StepError("After-first-install verification requires the installed legacy roster case")
     if (args["phase"] == module_legacy_restore.PHASE) != (case_id == module_legacy_restore.CASE_ID):
         raise StepError("The staged-restore observation belongs to its own legacy profile case")
+    if (args["phase"] == RDP_PINS_RETAINED) != (case_id == RDP_PIN_CASE):
+        raise StepError("RDP certificate migration requires its signed native lifecycle case")
     data = isolated_data_root(owner)
     if data != state["root"]:
         raise StepError("Upgrade observation requires its own isolated profile")
@@ -150,6 +186,8 @@ def run(ctx, args):
             record.update(module_legacy_restore.observe(data, state["sessions"][0]))
         else:
             record.update(observe(data, state, args["phase"]))
+        if args["phase"] == RDP_PINS_RETAINED:
+            record.update(observe_rdp_pins(data, state, record["journal"]))
         if args["phase"] == VNC_RETAINED:
             artifact = json.loads((Path(ctx.case_dir) / "signed-vnc/provenance.json").read_text(encoding="utf-8"))
             module = data / "plugins/vnc-client"

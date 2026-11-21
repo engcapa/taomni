@@ -1,37 +1,57 @@
 //! Owns RDP protocol and WebSocket sessions in the signed module process.
 
+mod pins;
 mod sessions;
 
 use std::{io, sync::Arc, time::Duration};
 
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
-use taomni_plugin_api::{ErrorCode, RpcError};
-use taomni_plugin_sdk::{HostConfig, Operation, PluginHandler, serve_stdio_with};
+use taomni_plugin_api::{
+    ErrorCode, RpcError,
+    services::{SNAPSHOT_METHOD, SNAPSHOT_PREPARE_METHOD, SNAPSHOT_RELEASE_METHOD},
+};
+use taomni_plugin_sdk::{HostConfig, Operation, PluginHandler, SnapshotProvider, serve_stdio_with};
 use taomni_rdp_client_api::{
     CLOSE, Connection, GatewayConnection, START, START_GATEWAY, SessionId, TEST, TEST_GATEWAY,
+    TRUST_CERTIFICATE,
 };
 
-const COMMANDS: [&str; 5] = [START, CLOSE, TEST, START_GATEWAY, TEST_GATEWAY];
+const COMMANDS: [&str; 9] = [
+    START,
+    CLOSE,
+    TEST,
+    START_GATEWAY,
+    TEST_GATEWAY,
+    TRUST_CERTIFICATE,
+    SNAPSHOT_PREPARE_METHOD,
+    SNAPSHOT_METHOD,
+    SNAPSHOT_RELEASE_METHOD,
+];
 
 pub fn serve_stdio() -> io::Result<()> {
     let config = HostConfig {
         plugin_id: "taomni-plugin-rdp-client".into(),
         plugin_version: env!("CARGO_PKG_VERSION").into(),
         commands: COMMANDS.into_iter().map(String::from).collect(),
-        permissions: Default::default(),
+        permissions: ["fs.dataDir".to_owned()].into(),
         required_services: Default::default(),
         optional_services: Default::default(),
         operation_timeout: Duration::from_secs(100),
         snapshot_timeout: Duration::from_secs(30),
     };
     serve_stdio_with(config, |storage| {
-        storage.ok_or_else(|| io::Error::other("RDP profile ownership required"))?;
-        Ok(Arc::new(sessions::Sessions::new()?))
+        let storage = storage.ok_or_else(|| io::Error::other("RDP profile ownership required"))?;
+        let pins = Arc::new(pins::Pins::open(storage.root().path())?);
+        Ok(Arc::new(sessions::Sessions::new(pins)?))
     })
 }
 
 impl PluginHandler for sessions::Sessions {
+    fn snapshot_provider(&self) -> Option<Arc<dyn SnapshotProvider>> {
+        Some(self.pins.clone())
+    }
+
     fn invoke(
         &self,
         operation: &Operation,
@@ -58,6 +78,10 @@ impl PluginHandler for sessions::Sessions {
                 let request: SessionId = request(params)?;
                 response(self.close(&request.session_id)?)
             }
+            TRUST_CERTIFICATE => response(
+                self.pins
+                    .trust(request(params)?, &|| operation.check_current())?,
+            ),
             _ => Err(RpcError::from_code(ErrorCode::MethodNotFound)),
         }
     }

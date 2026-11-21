@@ -1,8 +1,8 @@
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
 use taomni_rdp_client_api::{
-    CLOSE, Connection, ConnectionTestResult, GatewayConnection, SLUG, START, START_GATEWAY,
-    SessionId, Started, TEST, TEST_GATEWAY,
+    CLOSE, CertificateTrust, Connection, ConnectionTestResult, GatewayConnection, SLUG, START,
+    START_GATEWAY, SessionId, Started, TEST, TEST_GATEWAY, TRUST_CERTIFICATE,
     transport::{RdpConnector, gateway_socket},
 };
 use tokio_util::sync::CancellationToken;
@@ -32,6 +32,30 @@ struct Routes {
 enum BoundConnection {
     Direct(Connection),
     Gateway(GatewayConnection),
+}
+
+pub(super) fn owns_certificate_pins(registry: &PluginRegistry) -> bool {
+    registry
+        .get(SLUG)
+        .is_some_and(|record| record.manifest.commands.contains(TRUST_CERTIFICATE))
+}
+
+pub(super) async fn trust_certificate(
+    registry: &PluginRegistry,
+    host: &str,
+    port: u16,
+    fingerprint: String,
+) -> Result<String, String> {
+    invoke(
+        registry,
+        TRUST_CERTIFICATE,
+        CertificateTrust {
+            host: host.to_owned(),
+            port,
+            fingerprint,
+        },
+    )
+    .await?
 }
 
 async fn bind_route(connector: RdpConnector) -> Result<(Route, Endpoint), String> {

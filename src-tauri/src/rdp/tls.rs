@@ -3,23 +3,18 @@
 use rusqlite::{Connection, OptionalExtension, params};
 
 pub(super) use taomni_rdp_client_api::normalize_fingerprint;
+use taomni_rdp_client_api::{PINS_SCHEMA, certificate_endpoint};
 
 const TRUST_TABLE: &str = "rdp_certificate_pins";
 
 pub fn init_trust_table(conn: &Connection) -> rusqlite::Result<()> {
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS rdp_certificate_pins (
-            endpoint TEXT PRIMARY KEY,
-            fingerprint TEXT NOT NULL,
-            updated_at INTEGER NOT NULL
-        );",
-    )
+    conn.execute_batch(PINS_SCHEMA)
 }
 
 pub fn load_pin(conn: &Connection, host: &str, port: u16) -> rusqlite::Result<Option<String>> {
     conn.query_row(
         &format!("SELECT fingerprint FROM {TRUST_TABLE} WHERE endpoint = ?1"),
-        params![endpoint_key(host, port)],
+        params![certificate_endpoint(host, port)],
         |row| row.get(0),
     )
     .optional()
@@ -41,17 +36,10 @@ pub fn save_pin(
             "INSERT OR REPLACE INTO {TRUST_TABLE} (endpoint, fingerprint, updated_at) \
              VALUES (?1, ?2, ?3)"
         ),
-        params![endpoint_key(host, port), fingerprint, now],
+        params![certificate_endpoint(host, port), fingerprint, now],
     )
     .map_err(|e| e.to_string())?;
     Ok(fingerprint)
-}
-
-fn endpoint_key(host: &str, port: u16) -> String {
-    format!(
-        "{}:{port}",
-        host.trim().trim_end_matches('.').to_ascii_lowercase()
-    )
 }
 
 #[cfg(test)]

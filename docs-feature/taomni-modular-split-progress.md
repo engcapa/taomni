@@ -2,6 +2,9 @@
 
 ## 2026-11-21 当前进展
 
+- GitHub 的四个发布目标在 `b97d58d22` 通过默认核心依赖清单检查。各 Cargo 树保留 RDP/VNC 共享接口，排除两个客户端引擎、各自宿主和 Windows VNC 按键辅助程序。生产 Vite 清单也排除了 RDP/VNC 查看器。证据位于 `qa-ui-auto-report/github/44879692505/live-contracts/modular-core-build-inventory/`。G9 还需核对其他业务模块的裁剪及最终安装包。 [四目标清单](https://github.com/engcapa/taomni/actions/runs/44879692505)
+- RDP 0.1.2 在签名安装阶段只读导出旧 `taomni.db` 的证书表，并原子发布到 `plugins/rdp-client/data/data.db`。原会话留在核心。模块保存后续显式确认，备份通过宿主的 SQLite 快照。数据文件记录来源指纹，恢复可补写中断的 journal。TC-MODULES-056 同时核对旧表、迁移回执与新确认的真实证书。
+- Windows 的 `3209d2dd9` 签名 RDP TC-MODULES-056 已通过，验证了 0.1.0 的真实输入、停用释放和重复连接。Windows MSI 强退专项另一次复跑仍在创建 Vault 时超时，回执显示 MFA 入口可见且可访问性树有零个可见密码输入框。 [签名 RDP](https://github.com/engcapa/taomni/actions/runs/44876459274) · [MSI 实装](https://github.com/engcapa/taomni/actions/runs/44878760934)
 - RDP 客户端 0.1.1 由独立宿主完成 RD Gateway 的双通道 TLS 和 MS-TSGU 握手。核心绑定指向同一已选网关的入站和出站 TCP 路由。直连、代理和 SSH 跳板保留原路由，RDP 引擎只在隔离 QA 开启兼容功能时进入核心构建。证书指纹仍由核心旧库读取，数据迁移待完成。RDP 引擎 159 项单测、50 项前端单测、23 项签名工具单测、默认和 QA 特性编译、类型与边界检查通过。TC-MODULES-057 增加网关控件路径，056 增加签名前端的网关配置错误检查。四目标 G9 清单检查同时核对 RDP 与 VNC。
 - 合并后的 `3209d2dd9` 三端 Browser 各通过 35/35。056 所在的 Linux Native 在构建前被 QA 工具单测阻断，原因是平台依赖契约遗漏了新增的签名 RDP 工作。已补齐契约的三端依赖预期。Windows 与 macOS Native 继续收取。 [三端运行](https://github.com/engcapa/taomni/actions/runs/44876459274) · [Linux 构建日志](https://github.com/engcapa/taomni/actions/runs/44876459274/job/136763080138)
 - Windows 实装复跑已定位到 Vault 创建密码字段等待超时。 `4a2cb7393` 让原生点击进入 MFA，并在失败时记录可见控件数量。复验沿用相同的 MSI 以比较驱动行为。 [原始回执](https://github.com/engcapa/taomni/actions/runs/44876631457)

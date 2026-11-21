@@ -205,6 +205,28 @@ impl MigrationJournal {
         }
         Self::load(&directory.join("journal.json"))?.committed_mfa()
     }
+
+    pub(crate) fn committed_rdp_pins(&self) -> Result<bool, String> {
+        let mut matches = self
+            .entries
+            .iter()
+            .filter(|entry| entry.item == MigrationItem::RdpCertificatePins);
+        match (matches.next(), matches.next()) {
+            (None, None) => Ok(false),
+            (Some(entry), None)
+                if entry.state == MigrationStepState::Pending
+                    && entry.target.as_os_str().is_empty() =>
+            {
+                Ok(false)
+            }
+            (Some(entry), None)
+                if entry.state == MigrationStepState::Committed && valid_rdp_pin_commit(entry) =>
+            {
+                Ok(true)
+            }
+            _ => Err("RDP certificate migration journal requires recovery".into()),
+        }
+    }
 }
 
 fn valid_mfa_commit(entry: &MigrationJournalEntry) -> bool {
@@ -225,6 +247,13 @@ fn valid_vnc_retention(entry: &MigrationJournalEntry) -> bool {
     entry.item == MigrationItem::VncSessions
         && entry.source_path == Path::new(VNC_RETAINED_DATABASE)
         && entry.target == entry.source_path
+        && source::valid_fingerprint(&entry.source_fingerprint)
+}
+
+fn valid_rdp_pin_commit(entry: &MigrationJournalEntry) -> bool {
+    entry.item == MigrationItem::RdpCertificatePins
+        && entry.source_path == Path::new("taomni.db")
+        && entry.target == Path::new(taomni_rdp_client_api::PINS_DATABASE)
         && source::valid_fingerprint(&entry.source_fingerprint)
 }
 
@@ -353,7 +382,8 @@ fn reconcile_pending(
             MigrationStepState::Committed
                 if (valid_mfa_commit(entry)
                     || valid_mail_commit(entry)
-                    || valid_vnc_retention(entry))
+                    || valid_vnc_retention(entry)
+                    || valid_rdp_pin_commit(entry))
                     && !committed.contains(&entry.item) =>
             {
                 committed.push(entry.item);

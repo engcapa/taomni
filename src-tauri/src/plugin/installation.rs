@@ -9,6 +9,18 @@ pub(crate) enum InstallIntent<'a> {
 }
 
 impl PluginRegistry {
+    pub(crate) fn record_legacy_migration(
+        &self,
+        executor: &super::migration::MigrationExecutor,
+        snapshot: &super::migration::LegacyInstallSnapshot,
+        retain_vnc: bool,
+    ) -> Result<super::migration::MigrationExecutionResult, String> {
+        let _mutation = install::ModuleInstaller::new(&self.root)
+            .lock_mutations()
+            .map_err(|error| error.to_string())?;
+        executor.record_session_retention(snapshot, retain_vnc)
+    }
+
     /// Retained IPC contract: arbitrary renderer directories are never trusted.
     /// Callers must supply a signed archive through the verified installer.
     pub fn install_staged(
@@ -152,6 +164,8 @@ impl PluginRegistry {
             .contains_key(slug);
         self.stop_host(slug)?;
         let result = (|| {
+            super::migration_rdp_pins::prepare(&self.root, manifest)
+                .map_err(PluginError::HostRequest)?;
             activate()?;
             self.scan_locked()?;
             let record = self

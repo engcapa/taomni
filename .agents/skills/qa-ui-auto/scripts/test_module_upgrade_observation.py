@@ -14,7 +14,7 @@ from qa_ui_auto.fixtures.module_upgrade import (
     input_sessions, preview_client_snapshot, preview_snapshot, preview_server_snapshot,
 )
 from qa_ui_auto.fixtures.session_config import seed_sessions
-from qa_ui_auto.module_upgrade_observation import observe, run, wal_fingerprint
+from qa_ui_auto.module_upgrade_observation import RDP_PINS_DATABASE, observe, observe_rdp_pins, run, wal_fingerprint
 from qa_ui_auto.steps import StepError
 from unittest.mock import patch
 
@@ -79,6 +79,24 @@ class UpgradeObservationTests(unittest.TestCase):
         self.write_journal()
         with self.assertRaisesRegex(StepError, "Read-only preflight wrote"):
             observe(self.root, self.state, "preflight")
+
+    def test_rdp_pin_observation_requires_the_import_receipt_and_the_new_native_pin(self):
+        target = self.root / RDP_PINS_DATABASE
+        target.parent.mkdir(parents=True)
+        source = self.journal["entries"][0]["source_fingerprint"]
+        state = {"certificate_pins": PIN_ROWS}
+        live_pin = ("127.0.0.1:33890", "cd" * 32, 30)
+        with closing(sqlite3.connect(target)) as db:
+            db.execute("CREATE TABLE rdp_certificate_pins (endpoint TEXT, fingerprint TEXT, updated_at INTEGER)")
+            db.execute("CREATE TABLE legacy_rdp_pin_source (fingerprint TEXT)")
+            db.executemany("INSERT INTO rdp_certificate_pins VALUES (?, ?, ?)", PIN_ROWS + [live_pin])
+            db.execute("INSERT INTO legacy_rdp_pin_source VALUES (?)", [source])
+            db.commit()
+            self.assertEqual(observe_rdp_pins(self.root, state, self.journal)["ownedPinCount"], 2)
+            db.execute("DELETE FROM rdp_certificate_pins WHERE endpoint = ?", [live_pin[0]])
+            db.commit()
+            with self.assertRaisesRegex(StepError, "live certificate"):
+                observe_rdp_pins(self.root, state, self.journal)
 
     def test_mail_preflight_rejects_creation_of_unused_default_storage(self):
         self.state["expected_items"] = ["mail-accounts"]

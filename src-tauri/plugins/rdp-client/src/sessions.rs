@@ -30,14 +30,16 @@ struct ActiveSession {
 }
 
 pub(super) struct Sessions {
+    pub(super) pins: Arc<super::pins::Pins>,
     active: Arc<Mutex<HashMap<Uuid, ActiveSession>>>,
     slots: Arc<Semaphore>,
     runtime: Runtime,
 }
 
 impl Sessions {
-    pub(super) fn new() -> io::Result<Self> {
+    pub(super) fn new(pins: Arc<super::pins::Pins>) -> io::Result<Self> {
         Ok(Self {
+            pins,
             active: Arc::new(Mutex::new(HashMap::new())),
             slots: Arc::new(Semaphore::new(SESSION_LIMIT)),
             runtime: Builder::new_multi_thread()
@@ -49,11 +51,13 @@ impl Sessions {
 
     pub(super) fn start(
         &self,
-        input: Connection,
+        mut input: Connection,
         outbound: Option<Endpoint>,
         current: &dyn Fn() -> Result<(), RpcError>,
     ) -> Result<Result<Started, String>, RpcError> {
         super::validate_endpoint(&input)?;
+        self.pins
+            .apply(&input.host, input.port, &mut input.options)?;
         let config = spawn_config(input, outbound)?;
         let slot = self.slot()?;
         let session = match self.run(current, spawn_rdp_relay(config))? {
@@ -88,11 +92,13 @@ impl Sessions {
 
     pub(super) fn test(
         &self,
-        input: Connection,
+        mut input: Connection,
         outbound: Option<Endpoint>,
         current: &dyn Fn() -> Result<(), RpcError>,
     ) -> Result<Result<ConnectionTestResult, String>, RpcError> {
         super::validate_endpoint(&input)?;
+        self.pins
+            .apply(&input.host, input.port, &mut input.options)?;
         let config = spawn_config(input, outbound)?;
         let _slot = self.slot()?;
         self.run(current, async move {

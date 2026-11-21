@@ -20,6 +20,7 @@ CLIENT_ITEMS = ["rdp-vnc-sessions", "vnc-sessions", "rdp-certificate-pins"]
 PIN_ROWS = [("qa-upgrade.invalid:3389", "ab" * 32, 1)]
 MAIL_CASES = {"TC-MODULES-049", "TC-MODULES-050"}
 LEGACY_WAL_CASE = "TC-MODULES-051"
+RDP_PIN_CASE = "TC-MODULES-056"
 
 
 def input_sessions(vnc):
@@ -67,10 +68,10 @@ def preview_client_snapshot():
 
 
 def setup(ctx):
-    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031", "TC-MODULES-032", "TC-MODULES-036", "TC-MODULES-037", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID, LEGACY_WAL_CASE, *MAIL_CASES}:
+    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031", "TC-MODULES-032", "TC-MODULES-036", "TC-MODULES-037", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID, LEGACY_WAL_CASE, RDP_PIN_CASE, *MAIL_CASES}:
         raise RuntimeError("module_upgrade requires a registered fixed-input case")
     server_profile = ctx.case_id in {"TC-MODULES-028", "TC-MODULES-029"}
-    client_profile = ctx.case_id in {"TC-MODULES-030", "TC-MODULES-031"}
+    client_profile = ctx.case_id in {"TC-MODULES-030", "TC-MODULES-031", RDP_PIN_CASE}
     mfa_profile = ctx.case_id in {"TC-MODULES-036", "TC-MODULES-037"}
     mail_profile = ctx.case_id in MAIL_CASES
     vnc = ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID} and not (server_profile or mail_profile)

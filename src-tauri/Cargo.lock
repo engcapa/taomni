@@ -11184,8 +11184,9 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-rdp-client"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
+ "rusqlite",
  "serde",
  "serde_json",
  "taomni-plugin-api",

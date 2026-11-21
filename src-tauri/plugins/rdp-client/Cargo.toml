@@ -1,12 +1,13 @@
 [package]
 name = "taomni-plugin-rdp-client"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 rust-version = "1.94"
 publish = false
 description = "Official Taomni RDP client host"
 
 [dependencies]
+rusqlite = { version = "0.40", features = ["bundled"] }
 serde = "1"
 serde_json = "1"
 taomni-plugin-api = { path = "../../crates/taomni-plugin-api" }

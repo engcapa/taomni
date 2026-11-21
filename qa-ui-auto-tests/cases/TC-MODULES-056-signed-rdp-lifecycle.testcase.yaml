@@ -7,10 +7,11 @@ description: >-
   connection, and re-enable the module. The same tab must reconnect without
   another certificate confirmation and deliver a second click. A separate
   session without a configured RD Gateway username shows the gateway validation error.
+  The migration imports legacy pins and records the new pin in the module database.
 covers: [F-Modules-1, F9.7, F-RdpServer-1]
 tags: [modules, rdp-client, rdp-server, lifecycle, native-boundary, p1]
 modes: [native]
-fixtures: [reset_db, module_signed_rdp_archive, rdp_server_required, system_rdp_running]
+fixtures: [reset_db, module_upgrade, module_signed_rdp_archive, rdp_server_required, system_rdp_running]
 timeout_sec: 420
 steps:
 - open: ${cfg.app.base_url}
@@ -116,6 +117,7 @@ steps:
     contains: 'rdg: gateway username is empty'
     timeout_sec: 45
 - assert_no_runtime_errors: null
+- module_upgrade_probe: {phase: rdp-pins-retained}
 verification:
   review: reviewed
   requirements:
@@ -147,6 +149,12 @@ verification:
     - {step: 92, expectation: The signed renderer shows the missing gateway username error.}
     - {step: 93, expectation: The gateway validation produces no uncaught renderer errors.}
     results: [92, 93]
+  - id: R4
+    requirement: A signed installation imports old certificate decisions and records newly accepted certificates in the module store.
+    actions: [6, 8, 46]
+    checkpoints:
+    - {step: 94, expectation: "The native profile preserves the legacy rows and contains the import receipt and the new module-owned pin."}
+    results: [94]
   visual:
   - check: The signed viewer and the disabled state appear in the saved tab.
     method: automated

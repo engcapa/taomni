@@ -15,6 +15,30 @@ pub const CLOSE: &str = "rdp/close";
 pub const TEST: &str = "rdp/test";
 pub const START_GATEWAY: &str = "rdp/start-gateway";
 pub const TEST_GATEWAY: &str = "rdp/test-gateway";
+pub const TRUST_CERTIFICATE: &str = "rdp/trust-certificate";
+pub const PINS_DATABASE: &str = "plugins/rdp-client/data/data.db";
+
+// The importer and the independent writer share the persisted format.
+pub const PINS_SCHEMA: &str = "CREATE TABLE IF NOT EXISTS rdp_certificate_pins (
+    endpoint TEXT PRIMARY KEY,
+    fingerprint TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+);";
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CertificateTrust {
+    pub host: String,
+    pub port: u16,
+    pub fingerprint: String,
+}
+
+pub fn certificate_endpoint(host: &str, port: u16) -> String {
+    format!(
+        "{}:{port}",
+        host.trim().trim_end_matches('.').to_ascii_lowercase()
+    )
+}
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
