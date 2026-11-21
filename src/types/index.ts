@@ -249,9 +249,11 @@ export interface ProxyTestTabInfo {
 export interface FileViewerTabInfo {
   path: string;
   kind: import("../lib/openFile/classifyFile").FileKind;
-  mode?: "taomni" | "source";
+  mode?: "taomni" | "source" | "notepad";
   readOnlyReason?: string;
   source?: "local" | "remote-temp" | "mail-attachment";
+  untitled?: boolean;
+  title?: string;
 }
 
 export interface FileBrowserTabInfo {
@@ -447,6 +449,7 @@ export interface Tab {
   sessionId?: string;
   connectionId?: string;
   closable: boolean;
+  pinned?: boolean;
   ssh?: SshConnectInfo;
   commandTerminal?: CommandTerminalConnectInfo;
   localShell?: LocalShellSelection;
