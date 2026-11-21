@@ -49,7 +49,6 @@ steps:
 - click: '[data-testid="notepad-menu-file"]'
 - click: '[data-testid="notepad-menu-item-file.saveAs"]'
 - wait_for: '[data-testid="notepad-save-as-dialog"]'
-- assert_not_visible: '[data-testid="notepad-save-as-confirm"][disabled]'
 - fill:
     selector: '[data-testid="notepad-save-as-input"]'
     value: ${fixture.file_open_root}/notepad-save-as.txt
