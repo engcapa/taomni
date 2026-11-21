@@ -189,6 +189,8 @@ pub async fn plugin_invoke(
             && taomni_server_process::vnc::COMMANDS.contains(&command.as_str()))
         || (slug == taomni_server_process::rdp::SLUG
             && taomni_server_process::rdp::COMMANDS.contains(&command.as_str()))
+        || (slug == taomni_server_process::local::SLUG
+            && taomni_server_process::local::COMMANDS.contains(&command.as_str()))
         || (slug == taomni_screenshot_api::SLUG
             && taomni_screenshot_api::COMMANDS.contains(&command.as_str()))
         || (slug == taomni_mail_api::SLUG

@@ -266,6 +266,33 @@ def setup_rdp_server(ctx):
     ctx.values.update(rdp_server_archive=destination.as_posix(), rdp_server_signature=signature)
 
 
+SERVERS_CASE = "TC-MODULES-066"
+
+
+def setup_servers(ctx):
+    if ctx.case_id != SERVERS_CASE or (ctx.cfg.get("app") or {}).get("mode") != "native":
+        raise RuntimeError("Signed Local servers input requires its registered native case")
+    raw = os.environ.get("QA_SIGNED_SERVERS_ROOT")
+    if not raw:
+        raise RuntimeError("QA_SIGNED_SERVERS_ROOT is required to locate the signed artifact")
+    source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    manifest = Path(__file__).resolve().parents[6] / "src-tauri/plugins/servers/module.json"
+    version = json.loads(manifest.read_text(encoding="utf-8"))["version"]
+    info, archive, signature, _ = load_artifact(
+        Path(raw), source, platform_key(), "servers", version=version,
+    )
+    host = "taomni-plugin-servers.exe" if platform.system() == "Windows" else "taomni-plugin-servers"
+    with zipfile.ZipFile(archive) as package, package.open(host) as binary:
+        info["hostSha256"] = hashlib.file_digest(binary, "sha256").hexdigest()
+    owned = Path(ctx.case_dir).resolve() / "signed-servers"
+    owned.mkdir()
+    destination = owned / archive.name
+    shutil.copyfile(archive, destination)
+    (owned / "provenance.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
+    ctx.signed_servers = {"host": host, "receipt": info}
+    ctx.values.update(local_servers_archive=destination.as_posix(), local_servers_signature=signature)
+
+
 def setup_desktop_client(ctx, protocol):
     if (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("The signed desktop client requires the native package verifier")

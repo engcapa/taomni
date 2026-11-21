@@ -1,0 +1,46 @@
+id: TC-SERVERS-004-local-ssh-sftp-native
+title: Local servers starts a native SSH/SFTP listener and releases it on Stop
+description: Start the normal desktop listener with an isolated document root. An independent client must authenticate, obtain a file via SFTP and receive output from a real PTY. Stop must close the listener.
+covers: [F-Servers-1]
+tags: [servers, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, local_servers_ssh]
+timeout_sec: 150
+steps:
+- open_route: '?servers=main'
+- wait_for: {selector: '[data-testid="servers-dialog"]', timeout_sec: 30}
+- click: '[data-testid="server-row-ssh"]'
+- wait_for: '[data-testid="server-field-ssh-root-dir"]'
+- fill: {selector: '[data-testid="server-field-port"]', value: '28491'}
+- fill: {selector: '[data-testid="server-field-bind-address"]', value: '127.0.0.1'}
+- fill: {selector: '[data-testid="server-field-ssh-root-dir"]', value: '${fixture.local_servers_ssh_root}'}
+- fill: {selector: '[data-testid="server-field-ssh-password"]', value: '${fixture.local_servers_ssh_password}'}
+- click: '[data-testid="server-row-ssh-start"]'
+- wait_for: {selector: '[data-testid="server-row-ssh"][data-status="running"]', timeout_sec: 30}
+- assert_local_servers_ssh: serving
+- click: '[data-testid="server-row-ssh-stop"]'
+- wait_for: {selector: '[data-testid="server-row-ssh"][data-status="stopped"]', timeout_sec: 15}
+- assert_local_servers_ssh: stopped
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: ssh-sftp
+    requirement: The Local servers page can serve files and terminal output over native SSH and shut down the actual port.
+    actions: [3, 5, 6, 7, 8, 9, 12]
+    checkpoints:
+    - {step: 10, expectation: The application reports that the listener is running.}
+    - {step: 11, expectation: The independent client authenticates and receives fixed file and PTY bytes.}
+    - {step: 13, expectation: The application reports that the listener stopped.}
+    - {step: 14, expectation: An independent client observes that a new connection is refused.}
+    - {step: 15, expectation: Start and Stop complete without runtime errors.}
+    results: [10, 11, 13, 14, 15]
+  visual:
+  - check: The SSH row shows the running and stopped state.
+    method: automated
+    reason: The case observes the existing row in the native WebView.
+  native:
+  - check: Actual SSH authentication, file transfer, PTY command launch and listener lifecycle.
+    method: automated
+    reason: An independent SSH client records the real host key, downloaded file bytes and PTY exit.

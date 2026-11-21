@@ -1,4 +1,4 @@
-use crate::servers::engine::LogEmitter;
+use crate::LogEmitter;
 use russh::Channel;
 use russh::server::Msg;
 use tokio::io::AsyncWriteExt;

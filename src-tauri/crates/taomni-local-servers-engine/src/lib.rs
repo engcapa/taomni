@@ -5,6 +5,8 @@ pub mod ftp;
 pub mod http;
 pub mod iperf;
 pub mod nfs;
+pub mod ssh;
+pub mod telnet;
 pub mod tftp;
 
 use std::sync::Arc;

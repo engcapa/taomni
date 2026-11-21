@@ -1,0 +1,63 @@
+id: TC-MODULES-066
+title: Signed Local servers runs HTTP and closes the listener when disabled
+description: Install the ordinary signed package, start HTTP through Local servers, read actual fixture bytes and disable the host without restarting the core.
+covers: [F-Modules-1, F-Servers-1]
+tags: [modules, servers, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, module_signed_servers_archive, local_servers_http]
+timeout_sec: 235
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.local_servers_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.local_servers_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-servers"]'
+- wait_for: '[data-testid="module-action-disable-servers"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-http"]'
+- fill: {selector: '[data-testid="server-field-port"]', value: '28489'}
+- fill: {selector: '[data-testid="server-field-bind-address"]', value: '127.0.0.1'}
+- fill: {selector: '[data-testid="server-field-http-root-dir"]', value: '${fixture.local_servers_http_root}'}
+- click: '[data-testid="server-row-http-start"]'
+- wait_for: {selector: '[data-testid="server-row-http"][data-status="running"]', timeout_sec: 20}
+- assert_signed_servers_host: running
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-servers"]'
+- wait_for: '[data-testid="module-action-enable-servers"]'
+- assert_signed_servers_host: disabled
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- wait_for: '[data-testid="server-row-http"][data-status="stopped"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-http
+    requirement: The module installs through the signed package and serves HTTP until disabled in the same app session.
+    actions: [7, 9, 14, 19, 24, 30]
+    checkpoints:
+    - {step: 8, expectation: The normal offline form accepts the verified package.}
+    - {step: 21, expectation: The installed host holds its writer lease and the loopback response matches the configured document.}
+    - {step: 26, expectation: Disabling releases both the writer lease and the real listener.}
+    - {step: 31, expectation: Local servers shows HTTP stopped.}
+    - {step: 32, expectation: The same application session remains usable.}
+    results: [8, 21, 26, 31, 32]
+  visual:
+  - check: The HTTP row reports the actual lifecycle.
+    method: automated
+    reason: The case observes the native tab before and after disabling the module.
+  native:
+  - check: The module starts an independent host and releases the listener and profile writer.
+    method: automated
+    reason: The signed package bytes, lock and HTTP response are observed independently of the renderer.

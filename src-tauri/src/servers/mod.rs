@@ -64,6 +64,7 @@ mod model;
 mod registry;
 
 mod lifetime;
+mod local_host;
 
 mod probes;
 

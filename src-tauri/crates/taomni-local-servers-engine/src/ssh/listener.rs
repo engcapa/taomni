@@ -4,17 +4,17 @@ use super::authentication::load_or_create_host_key;
 use super::authentication::parse_authorized_keys_text;
 use super::connection::SessionOpts;
 use super::connection::SshConnection;
-use crate::servers::ServerConfig;
-use crate::servers::engine::LogEmitter;
-use crate::servers::engine::ServerCtx;
-use crate::servers::engine::ServerStarted;
+use crate::LogEmitter;
+use crate::ServerConfig;
+use crate::ServerCtx;
+use crate::ServerStarted;
 use russh::MethodKind;
 use russh::MethodSet;
 use russh::server::Config as RusshConfig;
 use russh::server::Server;
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::time::Instant;
@@ -69,7 +69,11 @@ impl Server for SshServer {
 
 /* ------------------------------- start ------------------------------- */
 
-pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted, String> {
+pub async fn start(
+    ctx: ServerCtx,
+    config: ServerConfig,
+    identity_directory: &Path,
+) -> Result<ServerStarted, String> {
     let port = if config.port == 0 { 22 } else { config.port };
     let bind = config.bind_address.clone();
 
@@ -145,7 +149,7 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
             format!("cannot bind {}:{} for SSH — {}{}", bind, port, e, hint)
         })?;
 
-    let (host_key, fingerprint) = load_or_create_host_key(&ctx.app)?;
+    let (host_key, fingerprint) = load_or_create_host_key(identity_directory)?;
     let mut methods = MethodSet::empty();
     if password.is_some() {
         methods.push(MethodKind::Password);

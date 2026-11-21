@@ -1,5 +1,5 @@
 use super::authentication::AuthPolicy;
-use crate::servers::engine::LogEmitter;
+use crate::LogEmitter;
 use russh::Channel;
 use russh::ChannelId;
 use russh::server::Msg;

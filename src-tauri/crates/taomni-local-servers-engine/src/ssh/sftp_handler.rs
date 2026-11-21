@@ -2,7 +2,7 @@ use super::sftp_attributes::apply_file_attributes;
 use super::sftp_attributes::apply_file_attributes_on_file;
 use super::sftp_paths::canonical_client_path;
 use super::sftp_paths::confine_path;
-use crate::servers::engine::LogEmitter;
+use crate::LogEmitter;
 use russh_sftp::protocol::File;
 use russh_sftp::protocol::FileAttributes;
 use russh_sftp::protocol::Handle as SftpHandle;

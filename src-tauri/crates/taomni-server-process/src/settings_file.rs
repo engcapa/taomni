@@ -76,6 +76,21 @@ impl SettingsFile {
     /// Callers must hold the module writer lease. Receipt and settings share
     /// one atomic file so interrupted migrations can recover their identity.
     pub(crate) fn save(&self, record: &impl Serialize) -> io::Result<()> {
+        let parent = self.prepare_parent()?;
+        let contents = serde_json::to_vec(record).map_err(io::Error::other)?;
+        if contents.len() as u64 > MAX_SETTINGS_BYTES {
+            return Err(invalid_settings());
+        }
+        let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
+        temporary.write_all(&contents)?;
+        temporary.as_file().sync_all()?;
+        temporary.persist(&self.0).map_err(|error| error.error)?;
+        #[cfg(unix)]
+        File::open(parent)?.sync_all()?;
+        Ok(())
+    }
+
+    pub(crate) fn prepare_parent(&self) -> io::Result<&Path> {
         let directories: Vec<_> = self.0.ancestors().skip(1).take(3).collect();
         for directory in directories.iter().rev() {
             match fs::create_dir(directory) {
@@ -89,18 +104,7 @@ impl SettingsFile {
             }
         }
         self.open()?;
-        let contents = serde_json::to_vec(record).map_err(io::Error::other)?;
-        if contents.len() as u64 > MAX_SETTINGS_BYTES {
-            return Err(invalid_settings());
-        }
-        let parent = directories[0];
-        let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
-        temporary.write_all(&contents)?;
-        temporary.as_file().sync_all()?;
-        temporary.persist(&self.0).map_err(|error| error.error)?;
-        #[cfg(unix)]
-        File::open(parent)?.sync_all()?;
-        Ok(())
+        Ok(directories[0])
     }
 }
 

@@ -17,6 +17,7 @@ pub struct ActiveServer {
     pub task: JoinHandle<()>,
     pub auto_stop_task: Option<JoinHandle<()>>,
     pub status: ServerStatus,
+    pub(super) wait_for_stop: bool,
     pub(super) _process_lock: ModuleLock,
 }
 

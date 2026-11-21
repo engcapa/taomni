@@ -2752,6 +2752,7 @@
   ↳ `[data-testid="module-action-enable-vnc-server"]` — alias
   ↳ `[data-testid="module-action-enable-rdp-client"]` — alias
   ↳ `[data-testid="module-action-enable-rdp-server"]` — alias
+  ↳ `[data-testid="module-action-enable-servers"]` — alias
   ↳ `[data-testid="module-action-enable-mail"]` — alias
   ↳ `[data-testid="module-action-enable-screenshot"]` — alias
 - `[data-testid="module-status-mfa"]` — display — F-Modules-1.module-status-mfa
@@ -2761,6 +2762,7 @@
   ↳ `[data-testid="module-action-disable-vnc-server"]` — alias
   ↳ `[data-testid="module-action-disable-rdp-client"]` — alias
   ↳ `[data-testid="module-action-disable-rdp-server"]` — alias
+  ↳ `[data-testid="module-action-disable-servers"]` — alias
   ↳ `[data-testid="module-action-disable-mail"]` — alias
   ↳ `[data-testid="module-action-disable-screenshot"]` — alias
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
@@ -3228,6 +3230,8 @@
 ## servers (F-Servers-1)
 
 - `[data-testid="server-field-http-root-dir"]` — interactive [optional] — F-Servers-1.server-field-http-root-dir
+- `[data-testid="server-field-ssh-password"]` — interactive [optional] — F-Servers-1.server-field-ssh-password
+- `[data-testid="server-field-ssh-root-dir"]` — interactive [optional] — F-Servers-1.server-field-ssh-root-dir
 - `[data-testid="sidebar-tool-servers"]` — interactive [optional] — F-Servers-1.sidebar-tool-servers
 - `[data-testid="servers-tab-panel"]` — display [optional] — F-Servers-1.servers-tab-panel
 - `[data-testid="tab-item"][data-tab-type="servers"]` — display [optional] — F-Servers-1.tab-servers

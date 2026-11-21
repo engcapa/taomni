@@ -9,7 +9,12 @@ publish = false
 [dependencies]
 chrono = "0.4"
 dirs = "6"
+portable-pty = "0.9"
+rand = "0.10"
+russh = { version = "0.61", features = ["async-trait", "flate2"] }
+russh-sftp = "2.3"
+taomni-pty = { path = "../taomni-pty" }
 taomni-server-process = { path = "../taomni-server-process" }
-tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "process", "rt", "time"] }
+tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "process", "rt", "sync", "time"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 which = "8"

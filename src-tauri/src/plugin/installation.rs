@@ -171,6 +171,8 @@ impl PluginRegistry {
             if previous.active_version.is_none() && !previous.was_uninstalled() {
                 super::migration_rdp_server_identity::prepare(&self.root, manifest)
                     .map_err(PluginError::HostRequest)?;
+                super::migration_local_servers_identity::prepare(&self.root, manifest)
+                    .map_err(PluginError::HostRequest)?;
             }
             if !previous.was_uninstalled() {
                 super::migration_rdp_server::prepare(&self.root, manifest)

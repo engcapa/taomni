@@ -4,7 +4,7 @@ use russh::keys::PrivateKey;
 use russh::keys::PublicKey;
 use russh::keys::ssh_key;
 use russh::server::Auth;
-use tauri::AppHandle;
+use std::path::Path;
 
 /* ----------------------------- auth model ---------------------------- */
 
@@ -33,9 +33,8 @@ pub(super) fn reject() -> Auth {
 }
 
 /// Load or generate a persistent Ed25519 host key under app-data.
-pub(super) fn load_or_create_host_key(app: &AppHandle) -> Result<(PrivateKey, String), String> {
-    let dir = crate::resolved_app_data_dir(app)?.join("ssh-server");
-    std::fs::create_dir_all(&dir)
+pub(super) fn load_or_create_host_key(dir: &Path) -> Result<(PrivateKey, String), String> {
+    std::fs::create_dir_all(dir)
         .map_err(|e| format!("create ssh-server dir {}: {e}", dir.display()))?;
     let path = dir.join("host_ed25519");
 

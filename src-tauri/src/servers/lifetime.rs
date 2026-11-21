@@ -32,7 +32,7 @@ pub(super) async fn stop_internal(
             if let Some(t) = active.auto_stop_task.take() {
                 t.abort();
             }
-            finish_server(server_type, active).await;
+            finish_server(active).await;
         }
     }
     let info = ServerStatus::stopped(server_type);
@@ -60,7 +60,7 @@ pub(super) fn spawn_auto_stop(
                     let mut running = registry.running.lock().await;
                     if let Some(active) = running.remove(&server_type) {
                         // active.auto_stop_task is this very task — just drop it.
-                        finish_server(server_type, active).await;
+                        finish_server(active).await;
                     } else {
                         // Already stopped elsewhere; nothing to do.
                         return;
@@ -75,9 +75,9 @@ pub(super) fn spawn_auto_stop(
     })
 }
 
-async fn finish_server(server_type: ServerType, mut active: ActiveServer) {
+async fn finish_server(mut active: ActiveServer) {
     active.cancel.cancel();
-    if matches!(server_type, ServerType::Vnc | ServerType::Rdp) {
+    if active.wait_for_stop {
         // The monitor forwards cancellation and waits for the listener to close.
         if tokio::time::timeout(Duration::from_secs(12), &mut active.task)
             .await
@@ -174,6 +174,12 @@ pub async fn start_local_server(
     let cancel = CancellationToken::new();
     let ctx = ServerCtx::new(app.clone(), st, cancel.clone());
     let log = ctx.log.clone();
+    let wait_for_stop = matches!(st, ServerType::Vnc | ServerType::Rdp)
+        || (super::local_host::kind(st).is_some()
+            && state
+                .plugins
+                .get(taomni_server_process::local::SLUG)
+                .is_some());
     let started = match engine::start(ctx.clone(), config.clone()).await {
         Ok(s) => s,
         Err(e) => {
@@ -214,7 +220,7 @@ pub async fn start_local_server(
 
     {
         let mut running = state.legacy.servers.running.lock().await;
-        let task = if matches!(st, ServerType::Vnc | ServerType::Rdp) {
+        let task = if wait_for_stop {
             watch_desktop_server_exit(ctx, state.legacy.servers.clone(), started.task)
         } else {
             started.task
@@ -226,6 +232,7 @@ pub async fn start_local_server(
                 task,
                 auto_stop_task,
                 status: running_status.clone(),
+                wait_for_stop,
                 _process_lock: process_lock,
             },
         );

@@ -16,6 +16,7 @@ pub mod migration;
 pub(crate) mod migration_commit;
 pub(crate) mod migration_execute_mfa;
 mod migration_key_check;
+mod migration_local_servers_identity;
 pub(crate) mod migration_mail;
 pub(crate) mod migration_mail_provision;
 pub(crate) mod migration_rdp_pins;

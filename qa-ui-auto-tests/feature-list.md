@@ -336,6 +336,7 @@ controls:
     - '[data-testid="module-action-enable-vnc-server"]'
     - '[data-testid="module-action-enable-rdp-client"]'
     - '[data-testid="module-action-enable-rdp-server"]'
+    - '[data-testid="module-action-enable-servers"]'
     - '[data-testid="module-action-enable-mail"]'
     - '[data-testid="module-action-enable-screenshot"]'
   - id: module-status-mfa
@@ -350,6 +351,7 @@ controls:
     - '[data-testid="module-action-disable-vnc-server"]'
     - '[data-testid="module-action-disable-rdp-client"]'
     - '[data-testid="module-action-disable-rdp-server"]'
+    - '[data-testid="module-action-disable-servers"]'
     - '[data-testid="module-action-disable-mail"]'
     - '[data-testid="module-action-disable-screenshot"]'
   - id: module-action-uninstall-hello-plugin
@@ -6012,6 +6014,7 @@ files:
   - src/components/servers/ServerSettings.tsx
   - src/components/servers/CommonSettings.tsx
   - src/components/servers/settings/HttpSettings.tsx
+  - src/components/servers/settings/SshSettings.tsx
   - src/components/servers/settings/VncSettings.tsx
   - src/components/servers/ServerOutputLog.tsx
   - src/components/servers/fields.tsx
@@ -6025,6 +6028,9 @@ files:
   - src-tauri/src/servers/vnc.rs
   - src-tauri/src/servers/lifetime.rs
   - src-tauri/crates/taomni-local-servers-engine/src/
+  - src-tauri/crates/taomni-pty/src/
+  - src-tauri/plugins/servers/module.json
+  - src-tauri/plugins/servers/src/
   - src-tauri/plugins/vnc-server/module.json
   - src-tauri/plugins/vnc-server/src/daemon.rs
   - src-tauri/src/servers/mod.rs
@@ -6032,6 +6038,14 @@ files:
 controls:
   - id: server-field-http-root-dir
     selector: '[data-testid="server-field-http-root-dir"]'
+    kind: interactive
+    optional: true
+  - id: server-field-ssh-password
+    selector: '[data-testid="server-field-ssh-password"]'
+    kind: interactive
+    optional: true
+  - id: server-field-ssh-root-dir
+    selector: '[data-testid="server-field-ssh-root-dir"]'
     kind: interactive
     optional: true
   # Single-instance tab ("servers") opened by Tools sidebar, Tools menu, Ctrl+Shift+S,
@@ -6182,6 +6196,8 @@ controls:
 - i18n key 在 `servers.*`（en / zh-CN 双语）；前端 store 为 `serversStore`，IPC + 类型 + `SERVER_DEFS` 在 `src/lib/servers.ts`，单实例页签协调逻辑在 `src/lib/serversTab.ts`
 - **e2e 测试覆盖**：`TC-SERVERS-001-tab-singleton-browser`、`TC-auto-F-Servers-1-servers-dialog` 覆盖浏览器单实例页签及跨上下文互斥，`TC-SERVERS-002-tab-singleton-native` 覆盖原生双进程 OS `ModuleLock` 与热路由切换，`TC-SERVERS-003-tab-functional-native` 核对真实 HTTP 文件内容、停止后端口关闭、日志、热改端口提示及配置持久化。
 - VNC 由签名 `vnc-server` 宿主启动和监督系统 daemon。Linux X11 的 `TC-MODULES-063` 验证离线安装、真实回环连接、停止及禁用后的端口与租约释放。`TC-MODULES-064` 在 Browser 核对端口、绑定地址、密码及两个选项的保存和恢复。
+- TC-SERVERS-004 从 Local servers 启动真实 SSH 监听器。独立客户端验证鉴权、SFTP 文件内容、PTY 命令完成和停止后的端口关闭。
+- TC-MODULES-066 安装签名 Local servers 模块后验证回环 HTTP 文件以及停用时关闭监听、释放写租约和刷新状态。
 
 ### 22.2 RDP Server（与 Windows 远程桌面对齐）🚧
 

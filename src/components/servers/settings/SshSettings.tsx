@@ -59,6 +59,7 @@ export function SshSettings({ config, onChange }: Props) {
       {showPassword ? (
         <PasswordField
           label={t("servers.fields.password")}
+          testId="server-field-ssh-password"
           value={password}
           onChange={(v) => onChange({ password: v })}
         />
@@ -83,6 +84,7 @@ export function SshSettings({ config, onChange }: Props) {
 
       <PathField
         label={t("servers.fields.sftpRootDir")}
+        testId="server-field-ssh-root-dir"
         value={rootDir}
         mode="folder"
         browseLabel={t("servers.fields.browse")}

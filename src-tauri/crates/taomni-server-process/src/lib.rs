@@ -13,6 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 mod config;
 pub use config::ServerConfig;
+pub mod local;
 pub mod rdp;
 mod settings_file;
 pub mod system_rdp;

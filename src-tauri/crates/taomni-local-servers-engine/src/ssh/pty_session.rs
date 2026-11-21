@@ -49,7 +49,7 @@ impl SshConnection {
             pending.remove(&channel);
         }
 
-        let launch = crate::terminal::pty::resolve_shell(None);
+        let launch = taomni_pty::resolve_shell(None);
         let mut args = launch.args;
         #[cfg(unix)]
         if self.opts.login_shell {
@@ -113,12 +113,12 @@ impl SshConnection {
     pub(super) fn attach_pty_io(
         &mut self,
         channel: ChannelId,
-        handle: crate::terminal::pty::PtyHandle,
+        handle: taomni_pty::PtyHandle,
         mut reader: Box<dyn Read + Send>,
         session: &mut Session,
         kind: &'static str,
     ) {
-        let crate::terminal::pty::PtyHandle {
+        let taomni_pty::PtyHandle {
             writer,
             mut child,
             master,
@@ -182,7 +182,7 @@ impl SshConnection {
 
 /// Build (program, args) for an SSH `exec` request using the platform default shell.
 pub(super) fn exec_command_launch(command: &str, login_shell: bool) -> (String, Vec<String>) {
-    let launch = crate::terminal::pty::resolve_shell(None);
+    let launch = taomni_pty::resolve_shell(None);
     let program = launch.program;
     let _lower = program.to_ascii_lowercase();
 
@@ -233,9 +233,9 @@ pub(super) fn spawn_pty_command(
     program: &str,
     args: &[String],
     cwd: Option<&str>,
-) -> Result<(crate::terminal::pty::PtyHandle, Box<dyn Read + Send>), String> {
+) -> Result<(taomni_pty::PtyHandle, Box<dyn Read + Send>), String> {
     if let Some(dir) = cwd {
-        crate::terminal::pty::create_pty(
+        taomni_pty::create_pty(
             cols,
             rows,
             Some(program.to_string()),
@@ -244,7 +244,7 @@ pub(super) fn spawn_pty_command(
         )
         .map(|(h, r, _)| (h, r))
     } else {
-        crate::terminal::pty::create_command_pty(cols, rows, program, args)
+        taomni_pty::create_command_pty(cols, rows, program, args)
     }
 }
 

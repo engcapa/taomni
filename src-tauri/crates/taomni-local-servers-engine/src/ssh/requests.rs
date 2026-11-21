@@ -428,7 +428,7 @@ impl ServerHandler for SshConnection {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         async move {
             if let Some(shell) = self.shells.get(&channel) {
-                let _ = crate::terminal::pty::resize_pty(
+                let _ = taomni_pty::resize_pty(
                     shell.master.as_ref(),
                     col_width as u16,
                     row_height as u16,

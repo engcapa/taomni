@@ -42,6 +42,10 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("assert_signed_rdp_server")(assert_signed_rdp_server)
     from .servers_http_observation import run as assert_local_servers_http
     register_verb("assert_local_servers_http")(assert_local_servers_http)
+    from .servers_ssh_observation import run as assert_local_servers_ssh
+    register_verb("assert_local_servers_ssh")(assert_local_servers_ssh)
+    from .module_servers_observation import run as assert_signed_servers_host
+    register_verb("assert_signed_servers_host")(assert_signed_servers_host)
     from .rdp_helpers.signed_viewer_latency import run as assert_signed_rdp_latency
     register_verb("assert_signed_rdp_latency")(assert_signed_rdp_latency)
     from .module_download_observation import run as module_download_probe

@@ -10947,6 +10947,7 @@ dependencies = [
  "taomni-plugin-services",
  "taomni-plugin-stream",
  "taomni-profile-locks",
+ "taomni-pty",
  "taomni-rdp-client-api",
  "taomni-rdp-client-engine",
  "taomni-rdp-common",
@@ -11107,6 +11108,11 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "dirs 6.0.0",
+ "portable-pty",
+ "rand 0.10.2",
+ "russh",
+ "russh-sftp",
+ "taomni-pty",
  "taomni-server-process",
  "tokio",
  "tokio-util 0.7.19",
@@ -11287,6 +11293,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-plugin-servers"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "taomni-local-servers-engine",
+ "taomni-plugin-api",
+ "taomni-plugin-sdk",
+ "taomni-server-process",
+ "tokio",
+ "tokio-util 0.7.19",
+ "uuid",
+]
+
+[[package]]
 name = "taomni-plugin-services"
 version = "0.1.0"
 dependencies = [
@@ -11359,6 +11380,15 @@ name = "taomni-profile-locks"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "tempfile",
+]
+
+[[package]]
+name = "taomni-pty"
+version = "0.1.0"
+dependencies = [
+ "portable-pty",
+ "serde",
  "tempfile",
 ]
 

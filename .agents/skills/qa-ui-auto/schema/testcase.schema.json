@@ -107,7 +107,9 @@
           "module_signed_screenshot_archive",
           "module_signed_vnc_server_archive",
           "module_signed_rdp_server_archive",
+          "module_signed_servers_archive",
           "local_servers_http",
+          "local_servers_ssh",
           "module_execution",
           "module_backup_data",
           "vnc_required",
@@ -973,6 +975,14 @@
         "assert_local_servers_http": {
           "enum": ["serving", "stopped"],
           "description": "Native Local servers HTTP case. Check an actual file response or the closed listener on its registered loopback port."
+        },
+        "assert_local_servers_ssh": {
+          "enum": ["serving", "stopped"],
+          "description": "Native Local servers SSH case. Use the isolated server for authenticated SFTP and PTY command output, then check the listener closes."
+        },
+        "assert_signed_servers_host": {
+          "enum": ["running", "disabled"],
+          "description": "Native signed Local servers case. Match the host to the package and observe its writer lease and HTTP endpoint."
         },
         "assert_signed_mail_host": {
           "enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "disabled"],

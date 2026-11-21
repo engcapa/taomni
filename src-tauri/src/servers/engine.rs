@@ -117,6 +117,15 @@ pub async fn set_status(app: &AppHandle, registry: &ServerRegistry, status: Serv
 /// and returns `Err` synchronously on failure so the caller can map it to an
 /// `Error` status.
 pub async fn start(ctx: ServerCtx, config: super::ServerConfig) -> Result<ServerStarted, String> {
+    let state = ctx.app.state::<crate::state::AppState>();
+    if let Some(kind) = super::local_host::kind(ctx.server_type)
+        && let Some(record) = state.plugins.get(taomni_server_process::local::SLUG)
+    {
+        if record.state != crate::plugin::LifecycleState::Enabled {
+            return Err("Enable the Local servers module in Settings → Module Store.".into());
+        }
+        return super::local_host::start(state.plugins.clone(), ctx.clone(), kind, config).await;
+    }
     match ctx.server_type {
         ServerType::Ssh => super::ssh::start(ctx, config).await,
         ServerType::Ftp => super::ftp::start(ctx, config).await,

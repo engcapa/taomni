@@ -102,6 +102,7 @@ cases:
 - TC-MODULES-063
 - TC-MODULES-064
 - TC-MODULES-065
+- TC-MODULES-066
 - TC-BACKUP-RESTORE-001
 - TC-WS-GIT-CLONE-01-defaults-proxy-and-clone-browser
 - TC-WS-GIT-CLONE-02-background-close-cancel-retry-browser
@@ -948,3 +949,4 @@ cases:
 - TC-SERVERS-001-tab-singleton-browser
 - TC-SERVERS-002-tab-singleton-native
 - TC-SERVERS-003-tab-functional-native
+- TC-SERVERS-004-local-ssh-sftp-native
