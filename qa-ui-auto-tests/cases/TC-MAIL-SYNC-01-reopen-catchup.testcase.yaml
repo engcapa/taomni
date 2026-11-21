@@ -76,9 +76,11 @@ steps:
 - press:
     selector: '[data-testid="mail-message-row"][data-subject="Closed-tab 0450"]'
     key: Enter
-- assert_text:
-    selector: '[data-testid="mail-reader-text"]'
-    contains: Closed-tab 0450
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent
+      ?? document.querySelector('.taomni-mail-reader-text')?.textContent
+      ?? '').includes('Closed-tab 0450')
     timeout_sec: 30
 - assert_no_runtime_errors: null
 - screenshot: mail-sync-01-reopen-catchup.png
