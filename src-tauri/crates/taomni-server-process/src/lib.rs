@@ -11,6 +11,9 @@ use tokio::process::Command;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
+mod config;
+pub use config::ServerConfig;
+pub mod system_rdp;
 pub mod vnc;
 
 pub type Log = Arc<dyn Fn(String) + Send + Sync>;

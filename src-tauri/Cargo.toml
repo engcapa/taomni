@@ -21,6 +21,7 @@ members = [
     "crates/taomni-rdp-client-api",
     "crates/taomni-rdp-client-engine",
     "crates/taomni-rdp-probe",
+    "crates/taomni-rdp-server-engine",
     "crates/taomni-file-uri",
     "crates/taomni-mail-api",
     "crates/taomni-mail-engine",
@@ -98,6 +99,7 @@ taomni-screenshot-api = { path = "crates/taomni-screenshot-api" }
 taomni-screenshot-ocr = { path = "crates/taomni-screenshot-ocr", optional = true }
 taomni-screenshot-recording = { path = "crates/taomni-screenshot-recording", optional = true }
 taomni-server-process = { path = "crates/taomni-server-process" }
+taomni-rdp-server-engine = { path = "crates/taomni-rdp-server-engine" }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-rdp-client-api = { path = "crates/taomni-rdp-client-api" }
 taomni-rdp-client-engine = { path = "crates/taomni-rdp-client-engine", optional = true }
@@ -188,7 +190,7 @@ tokio-native-tls = "0.3"
 # features turn them on in ironrdp-pdu, so `client_codecs_capabilities`
 # advertises QOI/QOIZ, and an IronRDP-based server (Taomni's own included)
 # then sends surface bits the client could not decode — a black desktop.
-ironrdp = { version = "0.17.0", features = ["core", "connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol", "server", "acceptor", "qoi", "qoiz"] }
+ironrdp = { version = "0.17.0", features = ["core", "connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol", "qoi", "qoiz"] }
 ironrdp-bulk = "=0.1.1"
 ironrdp-tokio = { version = "0.10.0", features = ["reqwest-rustls-ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
@@ -312,7 +314,7 @@ asr-whisper = ["dep:whisper-rs"]
 asr-sherpa = ["dep:sherpa-onnx"]
 # RDP server sound: WASAPI loopback / virtual-microphone playback through cpal
 # (macOS loopback uses ScreenCaptureKit; Linux uses PipeWire directly).
-rdp-server-audio = ["dep:cpal"]
+rdp-server-audio = ["taomni-rdp-server-engine/rdp-server-audio"]
 voice-capture = ["dep:cpal"]
 screen-capture = ["dep:xcap"]
 vulkan-detect = ["dep:ash"]
@@ -386,11 +388,6 @@ objc2-core-video = { version = "0.3.2", features = ["CVBase", "CVBuffer", "CVIma
 objc2-core-foundation = "0.3.2"
 objc2-screen-capture-kit = { version = "0.3.2", default-features = false, features = ["std", "SCShareableContent", "SCStream", "block2", "dispatch2", "objc2-core-graphics", "objc2-core-media"] }
 objc2-video-toolbox = { version = "0.3.2", default-features = false, features = ["std", "block2", "objc2-core-media", "objc2-core-video", "VTBase", "VTCompressionProperties", "VTCompressionSession", "VTErrors", "VTSession"] }
-# The IronRDP umbrella crate does not expose its server EGFX feature. A direct
-# dependency enables that feature on the same 0.13 server crate it re-exports,
-# so the macOS server can use the negotiated AVC420 graphics channel.
-ironrdp-server = { version = "0.13", features = ["egfx"] }
-ironrdp-egfx = "0.3"
 # Explicit Screen Recording permission preflight/request used by the RDP
 # server settings probe. xcap also uses CoreGraphics internally, but keeping
 # this direct dependency makes our permission boundary intentional.

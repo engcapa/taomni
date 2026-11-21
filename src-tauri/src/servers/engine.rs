@@ -44,30 +44,15 @@ impl ServerCtx {
 /// local-time timestamp.
 #[derive(Clone)]
 pub struct LogEmitter {
-    target: LogTarget,
+    app: AppHandle,
     server_type: ServerType,
-}
-
-#[derive(Clone)]
-enum LogTarget {
-    App(AppHandle),
-    #[cfg(test)]
-    Stderr,
 }
 
 impl LogEmitter {
     pub fn new(app: AppHandle, t: ServerType) -> Self {
         Self {
-            target: LogTarget::App(app),
+            app,
             server_type: t,
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn rdp_test_log() -> Self {
-        Self {
-            target: LogTarget::Stderr,
-            server_type: ServerType::Rdp,
         }
     }
 
@@ -81,19 +66,11 @@ impl LogEmitter {
     pub fn line(&self, msg: impl Into<String>) {
         let ts = chrono::Local::now().format("%H:%M:%S");
         let line = format!("[{}] {}", ts, msg.into());
-        let app = match &self.target {
-            LogTarget::App(app) => app,
-            #[cfg(test)]
-            LogTarget::Stderr => {
-                eprintln!("{line}");
-                return;
-            }
-        };
-        if let Some(state) = app.try_state::<crate::state::AppState>() {
+        if let Some(state) = self.app.try_state::<crate::state::AppState>() {
             state.legacy.servers.record_log(self.server_type, &line);
         }
         let channel = format!("server://output/{}", self.server_type.as_str());
-        let _ = app.emit(&channel, line);
+        let _ = self.app.emit(&channel, line);
     }
 }
 

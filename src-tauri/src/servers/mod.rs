@@ -82,7 +82,7 @@ use credentials::{
 
 pub use model::{ServerConfig, ServerRunState, ServerStatus, ServerType};
 
-use model::{default_autostop, default_bind, now_ms};
+use model::now_ms;
 
 pub use registry::{
     ActiveServer, ServerRegistry, clear_server_log, list_server_logs,

@@ -425,7 +425,7 @@ jobs:
           pnpm build 2>&1 | tee rdp-pipeline-evidence/frontend-build.log
           cargo build --locked --release --manifest-path src-tauri/Cargo.toml --package taomni-rdp-probe \
             2>&1 | tee rdp-pipeline-evidence/probe-build.log
-          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --package taomni \
+          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --package taomni-rdp-server-engine \
             --lib --no-default-features --no-run --message-format=json > rdp-pipeline-evidence/harness-build.jsonl
           python - <<'PY'
           import json
@@ -435,7 +435,7 @@ jobs:
               harnesses = [
                   item["executable"] for line in build
                   if (item := json.loads(line)).get("reason") == "compiler-artifact"
-                  and item["target"]["name"] == "taomni_lib" and item["profile"]["test"]
+                  and item["target"]["name"] == "taomni_rdp_server_engine" and item["profile"]["test"]
                   and item["executable"]
               ]
           assert len(harnesses) == 1, harnesses
@@ -447,7 +447,7 @@ jobs:
           set -o pipefail
           read -r harness < rdp-pipeline-evidence/harness-path.txt
           if [[ "$RUNNER_OS" == Windows ]]; then harness="$(cygpath -u "$harness")"; fi
-          "$harness" --exact servers::rdp::host_perf::bitmap::validates_dimensions_stride_and_damage_offsets_before_allocating_pixels
+          "$harness" --exact host_perf::bitmap::validates_dimensions_stride_and_damage_offsets_before_allocating_pixels
           runner=()
           probe=src-tauri/target/release/rdp-probe
           if [[ "$RUNNER_OS" == Linux ]]; then

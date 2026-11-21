@@ -18,7 +18,7 @@ from qa_ui_auto.rdp_helpers.report_assertions import P95_METRIC, report_expectat
 from qa_ui_auto.testcase import load_case, step_verb_and_args
 
 CASE = Path("qa-ui-auto-tests/cases/TC-RDPS-PERF-01-performance-budget.testcase.yaml")
-SERVER = "servers::rdp::host_perf::serve_desktop"
+SERVER = "host_perf::serve_desktop"
 ROUTES = ("in-process", "encoder-host")
 
 

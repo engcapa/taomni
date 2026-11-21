@@ -10868,8 +10868,6 @@ dependencies = [
  "imap-proto",
  "ironrdp",
  "ironrdp-bulk",
- "ironrdp-egfx",
- "ironrdp-server",
  "ironrdp-tokio",
  "jaq-core",
  "jaq-json",
@@ -10951,6 +10949,7 @@ dependencies = [
  "taomni-rdp-client-api",
  "taomni-rdp-client-engine",
  "taomni-rdp-common",
+ "taomni-rdp-server-engine",
  "taomni-redirector",
  "taomni-screenshot-api",
  "taomni-screenshot-ocr",
@@ -11407,6 +11406,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-rdp-server-engine"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arboard",
+ "async-trait",
+ "block2",
+ "bytes",
+ "cpal",
+ "dispatch2",
+ "enigo",
+ "ironrdp",
+ "ironrdp-egfx",
+ "ironrdp-server",
+ "ironrdp-tokio",
+ "libc",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-core-audio-types",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
+ "objc2-core-media",
+ "objc2-core-video",
+ "objc2-foundation",
+ "objc2-screen-capture-kit",
+ "objc2-video-toolbox",
+ "pipewire",
+ "rcgen",
+ "rustls 0.23.44",
+ "serde",
+ "serde_json",
+ "taomni-capture",
+ "taomni-plugin-api",
+ "taomni-plugin-stream",
+ "taomni-rdp-common",
+ "taomni-server-process",
+ "tempfile",
+ "tokio",
+ "tokio-rustls 0.26.5",
+ "tokio-util 0.7.19",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "which",
+ "windows 0.62.2",
+ "x11rb",
+]
+
+[[package]]
 name = "taomni-redirector"
 version = "0.1.0"
 dependencies = [
@@ -11467,6 +11515,8 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.19",
  "which",
+ "windows 0.62.2",
+ "winreg 0.55.0",
 ]
 
 [[package]]

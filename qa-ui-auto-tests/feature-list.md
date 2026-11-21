@@ -6191,7 +6191,8 @@ files:
   - src/components/servers/fields.tsx
   - src/components/servers/RdpServerApprovalBridge.tsx
   - src-tauri/src/servers/rdp.rs
-  - src-tauri/src/servers/rdp/
+  - src-tauri/crates/taomni-rdp-server-engine/src/
+  - src-tauri/crates/taomni-server-process/src/system_rdp.rs
   - src-tauri/src/bin/rdp-probe/
   - src-tauri/vendor/ironrdp-server/
   - src-tauri/vendor/ironrdp-acceptor/

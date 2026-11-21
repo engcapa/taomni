@@ -219,6 +219,21 @@ export function modularBoundaryViolations(root, { linuxTreeFile, mfaTreeFile, mf
     });
   }
 
+  const rdpServer = path.join(root, "src-tauri/crates/taomni-rdp-server-engine");
+  if (fs.existsSync(rdpServer)) {
+    const cargo = fs.readFileSync(path.join(rdpServer, "Cargo.toml"), "utf8");
+    for (const { name, value } of cargoDependencies(cargo)) {
+      const packageName = value.match(/\bpackage\s*=\s*"([^"]+)"/)?.[1] ?? name;
+      const dependencyPath = value.match(/\bpath\s*=\s*"([^"]+)"/)?.[1];
+      const resolved = dependencyPath && path.resolve(rdpServer, dependencyPath);
+      if (/^(?:tauri(?:-|$)|wry$|taomni$)/.test(packageName)
+        || resolved === path.join(root, "src-tauri")
+        || resolved?.startsWith(path.join(root, "src-tauri/plugins") + path.sep)) {
+        errors.push(`RDP Server engine dependency ${name} links application or module state`);
+      }
+    }
+  }
+
   if (linuxTreeFile) {
     const tree = fs.readFileSync(linuxTreeFile, "utf8");
     if (!/^taomni-capture v/m.test(tree)) errors.push("Linux cargo tree does not identify taomni-capture as its root");

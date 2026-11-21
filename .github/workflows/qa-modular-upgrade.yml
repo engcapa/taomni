@@ -695,6 +695,12 @@ jobs:
         run: |
           set -o pipefail
           cargo test --locked --manifest-path src-tauri/Cargo.toml -p taomni-rdp-client-engine --lib 2>&1 | tee modular-evidence/rdp-client-engine.log
+      - name: RDP server clipboard contracts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --locked --manifest-path src-tauri/Cargo.toml -p taomni-rdp-server-engine --lib clipboard::tests 2>&1 | tee modular-evidence/rdp-server-engine.log
       - name: Core migration, retained RDP, Vault and application lifecycle unit contracts
         if: runner.os == 'Linux'
         shell: bash
@@ -723,7 +729,6 @@ jobs:
           executable = Path(executables.pop()).resolve()
           filters = [
               "plugin::",
-              "servers::rdp::clipboard::tests",
               "config::tests",
               "mail::mbox::tests::export_then_import_on_fake_server",
               "mail::tests::accounts_and_authentication",
