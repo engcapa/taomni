@@ -10,6 +10,10 @@
   --accent-s: var(--taomni-accent, #3b82f6);
   --sel: var(--taomni-selected, #dbeafe);
   --sel-b: var(--taomni-input-border, #93c5fd);
+  --editor-sel: var(--taomni-editor-selection-bg, rgba(37, 99, 235, 0.26));
+  --editor-sel-unfocused: var(--taomni-editor-selection-unfocused-bg, rgba(37, 99, 235, 0.14));
+  --editor-sel-match-bg: var(--taomni-editor-selection-match-bg, rgba(245, 158, 11, 0.24));
+  --editor-sel-match-border: var(--taomni-editor-selection-match-border, rgba(245, 158, 11, 0.58));
   --input: var(--taomni-input-bg, #fff);
   --input-b: var(--taomni-input-border, #cbd5e1);
   --chrome-b: var(--taomni-card-border, #cbd5e1);
@@ -69,6 +73,7 @@
 .fv-chip.warn { background: color-mix(in srgb,var(--warn) 20%,transparent); color: var(--warn); }
 .fv-editor { flex: 1; min-height: 0; min-width: 0; overflow: hidden; text-align: left; }
 .fv-editor > .cm-editor { height: 100%; }
+.fv-selection-active .cm-activeLine, .fv-selection-active .cm-activeLineGutter { background-color: transparent !important; }
 .fv-status { height: 25px; display: flex; align-items: center; padding: 3px 12px; gap: 16px; color: var(--muted); border-top: 1px solid var(--divider); font-size: 11px; flex: none; }
 .fv-status .dirty { color: var(--warn); }
 .fv-select { height: 26px; border: 0; background: var(--bg); padding: 0 5px; font-size: 12px; }

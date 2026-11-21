@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { prepareMarkdownExport, DEFAULT_EXPORT_SETTINGS, markdownExportCss } from "./exportModel";
-import { exportMarkdown } from "./markdownExport";
+import { exportMarkdown, pngExportScale, PNG_EXPORT_DPI } from "./markdownExport";
+import { toBlob } from "html-to-image";
 import { readMarkdownImage } from "../../../lib/markdownAssets";
 import { saveExportBlob } from "./exportFiles";
 import { markdownPdf } from "./exportPdf";
@@ -9,6 +10,7 @@ import { renderMermaid } from "../../editor/workspace/model/mermaid";
 vi.mock("../../../lib/markdownAssets", async (original) => ({ ...await original<typeof import("../../../lib/markdownAssets")>(), readMarkdownImage: vi.fn() }));
 vi.mock("./exportFiles", () => ({ saveExportBlob: vi.fn(), exportMarkdownFolder: vi.fn() }));
 vi.mock("./exportPdf", () => ({ markdownPdf: vi.fn() }));
+vi.mock("html-to-image", () => ({ toBlob: vi.fn() }));
 vi.mock("../../editor/workspace/model/mermaid", async (original) => {
   const actual = await original<typeof import("../../editor/workspace/model/mermaid")>();
   return { ...actual, renderMermaid: vi.fn(actual.renderMermaid) };
@@ -141,5 +143,39 @@ describe("self-contained sanitized Markdown output", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: {} });
     await expect(exportMarkdown("richtext", "a", "/a.md", DEFAULT_EXPORT_SETTINGS)).rejects.toThrow("unavailable");
     vi.unstubAllGlobals();
+  });
+  it("rasterizes the whole document at the 300 DPI standard shared with PDF and diagram PNG", async () => {
+    vi.mocked(toBlob).mockResolvedValue(new Blob(["png"], { type: "image/png" }));
+    vi.mocked(saveExportBlob).mockImplementationOnce(async (_name, output) => {
+      expect(await (typeof output === "function" ? output() : output)).toBeInstanceOf(Blob);
+      return "/out/a.png";
+    });
+    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ height: 2000, width: 800 } as DOMRect);
+    try {
+      expect(await exportMarkdown("png", "# PNG\n\n```mermaid\nflowchart LR\nA-->B\n```", "/docs/a.md", DEFAULT_EXPORT_SETTINGS)).toEqual({ status: "saved", path: "/out/a.png" });
+    } finally { rect.mockRestore(); }
+    expect(toBlob).toHaveBeenCalledOnce();
+    const options = vi.mocked(toBlob).mock.calls[0][1]!;
+    expect(options.width).toBe(800);
+    expect(options.height).toBe(2000);
+    expect(options.pixelRatio).toBe(PNG_EXPORT_DPI / 96);
+    expect(options.skipFonts).toBe(true);
+  });
+});
+
+describe("pngExportScale density limits", () => {
+  it("matches the 300 DPI export standard for ordinary documents", () => {
+    expect(pngExportScale(2000)).toBe(PNG_EXPORT_DPI / 96);
+    expect(pngExportScale(100)).toBe(PNG_EXPORT_DPI / 96);
+  });
+  it("degrades density instead of exceeding the safe canvas area for long documents", () => {
+    expect(pngExportScale(10000)).toBeLessThan(PNG_EXPORT_DPI / 96);
+    expect(800 * 10000 * pngExportScale(10000) ** 2).toBeLessThanOrEqual(40_000_000);
+    expect(800 * 20000 * pngExportScale(20000) ** 2).toBeLessThanOrEqual(40_000_000);
+    expect(20000 * pngExportScale(20000)).toBeLessThanOrEqual(32700);
+  });
+  it("never renders below the previous 96 DPI density", () => {
+    expect(pngExportScale(40_000)).toBe(1);
+    expect(pngExportScale(10)).toBeGreaterThanOrEqual(1);
   });
 });

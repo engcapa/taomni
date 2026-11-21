@@ -1,12 +1,12 @@
 import { expect, it } from "vitest";
 import { captureWordTextLayout } from "./wordSvgText";
 
-function fixture(content: string) {
+function fixture(content: string, uniform = false) {
   const svg = new DOMParser().parseFromString(`<svg xmlns="http://www.w3.org/2000/svg">${content}</svg>`, "image/svg+xml").documentElement as unknown as SVGSVGElement;
   const owner = svg.querySelector("text")!;
   Object.assign(owner, {
     getNumberOfChars: () => owner.textContent!.length,
-    getStartPositionOfChar: (index: number) => ({ x: -48 + index * 16, y: index < 4 ? 12 : 32 }),
+    getStartPositionOfChar: (index: number) => ({ x: -48 + index * 16, y: index < 4 || uniform ? 12 : 32 }),
   });
   return { svg, owner };
 }
@@ -35,8 +35,45 @@ it("retains CJK glyph positions, Latin runs, label text, paint and multiline bas
   expect(Array.from(owner.children).every(span => span.getAttribute("text-anchor") === "start")).toBe(true);
 });
 
-it.each(["Plain Latin office", "中文 مع العربية", "中文 e\u0301", "中文 हिन्दी"])("keeps contextual or unrelated SVG text unchanged: %s", (value) => {
+it("pins a plain Latin label so Office importers cannot re-anchor it", () => {
+  const { svg, owner } = fixture('<text x="320" y="70" text-anchor="middle" font-size="20">Plain Latin office</text>', true);
+  const apply = captureWordTextLayout(svg);
+  apply();
+  expect(owner.textContent).toBe("Plain Latin office");
+  expect(owner.getAttribute("text-anchor")).toBe("start");
+  expect(owner.hasAttribute("x")).toBe(false);
+  const span = owner.querySelector("tspan")!;
+  expect(span.textContent).toBe("Plain Latin office");
+  expect(span.getAttribute("x")).toBe("-48");
+  expect(span.getAttribute("y")).toBe("12");
+  expect(span.getAttribute("text-anchor")).toBe("start");
+});
+
+it("pins C4-style row tspans with measured positions of every inner word", () => {
+  const { svg, owner } = fixture('<text y="-10.1" text-anchor="start"><tspan class="row" x="0" y="-1.4" dy="15.4" text-anchor="middle"><tspan class="word">Banking</tspan><tspan class="word"> Customer</tspan><tspan class="word"> A</tspan></tspan></text>', true);
+  const apply = captureWordTextLayout(svg);
+  apply();
+  expect(owner.textContent).toBe("Banking Customer A");
+  expect(owner.hasAttribute("y")).toBe(false);
+  expect(owner.getAttribute("text-anchor")).toBe("start");
+  // The center-anchored row coordinate is gone; each word starts where the
+  // browser measured it, so importers that ignore text-anchor keep the layout.
+  expect(owner.querySelector(".row")).toBe(null);
+  const words = Array.from(owner.children);
+  expect(words.map(span => span.textContent)).toEqual(["Banking", " Customer", " A"]);
+  expect(words.map(span => Number(span.getAttribute("x")))).toEqual([-48, -48 + 7 * 16, -48 + 16 * 16]);
+  expect(words.every(span => span.getAttribute("text-anchor") === "start")).toBe(true);
+});
+
+it.each(["中文 مع العربية", "中文 e\u0301", "中文 हिन्दी"])("keeps contextual or bidi SVG text unchanged: %s", (value) => {
   const { svg, owner } = fixture(`<text x="10"><tspan>${value}</tspan></text>`);
+  const before = owner.outerHTML;
+  captureWordTextLayout(svg)();
+  expect(owner.outerHTML).toBe(before);
+});
+
+it("keeps whitespace-only and empty labels untouched", () => {
+  const { svg, owner } = fixture('<text x="10"><tspan>   </tspan></text>');
   const before = owner.outerHTML;
   captureWordTextLayout(svg)();
   expect(owner.outerHTML).toBe(before);
