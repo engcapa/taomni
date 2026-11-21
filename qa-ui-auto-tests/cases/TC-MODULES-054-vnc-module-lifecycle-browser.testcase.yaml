@@ -37,7 +37,7 @@ steps:
 - click: '[data-testid="vnc-auth-ok"]'
 - wait_for: {selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]', timeout_sec: 30}
 - eval_readonly:
-    expression: "document.querySelector('.vnc-container canvas')?.getContext('2d')?.getImageData(16, 16, 1, 1).data[3] === 255"
+    expression: "document.querySelector('.vnc-container')?.getAttribute('data-frontend-source')?.includes('/src-tauri/plugins/vnc-client/renderer/VncPanel.tsx') === true && document.querySelector('.vnc-container canvas')?.getContext('2d')?.getImageData(16, 16, 1, 1).data[3] === 255"
     timeout_sec: 15
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
@@ -60,7 +60,7 @@ verification:
     - {step: 14, expectation: No VNC renderer mounts before enable.}
     - {step: 16, expectation: The tab opens the Module Store at the enable action.}
     - {step: 22, expectation: A single VNC tab represents the saved session.}
-    - {step: 27, expectation: The fixture paints a frame after enable.}
+    - {step: 27, expectation: The preview loads the module renderer source and paints a fixture frame after enable.}
     results: [13, 14, 16, 22, 27]
   - id: R2
     requirement: Disabling the module replaces the viewer with its disabled state in the saved session.

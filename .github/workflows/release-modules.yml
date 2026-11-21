@@ -140,6 +140,14 @@ jobs:
               stream.write(f'macos_runner={macos_runner}\n')
           PY
 
+  vnc-frontend:
+    if: needs.source.outputs.slug == 'vnc-client'
+    needs: source
+    uses: ./.github/workflows/build-vnc-frontend.yml
+    with:
+      source: ${{ needs.source.outputs.sha }}
+      artifact: release-vnc-frontend-${{ github.run_id }}
+
   build:
     name: Build unsigned ${{ needs.source.outputs.slug }} (${{ matrix.platform }})
     needs: source
@@ -202,7 +210,7 @@ jobs:
               helper = 'taomni-vnc-key-helper.exe'
               shutil.copyfile(binaries / helper, payload / helper)
           frontend = manifest.get('entry', {}).get('frontend')
-          if frontend:
+          if frontend and slug != 'vnc-client':
               source_frontend = source / pathlib.Path(frontend).parent
               shutil.copytree(source_frontend, payload / source_frontend.relative_to(source))
           pathlib.Path('candidate-source.json').write_text(json.dumps({
@@ -222,8 +230,8 @@ jobs:
 
   sign:
     name: Sign ${{ needs.source.outputs.slug }} (${{ matrix.platform }})
-    needs: [source, build]
-    if: github.event_name != 'pull_request' && github.repository == 'engcapa/taomni'
+    needs: [source, build, vnc-frontend]
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'engcapa/taomni' && needs.build.result == 'success' && (needs.vnc-frontend.result == 'success' || (needs.source.outputs.slug != 'vnc-client' && needs.vnc-frontend.result == 'skipped')) }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.source.outputs.matrix) }}
@@ -280,6 +288,17 @@ jobs:
               with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
                   stream.write(f'host={host}\n')
           PY
+      - uses: actions/download-artifact@v4
+        if: needs.source.outputs.slug == 'vnc-client'
+        with:
+          name: release-vnc-frontend-${{ github.run_id }}
+          path: trusted-vnc-frontend
+      - name: Stage the verified VNC frontend bytes
+        if: needs.source.outputs.slug == 'vnc-client'
+        env:
+          MODULE_SOURCE: ${{ needs.source.outputs.sha }}
+          FRONTEND_TOOLING: ${{ github.workflow_sha }}
+        run: python scripts/stage-vnc-frontend.py trusted-vnc-frontend candidate/unsigned-module "$MODULE_SOURCE" "$FRONTEND_TOOLING"
       - uses: actions/setup-node@v4
         if: startsWith(matrix.platform, 'darwin-') && steps.candidate.outputs.host != ''
         with:

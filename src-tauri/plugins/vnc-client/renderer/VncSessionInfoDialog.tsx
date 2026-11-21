@@ -1,9 +1,8 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
-import type { VncSessionStats } from "../../lib/vnc";
-import type { VncPaintStats } from "../../lib/vncFramePainter";
-import { useT } from "../../lib/i18n";
-import { useFocusReturn } from "../editor/workspace/useFocusReturn";
+import type { VncSessionStats } from "../../../../src/lib/vnc/viewerProtocol";
+import type { VncPaintStats } from "./vncFramePainter";
+import { useT, useFocusReturn } from "../../../../src/lib/vnc/viewerHost";
 
 export interface VncSessionInfo {
   desktopName: string;

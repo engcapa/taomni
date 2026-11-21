@@ -144,6 +144,14 @@ jobs:
           pnpm run build --manifest
           cp dist/.vite/manifest.json gate-inventory/vite-manifest.json
           find dist -type f -print0 | sort -z | xargs -0 -r sha256sum > gate-inventory/dist-sha256.txt
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const manifest = JSON.parse(readFileSync('gate-inventory/vite-manifest.json', 'utf8'));
+          for (const path of Object.keys(manifest)) {
+            assert(!path.includes('plugins/vnc-client/renderer/'), `Bundled VNC frontend ${path}`);
+          }
+          JS
       - uses: actions/upload-artifact@v4
         if: always()
         with:

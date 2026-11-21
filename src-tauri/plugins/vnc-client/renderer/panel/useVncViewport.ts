@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { computeVncDisplaySize } from "../../../lib/vnc";
-import type { VncScaling } from "../../../lib/vnc";
+import { computeVncDisplaySize } from "../../../../../src/lib/vnc/viewerProtocol";
+import type { VncScaling } from "../../../../../src/lib/vnc/viewerProtocol";
 
 
 export interface UseVncViewportContext {
   containerRef: import("react").RefObject<HTMLDivElement | null>;
   scaling: VncScaling;
-  conn: import("../../../stores/vncStore").VncConnectionState;
+  conn: import("../vncStore").VncConnectionState;
   preserveAspect: boolean;
   remoteCursorCss: string;
 }

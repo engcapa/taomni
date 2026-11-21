@@ -1,7 +1,7 @@
 import { ExternalLink, Maximize, Maximize2, Menu as MenuIcon, Minimize, Minimize2, ShieldAlert } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { t as tr, useT } from "../../lib/i18n";
-import type { VncScaling, WsOutgoing } from "../../lib/vnc";
+import { useCallback, useEffect, useInsertionEffect, useMemo, useRef, useState } from "react";
+import { type VncPanelProps } from "../../../../src/lib/vnc/viewerContract";
+import type { VncScaling, WsOutgoing } from "../../../../src/lib/vnc/viewerProtocol";
 import {
   codePointToKeysym,
   encodeWsAck,
@@ -10,20 +10,16 @@ import {
   encodeWsRefresh,
   normalizeVncScaling,
   VNC_KEYSYM,
-  vncDisconnect,
   VncWheelAccumulator,
-} from "../../lib/vnc";
-import { VncFramePainter } from "../../lib/vncFramePainter";
-import { DEFAULT_VNC_VIEWER_OPTIONS, pictureQualityWire, type VncPictureQuality, type VncViewerOptions } from "../../lib/vncOptions";
-import { VncPointerScheduler, type VncPointerState } from "../../lib/vncPointerScheduler";
-import { useVncStore } from "../../stores/vncStore";
-import { useContextMenu } from "../ContextMenu";
-import { FT_BUTTON_STYLE, FT_ICON_BUTTON_STYLE, FT_SEPARATOR_STYLE } from "../floating-toolbar/floatingToolbarStyles";
-import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
-import { TabActions } from "../tabbar/TabActionSlot";
+} from "../../../../src/lib/vnc/viewerProtocol";
+import { VncFramePainter } from "./vncFramePainter";
+import { DEFAULT_VNC_VIEWER_OPTIONS, pictureQualityWire, type VncPictureQuality, type VncViewerOptions } from "../../../../src/lib/vncOptions";
+import { VncPointerScheduler, type VncPointerState } from "./vncPointerScheduler";
+import { useVncStore } from "./vncStore";
+import { t as tr, useT, vncDisconnect, useContextMenu, FT_BUTTON_STYLE, FT_ICON_BUTTON_STYLE, FT_SEPARATOR_STYLE, ScreenshotMenuButton, TabActions } from "../../../../src/lib/vnc/viewerHost";
 import { CLIPBOARD_KEYSTROKE_BATCH, CLIPBOARD_KEYSTROKE_LIMIT, CLIPBOARD_SYNC_MIN_INTERVAL_MS, readVncClipboardText } from "./panel/clipboardPolicy";
 import { networkSettingsUsesTunnel } from "./panel/connectionPolicy";
-import { type DelayedPointerDown, type VncPanelProps } from "./panel/types";
+import type { DelayedPointerDown } from "./panel/types";
 import { useVncConnection } from "./panel/useVncConnection";
 import { useVncFullScreen } from "./panel/useVncFullScreen";
 import { useVncKeyboard } from "./panel/useVncKeyboard";
@@ -35,6 +31,7 @@ import { VncFullScreenToolbar } from "./VncFullScreenToolbar";
 import { VncPropertiesDialog } from "./VncPropertiesDialog";
 import { VncSessionInfoDialog } from "./VncSessionInfoDialog";
 import { buildVncSessionMenuItems } from "./vncSessionMenu";
+import viewerStyles from "./viewer.css?inline";
 
 export default function VncPanel({
   tabId,
@@ -54,6 +51,12 @@ export default function VncPanel({
   onDetach,
   detachedWindowControls,
 }: VncPanelProps) {
+  useInsertionEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = viewerStyles;
+    document.head.append(style);
+    return () => style.remove();
+  }, []);
   const t = useT();
   // View-only and the clipboard direction are enforced by the backend per
   // connection, so an in-session change only takes effect on reconnect.
@@ -555,6 +558,7 @@ export default function VncPanel({
       ref={containerRef}
       className="vnc-container"
       data-testid="vnc-panel"
+      data-frontend-source={import.meta.url}
       data-vnc-scaling={String(scaling)}
       data-vnc-frames-painted="0"
       data-vnc-full-frame-ms={paintStats?.fullFrame
@@ -791,5 +795,3 @@ export default function VncPanel({
     </div>
   );
 }
-
-export { type VncPanelProps } from "./panel/types";

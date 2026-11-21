@@ -1,6 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { isTauriRuntime } from "../../../lib/runtime";
+import { getViewerWindow, isTauriRuntime } from "../../../../../src/lib/vnc/viewerHost";
 import { type FullScreenRestore, restoreWindowAfterFullScreen } from "./fullScreen";
 
 
@@ -29,7 +28,7 @@ export function useVncFullScreen(context: UseVncFullScreenContext) {
       return;
     }
     try {
-      const w = getCurrentWindow();
+      const w = getViewerWindow();
       if (next) {
         const restore = {
           maximized: await w.isMaximized(),
@@ -74,7 +73,7 @@ export function useVncFullScreen(context: UseVncFullScreenContext) {
   useEffect(() => () => {
     if (fullScreenRestoreRef.current && isTauriRuntime()) {
       const restore = fullScreenRestoreRef.current;
-      void restoreWindowAfterFullScreen(getCurrentWindow(), restore).catch(() => { });
+      void restoreWindowAfterFullScreen(getViewerWindow(), restore).catch(() => { });
     }
   }, []);
   return { fullScreen, canFullScreen, toggleFullScreen, screenFullScreen, setScreenFullScreen, fullScreenRestoreRef };

@@ -74,7 +74,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 
 vi.mock("@tauri-apps/api/core", () => ({
   convertFileSrc: (path: string) => path,
-  invoke: vi.fn(async () => undefined),
+  invoke: vi.fn(async (command: string) => command === "plugin_list" ? [] : undefined),
 }));
 
 vi.mock("@tauri-apps/api/event", () => import("../../../stubs/tauri-event"));
@@ -296,7 +296,7 @@ vi.mock("../../../components/rdp/RdpPanel", () => ({
   ),
 }));
 
-vi.mock("../../../components/vnc/VncPanel", () => ({
+vi.mock("../../../../src-tauri/plugins/vnc-client/renderer/VncPanel", () => ({
   default: ({
     host,
     port,

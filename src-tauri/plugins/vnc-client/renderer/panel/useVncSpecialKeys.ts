@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
-import { encodeWsKey } from "../../../lib/vnc";
-import type { WsOutgoing } from "../../../lib/vnc";
-import { type VncViewerOptions } from "../../../lib/vncOptions";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { getAppPlatform, isTauriRuntime } from "../../../lib/runtime";
+import { encodeWsKey } from "../../../../../src/lib/vnc/viewerProtocol";
+import type { WsOutgoing } from "../../../../../src/lib/vnc/viewerProtocol";
+import { type VncViewerOptions } from "../../../../../src/lib/vncOptions";
+import { getAppPlatform, isTauriRuntime, listenVncSpecialKey, setVncSpecialKeyCapture } from "../../../../../src/lib/vnc/viewerHost";
 import { SPECIAL_KEY_KEYSYMS } from "./keyboardPolicy";
 
 
 export interface UseVncSpecialKeysContext {
   visible: boolean;
-  conn: import("../../../stores/vncStore").VncConnectionState;
+  conn: import("../vncStore").VncConnectionState;
   viewOnly: boolean;
   viewer: VncViewerOptions;
   canvasFocused: boolean;
@@ -74,9 +72,9 @@ export function useVncSpecialKeys(context: UseVncSpecialKeysContext) {
     }
     let disposed = false;
     let unlisten: (() => void) | null = null;
-    void invoke("vnc_set_special_key_capture", { enabled: true }).catch(() => { });
-    void listen<{ code: string; down: boolean; }>("vnc-special-key", ({ payload }) => {
-      forward(payload.code, payload.down);
+    void setVncSpecialKeyCapture(true).catch(() => { });
+    void listenVncSpecialKey(({ code, down }) => {
+      forward(code, down);
     }).then((fn) => {
       if (disposed) fn();
       else unlisten = fn;
@@ -84,7 +82,7 @@ export function useVncSpecialKeys(context: UseVncSpecialKeysContext) {
     return () => {
       disposed = true;
       unlisten?.();
-      void invoke("vnc_set_special_key_capture", { enabled: false }).catch(() => { });
+      void setVncSpecialKeyCapture(false).catch(() => { });
     };
   }, [captureSpecialKeys, conn?.sessionId, conn?.nativeSpecialKeys, sendWs, sendWsBinary]);
   return { captureSpecialKeys };

@@ -6,9 +6,9 @@ import { createPluginFrontendApi, installPluginFrontendHost, type PluginFrontend
 import { usePluginFrontendStore } from "../../stores/pluginFrontendStore";
 import { PluginUnavailablePane } from "./PluginUnavailablePane";
 
-interface LoadedFrontend {
+interface LoadedFrontend<Props> {
   identity: string;
-  component: ComponentType<PluginFrontendProps>;
+  component: ComponentType<Props>;
   api: PluginFrontendApi;
 }
 
@@ -20,11 +20,17 @@ class PluginRenderBoundary extends Component<{ children: ReactNode; fallback: (e
   render() { return this.state.error ? this.props.fallback(this.state.error) : this.props.children; }
 }
 
-export function PluginTabPane({ tab, active, importer, onOpenSettings }: {
-  tab: Tab;
+type TabLocator = Pick<Tab, "id" | "plugin">;
+
+export function PluginTabPane<Props extends object = Record<never, never>>({ tab, active, importer, onOpenSettings,
+  componentProps, unavailableActions,
+}: {
+  tab: TabLocator;
   active: boolean;
-  importer?: PluginImporter;
+  importer?: PluginImporter<PluginFrontendProps & Props>;
   onOpenSettings?: () => void;
+  componentProps?: Props;
+  unavailableActions?: ReactNode;
 }) {
   const t = useT();
   const state = usePluginFrontendStore();
@@ -33,11 +39,11 @@ export function PluginTabPane({ tab, active, importer, onOpenSettings }: {
   const record = state.records[slug];
   const epoch = state.epochs[slug] ?? 0;
   const [retry, setRetry] = useState(0);
-  const [loaded, setLoaded] = useState<LoadedFrontend | null>(null);
+  const [loaded, setLoaded] = useState<LoadedFrontend<PluginFrontendProps & Props> | null>(null);
   const [failure, setFailure] = useState<{ identity: string; error: string } | null>(null);
   const available = state.status === "ready" && !state.pending.has(slug)
     && record?.lifecycle === "enabled" && Boolean(record.manifest?.entry.frontend)
-    && Boolean(record.manifest?.tabs.some((entry) => entry.kind === kind));
+    && (componentProps !== undefined || Boolean(record.manifest?.tabs.some((entry) => entry.kind === kind)));
   const identity = `${slug}/${record?.manifest?.version}/${epoch}/${retry}`;
 
   useEffect(() => {
@@ -53,7 +59,7 @@ export function PluginTabPane({ tab, active, importer, onOpenSettings }: {
     const api = createPluginFrontendApi(slug, isCurrent);
     void Promise.resolve().then(() => {
       installPluginFrontendHost();
-      return loadPluginFrontend(record.manifest!, importer, `${tab.id}-${epoch}-${retry}`);
+      return loadPluginFrontend<PluginFrontendProps & Props>(record.manifest!, importer, `${tab.id}-${epoch}-${retry}`);
     }).then((module) => {
       if (isCurrent()) setLoaded({ identity, component: (module.default ?? module.component)!, api });
     }).catch((error) => {
@@ -68,6 +74,7 @@ export function PluginTabPane({ tab, active, importer, onOpenSettings }: {
       <p className="font-semibold">{t("plugins.loadFailed")}</p>
       <p className="break-words text-[var(--taomni-text-muted)]">{message}</p>
       <button data-testid="plugin-tab-retry" className="taomni-btn px-3 py-1" onClick={retryLoad}>{t("plugins.retry")}</button>
+      {unavailableActions}
     </div>
   );
   let content: ReactNode;
@@ -79,12 +86,13 @@ export function PluginTabPane({ tab, active, importer, onOpenSettings }: {
     const reason = record?.lifecycle === "uninstalled" || !record ? "missing" : record.lifecycle !== "enabled" ? "disabled" : "unavailable";
     content = <PluginUnavailablePane reason={reason} detail={record?.reason} onOpenSettings={onOpenSettings}>
       <button data-testid="plugin-tab-retry" className="taomni-btn px-3 py-1" onClick={retryLoad}>{t("plugins.retry")}</button>
+      {unavailableActions}
     </PluginUnavailablePane>;
   } else if (failure?.identity === identity) {
     content = errorView(failure.error);
   } else if (loaded?.identity === identity) {
     content = <PluginRenderBoundary key={identity} onError={loaded.api.dispose} fallback={(error) => errorView(error.message)}>
-      {createElement(loaded.component, { tabId: tab.id, kind, active, api: loaded.api })}
+      {createElement(loaded.component, { ...componentProps as Props, tabId: tab.id, kind, active, api: loaded.api })}
     </PluginRenderBoundary>;
   } else {
     content = <p data-testid="plugin-tab-loading" role="status" className="m-auto p-6 text-[13px]">{t("plugins.loading")}</p>;

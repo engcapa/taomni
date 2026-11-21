@@ -1,8 +1,10 @@
 """Execute the workflow's inert-payload guard without keys or host processes."""
 from contextlib import chdir
+import hashlib
 import json
 import os
 from pathlib import Path
+import runpy
 import shutil
 import tempfile
 import unittest
@@ -28,7 +30,7 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
         if module == "vnc-client" and platform == "windows-x86_64":
             (payload / "taomni-vnc-key-helper.exe").write_bytes(b"inert unit helper")
         frontend = manifest["entry"].get("frontend")
-        if frontend:
+        if frontend and module != "vnc-client":
             shutil.copytree(ROOT / "src-tauri/plugins" / module / "frontend", trusted / "frontend")
             shutil.copytree(trusted / "frontend", payload / "frontend")
         (payload / "module.json").write_text(json.dumps(manifest))
@@ -109,6 +111,34 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
                     helper.write_bytes(b"unexpected Windows helper")
                 with self.assertRaisesRegex(AssertionError, "Unexpected files"):
                     self.guard(root, "vnc-client", platform)
+
+    def test_vnc_only_stages_the_trusted_build_with_matching_renderer_bytes(self):
+        stage_frontend = runpy.run_path(str(ROOT / "scripts/stage-vnc-frontend.py"))["stage_frontend"]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = self.seed(root, "vnc-client", "linux-x86_64")
+            candidate_frontend = payload / "frontend"
+            candidate_frontend.mkdir()
+            (candidate_frontend / "index.js").write_bytes(b"unexpected candidate frontend")
+            with self.assertRaisesRegex(AssertionError, "Unexpected files"):
+                self.guard(root, "vnc-client", "linux-x86_64")
+            shutil.rmtree(candidate_frontend)
+            self.guard(root, "vnc-client", "linux-x86_64")
+            trusted = root / "trusted-frontend"
+            trusted.mkdir()
+            entry = b"export default function Viewer() {}\n"
+            (trusted / "index.js").write_bytes(entry)
+            (trusted / "receipt.json").write_text(json.dumps({
+                "sourceSha": "a" * 40, "toolingSha": "b" * 40, "sha256": hashlib.sha256(entry).hexdigest(),
+            }), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "receipt"):
+                stage_frontend(trusted, payload, "c" * 40, "b" * 40)
+            (trusted / "index.js").write_bytes(b"changed")
+            with self.assertRaisesRegex(ValueError, "receipt"):
+                stage_frontend(trusted, payload, "a" * 40, "b" * 40)
+            (trusted / "index.js").write_bytes(entry)
+            stage_frontend(trusted, payload, "a" * 40, "b" * 40)
+            self.assertEqual((candidate_frontend / "index.js").read_bytes(), entry)
 
     def test_source_module_metadata_and_unsigned_file_changes_are_rejected(self):
         for change in ["source", "module", "permissions", "frontend-entry", "extra-file", "frontend-bytes", "secondary-chunk"]:

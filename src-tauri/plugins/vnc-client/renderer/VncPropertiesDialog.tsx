@@ -1,16 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { useT } from "../../lib/i18n";
-import { normalizeVncScaling, VNC_SCALE_PERCENTAGES, type VncClipboardPolicy, type VncScaling } from "../../lib/vnc";
-import type { VncMenuKey, VncPictureQuality, VncViewerOptions } from "../../lib/vncOptions";
-import { useFocusReturn } from "../editor/workspace/useFocusReturn";
-
-/** Settings the Properties dialog edits (VNC-CONN-001). */
-export interface VncSessionProperties {
-  viewer: VncViewerOptions;
-  viewOnly: boolean;
-  clipboardPolicy: VncClipboardPolicy;
-}
+import { useT, useFocusReturn } from "../../../../src/lib/vnc/viewerHost";
+import type { VncSessionProperties } from "../../../../src/lib/vnc/viewerContract";
+import { normalizeVncScaling, VNC_SCALE_PERCENTAGES, type VncClipboardPolicy, type VncScaling } from "../../../../src/lib/vnc/viewerProtocol";
+import type { VncMenuKey, VncPictureQuality, VncViewerOptions } from "../../../../src/lib/vncOptions";
 
 /** Changing any of these only takes effect on the next connection. */
 export function propertiesNeedReconnect(before: VncSessionProperties, after: VncSessionProperties): boolean {

@@ -3993,15 +3993,10 @@ components: [VncPanel, FloatingToolbar, CaptureToolbar, SessionEditor]
 files:
   - src/components/plugins/VncSessionPane.tsx
   - src/stubs/modulePreview.ts
-  - src/components/vnc/VncPanel.tsx
-  - src/components/vnc/vncSessionMenu.ts
-  - src/components/vnc/VncConnectionOverlay.tsx
-  - src/components/vnc/VncConnectionOverlay.css
-  - src/components/vnc/VncPropertiesDialog.tsx
-  - src/components/vnc/VncSessionInfoDialog.tsx
-  - src/components/vnc/VncFullScreenToolbar.tsx
+  - src-tauri/plugins/vnc-client/renderer/
+  - src-tauri/plugins/vnc-client/vite.config.ts
   - src/lib/vnc.ts
-  - src/lib/vncFramePainter.ts
+  - src/lib/vnc/
   - src/lib/vncOptions.ts
   - src/components/session/SessionEditor.tsx
   # Browser-preview VNC bridge and the scriptable RFB fixture behind vnc_required.
@@ -4016,6 +4011,7 @@ controls:
   - id: panel-root
     selector: '[data-testid="vnc-panel"]'
     kind: display
+    aliases: ['[data-testid="vnc-panel"][data-frontend-source]']
   - id: canvas
     selector: '[data-testid="vnc-canvas"]'
     kind: display       # pointer / wheel / context-menu handlers fire only after a live RFB session;
@@ -4111,6 +4107,7 @@ controls:
 - 保存的 VNC 会话可从会话树双击连接；没保存密码时直接连接，不弹连接前的密码框，服务器要求密码时由会话内认证表单询问，`vnc://` 快速连接相同（VNC-AUTH-002；TC-151/TC-152/TC-153 经会话内表单登录，TC-107 确认不弹连接前密码框）
 - 浏览器预览（`pnpm dev`）经 dev server VNC bridge 连接真实 RFB 服务器：None/VNCAuth、Raw、DesktopSize、Bell、legacy 与 ExtendedClipboard；不含原生 relay 的编码、OS 输入和系统剪贴板（TC-151 双模式）
 - VNC tab 常驻挂载，切换标签时连接不主动销毁
+- VNC 的签名前端随模块包发布。TC-MODULES-053 核对主窗、分离窗和回挂后的实际加载路径与帧像素。TC-MODULES-054 核对浏览器预览的模块入口、启禁和绘制。
 - 已修复 VNC 剪贴板与输入延迟、Windows 11 上的 client→server 文本粘贴
 - 连续鼠标与键盘输入后，relay 以画布 ACK 作为帧背压、鼠标移动按显示帧合并，仍持续请求并绘制后续 framebuffer 更新。TC-156 在 Browser 和 Native 核对远端缩放完成后，原连接还能传送新的按键。
 - 连接警告、用户名/密码表单和认证错误使用浅色/深色主题的实色卡片，保留密码焦点、遮掩与 Enter 提交（TC-157 双模式，截图检查对比度与布局）

@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useVncStore } from "../../../../stores/vncStore";
-import { TabActionSlotProvider } from "../../../tabbar/TabActionSlot";
+import { useVncStore } from "../../vncStore";
+import { TabActionSlotProvider } from "../../../../../../src/components/tabbar/TabActionSlot";
 import VncPanel from "../../VncPanel";
 import { CONNECTED, MockWebSocket, mocks, renderConnected, sentMessages, sentText } from "./harness";
 

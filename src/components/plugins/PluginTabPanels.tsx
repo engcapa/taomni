@@ -9,7 +9,7 @@ import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
 import { isLegacyPluginTab, LegacyPluginTabPane } from "./LegacyPluginTabPane";
 import type { MailTabInfo } from "../../types";
-import type { VncSessionProperties } from "../vnc/VncPropertiesDialog";
+import type { VncSessionProperties } from "../../lib/vnc/viewerContract";
 
 export function PluginTabPanels({ tabs, activeTabId, onOpenSettings, onClose, onStatusMessage,
   onPersistVncProperties, onRememberVncCredentials, onDetachVnc, onDetachRdp, unifiedMailAccounts,

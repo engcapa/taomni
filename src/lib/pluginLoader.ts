@@ -11,13 +11,13 @@ export class PluginLoadError extends Error {
   }
 }
 
-export interface PluginFrontendModule {
-  default?: ComponentType<PluginFrontendProps>;
-  component?: ComponentType<PluginFrontendProps>;
+export interface PluginFrontendModule<Props = PluginFrontendProps> {
+  default?: ComponentType<Props>;
+  component?: ComponentType<Props>;
   [key: string]: unknown;
 }
 
-export type PluginImporter = (url: string) => Promise<PluginFrontendModule>;
+export type PluginImporter<Props = PluginFrontendProps> = (url: string) => Promise<PluginFrontendModule<Props>>;
 
 export function pluginFrontendUrl(manifest: PluginManifest, documentUrl = globalThis.location?.href): string {
   if (!manifest.entry.frontend) throw new PluginLoadError(`Plugin ${manifest.slug} has no frontend entry`, manifest.slug);
@@ -49,26 +49,31 @@ export function pluginFrontendUrl(manifest: PluginManifest, documentUrl = global
   return `${origin}/${parts.map((part) => encodeURIComponent(part)).join("/")}`;
 }
 
-const defaultImporter: PluginImporter = (url) => import(/* @vite-ignore */ url) as Promise<PluginFrontendModule>;
+const defaultImporter = <Props>(url: string) => import(/* @vite-ignore */ url) as Promise<PluginFrontendModule<Props>>;
 
-function isComponentExport(value: unknown): value is ComponentType<PluginFrontendProps> {
+function isComponentExport(value: unknown): boolean {
   if (typeof value === "function") return true;
   if (!value || typeof value !== "object") return false;
   const marker = (value as { $$typeof?: unknown }).$$typeof;
   return marker === Symbol.for("react.memo") || marker === Symbol.for("react.forward_ref");
 }
 
-export async function loadPluginFrontend(
+export async function loadPluginFrontend<Props = PluginFrontendProps>(
   manifest: PluginManifest,
-  importer: PluginImporter = defaultImporter,
+  importer: PluginImporter<Props> = defaultImporter,
   activation?: string,
-): Promise<PluginFrontendModule> {
+): Promise<PluginFrontendModule<Props>> {
   try {
     let url = pluginFrontendUrl(manifest);
     // Preview serves repository sources, with no claim of native package trust.
     // Native builds only load the immutable, verified custom-protocol URL.
-    if (importer === defaultImporter && import.meta.env.DEV && !isTauriRuntime() && manifest.slug === "hello-plugin") {
-      url = "/src-tauri/plugins/hello-plugin/frontend/index.js";
+    if (importer === defaultImporter && import.meta.env.DEV && !isTauriRuntime()) {
+      if (manifest.slug === "hello-plugin") url = "/src-tauri/plugins/hello-plugin/frontend/index.js";
+      if (manifest.slug === "vnc-client") url = "/src-tauri/plugins/vnc-client/renderer/VncPanel.tsx";
+    }
+    if (manifest.slug === "vnc-client") {
+      const { installVncViewerHost } = await import("./vnc/viewerHost");
+      installVncViewerHost();
     }
     // A fragment changes ESM identity for retry/reactivation without changing
     // the signed resource path or allowing a query through the native protocol.

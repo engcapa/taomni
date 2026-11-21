@@ -1,4 +1,4 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { getViewerWindow } from "../../../../../src/lib/vnc/viewerHost";
 
 
 /** Keysyms for keys the Windows keyboard hook passes through (VNC-INPUT-003). */
@@ -7,7 +7,7 @@ export type FullScreenRestore = { maximized: boolean; osFullscreen: boolean; res
 
 
 export async function restoreWindowAfterFullScreen(
-  w: ReturnType<typeof getCurrentWindow>,
+  w: ReturnType<typeof getViewerWindow>,
   restore: FullScreenRestore | null,
 ): Promise<void> {
   if (!restore?.osFullscreen) await w.setFullscreen(false);

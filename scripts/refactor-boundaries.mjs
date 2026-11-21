@@ -63,7 +63,7 @@ const boundaries = [
   ["src/components/sidebar/sessionTree", "src/components/sidebar/SessionTree.tsx"],
   ["src/components/database/grid", "src/components/database/QueryResultGrid.tsx"],
   ["src/components/welcome", "src/components/WelcomePanel.tsx"],
-  ["src/components/vnc/panel", "src/components/vnc/VncPanel.tsx"],
+  ["src-tauri/plugins/vnc-client/renderer/panel", "src-tauri/plugins/vnc-client/renderer/VncPanel.tsx"],
   ["src/components/editor/workspace/host", "src/components/editor/workspace/CodeMirrorHost.tsx"],
   ["src/lib/ipc", "src/lib/ipc.ts"],
   ["src/lib/sessionImportExport", "src/lib/sessionImportExport.ts"],

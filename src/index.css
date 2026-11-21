@@ -29,3 +29,5 @@
 @import "./styles/compatibility.css";
 @import "./styles/mail.css";
 @import "./styles/sockscap.css";
+
+@source not "../src-tauri/plugins/vnc-client/renderer";

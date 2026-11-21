@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_VNC_VIEWER_OPTIONS } from "../../../../lib/vncOptions";
-import { useVncStore } from "../../../../stores/vncStore";
+import { DEFAULT_VNC_VIEWER_OPTIONS } from "../../../../../../src/lib/vncOptions";
+import { useVncStore } from "../../vncStore";
 import { MockWebSocket, mocks, renderConnected, sentMessages, sentText } from "./harness";
 
 export function registerVncPanelLayout3Cases() {

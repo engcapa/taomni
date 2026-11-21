@@ -1,18 +1,17 @@
 import { useRef, useEffect } from "react";
-import { encodeWsKey, encodeWsPointer, keyEventToKeysym } from "../../../lib/vnc";
-import type { WsOutgoing } from "../../../lib/vnc";
-import { type VncViewerOptions } from "../../../lib/vncOptions";
-import { getAppPlatform } from "../../../lib/runtime";
-import { type VncPointerState } from "../../../lib/vncPointerScheduler";
-import { isEditableTarget, isTerminalFocused } from "../../../lib/terminal/keyboardGuards";
-import { readMultiFormat } from "../../../lib/clipboard";
+import { encodeWsKey, encodeWsPointer, keyEventToKeysym } from "../../../../../src/lib/vnc/viewerProtocol";
+import type { WsOutgoing } from "../../../../../src/lib/vnc/viewerProtocol";
+import { type VncViewerOptions } from "../../../../../src/lib/vncOptions";
+import { getAppPlatform, readMultiFormat } from "../../../../../src/lib/vnc/viewerHost";
+import { type VncPointerState } from "../vncPointerScheduler";
+import { isEditableTarget, isTerminalFocused } from "../../../../../src/lib/terminal/keyboardGuards";
 import { readVncClipboardText, pasteModifierKeysyms, hasNonAsciiText, PASTE_KEY_DELAY_MS, modifierKeysymFromKey, isPasteShortcut } from "./clipboardPolicy";
 import { ALTGR_FLUSH_MS, ALTGR_PAIR_WINDOW_MS } from "./keyboardPolicy";
 
 
 export interface UseVncKeyboardContext {
   visible: boolean;
-  conn: import("../../../stores/vncStore").VncConnectionState;
+  conn: import("../vncStore").VncConnectionState;
   sendWs: (msg: WsOutgoing) => void;
   pasteInFlightRef: import("react").RefObject<{ pasteKeysym: number; heldModifiers: Set<number>; deferredKeyUps: Set<number>; } | null>;
   lastSyncedLocalClipboardTextRef: import("react").RefObject<string | null>;

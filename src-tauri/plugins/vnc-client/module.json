@@ -8,7 +8,7 @@
   "kind": "remote-client",
   "status": "provisional",
   "platforms": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"],
-  "entry": { "host": "taomni-plugin-vnc-client", "protocol": 1 },
+  "entry": { "host": "taomni-plugin-vnc-client", "frontend": "frontend/index.js", "protocol": 1 },
   "tabs": [],
   "commands": ["vnc/start", "vnc/close", "vnc/test"],
   "permissions": [],

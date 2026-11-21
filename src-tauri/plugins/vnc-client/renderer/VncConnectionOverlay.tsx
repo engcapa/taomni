@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { LockKeyhole, RefreshCw, ShieldAlert, Square } from "lucide-react";
-import { useT } from "../../lib/i18n";
-import "./VncConnectionOverlay.css";
+import { useT } from "../../../../src/lib/vnc/viewerHost";
 
 /**
  * Connection lifecycle overlays (VNC-SESS-003), modelled on RealVNC Viewer:

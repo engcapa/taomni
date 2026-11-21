@@ -1,5 +1,4 @@
-import { getAppPlatform, isTauriRuntime } from "../../../lib/runtime";
-import { readText as readClipboardText, readNativeTextResult } from "../../../lib/clipboard";
+import { getAppPlatform, isTauriRuntime, readText as readClipboardText, readNativeTextResult } from "../../../../../src/lib/vnc/viewerHost";
 
 
 export const PASTE_KEY_DELAY_MS = 120;

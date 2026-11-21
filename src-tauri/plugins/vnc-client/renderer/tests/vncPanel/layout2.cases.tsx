@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useVncStore } from "../../../../stores/vncStore";
+import { useVncStore } from "../../vncStore";
 import VncPanel from "../../VncPanel";
 import { MockWebSocket, connectCalls, mocks } from "./harness";
 

@@ -1,4 +1,4 @@
-import { normalizeVncScaling, type VncScaling } from "./vnc";
+import { normalizeVncScaling, type VncScaling } from "./vnc/scaling";
 
 /**
  * Per-session VNC viewer options (VNC-CONN-001), modelled on RealVNC Viewer's

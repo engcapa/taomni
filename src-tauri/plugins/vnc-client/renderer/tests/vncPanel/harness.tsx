@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import { vi } from "vitest";
-import { type VncConnectionState } from "../../../../stores/vncStore";
+import { type VncConnectionState } from "../../vncStore";
 import VncPanel from "../../VncPanel";
 
 const mocks = vi.hoisted(() => ({

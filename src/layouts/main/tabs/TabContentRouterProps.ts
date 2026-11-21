@@ -3,7 +3,7 @@ import { type CodeWorkspaceGitManagerPayload } from "../../../components/editor/
 import type { WorkspaceCommandRegistration } from "../../../components/editor/workspace/workspaceCommands";
 import { type SftpPendingUploadRequest } from "../../../components/filebrowser/FileBrowser";
 import { type TerminalLocalPathUploadRequest } from "../../../components/terminal/TerminalPanel";
-import type { VncSessionProperties } from "../../../components/vnc/VncPropertiesDialog";
+import type { VncSessionProperties } from "../../../lib/vnc/viewerContract";
 import { type SessionConfig } from "../../../lib/ipc";
 import { type TerminalProfile } from "../../../lib/terminalProfile";
 import type { LocalLaunchOutcome, LocalShellSelection, MailTabInfo, RecentWorkspace, Tab } from "../../../types";

@@ -11,8 +11,24 @@ cancellation during RFB setup, explicit close, and upstream socket release when
 the host exits.
 The desktop adapter routes an enabled module's connections through the signed
 host. Disabling or uninstalling the module unmounts the viewer and keeps its
-saved session. The renderer is still built into the desktop during the frontend
-migration.
+saved session. The release desktop loads the viewer from the active signed
+version. The saved-session and quick-connect routes use the same module loader
+in the main window, Workspace and detached windows.
+
+`pnpm exec vite build --config src-tauri/plugins/vnc-client/vite.config.ts`
+builds the standalone ESM at `dist/frontend/index.js` within the module
+directory. The bundle uses the core's React, Zustand, context menu, screenshot,
+clipboard and VNC session bridge. Its CSS travels with the ESM and is removed
+when its view unmounts. The build rejects bundled core implementations and
+unresolved ESM imports. Development and isolated QA builds include a fallback
+for retained cases using an uninstalled fixture.
+
+The signed QA and module release workflows build the renderer from matching
+trusted inputs in a separate job. They attach its verified bytes at
+`frontend/index.js` before signing the archive. TC-MODULES-053 checks the
+versioned native URL, real frame pixels, input, disable and enable, and a
+detached WebView that reattaches to the original main window. TC-MODULES-054
+checks the corresponding development preview flow.
 
 The Windows special-key helper builds from `key-helper/` without linking the
 desktop application. The current VNC adapter starts it by executable name and

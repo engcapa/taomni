@@ -1,0 +1,60 @@
+name: Build the official VNC frontend
+
+on:
+  workflow_call:
+    inputs:
+      source:
+        type: string
+        required: true
+      artifact:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Match the selected frontend inputs to the trusted workflow revision
+        env:
+          MODULE_SOURCE: ${{ inputs.source }}
+        run: |
+          git diff --quiet HEAD "${MODULE_SOURCE}^{commit}" -- \
+            package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc patches \
+            src-tauri/plugins/vnc-client/renderer src-tauri/plugins/vnc-client/vite.config.ts \
+            src/lib/vnc src/lib/vncOptions.ts src/lib/terminal/keyboardGuards.ts || {
+              echo 'The selected VNC frontend inputs differ from the trusted workflow revision.' >&2
+              exit 1
+            }
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Build the frontend and bind its bytes to the selected source
+        env:
+          MODULE_SOURCE: ${{ inputs.source }}
+          FRONTEND_TOOLING: ${{ github.workflow_sha }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec vite build --config src-tauri/plugins/vnc-client/vite.config.ts
+          cd src-tauri/plugins/vnc-client/dist/frontend
+          jq -n --arg source "$MODULE_SOURCE" --arg tooling "$FRONTEND_TOOLING" \
+            --arg sha256 "$(sha256sum index.js | cut -d ' ' -f 1)" \
+            '{sourceSha:$source, toolingSha:$tooling, sha256:$sha256}' > receipt.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: src-tauri/plugins/vnc-client/dist/frontend/
+          if-no-files-found: error
+          retention-days: 14

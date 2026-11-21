@@ -130,6 +130,14 @@ jobs:
               ]}, separators=(',', ':')) + '\n')
           PY
 
+  vnc-frontend:
+    if: inputs.module == 'vnc-client'
+    needs: source
+    uses: ./.github/workflows/build-vnc-frontend.yml
+    with:
+      source: ${{ needs.source.outputs.sha }}
+      artifact: qa-vnc-frontend-${{ inputs.artifact_key || github.run_id }}
+
   build:
     name: Build unsigned ${{ inputs.module || 'hello-plugin' }} (${{ matrix.platform }})
     needs: source
@@ -196,7 +204,7 @@ jobs:
               if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
                   helper = 'taomni-vnc-key-helper.exe'
                   shutil.copyfile(binaries / helper, output / helper)
-              if manifest['entry'].get('frontend'):
+              if slug != 'vnc-client' and manifest['entry'].get('frontend'):
                   shutil.copytree(source / 'frontend', output / 'frontend')
 
           stage(os.environ['QA_MODULE'], 'unsigned-module')
@@ -244,10 +252,10 @@ jobs:
 
   sign:
     name: Sign official ${{ inputs.module || 'hello-plugin' }} (${{ matrix.platform }})
-    needs: [source, build]
+    needs: [source, build, vnc-frontend]
     # Fork pull requests cannot request a production signature. A manual or
     # reusable invocation runs the workflow revision trusted by its operator.
-    if: github.event_name != 'pull_request' && github.repository == 'engcapa/taomni'
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'engcapa/taomni' && needs.build.result == 'success' && (needs.vnc-frontend.result == 'success' || (inputs.module != 'vnc-client' && needs.vnc-frontend.result == 'skipped')) }}
     runs-on: ${{ inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-') && needs.source.outputs.macos_runner || 'ubuntu-24.04' }}
     timeout-minutes: 20
     strategy:
@@ -297,7 +305,7 @@ jobs:
                   binaries.add('taomni-vnc-key-helper.exe')
               allowed = {'module.json', *binaries}
               frontend = expected['entry'].get('frontend')
-              if frontend:
+              if frontend and slug != 'vnc-client':
                   assert (trusted_source / frontend).is_file()
                   for source in (trusted_source / 'frontend').rglob('*'):
                       assert not source.is_symlink()
@@ -325,6 +333,17 @@ jobs:
               shutil.copytree(root / 'unsigned-module', failing)
               (failing / 'module.json').write_text(json.dumps({**expected, 'version': '0.1.1'}), encoding='utf-8')
           PY
+      - uses: actions/download-artifact@v4
+        if: env.QA_MODULE == 'vnc-client'
+        with:
+          name: qa-vnc-frontend-${{ inputs.artifact_key || github.run_id }}
+          path: trusted-vnc-frontend
+      - name: Stage the verified VNC frontend bytes
+        if: env.QA_MODULE == 'vnc-client'
+        env:
+          MODULE_SOURCE: ${{ needs.source.outputs.sha }}
+          FRONTEND_TOOLING: ${{ github.workflow_sha }}
+        run: python scripts/stage-vnc-frontend.py trusted-vnc-frontend candidate/unsigned-module "$MODULE_SOURCE" "$FRONTEND_TOOLING"
       - uses: actions/setup-node@v4
         if: inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-')
         with:

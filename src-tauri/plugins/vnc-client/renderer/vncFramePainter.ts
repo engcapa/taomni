@@ -1,4 +1,4 @@
-import { parseFrameHeader } from "./vnc";
+import { parseFrameHeader } from "../../../../src/lib/vnc/viewerProtocol";
 
 /** Bounds on what the WebView buffers between two relay frame boundaries. */
 export const VNC_MAX_PENDING_RECTS = 4096;

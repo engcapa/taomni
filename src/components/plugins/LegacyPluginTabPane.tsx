@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import type { VncSessionProperties } from "../vnc/VncPropertiesDialog";
+import type { VncSessionProperties } from "../../lib/vnc/viewerContract";
 import type { MailTabInfo, Tab } from "../../types";
 import { useT } from "../../lib/i18n";
 import VncSessionPane from "./VncSessionPane";

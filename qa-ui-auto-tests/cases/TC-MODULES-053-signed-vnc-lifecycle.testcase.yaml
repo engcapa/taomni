@@ -1,16 +1,17 @@
 id: TC-MODULES-053
-title: A signed VNC host connects and follows the module lifecycle
+title: The signed VNC viewer and host follow the module lifecycle
 description: >-
   Install the matching signed VNC module, enable it and open a saved VNC session.
   Check authentication, pixels and input on a real runner-local RFB server. Disable
   the module while the session is active, verify the authenticated socket closes
   and that the open tab explains how to enable the module. Resume the same saved
-  session without closing the tab or restarting the app.
-covers: [F-Modules-1, F9.1, F9.6]
+  session without restarting the app, detach it to its own WebView, then return
+  it to the main window. Both windows load the installed signed frontend.
+covers: [F-Modules-1, F9.1, F9.6, F-Detach-1]
 tags: [modules, vnc, lifecycle, native-boundary, p1]
 modes: [native]
 fixtures: [reset_db, module_signed_vnc_archive, vnc_required]
-timeout_sec: 240
+timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
@@ -37,7 +38,7 @@ steps:
 - click: '[data-testid="vnc-auth-ok"]'
 - wait_for: {selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]', timeout_sec: 30}
 - eval_readonly:
-    expression: "document.querySelector('.vnc-container canvas')?.getContext('2d')?.getImageData(16, 16, 1, 1).data[3] === 255"
+    expression: "document.querySelector('.vnc-container')?.getAttribute('data-frontend-source')?.includes('/__taomni_plugins__/vnc-client/${fixture.vnc_signed_version}/frontend/index.js') === true && document.querySelector('.vnc-container canvas')?.getContext('2d')?.getImageData(16, 16, 1, 1).data[3] === 255"
     timeout_sec: 15
 - press: {key: a, selector: '[data-testid="vnc-canvas"]'}
 - assert_file_contains: {path: '${fixture.vnc_events}', contains: '"keysym": 97, "keysym_hex": "0x61"'}
@@ -64,10 +65,36 @@ steps:
 - click: '[data-testid="vnc-auth-ok"]'
 - wait_for: {selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]', timeout_sec: 30}
 - eval_readonly:
-    expression: "document.querySelector('.vnc-container canvas')?.getContext('2d')?.getImageData(16, 16, 1, 1).data[3] === 255"
+    expression: "document.querySelector('.vnc-container')?.getAttribute('data-frontend-source')?.includes('/__taomni_plugins__/vnc-client/${fixture.vnc_signed_version}/frontend/index.js') === true && document.querySelector('.vnc-container canvas')?.getContext('2d')?.getImageData(16, 16, 1, 1).data[3] === 255"
     timeout_sec: 15
 - press: {key: b, selector: '[data-testid="vnc-canvas"]'}
 - assert_file_contains: {path: '${fixture.vnc_events}', contains: '"keysym": 98, "keysym_hex": "0x62"'}
+- assert_no_runtime_errors: null
+- click: '[data-testid="vnc-detach"]'
+- switch_window: {selector: '[data-testid="detached-session-window"]'}
+- wait_for: '[data-testid="vnc-panel"][data-frontend-source*="/__taomni_plugins__/vnc-client/${fixture.vnc_signed_version}/frontend/index.js"]'
+- click: '[data-testid="vnc-unencrypted-continue"]'
+- fill: {selector: '[data-testid="vnc-auth-password"]', value: '${env.QA_VNC_PASSWORD}'}
+- click: '[data-testid="vnc-auth-ok"]'
+- wait_for: {selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]', timeout_sec: 30}
+- eval_readonly:
+    expression: "document.querySelector('.vnc-container canvas')?.getContext('2d')?.getImageData(16, 16, 1, 1).data[3] === 255"
+    timeout_sec: 15
+- press: {key: c, selector: '[data-testid="vnc-canvas"]'}
+- assert_file_contains: {path: '${fixture.vnc_events}', contains: '"keysym": 99, "keysym_hex": "0x63"'}
+- assert_no_runtime_errors: null
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    close_with: '[data-testid="detached-reattach"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="vnc"]', equal: 1}
+- wait_for: '[data-testid="vnc-panel"][data-frontend-source*="/__taomni_plugins__/vnc-client/${fixture.vnc_signed_version}/frontend/index.js"]'
+- click: '[data-testid="vnc-unencrypted-continue"]'
+- fill: {selector: '[data-testid="vnc-auth-password"]', value: '${env.QA_VNC_PASSWORD}'}
+- click: '[data-testid="vnc-auth-ok"]'
+- wait_for: {selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]', timeout_sec: 30}
+- eval_readonly:
+    expression: "document.querySelector('.vnc-container canvas')?.getContext('2d')?.getImageData(16, 16, 1, 1).data[3] === 255"
+    timeout_sec: 15
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -78,7 +105,7 @@ verification:
     checkpoints:
     - {step: 8, expectation: The native verifier completes installation.}
     - {step: 10, expectation: Settings shows the enabled module.}
-    - {step: 25, expectation: The native viewer displays pixels from the RFB fixture.}
+    - {step: 25, expectation: The signed viewer displays pixels from the RFB fixture.}
     - {step: 27, expectation: The fixture receives the first key through the relay.}
     results: [8, 10, 25, 27]
   - id: R2
@@ -91,10 +118,22 @@ verification:
     - {step: 37, expectation: The VNC renderer unmounts when the module is disabled.}
     - {step: 38, expectation: A single VNC tab preserves the saved session.}
     - {step: 42, expectation: Settings shows the module enabled again.}
-    - {step: 50, expectation: The reopened saved session paints frames.}
+    - {step: 50, expectation: The reopened saved session paints frames from the installed viewer.}
     - {step: 52, expectation: The RFB server receives fresh input from the reopened viewer.}
     - {step: 53, expectation: Lifecycle changes leave the desktop without uncaught renderer errors.}
     results: [31, 32, 36, 37, 38, 42, 50, 52, 53]
+  - id: R3
+    requirement: The detached WebView authenticates with the signed viewer and reattachment restores exactly one working main-window tab.
+    actions: [54, 55, 57, 58, 59, 62, 65, 68, 69, 70]
+    checkpoints:
+    - {step: 56, expectation: The detached WebView loads the installed frontend path.}
+    - {step: 61, expectation: The detached canvas paints fixture pixels.}
+    - {step: 63, expectation: The fixture receives a key sent from the detached canvas.}
+    - {step: 66, expectation: Reattachment returns to a single VNC tab.}
+    - {step: 67, expectation: The returned tab uses the installed frontend path.}
+    - {step: 72, expectation: The returned session paints the framebuffer.}
+    - {step: 73, expectation: The reattached window has no runtime errors.}
+    results: [56, 61, 63, 66, 67, 72, 73]
   visual:
   - check: The connected viewer paints the fixture before disable and after re-enable.
     method: automated

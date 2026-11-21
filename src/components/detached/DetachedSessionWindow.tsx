@@ -45,7 +45,7 @@ import { useAppTheme } from "../../lib/appTheme";
 import { isTauriRuntime } from "../../lib/runtime";
 import { redactVncHandoff, vncConsumeDetachClaim, vncCreateDetachClaim } from "../../lib/vnc";
 import { deserializeVncViewerOptions, serializeVncViewerOptions, type VncViewerOptions } from "../../lib/vncOptions";
-import type { VncSessionProperties } from "../vnc/VncPropertiesDialog";
+import type { VncSessionProperties } from "../../lib/vnc/viewerContract";
 import {
   TerminalPanel,
   type TerminalReattachState,

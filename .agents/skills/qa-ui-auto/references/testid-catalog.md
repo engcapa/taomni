@@ -4340,6 +4340,7 @@
 ## vnc (F9.6)
 
 - `[data-testid="vnc-panel"]` — display — F9.6.panel-root
+  ↳ `[data-testid="vnc-panel"][data-frontend-source]` — alias
 - `[data-testid="vnc-canvas"]` — display — F9.6.canvas
 - `[data-testid="vnc-scale-toggle"]` — interactive [optional] — F9.6.scale-toggle
 - `[data-testid="vnc-send-cad"]` — interactive [optional] — F9.6.send-ctrl-alt-del

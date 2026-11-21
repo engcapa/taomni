@@ -8,9 +8,10 @@ import { usePluginFrontendStore } from "../../stores/pluginFrontendStore";
 import vncManifest from "../../../src-tauri/plugins/vnc-client/module.json";
 import VncSessionPane from "./VncSessionPane";
 
-const mocks = vi.hoisted(() => ({ list: vi.fn(), closeViewer: vi.fn() }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), closeViewer: vi.fn(), loadFrontend: vi.fn() }));
 vi.mock("../../lib/ipc/plugin", () => ({ listPlugins: mocks.list }));
-vi.mock("../vnc/VncPanel", () => ({
+vi.mock("../../lib/pluginLoader", () => ({ loadPluginFrontend: mocks.loadFrontend }));
+vi.mock("../../../src-tauri/plugins/vnc-client/renderer/VncPanel", () => ({
   default: ({ host }: { host: string }) => {
     useEffect(() => mocks.closeViewer, []);
     return <div data-testid="vnc-panel">{host}</div>;
@@ -30,6 +31,7 @@ beforeEach(() => {
   usePluginFrontendStore.setState({ records: {}, epochs: {}, pending: new Set(), status: "idle", error: null });
   mocks.list.mockReset().mockResolvedValue([]);
   mocks.closeViewer.mockClear();
+  mocks.loadFrontend.mockReset().mockImplementation(() => import("../../../src-tauri/plugins/vnc-client/renderer/VncPanel"));
 });
 afterEach(() => {
   cleanup();
@@ -49,6 +51,7 @@ describe("a saved VNC session's module lifecycle", () => {
 
     await setLifecycle("enabled");
     expect(await screen.findByTestId("vnc-panel")).toHaveTextContent("vnc.test");
+    expect(mocks.loadFrontend).toHaveBeenCalledWith(manifest, undefined, expect.any(String));
     await setLifecycle("enabled", "0.2.0");
     await waitFor(() => expect(mocks.closeViewer).toHaveBeenCalledTimes(2));
     await screen.findByTestId("vnc-panel");

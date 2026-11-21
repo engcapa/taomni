@@ -1,14 +1,14 @@
 import { useEffect, useRef, useCallback } from "react";
-import { encodeWsPointer, mapClientToFramebuffer, mouseButtonMask, VncWheelAccumulator } from "../../../lib/vnc";
-import type { VncNativePointerTarget, WsOutgoing } from "../../../lib/vnc";
-import { VncPointerScheduler, type VncPointerState } from "../../../lib/vncPointerScheduler";
+import { encodeWsPointer, mapClientToFramebuffer, mouseButtonMask, VncWheelAccumulator } from "../../../../../src/lib/vnc/viewerProtocol";
+import type { VncNativePointerTarget, WsOutgoing } from "../../../../../src/lib/vnc/viewerProtocol";
+import { VncPointerScheduler, type VncPointerState } from "../vncPointerScheduler";
 import { type DelayedPointerDown } from "./types";
 import { MIDDLE_CLICK_CLIPBOARD_WAIT_MS } from "./clipboardPolicy";
 
 
 export interface UseVncPointerContext {
   canvasRef: import("react").RefObject<HTMLCanvasElement | null>;
-  conn: import("../../../stores/vncStore").VncConnectionState;
+  conn: import("../vncStore").VncConnectionState;
   lastPointerSentRef: import("react").RefObject<VncPointerState | null>;
   sendWsBinary: (data: ArrayBuffer) => boolean;
   pointerSchedulerRef: import("react").RefObject<VncPointerScheduler | null>;

@@ -1,6 +1,6 @@
-import type { MenuItem } from "../ContextMenu";
-import { VNC_SCALE_PERCENTAGES, type VncScaling } from "../../lib/vnc";
-import type { VncPictureQuality } from "../../lib/vncOptions";
+import type { MenuItem } from "../../../../src/lib/vnc/viewerHost";
+import { VNC_SCALE_PERCENTAGES, type VncScaling } from "../../../../src/lib/vnc/viewerProtocol";
+import type { VncPictureQuality } from "../../../../src/lib/vncOptions";
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 

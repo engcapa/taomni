@@ -51,7 +51,7 @@ def load_artifact(root: Path, source_sha: str, expected_platform: str, slug: str
     if len(detached.splitlines()) != 4 or detached.splitlines()[2] != trusted:
         raise RuntimeError("Official module signature does not bind the expected metadata")
     frontend = None
-    if slug == "hello-plugin":
+    if slug in {"hello-plugin", "vnc-client"}:
         with zipfile.ZipFile(archive) as zipped:
             frontend = zipped.read("frontend/index.js")
     return receipt, archive, detached, frontend
@@ -115,11 +115,15 @@ def setup_vnc(ctx):
     if not raw:
         raise RuntimeError("QA_SIGNED_VNC_ROOT is required; build the signed VNC artifact first")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    receipt, archive, signature, _ = load_artifact(Path(raw), source, platform_key(), "vnc-client")
+    receipt, archive, signature, frontend = load_artifact(Path(raw), source, platform_key(), "vnc-client")
+    if not frontend:
+        raise RuntimeError("The signed VNC package has no renderer bytes")
+    receipt["frontendSha256"] = hashlib.sha256(frontend).hexdigest()
     owned = Path(ctx.case_dir).resolve() / "signed-vnc"
     owned.mkdir()
     destination = owned / archive.name
     shutil.copyfile(archive, destination)
     (owned / "provenance.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
-    ctx.values.update(vnc_signed_archive=destination.as_posix(), vnc_signed_signature=signature)
+    ctx.values.update(vnc_signed_archive=destination.as_posix(), vnc_signed_signature=signature,
+                      vnc_signed_version=receipt["version"])
 

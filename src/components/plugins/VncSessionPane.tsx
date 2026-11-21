@@ -2,35 +2,28 @@ import { lazy } from "react";
 import { useT } from "../../lib/i18n";
 import { openSettingsSection } from "../../lib/settingsNavigation";
 import { usePluginFrontendRegistry } from "../../lib/usePluginFrontendRegistry";
-import type { VncPanelProps } from "../vnc/panel/types";
-import { PluginUnavailablePane } from "./PluginUnavailablePane";
+import type { VncPanelProps } from "../../lib/vnc/viewerContract";
+import { PluginTabPane } from "./PluginTabPane";
 
-const VncPanel = lazy(() => import("../vnc/VncPanel"));
+const LegacyViewer = __TAOMNI_BUNDLED_VNC_VIEWER__
+  ? lazy(() => import("../../../src-tauri/plugins/vnc-client/renderer/VncPanel"))
+  : null;
 const SLUG = "vnc-client";
+const locator = { slug: SLUG, kind: "viewer" };
 
 /** Keeps the saved tab while the registry revokes or replaces its session owner. */
 export default function VncSessionPane(props: VncPanelProps) {
   const t = useT();
-  const { status, records } = usePluginFrontendRegistry();
-  const record = records[SLUG];
-
-  if (status === "idle" || status === "loading") {
-    return <p data-testid="plugin-tab-loading" role="status" className="p-6 text-[13px]">{t("plugins.loading")}</p>;
-  }
-  if (record && record.lifecycle !== "enabled") {
-    const detached = props.detachedWindowControls;
-    return (
-      <section data-plugin-slug={SLUG} className="flex h-full min-h-0 flex-col overflow-auto">
-        <PluginUnavailablePane reason={record.lifecycle === "uninstalled" ? "missing" : "disabled"}
-          detail={record.reason} onOpenSettings={detached ? undefined : () => openSettingsSection("module-store")}>
-          {detached && (
-            <button type="button" data-testid="detached-reattach" className="taomni-btn px-3 py-1"
-              onClick={detached.onReattach}>{t("rdp.reattach")}</button>
-          )}
-        </PluginUnavailablePane>
-      </section>
-    );
+  const { status, records, pending } = usePluginFrontendRegistry();
+  if (LegacyViewer && status === "ready" && !records[SLUG] && !pending.has(SLUG)) {
+    return <LegacyViewer {...props} />;
   }
 
-  return <VncPanel key={record?.manifest?.version ?? "legacy"} {...props} />;
+  const detached = props.detachedWindowControls;
+  return <PluginTabPane tab={{ id: props.tabId, plugin: locator }} active={props.visible} componentProps={props}
+    onOpenSettings={detached ? undefined : () => openSettingsSection("module-store")}
+    unavailableActions={detached && (
+      <button type="button" data-testid="detached-reattach" className="taomni-btn px-3 py-1"
+        onClick={detached.onReattach}>{t("rdp.reattach")}</button>
+    )} />;
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Maximize, Menu as MenuIcon, Minimize, Minimize2, Pin, PinOff, Power, ShieldAlert } from "lucide-react";
-import { useT } from "../../lib/i18n";
+import { useT } from "../../../../src/lib/vnc/viewerHost";
 
 /**
  * Delay before an unpinned toolbar slides away once the pointer is off both
