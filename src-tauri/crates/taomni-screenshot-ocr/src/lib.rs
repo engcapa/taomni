@@ -155,15 +155,10 @@ fn run_tesseract_tsv(path: &str) -> Result<(String, String), String> {
     Err("tesseract failed: no usable language data".to_string())
 }
 
-/// Parse tesseract TSV output (level 5 = word rows).
+/// Parse word rows from the CLI (with column labels) and WASM (without them).
 fn parse_tsv_words(tsv: &str) -> Vec<OcrWord> {
     let mut words = Vec::new();
-    let mut lines = tsv.lines();
-    let header = lines.next().unwrap_or("");
-    if !header.starts_with("level") {
-        return words;
-    }
-    for line in lines {
+    for line in tsv.lines() {
         let cols: Vec<&str> = line.split('\t').collect();
         // level, page_num, block_num, par_num, line_num, word_num,
         // left, top, width, height, conf, text
@@ -542,6 +537,18 @@ mod tests {
         let result = finish(vec![low, word("kept", 60, "1:1:1")], "test".into());
         assert_eq!(result.text, "kept");
         assert_eq!(result.words.len(), 1);
+    }
+
+    #[test]
+    fn wasm_word_rows_without_the_cli_header_are_redacted() {
+        let tsv = "1\t1\t0\t0\t0\t0\t0\t0\t508\t428\t-1\t\n\
+5\t1\t1\t1\t1\t1\t12\t30\t140\t20\t95.5\tuser@example.com\n";
+        let result = redact_tsv(tsv).unwrap();
+        assert_eq!(result.count, 1);
+        let area = &result.boxes[0];
+        assert_eq!(area.kind, "email");
+        assert!(area.x <= 12 && area.x + area.w >= 152);
+        assert!(area.y <= 30 && area.y + area.h >= 50);
     }
 
     #[test]

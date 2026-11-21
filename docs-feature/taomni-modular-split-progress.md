@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- Windows 的签名包已从本地 WASM 与语言文件识别测试截图。WASM 返回无列标题的 TSV，遮挡解析此前只接受带标题的 CLI 输出。0.1.4 解析两种格式，单测检查实际词框，TC-MODULES-061 继续要求真实离线识别和 email 遮挡框均成功。 [Windows 原始回执](https://github.com/engcapa/taomni/actions/runs/44933996901)
+- macOS 录制回执显示一次 CoreGraphics 取帧调用阻塞 1145 ms，返回画面像素与原画相符，但时间戳早于原画约 1166 ms。录制期间遇到超过 250 ms 的取帧调用时保留上一帧，读取像素缓慢时继续使用已经取得的采集时间。沿用现有原画与播放时间轴断言复验。 [原始比较](https://github.com/engcapa/taomni/actions/runs/44931597033)
 - Screenshot 0.1.3 的录制浮窗从签名包动态加载。核心分配窗口、系统剪贴板和保存路径。TC-MODULES-062 同时检查签名 RecorderBar 与真实编码，Browser 继续覆盖原操作。生产构建弃用录制渲染器的兼容副本，隔离 QA 保留该版本用于旧入口回归。
 - 默认基座从 Cargo 依赖移出 Screenshot OCR、GIF/MP4 编码器与预览验收解码器，Linux 安装件移除 Tesseract 推荐依赖。缺失模块时 OCR 和录制显示模块商店指引。隔离 QA 构建保留兼容特性以覆盖原流程及签名模块切换。G9 四目标清单已加入 Screenshot 引擎及前端资源检查。
 - Screenshot 0.1.2 将前端离线 OCR、两个语言文件和 WASM 移入签名包。打包前逐文件核对源码和 SHA-256，生产基座构建检查排除这些前端资产。TC-MODULES-061 使用原生 WebView 加载签名渲染器，从实际截图识别文字并核对遮挡坐标。原生编码和识别的兼容路径继续随 TASK-020 收口。

@@ -122,12 +122,14 @@ impl FrameSource {
                 ensure_capture_permission()?;
                 #[cfg(debug_assertions)]
                 QA_SNAPSHOT_READS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                let (image, captured_at) = snapshot
+                snapshot
                     .as_ref()
                     .map_err(|error| anyhow::anyhow!("{error:#}"))?
-                    .capture()?;
-                self.captured_at = Some(captured_at);
-                Some(image)
+                    .capture(self.last.is_some())?
+                    .map(|(image, captured_at)| {
+                        self.captured_at = Some(captured_at);
+                        image
+                    })
             }
         };
         match image {
@@ -153,7 +155,7 @@ impl FrameSource {
                     Backend::Unavailable(error) => anyhow::bail!("{error}"),
                     #[cfg(target_os = "macos")]
                     Backend::MacRegion(_) => {
-                        unreachable!("region snapshots always return an image")
+                        unreachable!("the initial region snapshot is retained")
                     }
                 };
                 self.last = Some(image);

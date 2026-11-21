@@ -1,6 +1,6 @@
 //! A cached CoreGraphics region for the macOS recording compatibility path.
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use anyhow::Context;
 use image::RgbaImage;
@@ -37,7 +37,7 @@ impl RegionSnapshot {
         Ok(Self { rect })
     }
 
-    pub fn capture(&self) -> anyhow::Result<(RgbaImage, Instant)> {
+    pub fn capture(&self, already_captured: bool) -> anyhow::Result<Option<(RgbaImage, Instant)>> {
         // CoreGraphics snapshots the requested screen state. Reading/copying
         // its provider may then block: stamping after conversion assigns old
         // pixels to a later time and stretches the preceding recorded frame.
@@ -50,6 +50,16 @@ impl RegionSnapshot {
         )
         .context("create recording region snapshot")?;
         let snapshot_elapsed = captured_at.elapsed();
+        // A blocked WindowServer call can return pixels drawn after the call
+        // began. Once recording has started, hold the previous valid pixels
+        // until the next sample instead of assigning an uncertain timestamp.
+        if already_captured && snapshot_elapsed > Duration::from_millis(250) {
+            log::warn!(
+                "screenshot: discarding a macOS recording snapshot with an uncertain timestamp ({}ms)",
+                snapshot_elapsed.as_millis(),
+            );
+            return Ok(None);
+        }
         let provider = CGImage::data_provider(Some(&image)).context("snapshot data provider")?;
         let data = CGDataProvider::data(Some(&provider)).context("read snapshot pixels")?;
         let provider_elapsed = captured_at.elapsed();
@@ -92,6 +102,6 @@ impl RegionSnapshot {
                 (captured_at.elapsed() - provider_elapsed).as_millis()
             );
         }
-        Ok((image, captured_at))
+        Ok(Some((image, captured_at)))
     }
 }
