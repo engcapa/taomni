@@ -8,7 +8,7 @@ use windows::Media::Ocr::OcrEngine;
 use windows::Security::Cryptography::CryptographicBuffer;
 use windows::core::HSTRING;
 
-use super::ocr::OcrWord;
+use super::OcrWord;
 
 /// Languages tried first; the user's profile languages follow.
 const PREFERRED: [&str; 3] = ["zh-Hans-CN", "zh-CN", "en-US"];

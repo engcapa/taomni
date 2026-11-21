@@ -8,7 +8,7 @@ use objc2_vision::{
     VNImageRequestHandler, VNRecognizeTextRequest, VNRequest, VNRequestTextRecognitionLevel,
 };
 
-use super::ocr::{OcrWord, split_line_words};
+use super::{OcrWord, split_line_words};
 
 pub struct MacOcr {
     pub words: Vec<OcrWord>,

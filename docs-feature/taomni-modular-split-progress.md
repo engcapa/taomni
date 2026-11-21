@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- Screenshot OCR 的签名宿主接管文字识别和自动遮挡。核心授予单次图片读取，并持有采集和截图窗口。TC-MODULES-061 核对宿主摘要、实际识别、剪贴板像素和停用后的写租约，TC-SHOT-021 核对 Browser 的裁剪、遮挡与复制。兼容路径仍为未安装过该模块的配置提供原 OCR，录制和核心依赖裁剪继续按 TASK-020 验收。
+- `2168325e4` 的 Mail 0.1.16 草稿协议在 Linux、Windows、macOS ARM64 通过，三端 Browser 各通过 28/28。各平台的源码、宿主摘要和原始日志位于 `qa-ui-auto-report/github/44926627778/live-contracts/modular-protocol-*/`。Native 在执行期间逐片核对。 [真实宿主](https://github.com/engcapa/taomni/actions/runs/44926627778) · [三端应用](https://github.com/engcapa/taomni/actions/runs/44925531406)
 - Mail 0.1.15 的签名宿主协议在 Linux、Windows 和 macOS ARM64 均通过，核对了所选远端 Sent 文件夹、原始 MIME 字节和单次 APPEND。对应三个 Browser 平台各通过 28/28，其中 TC-MAIL-SEND-01 均通过。 [宿主协议](https://github.com/engcapa/taomni/actions/runs/44923460860) · [应用分片](https://github.com/engcapa/taomni/actions/runs/44922422361)
 - Mail 附件轮次的 18 个分片全部下载并通过回执身份检查。Native 在 Linux、Windows、macOS 26 分别为 31/31、30/31、29/31。macOS 的 Mail EML 和 Markdown 导出工件确认系统面板已打开。驱动改为在应用所属的 AppKit 面板内查找嵌套控件，并识别省略扩展名的文件名输入框。31 项对话框工具单测通过，分片复验继续收取。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44918072491)
 - Mail 0.1.16 将手工保存、替换和删除服务器草稿交给签名宿主。草稿的本地编辑和自动保存保留已确认的远端 UID，避免再次保存时留下旧副本。TC-MAIL-SEND-01 与 TC-MODULES-059 检查服务器上的新旧主题以及显式删除。

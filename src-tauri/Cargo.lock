@@ -10897,7 +10897,6 @@ dependencies = [
  "objc2-foundation",
  "objc2-screen-capture-kit",
  "objc2-video-toolbox",
- "objc2-vision",
  "openh264",
  "oracle",
  "pbkdf2 0.13.0",
@@ -10955,6 +10954,8 @@ dependencies = [
  "taomni-rdp-client-engine",
  "taomni-rdp-common",
  "taomni-redirector",
+ "taomni-screenshot-api",
+ "taomni-screenshot-ocr",
  "taomni-sqlite-snapshot",
  "taomni-vnc-api",
  "taomni-vnc-engine",
@@ -11220,6 +11221,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-plugin-screenshot"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "taomni-plugin-api",
+ "taomni-plugin-sdk",
+ "taomni-screenshot-api",
+ "taomni-screenshot-ocr",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "taomni-plugin-sdk"
 version = "0.1.0"
 dependencies = [
@@ -11386,6 +11401,26 @@ dependencies = [
  "sha2 0.11.0",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "taomni-screenshot-api"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "taomni-plugin-stream",
+]
+
+[[package]]
+name = "taomni-screenshot-ocr"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "objc2",
+ "objc2-foundation",
+ "objc2-vision",
+ "taomni-screenshot-api",
+ "windows 0.62.2",
 ]
 
 [[package]]

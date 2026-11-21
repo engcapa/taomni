@@ -1,0 +1,25 @@
+[package]
+name = "taomni-screenshot-ocr"
+version = "0.1.0"
+description = "OCR and redaction for pixels supplied by the desktop"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
+taomni-screenshot-api = { path = "../taomni-screenshot-api" }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+  "Foundation", "Globalization", "Graphics_Imaging", "Media_Ocr",
+  "Security_Cryptography", "Storage_Streams",
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.4"
+objc2-foundation = { version = "0.3.2", features = ["NSArray", "NSData", "NSDictionary", "NSError", "NSString"] }
+objc2-vision = { version = "0.3.2", default-features = false, features = [
+  "std", "VNRequest", "VNRecognizeTextRequest", "VNRequestHandler", "VNObservation",
+  "VNTypes", "objc2-core-foundation",
+] }

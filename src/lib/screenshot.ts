@@ -282,6 +282,7 @@ async function offlineOcr(path: string) {
 export async function ocrImage(path: string): Promise<OcrResponse> {
   try { return await invoke<OcrResponse>("screenshot_ocr", { path }); }
   catch (nativeError) {
+    if (String(nativeError).startsWith("OCR_MODULE_UNAVAILABLE:")) throw nativeError;
     try { return await offlineOcr(path); }
     catch (error) { throw new Error(`OCR: ${String(nativeError)}; offline engine: ${String(error)}`); }
   }
@@ -294,7 +295,8 @@ export interface RedactResponse {
 
 export async function autoRedact(path: string): Promise<RedactResponse> {
   try { return await invoke<RedactResponse>("screenshot_auto_redact", { path }); }
-  catch {
+  catch (nativeError) {
+    if (String(nativeError).startsWith("OCR_MODULE_UNAVAILABLE:")) throw nativeError;
     const { tsv } = await offlineOcr(path);
     return invoke<RedactResponse>("screenshot_redact_tsv", { tsv });
   }

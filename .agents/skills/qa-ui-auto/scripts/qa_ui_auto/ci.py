@@ -114,6 +114,8 @@ def capabilities(cases, mode: str) -> list[str]:
                 result.add("signed-mfa")
             if "module_signed_mail_archive" in fixtures:
                 result.add("signed-mail")
+            if "module_signed_screenshot_archive" in fixtures:
+                result.add("signed-screenshot")
             if "module_signed_vnc_archive" in fixtures:
                 result.add("signed-vnc")
             if "module_signed_rdp_archive" in fixtures:

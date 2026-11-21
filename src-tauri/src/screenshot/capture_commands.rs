@@ -6,8 +6,9 @@ use crate::screenshot::ocr;
 use crate::screenshot::overlay_handoff;
 use crate::screenshot::runtime::blocking;
 use crate::screenshot::startup_timing;
+use crate::state::AppState;
 use std::path::PathBuf;
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 
 /// Raw bytes of a screenshot artifact. The UI turns them into a same-origin
 /// `blob:` URL: unlike asset-protocol URLs (a different origin), blob images
@@ -86,26 +87,25 @@ pub async fn screenshot_capture_region(
 }
 
 #[tauri::command]
-pub async fn screenshot_probe() -> Result<ScreenshotProbe, String> {
-    blocking("probe", || {
-        let base = taomni_capture::engine::probe()?;
-        let engine = ocr::engine_name();
-        Ok(ScreenshotProbe {
-            permission: base.permission,
-            control_permission: base.control_permission,
-            mp4_available: true,
-            ocr_available: engine.is_some(),
-            ocr_engine: engine.map(str::to_string),
-            ocr_hint: engine.is_none().then(|| ocr::install_hint().to_string()),
-            summary: format!(
-                "{}. OCR {}.",
-                base.summary,
-                match engine {
-                    Some(name) => format!("uses the {name} engine"),
-                    None => "needs an OCR engine".into(),
-                }
-            ),
-        })
+pub async fn screenshot_probe(state: State<'_, AppState>) -> Result<ScreenshotProbe, String> {
+    let base = blocking("probe", taomni_capture::engine::probe).await?;
+    let availability = ocr::probe(state.plugins.clone())
+        .await
+        .unwrap_or_else(|error| taomni_screenshot_api::OcrAvailability {
+            engine: None,
+            hint: Some(error),
+        });
+    let summary = match &availability.engine {
+        Some(name) => format!("{}. OCR uses the {name} engine.", base.summary),
+        None => format!("{}. OCR needs an OCR engine.", base.summary),
+    };
+    Ok(ScreenshotProbe {
+        permission: base.permission,
+        control_permission: base.control_permission,
+        mp4_available: true,
+        ocr_available: availability.engine.is_some(),
+        ocr_engine: availability.engine,
+        ocr_hint: availability.hint,
+        summary,
     })
-    .await
 }

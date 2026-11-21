@@ -142,6 +142,31 @@ def setup_mail(ctx):
     ctx.values.update(mail_signed_archive=destination.as_posix(), mail_signed_signature=signature)
 
 
+def setup_screenshot(ctx):
+    if ctx.case_id != "TC-MODULES-061" or (ctx.cfg.get("app") or {}).get("mode") != "native":
+        raise RuntimeError("Signed Screenshot input requires its registered native case")
+    setting = "QA_SIGNED_SCREENSHOT_ROOT"
+    raw = os.environ.get(setting)
+    if not raw:
+        raise RuntimeError(f"{setting} is required to locate the signed artifact")
+    source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    manifest = Path(__file__).resolve().parents[6] / "src-tauri/plugins/screenshot/module.json"
+    version = json.loads(manifest.read_text(encoding="utf-8"))["version"]
+    info, archive, signature, _ = load_artifact(
+        Path(raw), source, platform_key(), "screenshot", version=version,
+    )
+    host = "taomni-plugin-screenshot.exe" if platform.system() == "Windows" else "taomni-plugin-screenshot"
+    with zipfile.ZipFile(archive) as package, package.open(host) as binary:
+        info["hostSha256"] = hashlib.file_digest(binary, "sha256").hexdigest()
+    owned = Path(ctx.case_dir).resolve() / "signed-screenshot"
+    owned.mkdir()
+    destination = owned / archive.name
+    shutil.copyfile(archive, destination)
+    (owned / "provenance.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
+    ctx.signed_screenshot = {"host": host, "receipt": info}
+    ctx.values.update(screenshot_signed_archive=destination.as_posix(), screenshot_signed_signature=signature)
+
+
 def setup_desktop_client(ctx, protocol):
     if (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("The signed desktop client requires the native package verifier")

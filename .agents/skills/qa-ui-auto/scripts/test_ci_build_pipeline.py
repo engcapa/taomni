@@ -84,7 +84,7 @@ class BuildPipelineTests(unittest.TestCase):
                                  f'{module}-client' if module in ('rdp', 'vnc') else module)
                 self.assertEqual(jobs[signer]['with']['native_builds'],
                                  '${{ needs.plan.outputs.' + platform + '_build_matrix }}')
-            self.assertEqual(jobs[f'execute-{platform}-native']['needs'], dependencies + ['signed-mail'])
+            self.assertEqual(jobs[f'execute-{platform}-native']['needs'], dependencies + ['signed-mail', 'signed-screenshot'])
             self.assertIn(f'execute-{platform}-native', jobs['summarize']['needs'])
             self.assertIn(f'build-{platform}', jobs['summarize']['needs'])
         self.assertEqual(jobs['native-contracts']['needs'], 'plan')
@@ -94,6 +94,9 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertIn('signed-mail', jobs['summarize']['needs'])
         self.assertEqual(jobs['signed-mail']['with']['module'], 'mail')
         self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-mail')", jobs['signed-mail']['if'])
+        self.assertIn('signed-screenshot', jobs['summarize']['needs'])
+        self.assertEqual(jobs['signed-screenshot']['with']['module'], 'screenshot')
+        self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-screenshot')", jobs['signed-screenshot']['if'])
         self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-module')", jobs['signed-modular-packages']['if'])
         self.assertNotIn('Validate QA tools', [s.get('name') for s in jobs['plan']['steps']])
 

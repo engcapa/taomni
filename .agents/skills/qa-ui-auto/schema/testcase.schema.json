@@ -104,6 +104,7 @@
           "module_signed_vnc_archive",
           "module_signed_rdp_archive",
           "module_signed_mail_archive",
+          "module_signed_screenshot_archive",
           "module_execution",
           "module_backup_data",
           "vnc_required",
@@ -954,6 +955,10 @@
           "enum": ["running", "disabled"],
           "description": "Windows native signed VNC case only. Check exact installed host and helper bytes, process ownership and teardown while the original core stays running."
         },
+        "assert_signed_screenshot_host": {
+          "enum": ["idle", "running", "disabled"],
+          "description": "Native signed Screenshot case only. Match the installed host to the signed archive and observe its writer lease."
+        },
         "assert_signed_mail_host": {
           "enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "disabled"],
           "description": "Native signed Mail case only. Match installed host bytes to the signed input and observe the module writer lease before, during and after using the Mail host."
@@ -1069,7 +1074,7 @@
           "additionalProperties": false,
           "required": ["scenario"],
           "properties": {
-            "scenario": {"enum": ["displays", "capture", "capture-fidelity", "scroll", "overlay-copy", "record", "recorder", "pin", "hotkey", "ocr-redact", "freehand", "controls", "full-recorder", "macos-capture-source", "scroll-permission-error", "capture-permission-error", "scroll-manual", "scroll-exit", "pin-tools", "pin-arrangement", "colors", "annotation-tools", "escape-entry", "startup-timing", "startup-isolation", "startup-flash", "clipboard-retry", "resident-overlay", "x11-compositor-bypass", "current-window"]},
+            "scenario": {"enum": ["displays", "capture", "capture-fidelity", "scroll", "overlay-copy", "record", "recorder", "pin", "hotkey", "ocr-redact", "ocr-disabled", "freehand", "controls", "full-recorder", "macos-capture-source", "scroll-permission-error", "capture-permission-error", "scroll-manual", "scroll-exit", "pin-tools", "pin-arrangement", "colors", "annotation-tools", "escape-entry", "startup-timing", "startup-isolation", "startup-flash", "clipboard-retry", "resident-overlay", "x11-compositor-bypass", "current-window"]},
             "format": {"enum": ["gif", "mp4"]},
             "secs": {"type": "integer", "minimum": 1, "maximum": 8}
           }

@@ -34,6 +34,8 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("assert_vnc_key_helper")(assert_vnc_key_helper)
     from .module_mail_observation import run as assert_signed_mail_host
     register_verb("assert_signed_mail_host")(assert_signed_mail_host)
+    from .module_screenshot_observation import run as assert_signed_screenshot_host
+    register_verb("assert_signed_screenshot_host")(assert_signed_screenshot_host)
     from .rdp_helpers.signed_viewer_latency import run as assert_signed_rdp_latency
     register_verb("assert_signed_rdp_latency")(assert_signed_rdp_latency)
     from .module_download_observation import run as module_download_probe

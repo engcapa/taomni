@@ -2,7 +2,10 @@ use super::*;
 
 /// Real OCR and automatic-redaction UI over a native text fixture.
 #[tauri::command]
-pub async fn screenshot_qa_ocr_redact(app: AppHandle) -> Result<String, String> {
+pub async fn screenshot_qa_ocr_redact(
+    app: AppHandle,
+    expect_disabled: Option<bool>,
+) -> Result<String, String> {
     ensure_qa(&app)?;
     let _cleanup = ScenarioCleanup(app.clone());
     let (_fixture, display, region) = open_fixture(&app, "ocr")
@@ -17,8 +20,28 @@ pub async fn screenshot_qa_ocr_redact(app: AppHandle) -> Result<String, String> 
         region.3,
     )
     .await?;
-    let ocr = super::super::screenshot_ocr(source.path.clone()).await?;
-    let boxes = super::super::screenshot_auto_redact(source.path.clone()).await?;
+    let ocr = super::super::screenshot_ocr(source.path.clone(), app.state()).await;
+    let boxes = super::super::screenshot_auto_redact(source.path.clone(), app.state()).await;
+    if expect_disabled == Some(true) {
+        let probe = super::super::screenshot_probe(app.state()).await?;
+        let expected = super::super::ocr::MODULE_UNAVAILABLE;
+        let artifact = keep_artifact(
+            std::path::Path::new(&source.path),
+            "ocr-disabled-capture.png",
+        );
+        let recognition_error = ocr.err();
+        let redaction_error = boxes.err();
+        let ok = artifact.is_some()
+            && recognition_error.as_deref() == Some(expected)
+            && redaction_error.as_deref() == Some(expected)
+            && !probe.ocr_available
+            && probe.ocr_hint.as_deref() == Some(expected);
+        return Ok(report(
+            ok,
+            json!({"artifact":artifact,"recognitionError":recognition_error,"redactionError":redaction_error,"probe":probe}),
+        ));
+    }
+    let (ocr, boxes) = (ocr?, boxes?);
     let ocr_ok = ocr.text.contains("user@example.com") && ocr.text.contains("13812345678");
     let boxes_ok = boxes.boxes.iter().any(|b| b.kind == "email")
         && boxes.boxes.iter().any(|b| b.kind == "phone")

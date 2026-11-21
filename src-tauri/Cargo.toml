@@ -31,6 +31,8 @@ members = [
     "crates/taomni-plugin-stream",
     "crates/taomni-profile-locks",
     "crates/taomni-redirector",
+    "crates/taomni-screenshot-api",
+    "crates/taomni-screenshot-ocr",
     "crates/taomni-sqlite-snapshot",
     "crates/taomni-vnc-api",
     "crates/taomni-vnc-engine",
@@ -39,6 +41,7 @@ members = [
     "plugins/mail",
     "plugins/mfa",
     "plugins/rdp-client",
+    "plugins/screenshot",
     "plugins/sockscap/tools",
     "plugins/vnc-client",
     "plugins/vnc-client/key-helper",
@@ -88,6 +91,8 @@ taomni-profile-locks = { path = "crates/taomni-profile-locks" }
 taomni-redirector = { path = "crates/taomni-redirector" }
 taomni-sqlite-snapshot = { path = "crates/taomni-sqlite-snapshot" }
 taomni-capture = { path = "crates/taomni-capture" }
+taomni-screenshot-api = { path = "crates/taomni-screenshot-api" }
+taomni-screenshot-ocr = { path = "crates/taomni-screenshot-ocr" }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-rdp-client-api = { path = "crates/taomni-rdp-client-api" }
 taomni-rdp-client-engine = { path = "crates/taomni-rdp-client-engine", optional = true }
@@ -350,12 +355,6 @@ windows = { version = "0.62", features = [
   "Win32_System_JobObjects",
   "Win32_UI_Shell",
   "Win32_System_DataExchange",
-  # Screenshot OCR: the built-in Windows.Media.Ocr engine (no install).
-  "Globalization",
-  "Graphics_Imaging",
-  "Media_Ocr",
-  "Security_Cryptography",
-  "Storage_Streams",
 ] }
 # On Windows, upstream sherpa-onnx prebuilt static libraries are compiled with /MT (MT_StaticRelease),
 # which conflicts with Rust MSVC /MD (MD_DynamicRelease) and whisper-rs-sys (LNK2038).
@@ -383,8 +382,6 @@ objc2-core-media = { version = "0.3.2", features = ["CMSampleBuffer", "objc2-cor
 objc2-core-audio-types = { version = "0.3.2", default-features = false, features = ["std", "CoreAudioBaseTypes"] }
 objc2-core-video = { version = "0.3.2", features = ["CVBase", "CVBuffer", "CVImageBuffer", "CVPixelBuffer", "CVReturn"] }
 objc2-core-foundation = "0.3.2"
-# Screenshot OCR: the built-in Vision text recognizer (no install).
-objc2-vision = { version = "0.3.2", default-features = false, features = ["std", "VNRequest", "VNRecognizeTextRequest", "VNRequestHandler", "VNObservation", "VNTypes", "objc2-core-foundation"] }
 objc2-screen-capture-kit = { version = "0.3.2", default-features = false, features = ["std", "SCShareableContent", "SCStream", "block2", "dispatch2", "objc2-core-graphics", "objc2-core-media"] }
 objc2-video-toolbox = { version = "0.3.2", default-features = false, features = ["std", "block2", "objc2-core-media", "objc2-core-video", "VTBase", "VTCompressionProperties", "VTCompressionSession", "VTErrors", "VTSession"] }
 # The IronRDP umbrella crate does not expose its server EGFX feature. A direct

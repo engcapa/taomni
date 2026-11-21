@@ -15,6 +15,7 @@ SCENARIOS = {
     "capture": "screenshot_qa_capture",
     "capture-fidelity": "screenshot_qa_capture_fidelity",
     "ocr-redact": "screenshot_qa_ocr_redact",
+    "ocr-disabled": "screenshot_qa_ocr_redact",
     "scroll": "screenshot_qa_scroll",
     "overlay-copy": "screenshot_qa_overlay_copy",
     "record": "screenshot_qa_record",
@@ -57,6 +58,8 @@ def run_scenario(ctx, args):
     if scenario not in SCENARIOS:
         raise StepError(f"native_screenshot_scenario: unknown scenario {scenario!r}")
     params = {}
+    if scenario == "ocr-disabled":
+        params["expectDisabled"] = True
     if scenario in {"record", "recorder", "macos-capture-source"}:
         if args.get("format") not in {"gif", "mp4"}:
             raise StepError("native_screenshot_scenario: record/recorder/macos-capture-source requires gif or mp4")

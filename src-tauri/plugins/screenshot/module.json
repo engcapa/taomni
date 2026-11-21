@@ -1,0 +1,21 @@
+{
+  "id": "taomni-plugin-screenshot",
+  "slug": "screenshot",
+  "name": "Screenshot OCR",
+  "description": "Recognize text in screenshots and find email addresses, phone numbers and IDs for redaction.",
+  "version": "0.1.0",
+  "coreApiVersion": "1",
+  "kind": "media",
+  "status": "provisional",
+  "platforms": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"],
+  "entry": { "host": "taomni-plugin-screenshot", "protocol": 1 },
+  "tabs": [],
+  "commands": ["screenshot/probe-ocr", "screenshot/recognize", "screenshot/redact", "screenshot/classify-tsv"],
+  "permissions": [],
+  "dataDir": "plugins/screenshot",
+  "dataSchemaVersion": 1,
+  "backupPaths": [],
+  "legacyTables": [],
+  "vaultFixedKeys": [],
+  "snapshot": "file"
+}
