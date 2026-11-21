@@ -13121,6 +13121,7 @@ files:
   - src-tauri/plugins/screenshot/module.json
   - src-tauri/plugins/screenshot/src/lib.rs
   - src-tauri/plugins/screenshot/src/recording.rs
+  - src-tauri/plugins/screenshot/renderer/index.ts
   - src-tauri/src/screenshot/qa.rs
   - src-tauri/src/screenshot/qa/pin_arrangement.rs
   - src-tauri/src/screenshot/qa_oracle.rs
@@ -13772,7 +13773,7 @@ controls:
 - 滚动截图开始前说明自动滚动与结束方式，进行中显示帧数、“完成”和“取消”；完成保留已捕获长图，取消保留原始选区和标注。滚动及录制期间使用选区外的原生红色边框和控制窗口，避免依赖平台的内容保护来排除控制画面；全屏等没有安全控制位置时隐藏控制窗口，截图快捷键结束采集后再显示预览。没有安全位置且快捷键未注册时拒绝启动并提示调整范围或启用快捷键。
 - Browser `TC-SHOT-001`–`021` 检查真实 renderer 输入、选区几何、`data-shapes` 历史、已绘制 canvas 颜色/线宽、PNG 解码尺寸、dialog 取消/确认、贴图 route 和快捷键/倒计时；浏览器 OCR 返回 `Taomni stub OCR\nuser@example.com`，滚动 stub 返回 400×1800 的可读长图，录制 stop 返回 PNG preview。请求/route/形状数断言不等于真实采集、拼接、GIF/MP4 编码或敏感像素遮盖证据；水印 apply/clear 状态不宣称水印输出像素通过。
 - Native `SHOT-N*` 用例负责真实屏幕、滚动注入/拼接、OS 剪贴板、媒体解码和窗口/全局热键边界。N2/N9 捕获完整长页并将产物逐像素/24×24 区块与真实 renderer canvas 保留的原画比对，覆盖文字、图案、分隔线及缺失/重复/错位/拉伸，不只检查高度或单列颜色。N5–N8 对 GIF/MP4 每一解码帧核对原画 frame id、每轮随机 nonce、区域像素及有序时间线，黑帧/错区域/静态或无关多帧均不得通过；保存原始 PNG、产物、逐帧指标/时间线和原图/实际/差异接触图。
-- `TC-MODULES-061` 安装并启用签名 Screenshot OCR 包，核对识别文字、撤销/重做、剪贴板像素、宿主字节和写租约，停用后再次执行原生截图。Browser `TC-SHOT-021` 核对自动遮挡使用裁剪后的图片，并覆盖选区、历史和复制结果。
+- `TC-MODULES-061` 安装并启用签名 Screenshot OCR 包，核对宿主与离线 WASM 的实际识别文字、撤销/重做、剪贴板像素和写租约，停用后再次执行原生截图。Browser `TC-SHOT-021` 核对自动遮挡使用裁剪后的图片，并覆盖选区、历史和复制结果。
 - `TC-MODULES-062` 从同一签名宿主完成 GIF 和 MP4 录制，验证实际像素及时间戳、预览清理和停用后的写租约。Browser `TC-SHOT-006` 继续检查停止、预览、首帧复制和关闭后的运行时错误。
 - 新增 Browser `TC-SHOT-022` 验证自由轮廓/退化拒绝/移动缩放/历史/切换/轮廓外命中，`TC-SHOT-023` 将两种轮廓 Pin 的实际 PNG 与导出前保留原图做独立 RGB/alpha 比对。Native `TC-SHOT-N11` 使用真实 OS 鼠标绘制凹形选区，分别核对 Pin 文件与 OS 剪贴板 RGBA；实际拖动 Pin 后读取窗口位置差/置顶状态，并检查独立副本存活/销毁。run36991920385（SHA63c275da）三端新增与保留流程已通过：各 browser23/23、native11/11，零失败零跳过；三端 Pin 实际位移均80×64，原画 RGB 完全一致且非边缘 alpha 无差异。Linux 置顶读取真实 X11 ABOVE atom，保留 GTK/Tao 缓存 false 作为诊断，不用缓存或 builder 声明代替实际 WM 状态。
 - `TC-SHOT-028` 覆盖多行输入、字体/字号、文字样式撤销/重做与窄窗口录制菜单；`TC-SHOT-003` 覆盖长图预览比例、100% 尺寸与完整输出。N3 同时检查原生菜单布局与剪贴板两行文字像素，N12 检查原生结果预览及继续标记比例。 验证 run37113915949（产品提交 `1b99b6a8`）：Linux/Windows/macOS browser 各 6/6、native 各 2/2，零失败零跳过；三端真实长图像素误差为 0，两行文字分别通过剪贴板像素检查。六组回执附件哈希、QA 构建源码身份及 15 个原生产物哈希已核验，报告保留于 `qa-ui-auto-report/hosted-37113915949/`。本地仅运行单测（截图相关 93 项、QA scenario 5 项）与目录静态校验；未在本地构建或运行 browser/native。

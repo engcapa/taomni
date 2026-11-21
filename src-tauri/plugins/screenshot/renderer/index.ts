@@ -4,8 +4,7 @@ export interface OfflineOcrResult { text: string; tsv: string; langs: string; }
 
 /** Per-operation workers are always terminated; no screenshot leaves the app.
  * Assets are emitted by screenshotOcrPlugin from lockfile-pinned packages. */
-export async function recognizeOffline(image: string): Promise<OfflineOcrResult> {
-  const base = new URL("screenshot-ocr/", document.baseURI).href;
+export async function recognizeOffline(image: string, base: string): Promise<OfflineOcrResult> {
   let worker: Awaited<ReturnType<typeof createWorker>> | undefined;
   let expired = false;
   let timer: ReturnType<typeof setTimeout> | undefined;

@@ -274,8 +274,21 @@ export interface OcrResponse {
 async function offlineOcr(path: string) {
   const url = await loadScreenshotUrl(path);
   try {
-    const { recognizeOffline } = await import("./screenshotOcr");
-    return await recognizeOffline(url);
+    if (isTauriRuntime()) {
+      const { listPlugins } = await import("./ipc/plugin");
+      const record = (await listPlugins()).find((item) => item.slug === "screenshot");
+      if (record?.lifecycle === "enabled" && record.manifest?.entry.frontend) {
+        const { pluginFrontendUrl } = await import("./pluginLoader");
+        const entry = pluginFrontendUrl(record.manifest);
+        const renderer = await import(/* @vite-ignore */ entry) as typeof import("../../src-tauri/plugins/screenshot/renderer");
+        return await renderer.recognizeOffline(url, new URL("screenshot-ocr/", entry).href);
+      }
+    }
+    if (__TAOMNI_BUNDLED_SCREENSHOT_OCR__) {
+      const { recognizeOffline } = await import("../../src-tauri/plugins/screenshot/renderer");
+      return await recognizeOffline(url, new URL("screenshot-ocr/", document.baseURI).href);
+    }
+    throw new Error("Install and enable the Screenshot module for offline OCR.");
   } finally { revokeScreenshotUrl(url); }
 }
 

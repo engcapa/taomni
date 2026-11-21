@@ -137,8 +137,10 @@ jobs:
           find dist -type f -print0 | sort -z | xargs -0 -r sha256sum > gate-inventory/dist-sha256.txt
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
-          import { readFileSync } from 'node:fs';
+          import { existsSync, readFileSync } from 'node:fs';
           const manifest = JSON.parse(readFileSync('gate-inventory/vite-manifest.json', 'utf8'));
+          assert(!existsSync('dist/screenshot-ocr'), 'Core contains module OCR language and worker assets');
+          assert(!Object.keys(manifest).some((path) => path.includes('plugins/screenshot/renderer/')), 'Core contains the Screenshot OCR renderer');
           for (const path of Object.keys(manifest)) {
             assert(!/plugins\/(vnc|rdp)-client\/renderer\//.test(path), `Bundled remote desktop frontend ${path}`);
           }

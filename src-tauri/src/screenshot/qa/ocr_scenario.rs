@@ -5,6 +5,7 @@ use super::*;
 pub async fn screenshot_qa_ocr_redact(
     app: AppHandle,
     expect_disabled: Option<bool>,
+    expect_offline: Option<bool>,
 ) -> Result<String, String> {
     ensure_qa(&app)?;
     let _cleanup = ScenarioCleanup(app.clone());
@@ -20,6 +21,9 @@ pub async fn screenshot_qa_ocr_redact(
         region.3,
     )
     .await?;
+    if expect_offline == Some(true) {
+        return signed_offline_ocr(&app, &source.path).await;
+    }
     let ocr = super::super::screenshot_ocr(source.path.clone(), app.state()).await;
     let boxes = super::super::screenshot_auto_redact(source.path.clone(), app.state()).await;
     if expect_disabled == Some(true) {
@@ -144,6 +148,58 @@ pub async fn screenshot_qa_ocr_redact(
         ok,
         json!({"ocr":ocr,"boxes":boxes,"page":page,"inputsRetained":inputs_retained,"pixelsChanged":changed,"overlayClosed":closed,
         "sourceArtifact":source_artifact,"artifact":artifact}),
+    ))
+}
+
+async fn signed_offline_ocr(app: &AppHandle, path: &str) -> Result<String, String> {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+
+    let state = app.state::<crate::state::AppState>();
+    let module = state
+        .plugins
+        .get(taomni_screenshot_api::SLUG)
+        .filter(|record| record.state == crate::plugin::LifecycleState::Enabled)
+        .ok_or("Enable the signed Screenshot module before verifying offline recognition")?;
+    let entry = module
+        .manifest
+        .entry
+        .frontend
+        .ok_or("Missing signed OCR renderer")?;
+    let route = format!(
+        "/__taomni_plugins__/screenshot/{}/{}",
+        module.manifest.version, entry
+    );
+    let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
+    let data = format!("data:image/png;base64,{}", STANDARD.encode(bytes));
+    let main = app
+        .get_webview_window("main")
+        .ok_or("Missing native main window")?;
+    let script = format!(
+        r#"
+      const entry = new URL({route}, location.href).href;
+      const renderer = await import(entry);
+      return await renderer.recognizeOffline({data}, new URL('screenshot-ocr/', entry).href);
+    "#,
+        route = json!(route),
+        data = json!(data)
+    );
+    let result = run_js(&main, &script, Duration::from_secs(105))
+        .await
+        .map_err(|error| format!("{error:#}"))?;
+    let recognized = result["text"]
+        .as_str()
+        .is_some_and(|text| text.contains("user@example.com"));
+    let tsv = result["tsv"]
+        .as_str()
+        .ok_or("Missing offline OCR word geometry")?;
+    let sensitive = super::super::screenshot_redact_tsv(tsv.to_owned(), state).await?;
+    let email_box = sensitive
+        .boxes
+        .iter()
+        .any(|item| item.kind == "email" && item.w > 0 && item.h > 0);
+    Ok(report(
+        recognized && email_box && result["langs"] == json!("bundled:eng+chi_sim"),
+        json!({"recognition":result,"redaction":sensitive}),
     ))
 }
 

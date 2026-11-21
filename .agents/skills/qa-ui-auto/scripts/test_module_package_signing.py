@@ -30,7 +30,7 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
         if module == "vnc-client" and platform == "windows-x86_64":
             (payload / "taomni-vnc-key-helper.exe").write_bytes(b"inert unit helper")
         frontend = manifest["entry"].get("frontend")
-        if frontend and module not in {"vnc-client", "rdp-client", "mail"}:
+        if frontend and module not in {"vnc-client", "rdp-client", "mail", "screenshot"}:
             shutil.copytree(ROOT / "src-tauri/plugins" / module / "frontend", trusted / "frontend")
             shutil.copytree(trusted / "frontend", payload / "frontend")
         (payload / "module.json").write_text(json.dumps(manifest))
@@ -162,6 +162,31 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
             self.assertEqual((payload / "frontend/index.js").read_bytes(), entry)
             with self.assertRaisesRegex(AssertionError, "Unexpected files"):
                 self.guard(root, "mail", "linux-x86_64")
+
+    def test_screenshot_rejects_changed_trained_data_before_signing(self):
+        helpers = runpy.run_path(str(ROOT / "scripts/stage-vnc-frontend.py"))
+        source, tooling, slug = "a" * 40, "b" * 40, "screenshot"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = self.seed(root, slug, "linux-x86_64")
+            self.guard(root, slug, "linux-x86_64")
+            trusted = root / "trusted-frontend"
+            assets = trusted / "screenshot-ocr"
+            assets.mkdir(parents=True)
+            (trusted / "index.js").write_bytes(b"export const fixture = true;")
+            for name in helpers["SCREENSHOT_ASSETS"]:
+                (assets / name).write_bytes(name.encode())
+            files = helpers["frontend_files"](trusted, slug, with_receipt=False)
+            receipt = helpers["frontend_receipt"](files, source, tooling, slug)
+            (trusted / "receipt.json").write_text(json.dumps(receipt), encoding="utf-8")
+            changed = assets / "eng.traineddata.gz"
+            changed.write_bytes(b"changed while staging")
+            with self.assertRaisesRegex(ValueError, "receipt"):
+                helpers["stage_frontend"](trusted, payload, source, tooling, slug)
+            self.assertFalse((payload / "frontend").exists())
+            changed.write_bytes(changed.name.encode())
+            helpers["stage_frontend"](trusted, payload, source, tooling, slug)
+            self.assertEqual((payload / "frontend/screenshot-ocr/eng.traineddata.gz").read_bytes(), changed.read_bytes())
 
     def test_source_module_metadata_and_unsigned_file_changes_are_rejected(self):
         for change in ["source", "module", "permissions", "frontend-entry", "extra-file", "frontend-bytes", "secondary-chunk"]:

@@ -16,6 +16,7 @@ SCENARIOS = {
     "capture-fidelity": "screenshot_qa_capture_fidelity",
     "ocr-redact": "screenshot_qa_ocr_redact",
     "ocr-disabled": "screenshot_qa_ocr_redact",
+    "ocr-offline-module": "screenshot_qa_ocr_redact",
     "scroll": "screenshot_qa_scroll",
     "overlay-copy": "screenshot_qa_overlay_copy",
     "record": "screenshot_qa_record",
@@ -48,7 +49,7 @@ SCENARIOS = {
 # the overlay in three groups of 20 real captures. The case's own deadline
 # remains authoritative through budget_time; this cap must not undercut it.
 DEFAULT_DEADLINE = 90
-DEADLINES = {"startup-timing": 600, "startup-isolation": 150}
+DEADLINES = {"startup-timing": 600, "startup-isolation": 150, "ocr-offline-module": 120}
 
 
 def run_scenario(ctx, args):
@@ -60,6 +61,8 @@ def run_scenario(ctx, args):
     params = {}
     if scenario == "ocr-disabled":
         params["expectDisabled"] = True
+    if scenario == "ocr-offline-module":
+        params["expectOffline"] = True
     if scenario in {"record", "recorder", "macos-capture-source"}:
         if args.get("format") not in {"gif", "mp4"}:
             raise StepError("native_screenshot_scenario: record/recorder/macos-capture-source requires gif or mp4")
