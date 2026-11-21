@@ -4,12 +4,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$script:diagnosticStage = 'initialization'
 trap {
     $failure = $_.Exception.GetBaseException()
     $diagnostic = [pscustomobject]@{
         exception = $failure.GetType().FullName
         hresult = $failure.HResult
         line = $_.InvocationInfo.ScriptLineNumber
+        stage = $script:diagnosticStage
     }
     [Console]::Error.WriteLine(($diagnostic | ConvertTo-Json -Compress))
     exit 1
@@ -57,7 +59,8 @@ $scope = [System.Windows.Automation.TreeScope]::Descendants
 $types = [System.Windows.Automation.ControlType]
 $clock = [Diagnostics.Stopwatch]::StartNew()
 
-function Wait-Element([scriptblock]$Find, [string]$Description) {
+function Wait-Element([scriptblock]$Find, [string]$Stage) {
+    $script:diagnosticStage = $Stage
     $end = [Math]::Min($clock.Elapsed.TotalSeconds + 25, 75)
     do {
         try {
@@ -69,7 +72,7 @@ function Wait-Element([scriptblock]$Find, [string]$Description) {
         if ((Get-Process -Id $OwnerId).HasExited) { throw 'The installed Taomni process exited' }
         Start-Sleep -Milliseconds 150
     } while ($clock.Elapsed.TotalSeconds -lt $end)
-    throw "Timed out waiting for $Description in the installed Taomni window"
+    throw "Timed out waiting for $Stage in the installed Taomni window"
 }
 
 function Find-Control($Root, $Type, [string]$Name) {
@@ -90,8 +93,8 @@ function Click-Element($Element) {
         [int]($rect.X + $rect.Width / 2), [int]($rect.Y + $rect.Height / 2))
 }
 
-function Invoke-Button($Root, [string]$Name) {
-    $button = Wait-Element { Find-Control $Root $types::Button $Name } $Name
+function Invoke-Button($Root, [string]$Name, [string]$Stage) {
+    $button = Wait-Element { Find-Control $Root $types::Button $Name } $Stage
     [object]$pattern = $null
     if ($button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
         $pattern.Invoke()
@@ -127,11 +130,11 @@ function Find-Passwords([int]$Count) {
 
 function Read-Code([string]$Expected) {
     [System.Windows.Forms.Clipboard]::Clear()
-    Invoke-Button $window "Copy code for $($fixture.issuer)"
+    Invoke-Button $window "Copy code for $($fixture.issuer)" 'copy-hotp'
     Wait-Element {
         $actual = [System.Windows.Forms.Clipboard]::GetText()
         if ($actual -ceq $Expected) { return $actual }
-    } "HOTP clipboard value $Expected"
+    } 'read-hotp'
 }
 
 $windowHandle = Wait-Element {
@@ -140,33 +143,35 @@ $windowHandle = Wait-Element {
         $element = $automation::FromHandle($process.MainWindowHandle)
         if ($element.Current.ProcessId -eq $OwnerId) { return $process.MainWindowHandle }
     }
-} 'the owned top-level window'
+} 'owned-window'
 $window = $automation::FromHandle($windowHandle)
 
 if ($Phase -ne 'seed') {
-    $fields = Wait-Element { Find-Passwords 1 } 'the vault unlock field'
+    $fields = Wait-Element { Find-Passwords 1 } 'vault-unlock-field'
     Set-Value $fields[0] $fixture.password
-    Invoke-Button $window 'Unlock'
+    Invoke-Button $window 'Unlock' 'unlock-vault'
 }
-Invoke-Button $window 'Tools'
-Invoke-Button $window 'MFA authenticator'
+if (-not (Find-Control $window $types::Button 'MFA authenticator')) {
+    Invoke-Button $window 'Tools' 'open-tools'
+}
+Invoke-Button $window 'MFA authenticator' 'open-mfa'
 
 $codes = @()
 if ($Phase -eq 'seed') {
-    $fields = Wait-Element { Find-Passwords 2 } 'the vault password and confirmation fields'
+    $fields = Wait-Element { Find-Passwords 2 } 'vault-setup-fields'
     Set-Value $fields[0] $fixture.password
     Set-Value $fields[1] $fixture.password
-    Invoke-Button $window 'Create vault'
-    Invoke-Button $window 'Add MFA account'
-    $uri = Wait-Element { Find-Control $window $types::Edit 'otpauth link' } 'the otpauth field'
+    Invoke-Button $window 'Create vault' 'create-vault'
+    Invoke-Button $window 'Add MFA account' 'open-add-account'
+    $uri = Wait-Element { Find-Control $window $types::Edit 'otpauth link' } 'otpauth-field'
     Set-Value $uri $fixture.uri
-    Invoke-Button $window 'Add account'
+    Invoke-Button $window 'Add account' 'save-account'
     $codes += Read-Code '755224'
 } else {
     $codes += Read-Code '287082'
 }
 if ($Phase -ne 'before') {
-    Invoke-Button $window "Generate the next code for $($fixture.issuer)"
+    Invoke-Button $window "Generate the next code for $($fixture.issuer)" 'advance-hotp'
     $codes += Read-Code $(if ($Phase -eq 'seed') { '287082' } else { '359152' })
 }
 [System.Windows.Forms.Clipboard]::Clear()

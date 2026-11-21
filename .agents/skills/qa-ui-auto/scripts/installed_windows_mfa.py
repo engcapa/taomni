@@ -11,6 +11,14 @@ from modular_bundle_inventory import write_json
 from qa_ui_auto.fixtures.module_legacy_mfa import ISSUER, PASSWORD, SECRET
 
 
+UIA_STAGES = {
+    "initialization", "owned-window", "vault-unlock-field", "unlock-vault",
+    "open-tools", "open-mfa", "vault-setup-fields", "create-vault",
+    "open-add-account", "otpauth-field", "save-account", "copy-hotp",
+    "read-hotp", "advance-hotp",
+}
+
+
 @contextmanager
 def installed_windows_desktop(executable, work, evidence, label):
     webview = work / f"{label}-webview"
@@ -59,6 +67,10 @@ def verify_mfa_controls(owner, phase, evidence):
                 if (isinstance(exception, str) and re.fullmatch(r"[.\w+]{1,120}", exception)
                         and type(code) is int and type(line) is int and 0 <= line <= 1000):
                     failure = f"{exception}, HRESULT 0x{code & 0xffffffff:08X}, script line {line}"
+                    stage = diagnostic.get("stage")
+                    if isinstance(stage, str) and stage in UIA_STAGES:
+                        result["stage"] = stage
+                        failure += f", stage {stage}"
             result["error"] = failure
             raise RuntimeError(f"Installed Windows MFA UI Automation {phase} failed ({failure})")
         payload = json.loads(observed.stdout)

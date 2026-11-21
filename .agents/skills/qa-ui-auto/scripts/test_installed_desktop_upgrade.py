@@ -236,8 +236,8 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
     def test_windows_mfa_failure_keeps_script_location_without_raw_output(self):
         owner = Mock(pid=21)
         cases = [
-            ('{"exception":"System.InvalidOperationException","hresult":-2146233079,"line":52}',
-             "System.InvalidOperationException, HRESULT 0x80131509, script line 52"),
+            ('{"exception":"System.InvalidOperationException","hresult":-2146233079,"line":52,"stage":"open-mfa"}',
+             "System.InvalidOperationException, HRESULT 0x80131509, script line 52, stage open-mfa"),
             ('Sensitive WebView or fixture output', "PowerShell exit 1"),
         ]
         for stderr, expected in cases:
