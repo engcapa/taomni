@@ -13,6 +13,13 @@ trap {
         line = $_.InvocationInfo.ScriptLineNumber
         stage = $script:diagnosticStage
     }
+    if ($null -ne $window) {
+        try {
+            $diagnostic | Add-Member -NotePropertyName controls -NotePropertyValue (Observe-Controls)
+        } catch {
+            # The HWND can disappear while handling an application exit.
+        }
+    }
     [Console]::Error.WriteLine(($diagnostic | ConvertTo-Json -Compress))
     exit 1
 }
@@ -93,10 +100,10 @@ function Click-Element($Element) {
         [int]($rect.X + $rect.Width / 2), [int]($rect.Y + $rect.Height / 2))
 }
 
-function Invoke-Button($Root, [string]$Name, [string]$Stage) {
+function Invoke-Button($Root, [string]$Name, [string]$Stage, [switch]$Physical) {
     $button = Wait-Element { Find-Control $Root $types::Button $Name } $Stage
     [object]$pattern = $null
-    if ($button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
+    if (-not $Physical -and $button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
         $pattern.Invoke()
         return
     }
@@ -119,13 +126,25 @@ function Set-Value($Element, [string]$Value) {
     }
 }
 
-function Find-Passwords([int]$Count) {
+function Get-VisiblePasswords {
     $condition = [System.Windows.Automation.AndCondition]::new([System.Windows.Automation.Condition[]]@(
         [System.Windows.Automation.PropertyCondition]::new($automation::IsPasswordProperty, $true),
         [System.Windows.Automation.PropertyCondition]::new($automation::IsOffscreenProperty, $false)
     ))
-    $fields = @($window.FindAll($scope, $condition) | Sort-Object { $_.Current.BoundingRectangle.Y })
+    return $window.FindAll($scope, $condition) | Sort-Object { $_.Current.BoundingRectangle.Y }
+}
+
+function Find-Passwords([int]$Count) {
+    $fields = @(Get-VisiblePasswords)
     if ($fields.Length -eq $Count) { return ,$fields }
+}
+
+function Observe-Controls {
+    return [pscustomobject]@{
+        visiblePasswordFields = @(Get-VisiblePasswords).Count
+        mfaActionVisible = ($null -ne (Find-Control $window $types::Button 'MFA authenticator'))
+        addAccountVisible = ($null -ne (Find-Control $window $types::Button 'Add MFA account'))
+    }
 }
 
 function Read-Code([string]$Expected) {
@@ -152,9 +171,9 @@ if ($Phase -ne 'seed') {
     Invoke-Button $window 'Unlock' 'unlock-vault'
 }
 if (-not (Find-Control $window $types::Button 'MFA authenticator')) {
-    Invoke-Button $window 'Tools' 'open-tools'
+    Invoke-Button $window 'Tools' 'open-tools' -Physical
 }
-Invoke-Button $window 'MFA authenticator' 'open-mfa'
+Invoke-Button $window 'MFA authenticator' 'open-mfa' -Physical
 
 $codes = @()
 if ($Phase -eq 'seed') {

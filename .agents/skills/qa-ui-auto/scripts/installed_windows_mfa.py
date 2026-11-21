@@ -71,6 +71,18 @@ def verify_mfa_controls(owner, phase, evidence):
                     if isinstance(stage, str) and stage in UIA_STAGES:
                         result["stage"] = stage
                         failure += f", stage {stage}"
+                    controls = diagnostic.get("controls")
+                    if isinstance(controls, dict):
+                        count = controls.get("visiblePasswordFields")
+                        mfa = controls.get("mfaActionVisible")
+                        add = controls.get("addAccountVisible")
+                        if (type(count) is int and 0 <= count <= 100
+                                and isinstance(mfa, bool) and isinstance(add, bool)):
+                            result["controls"] = {
+                                "visiblePasswordFields": count,
+                                "mfaActionVisible": mfa,
+                                "addAccountVisible": add,
+                            }
             result["error"] = failure
             raise RuntimeError(f"Installed Windows MFA UI Automation {phase} failed ({failure})")
         payload = json.loads(observed.stdout)

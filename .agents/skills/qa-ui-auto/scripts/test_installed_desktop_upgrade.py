@@ -251,6 +251,19 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
                 self.assertFalse(receipt["passed"])
                 self.assertEqual(receipt["error"], expected)
 
+    def test_windows_mfa_failure_keeps_only_safe_control_observations(self):
+        controls = {"visiblePasswordFields": 0, "mfaActionVisible": True, "addAccountVisible": False}
+        diagnostic = {"exception": "System.InvalidOperationException", "hresult": -2146233079,
+                      "line": 80, "stage": "vault-setup-fields", "controls": {**controls, "unknown": "redact"}}
+        failed = subprocess.CompletedProcess([], 1, stdout="", stderr=json.dumps(diagnostic))
+        with TemporaryDirectory() as directory:
+            report = Path(directory)
+            with patch("installed_windows_mfa.subprocess.run", return_value=failed):
+                with self.assertRaisesRegex(RuntimeError, "stage vault-setup-fields"):
+                    verify_mfa_controls(Mock(pid=21), "seed", report)
+            receipt = json.loads((report / "windows-mfa-seed.json").read_text(encoding="utf-8"))
+            self.assertEqual(receipt["controls"], controls)
+
     def test_macos_uses_the_owned_bridge_and_matches_a_hardened_child_command(self):
         with TemporaryDirectory() as temporary:
             application = Path(temporary).resolve() / "Taomni"
