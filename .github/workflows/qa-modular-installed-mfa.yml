@@ -139,7 +139,7 @@ jobs:
           VERIFY_RDP_PERF: ${{ inputs.verify_rdp_perf }}
         run: |
           extra=()
-          python -m unittest test_installed_mfa_crash
+          python -m unittest test_installed_mfa_crash test_installed_mfa_mode_lease
           if [[ "$VERIFY_RDP_PERF" == true ]]; then
             python -m unittest test_installed_rdp_baseline
             extra+=(--rdp-probe src-tauri/target/release/rdp-probe)

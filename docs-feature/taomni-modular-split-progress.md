@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- Local servers 0.1.1 的源码 `66d0b58f9` 已进入三端 Browser、Native 与完整崩溃回归。验证覆盖签名模块的 HTTP、SSH/SFTP、备份与停用，以及旧服务器预检、SSH 凭据界面和终端 PTY。 [三端回归](https://github.com/engcapa/taomni/actions/runs/44957237883)
+- 候选 `0.6.0` Linux deb 完成签名 MFA 的升级、回退和重装。G11 的反向桌面竞争进程只收到测试数据路径，缺少 Xvfb 的显示和认证变量，退出码为 101。已修正测试环境并保留退出码、占用提示、监听端点和原进程存活的断言。 [原始升级回执](https://github.com/engcapa/taomni/actions/runs/44956421239)
 - Local servers 0.1.1 接管原 `server_configs` 中的八类本地服务配置。原 SSH 和 FTP 密码在首次保存时进入专用 Vault 凭据。原库和 SSH 主机身份保留供旧版回滚。正式基座移出 Local servers 引擎，隔离 QA 保留旧路径用于回归。TC-MODULES-066 覆盖真实 HTTP、SSH/SFTP、运行中备份和停用。
 - Local servers 0.1.0 接入签名宿主。启用后八类服务由该进程运行，首次安装可接管已有 SSH host key，核心保留原控制面。TC-MODULES-066 通过真实 HTTP 和写租约观察停用。服务设置仍由原核心表提供，模块设置迁移和全部协议验收待完成。
 - SSH/SFTP 和 Telnet 也迁入 `taomni-local-servers-engine`。终端和本地服务器复用 `taomni-pty` 的平台 shell、PTY 和集成脚本，工作区 SDK 环境仍由核心传入。TC-SERVERS-004 检查真实鉴权、SFTP 文件、PTY 命令和监听端口回收。签名 Servers 宿主仍待接线。

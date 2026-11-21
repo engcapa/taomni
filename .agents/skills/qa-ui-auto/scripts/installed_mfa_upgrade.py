@@ -73,7 +73,7 @@ def verify_desktop_profile_lease(ctx, candidate, work, profile, evidence, observ
     def verify_gui_contender(owner):
         contender = observe_same_profile_contender(
             [str(candidate)], lambda: owner.poll() is None,
-            evidence, "headless-owns-mode-lease-desktop", desktop_env=environment,
+            evidence, "headless-owns-mode-lease-desktop", desktop_env=os.environ.copy(),
         )
         observation["desktopContender"] = contender
         if contender != MODE_LEASE_DENIAL:
