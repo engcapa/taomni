@@ -97,6 +97,7 @@ steps:
 - rdp_canvas_click: {x: 280, y: 240}
 - assert_json_file: {path: target-state.json, timeout_sec: 20, expect: {flips: {min: 2}}}
 - assert_no_runtime_errors: null
+- click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - click: '[data-testid="session-proto-rdp"]'
@@ -144,17 +145,17 @@ verification:
     results: [60, 61, 62, 69, 73, 75, 76]
   - id: R3
     requirement: The signed viewer reports an invalid gateway using its normal connection workflow.
-    actions: [78, 79, 81, 82, 83, 84, 87, 88, 90, 91]
+    actions: [77, 78, 79, 80, 82, 83, 84, 85, 88, 89, 91, 92]
     checkpoints:
-    - {step: 92, expectation: The signed renderer shows the missing gateway username error.}
-    - {step: 93, expectation: The gateway validation produces no uncaught renderer errors.}
-    results: [92, 93]
+    - {step: 93, expectation: The signed renderer shows the missing gateway username error.}
+    - {step: 94, expectation: The gateway validation produces no uncaught renderer errors.}
+    results: [93, 94]
   - id: R4
     requirement: A signed installation imports old certificate decisions and records newly accepted certificates in the module store.
     actions: [6, 8, 46]
     checkpoints:
-    - {step: 94, expectation: "The native profile preserves the legacy rows and contains the import receipt and the new module-owned pin."}
-    results: [94]
+    - {step: 95, expectation: "The native profile preserves the legacy rows and contains the import receipt and the new module-owned pin."}
+    results: [95]
   visual:
   - check: The signed viewer and the disabled state appear in the saved tab.
     method: automated

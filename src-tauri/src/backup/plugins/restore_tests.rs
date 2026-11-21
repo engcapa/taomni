@@ -209,6 +209,86 @@ fn restored_modular_mfa_owns_the_store_without_a_migration_journal() {
 }
 
 #[test]
+fn legacy_rdp_pins_restore_into_an_owned_module_and_modern_core_only_backups_leave_pins_in_place() {
+    use crate::backup::archive_writer::pack_staged_archive;
+    use taomni_profile_locks::{PluginDataLease, PluginSlug, ProfileRoot};
+    use taomni_rdp_client_api::{PINS_DATABASE, PINS_SCHEMA};
+
+    let source = tempfile::tempdir().unwrap();
+    let legacy = source.path().join("taomni.db");
+    let old = rusqlite::Connection::open(&legacy).unwrap();
+    old.execute_batch(PINS_SCHEMA).unwrap();
+    old.execute(
+        "INSERT INTO rdp_certificate_pins VALUES ('legacy.example:3389', ?1, 8)",
+        ["ab".repeat(32)],
+    )
+    .unwrap();
+    drop(old);
+    let files = [StagedFile {
+        archive_path: "databases/taomni.db".into(),
+        disk_path: legacy.clone(),
+    }];
+    let archive = source.path().join("legacy.taobak");
+    pack_staged_archive(&files, "0.5.10", "core", None, &archive).unwrap();
+
+    let target = tempfile::tempdir().unwrap();
+    let profile = target.path().canonicalize().unwrap();
+    let pins = profile.join(PINS_DATABASE);
+    fs::create_dir_all(pins.parent().unwrap()).unwrap();
+    let module = rusqlite::Connection::open(&pins).unwrap();
+    module.execute_batch(PINS_SCHEMA).unwrap();
+    module
+        .execute(
+            "INSERT INTO rdp_certificate_pins VALUES ('later.example:3389', ?1, 19)",
+            ["bb".repeat(32)],
+        )
+        .unwrap();
+    drop(module);
+    restore::stage_restore_to_dir(&profile, &archive, None).unwrap();
+    let root = ProfileRoot::prepare(&profile).unwrap();
+    let slug = PluginSlug::parse(taomni_rdp_client_api::SLUG).unwrap();
+    let lease = PluginDataLease::try_acquire(&root, &slug).unwrap();
+    let previous = fs::read(&pins).unwrap();
+    let busy = restore::apply_pending_restore(&profile).unwrap_err();
+    assert!(busy.contains("Plugin rdp-client is in use during restore"));
+    assert!(profile.join(RESTORE_INTENT_FILE).is_file());
+    assert_eq!(fs::read(&pins).unwrap(), previous);
+    drop(lease);
+    restore::apply_pending_restore(&profile).unwrap();
+    let configured = |path: &std::path::Path| {
+        rusqlite::Connection::open(path)
+            .unwrap()
+            .query_row(
+                "SELECT endpoint, fingerprint FROM rdp_certificate_pins ORDER BY endpoint",
+                [],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .unwrap()
+    };
+    assert_eq!(
+        configured(&pins),
+        ("legacy.example:3389".into(), "ab".repeat(32))
+    );
+    assert_eq!(configured(&profile.join("taomni.db")), configured(&pins));
+    assert!(!profile.join("plugins/rdp-client/active.json").is_file());
+    assert!(
+        crate::plugin::retained_data::load(&profile.join("plugins"), "rdp-client")
+            .unwrap()
+            .is_some()
+    );
+
+    let modern_core = rusqlite::Connection::open(&legacy).unwrap();
+    crate::plugin::migration_rdp_pins::omit_rollback_pins(&modern_core).unwrap();
+    drop(modern_core);
+    let core_only = source.path().join("core-only.taobak");
+    pack_staged_archive(&files, "0.5.11", "core", None, &core_only).unwrap();
+    let before = fs::read(&pins).unwrap();
+    restore::stage_restore_to_dir(&profile, &core_only, None).unwrap();
+    restore::apply_pending_restore(&profile).unwrap();
+    assert_eq!(fs::read(&pins).unwrap(), before);
+}
+
+#[test]
 fn dishonest_or_corrupt_sqlite_payloads_never_stage_or_change_target_data() {
     for (actual_sqlite, kind, corrupt_pages) in [
         (true, PluginDataFileKind::File, false),

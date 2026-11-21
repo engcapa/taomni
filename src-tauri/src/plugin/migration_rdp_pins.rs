@@ -19,6 +19,55 @@ const LEGACY_DATABASE: &str = "taomni.db";
 const TABLE: &str = "rdp_certificate_pins";
 const RECEIPT_TABLE: &str = "legacy_rdp_pin_source";
 
+pub(crate) fn owns_profile_pins(profile: &Path) -> Result<bool, String> {
+    let plugins = profile.join("plugins");
+    let installer = super::install::ModuleInstaller::new(&plugins);
+    let pointer = installer
+        .active_pointer(SLUG)
+        .map_err(|error| error.to_string())?;
+    if let Some(version) = pointer.active_version {
+        let path = installer
+            .version_dir(SLUG, &version)
+            .map_err(|error| error.to_string())?;
+        if let Ok(manifest) = super::verify::verify_installed(&path, super::current_platform())
+            && manifest.slug == SLUG
+        {
+            return Ok(manifest.commands.contains(TRUST_CERTIFICATE));
+        }
+    }
+    if paths::file_exists(&profile.join(PINS_DATABASE))? {
+        return Ok(true);
+    }
+    let journal = MigrationJournal::load(&profile.join("migration/journal.json"))?;
+    journal.committed_rdp_pins()
+}
+
+pub(crate) fn omit_rollback_pins(snapshot: &Connection) -> Result<(), String> {
+    snapshot
+        .execute_batch("DROP TABLE IF EXISTS rdp_certificate_pins;")
+        .map_err(|error| error.to_string())
+}
+
+/// Project a verified legacy core backup into the RDP data schema.
+/// The caller applies this file in the existing atomic restore transaction.
+pub(crate) fn export_for_restore(legacy: &Path, staging: &Path) -> Result<Option<PathBuf>, String> {
+    let (pins, fingerprint) = source::read_snapshot_checked(
+        legacy,
+        |connection| {
+            table_exists(connection, TABLE)?
+                .then(|| read_legacy_pins(connection))
+                .transpose()
+        },
+        &|| Ok(()),
+    )?;
+    let Some(pins) = pins else {
+        return Ok(None);
+    };
+    let output = staging.join("data.db");
+    publish_pins(staging, &output, &pins, &fingerprint)?;
+    Ok(Some(output))
+}
+
 pub(super) fn prepare(plugins: &Path, manifest: &ModuleManifest) -> Result<(), String> {
     if manifest.slug != SLUG || !manifest.commands.contains(TRUST_CERTIFICATE) {
         return Ok(());

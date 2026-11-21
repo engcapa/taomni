@@ -128,7 +128,10 @@ pub fn apply_pending_restore(app_data: &Path) -> Result<(), String> {
     if intent.manifest.app_name != "Taomni" {
         return Err("Unsupported restore intent".into());
     }
-    let (_plugin_leases, old_plugin_files) = plugins::restore_targets(app_data, &intent.manifest)?;
+    let rdp_pins = super::rdp_pins::stage(app_data, &pending, &intent.manifest)?;
+    let has_rdp_projection = rdp_pins.is_some();
+    let (_plugin_leases, old_plugin_files) =
+        plugins::restore_targets(app_data, &intent.manifest, has_rdp_projection)?;
     plugins::check_restore_dependencies(app_data, &intent.manifest)?;
     let _mail_locks = lock_mail_restore(
         app_data,
@@ -150,6 +153,11 @@ pub fn apply_pending_restore(app_data: &Path) -> Result<(), String> {
         plugin_owners: plugins::restore::restore_owners(app_data, &intent.manifest)?,
         profile_generation: None,
     };
+    if has_rdp_projection {
+        journal
+            .plugin_owners
+            .push(taomni_rdp_client_api::SLUG.into());
+    }
     let mut mappings = vec![];
     let mut journal_paths = std::collections::BTreeSet::new();
     for entry in &intent.manifest.files {
@@ -176,8 +184,15 @@ pub fn apply_pending_restore(app_data: &Path) -> Result<(), String> {
         journal_paths.extend(paths);
         mappings.push((src, dst, sqlite));
     }
+    if let Some(pins) = &rdp_pins {
+        let dst = app_data.join(taomni_rdp_client_api::PINS_DATABASE);
+        journal_paths.insert(dst.clone());
+        mappings.push((pins.database.clone(), dst, true));
+    }
     journal_paths.extend(old_plugin_files.iter().cloned());
-    for (src, dst) in plugins::restore::stage_locators(app_data, &pending, &intent.manifest)? {
+    for (src, dst) in
+        plugins::restore::stage_locators(app_data, &pending, &intent.manifest, has_rdp_projection)?
+    {
         journal_paths.insert(dst.clone());
         mappings.push((src, dst, false));
     }

@@ -21,6 +21,7 @@ PIN_ROWS = [("qa-upgrade.invalid:3389", "ab" * 32, 1)]
 MAIL_CASES = {"TC-MODULES-049", "TC-MODULES-050"}
 LEGACY_WAL_CASE = "TC-MODULES-051"
 RDP_PIN_CASE = "TC-MODULES-056"
+RDP_RESTORE_CASE = "TC-MODULES-058"
 
 
 def input_sessions(vnc):
@@ -68,10 +69,10 @@ def preview_client_snapshot():
 
 
 def setup(ctx):
-    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031", "TC-MODULES-032", "TC-MODULES-036", "TC-MODULES-037", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID, LEGACY_WAL_CASE, RDP_PIN_CASE, *MAIL_CASES}:
+    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031", "TC-MODULES-032", "TC-MODULES-036", "TC-MODULES-037", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID, LEGACY_WAL_CASE, RDP_PIN_CASE, RDP_RESTORE_CASE, *MAIL_CASES}:
         raise RuntimeError("module_upgrade requires a registered fixed-input case")
     server_profile = ctx.case_id in {"TC-MODULES-028", "TC-MODULES-029"}
-    client_profile = ctx.case_id in {"TC-MODULES-030", "TC-MODULES-031", RDP_PIN_CASE}
+    client_profile = ctx.case_id in {"TC-MODULES-030", "TC-MODULES-031", RDP_PIN_CASE, RDP_RESTORE_CASE}
     mfa_profile = ctx.case_id in {"TC-MODULES-036", "TC-MODULES-037"}
     mail_profile = ctx.case_id in MAIL_CASES
     vnc = ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID} and not (server_profile or mail_profile)
@@ -120,6 +121,15 @@ def setup(ctx):
             db.execute("CREATE TABLE rdp_certificate_pins (endpoint TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, updated_at INTEGER NOT NULL)")
             db.executemany("INSERT INTO rdp_certificate_pins VALUES (?, ?, ?)", PIN_ROWS)
         ctx.module_upgrade.update(expected_items=CLIENT_ITEMS, certificate_pins=PIN_ROWS)
+    if ctx.case_id == RDP_RESTORE_CASE:
+        previous = data / "plugins/rdp-client/data/data.db"
+        previous.parent.mkdir(parents=True)
+        with closing(sqlite3.connect(previous)) as db, db:
+            db.execute("CREATE TABLE rdp_certificate_pins (endpoint TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, updated_at INTEGER NOT NULL)")
+            db.execute("INSERT INTO rdp_certificate_pins VALUES ('later.invalid:3389', ?, 2)", ["cd" * 32])
+        rdp_session = next(row for row in rows if row["session_type"] == "RDP")
+        ctx.module_upgrade["restored_rdp_session"] = rdp_session
+        module_legacy_restore.stage(ctx, data, rdp_session)
     if server_profile:
         with closing(sqlite3.connect(data / "taomni.db")) as db, db:
             db.execute("CREATE TABLE server_configs (server_type TEXT PRIMARY KEY, config_json TEXT NOT NULL, updated_at INTEGER NOT NULL)")

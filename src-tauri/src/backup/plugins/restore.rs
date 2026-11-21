@@ -140,6 +140,7 @@ pub(crate) fn destination(
 pub(crate) fn restore_targets(
     profile: &Path,
     manifest: &BackupManifest,
+    legacy_rdp_pins: bool,
 ) -> Result<(Vec<PluginDataLease>, Vec<PathBuf>), String> {
     let mut owners = manifest
         .plugin_datasets
@@ -148,6 +149,9 @@ pub(crate) fn restore_targets(
         .collect::<Vec<_>>();
     if legacy_mfa_alias(profile, manifest)? {
         owners.push(("mfa", 1));
+    }
+    if legacy_rdp_pins {
+        owners.push((taomni_rdp_client_api::SLUG, 1));
     }
     if owners.is_empty() {
         return Ok((Vec::new(), Vec::new()));
@@ -204,6 +208,7 @@ pub(crate) fn stage_locators(
     profile: &Path,
     staging: &Path,
     manifest: &BackupManifest,
+    legacy_rdp_pins: bool,
 ) -> Result<Vec<(PathBuf, PathBuf)>, String> {
     let mut locators = manifest
         .plugin_datasets
@@ -236,6 +241,17 @@ pub(crate) fn stage_locators(
             data_schema_version: 1,
             files: vec![retained_data::RetainedDataFile {
                 path: "mfa.db".into(),
+                kind: retained_data::DataFileKind::Sqlite,
+            }],
+        });
+    }
+    if legacy_rdp_pins {
+        locators.push(retained_data::RetainedDataLocator {
+            format_version: 1,
+            slug: taomni_rdp_client_api::SLUG.into(),
+            data_schema_version: 1,
+            files: vec![retained_data::RetainedDataFile {
+                path: "data.db".into(),
                 kind: retained_data::DataFileKind::Sqlite,
             }],
         });

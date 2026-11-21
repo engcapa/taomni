@@ -2,6 +2,7 @@
 mod archive;
 mod journal;
 mod paths;
+mod rdp_pins;
 
 use super::manifest::BackupManifest;
 use archive::{verified_archive, verified_archive_with_context};

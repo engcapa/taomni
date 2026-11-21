@@ -252,7 +252,15 @@ fn create_backup_locked(
         let conn = context.lock(&state.core.db)?;
         super::snapshot_context::hot_backup_conn(&conn, &snap_dest, context)?;
         drop(conn);
-        portable_mail_paths(&rusqlite::Connection::open(&snap_dest).map_err(|e| e.to_string())?)?;
+        let snapshot = rusqlite::Connection::open(&snap_dest).map_err(|e| e.to_string())?;
+        portable_mail_paths(&snapshot)?;
+        let profile = state
+            .plugins
+            .data_profile()
+            .map_err(|error| error.to_string())?;
+        if crate::plugin::migration_rdp_pins::owns_profile_pins(profile.path())? {
+            crate::plugin::migration_rdp_pins::omit_rollback_pins(&snapshot)?;
+        }
         staged_files.push(StagedFile {
             archive_path: "databases/taomni.db".into(),
             disk_path: snap_dest,

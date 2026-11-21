@@ -8,12 +8,13 @@ import sqlite3
 
 from .fixtures.backup_policy import isolated_data_root
 from .fixtures import module_legacy_restore
-from .fixtures.module_upgrade import CHAT_FILES, LEGACY_WAL_CASE, RDP_PIN_CASE
+from .fixtures.module_upgrade import CHAT_FILES, LEGACY_WAL_CASE, RDP_PIN_CASE, RDP_RESTORE_CASE
 from .steps import StepError
 
 AFTER_FIRST_INSTALL = "after-first-install"
 VNC_RETAINED = "vnc-retained"
 RDP_PINS_RETAINED = "rdp-pins-retained"
+RDP_LEGACY_RESTORED = "rdp-legacy-restore-applied"
 RDP_PINS_DATABASE = "plugins/rdp-client/data/data.db"
 
 
@@ -162,14 +163,34 @@ def observe_rdp_pins(data, state, journal):
             "pinDatabase": RDP_PINS_DATABASE, "sourceFingerprint": fingerprint}
 
 
+def observe_rdp_legacy_restore(data, state):
+    result = module_legacy_restore.observe(data, state["restored_rdp_session"])
+    database = data / RDP_PINS_DATABASE
+    with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as connection:
+        pins = connection.execute(
+            "SELECT endpoint, fingerprint, updated_at FROM rdp_certificate_pins ORDER BY endpoint"
+        ).fetchall()
+    if pins != state["certificate_pins"]:
+        raise StepError("Restored RDP module pins differ from the legacy backup")
+    owner = data / "plugins/rdp-client"
+    if (owner / "active.json").exists() or (owner / "versions").exists():
+        raise StepError("Restoring certificates unexpectedly installed or activated code")
+    locator = json.loads((data / "plugins/.retained-data/rdp-client.json").read_text(encoding="utf-8"))
+    if locator != {"formatVersion": 1, "slug": "rdp-client", "dataSchemaVersion": 1,
+                   "files": [{"path": "data.db", "kind": "sqlite"}]}:
+        raise StepError("Restore did not register the retained RDP database")
+    return {**result, "restoredPinCount": len(pins), "pinDatabase": RDP_PINS_DATABASE}
+
+
 def run(ctx, args):
-    phases = {"preflight", "pending", "repeat", AFTER_FIRST_INSTALL, VNC_RETAINED, RDP_PINS_RETAINED, module_legacy_restore.PHASE}
+    phases = {"preflight", "pending", "repeat", AFTER_FIRST_INSTALL, VNC_RETAINED,
+              RDP_PINS_RETAINED, RDP_LEGACY_RESTORED, module_legacy_restore.PHASE}
     if not isinstance(args, dict) or set(args) != {"phase"} or args["phase"] not in phases:
         raise StepError("module_upgrade_probe requires a fixed registered phase")
     owner = getattr(ctx, "fixture_context", None) or ctx
     state = getattr(owner, "module_upgrade", None)
     case_id = getattr(owner, "case_id", None)
-    if not state or case_id not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032", "TC-MODULES-049", module_legacy_restore.CASE_ID, LEGACY_WAL_CASE, RDP_PIN_CASE}:
+    if not state or case_id not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032", "TC-MODULES-049", module_legacy_restore.CASE_ID, LEGACY_WAL_CASE, RDP_PIN_CASE, RDP_RESTORE_CASE}:
         raise StepError("module_upgrade_probe requires its registered native legacy input fixture")
     if args["phase"] in {AFTER_FIRST_INSTALL, VNC_RETAINED} and case_id != "TC-MODULES-027":
         raise StepError("After-first-install verification requires the installed legacy roster case")
@@ -177,6 +198,8 @@ def run(ctx, args):
         raise StepError("The staged-restore observation belongs to its own legacy profile case")
     if (args["phase"] == RDP_PINS_RETAINED) != (case_id == RDP_PIN_CASE):
         raise StepError("RDP certificate migration requires its signed native lifecycle case")
+    if (args["phase"] == RDP_LEGACY_RESTORED) != (case_id == RDP_RESTORE_CASE):
+        raise StepError("RDP certificate restore requires its native legacy backup fixture")
     data = isolated_data_root(owner)
     if data != state["root"]:
         raise StepError("Upgrade observation requires its own isolated profile")
@@ -184,6 +207,8 @@ def run(ctx, args):
     try:
         if args["phase"] == module_legacy_restore.PHASE:
             record.update(module_legacy_restore.observe(data, state["sessions"][0]))
+        elif args["phase"] == RDP_LEGACY_RESTORED:
+            record.update(observe_rdp_legacy_restore(data, state))
         else:
             record.update(observe(data, state, args["phase"]))
         if args["phase"] == RDP_PINS_RETAINED:
