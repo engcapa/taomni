@@ -192,7 +192,7 @@ async fn signed_offline_ocr(app: &AppHandle, path: &str) -> Result<String, Strin
     let tsv = result["tsv"]
         .as_str()
         .ok_or("Missing offline OCR word geometry")?;
-    let sensitive = super::super::screenshot_redact_tsv(tsv.to_owned(), state).await?;
+    let sensitive = super::super::ocr::screenshot_redact_tsv(tsv.to_owned(), state).await?;
     let email_box = sensitive
         .boxes
         .iter()
