@@ -1,8 +1,8 @@
-use crate::rdp::RdpOptions;
-use crate::rdp::input::KeyEvent;
-use crate::rdp::input::PointerEvent;
-use crate::rdp::input::PointerWheelEvent;
-use crate::terminal::network::NetworkSettings;
+use crate::RdpOptions;
+use crate::input::KeyEvent;
+use crate::input::PointerEvent;
+use crate::input::PointerWheelEvent;
+use crate::transport::RdpConnector;
 use serde::Deserialize;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_util::sync::CancellationToken;
@@ -70,5 +70,5 @@ pub struct RdpSpawnConfig {
     pub username: Option<String>,
     pub password: Option<String>,
     pub options: RdpOptions,
-    pub network: Option<NetworkSettings>,
+    pub connect: RdpConnector,
 }

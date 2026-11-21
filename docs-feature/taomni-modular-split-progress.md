@@ -2,6 +2,9 @@
 
 ## 2026-11-21 当前进展
 
+- 合入 `main` 的 `44a9392d4`。深色 Markdown 选区和嵌套斜体修复沿用 main 的 TC-FILE-OPEN-045。分支的 Draw.io 旧资产用例改为 046，保留检查步骤。12 项 Markdown 单测、QA 审计及三端选集检查通过。 [合并提交](https://github.com/engcapa/taomni/commit/ce51d8820)
+- RDP 会话、图像解码、输入、剪贴板、驱动器和 WebSocket 中继已迁到 `taomni-rdp-client-engine`。桌面适配层提供首次连接和尺寸重连的路由，继续使用现有 Vault、证书确认、代理和 SSH 跳板。独立引擎 157 项单测通过，7 项外部目标测试保留为显式运行。TC-111 检查 Browser 重连后的画布，TC-RDPJ-01 增加原证书确认、NLA 和输入恢复。独立 RDP 宿主、签名前端和 GitHub 运行结果继续按 TASK-016 验收。
+- VNC 两轮 Browser 在 Linux、Windows、macOS 26 各通过 28/28。首轮 macOS Native 的 TC-MODULES-053 在签名安装、画面、输入和停用恢复后，因窗口操作菜单尚未展开停在分离步骤。用例现在先打开菜单再点击分离，保留后续独立窗口和回挂断言。首轮 Linux Native 在打包前遇到分离窗口单测缺少 `getLocale` mock，后续 `02362fff2` 已修复该 fixture。 [首轮分片](https://github.com/engcapa/taomni/actions/runs/44852430063) · [含旧会话接管和 Windows 辅助进程的复验](https://github.com/engcapa/taomni/actions/runs/44855178583)
 - RDP 客户端的 RD Gateway 和 TLS 校验迁入 `taomni-rdp-client-engine`。核心继续持有证书确认和指纹数据库。迁移保留配置序列化、错误文本、系统信任和显式 pin 校验。现有 TC-111、TC-RDPJ-01、TC-MODULES-030/031 继续覆盖入口、会话、真实端到端连接及升级保留，RD Gateway 的既有协议单测随新 crate 迁移。生产宿主和签名前端按 TASK-016 继续。
 - 再次拉取的 `origin/main` 为 `349dc9268`，当前分支已包含。`f04017cf0` 把 VNC 查看器、绘制和前端状态迁入模块，签名包携带独立 ESM。会话仍从 Sessions、Workspace 和分离窗口打开。TC-MODULES-053 核对实际签名路径、帧、禁用、恢复和分离回挂，TC-MODULES-054 核对开发预览。Linux、Windows、macOS 26 的六个 Browser 分片已在原生运行期间下载。 [VNC 三端复验](https://github.com/engcapa/taomni/actions/runs/44852430063)
 - `9b2973d84` 的 G9 子项在 GitHub 对照四个发布目标。默认核心 Cargo 树均保留 `taomni-vnc-api`，排除 VNC 引擎、Windows 按键协议和宿主。生产 Vite 清单无 VNC 查看器，Windows 配置也移除了辅助程序资源。原始清单在 `qa-ui-auto-report/github/44853523906/live-contracts/modular-core-build-inventory/`。实际新 MSI 和其他业务模块依赖闭包继续验证。 [G9 清单](https://github.com/engcapa/taomni/actions/runs/44853523906)

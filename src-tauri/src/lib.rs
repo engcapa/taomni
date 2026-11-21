@@ -227,7 +227,7 @@ pub fn run() {
                         eprintln!("QA RDP packet capture unavailable: {error}");
                     }
                     logger = logger
-                        .level_for("taomni_lib::rdp::session", log::LevelFilter::Debug)
+                        .level_for("taomni_rdp_client_engine::session", log::LevelFilter::Debug)
                         .level_for("ironrdp_session::fast_path", log::LevelFilter::Trace)
                         .level_for("ironrdp_session::rfx", log::LevelFilter::Trace)
                         .level_for("ironrdp_session::image", log::LevelFilter::Debug)

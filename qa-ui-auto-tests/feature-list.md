@@ -4225,6 +4225,7 @@ controls:
 - RDP options 表单已持久化 domain、color depth、NLA/performance、clipboard、audio、drive redirection、RD Gateway 配置
 - 浏览器预览模式只提供 desktop-only stub；真实协议连接和画面验证必须在 Tauri/native 或 Rust live test 环境下执行
 - OS 全屏连接栏（仿 mstsc）：固定、连接质量（服务端 Network Characteristics Result 的 RTT/带宽 → 4 格）、主机名、Ctrl+Alt+Del、最小化、还原、断开；未固定时 2.5 s 后收起，顶部 4 px 热区、Tab 聚焦或 Ctrl+Alt+Home 重新显示；窗口模式工具栏也有 Ctrl+Alt+Del。TC-RDPJ-01 用同一 QA 构建的客户端连接自家服务端联合验证
+- TC-111 检查 Browser 重连操作后仍保留单个 RDP 画布。原生 TC-RDPJ-01-client-server-loopback 检查断开后的重连使用原证书确认，再次完成 NLA，并把第二次画布点击转给宿主桌面。
 
 ### 9.8 WSL 会话类型（WSL session）✅
 

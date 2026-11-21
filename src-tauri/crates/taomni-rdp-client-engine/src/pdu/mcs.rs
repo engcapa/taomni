@@ -8,7 +8,7 @@
 //!   `Channel Join Request/Confirm`, `Send Data Request/Indication`.
 //!
 //! Higher-level PDUs (Connect-Initial, Confirm Active, capability sets)
-//! land in [`crate::rdp::session`] when the IronRDP integration replaces
+//! land in [`crate::session`] when the IronRDP integration replaces
 //! the placeholder driver.
 
 /// MCS PDU choice tags (top 6 bits of the first PER byte).

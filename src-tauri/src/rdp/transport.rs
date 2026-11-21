@@ -8,7 +8,7 @@
 //!   speaks both proxy protocols with auth, and
 //!   [`crate::terminal::ssh::build_ssh_transport`] for SSH jump hosts.
 //! - **RD Gateway (MS-TSGU)** — a hand-rolled RPC-over-HTTPS twin-channel
-//!   wrapper in [`super::gateway`] that exposes its tunnelled stream as
+//!   wrapper in [`taomni_rdp_client_engine::gateway`] that exposes its stream as
 //!   `AsyncRead + AsyncWrite`.
 //!
 //! Higher layers (X.224 negotiation, TLS upgrade, MCS, …) treat the
@@ -18,73 +18,34 @@ use std::fmt::Display;
 use std::future::Future;
 use std::net::SocketAddr;
 
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::sync::Arc;
 
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use taomni_rdp_client_engine::transport::{RdpConnector, RdpTransport};
+use taomni_rdp_client_engine::{GatewayOpt, gateway};
 use tokio::net::TcpStream;
 
-use crate::rdp::gateway::{self, GatewayOpt};
 use crate::terminal::network::{NetworkSettings, establish_transport};
-use crate::terminal::ssh::{SshTransport, build_ssh_transport};
+use crate::terminal::ssh::build_ssh_transport;
 
 const DIRECT_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 const ROUTED_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 const GATEWAY_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(45);
 
-pub struct RdpTransport {
-    pub stream: RdpStream,
-    pub local_addr: SocketAddr,
-}
-
-pub enum RdpStream {
-    Tcp(TcpStream),
-    Ssh(SshTransport),
-    Gateway(gateway::GatewayStream),
-}
-
-impl AsyncRead for RdpStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        match self.as_mut().get_mut() {
-            Self::Tcp(stream) => Pin::new(stream).poll_read(cx, buf),
-            Self::Ssh(stream) => Pin::new(stream).poll_read(cx, buf),
-            Self::Gateway(stream) => Pin::new(stream).poll_read(cx, buf),
-        }
-    }
-}
-
-impl AsyncWrite for RdpStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
-        match self.as_mut().get_mut() {
-            Self::Tcp(stream) => Pin::new(stream).poll_write(cx, buf),
-            Self::Ssh(stream) => Pin::new(stream).poll_write(cx, buf),
-            Self::Gateway(stream) => Pin::new(stream).poll_write(cx, buf),
-        }
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        match self.as_mut().get_mut() {
-            Self::Tcp(stream) => Pin::new(stream).poll_flush(cx),
-            Self::Ssh(stream) => Pin::new(stream).poll_flush(cx),
-            Self::Gateway(stream) => Pin::new(stream).poll_flush(cx),
-        }
-    }
-
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        match self.as_mut().get_mut() {
-            Self::Tcp(stream) => Pin::new(stream).poll_shutdown(cx),
-            Self::Ssh(stream) => Pin::new(stream).poll_shutdown(cx),
-            Self::Gateway(stream) => Pin::new(stream).poll_shutdown(cx),
-        }
-    }
+/// Resolve each stream using the same route on the first connect and after a resize.
+pub(super) fn connector(
+    host: String,
+    port: u16,
+    network: Option<NetworkSettings>,
+    gateway: Option<GatewayOpt>,
+) -> RdpConnector {
+    Arc::new(move || {
+        let host = host.clone();
+        let network = network.clone();
+        let gateway = gateway.clone();
+        Box::pin(
+            async move { open_transport(&host, port, network.as_ref(), gateway.as_ref()).await },
+        )
+    })
 }
 
 /// Open an RDP transport.
@@ -96,7 +57,7 @@ impl AsyncWrite for RdpStream {
 /// 2. Else, if `network` indicates a non-`none` route (`http` / `socks5` /
 ///    `ssh-tunnel`), route through the matching shared transport helper.
 /// 3. Else, direct TCP.
-pub async fn open_transport(
+async fn open_transport(
     host: &str,
     port: u16,
     network: Option<&NetworkSettings>,
@@ -109,10 +70,10 @@ pub async fn open_transport(
             gateway::open_tunnel(g, host, port),
         )
         .await?;
-        return Ok(RdpTransport {
-            stream: RdpStream::Gateway(stream),
-            local_addr: SocketAddr::from(([0, 0, 0, 0], 0)),
-        });
+        return Ok(RdpTransport::new(
+            stream,
+            SocketAddr::from(([0, 0, 0, 0], 0)),
+        ));
     }
     let proxy_kind = network.map(|n| n.proxy_kind.as_str()).unwrap_or("none");
     match proxy_kind {
@@ -126,10 +87,7 @@ pub async fn open_transport(
             let local_addr = s
                 .local_addr()
                 .map_err(|e| format!("rdp: get local address: {}", e))?;
-            Ok(RdpTransport {
-                stream: RdpStream::Tcp(s),
-                local_addr,
-            })
+            Ok(RdpTransport::new(s, local_addr))
         }
         "http" | "socks5" | "system" => {
             let s = with_timeout(
@@ -141,10 +99,7 @@ pub async fn open_transport(
             let local_addr = s
                 .local_addr()
                 .map_err(|e| format!("rdp: get local address: {}", e))?;
-            Ok(RdpTransport {
-                stream: RdpStream::Tcp(s),
-                local_addr,
-            })
+            Ok(RdpTransport::new(s, local_addr))
         }
         "ssh-tunnel" => {
             let s = with_timeout(
@@ -153,10 +108,7 @@ pub async fn open_transport(
                 build_ssh_transport(host, port, network),
             )
             .await?;
-            Ok(RdpTransport {
-                stream: RdpStream::Ssh(s),
-                local_addr: SocketAddr::from(([0, 0, 0, 0], 0)),
-            })
+            Ok(RdpTransport::new(s, SocketAddr::from(([0, 0, 0, 0], 0))))
         }
         other => Err(format!(
             "Proxy type '{}' is not implemented for RDP (supported: none, http, socks5, ssh-tunnel, plus RD Gateway).",

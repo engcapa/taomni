@@ -104,14 +104,13 @@ pub(super) async fn drive_ironrdp_session(
     install_rustls_crypto_provider();
 
     let RdpSessionConfig {
-        stream,
-        local_addr,
+        transport,
         host,
         port,
         username,
         password,
         options,
-        network,
+        reconnect,
     } = cfg;
     let mut settings = RdpConnectionSettings {
         host,
@@ -119,26 +118,13 @@ pub(super) async fn drive_ironrdp_session(
         username,
         password,
         options,
-        network,
     };
-    let mut next_transport = Some(RdpSessionTransport { stream, local_addr });
+    let mut next_transport = Some(transport);
 
     loop {
         let transport = match next_transport.take() {
             Some(transport) => transport,
-            None => {
-                let transport = open_transport(
-                    &settings.host,
-                    settings.port,
-                    settings.network.as_ref(),
-                    settings.options.gateway.as_ref(),
-                )
-                .await?;
-                RdpSessionTransport {
-                    stream: transport.stream,
-                    local_addr: transport.local_addr,
-                }
-            }
+            None => reconnect().await?,
         };
 
         match drive_ironrdp_connection(&settings, transport, out_tx.clone(), &mut ctrl_rx).await? {
@@ -168,7 +154,7 @@ pub(super) async fn drive_ironrdp_session(
 
 pub(super) async fn drive_ironrdp_connection(
     cfg: &RdpConnectionSettings,
-    transport: RdpSessionTransport,
+    transport: RdpTransport,
     out_tx: SessionOutputSender,
     ctrl_rx: &mut UnboundedReceiver<RdpControl>,
 ) -> Result<SessionRunOutcome, String> {
@@ -189,7 +175,7 @@ pub(super) async fn drive_ironrdp_connection(
         connector.attach_static_channel(CliprdrClient::new(Box::new(clipboard.backend())));
     }
     let drive_channel =
-        crate::rdp::rdpdr::build_drive_channel(&cfg.options.redirect_drive, Some(out_tx.clone()))?;
+        crate::rdpdr::build_drive_channel(&cfg.options.redirect_drive, Some(out_tx.clone()))?;
     let display_control_out = out_tx.clone();
     connector.attach_static_channel(DrdynvcClient::new().with_dynamic_channel(
         DisplayControlClient::new(move |caps| {
@@ -228,7 +214,7 @@ pub(super) async fn drive_ironrdp_connection(
             "RDP drive redirection channel requested.",
         );
     }
-    let mut framed = ironrdp_tokio::TokioFramed::new(transport.stream);
+    let mut framed = ironrdp_tokio::TokioFramed::new(transport);
 
     send_status(&out_tx, "negotiating", "Negotiating RDP security protocol.");
     let should_upgrade = tokio::time::timeout(
@@ -248,7 +234,7 @@ pub(super) async fn drive_ironrdp_connection(
     let stream = framed.into_inner_no_leftover();
     let verified = tokio::time::timeout(
         RDP_TLS_TIMEOUT,
-        crate::rdp::tls::upgrade(
+        crate::tls::upgrade(
             stream,
             &cfg.host,
             cfg.port,
@@ -272,7 +258,7 @@ pub(super) async fn drive_ironrdp_connection(
         },
         &format!(
             "RDP certificate verified (SHA-256 {}).",
-            crate::rdp::tls::format_fingerprint(&verified.fingerprint)
+            crate::tls::format_fingerprint(&verified.fingerprint)
         ),
     );
     let server_public_key = verified.server_public_key;
@@ -314,7 +300,7 @@ pub(super) async fn drive_ironrdp_connection(
     let activation_factory = connection_result.activation_factory.clone();
     send_connected_event(&out_tx, width, height, protocol, &server_name);
     #[cfg(debug_assertions)]
-    let qa_capture_connection = super::super::qa_graphics_capture::begin(
+    let qa_capture_connection = crate::qa_graphics_capture::begin(
         width,
         height,
         connection_result.user_channel_id,
@@ -385,7 +371,7 @@ pub(super) async fn drive_ironrdp_connection(
             read = framed.read_pdu() => {
                 let (action, payload) = read.map_err(|e| format!("rdp read frame: {}", e))?;
                 #[cfg(debug_assertions)]
-                super::super::qa_graphics_capture::packet(qa_capture_connection, &format!("{action:?}"), &payload);
+                crate::qa_graphics_capture::packet(qa_capture_connection, &format!("{action:?}"), &payload);
                 if let Some(sequence) = reactivation.as_mut() {
                     if matches!(action, Action::X224) {
                         if process_reactivation_frame(
@@ -401,7 +387,7 @@ pub(super) async fn drive_ironrdp_connection(
                         .await?
                         {
                             #[cfg(debug_assertions)]
-                            super::super::qa_graphics_capture::resized(qa_capture_connection, image.width(), image.height());
+                            crate::qa_graphics_capture::resized(qa_capture_connection, image.width(), image.height());
                             reactivation = None;
                             if let Some(clipboard) = &clipboard {
                                 drain_clipboard_actions(&mut active_stage, clipboard, &mut framed, &out_tx).await?;

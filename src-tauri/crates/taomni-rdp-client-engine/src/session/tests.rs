@@ -2,8 +2,6 @@ use super::*;
 
 use std::time::Duration;
 
-use tokio::net::TcpStream;
-
 /// Live RDP fixtures commonly use a self-signed certificate. Keep the
 /// production default fail-closed, while letting an operator explicitly
 /// supply the known SHA-256 leaf pin for ignored live tests.

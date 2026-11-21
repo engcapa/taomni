@@ -1,5 +1,5 @@
-use crate::rdp::session::ClipboardBridge;
-use crate::rdp::session::LocalClipboardFile;
+use crate::session::ClipboardBridge;
+use crate::session::LocalClipboardFile;
 use ironrdp::cliprdr::pdu::FileContentsFlags;
 use ironrdp::cliprdr::pdu::FileContentsRequest;
 use ironrdp::cliprdr::pdu::FileContentsResponse;
@@ -11,21 +11,21 @@ use ironrdp::core::IntoOwned;
 use taomni_rdp_common::file_transfer::read_clipboard_file_range;
 
 impl ClipboardBridge {
-    pub(in crate::rdp::session) fn set_local_text(&self, text: String) {
+    pub(in crate::session) fn set_local_text(&self, text: String) {
         if let Ok(mut state) = self.state.lock() {
             state.local_text = Some(text);
             state.local_files.clear();
         }
     }
 
-    pub(in crate::rdp::session) fn set_local_files(&self, files: Vec<LocalClipboardFile>) {
+    pub(in crate::session) fn set_local_files(&self, files: Vec<LocalClipboardFile>) {
         if let Ok(mut state) = self.state.lock() {
             state.local_text = None;
             state.local_files = files;
         }
     }
 
-    pub(in crate::rdp::session) fn local_file_list_response(&self) -> OwnedFormatDataResponse {
+    pub(in crate::session) fn local_file_list_response(&self) -> OwnedFormatDataResponse {
         let files = match self.state.lock() {
             Ok(state) => state.local_files.clone(),
             Err(_) => Vec::new(),
@@ -52,7 +52,7 @@ impl ClipboardBridge {
             .unwrap_or_else(|_| FormatDataResponse::new_error().into_owned())
     }
 
-    pub(in crate::rdp::session) fn local_file_contents_response(
+    pub(in crate::session) fn local_file_contents_response(
         &self,
         request: &FileContentsRequest,
     ) -> FileContentsResponse<'static> {

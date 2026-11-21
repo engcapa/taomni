@@ -1,5 +1,5 @@
-use crate::rdp::session::StagingDirectory;
-use crate::rdp::session::display;
+use crate::session::StagingDirectory;
+use crate::session::display;
 use ironrdp::core::IntoOwned;
 use std::fs;
 use std::path::PathBuf;
@@ -20,7 +20,7 @@ impl Drop for StagingDirectory {
     }
 }
 
-pub(in crate::rdp::session) fn clipboard_staging_base() -> PathBuf {
+pub(in crate::session) fn clipboard_staging_base() -> PathBuf {
     #[cfg(unix)]
     let name = format!("taomni-rdp-cliprdr-{}", unsafe { libc::geteuid() });
     #[cfg(not(unix))]
@@ -28,11 +28,11 @@ pub(in crate::rdp::session) fn clipboard_staging_base() -> PathBuf {
     std::env::temp_dir().join(name)
 }
 
-pub(in crate::rdp::session) fn clipboard_process_staging_root() -> PathBuf {
+pub(in crate::session) fn clipboard_process_staging_root() -> PathBuf {
     clipboard_staging_base().join(format!("process-{}", std::process::id()))
 }
 
-pub(in crate::rdp::session) fn cleanup_stale_clipboard_staging() {
+pub(in crate::session) fn cleanup_stale_clipboard_staging() {
     static CLEANUP: Once = Once::new();
     CLEANUP.call_once(|| {
         let base = clipboard_staging_base();

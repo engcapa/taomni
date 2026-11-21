@@ -1,8 +1,8 @@
 use super::opening::local_computer_name;
 use super::opening::sanitize_drive_label;
-use crate::rdp::DriveRedirectOpt;
-use crate::rdp::session::SessionOutput;
-use crate::rdp::session::SessionOutputSender;
+use crate::DriveRedirectOpt;
+use crate::session::SessionOutput;
+use crate::session::SessionOutputSender;
 use ironrdp::core::AsAny;
 use ironrdp::pdu::PduResult;
 use ironrdp::rdpdr::Rdpdr as IronRdpdr;

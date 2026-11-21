@@ -2,7 +2,7 @@
 
 use rusqlite::{Connection, OptionalExtension, params};
 
-pub use taomni_rdp_client_engine::tls::{format_fingerprint, normalize_fingerprint, upgrade};
+pub(super) use taomni_rdp_client_engine::tls::normalize_fingerprint;
 
 const TRUST_TABLE: &str = "rdp_certificate_pins";
 

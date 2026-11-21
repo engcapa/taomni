@@ -1,9 +1,9 @@
-use crate::rdp::session::CLIPRDR_FILE_LIST_FORMAT_VALUE;
-use crate::rdp::session::ClipboardAction;
-use crate::rdp::session::ClipboardBridge;
-use crate::rdp::session::SessionOutputSender;
-use crate::rdp::session::clipboard;
-use crate::rdp::session::events::send_status;
+use crate::session::CLIPRDR_FILE_LIST_FORMAT_VALUE;
+use crate::session::ClipboardAction;
+use crate::session::ClipboardBridge;
+use crate::session::SessionOutputSender;
+use crate::session::clipboard;
+use crate::session::events::send_status;
 use ironrdp::cliprdr::CliprdrClient;
 use ironrdp::cliprdr::pdu::ClipboardFormat;
 use ironrdp::cliprdr::pdu::ClipboardFormatId;
@@ -18,7 +18,7 @@ use ironrdp_tokio::Framed;
 use ironrdp_tokio::FramedWrite;
 use std::io::Write;
 
-pub(in crate::rdp::session) async fn drain_clipboard_actions<S>(
+pub(in crate::session) async fn drain_clipboard_actions<S>(
     active_stage: &mut ActiveStage,
     clipboard: &ClipboardBridge,
     framed: &mut Framed<S>,
@@ -112,7 +112,7 @@ where
     Ok(())
 }
 
-pub(in crate::rdp::session) async fn advertise_clipboard_formats<S>(
+pub(in crate::session) async fn advertise_clipboard_formats<S>(
     active_stage: &mut ActiveStage,
     formats: Vec<ClipboardFormat>,
     framed: &mut Framed<S>,
@@ -144,7 +144,7 @@ where
     Ok(())
 }
 
-pub(in crate::rdp::session) async fn write_cliprdr_messages<S>(
+pub(in crate::session) async fn write_cliprdr_messages<S>(
     active_stage: &mut ActiveStage,
     messages: ironrdp::cliprdr::CliprdrSvcMessages<ironrdp::cliprdr::Client>,
     framed: &mut Framed<S>,
@@ -164,15 +164,15 @@ where
     Ok(())
 }
 
-pub(in crate::rdp::session) fn file_list_clipboard_format_id() -> ClipboardFormatId {
+pub(in crate::session) fn file_list_clipboard_format_id() -> ClipboardFormatId {
     ClipboardFormatId::new(CLIPRDR_FILE_LIST_FORMAT_VALUE)
 }
 
-pub(in crate::rdp::session) fn file_list_clipboard_format() -> ClipboardFormat {
+pub(in crate::session) fn file_list_clipboard_format() -> ClipboardFormat {
     ClipboardFormat::new(file_list_clipboard_format_id()).with_name(ClipboardFormatName::FILE_LIST)
 }
 
-pub(in crate::rdp::session) fn file_contents_request_message(
+pub(in crate::session) fn file_contents_request_message(
     request: FileContentsRequest,
 ) -> SvcMessage {
     SvcMessage::from(ClipboardPdu::FileContentsRequest(request))

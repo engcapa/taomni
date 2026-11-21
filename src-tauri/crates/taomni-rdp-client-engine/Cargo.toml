@@ -3,22 +3,38 @@ name = "taomni-rdp-client-engine"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.94"
-description = "RDP client transport and RD Gateway protocols"
+description = "RDP client transport, session, and authenticated WebSocket relay"
 license = "MIT"
 
 [dependencies]
 base64 = "0.22"
+futures = "0.3"
 hex = "0.4"
+image = { version = "0.25", default-features = false, features = ["png"] }
+# Match the bitmap capabilities advertised during negotiation.
+ironrdp = { version = "0.17.0", features = ["core", "connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol", "qoi", "qoiz"] }
+ironrdp-tokio = { version = "0.10.0", features = ["reqwest-rustls-ring"] }
 rand = "0.10"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 rustls-native-certs = "0.8"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 sha2 = "0.11"
+taomni-file-uri = { path = "../taomni-file-uri" }
+taomni-rdp-common = { path = "../taomni-rdp-common", features = ["bitmap"] }
 tokio = { version = "1", features = ["io-util", "macros", "net", "rt", "sync", "time"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
+tokio-tungstenite = "0.29"
+tokio-util = "0.7"
 tracing = "0.1"
+tungstenite = "0.29"
 uuid = { version = "1", features = ["v4"] }
 x509-cert = "0.2"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 rcgen = "0.14"
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread"] }

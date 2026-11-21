@@ -10,7 +10,7 @@
 //! These are the layers every RDP connection — direct TCP, HTTP/SOCKS5
 //! proxy, or RD Gateway — passes through before the TLS upgrade. Higher-
 //! level MCS / Channel-Join / Capability Exchange PDUs land in
-//! [`crate::rdp::session`] once the IronRDP integration is wired.
+//! [`crate::session`] once the IronRDP integration is wired.
 
 pub mod mcs;
 pub mod nego;

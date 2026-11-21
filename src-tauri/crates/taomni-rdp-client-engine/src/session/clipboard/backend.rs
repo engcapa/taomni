@@ -1,6 +1,6 @@
 use super::protocol::file_list_clipboard_format_id;
-use crate::rdp::session::ClipboardAction;
-use crate::rdp::session::TaomniCliprdrBackend;
+use crate::session::ClipboardAction;
+use crate::session::TaomniCliprdrBackend;
 use ironrdp::cliprdr::backend::CliprdrBackend;
 use ironrdp::cliprdr::pdu::ClipboardFormat;
 use ironrdp::cliprdr::pdu::ClipboardFormatId;

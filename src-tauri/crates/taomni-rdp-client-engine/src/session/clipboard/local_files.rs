@@ -1,15 +1,15 @@
-use crate::rdp::session::LocalClipboardFile;
-use crate::rdp::session::MAX_CLIPBOARD_FILE_BYTES;
-use crate::rdp::session::MAX_CLIPBOARD_FILE_ITEMS;
-use crate::rdp::session::MAX_CLIPBOARD_TOTAL_BYTES;
-use crate::rdp::session::display;
+use crate::session::LocalClipboardFile;
+use crate::session::MAX_CLIPBOARD_FILE_BYTES;
+use crate::session::MAX_CLIPBOARD_FILE_ITEMS;
+use crate::session::MAX_CLIPBOARD_TOTAL_BYTES;
+use crate::session::display;
 use ironrdp::cliprdr::pdu::ClipboardFileAttributes;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use taomni_rdp_common::file_transfer::clipboard_relative_name;
 
-pub(in crate::rdp::session) fn collect_local_clipboard_files(
+pub(in crate::session) fn collect_local_clipboard_files(
     paths: &[String],
 ) -> Result<Vec<LocalClipboardFile>, String> {
     let mut files = Vec::new();
@@ -34,7 +34,7 @@ pub(in crate::rdp::session) fn collect_local_clipboard_files(
     Ok(files)
 }
 
-pub(in crate::rdp::session) fn collect_clipboard_path(
+pub(in crate::session) fn collect_clipboard_path(
     root: &Path,
     path: &Path,
     out: &mut Vec<LocalClipboardFile>,

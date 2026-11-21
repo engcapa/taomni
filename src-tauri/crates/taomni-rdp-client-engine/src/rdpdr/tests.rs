@@ -13,8 +13,8 @@ use super::protocol::RDPDR_DTYP_FILESYSTEM;
 use super::protocol::RdpdrHeader;
 use super::protocol::build_client_name;
 use super::protocol::build_device_list_announce;
-use crate::rdp::DriveRedirectOpt;
-use crate::rdp::session::SessionOutput;
+use crate::DriveRedirectOpt;
+use crate::session::SessionOutput;
 use ironrdp::rdpdr::pdu::efs;
 use std::fs;
 use std::io::Write;
@@ -253,7 +253,7 @@ fn build_drive_channel_ignores_disabled_option() {
 #[tokio::test]
 async fn local_drive_backend_reports_server_acceptance() {
     let dir = tempfile::tempdir().unwrap();
-    let (mut handle, tx, _ctrl_rx) = crate::rdp::session::RdpSessionHandle::new();
+    let (mut handle, tx, _ctrl_rx) = crate::session::RdpSessionHandle::new();
     let mut backend = LocalDriveBackend::new_with_status(dir.path(), "shared", Some(tx)).unwrap();
 
     backend

@@ -1,4 +1,6 @@
 use super::*;
+use crate::transport::direct_connector;
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "requires TAOMNI_RDP_LIVE_HOST/USER/PASS and a reachable Windows RDP server"]
 async fn live_credssp_session_emits_first_frame() {
@@ -10,10 +12,8 @@ async fn live_credssp_session_emits_first_frame() {
     let username = std::env::var("TAOMNI_RDP_LIVE_USER").expect("TAOMNI_RDP_LIVE_USER is required");
     let password = std::env::var("TAOMNI_RDP_LIVE_PASS").expect("TAOMNI_RDP_LIVE_PASS is required");
 
-    let stream = TcpStream::connect((host.as_str(), port))
-        .await
-        .expect("connect live RDP TCP stream");
-    let local_addr = stream.local_addr().expect("read live RDP local address");
+    let reconnect = direct_connector(host.clone(), port);
+    let transport = reconnect().await.expect("connect live RDP TCP stream");
     let mut options = RdpOptions::default();
     options.screen_w = 1280;
     options.screen_h = 720;
@@ -27,14 +27,13 @@ async fn live_credssp_session_emits_first_frame() {
     }
 
     let mut handle = start_ironrdp_session(RdpSessionConfig {
-        stream: RdpStream::Tcp(stream),
-        local_addr,
+        transport,
         host,
         port,
         username: Some(username),
         password: Some(password),
         options,
-        network: None,
+        reconnect,
     });
 
     let mut connected = false;
@@ -115,10 +114,8 @@ async fn live_credssp_clipboard_text_channel_accepts_local_copy() {
     let username = std::env::var("TAOMNI_RDP_LIVE_USER").expect("TAOMNI_RDP_LIVE_USER is required");
     let password = std::env::var("TAOMNI_RDP_LIVE_PASS").expect("TAOMNI_RDP_LIVE_PASS is required");
 
-    let stream = TcpStream::connect((host.as_str(), port))
-        .await
-        .expect("connect live RDP TCP stream");
-    let local_addr = stream.local_addr().expect("read live RDP local address");
+    let reconnect = direct_connector(host.clone(), port);
+    let transport = reconnect().await.expect("connect live RDP TCP stream");
     let mut options = RdpOptions::default();
     options.screen_w = 1280;
     options.screen_h = 720;
@@ -127,14 +124,13 @@ async fn live_credssp_clipboard_text_channel_accepts_local_copy() {
     options.redirect_clipboard = true;
 
     let mut handle = start_ironrdp_session(RdpSessionConfig {
-        stream: RdpStream::Tcp(stream),
-        local_addr,
+        transport,
         host,
         port,
         username: Some(username),
         password: Some(password),
         options,
-        network: None,
+        reconnect,
     });
 
     let mut connected = false;
@@ -217,10 +213,8 @@ async fn live_credssp_drive_channel_is_accepted() {
     let password = std::env::var("TAOMNI_RDP_LIVE_PASS").expect("TAOMNI_RDP_LIVE_PASS is required");
     let drive_dir = tempfile::tempdir().expect("create live redirected drive directory");
 
-    let stream = TcpStream::connect((host.as_str(), port))
-        .await
-        .expect("connect live RDP TCP stream");
-    let local_addr = stream.local_addr().expect("read live RDP local address");
+    let reconnect = direct_connector(host.clone(), port);
+    let transport = reconnect().await.expect("connect live RDP TCP stream");
     let mut options = RdpOptions::default();
     options.screen_w = 1280;
     options.screen_h = 720;
@@ -233,14 +227,13 @@ async fn live_credssp_drive_channel_is_accepted() {
     options.redirect_drive.path = drive_dir.path().to_string_lossy().into_owned();
 
     let mut handle = start_ironrdp_session(RdpSessionConfig {
-        stream: RdpStream::Tcp(stream),
-        local_addr,
+        transport,
         host,
         port,
         username: Some(username),
         password: Some(password),
         options,
-        network: None,
+        reconnect,
     });
 
     let deadline = tokio::time::Instant::now() + Duration::from_secs(45);
@@ -301,10 +294,8 @@ async fn live_credssp_session_resizes_and_reactivates() {
     let username = std::env::var("TAOMNI_RDP_LIVE_USER").expect("TAOMNI_RDP_LIVE_USER is required");
     let password = std::env::var("TAOMNI_RDP_LIVE_PASS").expect("TAOMNI_RDP_LIVE_PASS is required");
 
-    let stream = TcpStream::connect((host.as_str(), port))
-        .await
-        .expect("connect live RDP TCP stream");
-    let local_addr = stream.local_addr().expect("read live RDP local address");
+    let reconnect = direct_connector(host.clone(), port);
+    let transport = reconnect().await.expect("connect live RDP TCP stream");
     let mut options = RdpOptions::default();
     options.screen_w = 1280;
     options.screen_h = 720;
@@ -312,14 +303,13 @@ async fn live_credssp_session_resizes_and_reactivates() {
     apply_live_certificate_pin(&mut options);
 
     let mut handle = start_ironrdp_session(RdpSessionConfig {
-        stream: RdpStream::Tcp(stream),
-        local_addr,
+        transport,
         host,
         port,
         username: Some(username),
         password: Some(password),
         options,
-        network: None,
+        reconnect,
     });
 
     let resize_width = 1024;
@@ -400,10 +390,8 @@ async fn live_credssp_connection_test_reaches_connected() {
     let username = std::env::var("TAOMNI_RDP_LIVE_USER").expect("TAOMNI_RDP_LIVE_USER is required");
     let password = std::env::var("TAOMNI_RDP_LIVE_PASS").expect("TAOMNI_RDP_LIVE_PASS is required");
 
-    let stream = TcpStream::connect((host.as_str(), port))
-        .await
-        .expect("connect live RDP TCP stream");
-    let local_addr = stream.local_addr().expect("read live RDP local address");
+    let reconnect = direct_connector(host.clone(), port);
+    let transport = reconnect().await.expect("connect live RDP TCP stream");
     let mut options = RdpOptions::default();
     options.screen_w = 1280;
     options.screen_h = 720;
@@ -412,14 +400,13 @@ async fn live_credssp_connection_test_reaches_connected() {
 
     let result = test_ironrdp_connection(
         RdpSessionConfig {
-            stream: RdpStream::Tcp(stream),
-            local_addr,
+            transport,
             host: host.clone(),
             port,
             username: Some(username),
             password: Some(password),
             options,
-            network: None,
+            reconnect,
         },
         Duration::from_secs(45),
     )

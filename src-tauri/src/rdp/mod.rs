@@ -1,195 +1,22 @@
-//! RDP (Remote Desktop Protocol) client and WebSocket relay.
-//!
-//! This module mirrors the VNC architecture (`crate::vnc`):
-//!
-//! - The Tauri command `rdp_connect` opens a transport (direct TCP, HTTP/SOCKS5
-//!   proxy via [`crate::terminal::network::establish_transport`], or RD
-//!   Gateway), performs the X.224 / RDP Negotiation handshake, and binds a
-//!   loopback WebSocket the frontend canvas connects to.
-//! - The relay (`ws.rs`) bridges WS frames from the canvas to RDP fast-path
-//!   input PDUs and back, multiplexing display, audio, clipboard, and drive
-//!   redirection over a single tagged binary frame format.
-//! - Virtual channels live in `cliprdr.rs`, `rdpsnd.rs`, and `rdpdr.rs`.
-//! - RD Gateway's MS-TSGU transport (RPC-over-HTTPS twin-channel) lives in
-//!   `gateway.rs`.
-//!
-//! The first cut focuses on *correct framing and codecs* — every PDU encoder /
-//! decoder in this module ships with round-trip unit tests. Wire-level
-//! integration with a real Windows host happens behind the same WS protocol,
-//! so the canvas does not need to know which transport carried the bytes.
+//! Tauri commands and core-owned credentials, certificate pins, and routing
+//! for the RDP client engine.
 
-pub mod cliprdr;
-pub mod frame;
-pub use taomni_rdp_client_engine::{GatewayOpt, gateway};
-pub mod input;
-pub mod pdu;
+pub(crate) mod tls;
+mod transport;
+
 #[cfg(debug_assertions)]
-pub(crate) mod qa_graphics_capture;
-pub mod rdpdr;
-pub mod rdpsnd;
-pub mod rfx;
-pub mod session;
-pub mod tls;
-pub mod transport;
-pub mod ws;
+pub(crate) use taomni_rdp_client_engine::qa_graphics_capture;
+pub use taomni_rdp_client_engine::{RdpOptions, ws};
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use taomni_rdp_client_engine::session::{RdpSessionConfig, test_ironrdp_connection};
 use tauri::State;
 use uuid::Uuid;
 
-use crate::rdp::session::{RdpSessionConfig, test_ironrdp_connection};
 use crate::rdp::ws::{RdpControl, RdpSpawnConfig, spawn_rdp_relay};
 use crate::state::AppState;
 use crate::terminal::network::NetworkSettings;
 use crate::vault::Vault;
-
-/// Configuration parsed out of `SessionConfig.options_json` for an RDP
-/// session. Mirrors the TS-side `RdpOptions` in `src/types/rdp.ts`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RdpOptions {
-    #[serde(default)]
-    pub domain: Option<String>,
-    #[serde(default = "default_color_depth")]
-    pub color_depth: u8,
-    #[serde(default = "default_screen_w")]
-    pub screen_w: u16,
-    #[serde(default = "default_screen_h")]
-    pub screen_h: u16,
-    #[serde(default = "default_nla")]
-    pub nla: bool,
-    /// Optional SHA-256 pin for a self-signed/private-CA RDP certificate.
-    /// System trust is always attempted first.
-    #[serde(default)]
-    pub certificate_fingerprint: Option<String>,
-    #[serde(default)]
-    pub performance: PerformanceFlags,
-    #[serde(default = "default_true")]
-    pub redirect_clipboard: bool,
-    #[serde(default = "default_audio_mode")]
-    pub redirect_audio: String, // "play" | "off"
-    #[serde(default)]
-    pub redirect_drive: DriveRedirectOpt,
-    #[serde(default)]
-    pub gateway: Option<GatewayOpt>,
-}
-
-fn default_color_depth() -> u8 {
-    32
-}
-fn default_screen_w() -> u16 {
-    1920
-}
-fn default_screen_h() -> u16 {
-    1080
-}
-fn default_nla() -> bool {
-    true
-}
-fn default_true() -> bool {
-    true
-}
-fn default_audio_mode() -> String {
-    "play".into()
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PerformanceFlags {
-    #[serde(default)]
-    pub wallpaper: bool,
-    #[serde(default)]
-    pub themes: bool,
-    #[serde(default = "default_true")]
-    pub font_smooth: bool,
-    #[serde(default = "default_true")]
-    pub disable_full_window_drag: bool,
-    #[serde(default = "default_true")]
-    pub disable_menu_animations: bool,
-    #[serde(default = "default_true")]
-    pub disable_cursor_shadow: bool,
-}
-
-impl Default for PerformanceFlags {
-    fn default() -> Self {
-        Self {
-            wallpaper: false,
-            themes: false,
-            font_smooth: true,
-            disable_full_window_drag: true,
-            disable_menu_animations: true,
-            disable_cursor_shadow: true,
-        }
-    }
-}
-
-impl PerformanceFlags {
-    /// Encode to the `performanceFlags` bitmask documented in MS-RDPBCGR
-    /// 2.2.1.11.1.1.1 (TS_EXTENDED_INFO_PACKET.performanceFlags).
-    pub fn to_bitmask(&self) -> u32 {
-        let mut m = 0u32;
-        if !self.wallpaper {
-            m |= 0x0000_0001;
-        } // PERF_DISABLE_WALLPAPER
-        if !self.font_smooth {
-            m |= 0x0000_0080;
-        } // PERF_DISABLE_FONT_SMOOTHING (sense inverted in spec)
-        if self.disable_full_window_drag {
-            m |= 0x0000_0002;
-        }
-        if self.disable_menu_animations {
-            m |= 0x0000_0004;
-        }
-        if !self.themes {
-            m |= 0x0000_0008;
-        } // PERF_DISABLE_THEMING
-        if self.disable_cursor_shadow {
-            m |= 0x0000_0020;
-        }
-        m
-    }
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DriveRedirectOpt {
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default)]
-    pub label: String,
-    #[serde(default)]
-    pub path: String,
-    /// Expose the mapped directory without allowing the remote host to mutate it.
-    #[serde(default = "default_true")]
-    pub read_only: bool,
-}
-
-impl Default for DriveRedirectOpt {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            label: String::new(),
-            path: String::new(),
-            read_only: true,
-        }
-    }
-}
-
-impl RdpOptions {
-    pub fn from_json(raw: Option<&str>) -> Self {
-        let s = match raw {
-            Some(s) if !s.trim().is_empty() => s,
-            _ => return Self::default(),
-        };
-        match serde_json::from_str::<Self>(s) {
-            Ok(v) => v,
-            Err(e) => {
-                tracing::warn!("invalid RDP options_json: {}", e);
-                Self::default()
-            }
-        }
-    }
-}
 
 #[derive(Debug, Serialize)]
 pub struct RdpConnectResult {
@@ -278,13 +105,14 @@ pub async fn rdp_connect(
         crate::terminal::resolve_jump_credentials(&state, n)?;
     }
 
+    let connect = transport::connector(host.clone(), port, network, options.gateway.clone());
     let session = spawn_rdp_relay(RdpSpawnConfig {
         host,
         port,
         username,
         password: resolved_password,
         options,
-        network,
+        connect,
     })
     .await?;
 
@@ -369,18 +197,17 @@ pub async fn rdp_test_connection(
         crate::terminal::resolve_jump_credentials(&state, n)?;
     }
 
-    let transport =
-        transport::open_transport(&host, port, network.as_ref(), options.gateway.as_ref()).await?;
+    let reconnect = transport::connector(host.clone(), port, network, options.gateway.clone());
+    let transport = reconnect().await?;
     let result = test_ironrdp_connection(
         RdpSessionConfig {
-            stream: transport.stream,
-            local_addr: transport.local_addr,
-            host: host.clone(),
+            transport,
+            host,
             port,
             username,
             password: resolved_password,
             options,
-            network,
+            reconnect,
         },
         std::time::Duration::from_secs(45),
     )
@@ -392,27 +219,10 @@ pub async fn rdp_test_connection(
     ))
 }
 
-impl Default for RdpOptions {
-    fn default() -> Self {
-        Self {
-            domain: None,
-            color_depth: default_color_depth(),
-            screen_w: default_screen_w(),
-            screen_h: default_screen_h(),
-            nla: default_nla(),
-            certificate_fingerprint: None,
-            performance: PerformanceFlags::default(),
-            redirect_clipboard: default_true(),
-            redirect_audio: default_audio_mode(),
-            redirect_drive: DriveRedirectOpt::default(),
-            gateway: None,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use taomni_rdp_client_engine::GatewayOpt;
 
     #[test]
     fn gateway_reuses_session_credentials_when_requested() {

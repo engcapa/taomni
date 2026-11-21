@@ -9,10 +9,10 @@ use super::relay::spawn_rdp_relay;
 use super::wire::channel;
 use super::wire::frame_payload_with_header;
 use super::wire::parse_binary_control;
-use crate::rdp::RdpOptions;
-use crate::rdp::frame::TileHeader;
-use crate::rdp::session::RdpSessionHandle;
-use crate::rdp::session::SessionOutput;
+use crate::RdpOptions;
+use crate::frame::TileHeader;
+use crate::session::RdpSessionHandle;
+use crate::session::SessionOutput;
 use futures::SinkExt;
 use futures::StreamExt;
 use tokio::net::TcpListener;
@@ -243,13 +243,14 @@ async fn live_credssp_relay_authorizes_websocket_and_delivers_first_frame() {
     }
 
     let started = Instant::now();
+    let connect = crate::transport::direct_connector(host.clone(), port);
     let session = spawn_rdp_relay(RdpSpawnConfig {
         host,
         port,
         username: Some(username),
         password: Some(password),
         options,
-        network: None,
+        connect,
     })
     .await
     .expect("start live RDP relay");

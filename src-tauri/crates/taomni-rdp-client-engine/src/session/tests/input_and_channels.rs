@@ -121,7 +121,6 @@ fn connector_uses_client_side_cursor_rendering() {
         username: Some("user".to_owned()),
         password: Some("password".to_owned()),
         options: RdpOptions::default(),
-        network: None,
     };
 
     let config = build_ironrdp_config(&settings);

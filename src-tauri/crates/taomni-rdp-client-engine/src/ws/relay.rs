@@ -9,11 +9,10 @@ use super::outgoing::WsOutgoingReceiver;
 use super::outgoing::WsOutgoingSender;
 use super::wire::channel;
 use super::wire::parse_binary_control;
-use crate::rdp::session::RdpSessionConfig;
-use crate::rdp::session::RdpSessionHandle;
-use crate::rdp::session::SessionOutput;
-use crate::rdp::session::start_ironrdp_session;
-use crate::rdp::transport::open_transport;
+use crate::session::RdpSessionConfig;
+use crate::session::RdpSessionHandle;
+use crate::session::SessionOutput;
+use crate::session::start_ironrdp_session;
 use futures::SinkExt;
 use futures::StreamExt;
 use std::sync::Arc;
@@ -40,13 +39,7 @@ pub async fn spawn_rdp_relay(cfg: RdpSpawnConfig) -> Result<RdpSession, String> 
     // 1. Transport. Direct TCP, HTTP/SOCKS5 proxy, and RD Gateway all
     // converge on the same async stream abstraction; IronRDP owns all
     // RDP-layer negotiation after this point.
-    let transport = open_transport(
-        &cfg.host,
-        cfg.port,
-        cfg.network.as_ref(),
-        cfg.options.gateway.as_ref(),
-    )
-    .await?;
+    let transport = (cfg.connect)().await?;
 
     // 2. Bind WS listener before the IronRDP worker finishes authentication so
     // the frontend can show granular status updates.
@@ -64,14 +57,13 @@ pub async fn spawn_rdp_relay(cfg: RdpSpawnConfig) -> Result<RdpSession, String> 
     // 3. Hand off to IronRDP: connector, TLS, CredSSP, active-stage display
     //    decoding, and input all run behind this handle.
     let session = start_ironrdp_session(RdpSessionConfig {
-        stream: transport.stream,
-        local_addr: transport.local_addr,
+        transport,
         host: cfg.host.clone(),
         port: cfg.port,
         username: cfg.username.clone(),
         password: cfg.password.clone(),
         options: cfg.options.clone(),
-        network: cfg.network.clone(),
+        reconnect: cfg.connect,
     });
 
     let cancel_clone = cancel.clone();

@@ -1,27 +1,9 @@
 id: TC-111
 title: Saved RDP session opens the RDP panel and toolbar
-description: 'Coverage smoke for the desktop-only RDP client shell. Creates an RDP
-
-  session bookmark and double-clicks to open it. Browser mode cannot
-
-  authenticate to a real RDP target, so this case verifies the saved
-
-  session route, panel mount, canvas mount, and toolbar controls; live
-
-  protocol/display coverage is handled by ignored Rust live tests against
-
-  a configured Windows/xrdp target.
-
-
-  Because the configured cfg.ssh.host is not necessarily an RDP server,
-
-  the test does NOT authenticate — it only confirms the protocol
-
-  selector + tab-mount path is wired up. Real connection testing
-
-  requires a configured RDP fixture (xrdp / Windows host).
-
-  '
+description: >-
+  Open a saved RDP session in browser preview, exercise its toolbar and verify
+  that reconnect keeps one mounted client canvas. The live desktop handshake and
+  reconnect are exercised by TC-RDPJ-01-client-server-loopback.
 covers:
 - F9.7
 tags:
@@ -79,6 +61,8 @@ steps:
 - click: '[data-testid="rdp-view-cycle"]'
 - click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="rdp-reconnect"]'
+- assert_count: {selector: '[data-testid="rdp-canvas"]', equal: 1}
+- assert_no_runtime_errors: null
 - click: '[data-testid="titlebar-actions-more"]'
 - assert_visible: '[data-testid="rdp-detach"]'
 - click: '[data-testid="rdp-detach"]'
@@ -108,7 +92,7 @@ verification:
     - 27
     - 28
     - 29
-    - 30
+    - 32
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -132,7 +116,11 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"rdp-status\"]"}'
     - step: 26
       expectation: '{"assert_visible": "[data-testid=\"rdp-view-cycle\"]"}'
+    - step: 30
+      expectation: Reconnect keeps exactly one mounted RDP canvas.
     - step: 31
+      expectation: Reconnect leaves the renderer responsive without runtime errors.
+    - step: 33
       expectation: '{"assert_visible": "[data-testid=\"rdp-detach\"]"}'
     results:
     - 3
@@ -146,7 +134,9 @@ verification:
     - 21
     - 23
     - 26
+    - 30
     - 31
+    - 33
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

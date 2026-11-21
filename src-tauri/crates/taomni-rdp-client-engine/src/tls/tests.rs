@@ -2,9 +2,7 @@ use std::sync::Arc;
 
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 
-use super::{
-    certificate_fingerprint, format_fingerprint, normalize_fingerprint,
-};
+use super::{certificate_fingerprint, format_fingerprint, normalize_fingerprint};
 
 #[test]
 fn fingerprints_are_normalized_and_formatted() {

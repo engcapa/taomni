@@ -1,8 +1,8 @@
 use super::model::RdpControl;
-use crate::rdp::frame::TileHeader;
-use crate::rdp::input::KeyEvent;
-use crate::rdp::input::PointerEvent;
-use crate::rdp::input::PointerWheelEvent;
+use crate::frame::TileHeader;
+use crate::input::KeyEvent;
+use crate::input::PointerEvent;
+use crate::input::PointerWheelEvent;
 use tungstenite::http::header;
 
 /// Wire-protocol channel tags for the binary WS frames.

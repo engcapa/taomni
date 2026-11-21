@@ -1,13 +1,13 @@
 use super::staging::clipboard_process_staging_root;
-use crate::rdp::session::MAX_CLIPBOARD_FILE_BYTES;
-use crate::rdp::session::MAX_CLIPBOARD_FILE_ITEMS;
-use crate::rdp::session::MAX_CLIPBOARD_TOTAL_BYTES;
-use crate::rdp::session::REMOTE_FILE_CHUNK_SIZE;
-use crate::rdp::session::RemoteClipboardFile;
-use crate::rdp::session::RemoteFileStream;
-use crate::rdp::session::RemoteFileTransfer;
-use crate::rdp::session::StagingDirectory;
-use crate::rdp::session::display;
+use crate::session::MAX_CLIPBOARD_FILE_BYTES;
+use crate::session::MAX_CLIPBOARD_FILE_ITEMS;
+use crate::session::MAX_CLIPBOARD_TOTAL_BYTES;
+use crate::session::REMOTE_FILE_CHUNK_SIZE;
+use crate::session::RemoteClipboardFile;
+use crate::session::RemoteFileStream;
+use crate::session::RemoteFileTransfer;
+use crate::session::StagingDirectory;
+use crate::session::display;
 use ironrdp::cliprdr::pdu::ClipboardFileAttributes;
 use ironrdp::cliprdr::pdu::FileContentsFlags;
 use ironrdp::cliprdr::pdu::FileContentsRequest;
@@ -21,7 +21,7 @@ use taomni_rdp_common::file_transfer::{
     ensure_private_directory, remote_clipboard_safe_path, remote_top_level_name,
 };
 
-pub(in crate::rdp::session) fn build_remote_file_transfer(
+pub(in crate::session) fn build_remote_file_transfer(
     list: PackedFileList,
 ) -> Result<(RemoteFileTransfer, Vec<FileContentsRequest>), String> {
     if list.files.len() > MAX_CLIPBOARD_FILE_ITEMS {
@@ -117,7 +117,7 @@ pub(in crate::rdp::session) fn build_remote_file_transfer(
     Ok((transfer, requests))
 }
 
-pub(in crate::rdp::session) fn next_remote_file_request(
+pub(in crate::session) fn next_remote_file_request(
     transfer: &mut RemoteFileTransfer,
     index: usize,
     position: u64,

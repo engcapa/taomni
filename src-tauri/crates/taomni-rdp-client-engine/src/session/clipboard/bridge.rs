@@ -1,11 +1,11 @@
 use super::protocol::file_list_clipboard_format;
 use super::staging::cleanup_stale_clipboard_staging;
 use super::staging::clipboard_process_staging_root;
-use crate::rdp::session::ClipboardAction;
-use crate::rdp::session::ClipboardBridge;
-use crate::rdp::session::ClipboardBridgeState;
-use crate::rdp::session::SessionOutputSender;
-use crate::rdp::session::TaomniCliprdrBackend;
+use crate::session::ClipboardAction;
+use crate::session::ClipboardBridge;
+use crate::session::ClipboardBridgeState;
+use crate::session::SessionOutputSender;
+use crate::session::TaomniCliprdrBackend;
 use ironrdp::cliprdr::pdu::ClipboardFormat;
 use ironrdp::cliprdr::pdu::ClipboardFormatId;
 use ironrdp::cliprdr::pdu::ClipboardGeneralCapabilityFlags;
@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 impl ClipboardBridge {
-    pub(in crate::rdp::session) fn new(out_tx: SessionOutputSender) -> Self {
+    pub(in crate::session) fn new(out_tx: SessionOutputSender) -> Self {
         cleanup_stale_clipboard_staging();
         Self {
             state: Arc::new(Mutex::new(ClipboardBridgeState {
@@ -33,7 +33,7 @@ impl ClipboardBridge {
         }
     }
 
-    pub(in crate::rdp::session) fn backend(&self) -> TaomniCliprdrBackend {
+    pub(in crate::session) fn backend(&self) -> TaomniCliprdrBackend {
         let temporary_directory = clipboard_process_staging_root()
             .to_string_lossy()
             .into_owned();
@@ -43,7 +43,7 @@ impl ClipboardBridge {
         }
     }
 
-    pub(in crate::rdp::session) fn local_formats(&self) -> Vec<ClipboardFormat> {
+    pub(in crate::session) fn local_formats(&self) -> Vec<ClipboardFormat> {
         match self.state.lock() {
             Ok(state)
                 if state
@@ -58,20 +58,20 @@ impl ClipboardBridge {
         }
     }
 
-    pub(in crate::rdp::session) fn drain_actions(&self) -> Vec<ClipboardAction> {
+    pub(in crate::session) fn drain_actions(&self) -> Vec<ClipboardAction> {
         match self.state.lock() {
             Ok(mut state) => state.actions.drain(..).collect(),
             Err(_) => Vec::new(),
         }
     }
 
-    pub(in crate::rdp::session) fn queue_action(&self, action: ClipboardAction) {
+    pub(in crate::session) fn queue_action(&self, action: ClipboardAction) {
         if let Ok(mut state) = self.state.lock() {
             state.actions.push_back(action);
         }
     }
 
-    pub(in crate::rdp::session) fn local_text(&self) -> Option<String> {
+    pub(in crate::session) fn local_text(&self) -> Option<String> {
         self.state
             .lock()
             .ok()

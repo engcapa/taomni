@@ -7,8 +7,8 @@
 
 use tokio::io::{AsyncRead, AsyncWrite};
 
-use crate::rdp::RdpOptions;
-use crate::rdp::pdu::{tpkt, x224};
+use crate::RdpOptions;
+use crate::pdu::{tpkt, x224};
 
 /// Negotiation message types.
 pub const TYPE_NEG_REQ: u8 = 0x01;

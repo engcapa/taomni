@@ -71,12 +71,11 @@ use serde_json::json;
 use tokio::sync::Notify;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
-use crate::rdp::RdpOptions;
-use crate::rdp::frame::{DecodedTile, TileHeader};
-use crate::rdp::input::{KeyEvent, PointerEvent, PointerWheelEvent};
-use crate::rdp::transport::{RdpStream, open_transport};
-use crate::rdp::ws::{RdpControl, channel, cursor, frame_payload_with_header};
-use crate::terminal::network::NetworkSettings;
+use crate::RdpOptions;
+use crate::frame::{DecodedTile, TileHeader};
+use crate::input::{KeyEvent, PointerEvent, PointerWheelEvent};
+use crate::transport::{RdpConnector, RdpTransport};
+use crate::ws::{RdpControl, channel, cursor, frame_payload_with_header};
 
 /// Output yielded from the session toward the WS layer.
 pub enum SessionOutput {
@@ -130,14 +129,13 @@ pub struct RdpSessionHandle {
 }
 
 pub struct RdpSessionConfig {
-    pub stream: RdpStream,
-    pub local_addr: std::net::SocketAddr,
+    pub transport: RdpTransport,
     pub host: String,
     pub port: u16,
     pub username: Option<String>,
     pub password: Option<String>,
     pub options: RdpOptions,
-    pub network: Option<NetworkSettings>,
+    pub reconnect: RdpConnector,
 }
 
 struct RdpConnectionSettings {
@@ -146,12 +144,6 @@ struct RdpConnectionSettings {
     username: Option<String>,
     password: Option<String>,
     options: RdpOptions,
-    network: Option<NetworkSettings>,
-}
-
-struct RdpSessionTransport {
-    stream: RdpStream,
-    local_addr: std::net::SocketAddr,
 }
 
 enum SessionRunOutcome {
