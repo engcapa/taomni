@@ -172,6 +172,11 @@ def setup_large(ctx: Any) -> None:
     ctx.values["explorer_large"] = base
 
 
+def setup_search_native(ctx: Any) -> None:
+    setup(ctx)
+    setup_large(ctx)
+
+
 def teardown(ctx: Any) -> None:
     # Keep native bytes + original manifest with the run; browser dies with context.
     platform_workspace_root.teardown(ctx)

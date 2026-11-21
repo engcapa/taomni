@@ -20,6 +20,7 @@ import { useExplorerDirectory } from "./useExplorerDirectory";
 import { useExplorerDrop } from "./useExplorerDrop";
 import { useExplorerLabels } from "./explorerLabels";
 import { useElementResizeFrame } from "../../hooks/useElementResizeFrame";
+import { useExplorerSearch } from "./useExplorerSearch";
 import "./explorer.css";
 
 export interface ExplorerShellProps {
@@ -36,8 +37,8 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
   const preferences = useExplorerPreferences();
   const operations = useExplorerOperations(tabId, workspaceId);
   const pane = useExplorerDirectory(tabId, initialPath, operations.notify);
+  const search = useExplorerSearch(pane?.path ?? initialPath, preferences.showHidden, pane?.entries);
   const [home, setHome] = useState("");
-  const [filter, setFilter] = useState("");
   const [width, setWidth] = useState(1200);
   const [previewOverlay, setPreviewOverlay] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -56,12 +57,12 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
     const next = element.clientWidth;
     setWidth((current) => current === next ? current : next);
   });
-  useEffect(() => { setFilter(""); setPreviewOverlay(false); }, [pane?.path]);
+  useEffect(() => { search.setQuery(""); setPreviewOverlay(false); }, [pane?.path]);
   useEffect(() => {
     if (!pane) return;
     if (pane.showHidden !== preferences.showHidden) useSftpStore.getState().toggleHidden(tabId, "local");
   }, [tabId, pane?.showHidden, preferences.showHidden]);
-  const visible = useMemo(() => pane?.entries.filter((entry) => (preferences.showHidden || !entry.isHidden) && entry.name.toLowerCase().includes(filter.trim().toLowerCase())) ?? [], [pane?.entries, preferences.showHidden, filter]);
+  const visible = useMemo(() => search.active ? search.results : pane?.entries.filter((entry) => (preferences.showHidden || !entry.isHidden) && entry.name.toLowerCase().includes(search.query.trim().toLowerCase())) ?? [], [pane?.entries, preferences.showHidden, search.active, search.results, search.query]);
   const selected = useMemo(() => {
     const paths = new Set(pane?.selection ?? []);
     return visible.filter((entry) => paths.has(entry.path));
@@ -133,11 +134,11 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", cleanup); window.addEventListener("pointercancel", cleanup);
   };
   const preview = previewVisible ? <ExplorerPreviewPane entries={selected} currentPath={pane?.path ?? initialPath} tabId={tabId} workspaceId={workspaceId} onOpen={(entry) => void operations.open(entry)} onClose={closePreview} /> : null;
-  const viewContext = { operations, dropPath, onOpenExplorer: openExplorerAt, onOpenTerminal: terminal, onProperties: () => operations.setProperties(selected) };
+  const viewContext = { operations, dropPath, onOpenExplorer: openExplorerAt, onOpenTerminal: terminal, onProperties: () => operations.setProperties(selected), searchActive: search.active, searchPaths: search.relativePaths };
   return <ExplorerContext.Provider value={viewContext}>
     <div ref={root} className="ex-shell" data-testid="explorer-tab" data-tab-id={tabId} data-path={pane?.path ?? initialPath} data-active={active}
       data-preview-collapsed={preferences.preview && narrow && !previewOverlay ? "true" : "false"} tabIndex={0} onKeyDown={onKeyDown}>
-      <ExplorerAddressBar tabId={tabId} pane={pane} home={home} filter={filter} onFilter={setFilter} addressRef={address} />
+      <ExplorerAddressBar tabId={tabId} pane={pane} home={home} search={search} addressRef={address} />
       <ExplorerCommandBar path={pane?.path ?? ""} workspaceId={workspaceId} selected={selected} operations={operations} onOpenTerminal={terminal} onOpenExplorer={openExplorerAt} previewVisible={previewVisible} onTogglePreview={togglePreview}
         navigationId={navigationId} onToggleNavigation={() => setExplorerPreferences({ navVisible: !preferences.navVisible })} />
       <div className="ex-body">
@@ -148,7 +149,8 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
           <LocalFileBrowserPanel tabId={tabId} initialPath={initialPath} explorer={{
             renderView: ExplorerFileList,
             sortState: { key: preferences.sortKey, dir: preferences.sortDir, onChange: (sortKey, sortDir) => setExplorerPreferences({ sortKey, sortDir }) },
-            filterText: filter, onFilterTextChange: setFilter,
+            entriesOverride: search.active ? search.results : undefined,
+            filterText: search.active ? "" : search.query, onFilterTextChange: search.setQuery,
             onItemDoubleClick: (entry) => void operations.open(entry),
             onItemContext: (entry, _anchor, selection) => explorerItemMenu(selection.length ? selection : [entry], pane?.path ?? initialPath, operations, label, openExplorerAt, terminal, workspaceId),
             onEmptyContext: () => explorerEmptyMenu(pane?.path ?? initialPath, operations, label, () => void useSftpStore.getState().refreshPane(tabId, "local")),

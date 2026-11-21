@@ -3,6 +3,7 @@ import type { Tab } from "../../types";
 import { openServersTab } from "../../lib/serversTab";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { activeExplorerTab, useExplorerStore } from "../../stores/explorerStore";
 import { openExplorer } from "../../lib/explorer/openExplorer";
 import { parseQuickConnectInput } from "../../lib/quickConnect";
 import { type SessionConfig } from "../../lib/ipc";
@@ -126,6 +127,11 @@ export function createHandleCommand(controllerContext: HandleCommandContext): (c
           const workspace = platform.getWorkspace();
           const tab = workspace?.openTabs.find((item) => item.id === workspace.activeTabId);
           if (workspace && tab?.closable) platform.closeWorkspaceTab(workspace.id, tab.id);
+          break;
+        }
+        if (useAppStore.getState().activeSideTab === "explorer") {
+          const tab = activeExplorerTab();
+          if (tab?.closable) useExplorerStore.getState().closeTab(tab.id);
           break;
         }
         if (controllerContext.activeTab?.closable) controllerContext.removeTab(controllerContext.activeTab.id);

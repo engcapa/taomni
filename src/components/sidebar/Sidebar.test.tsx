@@ -31,6 +31,15 @@ describe("Sidebar rail (ED-PARITY-027)", () => {
     expect(useMainRailHostStore.getState().host).toBe(screen.getByTestId("sidebar-tool-window-rail"));
   });
 
+  it("keeps File Explorer out of Tools and renders its dedicated sidebar panel", () => {
+    useAppStore.setState({ activeSideTab: "tools" });
+    const { rerender } = render(<Sidebar />);
+    expect(screen.queryByTestId("sidebar-tool-file-explorer")).toBeNull();
+    act(() => useAppStore.getState().setActiveSideTab("explorer"));
+    rerender(<Sidebar />);
+    expect(screen.getByTestId("explorer-sidebar-panel")).toBeVisible();
+  });
+
   it("opens and collapses the permanent panels using the shared tool window buttons", () => {
     const { rerender } = render(<Sidebar compact />);
     const sessions = screen.getByTestId("side-tab-sessions");

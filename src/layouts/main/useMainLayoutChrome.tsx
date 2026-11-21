@@ -29,7 +29,6 @@ export function useMainLayoutChrome(context: UseMainLayoutChromeContext) {
   const codeWorkspaceTabs = layout.tabs.filter((t) => t.type === "code-workspace" && t.codeWorkspace);
   const vncTabs = layout.tabs.filter((t) => t.type === "vnc" && t.vnc);
   const rdpTabs = layout.tabs.filter((t) => t.type === "rdp" && t.rdp);
-  const fileBrowserTabs = layout.tabs.filter((t) => t.type === "file-browser" && t.fileBrowser);
   const objectStorageTabs = layout.tabs.filter((t) => t.type === "object-storage" && t.objectStorage);
   const dbTabs = layout.tabs.filter((t) => t.type === "database" && t.db);
   const redisTabs = layout.tabs.filter((t) => t.type === "redis" && t.db);
@@ -110,7 +109,6 @@ export function useMainLayoutChrome(context: UseMainLayoutChromeContext) {
     codeWorkspaceTabs,
     vncTabs,
     rdpTabs,
-    fileBrowserTabs,
     objectStorageTabs,
     mailTabs,
     dbTabs,

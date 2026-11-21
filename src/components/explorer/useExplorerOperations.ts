@@ -12,7 +12,7 @@ import { useSftpStore } from "../../stores/sftpStore";
 import { clipboardMatches, getExplorerClipboard, setExplorerClipboard } from "./explorerClipboard";
 import { useExplorerLabels } from "./explorerLabels";
 import { openFile } from "../../lib/openFile";
-import { newFileNameError, uniqueNewFileName } from "./explorerFileTypes";
+import { EXPLORER_TEXT_FILE_TYPES, newFileNameError, uniqueNewFileName, type ExplorerQuickExtension } from "./explorerFileTypes";
 import { setExplorerPreferences } from "./explorerPreferences";
 
 export interface ExplorerToast { message: string; error?: boolean; undo?: () => void }
@@ -183,10 +183,10 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
     useSftpStore.getState().setSelection(tabId, "local", [path]);
     setRenamePath(path);
   }, [label, refreshAll, tabId]);
-  const create = useCallback((directory: boolean) => run(async () => {
-    const base = directory ? label("新建文件夹", "New folder") : label("新建文本文档", "New text document");
-    const extension = directory ? "" : ".txt";
-    await createEntry(suggestFileName(`${base}${extension}`), directory);
+  const create = useCallback((directory: boolean, extension: ExplorerQuickExtension = "txt") => run(async () => {
+    const fileType = EXPLORER_TEXT_FILE_TYPES.find((type) => type.extension === extension)!;
+    const name = directory ? label("新建文件夹", "New folder") : `${label(fileType.name[0], fileType.name[1])}.${extension}`;
+    await createEntry(suggestFileName(name), directory);
   }), [createEntry, label, run, suggestFileName]);
   const createFile = useCallback(async (name: string) => {
     let created = false;

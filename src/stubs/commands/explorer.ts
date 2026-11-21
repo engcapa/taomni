@@ -21,6 +21,7 @@ import {
   VFS_ROOT,
 } from "../localVfs";
 import { emit } from "../tauri-event";
+import { searchVfs } from "../explorerSearch";
 import { readFiles, writeFiles } from "../fileClipboard";
 
 interface Snapshot {
@@ -293,6 +294,12 @@ export async function invokeExplorer<T>(command: string, args: Record<string, an
       return await readText(args.path) as T;
     case "explorer_read_preview_bytes":
       return await readImage(args.path, args.maxBytes) as T;
+    case "explorer_search_entries":
+      try {
+        return await searchVfs(args.root, args.query, args.recursive, args.includeHidden, args.operationId, () => cancelled.has(args.operationId)) as T;
+      } finally {
+        cancelled.delete(args.operationId);
+      }
     case "explorer_cancel_operation":
       cancelled.add(args.operationId);
       return undefined as T;

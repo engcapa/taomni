@@ -16,8 +16,8 @@ steps:
 - vault_first_run: qa-explorer-preview
 - reload_window: null
 - set_viewport: {width: 1600, height: 960}
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - click: 'button[aria-label="Cycle application theme"]'
 - assert_attribute: {selector: html, name: data-app-theme, equals: light}
@@ -121,7 +121,7 @@ steps:
 - assert_localstorage: {key: taomni.explorer.view.v1, contains: '"wrap":true'}
 - assert_no_runtime_errors: null
 - screenshot: explorer-shared-preview-preferences.png
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-new"]'
 - click: '[data-testid="explorer-new-folder"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-rename-input"]'

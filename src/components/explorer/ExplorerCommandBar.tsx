@@ -8,6 +8,7 @@ import type { ExplorerOperations } from "./useExplorerOperations";
 import { fileOpenMenu } from "./fileOpenMenu";
 import { classifyFile, supportsFileViewer } from "../../lib/openFile";
 import { openFile } from "../../lib/openFile";
+import { EXPLORER_TEXT_FILE_TYPES } from "./explorerFileTypes";
 
 export function ExplorerCommandBar({ path, workspaceId, selected, operations, onOpenTerminal, onOpenExplorer, previewVisible, onTogglePreview, navigationId, onToggleNavigation }: {
   path: string; workspaceId?: string; selected: FileEntry[]; operations: ExplorerOperations;
@@ -21,7 +22,10 @@ export function ExplorerCommandBar({ path, workspaceId, selected, operations, on
   const show = (event: React.MouseEvent, items: MenuItem[]) => { const rect = event.currentTarget.getBoundingClientRect(); ctx.showAt(rect.left, rect.bottom + 4, items); };
   const newMenu: MenuItem[] = [
     { label: label("文件夹", "Folder"), icon: <FolderPlus />, testId: "explorer-new-folder", onClick: () => void operations.create(true) },
-    { label: label("文本文件", "Text file"), icon: <Plus />, testId: "explorer-new-file", onClick: () => void operations.create(false) },
+    ...EXPLORER_TEXT_FILE_TYPES.map((fileType) => ({
+      label: label(fileType.zh, fileType.en), icon: <Plus />, testId: fileType.extension === "txt" ? "explorer-new-file" : `explorer-new-file-${fileType.extension}`,
+      onClick: () => void operations.create(false, fileType.extension),
+    })),
     { label: label("其他文件类型…", "Other file types…"), icon: <Plus />, testId: "explorer-new-typed-file", onClick: operations.startNewFile },
     { label: "", separator: true },
     { label: label("从剪贴板粘贴文件", "Paste files from clipboard"), icon: <ClipboardPaste />, onClick: () => void operations.paste() },

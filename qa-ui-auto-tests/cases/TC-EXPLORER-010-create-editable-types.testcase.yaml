@@ -1,4 +1,4 @@
-id: TC-EXPLORER-008
+id: TC-EXPLORER-010
 title: Explorer creates recognized editable file types and rejects invalid names without overwriting files
 description: Toolbar and directory blank-area context entry open the same type selector. Exercise cancellation, path/preview-only rejection,
   an existing-file conflict, retry, extension-specific numbered names, selected rename and exact empty bytes. Native proves real exclusive
@@ -23,8 +23,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-explorer-types
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'

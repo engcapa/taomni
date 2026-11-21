@@ -106,6 +106,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "explorer_same_volume"
         | "local_copy_entries"
         | "local_move_entries"
+        | "explorer_search_entries"
         | "explorer_cancel_operation"
         | "local_trash_entries"
         | "local_trash_restore"

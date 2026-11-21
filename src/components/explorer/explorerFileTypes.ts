@@ -3,6 +3,17 @@ import { classifyFile, editableFileExtensions, editableFileNames } from "../../l
 type Label = (zh: string, en: string) => string;
 export interface NewFileType { id: string; title: string; name: string; group: string }
 
+export const EXPLORER_TEXT_FILE_TYPES = [
+  { extension: "txt", zh: "文本文档 (.txt)", en: "Text document (.txt)", name: ["新建文本文档", "New text document"] },
+  { extension: "md", zh: "Markdown 文档 (.md)", en: "Markdown document (.md)", name: ["新建 Markdown 文档", "New Markdown document"] },
+  { extension: "html", zh: "HTML 文档 (.html)", en: "HTML document (.html)", name: ["新建 HTML 文档", "New HTML document"] },
+  { extension: "css", zh: "CSS 文档 (.css)", en: "CSS document (.css)", name: ["新建 CSS 文档", "New CSS document"] },
+  { extension: "js", zh: "JavaScript 文件 (.js)", en: "JavaScript file (.js)", name: ["新建 JavaScript 文件", "New JavaScript file"] },
+  { extension: "ts", zh: "TypeScript 文件 (.ts)", en: "TypeScript file (.ts)", name: ["新建 TypeScript 文件", "New TypeScript file"] },
+  { extension: "json", zh: "JSON 文档 (.json)", en: "JSON document (.json)", name: ["新建 JSON 文档", "New JSON document"] },
+] as const;
+export type ExplorerQuickExtension = (typeof EXPLORER_TEXT_FILE_TYPES)[number]["extension"];
+
 export function explorerFileTypes(label: Label): NewFileType[] {
   const groups = {
     text: label("文本与配置", "Text and configuration"),

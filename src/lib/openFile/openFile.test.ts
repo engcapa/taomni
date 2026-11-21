@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openFile } from "./index";
+import { openPlatformCodeWorkspace } from "../openPlatformCodeWorkspace";
 import { useAppStore } from "../../stores/appStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useWorkspacePlatformStore, DEFAULT_WORKSPACE_ID } from "../../stores/workspacePlatformStore";
 import { useDocumentStore } from "../../stores/documentStore";
 import { explorerCanonicalPath } from "../explorer";
@@ -12,6 +14,7 @@ vi.mock("../openPlatformCodeWorkspace", () => ({ openPlatformCodeWorkspace: vi.f
 beforeEach(() => {
   localStorage.clear(); vi.clearAllMocks(); resetFileOpenPreferences();
   useAppStore.setState({ tabs: [], activeTabId: null, activeSideTab: "home", codeWorkspaceByTab: {} });
+  useExplorerStore.setState({ tabs: [], activeTabId: null });
   useWorkspacePlatformStore.getState().reloadFromStorage();
   useDocumentStore.setState({ documents: {}, closeRequest: undefined });
   vi.mocked(explorerCanonicalPath).mockImplementation(async (path) => path);
@@ -73,5 +76,33 @@ describe("global open file routing", () => {
     vi.mocked(explorerCanonicalPath).mockRejectedValue(new Error("not_found"));
     await openFile({ path: "/missing.txt" }, { context: "explorer" });
     expect(useAppStore.getState().tabs[0].fileViewer?.path).toBe("/missing.txt");
+  });
+  it("keeps source and text viewers inside the dedicated Explorer surface", async () => {
+    useAppStore.setState({ activeSideTab: "explorer" });
+    const source = await openFile({ path: "/docs/example.rs" }, { context: "explorer", host: "explorer" });
+    const text = await openFile({ path: "/docs/notes.txt" }, { context: "explorer-command" });
+    expect(source).not.toBe(text);
+    expect(useExplorerStore.getState().tabs.map((tab) => tab.type)).toEqual(["file-viewer", "file-viewer"]);
+    expect(useExplorerStore.getState().tabs[0].fileViewer).toMatchObject({ path: "/docs/example.rs", kind: "source" });
+    expect(useExplorerStore.getState().activeTabId).toBe(text);
+    expect(useAppStore.getState()).toMatchObject({ activeSideTab: "explorer", tabs: [] });
+    expect(await openFile({ path: "/docs/example.rs" }, { context: "explorer", mode: "source" })).toBe(source);
+    expect(useExplorerStore.getState().tabs).toHaveLength(2);
+  });
+  it("does not reroute Explorer double-clicks through a saved workspace association", async () => {
+    useAppStore.setState({ activeSideTab: "explorer" });
+    setFileOpenPreferences({ associations: { rs: "workspace", md: "workspace", html: "workspace" } });
+    for (const path of ["/docs/example.rs", "/docs/readme.md", "/docs/page.html", "/docs/image.png"]) {
+      await openFile({ path }, { context: "explorer" });
+    }
+    expect(useExplorerStore.getState().tabs.map((tab) => tab.fileViewer?.kind)).toEqual(["source", "markdown", "html", "image"]);
+    expect(useExplorerStore.getState().tabs).toHaveLength(4);
+    expect(useAppStore.getState()).toMatchObject({ activeSideTab: "explorer", tabs: [] });
+  });
+  it("honors only an explicit Code Workspace choice from the Explorer open-with menu", async () => {
+    useAppStore.setState({ activeSideTab: "explorer" });
+    await openFile({ path: "/project/example.rs" }, { context: "explorer", mode: "workspace" });
+    expect(useExplorerStore.getState().tabs).toHaveLength(0);
+    expect(openPlatformCodeWorkspace).toHaveBeenCalled();
   });
 });

@@ -28,7 +28,7 @@ def args(**overrides):
 class MacosRunnerSelectionTests(unittest.TestCase):
     def test_macos_26_arm64_recovery_keeps_cases_crash_selection_and_release_architecture(self):
         selected = dict(scope="selected", platforms="macos", modes="native",
-                        case_ids="TC-EXPLORER-006,TC-EXPLORER-009,TC-EXPLORER-008,TC-FILE-OPEN-041,TC-MODULES-033,TC-MODULES-034,TC-MODULES-035",
+                        case_ids="TC-EXPLORER-006,TC-EXPLORER-011,TC-EXPLORER-010,TC-FILE-OPEN-041,TC-MODULES-033,TC-MODULES-034,TC-MODULES-035",
                         tags="crash-regression", native_release=True, shards="4")
         original = make_plan(args(**selected))
         recovery = make_plan(args(**selected, macos_runner="macos-26"))
@@ -156,7 +156,7 @@ class SelectionTests(unittest.TestCase):
                     'TC-WS-052', 'TC-WS-053', 'TC-WS-054', 'TC-WS-056', 'TC-WS-057', 'TC-MOBILE-013',
                     'TC-FILE-OPEN-002', 'TC-FILE-OPEN-003', 'TC-FILE-OPEN-005', 'TC-FILE-OPEN-006',
                     'TC-FILE-OPEN-007', 'TC-FILE-OPEN-008', 'TC-FILE-OPEN-009', 'TC-FILE-OPEN-010', 'TC-FILE-OPEN-011', 'TC-FILE-OPEN-012',
-                    'TC-FILE-OPEN-013', 'TC-TAO-HOME-002', 'TC-EXPLORER-009', 'TC-FILE-OPEN-041'}
+                    'TC-FILE-OPEN-013', 'TC-TAO-HOME-002', 'TC-EXPLORER-011', 'TC-FILE-OPEN-041'}
         for entry in native:
             with self.subTest(profile=entry['linux_profile']):
                 self.assertEqual(set(entry['selected_ids']), expected)

@@ -67,8 +67,22 @@ describe("Explorer mounted context and command workflows", () => {
     fireEvent.keyDown(input, { key: "Escape" });
     fireEvent.contextMenu(screen.getByTestId("explorer-file-list"));
     fireEvent.click(screen.getByTestId("explorer-context-new-file"));
+    fireEvent.click(screen.getByTestId("explorer-new-file"));
     expect(await screen.findByTestId("explorer-rename-input")).toHaveValue("New text document.txt");
     expect(native.localCreateEntry).toHaveBeenLastCalledWith("/fixture", "New text document.txt", false);
+  });
+
+  it("creates Markdown and HTML documents from the expanded New menu", async () => {
+    await mountShell();
+    fireEvent.click(screen.getByTestId("explorer-cmd-new"));
+    fireEvent.click(screen.getByTestId("explorer-new-file-md"));
+    expect(await screen.findByTestId("explorer-rename-input")).toHaveValue("New Markdown document.md");
+    expect(native.localCreateEntry).toHaveBeenLastCalledWith("/fixture", "New Markdown document.md", false);
+    fireEvent.keyDown(screen.getByTestId("explorer-rename-input"), { key: "Escape" });
+    fireEvent.click(screen.getByTestId("explorer-cmd-new"));
+    fireEvent.click(screen.getByTestId("explorer-new-file-html"));
+    expect(await screen.findByTestId("explorer-rename-input")).toHaveValue("New HTML document.html");
+    expect(native.localCreateEntry).toHaveBeenLastCalledWith("/fixture", "New HTML document.html", false);
   });
 
   it("cuts selected files, dims rows and clears cut state only for successful paste items", async () => {

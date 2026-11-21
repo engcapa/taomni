@@ -1,9 +1,7 @@
 import { Suspense } from "react";
 import { ViewerShell } from "../../components/viewer/ViewerShell";
-import { ViewerCloseDialog } from "../../components/viewer/ViewerDialogs";
 import { CodeWorkspaceTab } from "../../components/editor/CodeWorkspaceTab";
 import { FileBrowser } from "../../components/filebrowser/FileBrowser";
-import { ExplorerTabPane } from "../../components/explorer/ExplorerTabPane";
 import { GitPanel } from "../../components/git/GitPanel";
 import { WorkspaceGitManager } from "../../components/git/WorkspaceGitManager";
 import { ObjectStorageBrowser } from "../../components/objectstorage/ObjectStorageBrowser";
@@ -37,7 +35,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     codeWorkspaceTabs,
     completeLocalLaunch,
     dbTabs,
-    fileBrowserTabs,
     gitTabs,
     handleConnectSession,
     handleConnectSessions,
@@ -123,7 +120,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     welcomeRestore,
   } = viewProps;
   return (<div className="flex-1 min-h-0 overflow-hidden relative">
-    <ViewerCloseDialog />
     <PluginTabPanels
       tabs={tabs}
       activeTabId={activeTabId}
@@ -337,26 +333,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       );
     })}
 
-    {/* Embedded local file-browser tabs (File session type). */}
-    {fileBrowserTabs.map((tab) => {
-      if (!tab.fileBrowser) return null;
-      const isActive = activeTabId === tab.id;
-      return (
-        <div
-          key={tab.id}
-          className="absolute inset-0"
-          style={{ display: isActive ? "block" : "none" }}
-        >
-          <ExplorerTabPane
-            tabId={tab.id}
-            initialPath={tab.fileBrowser.initialPath}
-            active={activeTab?.id === tab.id}
-            onOpenTerminal={(path) => { void openLocalTab(undefined, undefined, undefined, undefined, path); }}
-          />
-        </div>
-      );
-    })}
-
     {/* Object-storage (S3 / Azure Blob) browser tabs — always
                     mounted so in-flight transfers survive tab switches. */}
     {objectStorageTabs.map((tab) => {
@@ -452,7 +428,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       activeTab.type !== "sftp" &&
       activeTab.type !== "vnc" &&
       activeTab.type !== "rdp" &&
-      activeTab.type !== "file-browser" &&
       activeTab.type !== "file-viewer" &&
       activeTab.type !== "database" &&
       activeTab.type !== "redis" &&

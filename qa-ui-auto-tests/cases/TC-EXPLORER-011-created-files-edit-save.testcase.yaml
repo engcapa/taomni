@@ -1,4 +1,4 @@
-id: TC-EXPLORER-009
+id: TC-EXPLORER-011
 title: Files created by Explorer open in their real editor and save exact source through reopen
 description: Create Markdown, HTML, SVG, JSON and TypeScript using the type selector; open through Explorer and edit/save/reopen through
   their existing editor routes. Independently read full bytes after creation, save and reopen. This is native disk/IPC coverage on native
@@ -25,8 +25,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-explorer-new-editor
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -78,7 +78,7 @@ steps:
       **中文**
 
       '
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="authored.md"]'
 - wait_for: '[data-testid="file-viewer"][data-kind="markdown"]'
 - click: '[data-testid="markdown-mode-source"]'
@@ -97,7 +97,7 @@ steps:
       **中文**
 
       '
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - assert_count:
     selector: '[data-testid="file-viewer"]'
     equal: 0
@@ -140,7 +140,7 @@ steps:
     equals: '<!doctype html><h1>Created HTML 中文</h1>
 
       '
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="authored.html"]'
 - wait_for: '[data-testid="file-viewer"][data-kind="html"]'
 - click: '[data-testid="html-mode-split"]'
@@ -154,7 +154,7 @@ steps:
     equals: '<!doctype html><h1>Created HTML 中文</h1>
 
       '
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - assert_count:
     selector: '[data-testid="file-viewer"]'
     equal: 0
@@ -191,7 +191,7 @@ steps:
     equals: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><rect width="80" height="40" fill="blue"/></svg>
 
       '
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="authored.svg"]'
 - wait_for: '[data-testid="file-viewer"][data-kind="svg"]'
 - click: '[data-testid="image-svg-mode-code"]'
@@ -205,7 +205,7 @@ steps:
     equals: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><rect width="80" height="40" fill="blue"/></svg>
 
       '
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - assert_count:
     selector: '[data-testid="file-viewer"]'
     equal: 0
@@ -241,7 +241,7 @@ steps:
     equals: '{ "created": true, "text": "中文" }
 
       '
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="authored.json"]'
 - wait_for: '[data-testid="file-viewer"][data-kind="text"]'
 - assert_items:
@@ -254,7 +254,7 @@ steps:
     equals: '{ "created": true, "text": "中文" }
 
       '
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - assert_count:
     selector: '[data-testid="file-viewer"]'
     equal: 0
@@ -276,9 +276,9 @@ steps:
 - press:
     selector: '[data-testid="explorer-rename-input"]'
     key: Enter
-- press:
-    selector: '[data-testid="explorer-file-list"]:has([data-name="authored.ts"][aria-selected="true"]):not(:has([data-testid="explorer-rename-input"]))'
-    key: Enter
+- right_click: '[data-testid="explorer-file-row"][data-name="authored.ts"]'
+- click: '[data-testid="explorer-context-open-with"]'
+- click: '[data-testid="file-open-with-workspace"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
 - fill:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
@@ -308,7 +308,7 @@ steps:
 
       '
 - assert_no_runtime_errors: null
-- screenshot: TC-EXPLORER-009-created-files-edit-save.png
+- screenshot: TC-EXPLORER-011-created-files-edit-save.png
 verification:
   review: reviewed
   requirements:
@@ -448,7 +448,7 @@ verification:
     - 107
     - 109
   - id: R2
-    requirement: New source files route to Code Workspace, save exact UTF-8 through the existing save command and survive renderer reload.
+    requirement: New source files open in Code Workspace through Explorer’s Open with menu, save exact UTF-8 through the existing save command and survive renderer reload.
     actions:
     - 110
     - 111
@@ -457,30 +457,32 @@ verification:
     - 115
     - 119
     - 120
+    - 121
     - 122
-    - 123
+    - 124
     - 125
-    - 126
+    - 127
+    - 128
     checkpoints:
     - step: 117
       expectation: Successful creation closes the dialog.
     - step: 118
       expectation: authored.ts exists with exactly zero bytes, independently read from VFS or native disk.
-    - step: 124
+    - step: 126
       expectation: Code Workspace save writes all authored TypeScript bytes to the created file.
-    - step: 128
-      expectation: Reload recovers the actual loose source file and exact saved text.
-    - step: 129
-      expectation: Code recovery does not replace or truncate the saved source.
     - step: 130
+      expectation: Reload recovers the actual loose source file and exact saved text.
+    - step: 131
+      expectation: Code recovery does not replace or truncate the saved source.
+    - step: 132
       expectation: All preceding creation/edit/lifecycle actions have no uncaught renderer errors.
     results:
     - 117
     - 118
-    - 124
-    - 128
-    - 129
+    - 126
     - 130
+    - 131
+    - 132
   visual:
   - check: New-file dialog and resulting editor/table layout.
     method: manual
