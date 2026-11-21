@@ -5,6 +5,7 @@ import { useSessionImportExport } from "../menubar/useSessionImportExport";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { useGitCloneStore } from "../../stores/gitCloneStore";
 
 /** Launch actions share the existing import, workspace and utility owners. */
 export function PlatformLaunchCards({ onNewSession, onOpenNewWorkspace }: {
@@ -45,6 +46,7 @@ export function PlatformLaunchCards({ onNewSession, onOpenNewWorkspace }: {
         <p>{t("platform.homeHint")}</p>
         <div className="taomni-home-card-actions">
           <button type="button" data-testid="home-open-workspace" className="taomni-btn taomni-btn-primary" onClick={() => onOpenNewWorkspace ? onOpenNewWorkspace() : mode("workspaces")}><Plus />{t("platform.newWorkspace")}</button>
+          <button type="button" data-testid="home-clone-workspace" className="taomni-btn" onClick={() => { mode("workspaces"); useGitCloneStore.getState().openDialog(); }}><GitBranch />{t("gitClone.cloneShort")}</button>
           <button type="button" data-testid="home-open-git" className="taomni-btn" onClick={openGit}><GitBranch />Git</button>
         </div>
         <div className="taomni-home-card-footer"><button type="button" data-testid="home-open-agents" onClick={showAgentsComingSoon}><Bot />{t("platform.agents")}</button></div>

@@ -11,6 +11,7 @@ import {
 } from "../../stores/workspacePlatformStore";
 import { createWorkspaceFileNode, createWorkspaceFolderNode } from "./workspaceFs";
 import { WorkspaceFsModals, type WorkspaceRootDestination } from "./WorkspaceFsModals";
+import { WorkspaceGitCloneModal } from "./WorkspaceGitCloneModal";
 import { WorkspaceGitPanel } from "./WorkspaceGitPanel";
 import { WorkspaceSessionPane } from "./WorkspaceSessionPane";
 import { WorkspaceSessionPickerModal } from "./WorkspaceSessionPickerModal";
@@ -170,6 +171,7 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEdi
         onClose={closeSessionPicker}
       />
       <WorkspaceFsModals request={visible ? fsModal : null} initialPath={workspace.rootFolders[0]?.path} onCancel={closeFsModal} onSubmit={submitFsModal} />
+      <WorkspaceGitCloneModal />
     </div>
   );
 }
