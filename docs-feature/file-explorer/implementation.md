@@ -95,7 +95,7 @@ Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS �
 - 诊断分支插桩（resolveCwd/preamble/total 三段计时）在 hosted 双平台读取：resolveCwd 0-3ms、openExplorer preamble 6-28ms、全程 30-75ms——**产品侧瞬时完成**，此前 10/30/90s 等待全部是 runner 判定问题；插桩分支已删除。
 - 读 runner 源码定位：native 路径 `selector_strategy` 对 Playwright 伪选择器不做翻译，`:nth-match` 以原样 CSS 交给 WebDriver——不是合法 CSS，native 模式永远匹配不到（browser 模式由 Playwright 原生支持，001 等 browser 用例不受影响；005 是唯一使用 `:nth-match` 的 native 用例且此前从未在 hosted 走到该步）。
 - 修复：第二标签等待改写为 native 支持的位置 XPath `xpath=(//*[@data-testid='explorer-workspace-tab'][@data-tab-type='file-browser'])[2]`，并登记为 catalog/feature-list 控件别名（orphans 保持 5、门禁全绿）；本地 native 探针验证 cmd-newtab 后该等待 0.06s 解析。
-- 最终 hosted win/mac 复验轮 run44923422331（`09f6dd6fc`）。
+- 最终 hosted win/mac 复验轮 run44923422331（`09f6dd6fc`）：**macOS 22/23、Windows 22/23，TC-EXPLORER-005 双平台全流程通过**（含第二标签 xpath 等待与 `5093be85c` 退出确认修复的终局步骤）；唯一失败均为 main 既有已记录竞态 `TC-FILE-OPEN-006`（f11b37cf3，与本分支无关）。本轮后该迁移验证闭环完成。
 - 本机 linux native 005：重启后目录导航恢复（20:0x 的导航挂死确认为机器态劣化），但本机 bashrc 提示符使 idle-prompt 探测不置 terminal-ready 的既有环境边界仍在，第二标签段无法本机走通；该段以 hosted 双平台为准。
 
 ## 迁移前历史证据
