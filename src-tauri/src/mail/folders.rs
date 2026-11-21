@@ -13,7 +13,6 @@ use std::collections::HashMap;
 use taomni_mail_api::FolderSubscription;
 use tauri::State;
 
-use super::sync::FolderSyncState;
 use super::{
     ImapSessionOpts, MailAccountConfig, MailFolder, ResolvedMailAccount, module_host,
     resolve_config, with_imap_session, with_mail_db,
@@ -23,35 +22,13 @@ use crate::state::AppState;
 #[cfg(test)]
 use taomni_mail_engine::imap_folders::imap_list_folders;
 pub(super) use taomni_mail_engine::imap_folders::{
-    FolderStatus, SUBSCRIBED_ATTRIBUTE, folder_visible, imap_folder_status, imap_set_subscription,
+    SUBSCRIBED_ATTRIBUTE, folder_visible, imap_set_subscription,
 };
-
-/// True when STATUS proves nothing changed since the last sync: same
-/// UIDVALIDITY, no UID above the watermark and, because only CONDSTORE can
-/// reveal flag changes and expunges without a fetch, the same HIGHESTMODSEQ
-/// (plus the same message count when the cache holds the whole folder).
-pub(super) fn folder_unchanged(state: &FolderSyncState, status: &FolderStatus) -> bool {
-    if state.needs_repair {
-        return false;
-    }
-    let (Some(high), Some(uid_next)) = (state.high, status.uid_next) else {
-        return false;
-    };
-    if state.uid_validity.is_none() || state.uid_validity != status.uid_validity {
-        return false;
-    }
-    if uid_next.saturating_sub(1) > high {
-        return false;
-    }
-    match (state.highest_modseq, status.highest_modseq) {
-        (Some(cached), Some(remote)) if cached == remote => {}
-        _ => return false,
-    }
-    if state.complete && status.messages != Some(state.cached_uids.len() as u32) {
-        return false;
-    }
-    true
-}
+#[cfg(test)]
+use taomni_mail_engine::{
+    imap_folders::{FolderStatus, imap_folder_status},
+    imap_sync::{FolderSyncState, folder_unchanged},
+};
 
 /// Special-folder override from the account settings (`sent`, `drafts`, ...).
 pub(super) fn special_folder_override(

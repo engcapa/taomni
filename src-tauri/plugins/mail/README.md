@@ -59,8 +59,10 @@ Version 0.1.6 runs the selected IMAP folder's header-only step in the signed
 host. The core supplies the cached UID snapshot and receives the resulting
 headers, flags and watermark through a private one-use connection. The cache
 adapter commits the result using its existing stale-state and retention rules.
-Sync steps that store message bodies and whole-account refresh keep using the
-desktop cache adapter during the migration.
+Version 0.1.7 also runs the header-only account refresh in the host, including
+CONDSTORE checks, gap repair, catch-up and reconciliation. Each folder's result
+commits independently before the next folder starts. Steps that store message
+bodies continue to use the desktop cache adapter during the migration.
 
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.

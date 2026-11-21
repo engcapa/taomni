@@ -17,6 +17,7 @@ mod limits;
 mod model;
 mod planning;
 mod protocol;
+mod round;
 
 pub use folder_step::imap_sync_folder_step;
 pub use limits::FLAG_RECONCILE_WINDOW;
@@ -25,6 +26,7 @@ pub use model::{
     MailSyncMode, MailSyncRequestMode, StepParams, Watermark, advance_state, step_result,
 };
 pub use protocol::imap_has_capability;
+pub use round::{FolderRoundOutcome, FolderRoundRequest, folder_unchanged, sync_folder_round};
 
 #[cfg(test)]
 mod tests;

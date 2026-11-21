@@ -1,3 +1,5 @@
+use taomni_mail_engine::imap_sync::{FolderRoundOutcome, FolderRoundRequest};
+
 use super::*;
 
 /// Sync headers for one folder.
@@ -252,8 +254,6 @@ pub async fn mail_sync_all_folders(
         MailSyncRequestMode::Reconcile
     };
     let skip_unchanged = cache_enabled && reconcile_mode == MailSyncRequestMode::Reconcile;
-    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
     let listed = folders::live_imap_folder_tree(
         &state,
         account.clone(),
@@ -292,109 +292,33 @@ pub async fn mail_sync_all_folders(
             FolderSyncState::default()
         };
         let started_ms = sync::now_ms();
-        // Release the account's background lane between folders. A transient
-        // disconnect retries only this folder; already committed progress is
-        // visible immediately and is never replayed as a whole-account batch.
-        let result = {
-            let pool = Arc::clone(&pool);
-            let account = account.clone();
-            let handle = handle.clone();
-            let name = name.clone();
-            let listed_folder = folder.clone();
-            tokio::task::spawn_blocking(move || {
-                with_imap_session(
-                    &pool,
-                    &account,
-                    &handle,
-                    ImapSessionOpts::background(),
-                    |imap| {
-                        let condstore = imap.has_capability("CONDSTORE");
-                        let mut folder_state = folder_state.clone();
-                        if skip_unchanged && condstore {
-                            if let Some(status) = imap.folder_status(&name, condstore) {
-                                if folders::folder_unchanged(&folder_state, &status) {
-                                    let mut folder = listed_folder.clone();
-                                    folder.total = status.messages;
-                                    folder.unread = status.unseen;
-                                    folder.uid_next = status.uid_next;
-                                    folder.uid_validity = status.uid_validity;
-                                    return Ok((Vec::new(), Vec::new(), Some(folder), None));
-                                }
-                            }
-                        }
-                        let mut folder_outcomes = Vec::new();
-                        let mut pending = Vec::new();
-                        let mut error = None;
-                        // A repair (pre-watermark cache) is followed by the real catch-up.
-                        for _ in 0..2 {
-                            let params = StepParams {
-                                request: MailSyncRequestMode::Auto,
-                                limit,
-                                include_bodies,
-                                condstore,
-                            };
-                            match imap.sync_folder_step(&account, &name, &folder_state, &params) {
-                                Ok(outcome) => {
-                                    folder_state = sync::advance_state(&folder_state, &outcome);
-                                    let repaired = outcome.mode == sync::MailSyncMode::Repair
-                                        && !outcome.watermark.needs_repair;
-                                    let more = outcome.more;
-                                    folder_outcomes.push(outcome);
-                                    if !repaired {
-                                        if more {
-                                            pending.push(name.clone());
-                                        }
-                                        break;
-                                    }
-                                }
-                                Err(e) => {
-                                    error = Some(e);
-                                    break;
-                                }
-                            }
-                        }
-                        let caught_up = error.is_none()
-                            && folder_outcomes
-                                .last()
-                                .is_some_and(|outcome: &FolderStepOutcome| !outcome.more);
-                        if caught_up && folder_state.high.is_some() {
-                            let params = StepParams {
-                                request: reconcile_mode,
-                                limit,
-                                include_bodies,
-                                condstore,
-                            };
-                            match imap.sync_folder_step(&account, &name, &folder_state, &params) {
-                                Ok(outcome) => {
-                                    if outcome.more {
-                                        pending.push(name.clone());
-                                    }
-                                    folder_outcomes.push(outcome);
-                                }
-                                Err(e) => error = Some(e),
-                            }
-                        }
-                        if let Some(ref e) = error {
-                            if is_imap_transport_error(e) {
-                                return Err(e.clone());
-                            }
-                        }
-                        Ok((folder_outcomes, pending, None, error))
-                    },
-                )
-            })
-            .await
-            .map_err(|e| format!("mail folder sync task failed: {e}"))?
+        let request = FolderRoundRequest {
+            folder: folder.clone(),
+            state: folder_state,
+            limit,
+            reconcile: reconcile_mode,
+            skip_unchanged,
         };
-        let (outcomes, folder_pending, unchanged, error) = match result {
+        let result = sync_account_folder(&state, &account, request, include_bodies).await;
+        let FolderRoundOutcome {
+            steps: outcomes,
+            pending: folder_pending,
+            unchanged,
+            error,
+        } = match result {
             Ok(result) => result,
-            Err(error) => (Vec::new(), Vec::new(), None, Some(error)),
+            Err(error) => FolderRoundOutcome {
+                error: Some(error),
+                ..Default::default()
+            },
         };
         if let Some(unchanged) = unchanged {
             *folder = unchanged;
             skipped.push(name.clone());
         }
-        pending.extend(folder_pending);
+        if folder_pending {
+            pending.push(name.clone());
+        }
         for outcome in &outcomes {
             fetched_messages += outcome.messages.len();
             cached_bodies += outcome
@@ -453,6 +377,40 @@ pub async fn mail_sync_all_folders(
         cached_bodies,
         synced_at: now_ts(),
     })
+}
+
+/// Retry a transient disconnect within this folder. Completed folders have
+/// already committed, so retrying does not replay a whole account refresh.
+async fn sync_account_folder(
+    state: &AppState,
+    account: &ResolvedMailAccount,
+    request: FolderRoundRequest,
+    include_bodies: bool,
+) -> Result<FolderRoundOutcome, String> {
+    if !include_bodies && module_host::syncs_imap_round(&state.plugins) {
+        let first = module_host::sync_imap_round(state.plugins.clone(), account, &request).await;
+        if first
+            .as_ref()
+            .is_err_and(|error| is_imap_transport_error(error))
+        {
+            return module_host::sync_imap_round(state.plugins.clone(), account, &request).await;
+        }
+        return first;
+    }
+    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
+    let account = account.clone();
+    tokio::task::spawn_blocking(move || {
+        with_imap_session(
+            &pool,
+            &account,
+            &handle,
+            ImapSessionOpts::background(),
+            |imap| imap.sync_folder_round(&account, &request, include_bodies),
+        )
+    })
+    .await
+    .map_err(|error| format!("mail folder sync task failed: {error}"))?
 }
 
 pub(super) fn folder_is_noselect(folder: &MailFolder) -> bool {

@@ -22,6 +22,7 @@ steps:
 - click: '[data-testid="module-action-enable-mail"]'
 - wait_for: '[data-testid="module-action-disable-mail"]'
 - click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mail"]'
 - wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]'
 - mail_server_assert_list_matches: {timeout_sec: 30}
@@ -37,6 +38,7 @@ steps:
 - wait_for: '[data-testid="module-action-enable-mail"]'
 - wait_for: {selector: '[data-testid="mail-client-tab"], [data-testid="mail-unified-tab"]', state: detached}
 - click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mail"]'
 - wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 1}
@@ -49,26 +51,26 @@ verification:
   requirements:
   - id: R1
     requirement: Enabling Mail renders the account list in the original tab and the unified list in its own tab.
-    actions: [5, 6, 9, 10, 12, 13, 16, 17, 18, 20]
+    actions: [5, 6, 9, 10, 12, 14, 17, 18, 19, 21]
     checkpoints:
     - {step: 7, expectation: The first open shows the disabled module.}
     - {step: 8, expectation: The disabled module has no account pane.}
-    - {step: 14, expectation: The existing tab mounts the account pane from the Mail module.}
-    - {step: 15, expectation: The account shows the same inbox as its stub server.}
-    - {step: 19, expectation: The Unified Mail entry mounts the module's unified pane.}
-    - {step: 21, expectation: Refresh populates the unified pane with the new message.}
-    results: [7, 8, 14, 15, 19, 21]
+    - {step: 15, expectation: The existing tab mounts the account pane from the Mail module.}
+    - {step: 16, expectation: The account shows the same inbox as its stub server.}
+    - {step: 20, expectation: The Unified Mail entry mounts the module's unified pane.}
+    - {step: 22, expectation: Refresh populates the unified pane with the new message.}
+    results: [7, 8, 15, 16, 20, 22]
   - id: R2
     requirement: Disabling Mail unmounts both panes while preserving both tabs.
-    actions: [22, 23, 24, 27, 28, 31]
+    actions: [23, 24, 25, 28, 30, 33]
     checkpoints:
-    - {step: 26, expectation: Both module panes have unmounted.}
-    - {step: 29, expectation: The original account tab displays the disabled state.}
-    - {step: 30, expectation: Exactly one account tab remains.}
-    - {step: 32, expectation: The original unified tab displays the disabled state.}
-    - {step: 33, expectation: Exactly one unified tab remains.}
-    - {step: 34, expectation: The transitions produce no uncaught errors.}
-    results: [26, 29, 30, 32, 33, 34]
+    - {step: 27, expectation: Both module panes have unmounted.}
+    - {step: 31, expectation: The original account tab displays the disabled state.}
+    - {step: 32, expectation: Exactly one account tab remains.}
+    - {step: 34, expectation: The original unified tab displays the disabled state.}
+    - {step: 35, expectation: Exactly one unified tab remains.}
+    - {step: 36, expectation: The transitions produce no uncaught errors.}
+    results: [27, 31, 32, 34, 35, 36]
   visual:
   - check: The account and unified panes each show content when enabled and a status when disabled.
     method: automated

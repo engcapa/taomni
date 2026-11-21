@@ -70,15 +70,29 @@ impl ActiveImapSession {
         }
     }
 
-    pub(super) fn folder_status(
+    pub(super) fn sync_folder_round(
         &mut self,
-        folder: &str,
-        condstore: bool,
-    ) -> Option<folders::FolderStatus> {
-        match self {
-            Self::Tls { session, .. } => folders::imap_folder_status(session, folder, condstore),
-            Self::Plain { session, .. } => folders::imap_folder_status(session, folder, condstore),
+        account: &ResolvedMailAccount,
+        request: &taomni_mail_engine::imap_sync::FolderRoundRequest,
+        include_bodies: bool,
+    ) -> Result<taomni_mail_engine::imap_sync::FolderRoundOutcome, String> {
+        use taomni_mail_engine::imap_sync::sync_folder_round;
+
+        let mut mailbox = imap_mailbox(account, &request.folder.name);
+        let result = match self {
+            Self::Tls { session, .. } => {
+                sync_folder_round(session, &mut mailbox, request, include_bodies)
+            }
+            Self::Plain { session, .. } => {
+                sync_folder_round(session, &mut mailbox, request, include_bodies)
+            }
+        };
+        if let Some(error) = &result.error
+            && is_imap_transport_error(error)
+        {
+            return Err(error.clone());
         }
+        Ok(result)
     }
 
     pub(super) fn has_capability(&mut self, name: &str) -> bool {

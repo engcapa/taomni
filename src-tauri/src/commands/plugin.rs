@@ -193,6 +193,7 @@ pub async fn plugin_invoke(
                     | taomni_mail_api::IMAP_FOLDER_TREE
                     | taomni_mail_api::SEND_SMTP
                     | taomni_mail_api::SYNC_IMAP_HEADERS
+                    | taomni_mail_api::SYNC_IMAP_ROUND
             ))
     {
         // The desktop commands resolve these routes and credentials.

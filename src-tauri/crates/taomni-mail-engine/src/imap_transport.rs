@@ -13,7 +13,8 @@ use crate::imap_auth::{MailAuthMode, MailProvider, authenticate};
 use crate::imap_folders::{imap_list_folders, imap_set_subscription};
 use crate::imap_messages::Mailbox;
 use crate::imap_sync::{
-    FolderStepOutcome, HeaderStepRequest, StepParams, imap_has_capability, imap_sync_folder_step,
+    FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest, StepParams,
+    imap_has_capability, imap_sync_folder_step, sync_folder_round,
 };
 use crate::tls::{MailConnectionSecurity, certificate_error_hint, tls_connector};
 
@@ -64,6 +65,14 @@ impl ImapSession {
             Self::Tls(session) => sync_headers(session, request),
         }
     }
+    pub fn sync_header_round(&mut self, request: &FolderRoundRequest) -> FolderRoundOutcome {
+        let cache = MailCacheSettings::default();
+        let mut mailbox = header_mailbox(&request.folder.account_id, &request.folder.name, &cache);
+        match self {
+            Self::Plain(session) => sync_folder_round(session, &mut mailbox, request, false),
+            Self::Tls(session) => sync_folder_round(session, &mut mailbox, request, false),
+        }
+    }
 }
 
 fn sync_headers<T: Read + Write>(
@@ -76,13 +85,22 @@ fn sync_headers<T: Read + Write>(
         include_bodies: false,
         condstore: imap_has_capability(session, "CONDSTORE"),
     };
-    let mut mailbox = Mailbox {
-        account_id: &step.account_id,
-        name: &step.folder,
-        cache: &MailCacheSettings::default(),
-        save_original: |_, _: &[u8]| Err("A header step cannot store message originals".into()),
-    };
+    let cache = MailCacheSettings::default();
+    let mut mailbox = header_mailbox(&step.account_id, &step.folder, &cache);
     imap_sync_folder_step(session, &mut mailbox, &step.state, &params)
+}
+
+fn header_mailbox<'a>(
+    account_id: &'a str,
+    name: &'a str,
+    cache: &'a MailCacheSettings,
+) -> Mailbox<'a, impl FnMut(u32, &[u8]) -> Result<(), String> + 'a> {
+    Mailbox {
+        account_id,
+        name,
+        cache,
+        save_original: |_, _: &[u8]| Err("A header step cannot store message originals".into()),
+    }
 }
 
 impl ImapConnection<'_> {

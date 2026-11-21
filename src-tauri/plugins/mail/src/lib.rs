@@ -13,7 +13,7 @@ use std::{collections::BTreeSet, io, sync::Arc, time::Duration};
 use serde_json::Value;
 use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, SEND_SMTP,
-    SYNC_IMAP_HEADERS,
+    SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND,
 };
 use taomni_plugin_api::{
     ErrorCode, RpcError,
@@ -37,6 +37,7 @@ fn host_config() -> HostConfig {
                 IMAP_FOLDER_TREE,
                 SEND_SMTP,
                 SYNC_IMAP_HEADERS,
+                SYNC_IMAP_ROUND,
                 SNAPSHOT_PREPARE_METHOD,
                 SNAPSHOT_METHOD,
                 SNAPSHOT_RELEASE_METHOD,
@@ -105,6 +106,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(header_sync::run(&self.io, operation, input)?)
+            }
+            SYNC_IMAP_ROUND => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(header_sync::run_round(&self.io, operation, input)?)
             }
             _ => {
                 return commands::invoke(&self.store, method, params, &|| {

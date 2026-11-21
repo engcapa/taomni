@@ -7,10 +7,12 @@ use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, FolderSubscription, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE,
     ImapFolderTree, IncomingTest, SEND_SMTP, SLUG, SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS,
-    SmtpConnection, SmtpDelivery,
+    SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
     folder_sync::{HeaderSync, read_frame, write_frame},
 };
-use taomni_mail_engine::imap_sync::{FolderStepOutcome, HeaderStepRequest};
+use taomni_mail_engine::imap_sync::{
+    FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest,
+};
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
 
 use crate::{
@@ -35,11 +37,55 @@ pub(super) fn syncs_imap_headers(registry: &PluginRegistry) -> bool {
     supports(registry, SYNC_IMAP_HEADERS)
 }
 
+pub(super) fn syncs_imap_round(registry: &PluginRegistry) -> bool {
+    supports(registry, SYNC_IMAP_ROUND)
+}
+
 pub(super) async fn sync_imap_headers(
     registry: Arc<PluginRegistry>,
     account: &ResolvedMailAccount,
     step: &HeaderStepRequest,
 ) -> Result<FolderStepOutcome, String> {
+    let outcome: FolderStepOutcome =
+        exchange_sync(registry, account, SYNC_IMAP_HEADERS, step).await?;
+    if outcome.folder.account_id != step.account_id || outcome.folder.name != step.folder {
+        return Err("Mail module returned another folder's result".into());
+    }
+    Ok(outcome)
+}
+
+pub(super) async fn sync_imap_round(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    request: &FolderRoundRequest,
+) -> Result<FolderRoundOutcome, String> {
+    let outcome: FolderRoundOutcome =
+        exchange_sync(registry, account, SYNC_IMAP_ROUND, request).await?;
+    if outcome
+        .steps
+        .iter()
+        .map(|step| &step.folder)
+        .chain(outcome.unchanged.as_ref())
+        .any(|folder| {
+            folder.account_id != request.folder.account_id || folder.name != request.folder.name
+        })
+    {
+        return Err("Mail module returned another folder's result".into());
+    }
+    if let Some(error) = &outcome.error
+        && super::is_imap_transport_error(error)
+    {
+        return Err(error.clone());
+    }
+    Ok(outcome)
+}
+
+async fn exchange_sync<T: DeserializeOwned + Send + 'static>(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    method: &'static str,
+    step: &impl Serialize,
+) -> Result<T, String> {
     let bytes = serde_json::to_vec(step).map_err(|error| error.to_string())?;
     let (_data_route, endpoint, mut peer) =
         Route::pair().await.map_err(|error| error.to_string())?;
@@ -52,27 +98,21 @@ pub(super) async fn sync_imap_headers(
             .map_err(|error| error.to_string())
     };
     let invoke =
-        invoke_with_incoming::<(), _>(registry, account, SYNC_IMAP_HEADERS, |connection| {
-            HeaderSync {
-                connection,
-                exchange: endpoint,
-            }
+        invoke_with_incoming::<(), _>(registry, account, method, |connection| HeaderSync {
+            connection,
+            exchange: endpoint,
         });
     let (_, frame) = tokio::time::timeout(HOST_REQUEST_TIMEOUT + Duration::from_secs(5), async {
         tokio::try_join!(invoke, exchange)
     })
     .await
     .map_err(|_| "Mail module sync timed out".to_owned())??;
-    let outcome: Result<FolderStepOutcome, String> = tokio::task::spawn_blocking(move || {
-        serde_json::from_slice(&frame).map_err(|_| "Invalid Mail sync result".to_owned())
+    tokio::task::spawn_blocking(move || {
+        serde_json::from_slice::<Result<T, String>>(&frame)
+            .map_err(|_| "Invalid Mail sync result".to_owned())?
     })
     .await
-    .map_err(|error| error.to_string())??;
-    let outcome = outcome?;
-    if outcome.folder.account_id != step.account_id || outcome.folder.name != step.folder {
-        return Err("Mail module returned another folder's result".into());
-    }
-    Ok(outcome)
+    .map_err(|error| error.to_string())?
 }
 
 pub(super) async fn test_smtp(
