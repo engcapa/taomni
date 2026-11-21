@@ -124,7 +124,6 @@ export function FindReplaceBar({
 
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
-  const [dirEditing, setDirEditing] = useState(false);
   const [findHistory, setFindHistory] = useState<readonly string[]>(() => readSearchHistory("find"));
   const [replaceHistory, setReplaceHistory] = useState<readonly string[]>(() => readSearchHistory("replace"));
   const panelRef = useRef<HTMLElement | null>(null);
@@ -496,12 +495,9 @@ export function FindReplaceBar({
                   type="text"
                   className="np-find-input"
                   data-testid="notepad-files-dir"
-                  readOnly={!dirEditing}
                   value={find.filesDir}
                   placeholder={label("~", "~")}
                   title={label("双击编辑搜索目录", "Double-click to edit the search folder")}
-                  onDoubleClick={() => setDirEditing(true)}
-                  onBlur={() => setDirEditing(false)}
                   onChange={(event) => onPatch({ filesDir: event.target.value })}
                 />
               </span>

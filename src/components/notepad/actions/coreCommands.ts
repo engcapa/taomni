@@ -1,6 +1,7 @@
 import { redo, selectAll, undo } from "@codemirror/commands";
 import { applyBookmarkLinesOp, nextBookmarkPos } from "../../../lib/notepad/cm6/bookmarksAndHistory";
 import { viewerTabHost } from "../../../lib/notepad/host/viewerTabHost";
+import { parentPath } from "../../../lib/sftp";
 import { notepadOpenTerminalDir, viewerSetReadonlyAttr } from "../../../lib/notepad/ipc";
 import { runMacroOnce } from "../../../lib/notepad/macro/macroManager";
 import { dedupeAdjacentLines, dedupeLines, duplicateLine, joinLines, moveSelectedLines, removeBlankLines, removeEmptyLines, resolveLineSpan, reverseLines, splitLinesAtColumn } from "../../../lib/notepad/transforms/lines";
@@ -186,7 +187,11 @@ export function createCoreCommandMap(ctx: NotepadActionContext): Record<string, 
     // Search & Bookmarks & Marks
     "search.find": () => useNotepadStore.getState().patchFind(ctx.docKey, { open: true, tab: "find" }),
     "search.replace": () => useNotepadStore.getState().patchFind(ctx.docKey, { open: true, tab: "replace" }),
-    "search.findInFiles": () => useNotepadStore.getState().patchFind(ctx.docKey, { open: true, tab: "files" }),
+    "search.findInFiles": () => {
+      const current = useNotepadStore.getState().docs[ctx.docKey]?.find;
+      const dir = current?.filesDir || (isUntitledKey(ctx.document.path) ? "" : parentPath(ctx.document.path));
+      useNotepadStore.getState().patchFind(ctx.docKey, { open: true, tab: "files", filesDir: dir });
+    },
     "search.findNext": () => ctx.runFindDirection(false),
     "search.findPrev": () => ctx.runFindDirection(true),
     "search.incremental": () => useNotepadStore.getState().patchFind(ctx.docKey, { open: true, tab: "find", incremental: true }),

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FolderOpen, ShieldAlert, Trash2, X } from "lucide-react";
 import { useViewerLabels } from "../../viewer/viewerLabels";
 import { selectSaveFilePath } from "../../../lib/ipc/files";
@@ -44,6 +44,17 @@ export function FileLifecycleDialogs({
   const [nameInput, setNameInput] = useState(modal?.kind === "rename" ? modal.currentName : "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const lastModalRef = useRef<NotepadLifecycleModal | null>(null);
+  // Re-initialize the editable fields whenever a new modal opens so a stale
+  // value from the previous open cannot leak into the next Save As/Rename.
+  useEffect(() => {
+    if (modal === lastModalRef.current) return;
+    lastModalRef.current = modal;
+    setOverwrite(false);
+    setErr(null);
+    if (modal?.kind === "saveAs") setPathInput(modal.initialPath || modal.defaultPath);
+    if (modal?.kind === "rename") setNameInput(modal.currentName);
+  }, [modal]);
 
   if (!modal) return null;
 
