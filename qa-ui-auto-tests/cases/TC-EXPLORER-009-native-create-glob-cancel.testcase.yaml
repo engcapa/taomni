@@ -1,0 +1,124 @@
+id: TC-EXPLORER-009
+title: Native Explorer creates real documents, traverses globs and cancels a large-disk search
+description: Real Tauri IPC and host-disk acceptance for typed creation, in-surface Markdown/HTML viewers, shallow and recursive glob
+  results, Windows/POSIX relative-path separators and cancellation after native progress. The cancellation search has no matches across
+  10,000 real files, so the 1000-result limit cannot terminate it early. WebView input is not physical OS keyboard evidence.
+modes: [native]
+covers: [F-EXPLORER-1, F-FILEOPEN-1]
+tags: [p0, explorer, file-creation, glob-search, cancellation, native-boundary, regression]
+fixtures: [reset_db, explorer_search_native]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-native-create-search
+- seed_storage: {key: taomni.explorer.view.v1, value: '{"preview":false,"searchRecursive":false}'}
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_source}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="alpha.txt"]'
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-file-md"]'
+- wait_for: '[data-testid="explorer-rename-input"]'
+- fill: {selector: '[data-testid="explorer-rename-input"]', value: native-search.md}
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="native-search.md"]'
+- assert_file_exists: ${fixture.explorer_source}/native-search.md
+- dblclick: '[data-testid="explorer-file-row"][data-name="native-search.md"]'
+- wait_for: '[data-testid="explorer-platform-view"] [data-testid="file-viewer"][data-kind="markdown"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]', equal: 0}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-file-html"]'
+- wait_for: '[data-testid="explorer-rename-input"]'
+- fill: {selector: '[data-testid="explorer-rename-input"]', value: native-page.html}
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="native-page.html"]'
+- assert_file_exists: ${fixture.explorer_source}/native-page.html
+- dblclick: '[data-testid="explorer-file-row"][data-name="native-page.html"]'
+- wait_for: '[data-testid="explorer-platform-view"] [data-testid="file-viewer"][data-kind="html"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]', equal: 0}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- fill: {selector: '[data-testid="explorer-filter"]', value: '*.txt'}
+- wait_for: '[data-testid="explorer-search-status"][data-state="done"]'
+- assert_count: {selector: '[data-testid="explorer-file-row"]', equal: 4}
+- assert_count: {selector: '[data-testid="explorer-file-row"][data-name="inner.txt"]', equal: 0}
+- click: '[data-testid="explorer-search-recursive"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="inner.txt"]'
+- assert_text_equals: {selector: '[data-testid="explorer-file-row"][data-name="inner.txt"] [data-testid="explorer-search-result-path"]', equals: folder/nested/inner.txt}
+- fill: {selector: '[data-testid="explorer-filter"]', value: 'folder\nested\*.txt'}
+- assert_items: {selector: '[data-testid="explorer-file-row"]', attribute: data-name, equals: [inner.txt], timeout_sec: 10}
+- fill: {selector: '[data-testid="explorer-filter"]', value: 'folder/nested/*.txt'}
+- assert_items: {selector: '[data-testid="explorer-file-row"]', attribute: data-name, equals: [inner.txt], timeout_sec: 10}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_large}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="entry-00000.txt"]'
+- fill: {selector: '[data-testid="explorer-filter"]', value: 'missing-*.md'}
+- wait_for: '[data-testid="explorer-search-status"][data-state="searching"]'
+- assert_pattern: {selector: '[data-testid="explorer-search-status"]', regex: '[1-9][0-9]* scanned', timeout_sec: 15}
+- click: '[data-testid="explorer-search-cancel"]'
+- wait_for: '[data-testid="explorer-search-status"][data-state="done"]'
+- assert_text: {selector: '[data-testid="explorer-search-status"]', contains: Cancelled}
+- assert_count: {selector: '[data-testid="explorer-file-row"]', equal: 0}
+- click: '[data-testid="explorer-search-clear"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="entry-00000.txt"]'
+- assert_file_exists: ${fixture.explorer_source}/native-search.md
+- assert_file_exists: ${fixture.explorer_source}/native-page.html
+- assert_no_runtime_errors: null
+- screenshot: explorer-native-create-glob-cancel.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Markdown and HTML creation write real host files and double-click opens both inside the dedicated Explorer, never Sessions.
+    actions: [12, 13, 15, 16, 19, 22, 23, 24, 26, 27, 30]
+    checkpoints:
+    - {step: 17, expectation: Renamed Markdown row is visible in Explorer.}
+    - {step: 18, expectation: Independent host filesystem confirms native-search.md exists.}
+    - {step: 20, expectation: Markdown viewer mounts inside Explorer.}
+    - {step: 21, expectation: Markdown creates no Sessions viewer.}
+    - {step: 28, expectation: Renamed HTML row is visible in Explorer.}
+    - {step: 29, expectation: Independent host filesystem confirms native-page.html exists.}
+    - {step: 31, expectation: HTML viewer mounts inside Explorer.}
+    - {step: 32, expectation: HTML creates no Sessions viewer.}
+    results: [17, 18, 20, 21, 28, 29, 31, 32]
+  - id: R2
+    requirement: Native glob search honors shallow/recursive scope, emits relative paths and accepts Windows and POSIX separators.
+    actions: [34, 38, 41, 43]
+    checkpoints:
+    - {step: 36, expectation: Shallow TXT glob returns exactly four real current-directory files.}
+    - {step: 37, expectation: Nested inner.txt is excluded before recursion.}
+    - {step: 39, expectation: Recursive native search finds inner.txt.}
+    - {step: 40, expectation: Native result path is folder/nested/inner.txt.}
+    - {step: 42, expectation: Windows-separated relative glob returns exactly inner.txt.}
+    - {step: 44, expectation: POSIX-separated relative glob returns exactly inner.txt.}
+    results: [36, 37, 39, 40, 42, 44]
+  - id: R3
+    requirement: A no-match search across 10000 real files reports progress and can be cancelled before completion; clearing restores the real listing.
+    actions: [45, 46, 47, 49, 52, 56]
+    checkpoints:
+    - {step: 48, expectation: The 10000-file native directory is listed before searching.}
+    - {step: 51, expectation: Native progress confirms scanning started and the result cap cannot end this no-match query.}
+    - {step: 53, expectation: Native cancellation settles the operation.}
+    - {step: 54, expectation: UI explicitly reports Cancelled.}
+    - {step: 55, expectation: The no-match query has no rows after cancellation.}
+    - {step: 57, expectation: Clearing restores the large real directory.}
+    - {step: 58, expectation: Markdown host file survives search and cancellation.}
+    - {step: 59, expectation: HTML host file survives search and cancellation.}
+    - {step: 60, expectation: Real create/open/search/cancel workflows complete without runtime errors.}
+    results: [48, 51, 53, 54, 55, 57, 58, 59, 60]
+  visual:
+  - check: Native created-file rows, dedicated viewers, relative search paths and restored large directory.
+    method: manual
+    reason: Retained packaged-WebView screenshot supports visual review but not physical native chrome or OS-input fidelity.
+  native:
+  - check: Real host file creation, native recursive search IPC and in-flight operation cancellation.
+    method: automated
+    reason: Host existence assertions are independent of product IPC; cancellation begins only after observed native scan progress.
+  - check: Physical keyboard, pointer and OS window chrome.
+    method: manual
+    reason: WebDriver drives packaged WebView controls; this case does not claim physical OS input or native-window pixels.

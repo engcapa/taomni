@@ -55,7 +55,7 @@ export async function searchVfs(root: string, query: string, recursive: boolean,
       const relativePath = entry.path.slice(normalizedRoot.length).replace(/^\//, "");
       if (entry.isHidden && !includeHidden) continue;
       result.scanned++;
-      if (result.scanned % 100 === 0) await emit("explorer:progress", { operationId, items: result.scanned, bytes: 0, path: entry.path });
+      if (result.scanned === 1 || result.scanned % 100 === 0) await emit("explorer:progress", { operationId, items: result.scanned, bytes: 0, path: entry.path });
       const matches = glob
         ? glob.test(pathGlob ? relativePath : entry.name)
         : entry.name.toLowerCase().includes(plain) || relativePath.toLowerCase().includes(plain);

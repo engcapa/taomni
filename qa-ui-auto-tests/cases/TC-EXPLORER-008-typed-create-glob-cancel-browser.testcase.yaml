@@ -1,0 +1,153 @@
+id: TC-EXPLORER-008
+title: Explorer creates seven text types, searches recursive globs and cancels in-flight work
+description: Browser production-renderer coverage for every exposed text-creation control, in-surface Markdown viewing, shallow versus
+  recursive glob results, relative paths, POSIX and Windows separators, invalid-pattern recovery and deterministic in-flight cancellation.
+  The delayed VFS stub proves renderer/controller behavior only; real native disk and IPC cancellation are covered by TC-EXPLORER-009.
+modes: [browser]
+covers: [F-EXPLORER-1, F-FILEOPEN-1]
+tags: [p0, explorer, file-creation, glob-search, cancellation, regression]
+fixtures: [reset_db, explorer_files]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-typed-create-search
+- seed_storage: {key: taomni.explorer.stubSearchDelayMs, value: '40'}
+- seed_storage: {key: taomni.explorer.view.v1, value: '{"preview":false,"searchRecursive":false}'}
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_source}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="alpha.txt"]'
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-file"]'
+- wait_for: '[data-testid="explorer-rename-input"]'
+- fill: {selector: '[data-testid="explorer-rename-input"]', value: qa-text.txt}
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="qa-text.txt"]'
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-file-md"]'
+- wait_for: '[data-testid="explorer-rename-input"]'
+- fill: {selector: '[data-testid="explorer-rename-input"]', value: qa-markdown.md}
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="qa-markdown.md"]'
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-file-html"]'
+- wait_for: '[data-testid="explorer-rename-input"]'
+- fill: {selector: '[data-testid="explorer-rename-input"]', value: qa-page.html}
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="qa-page.html"]'
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-file-css"]'
+- wait_for: '[data-testid="explorer-rename-input"]'
+- fill: {selector: '[data-testid="explorer-rename-input"]', value: qa-style.css}
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="qa-style.css"]'
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-file-js"]'
+- wait_for: '[data-testid="explorer-rename-input"]'
+- fill: {selector: '[data-testid="explorer-rename-input"]', value: qa-script.js}
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="qa-script.js"]'
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-file-ts"]'
+- wait_for: '[data-testid="explorer-rename-input"]'
+- fill: {selector: '[data-testid="explorer-rename-input"]', value: qa-types.ts}
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="qa-types.ts"]'
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-file-json"]'
+- wait_for: '[data-testid="explorer-rename-input"]'
+- fill: {selector: '[data-testid="explorer-rename-input"]', value: qa-data.json}
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="qa-data.json"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="qa-markdown.md"]'
+- wait_for: '[data-testid="explorer-platform-view"] [data-testid="file-viewer"][data-kind="markdown"]'
+- assert_attribute: {selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"]', name: data-tab-title, equals: qa-markdown.md}
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]', equal: 0}
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
+- fill: {selector: '[data-testid="explorer-filter"]', value: '*.txt'}
+- wait_for: '[data-testid="explorer-search-status"][data-state="done"]'
+- assert_count: {selector: '[data-testid="explorer-file-row"]', equal: 5}
+- assert_count: {selector: '[data-testid="explorer-file-row"][data-name="inner.txt"]', equal: 0}
+- click: '[data-testid="explorer-search-recursive"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="inner.txt"]'
+- assert_text_equals: {selector: '[data-testid="explorer-file-row"][data-name="inner.txt"] [data-testid="explorer-search-result-path"]', equals: folder/nested/inner.txt}
+- fill: {selector: '[data-testid="explorer-filter"]', value: 'folder\nested\*.txt'}
+- assert_items: {selector: '[data-testid="explorer-file-row"]', attribute: data-name, equals: [inner.txt], timeout_sec: 10}
+- fill: {selector: '[data-testid="explorer-filter"]', value: 'folder/nested/*.txt'}
+- assert_items: {selector: '[data-testid="explorer-file-row"]', attribute: data-name, equals: [inner.txt], timeout_sec: 10}
+- fill: {selector: '[data-testid="explorer-filter"]', value: '['}
+- wait_for: '[data-testid="explorer-search-status"][data-state="error"]'
+- assert_text: {selector: '[data-testid="explorer-search-status"]', contains: invalid_query}
+- click: '[data-testid="explorer-search-retry"]'
+- assert_text: {selector: '[data-testid="explorer-search-status"]', contains: invalid_query}
+- fill: {selector: '[data-testid="explorer-filter"]', value: 'missing-*.md'}
+- wait_for: '[data-testid="explorer-search-status"][data-state="searching"]'
+- assert_pattern: {selector: '[data-testid="explorer-search-status"]', regex: '[1-9][0-9]* scanned', timeout_sec: 10}
+- click: '[data-testid="explorer-search-cancel"]'
+- wait_for: '[data-testid="explorer-search-status"][data-state="done"]'
+- assert_text: {selector: '[data-testid="explorer-search-status"]', contains: Cancelled}
+- click: '[data-testid="explorer-search-clear"]'
+- wait_for: {selector: '[data-testid="explorer-search-status"]', state: detached}
+- wait_for: '[data-testid="explorer-file-row"][data-name="alpha.txt"]'
+- assert_no_runtime_errors: null
+- screenshot: explorer-typed-create-glob-cancel.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Every New-menu text type creates a real VFS entry and completes inline rename without replacing fixture files.
+    actions: [13, 14, 16, 17, 19, 20, 22, 23, 25, 26, 28, 29, 31, 32, 34, 35, 37, 38, 40, 41, 43, 44, 46, 47, 49, 50, 52, 53]
+    checkpoints:
+    - {step: 18, expectation: TXT creation and rename produces qa-text.txt.}
+    - {step: 24, expectation: Markdown creation and rename produces qa-markdown.md.}
+    - {step: 30, expectation: HTML creation and rename produces qa-page.html.}
+    - {step: 36, expectation: CSS creation and rename produces qa-style.css.}
+    - {step: 42, expectation: JavaScript creation and rename produces qa-script.js.}
+    - {step: 48, expectation: TypeScript creation and rename produces qa-types.ts.}
+    - {step: 54, expectation: JSON creation and rename produces qa-data.json.}
+    results: [18, 24, 30, 36, 42, 48, 54]
+  - id: R2
+    requirement: A newly created Markdown file opens in the dedicated Explorer viewer and never creates a Sessions viewer.
+    actions: [55]
+    checkpoints:
+    - {step: 56, expectation: Markdown viewer mounts inside the Explorer platform.}
+    - {step: 57, expectation: qa-markdown.md is the active Explorer viewer tab.}
+    - {step: 58, expectation: Sessions contains no file viewer.}
+    results: [56, 57, 58]
+  - id: R3
+    requirement: Filename globs are shallow by default, recursion includes nested files with relative paths, and both path separator spellings work.
+    actions: [60, 64, 67, 69]
+    checkpoints:
+    - {step: 62, expectation: Shallow TXT glob returns exactly the five current-directory TXT files.}
+    - {step: 63, expectation: Nested inner.txt is excluded while recursion is off.}
+    - {step: 65, expectation: Recursive search finds inner.txt.}
+    - {step: 66, expectation: Result displays folder/nested/inner.txt rather than only a basename.}
+    - {step: 68, expectation: Windows-separated relative glob returns exactly inner.txt.}
+    - {step: 70, expectation: POSIX-separated relative glob returns exactly inner.txt.}
+    results: [62, 63, 65, 66, 68, 70]
+  - id: R4
+    requirement: Invalid patterns are actionable, a delayed in-flight search can be cancelled after progress begins, and clearing restores the directory.
+    actions: [71, 74, 76, 79, 82]
+    checkpoints:
+    - {step: 72, expectation: Invalid glob enters the error state.}
+    - {step: 73, expectation: Error exposes invalid_query.}
+    - {step: 75, expectation: Retry dispatches the search again and preserves the actionable invalid-pattern error.}
+    - {step: 78, expectation: The delayed search has scanned real VFS entries before cancellation.}
+    - {step: 80, expectation: Cancellation settles instead of leaving a spinner.}
+    - {step: 81, expectation: UI explicitly reports Cancelled.}
+    - {step: 83, expectation: Clearing removes search status.}
+    - {step: 84, expectation: Original directory rows return.}
+    - {step: 85, expectation: 'All creation, open, search and cancellation paths avoid runtime errors.'}
+    results: [72, 73, 75, 78, 80, 81, 83, 84, 85]
+  visual:
+  - check: Seven created file types, dedicated viewer tab, recursive result paths and final restored directory remain readable.
+    method: manual
+    reason: The retained screenshot supports UI review; selector assertions do not establish prototype pixel fidelity.
+  native:
+  - check: Real filesystem creation, recursive traversal and native operation cancellation.
+    method: external
+    reason: Browser uses IndexedDB VFS and deterministic stub delay. TC-EXPLORER-009 supplies the real disk/IPC boundary.

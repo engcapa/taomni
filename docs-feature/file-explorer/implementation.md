@@ -4,37 +4,49 @@
 
 ## 实施边界
 
-- 当前分支 `feat/file-explorer` 直接修改；不改原型、不引入原型评审控制条。应用自身标题栏、全局侧栏和标签容器仍沿用产品组件，Explorer 内容区使用原型的浅/深色 token、210px 导航、300px 右预览、190px 底预览、28px 文件行、24px 状态栏与命令栏顺序。
+- 当前分支 `feat/sidebar-file-explorer` 直接修改；不改原型、不引入原型评审控制条。File Explorer 是左侧 Sessions 下方的独立工作区，Tools 面板不再提供入口。应用自身标题栏、全局侧栏和标签容器仍沿用产品组件，Explorer 内容区使用原型的浅/深色 token、210px 导航、300px 右预览、190px 底预览、28px 文件行、24px 状态栏与命令栏顺序。
 - 文件列表仍经过 `LocalFileBrowserPanel` → `FilePanel`，后者保留排序、过滤、选择及 SFTP 默认视图。Explorer 使用明确的 `renderView` / `sortState` 扩展契约，而不是复制一套目录状态；虚拟列表仅存在于 Explorer 视图中。
 - `sftpStore.sessions[tabId].local` 是唯一目录/选择权威。抽出 `sftp/navigation.ts` 的刷新、导航和历史请求所有权，以及 `localAttachment.ts` 本地挂载生命周期；请求序号和 StrictMode 清理使迟到响应不能覆盖更新目录或复活已关闭标签。
-- 主界面与单个工作区各自去重；按当前已提交目录、原生规范路径比较。`forceNew` 显式新开。旧 File 会话保留 `sessionId` 并采用 Explorer 外观；SFTP 双栏继续原视图。
-- 主界面新增独立的 Explorer 恢复开关（更多菜单；默认开），元数据存储 `taomni.explorer.tabs.v1` / `taomni.explorer.restoreTabs.v1`；工作区沿用工作区持久化。恢复只记录路径/标签，不保存剪贴板、撤销标识、预览内容或进行中的任务。
+- 主菜单、Home/历史、Workspace 导航、Project 树和终端入口统一进入全局 Explorer，按当前已提交目录与原生规范路径去重；`forceNew` 显式新开。旧 File 会话保留 `sessionId` 并迁移到独立 Explorer；SFTP 双栏继续原视图。侧栏首次或空状态打开 HOME，已有标签时返回当前工作区而不重置目录。
+- 独立 Explorer 恢复开关（更多菜单；默认开）同时保存目录和本地 viewer 标签，元数据存储 `taomni.explorer.tabs.v1` / `taomni.explorer.restoreTabs.v1`。恢复只记录路径/标签，不保存剪贴板、撤销标识、预览内容或进行中的任务。
 - 共享视图偏好 `taomni.explorer.view.v1`。预览默认开，窄容器自动折叠但保留开关，可手动覆盖展开。文本固定 256 KiB、CSV 前100行、图片固定20 MiB；Markdown/SVG 预览移除外部资源和主动内容，不扩大 asset scope。
 - 原生复制/移动、重命名和创建使用 no-replace 语义；符号链接按链接本身复制，拒绝目录自身/子孙目标；跨卷剪切复制完成后才开始删除源。每项失败汇总，不回滚已完成项。取消保留已写入的部分目标并报告。
 - 拖放使用产品已有指针 DnD（避免 Windows Tauri 拦截 HTML5 drag），同卷默认移动、异卷默认复制，Ctrl（macOS Option）强制复制。目标覆盖列表文件夹、导航树和面包屑。
 - 回收站依赖 trash 5.3；Linux 单元测试直接使用隔离 XDG Trash 验证真实删除/还原，不以 browser stub 代替。macOS 使用 NSFileManager resulting URL 保存还原位置；Windows Explorer 专用 IFileOperation 避免不可回收卷静默永久删除。Shift+Delete 永久删除必须确认；回收站失败仅对失败项提供显式永久删除确认。
 - Windows/Linux 剪切向系统文件剪贴板写入 move 提示。macOS Finder 没有同等 cut 格式，系统移动沿用 Finder 的 Option+Command+V；应用内 Command+X/V 正常移动。不能宣称在 Finder Command+V 会移除源。
-- 工作区入口为已选方案 A，Project 树不切换实现。Alt+3（macOS Option+3）只在工作区有效且让出编辑框、IME、对话框；终端 Explorer 入口不分配新快捷键。本地非 SSH、非命令终端显示当前目录与新标签两项。
+- Workspace 导航与 Project 树入口重定向到全局 Explorer，不再创建工作区作用域 Explorer。Alt+3（macOS Option+3）只在工作区有效且让出编辑框、IME、对话框；终端 Explorer 入口不分配新快捷键。本地非 SSH、非命令终端显示当前目录与新标签两项。
+- Explorer 中双击所有支持内部查看的类型都留在 Explorer，保存的 Workspace association/default 不再按类型分流；只有显式“在 Code Workspace 中打开”才跳转。PDF 与不支持的二进制仍使用系统应用，不新增 PDF 查看器。
+- 新建菜单支持 TXT、MD、HTML、CSS、JS、TS、JSON，沿用 no-replace、冲突自动编号与 inline rename。搜索支持普通文本、`*`/`?`/`**`/字符类、两种路径分隔符与递归子目录；250ms 防抖、旧请求隔离、执行中取消、部分结果、错误重试、隐藏文件偏好和 1000 条上限均有明确状态。原生搜索不跟随目录符号链接。
 
 ## 测试执行策略（本轮用户要求）
 
-本地仅执行单元测试和静态检查，不运行 browser/native UI。UI、真实 IPC、系统剪贴板/文件管理器和打包 WebView 验证在 GitHub `qa-ui-auto-platforms.yml` 执行；所有外网命令通过用户提供代理。GitHub 选择包含完整 `crash-regression` 与受影响既有 SFTP 用例。
+本地执行 unit、静态检查及 Linux browser/native 用例；native 复用机器现有 desktop，不新建桌面，不触碰生产 `/usr/bin/taomni`。Windows/macOS browser/native 在 GitHub `qa-ui-auto-platforms.yml` 执行。外网使用用户提供的 `http://127.0.0.1:31228`，保留 `http://127.0.0.1:31128` 作为备用；GitHub 选择包含完整 `crash-regression` 与受影响既有用例，job 运行中即下载已完成 shard 的原始报告。
 
 新增可执行用例：
 
 | 用例 | 层级 | 行为 |
 |---|---|---|
-| TC-EXPLORER-001 | browser | Tools/菜单/工作区导航条/项目树入口、去重、新标签、地址/面包屑/导航历史/失败/恢复 |
+| TC-EXPLORER-001 | browser | 独立 rail/HOME、Tools 入口移除、菜单/Workspace/Project 全局去重、导航、viewer 内开与恢复 |
 | TC-EXPLORER-002 | browser | 预览类型、截断、过期响应、浅深色原型尺寸、共享偏好、窄窗、创建和回收站降级 |
 | TC-EXPLORER-003 | browser/native | 选择、复制/剪切/冲突/重命名/属性、回收站/撤销/永久删除、拖放；独立全树字节与目录 oracle |
 | TC-EXPLORER-004 | browser/native | 10,000项真实列表、虚拟DOM、排序、过滤；记录实测，不预造性能目标 |
 | TC-EXPLORER-005 | native | 实际本地PTY cwd、系统文件剪贴板、真实系统文件管理器粘贴、外部修改、预览与标签恢复 |
+| TC-EXPLORER-006 | browser/native | 详细列宽拖动/键盘调整、内容适配、持久化、横向对齐 |
+| TC-EXPLORER-007 | browser | 导航树折叠/展开、焦点与既有目录状态保留 |
+| TC-EXPLORER-008 | browser | 七种文本类型创建、Explorer 内 Markdown viewer、递归 glob、相对路径、两种分隔符、错误重试、延迟 stub 执行中取消 |
+| TC-EXPLORER-009 | native | 真实 MD/HTML 创建与 viewer、真实递归 glob、10,000 文件无匹配搜索的进度与取消 |
 
 Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS 进程冷重启。macOS bridge 按键不是物理键盘/AppKit 全局菜单证据。截图仅证明执行状态；尺寸与颜色有命名断言，完整像素/交互保真需结合截图审阅。
 
 快捷键验收范围：Explorer非编辑区的Copy/Cut/Paste/Select-all使用Windows/Linux Ctrl与macOS Command；地址Ctrl/Command+L，预览Alt/Option+P，工作区入口Alt/Option+3。文本输入、IME和对话框优先；terminal Control信号不改。上下文菜单显示⌘编辑命令，工作区入口显示Option+3。预览/导航/属性部分提示仍使用跨平台`Alt`文字，macOS Option功能映射已测但文字一致性为剩余显示缺口；物理键盘、Fn键、AppKit系统菜单加速器/重复分发与IME候选窗仍未进行OS级验证，不从WKWebView合成按键推断通过。
 
-## 当前证据
+## 本轮独立视图迁移验证
+
+- `83afd7a69` 已通过 Node 22 TypeScript、68 项聚焦 Vitest、Rust fmt 与 `pnpm check:refactor`；此前原生 search 7 项 Rust 测试通过。该 checkpoint 已合并当时的 `origin/main` 并解决 QA 冲突。
+- 新增 001/008/009 的 YAML 解析和三模式 dry-run 已通过；`python3 -m qa_ui_auto.audit --gate` 通过，832 个唯一用例 ID、5 个既有 orphan、coverage 无回归。全量 behavior contract 另有 44 个既有未评审/缺失契约，不能用全量红状态否定本轮已评审用例，也不宣称这些既有 gap 已解决。
+- 本轮完整 unit、Linux browser/native、完整 `crash-regression` 与 Windows/macOS hosted 证据仍待执行；迁移前下列 run 只证明当时旧宿主，不作为本轮通过证据。
+
+## 迁移前历史证据
 
 ### 本地单元与静态检查
 

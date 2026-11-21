@@ -7,7 +7,7 @@ description: >-
   without losing Home. Native establishes real shell creation and native directory
   publication; browser provides the same renderer transitions through its stubs.
   Also select the first detected shell, reopen its menu to check retention, and
-  open the actual Home directory as an embedded filesystem pane.
+  open the actual Home directory in the dedicated Explorer workspace.
 modes: [browser, native]
 covers: [F1.11, F11.1, F-EXPLORER-1]
 tags: [p0, tao-home, regression]
@@ -34,7 +34,7 @@ steps:
 - click: '[data-testid="tao-home-dock-more"]'
 - click: '[data-testid="tao-home-dock-directory"]'
 - wait_for: '[data-testid="explorer-tab"]'
-- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-browser"]', equal: 1}
+- assert_count: {selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]', equal: 1}
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="tao-home-dock-more"]'
 - click: '[data-testid="tao-home-dock-mail"]'
@@ -95,7 +95,7 @@ verification:
     - {step: 54, expectation: All routes return without runtime errors.}
     results: [8, 12, 17, 21, 26, 30, 39, 54]
   - id: HOME-SHELL-OPTIONS
-    requirement: Shell selection survives menu dismissal and Home directory opens an embedded filesystem pane.
+    requirement: Shell selection survives menu dismissal and Home directory opens the dedicated Explorer workspace.
     actions: [43, 45, 46, 47, 49, 53]
     checkpoints:
     - {step: 48, expectation: Reopening retains the first detected shell; hosts with only one shell retain that sole option.}

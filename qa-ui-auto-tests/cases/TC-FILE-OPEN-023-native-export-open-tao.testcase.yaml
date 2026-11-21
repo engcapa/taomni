@@ -128,7 +128,7 @@ verification:
     - step: 20
       expectation: "assert_file_contains:\n  contains: File open Markdown\n  path: ${fixture.markdown_native_exports}/report.html"
     - step: 21
-      expectation: "assert_count:\n  equal: 2\n  selector: '[data-testid=\"tab-item\"][data-tab-type=\"file-viewer\"]'"
+      expectation: "assert_count:\n  equal: 2\n  selector: '[data-testid=\"explorer-workspace-tab\"][data-tab-type=\"file-viewer\"]'"
     - step: 23
       expectation: 'wait_for: ''[data-testid="markdown-editor"]'''
     - step: 27

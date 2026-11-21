@@ -1,6 +1,6 @@
 id: TC-EXPLORER-005
 title: Native Explorer opens terminal cwd, publishes real system file clipboard and restores current directory
-description: AC03/07/11/12/13/17/20 native boundary. Explorer opens from Tools and creates a real local terminal in its cwd. Terminal right-click
+description: AC03/07/11/12/13/17/20 native boundary. Explorer opens from the dedicated rail and creates a real local terminal in its cwd. Terminal right-click
   reuses the existing Explorer or explicitly creates another. Real clipboard formats are read independently, a real desktop file manager pastes
   copied bytes, real external edits refresh preview, and a verified OS-process restart restores persisted path/preferences. The open Explorer
   remains in place; restart expects and clicks its exact visible exit confirmation, retaining the confirmation and normal-shutdown receipt. No
@@ -156,7 +156,7 @@ steps:
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
 - right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
 - click: '[data-testid="terminal-context-explorer-new"]'
-- wait_for: xpath=(//*[@data-testid="tab-item" and @data-tab-type="file-browser"])[2]
+- wait_for: ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 2)'
 - assert_count:
     selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
     equal: 2
@@ -281,7 +281,7 @@ verification:
     reason: These assertions cannot be established by browser stubs. Clipboard/paste permissions or unavailable actions fail rather than skip.
   - check: Exact visible exit confirmation, normal application/storage shutdown and a new owned native session with the isolated profile retained.
     method: automated
-    reason: Step 57 opts into the expected Exit title, one-open-tab message and Exit button. native-application-restarts.jsonl retains the observed
+    reason: Step 59 opts into the expected Exit title, one-open-tab message and Exit button. native-application-restarts.jsonl retains the observed
       dialog, single session.click attempt and resulting closure alongside native shutdown and before/after session ownership proof. Missing,
       changed, blocked or additional prompts fail; cleanup/kill never counts as successful shutdown.
   - check: Physical menu/drag/keyboard input
