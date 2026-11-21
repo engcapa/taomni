@@ -48,6 +48,9 @@ steps:
 - select_option:
     selector: '[data-testid="mail-search-scope"]'
     value: all
+- select_option:
+    selector: '[data-testid="mail-search-field"]'
+    value: subject
 - fill:
     selector: '[data-testid="mail-search-input"]'
     value: Needle 0007
@@ -64,7 +67,7 @@ steps:
 - click: '[data-testid="mail-search-server"]'
 - assert_text:
     selector: '[data-testid="mail-client-tab"]'
-    contains: Server search found 1 message
+    contains: Server search found 1 message in INBOX
     timeout_sec: 30
 - screenshot: mail-search-01.png
 - click: '[aria-label="Select all visible messages"]'
@@ -96,50 +99,51 @@ verification:
     - 10
     - 12
     - 13
-    - 16
+    - 14
+    - 17
     checkpoints:
     - step: 8
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
     - step: 11
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
-    - step: 14
-      expectation: '{"assert_count": {"equal": 1}}'
     - step: 15
+      expectation: '{"assert_count": {"equal": 1}}'
+    - step: 16
       expectation: '{"assert_text": {"contains": "Needle 0007"}}'
-    - step: 17
+    - step: 18
       expectation: '{"assert_count": {"selector": "unread rows", "equal": 1}}'
     results:
-    - 14
     - 15
-    - 17
+    - 16
+    - 18
   - id: R2
     requirement: 服务器搜索在当前文件夹返回匹配邮件（AC-26）。
     actions:
-    - 18
-    checkpoints:
-    - step: 19
-      expectation: '{"assert_text": {"contains": "Server search found 1 message"}}'
-    results:
     - 19
+    checkpoints:
+    - step: 20
+      expectation: '{"assert_text": {"contains": "Server search found 1 message in INBOX"}}'
+    results:
+    - 20
   - id: R3
     requirement: 搜索结果可以选中并删除到 Trash，成功后从结果列表和选择中移除。
     actions:
-    - 21
-    - 23
-    checkpoints:
-    - step: 22
-      expectation: 搜索行计入选择数量。
-    - step: 24
-      expectation: 删除的搜索行消失。
-    - step: 25
-      expectation: 服务器 Trash 收到一封邮件。
-    - step: 26
-      expectation: 操作完成后清空选择。
-    results:
     - 22
     - 24
+    checkpoints:
+    - step: 23
+      expectation: 搜索行计入选择数量。
+    - step: 25
+      expectation: 删除的搜索行消失。
+    - step: 26
+      expectation: 服务器 Trash 收到一封邮件。
+    - step: 27
+      expectation: 操作完成后清空选择。
+    results:
+    - 23
     - 25
     - 26
+    - 27
   visual:
   - check: 截图中搜索框、范围、快捷过滤与结果行布局完整。
     method: manual

@@ -7772,6 +7772,8 @@ files:
   - src/lib/mail.ts
   - src/stubs/mailServerStub.ts
   - src-tauri/src/mail/search.rs
+  - src-tauri/crates/taomni-mail-engine/src/search.rs
+  - src-tauri/plugins/mail/src/imap_exchange.rs
 controls:
   - id: search-input
     selector: '[data-testid="mail-search-input"]'
@@ -7806,6 +7808,7 @@ controls:
 
 - 搜索框查询本地 SQLite FTS5（trigram 分词，支持中文子串；少于 3 字的词回退 LIKE）覆盖整个缓存的邮件头与已缓存正文，可选“本文件夹/所有文件夹”和字段（全部/主题/发件人/收件人/正文）；用户输入按字面短语处理，不解释 FTS 语法。
 - “Server”（或 Shift+Enter）对当前文件夹执行 IMAP `UID SEARCH`（非 ASCII 用 `CHARSET UTF-8`），结果与本地结果合并，不写入缓存。
+- 启用的签名 Mail 宿主执行 IMAP 搜索，核心核对结果的账户和文件夹。TC-MODULES-059 核对真实服务器返回的主题，TC-MAIL-SEARCH-01 覆盖本地索引和服务器搜索的现有流程。
 - 快捷过滤（未读/星标/附件）同时作用于普通列表与搜索结果；跨文件夹结果显示所在文件夹。
 
 ---

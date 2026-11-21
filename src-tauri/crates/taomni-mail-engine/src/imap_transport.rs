@@ -7,7 +7,6 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use imap::{Client, Session};
 use native_tls::TlsStream;
 
-use crate::MailFolder;
 use crate::cache::MailCacheSettings;
 use crate::imap_auth::{MailAuthMode, MailProvider, authenticate};
 use crate::imap_folders::{imap_list_folders, imap_set_subscription};
@@ -16,7 +15,9 @@ use crate::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest, StepParams,
     imap_has_capability, imap_sync_folder_step, sync_folder_round,
 };
+use crate::search::{ImapSearchRequest, search_imap_messages};
 use crate::tls::{MailConnectionSecurity, certificate_error_hint, tls_connector};
+use crate::{MailFolder, MailMessageHeader};
 
 pub struct ImapConnection<'a> {
     pub server_name: &'a str,
@@ -71,6 +72,16 @@ impl ImapSession {
         match self {
             Self::Plain(session) => sync_folder_round(session, &mut mailbox, request, false),
             Self::Tls(session) => sync_folder_round(session, &mut mailbox, request, false),
+        }
+    }
+
+    pub fn search_imap(
+        &mut self,
+        request: &ImapSearchRequest,
+    ) -> Result<Vec<MailMessageHeader>, String> {
+        match self {
+            Self::Plain(session) => search_imap_messages(session, request),
+            Self::Tls(session) => search_imap_messages(session, request),
         }
     }
 }

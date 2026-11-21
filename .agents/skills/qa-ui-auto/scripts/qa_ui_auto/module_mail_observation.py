@@ -12,7 +12,7 @@ from .steps import StepError
 def run(ctx, phase):
     owner = ctx.fixture_context
     signed = getattr(owner, "signed_mail", None)
-    active = {"folder-tree", "running", "imap-delivery", "pop3-delivery"}
+    active = {"folder-tree", "running", "imap-delivery", "pop3-delivery", "imap-search"}
     if phase not in active | {"idle", "disabled"} or not signed or owner.case_id != "TC-MODULES-059":
         raise StepError("The Mail host observation requires the registered signed native case")
     plugins = isolated_data_root(owner) / "plugins"

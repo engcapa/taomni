@@ -64,6 +64,11 @@ CONDSTORE checks, gap repair, catch-up and reconciliation. Each folder's result
 commits independently before the next folder starts. Steps that store message
 bodies continue to use the desktop cache adapter during the migration.
 
+Version 0.1.8 executes the Search on server action in the signed host. The
+core grants the resolved IMAP route and verifies that the returned headers
+belong to the selected account and folder. The shared search engine keeps the
+local index, POP3 search and the result order consistent across versions.
+
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.
 It publishes the module data before activating the verified package and

@@ -7,8 +7,8 @@ pub(super) use taomni_mail_engine::cache::{
     contact_email, escape_like, flags_include_seen, get_cached_body, list_cached_folders,
     list_cached_messages, mailbox_to_contact, mark_cached_messages_read, prune_mail_cache,
     purge_cached_folder, reindex_cached_contacts, remove_cached_messages,
-    reset_folder_if_uid_validity_changed, row_to_header, search_contacts, unread_cached_uids,
-    update_cached_flags, upsert_contact, upsert_folder, upsert_message, upsert_message_at,
+    reset_folder_if_uid_validity_changed, search_contacts, unread_cached_uids, update_cached_flags,
+    upsert_contact, upsert_folder, upsert_message, upsert_message_at,
 };
 
 pub(super) fn upsert_sent_contacts(

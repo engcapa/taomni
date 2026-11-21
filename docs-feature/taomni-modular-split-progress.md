@@ -2,6 +2,8 @@
 
 ## 2026-11-21 当前进展
 
+- Mail 0.1.8 将当前文件夹的 IMAP 服务器搜索交给签名宿主。核心授权连接并核对返回的账户和文件夹。本地索引、POP3 搜索和旧版接入继续复用同一套查询逻辑。TC-MAIL-SEARCH-01 增加主题字段覆盖，TC-MODULES-059 用实际 IMAP 服务器核对返回主题及签名宿主的写租约。
+- 合并提交 `406431d6e` 的三端 Browser 各 33/34，TC-MODULES-060 停在首页不可见的会话标签选择器。Native 三端构建停在 Git Clone 的旧 Vault 字段。更新用例通过首页工具栏进入 Sessions，再核对原邮件标签。`662d66d07` 包含已有 Vault 修复与新入口，运行期间从 `live-shards/` 逐个采集工件。 [首次失败](https://github.com/engcapa/taomni/actions/runs/44899423260) · [三端复跑](https://github.com/engcapa/taomni/actions/runs/44904055836)
 - `406431d6e` 合入主线 #849–#851。保留 Git Clone 与模块用例注册，从合并后的功能清单重建 testid 目录。合并后的 Rust 检查发现新 Git Clone 调用仍引用原 `AppState.vault`。已接到 `CoreState.vault`，复查通过。TypeScript、7 项 Workspace 和标签单测、用例审计及重构边界均通过。 [合并提交](https://github.com/engcapa/taomni/commit/406431d6e) · [首轮验证](https://github.com/engcapa/taomni/actions/runs/44899423260)
 - Mail 0.1.5 的签名包携带账户和统一收件箱入口。Sessions 与 Workspace 从同一个模块入口加载，停用时卸载视图并保留标签。独立前端构建通过，生产基座清单排除了 `MailView`、`MailClientTab` 和 `MailUnifiedTab`。GitHub 测试包把前端摘要和宿主摘要写入同一原始回执。同步、账户缓存和备份写入仍按 TASK-026 迁移。 [前端提交](https://github.com/engcapa/taomni/commit/4367199a9)
 - `57696943b` 的 Linux、Windows、macOS ARM64 真实 Mail 宿主协议均通过，包含 SMTP 接受、明确拒绝、未收到 DATA 回执及缓存续用。原始日志和源码及镜像回执位于 `qa-ui-auto-report/github/44896966910/live-contracts/modular-protocol-*/mail-host-native.log` 和同目录的 `mail-host-receipt.json`。 [协议运行](https://github.com/engcapa/taomni/actions/runs/44896966910)

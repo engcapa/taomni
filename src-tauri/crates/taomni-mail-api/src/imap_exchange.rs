@@ -1,4 +1,4 @@
-//! The RPC grants two sockets, one for the mail server and one for sync data.
+//! An IMAP operation has one socket for the server and one for request data.
 
 use std::io;
 
@@ -12,7 +12,7 @@ const MAX_FRAME_BYTES: usize = taomni_plugin_stream::MAX_PAYLOAD_BYTES;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct HeaderSync {
+pub struct ImapExchange {
     pub connection: IncomingTest,
     pub exchange: Endpoint,
 }
@@ -25,7 +25,7 @@ pub async fn read_frame(stream: &mut (impl AsyncRead + Unpin)) -> io::Result<Vec
     if data.len() != size {
         return Err(io::Error::new(
             io::ErrorKind::UnexpectedEof,
-            "Incomplete mail sync frame",
+            "Incomplete Mail IMAP frame",
         ));
     }
     Ok(data)
@@ -41,7 +41,7 @@ fn validate_size(size: usize) -> io::Result<()> {
     if size > MAX_FRAME_BYTES {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            "Mail sync frame exceeds its limit",
+            "Mail IMAP frame exceeds its limit",
         ));
     }
     Ok(())

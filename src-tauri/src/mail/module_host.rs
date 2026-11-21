@@ -6,13 +6,14 @@ use lettre::address::Envelope;
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, FolderSubscription, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE,
-    ImapFolderTree, IncomingTest, SEND_SMTP, SLUG, SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS,
-    SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
-    folder_sync::{HeaderSync, read_frame, write_frame},
+    ImapFolderTree, IncomingTest, SEARCH_IMAP, SEND_SMTP, SLUG, SMTP_DELIVERY_UNKNOWN,
+    SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
+    imap_exchange::{ImapExchange, read_frame, write_frame},
 };
 use taomni_mail_engine::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest,
 };
+use taomni_mail_engine::search::ImapSearchRequest;
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
 
 use crate::{
@@ -23,7 +24,7 @@ use crate::{
     },
 };
 
-use super::{MailFolder, ResolvedMailAccount};
+use super::{MailFolder, MailMessageHeader, ResolvedMailAccount};
 
 pub(super) fn checks_incoming(registry: &PluginRegistry) -> bool {
     supports(registry, CHECK_INCOMING)
@@ -41,13 +42,17 @@ pub(super) fn syncs_imap_round(registry: &PluginRegistry) -> bool {
     supports(registry, SYNC_IMAP_ROUND)
 }
 
+pub(super) fn searches_imap(registry: &PluginRegistry) -> bool {
+    supports(registry, SEARCH_IMAP)
+}
+
 pub(super) async fn sync_imap_headers(
     registry: Arc<PluginRegistry>,
     account: &ResolvedMailAccount,
     step: &HeaderStepRequest,
 ) -> Result<FolderStepOutcome, String> {
     let outcome: FolderStepOutcome =
-        exchange_sync(registry, account, SYNC_IMAP_HEADERS, step).await?;
+        exchange_imap(registry, account, SYNC_IMAP_HEADERS, step).await?;
     if outcome.folder.account_id != step.account_id || outcome.folder.name != step.folder {
         return Err("Mail module returned another folder's result".into());
     }
@@ -60,7 +65,7 @@ pub(super) async fn sync_imap_round(
     request: &FolderRoundRequest,
 ) -> Result<FolderRoundOutcome, String> {
     let outcome: FolderRoundOutcome =
-        exchange_sync(registry, account, SYNC_IMAP_ROUND, request).await?;
+        exchange_imap(registry, account, SYNC_IMAP_ROUND, request).await?;
     if outcome
         .steps
         .iter()
@@ -80,13 +85,29 @@ pub(super) async fn sync_imap_round(
     Ok(outcome)
 }
 
-async fn exchange_sync<T: DeserializeOwned + Send + 'static>(
+pub(super) async fn search_imap(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    request: &ImapSearchRequest,
+) -> Result<Vec<MailMessageHeader>, String> {
+    let results: Vec<MailMessageHeader> =
+        exchange_imap(registry, account, SEARCH_IMAP, request).await?;
+    if results
+        .iter()
+        .any(|message| message.account_id != request.account_id || message.folder != request.folder)
+    {
+        return Err("Mail module returned another folder's search results".into());
+    }
+    Ok(results)
+}
+
+async fn exchange_imap<T: DeserializeOwned + Send + 'static>(
     registry: Arc<PluginRegistry>,
     account: &ResolvedMailAccount,
     method: &'static str,
-    step: &impl Serialize,
+    request: &impl Serialize,
 ) -> Result<T, String> {
-    let bytes = serde_json::to_vec(step).map_err(|error| error.to_string())?;
+    let bytes = serde_json::to_vec(request).map_err(|error| error.to_string())?;
     let (_data_route, endpoint, mut peer) =
         Route::pair().await.map_err(|error| error.to_string())?;
     let exchange = async {
@@ -98,7 +119,7 @@ async fn exchange_sync<T: DeserializeOwned + Send + 'static>(
             .map_err(|error| error.to_string())
     };
     let invoke =
-        invoke_with_incoming::<(), _>(registry, account, method, |connection| HeaderSync {
+        invoke_with_incoming::<(), _>(registry, account, method, |connection| ImapExchange {
             connection,
             exchange: endpoint,
         });
@@ -106,10 +127,10 @@ async fn exchange_sync<T: DeserializeOwned + Send + 'static>(
         tokio::try_join!(invoke, exchange)
     })
     .await
-    .map_err(|_| "Mail module sync timed out".to_owned())??;
+    .map_err(|_| "Mail module IMAP request timed out".to_owned())??;
     tokio::task::spawn_blocking(move || {
         serde_json::from_slice::<Result<T, String>>(&frame)
-            .map_err(|_| "Invalid Mail sync result".to_owned())?
+            .map_err(|_| "Invalid Mail IMAP result".to_owned())?
     })
     .await
     .map_err(|error| error.to_string())?

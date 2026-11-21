@@ -1,22 +1,23 @@
-//! Execute the IMAP header step over the core's authorized route.
+//! Execute IMAP requests over the authorized account route.
 
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     MailIncomingProtocol,
-    folder_sync::{HeaderSync, read_frame, write_frame},
+    imap_exchange::{ImapExchange, read_frame, write_frame},
 };
 use taomni_mail_engine::imap_sync::{FolderRoundRequest, HeaderStepRequest};
 use taomni_mail_engine::imap_transport::{ImapSession, imap_catch_result};
+use taomni_mail_engine::search::ImapSearchRequest;
 use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_plugin_sdk::Operation;
 use tokio::runtime::Runtime;
 
 use super::incoming::{open_imap, while_current, with_socket};
 
-pub(super) fn run(
+pub(super) fn sync_headers(
     runtime: &Runtime,
     operation: &Operation,
-    request: HeaderSync,
+    request: ImapExchange,
 ) -> Result<Result<(), String>, RpcError> {
     transfer(
         runtime,
@@ -29,10 +30,10 @@ pub(super) fn run(
     )
 }
 
-pub(super) fn run_round(
+pub(super) fn sync_round(
     runtime: &Runtime,
     operation: &Operation,
-    request: HeaderSync,
+    request: ImapExchange,
 ) -> Result<Result<(), String>, RpcError> {
     transfer(
         runtime,
@@ -45,9 +46,25 @@ pub(super) fn run_round(
     )
 }
 
+pub(super) fn search(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: ImapExchange,
+) -> Result<Result<(), String>, RpcError> {
+    transfer(
+        runtime,
+        operation,
+        request,
+        |session, query: ImapSearchRequest| {
+            validate_folder(&query.account_id, &query.folder)?;
+            session.search_imap(&query)
+        },
+    )
+}
+
 fn validate_folder(account_id: &str, folder: &str) -> Result<(), String> {
     if account_id.trim().is_empty() || folder.trim().is_empty() {
-        return Err("Mail sync requires an account and folder".into());
+        return Err("Mail IMAP requests require an account and folder".into());
     }
     Ok(())
 }
@@ -55,7 +72,7 @@ fn validate_folder(account_id: &str, folder: &str) -> Result<(), String> {
 fn transfer<T: DeserializeOwned + Send + 'static, R: Serialize + Send + 'static>(
     runtime: &Runtime,
     operation: &Operation,
-    request: HeaderSync,
+    request: ImapExchange,
     work: impl FnOnce(&mut ImapSession, T) -> Result<R, String> + Send + 'static,
 ) -> Result<Result<(), String>, RpcError> {
     if request.connection.protocol != MailIncomingProtocol::Imap {
@@ -80,5 +97,5 @@ fn transfer<T: DeserializeOwned + Send + 'static, R: Serialize + Send + 'static>
     let frame =
         serde_json::to_vec(&outcome).map_err(|_| RpcError::from_code(ErrorCode::InternalError))?;
     let sent = runtime.block_on(while_current(operation, write_frame(&mut exchange, &frame)))?;
-    Ok(sent.map_err(|error| format!("Return Mail sync result: {error}")))
+    Ok(sent.map_err(|error| format!("Return Mail IMAP result: {error}")))
 }

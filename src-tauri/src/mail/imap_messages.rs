@@ -29,6 +29,7 @@ pub(super) fn imap_sync_folder<T: Read + Write>(
     imap_mailbox(account, folder).fetch_page(session, offset, limit, include_bodies)
 }
 
+#[cfg(test)]
 pub(super) fn imap_fetch_messages_for_uids<T: Read + Write>(
     session: &mut imap::Session<T>,
     account: &ResolvedMailAccount,
