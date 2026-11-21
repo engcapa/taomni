@@ -2,6 +2,9 @@
 
 ## 2026-11-21 当前进展
 
+- `cd8756948` 的 Windows 签名 RDP 查看器收到全部 40 帧，p95 为 46.90 ms，低于 130 ms。独立探针同轮首帧为 40 ms，输入延迟 p95 为 54.85 ms，动画观察为 33.24 fps，带宽检查通过。查看器原始回执在 `qa-ui-auto-report/github/44888211385/live-shards/qa-windows-native-shard-3-b68f39e17a734a3fa1d168c72e21dbd7/run-20261121-101057-023510200/TC-MODULES-056/signed-rdp-viewer-latency.json`。 [GitHub 分片](https://github.com/engcapa/taomni/actions/runs/44888211385)
+- `523f8c923` 合入主线 #848，保留 Explorer 独立标签计入退出确认的修复。ControlBar 用例从 Tools 调用实际 Explorer 打开流程，覆盖返回 Tools。相关 43 项单测和重构边界检查通过。 [合并提交](https://github.com/engcapa/taomni/commit/523f8c923)
+- Mail 0.1.3 将工具栏 SMTP 连接测试交给签名宿主。宿主通过核心为当次请求授权的路由执行 TLS、认证和 NOOP。通过真实宿主协议用例检查认证被拒后可重试。TC-MODULES-059 核对 IMAP、POP3 会话的连接结果。发送、同步和前端迁出仍在推进。
 - G11 的 MFA 升级辅助进程在读取确认前核对重启目标，只允许自己的核心可执行文件。TC-MODULES-009 在三端检查拒绝其他文件后原桌面仍可响应，TC-MODULES-038/044 同时核对 macOS 正常结束、应用自动重开及重开前后的核心二进制摘要。
 - 从 `b200f4556` 的 Windows 和 macOS 26 Native 原始页面均确认 TC-MODULES-059 的活动 POP3 标签显示连接成功。原断言读到先挂载的后台 IMAP 标签，已改为只读活动标签。Windows 的 TC-MAIL-POP3-01 原始页面已打开目标邮件并在 HTML 读件框显示正文。用例按实际显示的正文模式读取内容，并保留浏览器纯文本覆盖。macOS 的 TC-FILE-OPEN-015 停在系统保存对话框识别，失败工件保留。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44886830317)
 - `b200f4556` 在 Linux、Windows、macOS 26 Browser 各通过 40/40，六个分片在汇总前下载。Linux Native 在构建前遇到 ControlBar 针对旧 Sessions Explorer 的单测断言。`ce6f2ba97` 改用真实的独立 Explorer 打开流程，相关 40 项单测通过。Linux 首次补跑的计划拒绝了三条专用于 Windows 或 macOS 的用例，复跑选集已按 Linux 支持范围更新，仍保留完整崩溃回归和 G5 测量。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44886830317) · [补跑计划日志](https://github.com/engcapa/taomni/actions/runs/44888848242/job/136800013872)

@@ -1,5 +1,10 @@
 //! SMTP delivery using an endpoint selected by the caller's network policy.
 
+#[cfg(feature = "routed-smtp")]
+mod routed;
+#[cfg(feature = "routed-smtp")]
+pub use routed::check_routed_connection;
+
 use std::time::Duration;
 
 use lettre::address::Envelope;

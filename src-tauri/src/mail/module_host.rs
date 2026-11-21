@@ -4,13 +4,17 @@ use std::{net::SocketAddr, sync::Arc};
 
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
-    CHECK_INCOMING, FolderSubscription, IMAP_FOLDER_TREE, ImapFolderTree, IncomingTest, SLUG,
+    CHECK_INCOMING, CHECK_OUTGOING, FolderSubscription, IMAP_FOLDER_TREE, ImapFolderTree,
+    IncomingTest, OutgoingTest, SLUG,
 };
-use taomni_plugin_stream::routed_tcp::Route;
+use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
 
 use crate::{
     plugin::{LifecycleState, PluginRegistry},
-    terminal::ssh::{SshTransport, build_ssh_transport},
+    terminal::{
+        network::NetworkSettings,
+        ssh::{SshTransport, build_ssh_transport},
+    },
 };
 
 use super::{MailFolder, ResolvedMailAccount};
@@ -21,6 +25,37 @@ pub(super) fn checks_incoming(registry: &PluginRegistry) -> bool {
 
 pub(super) fn manages_imap_folders(registry: &PluginRegistry) -> bool {
     supports(registry, IMAP_FOLDER_TREE)
+}
+
+pub(super) async fn test_smtp(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+) -> Result<(), String> {
+    if !supports(&registry, CHECK_OUTGOING) {
+        let account = account.clone();
+        let runtime = tokio::runtime::Handle::current();
+        return tokio::task::spawn_blocking(move || super::smtp::test_smtp(&account, &runtime))
+            .await
+            .map_err(|error| format!("SMTP test task failed: {error}"))?;
+    }
+    let server = &account.config.smtp;
+    let server_name = server.host.trim().to_owned();
+    let (_route, endpoint) = bind_route(
+        server_name.clone(),
+        server.port,
+        account.network_settings.clone(),
+    )
+    .await?;
+    let request = OutgoingTest {
+        route: endpoint,
+        server_name,
+        security: server.security,
+        trusted_certificate: server.trusted_cert.clone(),
+        authentication: account.auth_mode,
+        username: account.smtp_username.clone(),
+        secret: account.smtp_password.clone().into(),
+    };
+    invoke(registry, CHECK_OUTGOING, request).await
 }
 
 fn supports(registry: &PluginRegistry, method: &str) -> bool {
@@ -59,11 +94,33 @@ async fn invoke_with_incoming<T: DeserializeOwned, P: Serialize + Send + 'static
 ) -> Result<T, String> {
     let server = &account.config.imap;
     let server_name = server.host.trim().to_owned();
-    let port = server.port;
-    let network = account.network_settings.clone();
-    let dial_name = server_name.clone();
-    let (_route, endpoint) = Route::bind(move || {
-        let host = dial_name.clone();
+    let (_route, endpoint) = bind_route(
+        server_name.clone(),
+        server.port,
+        account.network_settings.clone(),
+    )
+    .await?;
+    let connection = IncomingTest {
+        route: endpoint,
+        server_name,
+        security: server.security,
+        trusted_certificate: server.trusted_cert.clone(),
+        protocol: account.config.incoming,
+        provider: account.config.provider,
+        authentication: account.auth_mode,
+        username: account.imap_username.clone(),
+        secret: account.imap_password.clone().into(),
+    };
+    invoke(registry, method, build_request(connection)).await
+}
+
+async fn bind_route(
+    host: String,
+    port: u16,
+    network: Option<NetworkSettings>,
+) -> Result<(Route, Endpoint), String> {
+    Route::bind(move || {
+        let host = host.clone();
         let network = network.clone();
         async move {
             let stream = build_ssh_transport(&host, port, network.as_ref()).await?;
@@ -77,19 +134,14 @@ async fn invoke_with_incoming<T: DeserializeOwned, P: Serialize + Send + 'static
         }
     })
     .await
-    .map_err(|error| format!("Mail module route: {error}"))?;
-    let connection = IncomingTest {
-        route: endpoint,
-        server_name,
-        security: server.security,
-        trusted_certificate: server.trusted_cert.clone(),
-        protocol: account.config.incoming,
-        provider: account.config.provider,
-        authentication: account.auth_mode,
-        username: account.imap_username.clone(),
-        secret: account.imap_password.clone().into(),
-    };
-    let request = build_request(connection);
+    .map_err(|error| format!("Mail module route: {error}"))
+}
+
+async fn invoke<T: DeserializeOwned, P: Serialize + Send + 'static>(
+    registry: Arc<PluginRegistry>,
+    method: &'static str,
+    request: P,
+) -> Result<T, String> {
     let result = tokio::task::spawn_blocking(move || {
         let payload = serde_json::to_value(request).map_err(|error| error.to_string())?;
         registry

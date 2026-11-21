@@ -4,7 +4,7 @@ description: >-
   Install and enable the matching signed Mail package. Use the regular Mail
   tab to populate the IMAP folder tree and unsubscribe Archive. Check the host's
   module data lease before opening the tab, while displaying the folder tree,
-  after the normal IMAP and POP3 connection tests, and after disable.
+  after the normal IMAP, POP3 and SMTP connection tests, and after disable.
 covers: [F-Modules-1, F-MAIL-3, F-MAIL-11, F-MAIL-17]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
@@ -73,7 +73,7 @@ verification:
     - {step: 29, expectation: The refreshed server tree preserves the changed subscription.}
     results: [9, 12, 19, 20, 22, 24, 27, 29]
   - id: R2
-    requirement: The normal connection controls test IMAP and POP3 using the installed Mail host.
+    requirement: The normal connection controls test IMAP, POP3 and SMTP using the installed Mail host.
     actions: [30, 31, 34, 35, 38]
     checkpoints:
     - {step: 32, expectation: The hosted app reports working IMAP and SMTP connections.}

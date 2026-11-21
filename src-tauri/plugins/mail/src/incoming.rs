@@ -74,7 +74,7 @@ fn with_socket<T: Send + 'static>(
     result.map_err(|_| RpcError::from_code(ErrorCode::InternalError))
 }
 
-async fn while_current<T>(
+pub(super) async fn while_current<T>(
     operation: &Operation,
     work: impl Future<Output = T>,
 ) -> Result<T, RpcError> {

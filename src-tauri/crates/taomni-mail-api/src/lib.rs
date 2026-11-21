@@ -9,6 +9,7 @@ use zeroize::Zeroizing;
 
 pub const SLUG: &str = "mail";
 pub const CHECK_INCOMING: &str = "mail/check-incoming";
+pub const CHECK_OUTGOING: &str = "mail/check-outgoing";
 pub const IMAP_FOLDER_TREE: &str = "mail/imap-folder-tree";
 pub const HOST_REQUEST_TIMEOUT: Duration = Duration::from_secs(70);
 
@@ -60,6 +61,18 @@ pub struct IncomingTest {
     pub trusted_certificate: Option<String>,
     pub protocol: MailIncomingProtocol,
     pub provider: MailProvider,
+    pub authentication: MailAuthMode,
+    pub username: String,
+    pub secret: Zeroizing<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OutgoingTest {
+    pub route: Endpoint,
+    pub server_name: String,
+    pub security: MailConnectionSecurity,
+    pub trusted_certificate: Option<String>,
     pub authentication: MailAuthMode,
     pub username: String,
     pub secret: Zeroizing<String>,

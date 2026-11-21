@@ -6,6 +6,9 @@ rust-version = "1.94"
 publish = false
 description = "Mail message parsing and data contracts independent of desktop runtime"
 
+[features]
+routed-smtp = ["lettre/tokio1-native-tls", "dep:tokio", "dep:tokio-native-tls"]
+
 [dependencies]
 base64 = "0.22"
 chrono = "0.4"
@@ -25,6 +28,8 @@ sha2 = "0.11"
 taomni-mail-api = { path = "../taomni-mail-api" }
 taomni-sqlite-snapshot = { path = "../taomni-sqlite-snapshot" }
 tempfile = "3"
+tokio = { version = "1", features = ["net", "time"], optional = true }
+tokio-native-tls = { version = "0.3", optional = true }
 tokio-util = "0.7"
 tracing = "0.1"
 uuid = { version = "1", features = ["v4"] }

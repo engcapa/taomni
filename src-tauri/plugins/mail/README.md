@@ -34,13 +34,14 @@ blocks a second operation, which can retry after the first finishes. The
 reopened host reads the edited and newly created drafts.
 Linux, Windows and macOS run this check.
 
-The Mail toolbar's connection test uses the enabled host for IMAP and POP3
-authentication. Mail 0.1.2 serves the IMAP folder tree on open and full sync
-and updates folder subscriptions. The core grants a route to the selected destination and
-resolves the account credential for each request. The host checks TLS against
-the original hostname and closes the socket on cancellation. The desktop
-applies the resulting folder metadata to the current account cache. Profiles
-with older packages use the existing desktop folder path.
+The Mail toolbar's connection test uses the enabled 0.1.3 host for IMAP, POP3
+and SMTP authentication. The host also serves the IMAP folder tree on open and
+full sync and updates folder subscriptions. The core grants a route to the
+selected destination and resolves the account credential for each request.
+The host checks TLS against the original hostname and closes the socket on
+cancellation. The desktop applies resulting folder metadata to the current
+account cache. The protocol job checks SMTP authentication rejection and
+success, including the NOOP after successful authentication.
 
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.

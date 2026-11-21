@@ -12,8 +12,8 @@ use super::{
     MailMarkReadResult, MailMessageBody, MailMoveResult, MailSendRequest, MailSendResult,
     MailSyncAllResult, MailTestConnectionResult, MessageBuildOptions, build_send_message_with,
     cached_to_body, extract_attachment, get_cached_body, list_cached_folders,
-    mark_cached_messages_read, now_ts, resolve_config, send_smtp_with, test_smtp,
-    unread_cached_uids, update_cached_flags, upsert_sent_contacts, with_mail_db,
+    mark_cached_messages_read, now_ts, resolve_config, send_smtp_with, unread_cached_uids,
+    update_cached_flags, upsert_sent_contacts, with_mail_db,
 };
 use crate::state::AppState;
 
@@ -43,24 +43,22 @@ pub(super) async fn test_connection(
     config: MailAccountConfig,
 ) -> Result<MailTestConnectionResult, String> {
     let account = resolve_config(state, config)?;
-    let hosted = super::module_host::checks_incoming(&state.plugins);
-    if hosted {
+    if super::module_host::checks_incoming(&state.plugins) {
         super::module_host::check_incoming(state.plugins.clone(), &account).await?;
+    } else {
+        let incoming = account.clone();
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::spawn_blocking(move || Pop3Client::connect(&incoming, &handle)?.quit())
+            .await
+            .map_err(|error| format!("POP3 test task failed: {error}"))??;
     }
-    let handle = tokio::runtime::Handle::current();
-    let account_id = account.config.session_id.clone();
-    let smtp_ok = tokio::task::spawn_blocking(move || {
-        if !hosted {
-            Pop3Client::connect(&account, &handle)?.quit()?;
-        }
-        Ok::<bool, String>(test_smtp(&account, &handle).is_ok())
-    })
-    .await
-    .map_err(|e| format!("POP3 test task failed: {e}"))??;
+    let smtp_ok = super::module_host::test_smtp(state.plugins.clone(), &account)
+        .await
+        .is_ok();
     Ok(MailTestConnectionResult {
         imap_ok: true,
         smtp_ok,
-        folder_count: folders(state, &account_id)?.len(),
+        folder_count: folders(state, &account.config.session_id)?.len(),
     })
 }
 

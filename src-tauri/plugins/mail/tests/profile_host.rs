@@ -29,6 +29,9 @@ use taomni_plugin_api::{
 };
 use taomni_sqlite_snapshot::SnapshotControl;
 
+#[path = "support/smtp.rs"]
+mod smtp;
+
 const ACCOUNT: &str = "existing-mail";
 const FRESH_ACCOUNT: &str = "new-mail";
 const ARCHIVED_AT: i64 = 1_710_000_010;
@@ -110,6 +113,7 @@ impl MailHost {
             "mail-profile-test-token",
             [
                 taomni_mail_api::CHECK_INCOMING,
+                taomni_mail_api::CHECK_OUTGOING,
                 taomni_mail_api::IMAP_FOLDER_TREE,
                 "mail_list_cached_folders",
                 "mail_list_cached_messages",
@@ -321,6 +325,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     let before = fs::read(&path).unwrap();
     let mut host = MailHost::spawn(&profile, &context);
     host.handshake(&context);
+    smtp::check_routed_smtp(&mut host);
     snapshot_cache(&mut host, &context, &profile, &filename, &attachment);
     let folders = host.call("mail_list_cached_folders", json!({"accountId":ACCOUNT}));
     assert_eq!(folders[0]["name"], "INBOX");
