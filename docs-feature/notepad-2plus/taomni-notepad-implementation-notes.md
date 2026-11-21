@@ -116,7 +116,7 @@ gh workflow run qa-ui-auto-platforms.yml --ref feat/notepad-2plus-impl \
 
 selected scope 会自动并入 `crash-regression` 标签用例（AGENTS.md 要求）。
 
-**结果（run `44931303328`，head `dc78b7abe`）：** browser 三端全部通过——Linux / Windows / macOS 各 22 passed（含 TC-NP-001..005 与 crash-regression 套件）+ 各 1 passed（单用例 shard），0 failed / 0 skipped。shard 产物 `qa-<os>-browser-shard-*` 已下载核对（`qa-ui-auto-report/hosted/run2/`）。native 三端 release QA 构建与执行结果在运行页面记录；本地已用同一 head 的 debug QA 二进制验证 TC-NP-101/102。未执行平台/项目保持“未验证”。
+**结果（run `44931303328`，head `dc78b7abe`；run `44936461619`，head `3fab61357`）：** browser 三端全部通过——Linux / Windows / macOS 各 22 passed（含 TC-NP-001..005 与 crash-regression 套件）+ 各 1 passed（单用例 shard），0 failed / 0 skipped。shard 产物 `qa-<os>-browser-shard-*` 已下载核对（`qa-ui-auto-report/hosted/run2/`）。native 三端 release QA 构建与执行结果在运行页面记录；本地已用同一 head 的 debug QA 二进制验证 TC-NP-101/102。未执行平台/项目保持“未验证”。
 
 ### 4.4 Linux 真机（Xvfb 隔离会话）
 
@@ -128,6 +128,8 @@ TextEditor → NotepadEditor 迁移后，既有崩溃回归用例 `TC-FILE-OPEN-
 
 1. **共享保存按钮契约**：旧 `viewer-save` 在文档干净或只读时禁用；新工具栏最初按原型“全部按钮可点”实现，导致三个用例失败。现保存按钮仅对“脏且可写且不在保存中”的文档启用，其余 21 个原型按钮保持可点。
 2. **丢弃未保存内容后仍可恢复**：关闭标签选择“丢弃”后，Notepad 磁盘备份仍残留，重新打开文件会恢复被丢弃的内容而不是磁盘内容。`documentStore.discard` 现在会清理该文档的 Notepad 备份，`release` 对干净文档同样清理。
+
+3. **纯 Delete 键被命令拦截**：Edit 菜单把 Delete 显示为“删除”命令的快捷键，工作台 keydown 分发在 CodeMirror 之前命中了这条裸键映射，按 Delete 会删掉整行而不是删除光标后的字符。现在裸 Delete 键放行给编辑器，菜单项仍走命令注册表，且“删除”命令在没有选区时为空操作。浏览器实测：`abc def` 光标在 `abc` 后按 Delete → `abcdef`；全选后菜单 Edit → Delete 清空缓冲区。
 
 本机复核：`TC-FILE-OPEN-001`、`TC-FILE-OPEN-006` 与 `TC-NP-001..005` 一起执行 → 7 passed / 0 failed。`TC-FILE-OPEN-008` 本机因未配置 SSH fixture 跳过（托管 runner 提供 fixture）。
 
