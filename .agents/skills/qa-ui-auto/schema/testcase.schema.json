@@ -956,6 +956,10 @@
           "enum": ["idle", "running", "disabled"],
           "description": "Native signed Mail case only. Match installed host bytes to the signed input and observe the module writer lease before, during and after using the Mail host."
         },
+        "assert_signed_rdp_latency": {
+          "type": "null",
+          "description": "Signed RDP native lifecycle case only. Send 40 clicks to the owned desktop target and record native WebView pointer-to-decoded-frame latency, module identity and the applied p95 limit."
+        },
         "module_upgrade_probe": {
           "type": "object", "additionalProperties": false, "required": ["phase"],
           "properties": { "phase": { "enum": ["preflight", "pending", "repeat", "after-first-install", "vnc-retained", "rdp-pins-retained", "rdp-legacy-restore-applied", "legacy-restore-applied"] } },

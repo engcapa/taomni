@@ -8,10 +8,11 @@ description: >-
   another certificate confirmation and deliver a second click. A separate
   session without a configured RD Gateway username shows the gateway validation error.
   The migration imports legacy pins and records the new pin in the module database.
+  The reconnected signed viewer also measures the input-to-decoded-frame delay.
 covers: [F-Modules-1, F9.7, F-RdpServer-1]
 tags: [modules, rdp-client, rdp-server, lifecycle, native-boundary, p1]
 modes: [native]
-fixtures: [reset_db, module_upgrade, module_signed_rdp_archive, rdp_server_required, system_rdp_running]
+fixtures: [reset_db, module_upgrade, module_signed_rdp_archive, rdp_server_required, system_rdp_running, release_build_required]
 timeout_sec: 420
 steps:
 - open: ${cfg.app.base_url}
@@ -96,6 +97,7 @@ steps:
 - assert_count: {selector: '[data-testid="confirm-dialog"]', equal: 0}
 - rdp_canvas_click: {x: 280, y: 240}
 - assert_json_file: {path: target-state.json, timeout_sec: 20, expect: {flips: {min: 2}}}
+- assert_signed_rdp_latency: null
 - assert_no_runtime_errors: null
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="side-tab-sessions"]'
@@ -141,21 +143,22 @@ verification:
     - {step: 69, expectation: The same saved session occupies one tab after enabling.}
     - {step: 73, expectation: The second connection did not require renewed certificate approval.}
     - {step: 75, expectation: A second click reaches the same host target after enabling.}
-    - {step: 76, expectation: The native renderer has no uncaught runtime errors.}
-    results: [60, 61, 62, 69, 73, 75, 76]
+    - {step: 76, expectation: Forty target clicks yield at least 36 measured signed viewer frames and a p95 at or below 130 ms.}
+    - {step: 77, expectation: The native renderer has no uncaught runtime errors.}
+    results: [60, 61, 62, 69, 73, 75, 76, 77]
   - id: R3
     requirement: The signed viewer reports an invalid gateway using its normal connection workflow.
-    actions: [77, 78, 79, 80, 82, 83, 84, 85, 88, 89, 91, 92]
+    actions: [78, 79, 80, 81, 83, 84, 85, 86, 89, 90, 92, 93]
     checkpoints:
-    - {step: 93, expectation: The signed renderer shows the missing gateway username error.}
-    - {step: 94, expectation: The gateway validation produces no uncaught renderer errors.}
-    results: [93, 94]
+    - {step: 94, expectation: The signed renderer shows the missing gateway username error.}
+    - {step: 95, expectation: The gateway validation produces no uncaught renderer errors.}
+    results: [94, 95]
   - id: R4
     requirement: A signed installation imports old certificate decisions and records newly accepted certificates in the module store.
     actions: [6, 8, 46]
     checkpoints:
-    - {step: 95, expectation: "The native profile preserves the legacy rows and contains the import receipt and the new module-owned pin."}
-    results: [95]
+    - {step: 96, expectation: "The native profile preserves the legacy rows and contains the import receipt and the new module-owned pin."}
+    results: [96]
   visual:
   - check: The signed viewer and the disabled state appear in the saved tab.
     method: automated

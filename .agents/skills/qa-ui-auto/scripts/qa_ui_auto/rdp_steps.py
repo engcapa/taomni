@@ -792,23 +792,9 @@ def _do_rdp_canvas_click(ctx: NativeStepContext, args: Any) -> str:
     """Click remote desktop coordinate (x, y) inside the RDP client canvas."""
     if not isinstance(args, dict) or "x" not in args or "y" not in args:
         raise StepError("rdp_canvas_click: expected {x, y, selector?}")
-    selector = str(args.get("selector") or '[data-testid="rdp-canvas"]')
-    geometry = ctx.session.execute(
-        "const c = document.querySelector(" + json.dumps(selector) + ");"
-        "if (!c) return null; const r = c.getBoundingClientRect();"
-        "return {left: r.left, top: r.top, width: r.width, height: r.height,"
-        " desktopWidth: c.width, desktopHeight: c.height};"
-    )
-    if not isinstance(geometry, dict) or not geometry.get("width"):
-        raise StepError(f"rdp_canvas_click: canvas {selector} not found or not laid out")
-    sx = float(geometry["width"]) / float(geometry["desktopWidth"] or geometry["width"])
-    sy = float(geometry["height"]) / float(geometry["desktopHeight"] or geometry["height"])
-    vx = int(geometry["left"] + float(args["x"]) * sx)
-    vy = int(geometry["top"] + float(args["y"]) * sy)
-    from native_pointer import click_viewport_point
+    from .rdp_helpers.canvas import CANVAS, click_canvas
 
-    click_viewport_point(ctx.session, vx, vy, move_ms=50, hold_ms=60)
-    return f"clicked desktop ({args['x']},{args['y']}) at viewport ({vx},{vy}) scale {sx:.3f}x{sy:.3f}"
+    return click_canvas(ctx.session, args["x"], args["y"], str(args.get("selector") or CANVAS))
 
 
 # ------------------------------------------------------------------- save_text

@@ -15,9 +15,44 @@ from qa_ui_auto import audit, runner
 from qa_ui_auto.deadline import CaseTimeout, Deadline, budget_time, using_deadline
 from qa_ui_auto.feature_catalog import Feature
 from qa_ui_auto.provenance import digest_file, input_digest, conditions_identity
+from qa_ui_auto.rdp_helpers import signed_viewer_latency
 from qa_ui_auto.runner_receipt import emit_runner_receipt
+from qa_ui_auto.steps import StepError
 from qa_ui_auto.testcase import TestCase
 from qa_ui_auto.verification import coverage_status, load_observations, native_support, plan
+
+
+class SignedViewerLatencyTest(unittest.TestCase):
+    def test_counts_timeouts_separately_from_invalid_sample_pairs(self):
+        samples = [{"frameMs": ms, "targetMatched": True} for ms in reversed(range(36))]
+        samples += [{"frameMs": None, "targetMatched": True}] * 3
+        samples.append({"frameMs": 1, "targetMatched": False})
+        self.assertEqual(signed_viewer_latency.frame_stats(samples), {
+            "attempted": 40, "received": 36, "timeouts": 3, "p95Ms": 34,
+        })
+
+    def test_wrong_target_event_keeps_raw_receipt_and_removes_observer(self):
+        baseline = {"pid": 123, "flips": 2, "color": "#000000"}
+        after_input = {
+            "pid": 123, "flips": 3, "color": "#ffffff",
+            "flip_samples": [{"flip": 3, "event_type": "KeyPress", "button": None}],
+        }
+        provenance = {"sourceSha": "source", "sha256": "package", "platform": "linux-x86_64",
+                      "frontendSha256": "frontend", "version": "0.1.2"}
+        with tempfile.TemporaryDirectory() as home:
+            path = Path(home)
+            execute = Mock(side_effect=[True, True, True, 21.0, None])
+            ctx = SimpleNamespace(case_dir=path, session=SimpleNamespace(execute=execute),
+                                  fixture_context=SimpleNamespace(case_id="TC-MODULES-056"))
+            with patch.object(signed_viewer_latency, "read_json", side_effect=[provenance, baseline, after_input]), \
+                 patch.object(signed_viewer_latency, "click_canvas"):
+                with self.assertRaisesRegex(StepError, "expected RDP button press"):
+                    signed_viewer_latency.run(ctx, None)
+            report = json.loads((path / "signed-rdp-viewer-latency.json").read_text(encoding="utf-8"))
+        self.assertFalse(report["passed"])
+        self.assertEqual(report["received"], 0)
+        self.assertEqual(report["samples"][0]["target"]["event_type"], "KeyPress")
+        self.assertIn("dispose()", execute.call_args.args[0])
 
 
 class VerificationTest(unittest.TestCase):
@@ -266,10 +301,15 @@ class VerificationTest(unittest.TestCase):
             output.parent.mkdir(parents=True)
             output.write_bytes(b"QA")
             inputs = {"source_sha256": "source", "recipe_sha256": "recipe"}
-            native_build.identity_path(output).write_text(json.dumps({
+            identity = {
                 "identifier": native_build.QA_APP_ID, "binary_sha256": native_build.binary_digest(output),
                 "build_inputs": inputs,
-            }))
+            }
+            for _, name, suffix, key in native_build.PLATFORM_HELPERS["Windows"]:
+                helper = output.with_name(f"{name}{suffix}")
+                helper.write_bytes(name.encode("ascii"))
+                identity[key] = native_build.binary_digest(helper)
+            native_build.identity_path(output).write_text(json.dumps(identity), encoding="utf-8")
             with patch.object(native_build, "ROOT", root), \
                  patch.object(native_build.platform, "system", return_value="Windows"), \
                  patch.object(native_build.shutil, "which", return_value="pnpm"), \

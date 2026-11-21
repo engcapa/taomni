@@ -2,6 +2,8 @@
 
 ## 2026-11-21 当前进展
 
+- TC-MODULES-056 在重新启用 RDP 后使用相同签名包与会话测量 40 次点击。每次将 WebView 收到的指针事件、远程目标的按键与颜色记录以及签名查看器中解码的帧配对。要求至少 36 帧，p95 上限 130 ms。分片中的 `signed-rdp-viewer-latency.json` 保存签名包摘要和逐次计时。既有 TC-RDPS-PERF-01 继续测量首帧、带宽、帧率和探针路径延迟。
+- Windows G6 实装通过。`win25-vs2026` runner 上强制结束核心后，签名 MFA 宿主在驱动清理前自行退出。重开后原 HOTP 从 `287 082` 推进至 `359 152`，同批升级、模式互斥和回滚通过。实装包源码为 `bdb828ccf`，正式候选仍需复验。原始回执位于 `qa-ui-auto-report/github/44886832952/live-contracts/modular-bundle-windows-x86_64-44855371144/installed-desktop-mfa-crash.json`。 [实装工件](https://github.com/engcapa/taomni/actions/runs/44886832952)
 - `49a3540bf` 合入 `main` 的 `6b8e350cb`（#846）。独立 Explorer 工作区保留主线的快速创建和递归 glob 搜索，也保留可编辑类型对话框。TC-EXPLORER-010/011 继续检查完整类型列表、实际编辑、保存与重开。Live 表格、HTML 预览用例迁到新入口。TypeScript 和 409 项前端单测通过。 [合并提交](https://github.com/engcapa/taomni/commit/49a3540bf)
 - RDP 旧版备份在启动时把证书记录提交给已拥有证书数据的模块。核心备份副本去掉旧回退表，单独还原核心时保留模块证书。还原复用写锁和原子 journal，既有旧库与退回单体版本所需数据保留。TC-MODULES-058 覆盖启动还原和未安装模块的保留数据。`1da944af4` 的三端 Browser 各 36/36，macOS 26 已通过签名 RDP 全流程 056。 [逐片复验](https://github.com/engcapa/taomni/actions/runs/44882903220)
 - Windows MSI 截图确认 Tools 列表与悬浮窗入口同名。限定 Tools 入口后，Vault 创建和 MFA 账号添加完成，第一次剪贴板读取超时。改用原生点击并等待实际剪贴板内容，沿用原 MSI 复验。候选源为 `bdb828ccf`，runner 为 `win25-vs2026` `20261116.315.1`。 [截图](https://github.com/engcapa/taomni/actions/runs/44882128241) · [账号添加](https://github.com/engcapa/taomni/actions/runs/44883995075) · [HOTP 复验](https://github.com/engcapa/taomni/actions/runs/44885819763)
