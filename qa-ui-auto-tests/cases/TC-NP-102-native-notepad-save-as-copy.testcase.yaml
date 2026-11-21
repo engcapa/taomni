@@ -1,0 +1,96 @@
+id: TC-NP-102
+title: Native Notepad Save As writes a new real file and Save a Copy keeps the original document
+description: 'AC-01/AC-48: the Notepad Save As dialog writes a real file through viewer_save_as, re-keys the open document
+  and updates the tab title, while File → Save a Copy writes a second real file without re-pointing the open document.
+  Real host bytes and path identity are only observable natively; the browser VFS cannot prove either behaviour.'
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+- macOS
+covers:
+- F-NOTEPAD-5
+tags:
+- p0
+- notepad
+- native
+- file-open
+- lifecycle
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-notepad-native-save-as
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- wait_for: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- wait_for: '[data-testid="file-viewer"] [data-testid="notepad-workbench"]'
+- click: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+a
+    macos_key: Meta+a
+- type: 'Save-as native body'
+- click: '[data-testid="notepad-menu-file"]'
+- click: '[data-testid="notepad-menu-item-file.saveAs"]'
+- wait_for: '[data-testid="notepad-save-as-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="notepad-save-as-input"]'
+    name: value
+    contains: notes.txt
+- fill:
+    selector: '[data-testid="notepad-save-as-input"]'
+    value: ${fixture.file_open_root}/notepad-save-as.txt
+- click: '[data-testid="notepad-save-as-confirm"]'
+- assert_not_visible: '[data-testid="notepad-save-as-dialog"]'
+- assert_file_exists: ${fixture.file_open_root}/notepad-save-as.txt
+- assert_file_contains:
+    path: ${fixture.file_open_root}/notepad-save-as.txt
+    contains: Save-as native body
+- assert_text:
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
+    contains: notepad-save-as
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'false'
+- click: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+a
+    macos_key: Meta+a
+- type: 'Copy native body'
+- click: '[data-testid="notepad-menu-file"]'
+- click: '[data-testid="notepad-menu-item-file.saveCopy"]'
+- wait_for: '[data-testid="notepad-save-as-dialog"]'
+- fill:
+    selector: '[data-testid="notepad-save-as-input"]'
+    value: ${fixture.file_open_root}/notepad-copy.txt
+- click: '[data-testid="notepad-save-as-confirm"]'
+- assert_not_visible: '[data-testid="notepad-save-as-dialog"]'
+- assert_file_exists: ${fixture.file_open_root}/notepad-copy.txt
+- assert_file_contains:
+    path: ${fixture.file_open_root}/notepad-copy.txt
+    contains: Copy native body
+- assert_file_contains:
+    path: ${fixture.file_open_root}/notepad-save-as.txt
+    contains: Save-as native body
+- assert_text:
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
+    contains: notepad-save-as
+- assert_no_runtime_errors: null
