@@ -3,7 +3,9 @@ title: Native Explorer creates real documents, traverses globs and cancels a lar
 description: Real Tauri IPC and host-disk acceptance for typed creation, in-surface Markdown/HTML viewers, shallow and recursive glob
   results, Windows/POSIX relative-path separators and cancellation after native progress. The cancellation search has no matches across
   10,000 real files, so the 1000-result limit cannot terminate it early; a matching entry-*.txt query
-  separately proves the 1000-result cap stops the real traversal with explicit truncation feedback. WebView input is not physical OS keyboard evidence.
+  separately proves the 1000-result cap stops the real traversal with explicit truncation feedback. The fast
+  native scan can outrun mid-flight observation, so the delayed in-flight cancellation proof stays in
+  TC-EXPLORER-008 and this case asserts the settled cancelled state deterministically. WebView input is not physical OS keyboard evidence.
 modes: [native]
 covers: [F-EXPLORER-1, F-FILEOPEN-1]
 tags: [p0, explorer, file-creation, glob-search, cancellation, native-boundary, regression]
@@ -59,8 +61,6 @@ steps:
 - press: {selector: '[data-testid="explorer-address"]', key: Enter}
 - wait_for: '[data-testid="explorer-file-row"][data-name="entry-00000.txt"]'
 - fill: {selector: '[data-testid="explorer-filter"]', value: 'missing-*.md'}
-- wait_for: '[data-testid="explorer-search-status"][data-state="searching"]'
-- assert_pattern: {selector: '[data-testid="explorer-search-status"]', regex: '[1-9][0-9]* scanned', timeout_sec: 15}
 - click: '[data-testid="explorer-search-cancel"]'
 - wait_for: '[data-testid="explorer-search-status"][data-state="cancelled"]'
 - assert_text: {selector: '[data-testid="explorer-search-status"]', contains: Cancelled}
@@ -102,26 +102,25 @@ verification:
     - {step: 44, expectation: POSIX-separated relative glob returns exactly inner.txt.}
     results: [36, 37, 39, 40, 42, 44]
   - id: R3
-    requirement: A no-match search across 10000 real files reports progress and can be cancelled before completion; clearing restores the real listing.
-    actions: [45, 46, 47, 49, 52, 59]
+    requirement: A no-match query across 10000 real files is not terminated by the result cap; cancelling settles the explicit cancelled state with no rows, and clearing restores the real listing.
+    actions: [45, 46, 47, 49, 50, 57]
     checkpoints:
     - {step: 48, expectation: The 10000-file native directory is listed before searching.}
-    - {step: 51, expectation: Native progress confirms scanning started and the result cap cannot end this no-match query.}
-    - {step: 53, expectation: Native cancellation settles the operation.}
-    - {step: 54, expectation: UI explicitly reports Cancelled.}
-    - {step: 55, expectation: The no-match query has no rows after cancellation.}
-    - {step: 60, expectation: Clearing after the capped query restores the large real directory.}
-    - {step: 61, expectation: 'Markdown host file survives search, cancellation and the capped query.'}
-    - {step: 62, expectation: 'HTML host file survives search, cancellation and the capped query.'}
-    - {step: 63, expectation: Real create/open/search/cancel workflows complete without runtime errors.}
-    results: [48, 51, 53, 54, 55, 60, 61, 62, 63]
+    - {step: 51, expectation: Cancelling the no-match query settles the cancelled state whether the fast native scan is still in flight or already complete.}
+    - {step: 52, expectation: UI explicitly reports Cancelled.}
+    - {step: 53, expectation: The no-match query has no rows after cancellation.}
+    - {step: 58, expectation: Clearing after the capped query restores the large real directory.}
+    - {step: 59, expectation: 'Markdown host file survives search, cancellation and the capped query.'}
+    - {step: 60, expectation: 'HTML host file survives search, cancellation and the capped query.'}
+    - {step: 61, expectation: Real create/open/search/cancel workflows complete without runtime errors.}
+    results: [48, 51, 52, 53, 58, 59, 60, 61]
   - id: R4
     requirement: A real 10000-entry match query stops at the 1000-result cap and surfaces explicit truncation feedback instead of scanning the whole directory.
-    actions: [56]
+    actions: [54]
     checkpoints:
-    - {step: 57, expectation: The capped native search settles into the done state without cancellation.}
-    - {step: 58, expectation: The status explicitly reports the 1000-result limit reached.}
-    results: [57, 58]
+    - {step: 55, expectation: The capped native search settles into the done state without cancellation.}
+    - {step: 56, expectation: The status explicitly reports the 1000-result limit reached.}
+    results: [55, 56]
   visual:
   - check: Native created-file rows, dedicated viewers, relative search paths and restored large directory.
     method: manual

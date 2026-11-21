@@ -105,6 +105,7 @@ steps:
     selector: '[data-testid="explorer-tab"]'
     name: data-path
     equals: ${fixture.explorer_previews}
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="terminal"]'
 - host_write_file:
     path: ${fixture.explorer_previews}/notes.txt
@@ -120,6 +121,7 @@ steps:
     contains: External editor changed the preview
 - assert_no_runtime_errors: null
 - screenshot: explorer-native-clipboard-terminal-preview.png
+- click: '[data-testid="side-tab-sessions"]'
 - right_click: '[data-testid="tab-item"][data-tab-type="terminal"]'
 - click: '[data-testid="context-menu-item-close"]'
 - wait_for:
@@ -204,11 +206,11 @@ verification:
     - 35
     - 37
     - 40
-    - 44
     - 45
     - 46
     - 47
-    - 49
+    - 48
+    - 50
     checkpoints:
     - step: 36
       expectation: Anchored PTY output proves actual command execution.
@@ -220,7 +222,7 @@ verification:
       expectation: Existing same-directory Explorer is reused.
     - step: 43
       expectation: Terminal cwd maps to the Explorer directory that launched it.
-    - step: 50
+    - step: 51
       expectation: Preview re-reads actual externally modified file bytes.
     results:
     - 36
@@ -228,7 +230,7 @@ verification:
     - 39
     - 42
     - 43
-    - 50
+    - 51
   - id: R3
     requirement: Explorer current directory and shared preview preferences restore after a verified OS-process restart with Explorer still open.
       The runner checks the exact visible Exit dialog, clicks its confirm button once through real session input, records the confirmation and
@@ -238,39 +240,39 @@ verification:
     - 28
     - 30
     - 31
-    - 59
-    - 68
+    - 61
     - 70
-    - 71
+    - 72
+    - 73
     checkpoints:
     - step: 29
       expectation: Bottom position applies before the OS-process restart.
     - step: 32
       expectation: Wrap is persisted.
-    - step: 64
-      expectation: Current native directory restores after the verified OS-process restart, not a WebView reload.
-    - step: 65
-      expectation: Restore does not duplicate Explorer.
     - step: 66
-      expectation: Bottom position restores.
+      expectation: Current native directory restores after the verified OS-process restart, not a WebView reload.
     - step: 67
+      expectation: Restore does not duplicate Explorer.
+    - step: 68
+      expectation: Bottom position restores.
+    - step: 69
       expectation: Wrap restores.
-    - step: 73
-      expectation: Force-new from terminal adds exactly one Explorer.
-    - step: 74
-      expectation: Both same-cwd Explorer panes remain independently mounted.
     - step: 75
+      expectation: Force-new from terminal adds exactly one Explorer.
+    - step: 76
+      expectation: Both same-cwd Explorer panes remain independently mounted.
+    - step: 77
       expectation: No runtime errors after native restore and new tab.
     results:
     - 29
     - 32
-    - 64
-    - 65
     - 66
     - 67
-    - 73
-    - 74
+    - 68
+    - 69
     - 75
+    - 76
+    - 77
   visual:
   - check: Native packaged preview, terminal context menu and Explorer tabs.
     method: manual
