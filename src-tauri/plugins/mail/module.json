@@ -2,8 +2,8 @@
   "id": "taomni-plugin-mail",
   "slug": "mail",
   "name": "Mail",
-  "description": "Read migrated mail and local POP3 messages, check incoming mail connections and keep drafts and contacts in separate account stores.",
-  "version": "0.1.1",
+  "description": "Read migrated mail and local POP3 messages, connect to incoming mail servers, manage IMAP folders and keep drafts and contacts in separate account stores.",
+  "version": "0.1.2",
   "coreApiVersion": "1",
   "kind": "collaboration",
   "status": "provisional",
@@ -12,6 +12,7 @@
   "tabs": [],
   "commands": [
     "mail/check-incoming",
+    "mail/imap-folder-tree",
     "mail_list_cached_folders",
     "mail_list_cached_messages",
     "mail_get_cached_body",

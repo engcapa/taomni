@@ -10,10 +10,14 @@
 
 use std::collections::HashMap;
 
+use taomni_mail_api::FolderSubscription;
 use tauri::State;
 
 use super::sync::FolderSyncState;
-use super::{MailAccountConfig, MailFolder, resolve_config, with_imap_session, with_mail_db};
+use super::{
+    ImapSessionOpts, MailAccountConfig, MailFolder, ResolvedMailAccount, module_host,
+    resolve_config, with_imap_session, with_mail_db,
+};
 use crate::state::AppState;
 
 #[cfg(test)]
@@ -78,19 +82,7 @@ pub async fn mail_list_folders(
     let account = resolve_config(&state, config)?;
     let account_id = account.config.session_id.clone();
     let cache_enabled = account.config.cache.enabled;
-    let pool = std::sync::Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    let listed = tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            super::ImapSessionOpts::default(),
-            |imap| imap.list_folders(&account.config.session_id),
-        )
-    })
-    .await
-    .map_err(|e| format!("mail list folders task failed: {e}"))??;
+    let listed = live_imap_folder_tree(&state, account, None, ImapSessionOpts::default()).await?;
     if !cache_enabled {
         return Ok(listed);
     }
@@ -115,22 +107,9 @@ pub async fn mail_set_folder_subscription(
     let account = resolve_config(&state, config)?;
     let account_id = account.config.session_id.clone();
     let cache_enabled = account.config.cache.enabled;
-    let pool = std::sync::Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    let listed = tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            super::ImapSessionOpts::default(),
-            |imap| {
-                imap.set_subscription(&folder, subscribed)?;
-                imap.list_folders(&account.config.session_id)
-            },
-        )
-    })
-    .await
-    .map_err(|e| format!("mail subscription task failed: {e}"))??;
+    let change = FolderSubscription { folder, subscribed };
+    let listed =
+        live_imap_folder_tree(&state, account, Some(change), ImapSessionOpts::default()).await?;
     if !cache_enabled {
         return Ok(listed);
     }
@@ -148,6 +127,29 @@ pub async fn mail_set_folder_subscription(
         }
         super::list_cached_folders(db, &account_id)
     })
+}
+
+pub(super) async fn live_imap_folder_tree(
+    state: &State<'_, AppState>,
+    account: ResolvedMailAccount,
+    subscription: Option<FolderSubscription>,
+    options: ImapSessionOpts,
+) -> Result<Vec<MailFolder>, String> {
+    if module_host::manages_imap_folders(&state.plugins) {
+        return module_host::imap_folder_tree(state.plugins.clone(), &account, subscription).await;
+    }
+    let pool = std::sync::Arc::clone(&state.legacy.mail.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
+    tokio::task::spawn_blocking(move || {
+        with_imap_session(&pool, &account, &handle, options, |imap| {
+            if let Some(change) = &subscription {
+                imap.set_subscription(&change.folder, change.subscribed)?;
+            }
+            imap.list_folders(&account.config.session_id)
+        })
+    })
+    .await
+    .map_err(|error| format!("mail folder tree task failed: {error}"))?
 }
 
 #[cfg(test)]

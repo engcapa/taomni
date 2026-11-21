@@ -185,7 +185,11 @@ pub async fn plugin_invoke(
     state: State<'_, AppState>,
 ) -> Result<Value, taomni_plugin_api::RpcError> {
     if (slug == crate::vnc::MODULE_SLUG && command.starts_with("vnc/"))
-        || (slug == taomni_mail_api::SLUG && command == taomni_mail_api::CHECK_INCOMING)
+        || (slug == taomni_mail_api::SLUG
+            && matches!(
+                command.as_str(),
+                taomni_mail_api::CHECK_INCOMING | taomni_mail_api::IMAP_FOLDER_TREE
+            ))
     {
         // The desktop commands resolve these routes and credentials.
         return Err(taomni_plugin_api::RpcError::from_code(

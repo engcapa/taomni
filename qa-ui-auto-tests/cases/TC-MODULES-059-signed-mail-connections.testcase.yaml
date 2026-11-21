@@ -1,10 +1,11 @@
 id: TC-MODULES-059
-title: The signed Mail module tests incoming mail connections
+title: The signed Mail module lists and subscribes IMAP folders and tests incoming connections
 description: >-
   Install and enable the matching signed Mail package. Use the regular Mail
-  toolbar against the runner's IMAP, POP3 and SMTP servers. Check the host's
-  module data lease before the first test, after login and after disable.
-covers: [F-Modules-1, F-MAIL-3, F-MAIL-17]
+  tab to populate the IMAP folder tree and unsubscribe Archive. Check the host's
+  module data lease before opening the tab, while displaying the folder tree,
+  after the normal IMAP and POP3 connection tests, and after disable.
+covers: [F-Modules-1, F-MAIL-3, F-MAIL-11, F-MAIL-17]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
 fixtures: [reset_db, mail_server, module_signed_mail_archive]
@@ -28,6 +29,18 @@ steps:
 - click: '[data-testid="qc-submit"]'
 - wait_for: '[data-testid="mail-client-tab"]'
 - mail_server_assert_list_matches: {timeout_sec: 40}
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- assert_signed_mail_host: folder-tree
+- click: '[data-testid="mail-subscriptions-open"]'
+- wait_for: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="true"]'
+- click: '[data-testid="mail-subscription-row"][data-folder-name="Archive"] [data-testid="mail-subscription-toggle"]'
+- wait_for: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="false"]'
+- click: '[role="dialog"][aria-label="Folder subscriptions"] [aria-label="Close dialog"]'
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: 'new headers across', timeout_sec: 40}
+- click: '[data-testid="mail-subscriptions-open"]'
+- wait_for: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="false"]'
+- click: '[role="dialog"][aria-label="Folder subscriptions"] [aria-label="Close dialog"]'
 - click: '[data-testid="mail-test-connection"]'
 - assert_text: {selector: '[data-testid="mail-client-tab"]', contains: 'IMAP ok, SMTP ok', timeout_sec: 45}
 - assert_signed_mail_host: running
@@ -47,23 +60,34 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: The normal connection controls test IMAP and POP3 using the installed Mail host.
-    actions: [6, 7, 8, 10, 15, 16, 19, 22, 23, 26]
+    requirement: Opening the Mail tab starts the signed host, lists the actual IMAP folders and changes the server subscription.
+    actions: [6, 7, 8, 10, 15, 16, 21, 23, 26, 28]
     checkpoints:
     - {step: 9, expectation: The module installer accepts the verified artifact.}
-    - {step: 12, expectation: The signed module bytes are installed and the host has no writer lease yet.}
-    - {step: 20, expectation: The hosted app reports working IMAP and SMTP connections.}
-    - {step: 21, expectation: The signed Mail host now holds its data lease.}
-    - {step: 27, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
-    results: [9, 12, 20, 21, 27]
+    - {step: 12, expectation: The signed module is installed and the host has no writer lease yet.}
+    - {step: 19, expectation: Opening the account shows Archive from the actual IMAP server.}
+    - {step: 20, expectation: The signed Mail host holds its data lease before the connection test.}
+    - {step: 22, expectation: The subscription dialog shows the initial subscribed state.}
+    - {step: 24, expectation: The updated IMAP folder tree reports Archive as unsubscribed.}
+    - {step: 27, expectation: Full synchronization finishes with the signed host supplying the folder tree.}
+    - {step: 29, expectation: The refreshed server tree preserves the changed subscription.}
+    results: [9, 12, 19, 20, 22, 24, 27, 29]
   - id: R2
-    requirement: Disabling the module releases its data lease without restarting the desktop.
-    actions: [28, 29, 30]
+    requirement: The normal connection controls test IMAP and POP3 using the installed Mail host.
+    actions: [30, 31, 34, 35, 38]
     checkpoints:
-    - {step: 31, expectation: The disabled package can be re-enabled.}
-    - {step: 32, expectation: The verified module is still installed and the host released its writer lease.}
-    - {step: 33, expectation: The same renderer is still running without uncaught errors.}
-    results: [31, 32, 33]
+    - {step: 32, expectation: The hosted app reports working IMAP and SMTP connections.}
+    - {step: 33, expectation: The signed Mail host still holds its data lease.}
+    - {step: 39, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
+    results: [32, 33, 39]
+  - id: R3
+    requirement: Disabling the module releases its data lease without restarting the desktop.
+    actions: [40, 41, 42]
+    checkpoints:
+    - {step: 43, expectation: The disabled package can be re-enabled.}
+    - {step: 44, expectation: The verified module is still installed and the host released its writer lease.}
+    - {step: 45, expectation: The same renderer still runs without uncaught errors.}
+    results: [43, 44, 45]
   visual:
   - check: The Mail pane shows the connection results for both accounts.
     method: automated

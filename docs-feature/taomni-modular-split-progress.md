@@ -2,6 +2,8 @@
 
 ## 2026-11-21 当前进展
 
+- `b200f4556` 在 Linux、Windows、macOS 26 Browser 各通过 40/40，六个分片在汇总前下载。Linux Native 在构建前遇到 ControlBar 针对旧 Sessions Explorer 的单测断言。`ce6f2ba97` 改用真实的独立 Explorer 打开流程，相关 40 项单测通过。Linux 首次补跑的计划拒绝了三条专用于 Windows 或 macOS 的用例，复跑选集已按 Linux 支持范围更新，仍保留完整崩溃回归和 G5 测量。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44886830317) · [补跑计划日志](https://github.com/engcapa/taomni/actions/runs/44888848242/job/136800013872)
+- Mail 0.1.2 将普通标签打开、全量同步时的 IMAP 文件夹读取和订阅修改交给签名宿主。核心继续按账户更新现用缓存。TC-MODULES-059 核对真实 Archive 文件夹、签名宿主的写租约、取消订阅和全量同步后的状态，并继续检查 IMAP、POP3 连接测试和禁用时的租约释放。TC-MAIL-FOLDER-01 保留 Browser 和 Native 的订阅偏好和重开检查。
 - TC-MODULES-056 在重新启用 RDP 后使用相同签名包与会话测量 40 次点击。每次将 WebView 收到的指针事件、远程目标的按键与颜色记录以及签名查看器中解码的帧配对。要求至少 36 帧，p95 上限 130 ms。分片中的 `signed-rdp-viewer-latency.json` 保存签名包摘要和逐次计时。既有 TC-RDPS-PERF-01 继续测量首帧、带宽、帧率和探针路径延迟。
 - Windows G6 实装通过。`win25-vs2026` runner 上强制结束核心后，签名 MFA 宿主在驱动清理前自行退出。重开后原 HOTP 从 `287 082` 推进至 `359 152`，同批升级、模式互斥和回滚通过。实装包源码为 `bdb828ccf`，正式候选仍需复验。原始回执位于 `qa-ui-auto-report/github/44886832952/live-contracts/modular-bundle-windows-x86_64-44855371144/installed-desktop-mfa-crash.json`。 [实装工件](https://github.com/engcapa/taomni/actions/runs/44886832952)
 - `49a3540bf` 合入 `main` 的 `6b8e350cb`（#846）。独立 Explorer 工作区保留主线的快速创建和递归 glob 搜索，也保留可编辑类型对话框。TC-EXPLORER-010/011 继续检查完整类型列表、实际编辑、保存与重开。Live 表格、HTML 预览用例迁到新入口。TypeScript 和 409 项前端单测通过。 [合并提交](https://github.com/engcapa/taomni/commit/49a3540bf)

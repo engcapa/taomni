@@ -9,6 +9,7 @@ use zeroize::Zeroizing;
 
 pub const SLUG: &str = "mail";
 pub const CHECK_INCOMING: &str = "mail/check-incoming";
+pub const IMAP_FOLDER_TREE: &str = "mail/imap-folder-tree";
 pub const HOST_REQUEST_TIMEOUT: Duration = Duration::from_secs(70);
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -62,6 +63,21 @@ pub struct IncomingTest {
     pub authentication: MailAuthMode,
     pub username: String,
     pub secret: Zeroizing<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ImapFolderTree {
+    pub connection: IncomingTest,
+    pub account_id: String,
+    pub subscription: Option<FolderSubscription>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FolderSubscription {
+    pub folder: String,
+    pub subscribed: bool,
 }
 
 #[cfg(test)]

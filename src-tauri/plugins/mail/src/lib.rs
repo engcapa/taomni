@@ -9,7 +9,7 @@ mod store;
 use std::{collections::BTreeSet, io, sync::Arc, time::Duration};
 
 use serde_json::Value;
-use taomni_mail_api::{CHECK_INCOMING, HOST_REQUEST_TIMEOUT};
+use taomni_mail_api::{CHECK_INCOMING, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE};
 use taomni_plugin_api::{
     ErrorCode, RpcError,
     services::{SNAPSHOT_METHOD, SNAPSHOT_PREPARE_METHOD, SNAPSHOT_RELEASE_METHOD},
@@ -28,6 +28,7 @@ fn host_config() -> HostConfig {
             .into_iter()
             .chain([
                 CHECK_INCOMING,
+                IMAP_FOLDER_TREE,
                 SNAPSHOT_PREPARE_METHOD,
                 SNAPSHOT_METHOD,
                 SNAPSHOT_RELEASE_METHOD,
@@ -71,14 +72,24 @@ impl PluginHandler for Handler {
         params: Option<Value>,
     ) -> Result<Value, RpcError> {
         operation.check_current()?;
-        if method == CHECK_INCOMING {
-            let input = serde_json::from_value(params.unwrap_or_default())
-                .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
-            let result = incoming::check(&self.io, operation, input)?;
-            return serde_json::to_value(result)
-                .map_err(|_| RpcError::from_code(ErrorCode::InternalError));
-        }
-        commands::invoke(&self.store, method, params, &|| operation.check_current())
+        let result = match method {
+            CHECK_INCOMING => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(incoming::check(&self.io, operation, input)?)
+            }
+            IMAP_FOLDER_TREE => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(incoming::imap_folder_tree(&self.io, operation, input)?)
+            }
+            _ => {
+                return commands::invoke(&self.store, method, params, &|| {
+                    operation.check_current()
+                });
+            }
+        };
+        result.map_err(|_| RpcError::from_code(ErrorCode::InternalError))
     }
 }
 

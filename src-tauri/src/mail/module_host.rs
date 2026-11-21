@@ -2,7 +2,10 @@
 
 use std::{net::SocketAddr, sync::Arc};
 
-use taomni_mail_api::{CHECK_INCOMING, IncomingTest, SLUG};
+use serde::{Serialize, de::DeserializeOwned};
+use taomni_mail_api::{
+    CHECK_INCOMING, FolderSubscription, IMAP_FOLDER_TREE, ImapFolderTree, IncomingTest, SLUG,
+};
 use taomni_plugin_stream::routed_tcp::Route;
 
 use crate::{
@@ -10,11 +13,19 @@ use crate::{
     terminal::ssh::{SshTransport, build_ssh_transport},
 };
 
-use super::ResolvedMailAccount;
+use super::{MailFolder, ResolvedMailAccount};
 
 pub(super) fn checks_incoming(registry: &PluginRegistry) -> bool {
+    supports(registry, CHECK_INCOMING)
+}
+
+pub(super) fn manages_imap_folders(registry: &PluginRegistry) -> bool {
+    supports(registry, IMAP_FOLDER_TREE)
+}
+
+fn supports(registry: &PluginRegistry, method: &str) -> bool {
     registry.get(SLUG).is_some_and(|record| {
-        record.state == LifecycleState::Enabled && record.manifest.commands.contains(CHECK_INCOMING)
+        record.state == LifecycleState::Enabled && record.manifest.commands.contains(method)
     })
 }
 
@@ -22,6 +33,30 @@ pub(super) async fn check_incoming(
     registry: Arc<PluginRegistry>,
     account: &ResolvedMailAccount,
 ) -> Result<usize, String> {
+    invoke_with_incoming(registry, account, CHECK_INCOMING, |connection| connection).await
+}
+
+pub(super) async fn imap_folder_tree(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    subscription: Option<FolderSubscription>,
+) -> Result<Vec<MailFolder>, String> {
+    invoke_with_incoming(registry, account, IMAP_FOLDER_TREE, |connection| {
+        ImapFolderTree {
+            connection,
+            account_id: account.config.session_id.clone(),
+            subscription,
+        }
+    })
+    .await
+}
+
+async fn invoke_with_incoming<T: DeserializeOwned, P: Serialize + Send + 'static>(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    method: &'static str,
+    build_request: impl FnOnce(IncomingTest) -> P,
+) -> Result<T, String> {
     let server = &account.config.imap;
     let server_name = server.host.trim().to_owned();
     let port = server.port;
@@ -43,7 +78,7 @@ pub(super) async fn check_incoming(
     })
     .await
     .map_err(|error| format!("Mail module route: {error}"))?;
-    let request = IncomingTest {
+    let connection = IncomingTest {
         route: endpoint,
         server_name,
         security: server.security,
@@ -54,14 +89,15 @@ pub(super) async fn check_incoming(
         username: account.imap_username.clone(),
         secret: account.imap_password.clone().into(),
     };
+    let request = build_request(connection);
     let result = tokio::task::spawn_blocking(move || {
         let payload = serde_json::to_value(request).map_err(|error| error.to_string())?;
         registry
-            .invoke(SLUG, CHECK_INCOMING, payload)
+            .invoke(SLUG, method, payload)
             .map_err(|error| error.to_string())
     })
     .await
-    .map_err(|error| format!("Mail module connection test task: {error}"))??;
-    serde_json::from_value::<Result<usize, String>>(result)
-        .map_err(|_| "Invalid Mail module connection test response".to_owned())?
+    .map_err(|error| format!("Mail module request failed: {error}"))??;
+    serde_json::from_value::<Result<T, String>>(result)
+        .map_err(|_| "Invalid Mail module response".to_owned())?
 }

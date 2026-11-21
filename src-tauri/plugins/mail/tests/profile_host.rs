@@ -110,6 +110,7 @@ impl MailHost {
             "mail-profile-test-token",
             [
                 taomni_mail_api::CHECK_INCOMING,
+                taomni_mail_api::IMAP_FOLDER_TREE,
                 "mail_list_cached_folders",
                 "mail_list_cached_messages",
                 "mail_get_cached_body",

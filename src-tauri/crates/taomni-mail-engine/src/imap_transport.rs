@@ -6,7 +6,9 @@ use std::net::TcpStream;
 use imap::{Client, Session};
 use native_tls::TlsStream;
 
+use crate::MailFolder;
 use crate::imap_auth::{MailAuthMode, MailProvider, authenticate};
+use crate::imap_folders::{imap_list_folders, imap_set_subscription};
 use crate::tls::{MailConnectionSecurity, certificate_error_hint, tls_connector};
 
 pub struct ImapConnection<'a> {
@@ -22,6 +24,22 @@ pub struct ImapConnection<'a> {
 pub enum ImapSession {
     Plain(Session<TcpStream>),
     Tls(Session<TlsStream<TcpStream>>),
+}
+
+impl ImapSession {
+    pub fn list_folders(&mut self, account_id: &str) -> Result<Vec<MailFolder>, String> {
+        match self {
+            Self::Plain(session) => imap_list_folders(session, account_id),
+            Self::Tls(session) => imap_list_folders(session, account_id),
+        }
+    }
+
+    pub fn set_subscription(&mut self, folder: &str, subscribed: bool) -> Result<(), String> {
+        match self {
+            Self::Plain(session) => imap_set_subscription(session, folder, subscribed),
+            Self::Tls(session) => imap_set_subscription(session, folder, subscribed),
+        }
+    }
 }
 
 impl ImapConnection<'_> {

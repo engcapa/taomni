@@ -7609,7 +7609,7 @@ controls:
 -->
 
 - 手工刷新、打开自动刷新和定时刷新默认只同步 headers；headers 写入缓存并重新加载列表后界面即可继续操作。
-- 邮件工具栏的连接测试在已启用的 Mail 0.1.1 宿主中完成 IMAP 登录和文件夹检查或 POP3 登录。TC-MODULES-059 验证签名宿主与真实协议，TC-MAIL-POP3-01 覆盖连接结果和后续同步。
+- 邮件工具栏的连接测试在已启用的 Mail 宿主中完成 IMAP 登录和文件夹检查或 POP3 登录。TC-MODULES-059 验证签名宿主与真实协议，TC-MAIL-POP3-01 覆盖连接结果和后续同步。
 - 最近正文缓存按 `bodyRecentLimit` 遍历已缓存 headers，逐封调用 `mail_prefetch_message_body` 写入原生磁盘缓存，并用独立进度显示；预取不向前端传输或渲染正文，手动打开邮件使用独立于同步的 IMAP 连接。
 - 邮件正文读取按 `folder:uid` 缓存在前端内存中；点击已缓存正文优先使用内存/SQLite，自动标记已读不再等待正文加载完成。
 - 整个 IMAP 文件夹标记已读先查询服务器 UNSEEN，涵盖未下载历史；每批最多 250 个 UID，批间释放账号连接锁，网络断连只重试幂等标记。
@@ -7966,6 +7966,7 @@ controls:
 
 - 文件夹属性按 RFC 形式保存（`\Noselect`、`\Sent`），LSUB 报告的文件夹带 `\Subscribed`（RFC 5258）；服务器没有订阅数据时视为全部已订阅。
 - 文件夹栏 “Manage folder subscriptions” 对话框调用 SUBSCRIBE/UNSUBSCRIBE；“Show only subscribed folders”（按账户保存）开启后未订阅文件夹不在树中显示，也不参与全文件夹同步（INBOX 始终保留）。
+- TC-MODULES-059 从常规 Mail 标签加载 IMAP 文件夹，检查签名宿主的写租约，并通过订阅对话框在真实 IMAP 服务器上取消订阅。
 - 会话编辑器 “Special folders” 可手动指定 Sent/Drafts/Trash/Junk/Archive，优先于 SPECIAL-USE 属性与名称匹配（中文或自定义命名）。
 - 定时的全文件夹扫描在服务器支持 CONDSTORE 时先发 `STATUS (MESSAGES UNSEEN UIDNEXT UIDVALIDITY HIGHESTMODSEQ)`，未变化的文件夹只更新计数、跳过 EXAMINE/SEARCH；手动同步始终完整对账。
 

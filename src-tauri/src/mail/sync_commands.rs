@@ -235,22 +235,13 @@ pub async fn mail_sync_all_folders(
     let skip_unchanged = cache_enabled && reconcile_mode == MailSyncRequestMode::Reconcile;
     let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
-    let listed = {
-        let pool = Arc::clone(&pool);
-        let account = account.clone();
-        let handle = handle.clone();
-        tokio::task::spawn_blocking(move || {
-            with_imap_session(
-                &pool,
-                &account,
-                &handle,
-                ImapSessionOpts::background(),
-                |imap| imap.list_folders(&account.config.session_id),
-            )
-        })
-        .await
-        .map_err(|e| format!("mail folder listing task failed: {e}"))??
-    };
+    let listed = folders::live_imap_folder_tree(
+        &state,
+        account.clone(),
+        None,
+        ImapSessionOpts::background(),
+    )
+    .await?;
     if cache_enabled {
         let tree = listed.clone();
         with_mail_db_async(&state, &account_id, move |db, account_id| {

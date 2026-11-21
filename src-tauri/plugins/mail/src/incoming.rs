@@ -4,9 +4,9 @@ use std::{
     time::Duration,
 };
 
-use taomni_mail_api::{IncomingTest, MailIncomingProtocol};
+use taomni_mail_api::{ImapFolderTree, IncomingTest, MailIncomingProtocol};
 use taomni_mail_engine::{
-    imap_folders::imap_list_folders,
+    MailFolder,
     imap_transport::{ImapConnection, ImapSession},
     pop3::{Pop3Connection, Pop3Session},
 };
@@ -19,6 +19,37 @@ pub(super) fn check(
     operation: &Operation,
     input: IncomingTest,
 ) -> Result<Result<usize, String>, RpcError> {
+    with_socket(runtime, operation, input, probe)
+}
+
+pub(super) fn imap_folder_tree(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: ImapFolderTree,
+) -> Result<Result<Vec<MailFolder>, String>, RpcError> {
+    let ImapFolderTree {
+        connection,
+        account_id,
+        subscription,
+    } = request;
+    if connection.protocol != MailIncomingProtocol::Imap || account_id.trim().is_empty() {
+        return Err(RpcError::from_code(ErrorCode::InvalidParams));
+    }
+    with_socket(runtime, operation, connection, move |stream, input| {
+        let mut session = open_imap(stream, &input)?;
+        if let Some(change) = subscription {
+            session.set_subscription(&change.folder, change.subscribed)?;
+        }
+        session.list_folders(&account_id)
+    })
+}
+
+fn with_socket<T: Send + 'static>(
+    runtime: &Runtime,
+    operation: &Operation,
+    input: IncomingTest,
+    work: impl FnOnce(TcpStream, IncomingTest) -> Result<T, String> + Send + 'static,
+) -> Result<Result<T, String>, RpcError> {
     if input.server_name.trim().is_empty() || input.username.trim().is_empty() {
         return Err(RpcError::from_code(ErrorCode::InvalidParams));
     }
@@ -30,7 +61,7 @@ pub(super) fn check(
     configure(&stream, input.protocol)?;
     let interrupt = stream.try_clone().map_err(|_| socket_error())?;
     let result = runtime.block_on(async {
-        let mut worker = tokio::task::spawn_blocking(move || probe(stream, input));
+        let mut worker = tokio::task::spawn_blocking(move || work(stream, input));
         let result = while_current(operation, &mut worker).await;
         if result.is_err() {
             // Closing both halves wakes native TLS and any blocked protocol read.
@@ -76,30 +107,27 @@ fn socket_error() -> RpcError {
     RpcError::new(ErrorCode::InternalError, "MAIL_ROUTE_SOCKET_UNAVAILABLE")
 }
 
+fn open_imap(stream: TcpStream, input: &IncomingTest) -> Result<ImapSession, String> {
+    ImapConnection {
+        server_name: &input.server_name,
+        security: input.security,
+        trusted_certificate: input.trusted_certificate.as_deref(),
+        username: &input.username,
+        secret: &input.secret,
+        authentication: input.authentication,
+        provider: input.provider,
+    }
+    .open(stream)
+}
+
 fn probe(stream: TcpStream, input: IncomingTest) -> Result<usize, String> {
-    let trusted_certificate = input.trusted_certificate.as_deref();
     match input.protocol {
-        MailIncomingProtocol::Imap => {
-            let connection = ImapConnection {
-                server_name: &input.server_name,
-                security: input.security,
-                trusted_certificate,
-                username: &input.username,
-                secret: &input.secret,
-                authentication: input.authentication,
-                provider: input.provider,
-            };
-            let folders = match connection.open(stream)? {
-                ImapSession::Plain(mut session) => imap_list_folders(&mut session, "")?,
-                ImapSession::Tls(mut session) => imap_list_folders(&mut session, "")?,
-            };
-            Ok(folders.len())
-        }
+        MailIncomingProtocol::Imap => Ok(open_imap(stream, &input)?.list_folders("")?.len()),
         MailIncomingProtocol::Pop3 => {
             let connection = Pop3Connection {
                 server_name: &input.server_name,
                 security: input.security,
-                trusted_certificate,
+                trusted_certificate: input.trusted_certificate.as_deref(),
                 username: &input.username,
                 secret: &input.secret,
                 authentication: input.authentication,
