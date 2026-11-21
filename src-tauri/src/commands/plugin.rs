@@ -194,6 +194,8 @@ pub async fn plugin_invoke(
                     | taomni_mail_api::MUTATE_IMAP_FOLDER
                     | taomni_mail_api::SEND_SMTP
                     | taomni_mail_api::STORE_IMAP_SENT
+                    | taomni_mail_api::STORE_IMAP_DRAFT
+                    | taomni_mail_api::DISCARD_IMAP_DRAFT
                     | taomni_mail_api::SYNC_IMAP_HEADERS
                     | taomni_mail_api::SYNC_IMAP_ROUND
                     | taomni_mail_api::SEARCH_IMAP

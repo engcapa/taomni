@@ -24,6 +24,8 @@ pub const FETCH_IMAP_BODY: &str = "mail/fetch-imap-body";
 pub const FETCH_IMAP_ATTACHMENT: &str = "mail/fetch-imap-attachment";
 pub const SEND_SMTP: &str = "mail/send-smtp";
 pub const STORE_IMAP_SENT: &str = "mail/store-imap-sent";
+pub const STORE_IMAP_DRAFT: &str = "mail/store-imap-draft";
+pub const DISCARD_IMAP_DRAFT: &str = "mail/discard-imap-draft";
 pub const HOST_REQUEST_TIMEOUT: Duration = Duration::from_secs(70);
 pub const SMTP_DELIVERY_UNKNOWN: &str = "SMTP delivery status unknown";
 
@@ -124,15 +126,33 @@ pub struct ImapSentCopy {
     pub connection: IncomingTest,
     pub account_id: String,
     pub folder_override: Option<String>,
-    pub mime: Option<SentCopyPayload>,
+    pub mime: Option<MimeUpload>,
     pub remote_draft: Option<RemoteDraftLocation>,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SentCopyPayload {
+pub struct MimeUpload {
     pub source: Endpoint,
     pub length: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ImapDraftStore {
+    pub connection: IncomingTest,
+    pub account_id: String,
+    pub folder_override: Option<String>,
+    pub message_id: String,
+    pub mime: MimeUpload,
+    pub previous: Option<RemoteDraftLocation>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ImapDraftDiscard {
+    pub connection: IncomingTest,
+    pub location: RemoteDraftLocation,
 }
 
 #[derive(Serialize, Deserialize)]

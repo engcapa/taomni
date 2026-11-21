@@ -12,9 +12,10 @@ use std::{collections::BTreeSet, io, sync::Arc, time::Duration};
 
 use serde_json::Value;
 use taomni_mail_api::{
-    CHECK_INCOMING, CHECK_OUTGOING, FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, FETCH_IMAP_RAW,
-    HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, LIST_IMAP_UNREAD, MUTATE_IMAP_FOLDER, SEARCH_IMAP,
-    SEND_SMTP, SET_IMAP_FLAGS, STORE_IMAP_SENT, SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND,
+    CHECK_INCOMING, CHECK_OUTGOING, DISCARD_IMAP_DRAFT, FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY,
+    FETCH_IMAP_RAW, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, LIST_IMAP_UNREAD, MUTATE_IMAP_FOLDER,
+    SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, STORE_IMAP_DRAFT, STORE_IMAP_SENT, SYNC_IMAP_HEADERS,
+    SYNC_IMAP_ROUND,
 };
 use taomni_plugin_api::{
     ErrorCode, RpcError,
@@ -39,6 +40,8 @@ fn host_config() -> HostConfig {
                 MUTATE_IMAP_FOLDER,
                 SEND_SMTP,
                 STORE_IMAP_SENT,
+                STORE_IMAP_DRAFT,
+                DISCARD_IMAP_DRAFT,
                 SYNC_IMAP_HEADERS,
                 SYNC_IMAP_ROUND,
                 SEARCH_IMAP,
@@ -110,6 +113,16 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(outgoing::store_sent(&self.io, operation, input)?)
+            }
+            STORE_IMAP_DRAFT => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(outgoing::store_draft(&self.io, operation, input)?)
+            }
+            DISCARD_IMAP_DRAFT => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(outgoing::discard_draft(&self.io, operation, input)?)
             }
             IMAP_FOLDER_TREE => {
                 let input = serde_json::from_value(params.unwrap_or_default())

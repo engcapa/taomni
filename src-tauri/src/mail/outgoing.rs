@@ -5,21 +5,19 @@
 //! HEADER Message-ID`), which works without UIDPLUS `APPENDUID` (the `imap`
 //! 2.4 crate does not surface response codes of APPEND).
 
-use std::io::{Read, Write};
 use std::sync::Arc;
 
 use rusqlite::{Connection, OptionalExtension, Result as SqlResult, params};
 use taomni_mail_api::RemoteDraftLocation;
-use taomni_mail_engine::imap_outgoing::{SpecialFolder, special_folder_name, store_sent_copy};
+use taomni_mail_engine::imap_outgoing::{store_remote_draft, store_sent_copy};
 use tauri::State;
 
 pub(super) use taomni_mail_engine::imap_outgoing::imap_append;
 
-use super::sync::quote_imap_string;
 use super::{
     ActiveImapSession, ImapSessionOpts, MailAccountConfig, MailDraft, MailImapPool, MailProvider,
     MailSendAttachment, MailSendRequest, MessageBuildOptions, ResolvedMailAccount,
-    build_send_message_with, clean_message_id, list_mail_drafts, resolve_config, with_imap_session,
+    build_send_message_with, list_mail_drafts, module_host, resolve_config, with_imap_session,
     with_mail_db,
 };
 use crate::state::AppState;
@@ -41,33 +39,6 @@ pub(super) fn new_message_id(email_address: &str) -> String {
     format!("<{}@{}>", uuid::Uuid::new_v4().simple(), domain)
 }
 
-fn imap_uid_by_message_id<T: Read + Write>(
-    session: &mut imap::Session<T>,
-    folder: &str,
-    message_id: &str,
-) -> Result<Option<u32>, String> {
-    session
-        .examine(folder)
-        .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
-    let query = format!(
-        "HEADER Message-ID {}",
-        quote_imap_string(&format!("<{}>", clean_message_id(message_id)))
-    );
-    let uids = session
-        .uid_search(&query)
-        .map_err(|e| format!("IMAP UID SEARCH {query} failed: {e}"))?;
-    Ok(uids.into_iter().max())
-}
-
-fn imap_create<T: Read + Write>(
-    session: &mut imap::Session<T>,
-    folder: &str,
-) -> Result<(), String> {
-    session
-        .create(folder)
-        .map_err(|e| format!("IMAP CREATE {folder} failed: {e}"))
-}
-
 impl ActiveImapSession {
     pub(super) fn append(
         &mut self,
@@ -79,43 +50,6 @@ impl ActiveImapSession {
             Self::Tls { session, .. } => imap_append(session, folder, bytes, flags),
             Self::Plain { session, .. } => imap_append(session, folder, bytes, flags),
         }
-    }
-
-    fn uid_by_message_id(&mut self, folder: &str, message_id: &str) -> Result<Option<u32>, String> {
-        match self {
-            Self::Tls { session, .. } => imap_uid_by_message_id(session, folder, message_id),
-            Self::Plain { session, .. } => imap_uid_by_message_id(session, folder, message_id),
-        }
-    }
-
-    fn create_mailbox(&mut self, folder: &str) -> Result<(), String> {
-        match self {
-            Self::Tls { session, .. } => imap_create(session, folder),
-            Self::Plain { session, .. } => imap_create(session, folder),
-        }
-    }
-
-    /// Resolve (or create) the special folder.
-    fn special_folder(
-        &mut self,
-        config: &MailAccountConfig,
-        kind: SpecialFolder,
-        create: bool,
-    ) -> Result<Option<String>, String> {
-        let folders = self.list_folders(&config.session_id)?;
-        let configured = config
-            .special_folders
-            .get(kind.override_key())
-            .map(String::as_str);
-        if let Some(name) = special_folder_name(&folders, kind, configured) {
-            return Ok(Some(name));
-        }
-        if !create {
-            return Ok(None);
-        }
-        let name = kind.create_name().to_string();
-        self.create_mailbox(&name)?;
-        Ok(Some(name))
     }
 }
 
@@ -313,36 +247,51 @@ pub async fn mail_store_remote_draft(
         },
     )?
     .formatted();
-    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    let op_account_id = account_id.clone();
-    let location = tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
+    let location = if module_host::stores_remote_drafts(&state.plugins) {
+        module_host::store_remote_draft(
+            state.plugins.clone(),
             &account,
-            &handle,
-            ImapSessionOpts::default(),
-            |imap| {
-                let folder = imap
-                    .special_folder(&account.config, SpecialFolder::Drafts, true)?
-                    .ok_or_else(|| "no Drafts folder".to_string())?;
-                imap.append(&folder, &bytes, &["\\Draft", "\\Seen"])?;
-                let uid = imap.uid_by_message_id(&folder, &message_id)?;
-                if let Some(previous) = &previous {
-                    if Some(previous.uid) != uid || previous.folder != folder {
-                        if let Err(e) =
-                            imap.delete_messages(&previous.folder, &[previous.uid], false)
-                        {
-                            tracing::debug!("mail: replacing server draft left the old copy: {e}");
-                        }
-                    }
-                }
-                Ok(uid.map(|uid| RemoteDraftLocation { folder, uid }))
-            },
+            bytes,
+            message_id,
+            previous,
         )
-    })
-    .await
-    .map_err(|e| format!("mail draft task failed: {e}"))??;
+        .await?
+    } else {
+        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::spawn_blocking(move || {
+            let folder = account
+                .config
+                .special_folders
+                .get("drafts")
+                .map(String::as_str);
+            // A server can accept APPEND before its response reaches us.
+            let opts = ImapSessionOpts {
+                retry_on_error: false,
+                ..ImapSessionOpts::default()
+            };
+            with_imap_session(&pool, &account, &handle, opts, |imap| match imap {
+                ActiveImapSession::Plain { session, .. } => store_remote_draft(
+                    session,
+                    &account.config.session_id,
+                    folder,
+                    &bytes,
+                    &message_id,
+                    previous.as_ref(),
+                ),
+                ActiveImapSession::Tls { session, .. } => store_remote_draft(
+                    session,
+                    &account.config.session_id,
+                    folder,
+                    &bytes,
+                    &message_id,
+                    previous.as_ref(),
+                ),
+            })
+        })
+        .await
+        .map_err(|error| format!("Mail draft task failed: {error}"))??
+    };
     with_mail_db(&state, &account_id, |db| {
         set_remote_draft_location(db, &account_id, &draft.id, location.as_ref())?;
         Ok(list_mail_drafts(db, &account_id)?
@@ -372,20 +321,23 @@ pub async fn mail_discard_remote_draft(
     else {
         return Ok(false);
     };
-    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    let target = location.clone();
-    tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            ImapSessionOpts::default(),
-            |imap| imap.delete_messages(&target.folder, &[target.uid], false),
-        )
-    })
-    .await
-    .map_err(|e| format!("mail draft task failed: {e}"))??;
+    if module_host::discards_remote_drafts(&state.plugins) {
+        module_host::discard_remote_draft(state.plugins.clone(), &account, location).await?;
+    } else {
+        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::spawn_blocking(move || {
+            with_imap_session(
+                &pool,
+                &account,
+                &handle,
+                ImapSessionOpts::default(),
+                |imap| imap.delete_messages(&location.folder, &[location.uid], false),
+            )
+        })
+        .await
+        .map_err(|error| format!("Mail draft task failed: {error}"))??;
+    }
     with_mail_db(&state, &account_id, |db| {
         set_remote_draft_location(db, &account_id, &draft_id, None)
     })?;
@@ -396,6 +348,7 @@ pub async fn mail_discard_remote_draft(
 mod tests {
     use super::super::fake_imap::FakeImap;
     use super::*;
+    use taomni_mail_engine::imap_outgoing::uid_by_message_id;
 
     #[test]
     fn sent_copy_defaults_follow_provider() {
@@ -436,11 +389,11 @@ mod tests {
             &["\\Draft", "\\Seen"],
         )
         .unwrap();
-        let uid = imap_uid_by_message_id(&mut session, "Drafts", &id).unwrap();
+        let uid = uid_by_message_id(&mut session, "Drafts", &id).unwrap();
         assert_eq!(uid, Some(1));
         assert_eq!(fake.flags("Drafts", 1), vec!["\\Draft", "\\Seen"]);
         assert_eq!(
-            imap_uid_by_message_id(&mut session, "Drafts", "<missing@example.com>").unwrap(),
+            uid_by_message_id(&mut session, "Drafts", "<missing@example.com>").unwrap(),
             None
         );
     }

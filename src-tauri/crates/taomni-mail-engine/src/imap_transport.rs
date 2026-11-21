@@ -11,8 +11,8 @@ use crate::cache::MailCacheSettings;
 use crate::imap_auth::{MailAuthMode, MailProvider, authenticate};
 use crate::imap_folders::{imap_change_folder, imap_list_folders, imap_set_subscription};
 use crate::imap_messages::{Mailbox, imap_fetch_attachment, imap_fetch_raw};
-use crate::imap_mutations::{imap_set_flags, unread_uids};
-use crate::imap_outgoing::store_sent_copy;
+use crate::imap_mutations::{imap_delete_messages, imap_set_flags, unread_uids};
+use crate::imap_outgoing::{store_remote_draft, store_sent_copy};
 use crate::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest, StepParams,
     imap_has_capability, imap_sync_folder_step, sync_folder_round,
@@ -64,6 +64,46 @@ pub fn imap_catch_result<T>(work: impl FnOnce() -> Result<T, String>) -> Result<
 }
 
 impl ImapSession {
+    pub fn store_remote_draft(
+        &mut self,
+        account_id: &str,
+        configured_folder: Option<&str>,
+        bytes: &[u8],
+        message_id: &str,
+        previous: Option<&RemoteDraftLocation>,
+    ) -> Result<Option<RemoteDraftLocation>, String> {
+        match self {
+            Self::Plain(session) => store_remote_draft(
+                session,
+                account_id,
+                configured_folder,
+                bytes,
+                message_id,
+                previous,
+            ),
+            Self::Tls(session) => store_remote_draft(
+                session,
+                account_id,
+                configured_folder,
+                bytes,
+                message_id,
+                previous,
+            ),
+        }
+    }
+
+    pub fn discard_remote_draft(&mut self, location: &RemoteDraftLocation) -> Result<(), String> {
+        let result = match self {
+            Self::Plain(session) => {
+                imap_delete_messages(session, &location.folder, &[location.uid], false)
+            }
+            Self::Tls(session) => {
+                imap_delete_messages(session, &location.folder, &[location.uid], false)
+            }
+        };
+        result.map(|_| ())
+    }
+
     pub fn store_sent_copy(
         &mut self,
         account_id: &str,

@@ -1,4 +1,7 @@
-use taomni_mail_api::{ImapSentCopy, MailIncomingProtocol, SmtpConnection, SmtpDelivery};
+use taomni_mail_api::{
+    ImapDraftDiscard, ImapDraftStore, ImapSentCopy, MailIncomingProtocol, MimeUpload,
+    RemoteDraftLocation, SmtpConnection, SmtpDelivery,
+};
 use taomni_mail_engine::imap_transport::imap_catch_result;
 use taomni_mail_engine::smtp::{check_routed_connection, send_routed_message};
 use taomni_plugin_api::{ErrorCode, RpcError};
@@ -59,25 +62,12 @@ pub(super) fn store_sent(
         || (mime.is_none() && remote_draft.is_none())
         || remote_draft
             .as_ref()
-            .is_some_and(|draft| draft.folder.trim().is_empty() || draft.uid == 0)
+            .is_some_and(|draft| !valid_draft(draft))
     {
         return Err(RpcError::from_code(ErrorCode::InvalidParams));
     }
     let bytes = if let Some(mime) = mime {
-        let received = runtime.block_on(while_current(operation, async {
-            let (source, _) = mime.source.connect().await?;
-            let mut bytes = Vec::new();
-            source
-                .take(mime.length.saturating_add(1))
-                .read_to_end(&mut bytes)
-                .await
-                .map_err(|error| format!("Read Sent message: {error}"))?;
-            if bytes.is_empty() || bytes.len() as u64 != mime.length {
-                return Err("Incomplete Sent message".into());
-            }
-            Ok(bytes)
-        }))?;
-        match received {
+        match receive_mime(runtime, operation, mime)? {
             Ok(bytes) => Some(bytes),
             Err(error) => return Ok(Err(error)),
         }
@@ -94,4 +84,84 @@ pub(super) fn store_sent(
             )
         })
     })
+}
+
+pub(super) fn store_draft(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: ImapDraftStore,
+) -> Result<Result<Option<RemoteDraftLocation>, String>, RpcError> {
+    let ImapDraftStore {
+        connection,
+        account_id,
+        folder_override,
+        message_id,
+        mime,
+        previous,
+    } = request;
+    if connection.protocol != MailIncomingProtocol::Imap
+        || account_id.trim().is_empty()
+        || message_id.trim().is_empty()
+        || previous.as_ref().is_some_and(|draft| !valid_draft(draft))
+    {
+        return Err(RpcError::from_code(ErrorCode::InvalidParams));
+    }
+    let bytes = match receive_mime(runtime, operation, mime)? {
+        Ok(bytes) => bytes,
+        Err(error) => return Ok(Err(error)),
+    };
+    with_socket(runtime, operation, connection, move |stream, input| {
+        imap_catch_result(|| {
+            open_imap(stream, &input)?.store_remote_draft(
+                &account_id,
+                folder_override.as_deref(),
+                &bytes,
+                &message_id,
+                previous.as_ref(),
+            )
+        })
+    })
+}
+
+pub(super) fn discard_draft(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: ImapDraftDiscard,
+) -> Result<Result<(), String>, RpcError> {
+    if request.connection.protocol != MailIncomingProtocol::Imap || !valid_draft(&request.location)
+    {
+        return Err(RpcError::from_code(ErrorCode::InvalidParams));
+    }
+    with_socket(
+        runtime,
+        operation,
+        request.connection,
+        move |stream, input| {
+            imap_catch_result(|| open_imap(stream, &input)?.discard_remote_draft(&request.location))
+        },
+    )
+}
+
+fn valid_draft(location: &RemoteDraftLocation) -> bool {
+    !location.folder.trim().is_empty() && location.uid != 0
+}
+
+fn receive_mime(
+    runtime: &Runtime,
+    operation: &Operation,
+    mime: MimeUpload,
+) -> Result<Result<Vec<u8>, String>, RpcError> {
+    runtime.block_on(while_current(operation, async {
+        let (source, _) = mime.source.connect().await?;
+        let mut bytes = Vec::new();
+        source
+            .take(mime.length.saturating_add(1))
+            .read_to_end(&mut bytes)
+            .await
+            .map_err(|error| format!("Read Mail message: {error}"))?;
+        if bytes.is_empty() || bytes.len() as u64 != mime.length {
+            return Err("Incomplete Mail message".into());
+        }
+        Ok(bytes)
+    }))
 }

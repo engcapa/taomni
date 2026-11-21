@@ -5,8 +5,8 @@ use std::io::{Read, Write};
 use taomni_mail_api::{ImapFolderChange, RemoteDraftLocation};
 
 use crate::{
-    MailFolder,
-    imap_folders::{imap_change_folder, imap_list_folders},
+    MailFolder, clean_message_id,
+    imap_folders::{imap_change_folder, imap_list_folders, quote_imap_string},
     imap_mutations::imap_delete_messages,
 };
 
@@ -41,14 +41,7 @@ impl SpecialFolder {
         }
     }
 
-    pub fn override_key(self) -> &'static str {
-        match self {
-            Self::Sent => "sent",
-            Self::Drafts => "drafts",
-        }
-    }
-
-    pub fn create_name(self) -> &'static str {
+    fn create_name(self) -> &'static str {
         match self {
             Self::Sent => "Sent",
             Self::Drafts => "Drafts",
@@ -116,16 +109,7 @@ pub fn store_sent_copy<T: Read + Write>(
     remote_draft: Option<&RemoteDraftLocation>,
 ) -> Result<Option<String>, String> {
     let sent_folder = if let Some(bytes) = bytes {
-        let kind = SpecialFolder::Sent;
-        let folders = imap_list_folders(session, account_id)?;
-        let folder = match special_folder_name(&folders, kind, configured_folder) {
-            Some(folder) => folder,
-            None => {
-                let name = kind.create_name().to_owned();
-                imap_change_folder(session, &ImapFolderChange::Create { name: name.clone() })?;
-                name
-            }
-        };
+        let folder = ensure_folder(session, account_id, SpecialFolder::Sent, configured_folder)?;
         imap_append(session, &folder, bytes, &["\\Seen"])?;
         Some(folder)
     } else {
@@ -137,6 +121,65 @@ pub fn store_sent_copy<T: Read + Write>(
         tracing::debug!(%error, "mail: removing server draft after send failed");
     }
     Ok(sent_folder)
+}
+
+pub fn store_remote_draft<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    account_id: &str,
+    configured_folder: Option<&str>,
+    bytes: &[u8],
+    message_id: &str,
+    previous: Option<&RemoteDraftLocation>,
+) -> Result<Option<RemoteDraftLocation>, String> {
+    let folder = ensure_folder(
+        session,
+        account_id,
+        SpecialFolder::Drafts,
+        configured_folder,
+    )?;
+    imap_append(session, &folder, bytes, &["\\Draft", "\\Seen"])?;
+    let uid = uid_by_message_id(session, &folder, message_id)?
+        .ok_or("The server accepted the draft but did not return its UID. Check the Drafts folder before saving again.")?;
+    if let Some(previous) = previous
+        && (previous.uid != uid || previous.folder != folder)
+        && let Err(error) = imap_delete_messages(session, &previous.folder, &[previous.uid], false)
+    {
+        tracing::debug!(%error, "mail: replacing server draft left the old copy");
+    }
+    Ok(Some(RemoteDraftLocation { folder, uid }))
+}
+
+fn ensure_folder<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    account_id: &str,
+    kind: SpecialFolder,
+    configured_folder: Option<&str>,
+) -> Result<String, String> {
+    let folders = imap_list_folders(session, account_id)?;
+    if let Some(folder) = special_folder_name(&folders, kind, configured_folder) {
+        return Ok(folder);
+    }
+    let name = kind.create_name().to_owned();
+    imap_change_folder(session, &ImapFolderChange::Create { name: name.clone() })?;
+    Ok(name)
+}
+
+pub fn uid_by_message_id<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    folder: &str,
+    message_id: &str,
+) -> Result<Option<u32>, String> {
+    session
+        .examine(folder)
+        .map_err(|error| format!("IMAP EXAMINE {folder} failed: {error}"))?;
+    let query = format!(
+        "HEADER Message-ID {}",
+        quote_imap_string(&format!("<{}>", clean_message_id(message_id)))
+    );
+    session
+        .uid_search(&query)
+        .map(|uids| uids.into_iter().max())
+        .map_err(|error| format!("IMAP UID SEARCH {query} failed: {error}"))
 }
 
 #[cfg(test)]

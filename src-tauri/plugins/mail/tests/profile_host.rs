@@ -321,6 +321,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     imap::check_routed_body(&mut host);
     imap::check_routed_attachment(&mut host);
     imap::check_routed_sent_copy(&mut host);
+    imap::check_routed_draft(&mut host);
     snapshot_cache(&mut host, &context, &profile, &filename, &attachment);
     let folders = host.call("mail_list_cached_folders", json!({"accountId":ACCOUNT}));
     assert_eq!(folders[0]["name"], "INBOX");

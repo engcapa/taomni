@@ -7758,7 +7758,7 @@ controls:
 - SMTP 接受后立即反馈，Sent 副本结果通过独立提示显示；事件先于发送响应到达、或随后刷新邮箱，都不会覆盖副本结果。
 - 启用的 Mail 宿主负责 SMTP 发送，并在接受后把 IMAP 副本写入 Sent、清理服务器草稿。TC-MODULES-059 检查真实 SMTP 收信、IMAP Sent 和 Drafts 中的实际主题以及 POP3 的本地 Sent。TC-MAIL-SEND-01 在 Browser 和 Native 核对草稿、副本的主题和 SMTP 正文。
 - 发信成功后按账户设置把带 Bcc 的副本 APPEND 到 Sent（SPECIAL-USE 优先，找不到时按名称，缺失时创建）；Gmail/Outlook 默认不重复保存。副本失败不影响“已发送”，状态栏提示原因。
-- 手工保存草稿会把草稿 APPEND 到服务器 Drafts（`\Draft \Seen`，按 Message-ID 找回 UID 并替换旧副本）；发送或删除草稿时移除服务器副本；自动保存仍只写本地。
+- 手工保存草稿时，Mail 签名宿主把草稿 APPEND 到服务器 Drafts，并按 Message-ID 找回 UID 后替换旧副本。编辑和自动保存保留上一份服务器草稿的位置。TC-MAIL-SEND-01 与 TC-MODULES-059 检查替换、发送和显式删除后的服务器状态。
 
 ---
 

@@ -11,7 +11,7 @@ covers: [F-Modules-1, F-MAIL-3, F-MAIL-6, F-MAIL-7, F-MAIL-11, F-MAIL-12, F-MAIL
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
 fixtures: [reset_db, file_open_mail, module_signed_mail_archive, file_open_files]
-timeout_sec: 310
+timeout_sec: 340
 steps:
 - open: ${cfg.app.base_url}
 - seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
@@ -147,13 +147,32 @@ steps:
 - click: '[data-testid="mail-compose-save-draft"]'
 - assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: Draft saved to Drafts, timeout_sec: 25}
 - mail_server_assert_folder_count: {folder: Drafts, has_subject: Signed host IMAP delivery}
+- fill: {selector: '[data-testid="mail-compose-subject"]', value: Revised signed IMAP delivery}
+- click: '[data-testid="mail-compose-save-draft"]'
+- mail_server_assert_folder_count: {folder: Drafts, equals: 1, has_subject: Revised signed IMAP delivery, lacks_subject: Signed host IMAP delivery}
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: Draft saved to Drafts, timeout_sec: 25}
 - click: '[data-testid="mail-compose-send"]'
 - wait_for: {selector: '[data-testid="mail-compose-dialog"]', state: detached}
-- mail_server_assert_smtp_contains: {text: Signed host IMAP delivery, timeout_sec: 20}
+- mail_server_assert_smtp_contains: {text: Revised signed IMAP delivery, timeout_sec: 20}
 - assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-sent-copy-status"]', contains: copy saved to Sent, timeout_sec: 30}
-- mail_server_assert_folder_count: {folder: Sent, has_subject: Signed host IMAP delivery}
-- mail_server_assert_folder_count: {folder: Drafts, lacks_subject: Signed host IMAP delivery}
+- mail_server_assert_folder_count: {folder: Sent, has_subject: Revised signed IMAP delivery}
+- mail_server_assert_folder_count: {folder: Drafts, lacks_subject: Revised signed IMAP delivery}
 - assert_signed_mail_host: imap-delivery
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-compose-open"]'
+- fill: {selector: '[data-testid="mail-recipient-to"] input', value: receiver@example.com}
+- press: Enter
+- fill: {selector: '[data-testid="mail-compose-subject"]', value: Discardable server draft}
+- click: '[data-testid="mail-compose-save-draft"]'
+- mail_server_assert_folder_count: {folder: Drafts, has_subject: Discardable server draft}
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: Draft saved to Drafts, timeout_sec: 25}
+- click: '[role="dialog"][aria-label="New message"] [aria-label="Close dialog"]'
+- wait_for: {selector: '[data-testid="mail-compose-dialog"]', state: detached}
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-drafts-open"]'
+- assert_text: {selector: '[data-testid="mail-draft-row"][data-subject="Discardable server draft"]', contains: Discardable server draft}
+- click: '[data-testid="mail-draft-row"][data-subject="Discardable server draft"] button[title="Delete draft"]'
+- mail_server_assert_folder_count: {folder: Drafts, lacks_subject: Discardable server draft}
+- wait_for: {selector: '[data-testid="mail-draft-row"][data-subject="Discardable server draft"]', state: detached}
+- click: '[role="dialog"][aria-label="Drafts and templates"] [aria-label="Close dialog"]'
 - fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_pop3_quick_connect}'}
 - click: '[data-testid="qc-submit"]'
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 2}
@@ -198,36 +217,36 @@ verification:
     results: [9, 12, 18, 20, 21, 48, 50, 54, 55, 78]
   - id: R2
     requirement: The normal connection controls test IMAP, POP3 and SMTP using the installed Mail host.
-    actions: [79, 110, 128, 129, 132]
+    actions: [79, 110, 147, 148, 151]
     checkpoints:
     - {step: 111, expectation: The hosted app reports working IMAP and SMTP connections.}
     - {step: 112, expectation: The signed Mail host still holds its data lease.}
-    - {step: 133, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
-    results: [111, 112, 133]
+    - {step: 152, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
+    results: [111, 112, 152]
   - id: R3
     requirement: The signature-verified package delivers from both account types, stores an IMAP Sent copy and removes the server draft.
-    actions: [113, 114, 115, 116, 117, 118, 121, 134, 135, 136, 137, 138, 139]
+    actions: [113, 114, 115, 116, 117, 118, 125, 153, 154, 155, 156, 157, 158]
     checkpoints:
     - {step: 120, expectation: IMAP Drafts contains the composed subject before sending.}
-    - {step: 123, expectation: The SMTP server received the message sent from the IMAP account.}
-    - {step: 124, expectation: The IMAP Sent copy was stored.}
-    - {step: 125, expectation: The actual IMAP Sent folder contains the accepted message.}
-    - {step: 126, expectation: IMAP Drafts no longer contains the original server draft.}
-    - {step: 127, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
-    - {step: 141, expectation: The SMTP server received the message sent from the POP3 account.}
-    - {step: 142, expectation: The POP3 copy was stored in local Sent.}
-    - {step: 143, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
-    results: [120, 123, 124, 125, 126, 127, 141, 142, 143]
+    - {step: 127, expectation: The SMTP server received the message sent from the IMAP account.}
+    - {step: 128, expectation: The IMAP Sent copy was stored.}
+    - {step: 129, expectation: The actual IMAP Sent folder contains the accepted message.}
+    - {step: 130, expectation: IMAP Drafts no longer contains the original server draft.}
+    - {step: 131, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
+    - {step: 160, expectation: The SMTP server received the message sent from the POP3 account.}
+    - {step: 161, expectation: The POP3 copy was stored in local Sent.}
+    - {step: 162, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
+    results: [120, 127, 128, 129, 130, 131, 160, 161, 162]
   - id: R4
     requirement: Disabling the module releases its data lease without restarting the desktop.
-    actions: [144, 145, 146]
+    actions: [163, 164, 165]
     checkpoints:
-    - {step: 147, expectation: The disabled package can be re-enabled.}
-    - {step: 148, expectation: The verified module is still installed and the host released its writer lease.}
-    - {step: 149, expectation: Disabling unmounts both Mail account panes.}
-    - {step: 150, expectation: Both tabs remain open for reactivation.}
-    - {step: 151, expectation: The remaining application runs without uncaught errors.}
-    results: [147, 148, 149, 150, 151]
+    - {step: 166, expectation: The disabled package can be re-enabled.}
+    - {step: 167, expectation: The verified module is still installed and the host released its writer lease.}
+    - {step: 168, expectation: Disabling unmounts both Mail account panes.}
+    - {step: 169, expectation: Both tabs remain open for reactivation.}
+    - {step: 170, expectation: The remaining application runs without uncaught errors.}
+    results: [166, 167, 168, 169, 170]
   - id: R5
     requirement: The signed Mail host catches up the selected inbox after messages arrive while another folder is open.
     actions: [29, 40, 41]
@@ -302,6 +321,15 @@ verification:
     - {step: 106, expectation: Confirmed deletion removes the folder and keeps its parent.}
     - {step: 108, expectation: The fixture independently verifies the server result.}
     results: [88, 89, 94, 96, 101, 102, 106, 108]
+  - id: R13
+    requirement: Editing a saved draft replaces its server copy, and deleting a saved draft removes it from both the local list and the server.
+    actions: [122, 143]
+    checkpoints:
+    - {step: 123, expectation: Drafts contains only the revised version before sending.}
+    - {step: 137, expectation: The second draft is visible on the server before removal.}
+    - {step: 144, expectation: The server no longer lists the discarded draft.}
+    - {step: 145, expectation: The deleted draft leaves the local list.}
+    results: [123, 137, 144, 145]
   visual:
   - check: The Mail pane shows the connection results for both accounts.
     method: automated

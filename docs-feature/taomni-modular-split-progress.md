@@ -2,6 +2,9 @@
 
 ## 2026-11-22 当前进展
 
+- Mail 0.1.15 的签名宿主协议在 Linux、Windows 和 macOS ARM64 均通过，核对了所选远端 Sent 文件夹、原始 MIME 字节和单次 APPEND。对应三个 Browser 平台各通过 28/28，其中 TC-MAIL-SEND-01 均通过。 [宿主协议](https://github.com/engcapa/taomni/actions/runs/44923460860) · [应用分片](https://github.com/engcapa/taomni/actions/runs/44922422361)
+- Mail 附件轮次的 18 个分片全部下载并通过回执身份检查。Native 在 Linux、Windows、macOS 26 分别为 31/31、30/31、29/31。macOS 的 Mail EML 和 Markdown 导出工件确认系统面板已打开。驱动改为在应用所属的 AppKit 面板内查找嵌套控件，并识别省略扩展名的文件名输入框。31 项对话框工具单测通过，分片复验继续收取。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44918072491)
+- Mail 0.1.16 将手工保存、替换和删除服务器草稿交给签名宿主。草稿的本地编辑和自动保存保留已确认的远端 UID，避免再次保存时留下旧副本。TC-MAIL-SEND-01 与 TC-MODULES-059 检查服务器上的新旧主题以及显式删除。
 - Mail 0.1.15 将 SMTP 接受后的 IMAP Sent 副本和服务器草稿清理交给签名宿主。宿主先核对 MIME 长度，再按账户配置选择 Sent 文件夹。APPEND 的结果单独返回，避免因副本失败重新发送。TC-MODULES-059 在真实 IMAP 服务器上确认同一主题的草稿删除和 Sent 副本，TC-MAIL-SEND-01 核对 Browser 与 Native 对应结果。
 - Mail 0.1.14 的三个平台已下载全部 Browser 分片，每端通过 27/27，包含 TC-MODULES-060 的目录和附件用例。附件轮次三个平台的 Browser 同为 27/27，Linux Native 31/31。 [目录操作](https://github.com/engcapa/taomni/actions/runs/44920580710) · [附件分片](https://github.com/engcapa/taomni/actions/runs/44918072491)
 - 附件轮次的 Windows 原生分片显示 TC-MODULES-059 到达 10 秒上限时 UI 仍在验签安装。该步骤调整为 45 秒，继续要求安装成功。原始页面与收据在对应 Windows 分片保留。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44918072491)

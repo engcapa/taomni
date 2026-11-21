@@ -99,6 +99,7 @@ export function MailDraftsDialog(context: MailDraftsDialogContext) {
               key={saved.id}
               className="min-h-14 px-2 py-1.5 rounded border border-transparent hover:border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] flex items-center gap-2"
               data-testid={isOutbox(saved) ? "mail-outbox-row" : isTemplate(saved) ? "mail-template-row" : "mail-draft-row"}
+              data-subject={saved.subject}
             >
               <button
                 type="button"

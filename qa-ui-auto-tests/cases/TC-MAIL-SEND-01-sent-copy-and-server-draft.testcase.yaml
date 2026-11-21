@@ -26,7 +26,7 @@ modes:
 fixtures:
 - reset_db
 - mail_server
-timeout_sec: 150
+timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - seed_storage:
@@ -63,6 +63,10 @@ steps:
     folder: Drafts
     equals: 1
     has_subject: Server draft and sent copy
+- fill: {selector: '[data-testid="mail-compose-subject"]', value: Revised draft and sent copy}
+- click: '[data-testid="mail-compose-save-draft"]'
+- mail_server_assert_folder_count: {folder: Drafts, equals: 1, has_subject: Revised draft and sent copy, lacks_subject: Server draft and sent copy}
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Draft saved to Drafts, timeout_sec: 25}
 - click: '[data-testid="mail-compose-send"]'
 - wait_for:
     selector: '[data-testid="mail-compose-dialog"]'
@@ -74,11 +78,11 @@ steps:
 - mail_server_assert_folder_count:
     folder: Sent
     equals: 1
-    has_subject: Server draft and sent copy
+    has_subject: Revised draft and sent copy
 - mail_server_assert_folder_count:
     folder: Drafts
     equals: 0
-    lacks_subject: Server draft and sent copy
+    lacks_subject: Revised draft and sent copy
 - click: '[data-testid="mail-sync-button"]'
 - assert_text:
     selector: '[data-testid="mail-client-tab"]'
@@ -92,11 +96,26 @@ steps:
     contains: completed
     timeout_sec: 60
 - mail_server_assert_smtp_contains:
-    text: Server draft and sent copy
+    text: Revised draft and sent copy
     timeout_sec: 20
 - mail_server_assert_smtp_contains:
     text: Stored on the server for other clients
     timeout_sec: 20
+- click: '[data-testid="mail-client-tab"] [data-testid="mail-compose-open"]'
+- fill: {selector: '[data-testid="mail-recipient-to"] input', value: receiver@example.com}
+- press: Enter
+- fill: {selector: '[data-testid="mail-compose-subject"]', value: Discardable server draft}
+- click: '[data-testid="mail-compose-save-draft"]'
+- mail_server_assert_folder_count: {folder: Drafts, has_subject: Discardable server draft}
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Draft saved to Drafts, timeout_sec: 25}
+- click: '[role="dialog"][aria-label="New message"] [aria-label="Close dialog"]'
+- wait_for: {selector: '[data-testid="mail-compose-dialog"]', state: detached}
+- click: '[data-testid="mail-client-tab"] [data-testid="mail-drafts-open"]'
+- assert_text: {selector: '[data-testid="mail-draft-row"][data-subject="Discardable server draft"]', contains: Discardable server draft}
+- click: '[data-testid="mail-draft-row"][data-subject="Discardable server draft"] button[title="Delete draft"]'
+- mail_server_assert_folder_count: {folder: Drafts, lacks_subject: Discardable server draft}
+- wait_for: {selector: '[data-testid="mail-draft-row"][data-subject="Discardable server draft"]', state: detached}
+- click: '[role="dialog"][aria-label="Drafts and templates"] [aria-label="Close dialog"]'
 - assert_no_runtime_errors: null
 - screenshot: mail-send-01-sent-copy.png
 verification:
@@ -131,44 +150,53 @@ verification:
   - id: R2
     requirement: 发送后服务器 Sent 收到副本、服务器草稿被移除（AC-20/AC-21）。
     actions:
-    - 18
-    - 23
-    checkpoints:
-    - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached"}}'
-    - step: 20
-      expectation: '{"assert_text": {"contains": "copy saved to Sent"}}'
-    - step: 21
-      expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "equals": 1}}'
-    - step: 22
-      expectation: '{"mail_server_assert_folder_count": {"folder": "Drafts", "equals": 0}}'
-    - step: 25
-      expectation: A later mailbox refresh does not overwrite the Sent-copy result.
-    - step: 27
-      expectation: SMTP receives the composed message independently of the Sent folder copy.
-    - step: 28
-      expectation: SMTP receives the composed text body as well as the subject.
-    - step: 29
-      expectation: Sending and the subsequent refresh leave no runtime errors.
-    results:
-    - 25
-    - 20
-    - 21
     - 22
     - 27
-    - 28
+    checkpoints:
+    - step: 23
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached"}}'
+    - step: 24
+      expectation: '{"assert_text": {"contains": "copy saved to Sent"}}'
+    - step: 25
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "equals": 1}}'
+    - step: 26
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Drafts", "equals": 0}}'
+    - step: 29
+      expectation: A later mailbox refresh does not overwrite the Sent-copy result.
+    - step: 31
+      expectation: SMTP receives the composed message independently of the Sent folder copy.
+    - step: 32
+      expectation: SMTP receives the composed text body as well as the subject.
+    - step: 48
+      expectation: Sending and the subsequent refresh leave no runtime errors.
+    results:
     - 29
+    - 24
+    - 25
+    - 26
+    - 31
+    - 32
+    - 48
   - id: R3
     requirement: Quick Connect 默认目录的完整原件下载必须完成，不能在发送成功时遗漏后台归档发布错误；覆盖 Windows 长存储路径。
     actions:
     - 5
     - 6
-    - 18
+    - 22
     checkpoints:
-    - step: 26
+    - step: 30
       expectation: Default-directory full MIME storage completes without a publication error, including Windows paths longer than MAX_PATH.
     results:
-    - 26
+    - 30
+  - id: R4
+    requirement: Editing a saved draft replaces its server copy, and deleting a saved draft removes it from both the local list and the server.
+    actions: [19, 44]
+    checkpoints:
+    - {step: 20, expectation: Drafts contains only the revised version before sending.}
+    - {step: 38, expectation: The second draft is visible on the server before removal.}
+    - {step: 45, expectation: The server no longer lists the discarded draft.}
+    - {step: 46, expectation: The deleted draft leaves the local list.}
+    results: [20, 38, 45, 46]
   visual:
   - check: 截图中状态栏显示已保存 Sent 副本，写信窗口已关闭。
     method: manual

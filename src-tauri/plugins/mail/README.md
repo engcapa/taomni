@@ -55,6 +55,10 @@ The host checks the length before APPEND and uses targeted UID EXPUNGE for
 draft cleanup. The independent copy result stays separate from SMTP acceptance
 when APPEND fails or its reply is lost.
 
+Version 0.1.16 handles explicit server draft saves, replacements and deletes in
+the signed host. The cache preserves the last server folder and UID during local
+edits. The host locates the replacement by Message-ID before attempting cleanup.
+
 Version 0.1.5 adds a signed renderer for the account and unified inbox panes.
 Build it with `pnpm exec vite build --config src-tauri/plugins/mail/vite.config.ts`.
 The core shares its React runtime and specific file, dialog, theme and session

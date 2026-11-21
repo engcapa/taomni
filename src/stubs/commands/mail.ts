@@ -205,6 +205,9 @@ export function stubSaveMailDraft(accountId: string, draft: Record<string, unkno
     ? draft.id.trim()
     : `stub-draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const existing = drafts.find((item) => item.accountId === accountId && item.id === id);
+  const remoteDraftFolder = typeof draft.remoteDraftFolder === "string" ? draft.remoteDraftFolder : null;
+  const remoteDraftUid = typeof draft.remoteDraftUid === "number" ? draft.remoteDraftUid : null;
+  const preserveRemoteDraft = remoteDraftFolder === null && remoteDraftUid === null;
   const now = Math.floor(Date.now() / 1000);
   const attachments = Array.isArray(draft.attachments)
     ? draft.attachments
@@ -233,8 +236,8 @@ export function stubSaveMailDraft(accountId: string, draft: Record<string, unkno
     replyContext: draft.replyContext && typeof draft.replyContext === "object"
       ? draft.replyContext as Record<string, unknown>
       : null,
-    remoteDraftFolder: typeof draft.remoteDraftFolder === "string" ? draft.remoteDraftFolder : null,
-    remoteDraftUid: typeof draft.remoteDraftUid === "number" ? draft.remoteDraftUid : null,
+    remoteDraftFolder: preserveRemoteDraft ? existing?.remoteDraftFolder ?? null : remoteDraftFolder,
+    remoteDraftUid: preserveRemoteDraft ? existing?.remoteDraftUid ?? null : remoteDraftUid,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };

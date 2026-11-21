@@ -1,6 +1,6 @@
 //! Cached drafts, templates and scheduled Outbox state.
 
-use rusqlite::{Connection, OptionalExtension, Result as SqlResult, params};
+use rusqlite::{Connection, Result as SqlResult, params};
 use serde::{Deserialize, Serialize};
 
 use crate::now_ts;
@@ -149,15 +149,7 @@ pub fn save_mail_draft(
         .map(ToOwned::to_owned)
         .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let now = now_ts();
-    let created_at = conn
-        .query_row(
-            "SELECT created_at FROM mail_drafts WHERE account_id = ?1 AND id = ?2",
-            params![account_id, id],
-            |row| row.get::<_, i64>(0),
-        )
-        .optional()?
-        .unwrap_or(now);
-    let saved = MailDraft {
+    let mut saved = MailDraft {
         id,
         account_id: account_id.to_string(),
         to: draft.to,
@@ -170,7 +162,7 @@ pub fn save_mail_draft(
         reply_context: draft.reply_context,
         remote_draft_folder: draft.remote_draft_folder,
         remote_draft_uid: draft.remote_draft_uid,
-        created_at,
+        created_at: now,
         updated_at: now,
     };
     let to_json = serde_json::to_string(&saved.to).unwrap_or_else(|_| "[]".into());
@@ -182,7 +174,13 @@ pub fn save_mail_draft(
         .reply_context
         .as_ref()
         .and_then(|context| serde_json::to_string(context).ok());
-    conn.execute(
+    // Local edits omit the server location. Preserve it in the upsert so the
+    // next explicit save can replace that exact copy, even after autosave.
+    (
+        saved.created_at,
+        saved.remote_draft_folder,
+        saved.remote_draft_uid,
+    ) = conn.query_row(
         "INSERT INTO mail_drafts
          (account_id, id, to_json, cc_json, bcc_json, subject, text_body, html_body,
           attachments_json, reply_context_json, remote_draft_folder, remote_draft_uid,
@@ -197,9 +195,14 @@ pub fn save_mail_draft(
             html_body = excluded.html_body,
             attachments_json = excluded.attachments_json,
             reply_context_json = excluded.reply_context_json,
-            remote_draft_folder = excluded.remote_draft_folder,
-            remote_draft_uid = excluded.remote_draft_uid,
-            updated_at = excluded.updated_at",
+            remote_draft_folder = CASE
+                WHEN excluded.remote_draft_folder IS NULL AND excluded.remote_draft_uid IS NULL
+                THEN mail_drafts.remote_draft_folder ELSE excluded.remote_draft_folder END,
+            remote_draft_uid = CASE
+                WHEN excluded.remote_draft_folder IS NULL AND excluded.remote_draft_uid IS NULL
+                THEN mail_drafts.remote_draft_uid ELSE excluded.remote_draft_uid END,
+            updated_at = excluded.updated_at
+         RETURNING created_at, remote_draft_folder, remote_draft_uid",
         params![
             saved.account_id,
             saved.id,
@@ -216,6 +219,14 @@ pub fn save_mail_draft(
             saved.created_at,
             saved.updated_at,
         ],
+        |row| {
+            let uid: Option<i64> = row.get(2)?;
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                uid.map(|value| value.max(0) as u32),
+            ))
+        },
     )?;
     Ok(saved)
 }
@@ -253,4 +264,47 @@ fn mail_draft_from_row(row: &rusqlite::Row<'_>) -> SqlResult<MailDraft> {
         created_at: row.get(12)?,
         updated_at: row.get(13)?,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn editing_keeps_the_remote_location_until_it_is_cleared() {
+        let db = Connection::open_in_memory().unwrap();
+        crate::cache::init_mail_tables(&db).unwrap();
+        let first = save_mail_draft(
+            &db,
+            "account",
+            serde_json::from_value(json!({
+                "id": "draft",
+                "subject": "Before edit",
+                "remoteDraftFolder": "Server Drafts",
+                "remoteDraftUid": 42,
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let edit = || serde_json::from_value(json!({"id": "draft", "subject": "Edited"})).unwrap();
+        let saved = save_mail_draft(&db, "account", edit()).unwrap();
+        assert_eq!(saved.created_at, first.created_at);
+        assert_eq!(saved.remote_draft_folder.as_deref(), Some("Server Drafts"));
+        assert_eq!(saved.remote_draft_uid, Some(42));
+        let listed = list_mail_drafts(&db, "account").unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].subject, "Edited");
+        assert_eq!(listed[0].remote_draft_uid, Some(42));
+
+        db.execute(
+            "UPDATE mail_drafts SET remote_draft_folder=NULL, remote_draft_uid=NULL
+             WHERE account_id='account' AND id='draft'",
+            [],
+        )
+        .unwrap();
+        let saved = save_mail_draft(&db, "account", edit()).unwrap();
+        assert!(saved.remote_draft_folder.is_none());
+        assert!(saved.remote_draft_uid.is_none());
+    }
 }

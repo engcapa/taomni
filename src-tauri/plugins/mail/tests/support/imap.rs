@@ -1,8 +1,9 @@
 use std::net::Ipv4Addr;
 
 use taomni_mail_api::{
-    FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, ImapSentCopy, IncomingTest, MailAuthMode,
-    MailConnectionSecurity, MailIncomingProtocol, MailProvider, STORE_IMAP_SENT, SentCopyPayload,
+    DISCARD_IMAP_DRAFT, FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, ImapDraftDiscard, ImapDraftStore,
+    ImapSentCopy, IncomingTest, MailAuthMode, MailConnectionSecurity, MailIncomingProtocol,
+    MailProvider, MimeUpload, RemoteDraftLocation, STORE_IMAP_DRAFT, STORE_IMAP_SENT,
     imap_exchange::{
         AttachmentReceipt, AttachmentRequest, ImapExchange, read_body_frame, read_frame,
         write_frame,
@@ -158,7 +159,7 @@ pub(super) fn check_routed_sent_copy(host: &mut MailHost) {
                 connection,
                 account_id: "routed-mail".into(),
                 folder_override: Some("Chosen Sent".into()),
-                mime: Some(SentCopyPayload {
+                mime: Some(MimeUpload {
                     source,
                     length: mime.len() as u64,
                 }),
@@ -170,7 +171,7 @@ pub(super) fn check_routed_sent_copy(host: &mut MailHost) {
                 publish.send(value).unwrap();
             });
             let (value, ()) = tokio::time::timeout(WAIT, async {
-                tokio::join!(response, serve_sent_copy(listener, &mime))
+                tokio::join!(response, serve_outgoing(listener, Outgoing::Sent(&mime)))
             })
             .await
             .expect("Sent copy transfer completes within the fixture timeout");
@@ -181,7 +182,80 @@ pub(super) fn check_routed_sent_copy(host: &mut MailHost) {
     });
 }
 
-async fn serve_sent_copy(listener: TcpListener, mime: &[u8]) {
+pub(super) fn check_routed_draft(host: &mut MailHost) {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let location = std::thread::scope(|scope| {
+        runtime.block_on(async {
+            let (listener, _route, connection) = routed_mailbox().await;
+            let mime = format!("Message-ID: <draft@example.test>\r\n{HEADER}{TEXT}").into_bytes();
+            let (_offer, source) = Route::offer_bytes(mime.clone()).await.unwrap();
+            let request = ImapDraftStore {
+                connection,
+                account_id: "routed-mail".into(),
+                folder_override: None,
+                message_id: "<draft@example.test>".into(),
+                mime: MimeUpload {
+                    source,
+                    length: mime.len() as u64,
+                },
+                previous: Some(RemoteDraftLocation {
+                    folder: "Drafts".into(),
+                    uid: 41,
+                }),
+            };
+            let (publish, response) = oneshot::channel();
+            let host = &mut *host;
+            scope.spawn(move || {
+                let value = host.call(STORE_IMAP_DRAFT, serde_json::to_value(request).unwrap());
+                publish.send(value).unwrap();
+            });
+            let (value, ()) = tokio::time::timeout(WAIT, async {
+                tokio::join!(response, serve_outgoing(listener, Outgoing::Draft(&mime)))
+            })
+            .await
+            .expect("Draft copy transfer completes within the fixture timeout");
+            let location: Result<Option<RemoteDraftLocation>, String> =
+                serde_json::from_value(value.unwrap()).unwrap();
+            let location = location.unwrap().unwrap();
+            assert_eq!(location.folder, "Drafts");
+            assert_eq!(location.uid, 42);
+            location
+        })
+    });
+    std::thread::scope(|scope| {
+        runtime.block_on(async {
+            let (listener, _route, connection) = routed_mailbox().await;
+            let request = ImapDraftDiscard {
+                connection,
+                location,
+            };
+            let (publish, response) = oneshot::channel();
+            scope.spawn(move || {
+                let value = host.call(DISCARD_IMAP_DRAFT, serde_json::to_value(request).unwrap());
+                publish.send(value).unwrap();
+            });
+            let (value, ()) = tokio::time::timeout(WAIT, async {
+                tokio::join!(response, serve_outgoing(listener, Outgoing::Discard))
+            })
+            .await
+            .expect("Draft discard completes within the fixture timeout");
+            serde_json::from_value::<Result<(), String>>(value.unwrap())
+                .unwrap()
+                .unwrap();
+        });
+    });
+}
+
+enum Outgoing<'a> {
+    Sent(&'a [u8]),
+    Draft(&'a [u8]),
+    Discard,
+}
+
+async fn serve_outgoing(listener: TcpListener, fixture: Outgoing<'_>) {
     let (stream, _) = listener.accept().await.unwrap();
     let mut stream = BufReader::new(stream);
     stream
@@ -189,23 +263,60 @@ async fn serve_sent_copy(listener: TcpListener, mime: &[u8]) {
         .await
         .unwrap();
     let mut line = String::new();
-    let mut appends = 0;
+    let mut changes = Vec::new();
     while stream.read_line(&mut line).await.unwrap() != 0 {
         let (tag, input) = line.trim_end().split_once(' ').unwrap();
         let command = input.split_whitespace().next().unwrap();
         let data = match command {
             "LOGIN" | "LSUB" => "",
-            "CAPABILITY" => "* CAPABILITY IMAP4rev1\r\n",
-            "LIST" => "* LIST (\\Sent) \"/\" \"Sent\"\r\n* LIST () \"/\" \"Chosen Sent\"\r\n",
+            "CAPABILITY" => "* CAPABILITY IMAP4rev1 UIDPLUS\r\n",
+            "LIST" => concat!(
+                "* LIST (\\Sent) \"/\" \"Sent\"\r\n",
+                "* LIST () \"/\" \"Chosen Sent\"\r\n",
+                "* LIST (\\Drafts) \"/\" \"Drafts\"\r\n"
+            ),
+            "SELECT" | "EXAMINE" => {
+                assert!(input.ends_with("Drafts") || input.ends_with("\"Drafts\""));
+                "* 2 EXISTS\r\n* OK [UIDVALIDITY 17] UIDs valid\r\n"
+            }
             "APPEND" => {
-                assert!(input.starts_with("APPEND \"Chosen Sent\" (\\Seen) "));
+                let (mime, prefix) = match fixture {
+                    Outgoing::Sent(mime) => (mime, "APPEND \"Chosen Sent\" (\\Seen) "),
+                    Outgoing::Draft(mime) => (mime, "APPEND \"Drafts\" (\\Draft \\Seen) "),
+                    Outgoing::Discard => panic!("discard must not append messages"),
+                };
+                assert!(input.starts_with(prefix));
                 assert!(input.ends_with(&format!("{{{}}}", mime.len())));
                 stream.write_all(b"+ send the message\r\n").await.unwrap();
                 let mut literal = vec![0; mime.len() + 2];
                 stream.read_exact(&mut literal).await.unwrap();
                 assert_eq!(&literal[..mime.len()], mime);
                 assert_eq!(&literal[mime.len()..], b"\r\n");
-                appends += 1;
+                changes.push("append");
+                ""
+            }
+            "UID" if input.starts_with("UID SEARCH ") => {
+                assert!(matches!(fixture, Outgoing::Draft(_)));
+                assert_eq!(
+                    input,
+                    "UID SEARCH HEADER Message-ID \"<draft@example.test>\""
+                );
+                changes.push("find");
+                "* SEARCH 42\r\n"
+            }
+            "UID" => {
+                let uid = match fixture {
+                    Outgoing::Draft(_) => 41,
+                    Outgoing::Discard => 42,
+                    Outgoing::Sent(_) => panic!("no draft was supplied for cleanup"),
+                };
+                if input.starts_with("UID STORE ") {
+                    assert_eq!(input, format!("UID STORE {uid} +FLAGS.SILENT (\\Deleted)"));
+                    changes.push("mark deleted");
+                } else {
+                    assert_eq!(input, format!("UID EXPUNGE {uid}"));
+                    changes.push("expunge");
+                }
                 ""
             }
             "LOGOUT" => "* BYE goodbye\r\n",
@@ -220,7 +331,12 @@ async fn serve_sent_copy(listener: TcpListener, mime: &[u8]) {
         }
         line.clear();
     }
-    assert_eq!(appends, 1);
+    let expected: &[&str] = match fixture {
+        Outgoing::Sent(_) => &["append"],
+        Outgoing::Draft(_) => &["append", "find", "mark deleted", "expunge"],
+        Outgoing::Discard => &["mark deleted", "expunge"],
+    };
+    assert_eq!(changes, expected);
 }
 
 async fn routed_mailbox() -> (TcpListener, Route, IncomingTest) {
