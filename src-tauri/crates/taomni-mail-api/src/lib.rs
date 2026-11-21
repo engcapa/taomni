@@ -23,6 +23,7 @@ pub const FETCH_IMAP_RAW: &str = "mail/fetch-imap-raw";
 pub const FETCH_IMAP_BODY: &str = "mail/fetch-imap-body";
 pub const FETCH_IMAP_ATTACHMENT: &str = "mail/fetch-imap-attachment";
 pub const SEND_SMTP: &str = "mail/send-smtp";
+pub const STORE_IMAP_SENT: &str = "mail/store-imap-sent";
 pub const HOST_REQUEST_TIMEOUT: Duration = Duration::from_secs(70);
 pub const SMTP_DELIVERY_UNKNOWN: &str = "SMTP delivery status unknown";
 
@@ -108,6 +109,30 @@ pub struct SmtpDelivery {
     pub recipients: Vec<String>,
     pub mime_source: Endpoint,
     pub mime_length: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RemoteDraftLocation {
+    pub folder: String,
+    pub uid: u32,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ImapSentCopy {
+    pub connection: IncomingTest,
+    pub account_id: String,
+    pub folder_override: Option<String>,
+    pub mime: Option<SentCopyPayload>,
+    pub remote_draft: Option<RemoteDraftLocation>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SentCopyPayload {
+    pub source: Endpoint,
+    pub length: u64,
 }
 
 #[derive(Serialize, Deserialize)]

@@ -106,7 +106,6 @@ pub(super) async fn send_message(
     };
     let db = state.mail_db(&account_id)?;
     let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
     let (envelope, mime, pending, account) = tokio::task::spawn_blocking(move || {
         let (message, pending) = outgoing::prepare_send(&account, &request, remote_draft)?;
         Ok::<_, String>((
@@ -118,8 +117,8 @@ pub(super) async fn send_message(
     })
     .await
     .map_err(|e| format!("mail send task failed: {e}"))??;
-    let response =
-        super::module_host::send_smtp(state.plugins.clone(), &account, envelope, mime).await?;
+    let registry = state.plugins.clone();
+    let response = module_host::send_smtp(registry.clone(), &account, envelope, mime).await?;
     let result = MailSendResult {
         accepted: true,
         response,
@@ -130,18 +129,21 @@ pub(super) async fn send_message(
         // Owned by the backend, not the composer or tab. SMTP acceptance is
         // returned immediately; neither cache contention nor APPEND can turn
         // an accepted message into a send error (and an unsafe SMTP retry).
-        tokio::task::spawn_blocking(move || {
-            let contacts = (|| -> Result<(), String> {
+        tokio::spawn(async move {
+            let cached_account_id = account_id.clone();
+            let contacts = tokio::task::spawn_blocking(move || {
                 let db = db.lock().map_err(|e| e.to_string())?;
                 init_mail_tables(&db).map_err(|e| e.to_string())?;
-                upsert_sent_contacts(&db, &account_id, &sent_request).map_err(|e| e.to_string())?;
-                Ok(())
-            })();
+                upsert_sent_contacts(&db, &cached_account_id, &sent_request)
+                    .map_err(|error| error.to_string())
+            })
+            .await
+            .unwrap_or_else(|error| Err(error.to_string()));
             if let Err(error) = contacts {
                 tracing::warn!(%account_id, %error, "mail sent; contact cache update failed");
             }
             if let Some(pending) = pending {
-                let stored = outgoing::store_pending_copy(&pool, &account, pending, &handle);
+                let stored = module_host::store_sent_copy(registry, pool, account, pending).await;
                 let (folder, error) = match stored {
                     Ok(folder) => (folder, None),
                     Err(error) => (None, Some(error)),

@@ -48,6 +48,13 @@ Outbox waits for a manual retry if a lost reply leaves delivery uncertain.
 The protocol job checks authentication, delivery to blind recipients, MIME
 framing, explicit rejection and loss of the final DATA reply.
 
+Version 0.1.15 also stores the accepted message in the account's IMAP Sent
+folder and clears its remote draft after sending. The core supplies the
+account's folder preference and the MIME content through a one-use connection.
+The host checks the length before APPEND and uses targeted UID EXPUNGE for
+draft cleanup. The independent copy result stays separate from SMTP acceptance
+when APPEND fails or its reply is lost.
+
 Version 0.1.5 adds a signed renderer for the account and unified inbox panes.
 Build it with `pnpm exec vite build --config src-tauri/plugins/mail/vite.config.ts`.
 The core shares its React runtime and specific file, dialog, theme and session

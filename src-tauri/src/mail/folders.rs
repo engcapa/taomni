@@ -37,22 +37,6 @@ pub(super) fn merge_folder_status(previous: &MailFolder, mut status: MailFolder)
     status
 }
 
-/// Special-folder override from the account settings (`sent`, `drafts`, ...).
-pub(super) fn special_folder_override(
-    config: &MailAccountConfig,
-    folders: &[MailFolder],
-    key: &str,
-) -> Option<String> {
-    let wanted = config.special_folders.get(key)?.trim();
-    if wanted.is_empty() {
-        return None;
-    }
-    folders
-        .iter()
-        .find(|folder| folder.name == wanted || folder.display_name == wanted)
-        .map(|folder| folder.name.clone())
-}
-
 /// LIST (+LSUB) the remote folder tree without syncing messages, so a new
 /// account shows its folders on open instead of after the first full sync.
 #[tauri::command]

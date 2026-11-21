@@ -1,5 +1,11 @@
 # 模块化实施与验收台账
 
+## 2026-11-22 当前进展
+
+- Mail 0.1.15 将 SMTP 接受后的 IMAP Sent 副本和服务器草稿清理交给签名宿主。宿主先核对 MIME 长度，再按账户配置选择 Sent 文件夹。APPEND 的结果单独返回，避免因副本失败重新发送。TC-MODULES-059 在真实 IMAP 服务器上确认同一主题的草稿删除和 Sent 副本，TC-MAIL-SEND-01 核对 Browser 与 Native 对应结果。
+- Mail 0.1.14 的三个平台已下载全部 Browser 分片，每端通过 27/27，包含 TC-MODULES-060 的目录和附件用例。附件轮次三个平台的 Browser 同为 27/27，Linux Native 31/31。 [目录操作](https://github.com/engcapa/taomni/actions/runs/44920580710) · [附件分片](https://github.com/engcapa/taomni/actions/runs/44918072491)
+- 附件轮次的 Windows 原生分片显示 TC-MODULES-059 到达 10 秒上限时 UI 仍在验签安装。该步骤调整为 45 秒，继续要求安装成功。原始页面与收据在对应 Windows 分片保留。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44918072491)
+
 ## 2026-11-21 当前进展
 
 - Mail 0.1.14 将 IMAP 新建、改名和删除文件夹交给签名宿主。核心在同一事务中提交服务端目录树，目录名中的百分号和下划线按字面匹配。Browser 和 Native 检查新建、改名、取消删除及确认删除，Native 同时确认真实 IMAP 服务端状态。

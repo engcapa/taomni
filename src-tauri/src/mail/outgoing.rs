@@ -9,87 +9,20 @@ use std::io::{Read, Write};
 use std::sync::Arc;
 
 use rusqlite::{Connection, OptionalExtension, Result as SqlResult, params};
+use taomni_mail_api::RemoteDraftLocation;
+use taomni_mail_engine::imap_outgoing::{SpecialFolder, special_folder_name, store_sent_copy};
 use tauri::State;
+
+pub(super) use taomni_mail_engine::imap_outgoing::imap_append;
 
 use super::sync::quote_imap_string;
 use super::{
-    ActiveImapSession, ImapSessionOpts, MailAccountConfig, MailDraft, MailFolder, MailImapPool,
-    MailProvider, MailSendAttachment, MailSendRequest, MessageBuildOptions, ResolvedMailAccount,
+    ActiveImapSession, ImapSessionOpts, MailAccountConfig, MailDraft, MailImapPool, MailProvider,
+    MailSendAttachment, MailSendRequest, MessageBuildOptions, ResolvedMailAccount,
     build_send_message_with, clean_message_id, list_mail_drafts, resolve_config, with_imap_session,
     with_mail_db,
 };
 use crate::state::AppState;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum SpecialFolder {
-    Sent,
-    Drafts,
-}
-
-impl SpecialFolder {
-    fn attribute(self) -> &'static str {
-        match self {
-            Self::Sent => "\\sent",
-            Self::Drafts => "\\drafts",
-        }
-    }
-
-    fn names(self) -> &'static [&'static str] {
-        match self {
-            Self::Sent => &[
-                "sent",
-                "sent items",
-                "sent messages",
-                "sent mail",
-                "已发送",
-                "已發送",
-                "已傳送",
-                "寄件备份",
-                "已发送邮件",
-            ],
-            Self::Drafts => &["drafts", "draft", "草稿", "草稿箱", "草稿夹"],
-        }
-    }
-
-    fn override_key(self) -> &'static str {
-        match self {
-            Self::Sent => "sent",
-            Self::Drafts => "drafts",
-        }
-    }
-
-    fn create_name(self) -> &'static str {
-        match self {
-            Self::Sent => "Sent",
-            Self::Drafts => "Drafts",
-        }
-    }
-}
-
-/// Pick the folder for `kind`: SPECIAL-USE attribute first (RFC 6154), then a
-/// well-known name of the last path segment.
-pub(super) fn special_folder_name(folders: &[MailFolder], kind: SpecialFolder) -> Option<String> {
-    let attribute = kind.attribute();
-    if let Some(folder) = folders.iter().find(|folder| {
-        folder
-            .flags
-            .iter()
-            .any(|flag| flag.to_ascii_lowercase().contains(attribute))
-    }) {
-        return Some(folder.name.clone());
-    }
-    for name in kind.names() {
-        if let Some(folder) = folders.iter().find(|folder| {
-            let delimiter = folder.delimiter.as_deref().unwrap_or("/");
-            let label = folder.display_name.as_str();
-            let last = label.rsplit(delimiter).next().unwrap_or(label);
-            last.trim().to_lowercase() == *name
-        }) {
-            return Some(folder.name.clone());
-        }
-    }
-    None
-}
 
 pub(super) fn save_sent_copy_enabled(config: &MailAccountConfig) -> bool {
     config.save_sent_copy.unwrap_or(!matches!(
@@ -106,21 +39,6 @@ pub(super) fn new_message_id(email_address: &str) -> String {
         .filter(|domain| !domain.is_empty())
         .unwrap_or("taomni.local");
     format!("<{}@{}>", uuid::Uuid::new_v4().simple(), domain)
-}
-
-pub(super) fn imap_append<T: Read + Write>(
-    session: &mut imap::Session<T>,
-    folder: &str,
-    bytes: &[u8],
-    flags: &[&str],
-) -> Result<(), String> {
-    let flags: Vec<imap::types::Flag<'_>> = flags
-        .iter()
-        .map(|flag| imap::types::Flag::from(flag.to_string()))
-        .collect();
-    session
-        .append_with_flags(folder, bytes, &flags)
-        .map_err(|e| format!("IMAP APPEND {folder} failed: {e}"))
 }
 
 fn imap_uid_by_message_id<T: Read + Write>(
@@ -185,10 +103,11 @@ impl ActiveImapSession {
         create: bool,
     ) -> Result<Option<String>, String> {
         let folders = self.list_folders(&config.session_id)?;
-        if let Some(name) =
-            super::folders::special_folder_override(config, &folders, kind.override_key())
-                .or_else(|| special_folder_name(&folders, kind))
-        {
+        let configured = config
+            .special_folders
+            .get(kind.override_key())
+            .map(String::as_str);
+        if let Some(name) = special_folder_name(&folders, kind, configured) {
             return Ok(Some(name));
         }
         if !create {
@@ -198,13 +117,6 @@ impl ActiveImapSession {
         self.create_mailbox(&name)?;
         Ok(Some(name))
     }
-}
-
-/// Server location of a draft's stored copy.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct RemoteDraftLocation {
-    pub folder: String,
-    pub uid: u32,
 }
 
 pub(super) fn remote_draft_location(
@@ -249,8 +161,8 @@ fn set_remote_draft_location(
 }
 
 pub(super) struct PendingSentCopy {
-    copy: Option<Vec<u8>>,
-    remote_draft: Option<RemoteDraftLocation>,
+    pub(super) copy: Option<Vec<u8>>,
+    pub(super) remote_draft: Option<RemoteDraftLocation>,
 }
 
 /// Prepare local MIME before SMTP; once SMTP accepts, only the independent
@@ -302,21 +214,26 @@ pub(super) fn store_pending_copy(
         retry_on_error: false,
         ..ImapSessionOpts::default()
     };
-    with_imap_session(pool, account, runtime, opts, |imap| {
-        let mut sent_folder = None;
-        if let Some(bytes) = &pending.copy {
-            let folder = imap
-                .special_folder(&account.config, SpecialFolder::Sent, true)?
-                .ok_or_else(|| "no Sent folder".to_string())?;
-            imap.append(&folder, bytes, &["\\Seen"])?;
-            sent_folder = Some(folder);
-        }
-        if let Some(draft) = &pending.remote_draft {
-            if let Err(e) = imap.delete_messages(&draft.folder, &[draft.uid], false) {
-                tracing::debug!("mail: removing server draft after send failed: {e}");
-            }
-        }
-        Ok(sent_folder)
+    let folder_override = account
+        .config
+        .special_folders
+        .get("sent")
+        .map(String::as_str);
+    with_imap_session(pool, account, runtime, opts, |imap| match imap {
+        ActiveImapSession::Plain { session, .. } => store_sent_copy(
+            session,
+            &account.config.session_id,
+            folder_override,
+            pending.copy.as_deref(),
+            pending.remote_draft.as_ref(),
+        ),
+        ActiveImapSession::Tls { session, .. } => store_sent_copy(
+            session,
+            &account.config.session_id,
+            folder_override,
+            pending.copy.as_deref(),
+            pending.remote_draft.as_ref(),
+        ),
     })
 }
 
@@ -479,39 +396,6 @@ pub async fn mail_discard_remote_draft(
 mod tests {
     use super::super::fake_imap::FakeImap;
     use super::*;
-
-    fn folder(name: &str, flags: &[&str]) -> MailFolder {
-        MailFolder {
-            account_id: "acct".into(),
-            name: name.into(),
-            display_name: name.into(),
-            delimiter: Some("/".into()),
-            flags: flags.iter().map(|flag| flag.to_string()).collect(),
-            ..MailFolder::default()
-        }
-    }
-
-    #[test]
-    fn special_folder_prefers_special_use_then_names() {
-        let folders = vec![
-            folder("INBOX", &[]),
-            folder("Sent", &[]),
-            folder("[Gmail]/Sent Mail", &["Custom(\"\\\\Sent\")"]),
-            folder("草稿箱", &[]),
-        ];
-        assert_eq!(
-            special_folder_name(&folders, SpecialFolder::Sent).as_deref(),
-            Some("[Gmail]/Sent Mail")
-        );
-        assert_eq!(
-            special_folder_name(&folders, SpecialFolder::Drafts).as_deref(),
-            Some("草稿箱")
-        );
-        assert_eq!(
-            special_folder_name(&folders[..1], SpecialFolder::Sent),
-            None
-        );
-    }
 
     #[test]
     fn sent_copy_defaults_follow_provider() {

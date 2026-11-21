@@ -5,8 +5,8 @@ description: >-
   tab to populate the IMAP folder tree, unsubscribe Archive, search the server,
   update message flags, view and save the original of an unarchived message, and send
   messages from IMAP and POP3 accounts. Check the installed renderer,
-  connection tests, SMTP delivery, Sent copies, and the signed host's data
-  lease through disable.
+  connection tests, SMTP delivery, IMAP Sent copies, remote draft cleanup,
+  and the signed host's data lease through disable.
 covers: [F-Modules-1, F-MAIL-3, F-MAIL-6, F-MAIL-7, F-MAIL-11, F-MAIL-12, F-MAIL-15, F-MAIL-17, F-MAIL-23, F-FILEOPEN-1]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
@@ -21,7 +21,7 @@ steps:
 - fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
 - fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
 - click: '[data-testid="module-offline-submit"]'
-- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
 - click: '[data-testid="module-action-enable-mail"]'
 - wait_for: '[data-testid="module-action-disable-mail"]'
 - assert_signed_mail_host: idle
@@ -144,10 +144,15 @@ steps:
 - press: Enter
 - fill: {selector: '[data-testid="mail-compose-subject"]', value: Signed host IMAP delivery}
 - type: {selector: '[data-testid="mail-compose-editor"]', text: IMAP message from the signed Mail host}
+- click: '[data-testid="mail-compose-save-draft"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: Draft saved to Drafts, timeout_sec: 25}
+- mail_server_assert_folder_count: {folder: Drafts, has_subject: Signed host IMAP delivery}
 - click: '[data-testid="mail-compose-send"]'
 - wait_for: {selector: '[data-testid="mail-compose-dialog"]', state: detached}
 - mail_server_assert_smtp_contains: {text: Signed host IMAP delivery, timeout_sec: 20}
 - assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-sent-copy-status"]', contains: copy saved to Sent, timeout_sec: 30}
+- mail_server_assert_folder_count: {folder: Sent, has_subject: Signed host IMAP delivery}
+- mail_server_assert_folder_count: {folder: Drafts, lacks_subject: Signed host IMAP delivery}
 - assert_signed_mail_host: imap-delivery
 - fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_pop3_quick_connect}'}
 - click: '[data-testid="qc-submit"]'
@@ -193,33 +198,36 @@ verification:
     results: [9, 12, 18, 20, 21, 48, 50, 54, 55, 78]
   - id: R2
     requirement: The normal connection controls test IMAP, POP3 and SMTP using the installed Mail host.
-    actions: [79, 110, 123, 124, 127]
+    actions: [79, 110, 128, 129, 132]
     checkpoints:
     - {step: 111, expectation: The hosted app reports working IMAP and SMTP connections.}
     - {step: 112, expectation: The signed Mail host still holds its data lease.}
-    - {step: 128, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
-    results: [111, 112, 128]
+    - {step: 133, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
+    results: [111, 112, 133]
   - id: R3
-    requirement: The signature-verified package delivers from both account types and preserves the Sent-copy behavior.
-    actions: [113, 114, 115, 116, 117, 118, 129, 130, 131, 132, 133, 134]
+    requirement: The signature-verified package delivers from both account types, stores an IMAP Sent copy and removes the server draft.
+    actions: [113, 114, 115, 116, 117, 118, 121, 134, 135, 136, 137, 138, 139]
     checkpoints:
-    - {step: 120, expectation: The SMTP server received the message sent from the IMAP account.}
-    - {step: 121, expectation: The IMAP Sent copy was stored.}
-    - {step: 122, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
-    - {step: 136, expectation: The SMTP server received the message sent from the POP3 account.}
-    - {step: 137, expectation: The POP3 copy was stored in local Sent.}
-    - {step: 138, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
-    results: [120, 121, 122, 136, 137, 138]
+    - {step: 120, expectation: IMAP Drafts contains the composed subject before sending.}
+    - {step: 123, expectation: The SMTP server received the message sent from the IMAP account.}
+    - {step: 124, expectation: The IMAP Sent copy was stored.}
+    - {step: 125, expectation: The actual IMAP Sent folder contains the accepted message.}
+    - {step: 126, expectation: IMAP Drafts no longer contains the original server draft.}
+    - {step: 127, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
+    - {step: 141, expectation: The SMTP server received the message sent from the POP3 account.}
+    - {step: 142, expectation: The POP3 copy was stored in local Sent.}
+    - {step: 143, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
+    results: [120, 123, 124, 125, 126, 127, 141, 142, 143]
   - id: R4
     requirement: Disabling the module releases its data lease without restarting the desktop.
-    actions: [139, 140, 141]
+    actions: [144, 145, 146]
     checkpoints:
-    - {step: 142, expectation: The disabled package can be re-enabled.}
-    - {step: 143, expectation: The verified module is still installed and the host released its writer lease.}
-    - {step: 144, expectation: Disabling unmounts both Mail account panes.}
-    - {step: 145, expectation: Both tabs remain open for reactivation.}
-    - {step: 146, expectation: The remaining application runs without uncaught errors.}
-    results: [142, 143, 144, 145, 146]
+    - {step: 147, expectation: The disabled package can be re-enabled.}
+    - {step: 148, expectation: The verified module is still installed and the host released its writer lease.}
+    - {step: 149, expectation: Disabling unmounts both Mail account panes.}
+    - {step: 150, expectation: Both tabs remain open for reactivation.}
+    - {step: 151, expectation: The remaining application runs without uncaught errors.}
+    results: [147, 148, 149, 150, 151]
   - id: R5
     requirement: The signed Mail host catches up the selected inbox after messages arrive while another folder is open.
     actions: [29, 40, 41]

@@ -18,9 +18,10 @@ use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, FETCH_IMAP_RAW,
     FolderSubscription, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, ImapFlagUpdate, ImapFolderChange,
-    ImapFolderMutation, ImapFolderTree, IncomingTest, LIST_IMAP_UNREAD, MUTATE_IMAP_FOLDER,
-    SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, SLUG, SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS,
-    SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
+    ImapFolderMutation, ImapFolderTree, ImapSentCopy, IncomingTest, LIST_IMAP_UNREAD,
+    MUTATE_IMAP_FOLDER, SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, SLUG, SMTP_DELIVERY_UNKNOWN,
+    STORE_IMAP_SENT, SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND, SentCopyPayload, SmtpConnection,
+    SmtpDelivery,
     imap_exchange::{ImapExchange, read_frame, write_frame},
 };
 use taomni_mail_engine::imap_sync::{
@@ -272,6 +273,43 @@ async fn bind_smtp(account: &ResolvedMailAccount) -> Result<(Route, SmtpConnecti
             secret: account.smtp_password.clone().into(),
         },
     ))
+}
+
+pub(super) async fn store_sent_copy(
+    registry: Arc<PluginRegistry>,
+    pool: Arc<super::MailImapPool>,
+    account: ResolvedMailAccount,
+    pending: super::outgoing::PendingSentCopy,
+) -> Result<Option<String>, String> {
+    if !supports(&registry, STORE_IMAP_SENT) {
+        let runtime = tokio::runtime::Handle::current();
+        return tokio::task::spawn_blocking(move || {
+            super::outgoing::store_pending_copy(&pool, &account, pending, &runtime)
+        })
+        .await
+        .map_err(|error| format!("Mail Sent copy task failed: {error}"))?;
+    }
+    let (_offer, mime) = match pending.copy {
+        Some(bytes) => {
+            let length = bytes.len() as u64;
+            let (offer, source) = Route::offer_bytes(bytes)
+                .await
+                .map_err(|error| format!("Prepare Sent message: {error}"))?;
+            (Some(offer), Some(SentCopyPayload { source, length }))
+        }
+        None => (None, None),
+    };
+    // APPEND is non-idempotent. A lost reply stays a Sent-copy error.
+    invoke_with_incoming(registry, &account, STORE_IMAP_SENT, |connection| {
+        ImapSentCopy {
+            connection,
+            account_id: account.config.session_id.clone(),
+            folder_override: account.config.special_folders.get("sent").cloned(),
+            mime,
+            remote_draft: pending.remote_draft,
+        }
+    })
+    .await
 }
 
 fn supports(registry: &PluginRegistry, method: &str) -> bool {

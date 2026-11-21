@@ -1,8 +1,8 @@
 use std::net::Ipv4Addr;
 
 use taomni_mail_api::{
-    FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, IncomingTest, MailAuthMode, MailConnectionSecurity,
-    MailIncomingProtocol, MailProvider,
+    FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, ImapSentCopy, IncomingTest, MailAuthMode,
+    MailConnectionSecurity, MailIncomingProtocol, MailProvider, STORE_IMAP_SENT, SentCopyPayload,
     imap_exchange::{
         AttachmentReceipt, AttachmentRequest, ImapExchange, read_body_frame, read_frame,
         write_frame,
@@ -142,6 +142,85 @@ pub(super) fn check_routed_attachment(host: &mut MailHost) {
             });
         });
     }
+}
+
+pub(super) fn check_routed_sent_copy(host: &mut MailHost) {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    std::thread::scope(|scope| {
+        runtime.block_on(async {
+            let (listener, _route, connection) = routed_mailbox().await;
+            let mime = format!("{HEADER}{TEXT}").into_bytes();
+            let (_offer, source) = Route::offer_bytes(mime.clone()).await.unwrap();
+            let request = ImapSentCopy {
+                connection,
+                account_id: "routed-mail".into(),
+                folder_override: Some("Chosen Sent".into()),
+                mime: Some(SentCopyPayload {
+                    source,
+                    length: mime.len() as u64,
+                }),
+                remote_draft: None,
+            };
+            let (publish, response) = oneshot::channel();
+            scope.spawn(move || {
+                let value = host.call(STORE_IMAP_SENT, serde_json::to_value(request).unwrap());
+                publish.send(value).unwrap();
+            });
+            let (value, ()) = tokio::time::timeout(WAIT, async {
+                tokio::join!(response, serve_sent_copy(listener, &mime))
+            })
+            .await
+            .expect("Sent copy transfer completes within the fixture timeout");
+            let folder: Result<Option<String>, String> =
+                serde_json::from_value(value.unwrap()).unwrap();
+            assert_eq!(folder.unwrap().as_deref(), Some("Chosen Sent"));
+        });
+    });
+}
+
+async fn serve_sent_copy(listener: TcpListener, mime: &[u8]) {
+    let (stream, _) = listener.accept().await.unwrap();
+    let mut stream = BufReader::new(stream);
+    stream
+        .write_all(b"* OK IMAP fixture ready\r\n")
+        .await
+        .unwrap();
+    let mut line = String::new();
+    let mut appends = 0;
+    while stream.read_line(&mut line).await.unwrap() != 0 {
+        let (tag, input) = line.trim_end().split_once(' ').unwrap();
+        let command = input.split_whitespace().next().unwrap();
+        let data = match command {
+            "LOGIN" | "LSUB" => "",
+            "CAPABILITY" => "* CAPABILITY IMAP4rev1\r\n",
+            "LIST" => "* LIST (\\Sent) \"/\" \"Sent\"\r\n* LIST () \"/\" \"Chosen Sent\"\r\n",
+            "APPEND" => {
+                assert!(input.starts_with("APPEND \"Chosen Sent\" (\\Seen) "));
+                assert!(input.ends_with(&format!("{{{}}}", mime.len())));
+                stream.write_all(b"+ send the message\r\n").await.unwrap();
+                let mut literal = vec![0; mime.len() + 2];
+                stream.read_exact(&mut literal).await.unwrap();
+                assert_eq!(&literal[..mime.len()], mime);
+                assert_eq!(&literal[mime.len()..], b"\r\n");
+                appends += 1;
+                ""
+            }
+            "LOGOUT" => "* BYE goodbye\r\n",
+            _ => panic!("unexpected IMAP command {command}"),
+        };
+        stream
+            .write_all(format!("{data}{tag} OK done\r\n").as_bytes())
+            .await
+            .unwrap();
+        if command == "LOGOUT" {
+            break;
+        }
+        line.clear();
+    }
+    assert_eq!(appends, 1);
 }
 
 async fn routed_mailbox() -> (TcpListener, Route, IncomingTest) {

@@ -12,6 +12,7 @@ use crate::imap_auth::{MailAuthMode, MailProvider, authenticate};
 use crate::imap_folders::{imap_change_folder, imap_list_folders, imap_set_subscription};
 use crate::imap_messages::{Mailbox, imap_fetch_attachment, imap_fetch_raw};
 use crate::imap_mutations::{imap_set_flags, unread_uids};
+use crate::imap_outgoing::store_sent_copy;
 use crate::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest, StepParams,
     imap_has_capability, imap_sync_folder_step, sync_folder_round,
@@ -20,7 +21,7 @@ use crate::search::{ImapSearchRequest, search_imap_messages};
 use crate::tls::{MailConnectionSecurity, certificate_error_hint, tls_connector};
 use crate::{DownloadedMailAttachment, MailFolder, MailMessageCached, MailMessageHeader};
 use serde::{Deserialize, Serialize};
-use taomni_mail_api::{ImapFlagUpdate, ImapFolderChange};
+use taomni_mail_api::{ImapFlagUpdate, ImapFolderChange, RemoteDraftLocation};
 
 pub struct ImapConnection<'a> {
     pub server_name: &'a str,
@@ -63,6 +64,23 @@ pub fn imap_catch_result<T>(work: impl FnOnce() -> Result<T, String>) -> Result<
 }
 
 impl ImapSession {
+    pub fn store_sent_copy(
+        &mut self,
+        account_id: &str,
+        configured_folder: Option<&str>,
+        bytes: Option<&[u8]>,
+        remote_draft: Option<&RemoteDraftLocation>,
+    ) -> Result<Option<String>, String> {
+        match self {
+            Self::Plain(session) => {
+                store_sent_copy(session, account_id, configured_folder, bytes, remote_draft)
+            }
+            Self::Tls(session) => {
+                store_sent_copy(session, account_id, configured_folder, bytes, remote_draft)
+            }
+        }
+    }
+
     pub fn list_folders(&mut self, account_id: &str) -> Result<Vec<MailFolder>, String> {
         match self {
             Self::Plain(session) => imap_list_folders(session, account_id),

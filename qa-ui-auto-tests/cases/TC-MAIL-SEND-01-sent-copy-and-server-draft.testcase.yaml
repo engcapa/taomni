@@ -62,6 +62,7 @@ steps:
 - mail_server_assert_folder_count:
     folder: Drafts
     equals: 1
+    has_subject: Server draft and sent copy
 - click: '[data-testid="mail-compose-send"]'
 - wait_for:
     selector: '[data-testid="mail-compose-dialog"]'
@@ -73,9 +74,11 @@ steps:
 - mail_server_assert_folder_count:
     folder: Sent
     equals: 1
+    has_subject: Server draft and sent copy
 - mail_server_assert_folder_count:
     folder: Drafts
     equals: 0
+    lacks_subject: Server draft and sent copy
 - click: '[data-testid="mail-sync-button"]'
 - assert_text:
     selector: '[data-testid="mail-client-tab"]'
