@@ -114,7 +114,9 @@ gh workflow run qa-ui-auto-platforms.yml --ref feat/notepad-2plus-impl \
   -f case_ids=TC-NP-001,TC-NP-002,TC-NP-003,TC-NP-004,TC-NP-005,TC-NP-101,TC-NP-102
 ```
 
-selected scope 会自动并入 `crash-regression` 标签用例（AGENTS.md 要求），shard 结果按运行页面与产物归档；与本次改动无关的既有失败单独记录、不混入 Notepad 结论。未执行平台保持“未验证”。
+selected scope 会自动并入 `crash-regression` 标签用例（AGENTS.md 要求）。
+
+**结果（run `44931303328`，head `dc78b7abe`）：** browser 三端全部通过——Linux / Windows / macOS 各 22 passed（含 TC-NP-001..005 与 crash-regression 套件）+ 各 1 passed（单用例 shard），0 failed / 0 skipped。shard 产物 `qa-<os>-browser-shard-*` 已下载核对（`qa-ui-auto-report/hosted/run2/`）。native 三端 release QA 构建与执行结果在运行页面记录；本地已用同一 head 的 debug QA 二进制验证 TC-NP-101/102。未执行平台/项目保持“未验证”。
 
 ### 4.4 Linux 真机（Xvfb 隔离会话）
 
