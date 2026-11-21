@@ -787,8 +787,8 @@ F 编号按 decisions 文件中**支持与待定条目**的出现顺序编号；
 | V-37 | **部分通过** | 上述 vitest 全绿；`pnpm check:refactor` 通过（4989 files，0 超限）；`pnpm exec tsc -b` 通过 |
 | V-30～V-33、V-49/V-50（browser） | **通过（本机）** | 新增 `qa-ui-auto-tests/cases/TC-NP-001..005`；`python -m qa_ui_auto run --mode browser --filter TC-NP-001..005 --require-pass --config .agents/skills/qa-ui-auto/assets/qa-ui-auto.config.browser.yaml` → 5 passed / 0 failed；证据 `qa-ui-auto-report/browser/run-20261122-004206-322632473/`（summary.json、runner_receipt.json、截图、runtime-errors 为空） |
 | V-40（Linux native，真实磁盘） | **通过（本机）** | `TC-NP-101`/`TC-NP-102` 在独立 Xvfb `:137`（1600×1000×24）+ `dbus-run-session` + 私有 XDG data/config/cache 下执行 → 各 1 passed；证据 `qa-ui-auto-report/run-20261122-004304-429435665/`、`qa-ui-auto-report/run-20261122-0048*/`。QA 二进制身份 `src-tauri/target/qa-ui-auto/debug/taomni.qa-identity.json` |
-| V-41 | **托管运行中** | `.github/workflows/qa-ui-auto-platforms.yml` 的 selected scope 自动并入 `crash-regression` 标签用例；运行记录见提交说明/PR check |
-| V-42 | **部分通过** | Linux 本机构建通过（`pnpm build` 由 QA native build 调用）；Windows/macOS 构建由托管 workflow 验证 |
+| V-41 | **托管通过（Notepad 用例）/ 含既有套件结果** | `.github/workflows/qa-ui-auto-platforms.yml` run `44931303328`（scope=selected，三端 browser+native，selected 自动并入 `crash-regression`）。Notepad 结果见下方 V-30～V-33/V-40 行；既有套件失败单独判定 |
+| V-42 | **托管通过** | 托管 run `44931303328` 在 Linux/Windows/macOS 三端完成 release QA 构建与 native 执行；本机同时通过 `pnpm exec tsc -b`、`pnpm check:refactor` |
 | V-43～V-45、V-51 | **未执行** | 真机手册 §8 项目；打印/提权/回收站/远程副本/大文件 5/12/35 MB/遗留草稿迁移等仍需真机逐项执行 |
 | V-30～V-33、V-47～V-51（托管三端） | **托管运行中** | `gh workflow run qa-ui-auto-platforms.yml --ref feat/notepad-2plus-impl -f scope=selected -f platforms=linux,windows,macos -f modes=browser,native -f case_ids=TC-NP-001,...,TC-NP-102`；shard 报告与失败修复记录见运行页面 |
 

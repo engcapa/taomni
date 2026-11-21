@@ -120,6 +120,17 @@ selected scope 会自动并入 `crash-regression` 标签用例（AGENTS.md 要�
 
 native 用例在独立 X11 会话（Xvfb `:n`）、独立 D-Bus（`dbus-run-session`）与独立数据/配置/缓存目录下运行，不接触 `:0` 桌面。
 
+### 4.5 既有回归用例的适配（TASK-NP-24 要求）
+
+TextEditor → NotepadEditor 迁移后，既有崩溃回归用例 `TC-FILE-OPEN-001/006/008` 暴露了两处真实回归，已修复并复核：
+
+1. **共享保存按钮契约**：旧 `viewer-save` 在文档干净或只读时禁用；新工具栏最初按原型“全部按钮可点”实现，导致三个用例失败。现保存按钮仅对“脏且可写且不在保存中”的文档启用，其余 21 个原型按钮保持可点。
+2. **丢弃未保存内容后仍可恢复**：关闭标签选择“丢弃”后，Notepad 磁盘备份仍残留，重新打开文件会恢复被丢弃的内容而不是磁盘内容。`documentStore.discard` 现在会清理该文档的 Notepad 备份，`release` 对干净文档同样清理。
+
+本机复核：`TC-FILE-OPEN-001`、`TC-FILE-OPEN-006` 与 `TC-NP-001..005` 一起执行 → 7 passed / 0 failed。`TC-FILE-OPEN-008` 本机因未配置 SSH fixture 跳过（托管 runner 提供 fixture）。
+
+全量 `pnpm test` 另有一个与本次改动无关的既有不稳定用例（`CodeWorkspaceTab.test.tsx` 在满负载并行时偶发 observation 断言失败，单独执行 261 项全部通过），未计入 Notepad 结论。
+
 ## 5. 未完成 / 下一步
 
 1. TASK-NP-24：browser/native 三端用例跑通并回填证据；Windows/macOS 未执行项保留“未验证”。
