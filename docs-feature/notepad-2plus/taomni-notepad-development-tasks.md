@@ -91,3 +91,33 @@ DEC-22 已确认：NP-15 只实现宿主之外必要的部分（标签内分屏�
 - 任何任务若改变设计 §3 的 AC、§4.1 的决策或 §4.5 的接口，必须先更新设计并保留 ID 和变更原因。
 - 原型 v3 按 DEC-01=A、DEC-02=限定型、DEC-03=实现绘制；DEC-22 已确认接受。v1/v2（专属工作台标签）已被替代，不得继续当作有效图稿。
 - 标记（Mark）是否随会话保存、正则方言差异清单、`Ctrl+Tab` 在 WebView 的可用性是实施中必须关闭的评审项（设计 §10）。
+
+## 6. 实施进展（2026-11-21 接续开发）
+
+> 详细实现范围、代码位置、原型偏差与验证证据见 [taomni-notepad-implementation-notes.md](taomni-notepad-implementation-notes.md)。本节的“状态”只描述本轮结束时的实际代码与验证状态；任务板 §2 的“待开始”是设计阶段快照，不再表示当前状态。
+
+| 任务 | 实施状态 | 本轮证据 |
+|---|---|---|
+| NP-00 | 已实现待验证 | `spikes/spikes-s1-s6.md` |
+| NP-01～NP-09 | 已实现待验证 | 单测 `pnpm exec vitest run src/lib/notepad src/components/notepad`（2026-11-21：402 tests 通过） |
+| NP-10/NP-11 | 部分实现 | 剪贴板历史、选择下一个相同词、矩形选择、虚拟空格、列编辑器、插入日期；多光标/特殊粘贴行为待补 |
+| NP-12～NP-14 | 已实现待验证 | 查找替换/全部查找/标记/书签/变更历史单测与浏览器探测通过 |
+| NP-15～NP-17 | 已实现待验证 | 标签内分屏/克隆/旋转/同步滚动、视图开关、面板右/底/浮动三态 |
+| NP-18～NP-23 | 已实现待验证/部分实现 | 工具箱、宏、对比、打印、首选项、拖放/提权/大文件；真机项待 V-40/V-43～V-45 |
+| NP-24 | 进行中 | 单测与静态检查通过；TC-NP browser/native 用例与三端托管运行进行中 |
+| NP-25 | 已实现待验证 | `ViewerShell` 文本/源码/大文件分支改挂 `NotepadEditor`，旧 `TextEditor` 已删除（V-47 单测通过） |
+| NP-26 | 已实现待验证 | `FileHandler` 扩展、Explorer 打开方式与设置、TaOffice 禁用占位 |
+
+**新增/调整的自动化用例**：`qa-ui-auto-tests/cases/TC-NP-*.testcase.yaml`（browser：工作台外壳、文件生命周期、查找替换、视图/面板、工具/设置；native：真实磁盘保存与外部变更、另存为/保存副本），并在 `qa-ui-auto-tests/ci/{policy,dependencies}.yaml`、`qa-ui-auto-tests/feature-list.md` 的 `F-NOTEPAD-1..5` 下登记。
+
+**验证命令（本机）**
+
+```bash
+pnpm exec tsc -b
+pnpm check:refactor
+pnpm exec vitest run src/lib/notepad src/components/notepad src/lib/openFile src/components/viewer
+PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto run --mode browser --filter TC-NP-001 --require-pass
+PYTHONPATH=.agents/skills/qa-ui-auto/scripts python .agents/skills/qa-ui-auto/scripts/native_build.py   # Linux native QA 二进制
+```
+
+**当前未完成**：真实 Windows/macOS 运行、打印/提权/回收站/字体渲染真机确认、正则方言差异清单、Mark 是否随会话保存的评审结论。

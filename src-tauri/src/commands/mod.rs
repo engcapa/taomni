@@ -27,6 +27,7 @@ mod mail;
 mod mfa;
 mod mobile;
 mod models;
+mod notepad;
 mod notes;
 mod objectstorage;
 mod perf;
@@ -220,6 +221,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "viewer_release_temp"
         | "viewer_temp_allocate"
         | "viewer_temp_release" => viewer::handle(invoke),
+        command if notepad::handles(command) => notepad::handle(invoke),
         command if workspace::handles(command) => workspace::handle(invoke),
         "workspace_test_results" => test_results::handle(invoke),
         "workspace_execution_model" => workspace_execution::handle(invoke),

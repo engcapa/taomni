@@ -14,7 +14,7 @@ export function explorerItemMenu(entries: FileEntry[], path: string, operations:
   const directory = !multi && effectiveFileType(first) === "dir";
   const mod = getAppPlatform() === "macos" ? "⌘" : "Ctrl+";
   return [
-    ...(!multi && !directory ? [{ label: label("打开方式", "Open with"), testId: "explorer-context-open-with", children: fileOpenMenu(first.path, workspaceId, label, (message) => operations.notify(message, true)) }] : []),
+    ...(!multi && !directory ? [{ label: label("打开方式", "Open with"), testId: "explorer-context-open-with", children: fileOpenMenu(first.path, workspaceId, label, (message, error) => operations.notify(message, true, error)) }] : []),
     { label: label("打开", "Open"), testId: "explorer-context-open", icon: <ExternalLink />, shortcut: "Enter", onClick: () => { for (const entry of entries) void operations.open(entry); } },
     ...(directory ? [{ label: label("在新的 Explorer 标签中打开", "Open in new Explorer tab"), testId: "explorer-context-newtab", icon: <ExternalLink />, onClick: () => openExplorer(first.path, true) }] : []),
     { label: label("在终端中打开", "Open in terminal"), testId: "explorer-context-terminal", icon: <Terminal />, onClick: () => terminal(directory ? first.path : path) },

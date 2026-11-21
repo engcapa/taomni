@@ -1,4 +1,9 @@
 import { useEffect, useRef } from "react";
+import { migrateLegacyViewerDrafts } from "../notepad/persistence/draftMigration";
+import { loadSessionFromDisk } from "../notepad/persistence/sessionManager";
+import { notepadBackupList, notepadBackupRead } from "../notepad/ipc";
+import { useNotepadPreferences } from "../../stores/notepadPreferences";
+import { useNotepadStore } from "../../stores/notepadStore";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { useDocumentStore } from "../../stores/documentStore";
@@ -31,6 +36,47 @@ export function useViewerRecovery(): void {
   useEffect(() => {
     if (!restored.has(document)) {
       restored.add(document);
+      void migrateLegacyViewerDrafts().then(async () => {
+        if (!useNotepadPreferences.getState().restoreSessionOnStartup) return;
+        try {
+          const backups = await notepadBackupList();
+          const { openUntitledNotepadDocument } = await import("./index");
+          for (const entry of backups) {
+            if (entry.docId.startsWith("untitled:") && !useDocumentStore.getState().documents[entry.docId]) {
+              const loaded = await notepadBackupRead(entry.id);
+              openUntitledNotepadDocument({
+                host: "explorer",
+                docId: entry.docId,
+                title: loaded.entry.name,
+                content: loaded.content,
+                encoding: loaded.entry.encoding,
+                bom: loaded.entry.bom,
+                eol: loaded.entry.eol === "CRLF" || loaded.entry.eol === "CR" ? loaded.entry.eol : "LF",
+                dirty: true,
+              });
+              useDocumentStore.getState().applyRestoredBackup(entry.docId, {
+                content: loaded.content,
+                encoding: loaded.entry.encoding,
+                bom: loaded.entry.bom,
+                eol: loaded.entry.eol === "CRLF" || loaded.entry.eol === "CR" ? loaded.entry.eol : "LF",
+                savedHash: "",
+              });
+              useNotepadStore.getState().patchDoc(entry.docId, { backupState: "saved" });
+            }
+          }
+          const session = await loadSessionFromDisk(null).catch(() => null);
+          if (session?.tabs.length) {
+            const { openFile } = await import("./index");
+            for (const tab of session.tabs) {
+              if (!tab.untitled && tab.path && !useDocumentStore.getState().documents[tab.docKey]) {
+                await openFile({ path: tab.path }, { context: "global", host: "explorer" }).catch(() => undefined);
+              }
+            }
+          }
+        } catch {
+          // Non-fatal startup recovery failure
+        }
+      });
       const snapshot = read();
       const app = useAppStore.getState();
       const ids = new Set(app.tabs.map((tab) => tab.id));

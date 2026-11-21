@@ -1,0 +1,213 @@
+id: TC-NP-003
+title: Notepad find bar counts and navigates matches, replace all rewrites the buffer, marks and find-in-files surface real hits
+description: >-
+  AC-25/26/27 browser slice. Typing multi-line text with repeated tokens then opening Find from the toolbar drives the floating find
+  panel: live match count, Find Next selection, Count, Replace All text rewrite, Find All results panel, Mark All, and a Find in
+  Files search over the isolated VFS fixture directory. Assertions use the real editor lines and the results panel rows, not just the
+  find status message. Renderer-only evidence.
+modes:
+- browser
+covers:
+- F-NOTEPAD-2
+tags:
+- p0
+- notepad
+- search
+- editor
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab-new-notepad"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="notepad-workbench"]'
+- click: '[data-testid="viewer-editor"]'
+- type: "alpha beta alpha\nsecond line alpha\n"
+- click: '[data-testid="notepad-tool-find"]'
+- wait_for: '[data-testid="notepad-find-bar"]'
+- fill:
+    selector: '[data-testid="np-find-input"]'
+    value: alpha
+- assert_pattern:
+    selector: '[data-testid="notepad-find-status"]'
+    regex: (3 match\(es\) in the current document|当前文档匹配 3 处)
+- click: '[data-testid="np-find-next"]'
+- assert_pattern:
+    selector: '[data-testid="notepad-status-sel"]'
+    regex: (Sel 5|选 5)
+- click: '[data-testid="np-find-count"]'
+- assert_pattern:
+    selector: '[data-testid="notepad-find-status"]'
+    regex: (3 match\(es\) in the current document|当前文档匹配 3 处)
+- click: '[data-testid="np-find-tab-replace"]'
+- wait_for: '[data-testid="np-find-replace-input"]'
+- fill:
+    selector: '[data-testid="np-find-replace-input"]'
+    value: omega
+- click: '[data-testid="np-find-replace-all"]'
+- assert_text:
+    selector: '[data-testid="notepad-find-status"]'
+    contains: Replaced 3 occurrence(s).
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - omega beta omega
+    - second line omega
+    - ''
+- click: '[data-testid="np-find-tab-find"]'
+- fill:
+    selector: '[data-testid="np-find-input"]'
+    value: omega
+- assert_pattern:
+    selector: '[data-testid="notepad-find-status"]'
+    regex: (3 match\(es\) in the current document|当前文档匹配 3 处)
+- click: '[data-testid="np-find-all-current"]'
+- wait_for: '[data-testid="notepad-panel-results"]'
+- assert_count:
+    selector: '[data-testid^="notepad-result-hit-"]'
+    min: 3
+- assert_text:
+    selector: '[data-testid="notepad-search-results"]'
+    contains: omega
+- click: '[data-testid="np-find-tab-mark"]'
+- click: '[data-testid="np-find-mark-all"]'
+- assert_text:
+    selector: '[data-testid="notepad-find-status"]'
+    contains: Marked 3 occurrence(s).
+- click: '[data-testid="np-find-tab-files"]'
+- wait_for: '[data-testid="notepad-files-dir"]'
+- assert_visible: '[data-testid="notepad-files-filter"]'
+- assert_visible: '[data-testid="np-find-in-files"]'
+- fill:
+    selector: '[data-testid="notepad-files-dir"]'
+    value: ${fixture.file_open_root}
+- fill:
+    selector: '[data-testid="notepad-files-filter"]'
+    value: '*.txt'
+- fill:
+    selector: '[data-testid="np-find-input"]'
+    value: Second
+- click: '[data-testid="np-find-in-files"]'
+- wait_for: '[data-testid^="notepad-result-hit-"]'
+- assert_text:
+    selector: '[data-testid="notepad-search-results"]'
+    contains: notes.txt
+- assert_count:
+    selector: '[data-testid^="notepad-result-hit-"]'
+    min: 1
+- click: '[data-testid="np-find-close"]'
+- wait_for:
+    selector: '[data-testid="notepad-find-bar"]'
+    state: detached
+- assert_no_runtime_errors: null
+- screenshot: np-003-find-replace-results.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Opening Find from the toolbar shows the live match count and Find Next selects the next match in the real editor.
+    actions:
+    - 7
+    - 8
+    - 9
+    - 11
+    - 13
+    - 15
+    checkpoints:
+    - step: 10
+      expectation: The floating find bar opens for the active document.
+    - step: 12
+      expectation: The find message line reports three matches for the repeated token.
+    - step: 14
+      expectation: Find Next selects five characters in the editor and reports the selection.
+    - step: 16
+      expectation: The Count action keeps the same deterministic match total.
+    results:
+    - 12
+    - 14
+    - 16
+  - id: R2
+    requirement: Replace All rewrites every occurrence in the buffer and reports the replacement count.
+    actions:
+    - 17
+    - 19
+    - 20
+    checkpoints:
+    - step: 18
+      expectation: The Replace tab exposes the replace input.
+    - step: 21
+      expectation: The message line reports three replacements.
+    - step: 22
+      expectation: The editor lines now contain only the replacement token, with the trailing empty line preserved.
+    results:
+    - 21
+    - 22
+  - id: R3
+    requirement: Find All (Current) populates the Search Results panel with every hit row for the current document.
+    actions:
+    - 23
+    - 24
+    - 26
+    checkpoints:
+    - step: 25
+      expectation: The find message line recounts three matches after the replacement.
+    - step: 27
+      expectation: The bottom-docked Search Results panel opens.
+    - step: 28
+      expectation: At least three result hit rows are rendered.
+    - step: 29
+      expectation: The results panel shows the searched token.
+    results:
+    - 28
+    - 29
+  - id: R4
+    requirement: Mark All reports the number of marked occurrences for the active search.
+    actions:
+    - 30
+    - 31
+    checkpoints:
+    - step: 32
+      expectation: The message line reports three marked occurrences.
+    results:
+    - 32
+  - id: R5
+    requirement: Find in Files searches a real directory through the VFS and renders file hits in the results panel.
+    actions:
+    - 33
+    - 39
+    - 40
+    - 44
+    checkpoints:
+    - step: 34
+      expectation: The Find in Files tab exposes the directory field.
+    - step: 35
+      expectation: The file filter field is available.
+    - step: 36
+      expectation: The Find in Files action is available.
+    - step: 41
+      expectation: The directory search publishes at least one result hit row.
+    - step: 42
+      expectation: The results panel names the matching fixture file.
+    - step: 43
+      expectation: At least one file hit matches the expected count.
+    - step: 45
+      expectation: Closing the find bar removes the floating panel.
+    - step: 46
+      expectation: The search workflow raises no uncaught runtime errors.
+    results:
+    - 42
+    - 43
+    - 45
+    - 46
+  visual:
+  - check: Floating find panel layout, tab strip and results panel rendering
+    method: manual
+    reason: The case asserts DOM structure and text; pixel-level panel fidelity is not certified.
+  native:
+  - check: Native workspace search process and real disk traversal
+    method: external
+    reason: Browser mode searches the IndexedDB VFS only; native search effects require a native case.

@@ -7,8 +7,13 @@ export interface ExplorerStoreState {
   activeTabId: string | null;
   openTab: (tab: Tab, afterActive?: boolean) => void;
   setActiveTab: (id: string) => void;
+  togglePinTab: (id: string) => void;
   closeTab: (id: string) => void;
   closeTabs: (ids: string[]) => void;
+  closeTabsLeft: (id: string) => void;
+  closeTabsRight: (id: string) => void;
+  closeUnmodifiedTabs: (isDirty: (tab: Tab) => boolean) => void;
+  closeUnpinnedTabs: () => void;
   updateExplorerPath: (id: string, path: string, title: string) => void;
   updateViewerMode: (id: string, mode: NonNullable<Tab["fileViewer"]>["mode"]) => void;
   renameTab: (id: string, title: string) => void;
@@ -30,6 +35,37 @@ export const useExplorerStore = create<ExplorerStoreState>((set, get) => ({
 
   setActiveTab: (id) => {
     if (get().tabs.some((tab) => tab.id === id)) set({ activeTabId: id });
+  },
+
+  togglePinTab: (id) => set((state) => {
+    const toggled = state.tabs.map((tab) => (tab.id === id ? { ...tab, pinned: !tab.pinned } : tab));
+    const pinned = toggled.filter((tab) => tab.pinned);
+    const unpinned = toggled.filter((tab) => !tab.pinned);
+    return { tabs: [...pinned, ...unpinned] };
+  }),
+
+  closeTabsLeft: (id) => {
+    const tabs = get().tabs;
+    const idx = tabs.findIndex((t) => t.id === id);
+    if (idx <= 0) return;
+    get().closeTabs(tabs.slice(0, idx).filter((t) => !t.pinned).map((t) => t.id));
+  },
+
+  closeTabsRight: (id) => {
+    const tabs = get().tabs;
+    const idx = tabs.findIndex((t) => t.id === id);
+    if (idx < 0 || idx >= tabs.length - 1) return;
+    get().closeTabs(tabs.slice(idx + 1).filter((t) => !t.pinned).map((t) => t.id));
+  },
+
+  closeUnmodifiedTabs: (isDirty) => {
+    const ids = get().tabs.filter((t) => !t.pinned && !isDirty(t)).map((t) => t.id);
+    if (ids.length > 0) get().closeTabs(ids);
+  },
+
+  closeUnpinnedTabs: () => {
+    const ids = get().tabs.filter((t) => !t.pinned).map((t) => t.id);
+    if (ids.length > 0) get().closeTabs(ids);
   },
 
   closeTab: (id) => get().closeTabs([id]),

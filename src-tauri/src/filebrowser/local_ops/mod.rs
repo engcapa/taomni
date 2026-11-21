@@ -185,5 +185,16 @@ pub async fn local_create_entry(
     .await
 }
 
+pub(crate) fn trash_single_entry(path: &str) -> Result<String, String> {
+    let result = trash::trash_entries(vec![path.to_string()]);
+    if let Some(first) = result.trashed.into_iter().next() {
+        return Ok(first.original_path);
+    }
+    if let Some(failure) = result.failed.into_iter().next() {
+        return Err(format!("{}: {}", failure.code, failure.message));
+    }
+    Err("trash_unavailable: Unknown trash failure".into())
+}
+
 #[cfg(test)]
 mod tests;

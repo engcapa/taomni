@@ -4,7 +4,7 @@ use std::fs::{self, File};
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
-pub(super) fn io_error(operation: &str, error: io::Error) -> String {
+pub(crate) fn io_error(operation: &str, error: io::Error) -> String {
     let kind = match error.kind() {
         io::ErrorKind::NotFound => "not_found",
         _ => "permission",
@@ -21,7 +21,7 @@ pub(super) fn absolute(path: &str) -> Result<PathBuf, String> {
         .map_err(|error| io_error("resolve path", error))
 }
 
-pub(super) fn display(path: &Path) -> String {
+pub(crate) fn display(path: &Path) -> String {
     let value = path.to_string_lossy();
     #[cfg(windows)]
     {

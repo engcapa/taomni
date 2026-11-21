@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { AppProxyConfig } from "../ipc/proxy";
 
-export type FileHandler = "taomni" | "workspace" | "system";
+export type FileHandler = "taomni" | "notepad" | "workspace" | "system" | "taoffice";
 export interface FileOpenPreferences {
   defaultHandler: "taomni" | "system";
   associations: Record<string, FileHandler>;
@@ -28,11 +28,15 @@ export const DEFAULT_FILE_OPEN_PREFERENCES: FileOpenPreferences = {
   htmlProxyMode: "app", htmlCustomProxy: { enabled: true, mode: "manual", session_id: "", kind: "http", host: "", port: 3128, username: "", password_ref: "" },
 };
 
+const VALID_HANDLERS = new Set<string>(["taomni", "notepad", "workspace", "system", "taoffice"]);
+
 function validated(value: Partial<FileOpenPreferences>): FileOpenPreferences {
   const defaults = DEFAULT_FILE_OPEN_PREFERENCES;
   return {
     defaultHandler: value.defaultHandler === "system" ? "system" : "taomni",
-    associations: Object.fromEntries(Object.entries(value.associations ?? {}).filter(([key, handler]) => /^[a-z0-9_-]+$/i.test(key) && ["taomni", "workspace", "system"].includes(handler))),
+    associations: Object.fromEntries(
+      Object.entries(value.associations ?? {}).filter(([key, handler]) => /^[a-z0-9_-]+$/i.test(key) && VALID_HANDLERS.has(handler)),
+    ) as Record<string, FileHandler>,
     markdownImageDir: typeof value.markdownImageDir === "string" && value.markdownImageDir.trim() ? value.markdownImageDir : defaults.markdownImageDir,
     markdownImageTemplate: typeof value.markdownImageTemplate === "string" && value.markdownImageTemplate.trim() ? value.markdownImageTemplate : defaults.markdownImageTemplate,
     markdownRestrictRemoteImages: value.markdownRestrictRemoteImages === true,

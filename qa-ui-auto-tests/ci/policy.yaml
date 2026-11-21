@@ -872,3 +872,10 @@ cases:
 - TC-SERVERS-001-tab-singleton-browser
 - TC-SERVERS-002-tab-singleton-native
 - TC-SERVERS-003-tab-functional-native
+- TC-NP-001
+- TC-NP-002
+- TC-NP-003
+- TC-NP-004
+- TC-NP-005
+- TC-NP-101
+- TC-NP-102
