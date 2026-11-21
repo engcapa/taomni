@@ -274,17 +274,12 @@ export interface OcrResponse {
 async function offlineOcr(path: string) {
   const url = await loadScreenshotUrl(path);
   try {
-    if (isTauriRuntime()) {
-      const { listPlugins } = await import("./ipc/plugin");
-      const record = (await listPlugins()).find((item) => item.slug === "screenshot");
-      if (record?.lifecycle === "enabled" && record.manifest?.entry.frontend) {
-        const { pluginFrontendUrl } = await import("./pluginLoader");
-        const entry = pluginFrontendUrl(record.manifest);
-        const renderer = await import(/* @vite-ignore */ entry) as typeof import("../../src-tauri/plugins/screenshot/renderer");
-        return await renderer.recognizeOffline(url, new URL("screenshot-ocr/", entry).href);
-      }
+    const { loadSignedScreenshotRenderer } = await import("./screenshotRenderer");
+    const signed = await loadSignedScreenshotRenderer();
+    if (signed) {
+      return await signed.renderer.recognizeOffline(url, new URL("screenshot-ocr/", signed.entry).href);
     }
-    if (__TAOMNI_BUNDLED_SCREENSHOT_OCR__) {
+    if (__TAOMNI_BUNDLED_SCREENSHOT_MEDIA__) {
       const { recognizeOffline } = await import("../../src-tauri/plugins/screenshot/renderer");
       return await recognizeOffline(url, new URL("screenshot-ocr/", document.baseURI).href);
     }

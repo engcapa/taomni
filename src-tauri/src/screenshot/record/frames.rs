@@ -2,7 +2,7 @@ use anyhow::Context;
 use image::RgbaImage;
 use std::sync::mpsc::SyncSender;
 use std::sync::mpsc::TrySendError;
-use taomni_screenshot_recording::TimedFrame;
+use taomni_screenshot_api::TimedFrame;
 
 /// Encoded frames in flight before the capture thread starts dropping.
 pub(super) const FRAME_QUEUE: usize = 4;

@@ -13,4 +13,4 @@ gif = "0.13"
 image = { version = "0.25", default-features = false }
 mp4 = "0.14"
 openh264 = "0.9"
-serde = { version = "1", features = ["derive"] }
+taomni-screenshot-api = { path = "../taomni-screenshot-api" }

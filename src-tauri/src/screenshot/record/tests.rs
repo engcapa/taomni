@@ -17,10 +17,8 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::sync_channel;
 use std::thread;
-use taomni_screenshot_recording::{
-    RecordFormat, RecordingInfo, TimedFrame, annex_b_nals, encode_loop, inspect_clip,
-    inspect_clip_frames,
-};
+use taomni_screenshot_api::{RecordFormat, RecordingInfo, TimedFrame};
+use taomni_screenshot_recording::{annex_b_nals, encode_loop, inspect_clip, inspect_clip_frames};
 
 static RECORDING_TEST_LOCK: Mutex<()> = Mutex::new(());
 

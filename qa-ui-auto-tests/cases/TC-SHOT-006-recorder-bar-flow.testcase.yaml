@@ -7,7 +7,7 @@ modes: [browser]
 fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}#screenshot-recorder
-- wait_for: '[data-testid="screenshot-recorder-stop"]:enabled'
+- wait_for: '[data-testid="screenshot-recorder"][data-renderer="bundled"] [data-testid="screenshot-recorder-stop"]:enabled'
 - assert_visible: '[data-testid="screenshot-recorder-timer"]'
 - assert_text:
     selector: '[data-testid="screenshot-recorder-range-hint"]'

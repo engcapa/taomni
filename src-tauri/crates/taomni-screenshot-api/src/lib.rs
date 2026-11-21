@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use taomni_plugin_stream::routed_tcp::Endpoint;
 
 mod recording;
+mod recording_model;
 pub use recording::{FrameHeader, MAX_CLIP_BYTES, RecordStart};
+pub use recording_model::{ClipInfo, ClipMetadata, RecordFormat, RecordingInfo, TimedFrame};
 
 pub const SLUG: &str = "screenshot";
 pub const PROBE_OCR: &str = "screenshot/probe-ocr";

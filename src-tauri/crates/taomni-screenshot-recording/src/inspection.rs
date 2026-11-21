@@ -6,17 +6,7 @@ use std::path::Path;
 // Inspection (QA verification and tests)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ClipInfo {
-    pub format: &'static str,
-    pub width: u32,
-    pub height: u32,
-    pub frames: u32,
-    pub duration_ms: u64,
-    /// Distinct decoded pixel hashes; a structural check, not source-content proof.
-    pub distinct_frames: u32,
-}
+use taomni_screenshot_api::ClipInfo;
 
 pub(super) fn pixel_hash(data: &[u8]) -> u64 {
     use std::hash::{Hash, Hasher};

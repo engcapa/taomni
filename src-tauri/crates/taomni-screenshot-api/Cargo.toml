@@ -7,5 +7,7 @@ rust-version = "1.94"
 publish = false
 
 [dependencies]
+anyhow = "1"
+image = { version = "0.25", default-features = false }
 serde = { version = "1", features = ["derive"] }
 taomni-plugin-stream = { path = "../taomni-plugin-stream" }

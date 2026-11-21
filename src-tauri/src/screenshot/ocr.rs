@@ -16,6 +16,7 @@ use taomni_screenshot_api::{
 use tauri::State;
 
 pub use taomni_screenshot_api::{OcrResult, RedactResult};
+#[cfg(any(test, feature = "legacy-screenshot-media"))]
 pub use taomni_screenshot_ocr::{find_sensitive, ocr_image};
 
 use crate::{
@@ -24,11 +25,15 @@ use crate::{
 };
 
 pub(super) const MODULE_UNAVAILABLE: &str =
-    "OCR_MODULE_UNAVAILABLE: Enable the Screenshot OCR module in Settings → Module Store.";
+    "OCR_MODULE_UNAVAILABLE: Install and enable the Screenshot module in Settings → Module Store.";
 
 pub(super) fn use_host(registry: &PluginRegistry, method: &str) -> Result<bool, String> {
     let Some(record) = registry.get(SLUG) else {
-        return Ok(false);
+        return if cfg!(any(test, feature = "legacy-screenshot-media")) {
+            Ok(false)
+        } else {
+            Err(MODULE_UNAVAILABLE.into())
+        };
     };
     if record.state == LifecycleState::Enabled && record.manifest.commands.contains(method) {
         Ok(true)
@@ -41,7 +46,8 @@ pub(super) async fn probe(registry: Arc<PluginRegistry>) -> Result<OcrAvailabili
     if use_host(&registry, PROBE_OCR)? {
         return invoke(registry, PROBE_OCR, ()).await;
     }
-    tokio::task::spawn_blocking(|| {
+    #[cfg(any(test, feature = "legacy-screenshot-media"))]
+    return tokio::task::spawn_blocking(|| {
         let engine = taomni_screenshot_ocr::engine_name();
         OcrAvailability {
             engine: engine.map(str::to_owned),
@@ -51,7 +57,9 @@ pub(super) async fn probe(registry: Arc<PluginRegistry>) -> Result<OcrAvailabili
         }
     })
     .await
-    .map_err(|error| format!("OCR probe task failed: {error}"))
+    .map_err(|error| format!("OCR probe task failed: {error}"));
+    #[cfg(not(any(test, feature = "legacy-screenshot-media")))]
+    Err(MODULE_UNAVAILABLE.into())
 }
 
 /// A one-use authenticated route grants only the already validated artifact.
@@ -109,9 +117,12 @@ pub async fn screenshot_redact_tsv(
     if use_host(&state.plugins, CLASSIFY_TSV)? {
         return invoke(state.plugins.clone(), CLASSIFY_TSV, tsv).await;
     }
-    tokio::task::spawn_blocking(move || taomni_screenshot_ocr::redact_tsv(&tsv))
+    #[cfg(any(test, feature = "legacy-screenshot-media"))]
+    return tokio::task::spawn_blocking(move || taomni_screenshot_ocr::redact_tsv(&tsv))
         .await
-        .map_err(|error| format!("OCR classification task failed: {error}"))?
+        .map_err(|error| format!("OCR classification task failed: {error}"))?;
+    #[cfg(not(any(test, feature = "legacy-screenshot-media")))]
+    Err(MODULE_UNAVAILABLE.into())
 }
 
 async fn invoke<T: DeserializeOwned>(

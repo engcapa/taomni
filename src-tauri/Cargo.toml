@@ -93,8 +93,8 @@ taomni-redirector = { path = "crates/taomni-redirector" }
 taomni-sqlite-snapshot = { path = "crates/taomni-sqlite-snapshot" }
 taomni-capture = { path = "crates/taomni-capture" }
 taomni-screenshot-api = { path = "crates/taomni-screenshot-api" }
-taomni-screenshot-ocr = { path = "crates/taomni-screenshot-ocr" }
-taomni-screenshot-recording = { path = "crates/taomni-screenshot-recording" }
+taomni-screenshot-ocr = { path = "crates/taomni-screenshot-ocr", optional = true }
+taomni-screenshot-recording = { path = "crates/taomni-screenshot-recording", optional = true }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-rdp-client-api = { path = "crates/taomni-rdp-client-api" }
 taomni-rdp-client-engine = { path = "crates/taomni-rdp-client-engine", optional = true }
@@ -301,6 +301,7 @@ default = ["hbase-kerberos", "rdp-server-audio", "voice-capture", "asr-whisper",
 # Isolated QA exercises both the pre-module relay and the signed host.
 legacy-vnc-client = ["dep:taomni-vnc-engine", "dep:taomni-vnc-key-protocol"]
 legacy-rdp-client = ["dep:taomni-rdp-client-engine"]
+legacy-screenshot-media = ["dep:taomni-screenshot-ocr", "dep:taomni-screenshot-recording"]
 # Dedicated hosted test harness: use the production pinned key on every thread
 # instead of the normal unit-fixture key. Production verification is unchanged.
 qa-release-trust-gates = []
@@ -428,6 +429,8 @@ webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 gtk = "0.18.2"
 
 [dev-dependencies]
+taomni-screenshot-ocr = { path = "crates/taomni-screenshot-ocr" }
+taomni-screenshot-recording = { path = "crates/taomni-screenshot-recording" }
 mail-parser = { version = "0.11.4", features = ["full_encoding"] }
 tempfile = "3"
 ed25519-dalek = "2"

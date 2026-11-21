@@ -1,5 +1,7 @@
+#[cfg(any(test, feature = "legacy-screenshot-media"))]
 use crate::screenshot::capture;
 use crate::screenshot::ocr;
+#[cfg(any(test, feature = "legacy-screenshot-media"))]
 use crate::screenshot::runtime::internal_error;
 use crate::state::AppState;
 use taomni_screenshot_api::{RECOGNIZE, REDACT};
@@ -18,12 +20,15 @@ pub async fn screenshot_ocr(
     if ocr::use_host(&state.plugins, RECOGNIZE)? {
         return ocr::process_image(state.plugins.clone(), RECOGNIZE, path).await;
     }
-    tokio::task::spawn_blocking(move || {
+    #[cfg(any(test, feature = "legacy-screenshot-media"))]
+    return tokio::task::spawn_blocking(move || {
         let path = capture::ensure_artifact_path(&path).map_err(internal_error)?;
         ocr::ocr_image(&path.to_string_lossy())
     })
     .await
-    .map_err(|e| format!("ocr task failed: {e}"))?
+    .map_err(|e| format!("ocr task failed: {e}"))?;
+    #[cfg(not(any(test, feature = "legacy-screenshot-media")))]
+    Err(ocr::MODULE_UNAVAILABLE.into())
 }
 
 /// Find sensitive tokens (e-mail / phone / ID) in an artifact via OCR.
@@ -36,7 +41,8 @@ pub async fn screenshot_auto_redact(
     if ocr::use_host(&state.plugins, REDACT)? {
         return ocr::process_image(state.plugins.clone(), REDACT, path).await;
     }
-    tokio::task::spawn_blocking(move || {
+    #[cfg(any(test, feature = "legacy-screenshot-media"))]
+    return tokio::task::spawn_blocking(move || {
         let path = capture::ensure_artifact_path(&path).map_err(internal_error)?;
         let result = ocr::ocr_image(&path.to_string_lossy())?;
         let boxes = ocr::find_sensitive(&result.words);
@@ -46,5 +52,7 @@ pub async fn screenshot_auto_redact(
         })
     })
     .await
-    .map_err(|e| format!("redact task failed: {e}"))?
+    .map_err(|e| format!("redact task failed: {e}"))?;
+    #[cfg(not(any(test, feature = "legacy-screenshot-media")))]
+    Err(ocr::MODULE_UNAVAILABLE.into())
 }

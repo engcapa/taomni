@@ -76,3 +76,21 @@ impl RecordingInfo {
         }
     }
 }
+
+pub struct TimedFrame {
+    pub image: image::RgbaImage,
+    /// Milliseconds since recording start.
+    pub at_ms: u64,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClipInfo {
+    pub format: &'static str,
+    pub width: u32,
+    pub height: u32,
+    pub frames: u32,
+    pub duration_ms: u64,
+    /// Distinct decoded pixel hashes used by the recording verifier.
+    pub distinct_frames: u32,
+}

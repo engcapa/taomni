@@ -39,6 +39,7 @@ pub async fn screenshot_qa_ocr_redact(
             && recognition_error.as_deref() == Some(expected)
             && redaction_error.as_deref() == Some(expected)
             && !probe.ocr_available
+            && !probe.mp4_available
             && probe.ocr_hint.as_deref() == Some(expected);
         return Ok(report(
             ok,

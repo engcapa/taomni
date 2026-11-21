@@ -2,21 +2,41 @@ use std::{path::Path, sync::mpsc::Receiver, time::Duration};
 
 use anyhow::{Context, bail, ensure};
 use taomni_plugin_stream::routed_tcp::Route;
-use taomni_screenshot_api::{FrameHeader, MAX_CLIP_BYTES, RecordStart, SLUG, START_RECORDING};
-use taomni_screenshot_recording::{ClipMetadata, RecordFormat, RecordingInfo, TimedFrame};
+use taomni_screenshot_api::{
+    ClipMetadata, FrameHeader, MAX_CLIP_BYTES, RecordFormat, RecordStart, RecordingInfo, SLUG,
+    START_RECORDING, TimedFrame,
+};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt, DuplexStream};
 
 use crate::plugin::{LifecycleState, PluginRegistry};
 
 pub(super) fn selected(registry: &PluginRegistry) -> anyhow::Result<bool> {
     let Some(module) = registry.get(SLUG) else {
-        return Ok(false);
+        return legacy_recording();
     };
     if module.state != LifecycleState::Enabled {
-        bail!("Enable the Screenshot module in Settings → Module Store before recording.");
+        bail!(
+            "Install and enable the Screenshot module in Settings → Module Store before recording."
+        );
     }
     // An installed OCR-only module predates recording support.
-    Ok(module.manifest.commands.contains(START_RECORDING))
+    if module.manifest.commands.contains(START_RECORDING) {
+        Ok(true)
+    } else if cfg!(any(test, feature = "legacy-screenshot-media")) {
+        Ok(false)
+    } else {
+        bail!("Update the Screenshot module in Settings → Module Store to record.");
+    }
+}
+
+fn legacy_recording() -> anyhow::Result<bool> {
+    if cfg!(any(test, feature = "legacy-screenshot-media")) {
+        Ok(false)
+    } else {
+        bail!(
+            "Install and enable the Screenshot module in Settings → Module Store before recording."
+        );
+    }
 }
 
 pub(in crate::screenshot) fn available(registry: &PluginRegistry) -> bool {

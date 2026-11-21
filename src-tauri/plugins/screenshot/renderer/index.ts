@@ -1,4 +1,5 @@
 import { createWorker } from "tesseract.js";
+export const recorderEntry = "recorder.js";
 
 export interface OfflineOcrResult { text: string; tsv: string; langs: string; }
 

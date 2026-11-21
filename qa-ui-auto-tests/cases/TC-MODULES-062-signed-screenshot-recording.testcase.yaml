@@ -20,9 +20,9 @@ steps:
 - wait_for: '[data-testid="module-action-disable-screenshot"]'
 - assert_signed_screenshot_host: idle
 - click: '[data-testid="nav-mode-home"]'
-- native_screenshot_scenario: {scenario: recorder, format: gif}
+- native_screenshot_scenario: {scenario: recorder, format: gif, signed_renderer: true}
 - assert_signed_screenshot_host: running
-- native_screenshot_scenario: {scenario: recorder, format: mp4}
+- native_screenshot_scenario: {scenario: recorder, format: mp4, signed_renderer: true}
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
 - click: '[data-testid="module-action-disable-screenshot"]'
@@ -38,7 +38,7 @@ verification:
     checkpoints:
     - {step: 8, expectation: The normal installer verified and selected the signed package.}
     - {step: 11, expectation: The host was idle before the first recording.}
-    - {step: 13, expectation: 'The GIF preview, actual pixels and timestamps match the source. Done removes the temporary recording.'}
+    - {step: 13, expectation: 'The signed recorder renders the GIF preview. Decoded pixels and timestamps match the source and Done removes the temporary recording.'}
     - {step: 14, expectation: The selected signed host held the writer lease after encoding.}
     - {step: 15, expectation: The same host completes an MP4 with source-matched frames and native preview cleanup.}
     - {step: 20, expectation: Disabling the module released the host lease.}

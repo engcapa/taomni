@@ -429,7 +429,11 @@ pub(super) async fn finish_recorder(bar: &WebviewWindow) -> Result<(), String> {
 /// the preview loads (asset protocol), then finish and confirm the session
 /// ends with the main window restored.
 #[tauri::command]
-pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<String, String> {
+pub async fn screenshot_qa_recorder(
+    app: AppHandle,
+    format: String,
+    expect_signed_renderer: Option<bool>,
+) -> Result<String, String> {
     ensure_qa(&app)?;
     let _cleanup = ScenarioCleanup(app.clone());
     super::super::close_session(&app);
@@ -523,6 +527,7 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
       } else if (!preview.complete || preview.naturalWidth <= 0) throw new Error('GIF preview did not load');
       return {
         timerBefore, timerAfter, tag: preview.tagName,
+        renderer: q('[data-testid="screenshot-recorder"]')?.dataset.renderer,
         naturalWidth: preview.naturalWidth || preview.videoWidth || 0,
         naturalHeight: preview.naturalHeight || preview.videoHeight || 0,
         duration: preview.duration || 0, playbackMoved,
@@ -556,7 +561,10 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     let preview_ok = info["naturalWidth"].as_u64() == Some(clip.width as u64)
         && info["naturalHeight"].as_u64() == Some(clip.height as u64)
         && (format != "mp4" || info["playbackMoved"] == json!(true));
-    let ok = main_hidden
+    let renderer_ok =
+        expect_signed_renderer != Some(true) || info["renderer"] == json!("signed-module");
+    let ok = renderer_ok
+        && main_hidden
         && selection_layer_closed
         && geometry["controlsOutside"] == json!(true)
         && geometry["bordersOutside"] == json!(true)

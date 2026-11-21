@@ -174,6 +174,7 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
             assets = trusted / "screenshot-ocr"
             assets.mkdir(parents=True)
             (trusted / "index.js").write_bytes(b"export const fixture = true;")
+            (trusted / "recorder.js").write_bytes(b"export const RecorderBar = () => null;")
             for name in helpers["SCREENSHOT_ASSETS"]:
                 (assets / name).write_bytes(name.encode())
             files = helpers["frontend_files"](trusted, slug, with_receipt=False)

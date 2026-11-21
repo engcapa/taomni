@@ -53,8 +53,8 @@ DEADLINES = {"startup-timing": 600, "startup-isolation": 150, "ocr-offline-modul
 
 
 def run_scenario(ctx, args):
-    if not isinstance(args, dict) or set(args) - {"scenario", "format", "secs"}:
-        raise StepError("native_screenshot_scenario: expected scenario, optional format/secs")
+    if not isinstance(args, dict) or set(args) - {"scenario", "format", "secs", "signed_renderer"}:
+        raise StepError("native_screenshot_scenario: unexpected arguments")
     scenario = args.get("scenario")
     if scenario not in SCENARIOS:
         raise StepError(f"native_screenshot_scenario: unknown scenario {scenario!r}")
@@ -63,6 +63,10 @@ def run_scenario(ctx, args):
         params["expectDisabled"] = True
     if scenario == "ocr-offline-module":
         params["expectOffline"] = True
+    if "signed_renderer" in args:
+        if args["signed_renderer"] is not True or scenario != "recorder":
+            raise StepError("native_screenshot_scenario: signed_renderer applies only to recorder")
+        params["expectSignedRenderer"] = True
     if scenario in {"record", "recorder", "macos-capture-source"}:
         if args.get("format") not in {"gif", "mp4"}:
             raise StepError("native_screenshot_scenario: record/recorder/macos-capture-source requires gif or mp4")

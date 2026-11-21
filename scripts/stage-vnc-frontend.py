@@ -19,6 +19,7 @@ def frontend_files(built: Path, slug: str, *, with_receipt: bool) -> dict[str, P
     expected = {"index.js"}
     directories = {"screenshot-ocr"} if slug == "screenshot" else set()
     if directories:
+        expected.add("recorder.js")
         expected.update(f"screenshot-ocr/{name}" for name in SCREENSHOT_ASSETS)
     if with_receipt:
         expected.add("receipt.json")

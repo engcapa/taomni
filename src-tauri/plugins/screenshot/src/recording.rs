@@ -13,8 +13,10 @@ use std::{
 use anyhow::{Context, ensure};
 use image::RgbaImage;
 use taomni_plugin_api::{ErrorCode, RpcError};
-use taomni_screenshot_api::{FrameHeader, MAX_CLIP_BYTES, MAX_IMAGE_BYTES, RecordStart};
-use taomni_screenshot_recording::{RecordFormat, TimedFrame, encode_file};
+use taomni_screenshot_api::{
+    FrameHeader, MAX_CLIP_BYTES, MAX_IMAGE_BYTES, RecordFormat, RecordStart, TimedFrame,
+};
+use taomni_screenshot_recording::encode_file;
 
 #[derive(Default)]
 pub(super) struct Recorder(Arc<AtomicBool>);

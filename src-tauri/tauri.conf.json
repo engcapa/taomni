@@ -61,19 +61,11 @@
       "deb": {
         "depends": [
           "nftables"
-        ],
-        "recommends": [
-          "tesseract-ocr",
-          "tesseract-ocr-chi-sim"
         ]
       },
       "rpm": {
         "depends": [
           "nftables"
-        ],
-        "recommends": [
-          "tesseract",
-          "tesseract-langpack-chi_sim"
         ]
       }
     },

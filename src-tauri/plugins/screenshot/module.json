@@ -3,7 +3,7 @@
   "slug": "screenshot",
   "name": "Screenshot OCR and Recording",
   "description": "Recognize and redact text in screenshots and encode screen recordings as GIF or MP4.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "coreApiVersion": "1",
   "kind": "media",
   "status": "provisional",

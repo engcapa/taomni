@@ -16,7 +16,7 @@ use std::sync::mpsc::sync_channel;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use taomni_screenshot_recording::{RecordFormat, RecordingInfo, TimedFrame, encode_loop};
+use taomni_screenshot_api::{RecordFormat, RecordingInfo, TimedFrame};
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri::Manager;
@@ -163,7 +163,10 @@ pub fn start_recording(
                 if let Some(module) = module {
                     module_encoder::encode(module, rx, format, size, &path)
                 } else {
-                    encode_loop(rx, format, fps, &path)
+                    #[cfg(any(test, feature = "legacy-screenshot-media"))]
+                    return taomni_screenshot_recording::encode_loop(rx, format, fps, &path);
+                    #[cfg(not(any(test, feature = "legacy-screenshot-media")))]
+                    anyhow::bail!("Install and enable the Screenshot module before recording.");
                 }
             })
             .context("spawn encoder thread")?

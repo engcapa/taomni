@@ -1,12 +1,11 @@
-use super::TimedFrame;
 use super::gif::GifSink;
-use super::model::{ClipMetadata, RecordFormat, RecordingInfo};
 use super::mp4::Mp4Sink;
 use anyhow::Context;
 use image::RgbaImage;
 use std::fs::File;
 use std::path::Path;
 use std::sync::mpsc::Receiver;
+use taomni_screenshot_api::{ClipMetadata, RecordFormat, RecordingInfo, TimedFrame};
 
 /// Consume frames until the end marker (a 0x0 frame) or disconnect.
 pub fn encode_loop(
