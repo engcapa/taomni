@@ -39,6 +39,7 @@ impl ServerCtx {
     }
 }
 
+#[cfg(feature = "legacy-local-servers")]
 impl From<ServerCtx> for taomni_local_servers_engine::ServerCtx {
     fn from(ctx: ServerCtx) -> Self {
         let log = ctx.log;
@@ -91,6 +92,7 @@ pub struct ServerStarted {
     pub task: JoinHandle<()>,
 }
 
+#[cfg(feature = "legacy-local-servers")]
 impl From<taomni_local_servers_engine::ServerStarted> for ServerStarted {
     fn from(started: taomni_local_servers_engine::ServerStarted) -> Self {
         Self {
@@ -118,24 +120,42 @@ pub async fn set_status(app: &AppHandle, registry: &ServerRegistry, status: Serv
 /// `Error` status.
 pub async fn start(ctx: ServerCtx, config: super::ServerConfig) -> Result<ServerStarted, String> {
     let state = ctx.app.state::<crate::state::AppState>();
-    if let Some(kind) = super::local_host::kind(ctx.server_type)
-        && let Some(record) = state.plugins.get(taomni_server_process::local::SLUG)
-    {
-        if record.state != crate::plugin::LifecycleState::Enabled {
-            return Err("Enable the Local servers module in Settings → Module Store.".into());
+    if let Some(kind) = super::local_host::kind(ctx.server_type) {
+        if let Some(record) = state.plugins.get(taomni_server_process::local::SLUG) {
+            if record.state != crate::plugin::LifecycleState::Enabled {
+                return Err(super::local_config::ENABLE.into());
+            }
+            let mut config = config;
+            super::local_config::resolve_password(&state, kind, &mut config)?;
+            return super::local_host::start(state.plugins.clone(), ctx.clone(), kind, config)
+                .await;
         }
-        return super::local_host::start(state.plugins.clone(), ctx.clone(), kind, config).await;
     }
     match ctx.server_type {
+        ServerType::Vnc => super::vnc::start(ctx, config).await,
+        ServerType::Rdp => super::rdp::start(ctx, config).await,
+        #[cfg(feature = "legacy-local-servers")]
+        server => start_legacy_local(server, ctx, config).await,
+        #[cfg(not(feature = "legacy-local-servers"))]
+        _ => Err(super::local_config::INSTALL.into()),
+    }
+}
+
+#[cfg(feature = "legacy-local-servers")]
+async fn start_legacy_local(
+    server: ServerType,
+    ctx: ServerCtx,
+    config: super::ServerConfig,
+) -> Result<ServerStarted, String> {
+    match server {
         ServerType::Ssh => super::ssh::start(ctx, config).await,
         ServerType::Ftp => super::ftp::start(ctx, config).await,
         ServerType::Tftp => super::tftp::start(ctx, config).await,
         ServerType::Http => super::http::start(ctx, config).await,
         ServerType::Telnet => super::telnet::start(ctx, config).await,
-        ServerType::Vnc => super::vnc::start(ctx, config).await,
         ServerType::Nfs => super::nfs::start(ctx, config).await,
         ServerType::Cron => super::cron::start(ctx, config).await,
         ServerType::Iperf => super::iperf::start(ctx, config).await,
-        ServerType::Rdp => super::rdp::start(ctx, config).await,
+        ServerType::Vnc | ServerType::Rdp => unreachable!("desktop servers have separate owners"),
     }
 }

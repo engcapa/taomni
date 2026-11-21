@@ -9,7 +9,7 @@ import {
   saveServerConfig,
   startLocalServer,
   stopLocalServer,
-  vncSettingsNeedVault,
+  serverSettingsNeedVault,
   type ServerConfig,
   type ServerRunState,
   type ServerStatus,
@@ -219,9 +219,9 @@ export const useServersStore = create<ServersStore>((set, get) => ({
       if (t === "rdp" && !(await ensureVaultReady("Store the RDP server password securely"))) {
         throw new Error("RDP server start cancelled: credential vault is not ready");
       }
-      if (t === "vnc" && vncSettingsNeedVault(cfg) &&
-        !(await ensureVaultReady("Unlock the credential vault to use the VNC server password"))) {
-        throw new Error("VNC server start cancelled: credential vault is not ready");
+      if (serverSettingsNeedVault(t, cfg) &&
+        !(await ensureVaultReady("Unlock the credential vault to use the local server password"))) {
+        throw new Error("Server start cancelled: credential vault is not ready");
       }
       cfg = await saveServerConfig(t, cfg);
       get().setConfig(t, cfg);

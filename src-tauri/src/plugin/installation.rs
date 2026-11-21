@@ -177,6 +177,8 @@ impl PluginRegistry {
             if !previous.was_uninstalled() {
                 super::migration_rdp_server::prepare(&self.root, manifest)
                     .map_err(PluginError::HostRequest)?;
+                super::migration_local_servers::prepare(&self.root, manifest)
+                    .map_err(PluginError::HostRequest)?;
             }
             activate()?;
             self.scan_locked()?;

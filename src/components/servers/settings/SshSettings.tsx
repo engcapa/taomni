@@ -4,11 +4,11 @@ import {
   CheckboxField,
   FieldNote,
   NumberField,
-  PasswordField,
   PathField,
   SelectField,
   TextField,
 } from "../fields";
+import { LocalServerPassword } from "./LocalServerPassword";
 
 interface Props {
   config: ServerConfig;
@@ -31,7 +31,6 @@ export function SshSettings({ config, onChange }: Props) {
       : "password";
   const allowedUsers = typeof config.allowedUsers === "string" ? config.allowedUsers : "";
   const rootDir = typeof config.rootDir === "string" ? config.rootDir : "";
-  const password = typeof config.password === "string" ? config.password : "";
   const authorizedKeyPath =
     typeof config.authorizedKeyPath === "string" ? config.authorizedKeyPath : "";
   const loginShell = config.loginShell !== false;
@@ -57,12 +56,7 @@ export function SshSettings({ config, onChange }: Props) {
       />
 
       {showPassword ? (
-        <PasswordField
-          label={t("servers.fields.password")}
-          testId="server-field-ssh-password"
-          value={password}
-          onChange={(v) => onChange({ password: v })}
-        />
+        <LocalServerPassword type="ssh" config={config} onChange={onChange} />
       ) : null}
 
       {showKey ? (

@@ -2073,6 +2073,8 @@ export const zhCN: DeepPartial<typeof en> = {
       rdpPasswordStored: "已安全保存——输入新密码可替换",
       vncPasswordRetained: "已保留密码。可输入新密码替换。",
       vncRemovePassword: "移除已保存的 VNC 密码",
+      localPasswordRetained: "已保留密码。可输入新密码替换。",
+      localRemovePassword: "移除已保存的密码",
       rdpPublicBind: "允许绑定所有网络接口",
       rdpDisplay: "共享显示器",
       rdpDisplayPrimary: "主显示器（自动）",
@@ -2107,6 +2109,7 @@ export const zhCN: DeepPartial<typeof en> = {
       rdpHybridOnly: "生产模式强制使用 TLS 上的 NLA/CredSSP；自签名服务端证书保存在应用数据中。",
       rdpVaultReason: "请解锁凭据保险库，以保护 RDP Server 密码。",
       vncVaultReason: "请解锁凭据保险库，以使用 VNC 服务端密码。",
+      localVaultReason: "请解锁凭据保险库，以使用本地服务器的密码。",
       rdpVaultCancelled: "凭据保险库未解锁，RDP Server 设置未保存。",
       rdpPublicBind: "这会把 RDP 监听器暴露到本机之外；请使用防火墙限制范围，并仅用于可信网络。",
       rdpClipboardPolicy:

@@ -8,6 +8,7 @@ from .servers_http_observation import verify_listener_closed
 from .steps import StepError
 
 CASE_ID = "TC-SERVERS-004-local-ssh-sftp-native"
+SIGNED_CASE_ID = "TC-MODULES-066"
 PORT = 28491
 HOST = "127.0.0.1"
 USER = "taomni-qa"
@@ -18,7 +19,7 @@ MARKER = b"TAOMNI_LOCAL_SSH"
 
 
 def setup(ctx):
-    if ctx.case_id != CASE_ID or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    if ctx.case_id not in {CASE_ID, SIGNED_CASE_ID} or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("The local SSH fixture requires its native Local servers case")
     root = Path(ctx.case_dir).resolve() / "sftp-root"
     root.mkdir()
@@ -28,7 +29,7 @@ def setup(ctx):
 
 def run(ctx, phase):
     fixture = ctx.fixture_context
-    if fixture.case_id != CASE_ID or not fixture.values.get("local_servers_ssh_root"):
+    if fixture.case_id not in {CASE_ID, SIGNED_CASE_ID} or not fixture.values.get("local_servers_ssh_root"):
         raise StepError("The SSH observation requires its native Local servers fixture")
     if phase == "serving":
         receipt = observe()

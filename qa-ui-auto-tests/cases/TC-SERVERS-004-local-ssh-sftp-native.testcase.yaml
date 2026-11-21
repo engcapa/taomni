@@ -17,6 +17,10 @@ steps:
 - fill: {selector: '[data-testid="server-field-ssh-root-dir"]', value: '${fixture.local_servers_ssh_root}'}
 - fill: {selector: '[data-testid="server-field-ssh-password"]', value: '${fixture.local_servers_ssh_password}'}
 - click: '[data-testid="server-row-ssh-start"]'
+- wait_for: {selector: '[data-testid="vault-setup-dialog"]', timeout_sec: 30}
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: 'qa-local-server-vault'}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: 'qa-local-server-vault'}
+- click: '[data-testid="vault-setup-confirm"]'
 - wait_for: {selector: '[data-testid="server-row-ssh"][data-status="running"]', timeout_sec: 30}
 - assert_local_servers_ssh: serving
 - click: '[data-testid="server-row-ssh-stop"]'
@@ -28,14 +32,14 @@ verification:
   requirements:
   - id: ssh-sftp
     requirement: The Local servers page can serve files and terminal output over native SSH and shut down the actual port.
-    actions: [3, 5, 6, 7, 8, 9, 12]
+    actions: [3, 5, 6, 7, 8, 9, 13, 16]
     checkpoints:
-    - {step: 10, expectation: The application reports that the listener is running.}
-    - {step: 11, expectation: The independent client authenticates and receives fixed file and PTY bytes.}
-    - {step: 13, expectation: The application reports that the listener stopped.}
-    - {step: 14, expectation: An independent client observes that a new connection is refused.}
-    - {step: 15, expectation: Start and Stop complete without runtime errors.}
-    results: [10, 11, 13, 14, 15]
+    - {step: 14, expectation: The application reports that the listener is running.}
+    - {step: 15, expectation: The independent client authenticates and receives fixed file and PTY bytes.}
+    - {step: 17, expectation: The application reports that the listener stopped.}
+    - {step: 18, expectation: An independent client observes that a new connection is refused.}
+    - {step: 19, expectation: Start and Stop complete without runtime errors.}
+    results: [14, 15, 17, 18, 19]
   visual:
   - check: The SSH row shows the running and stopped state.
     method: automated

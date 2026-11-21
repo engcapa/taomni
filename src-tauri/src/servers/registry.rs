@@ -32,6 +32,7 @@ pub struct ServerRegistry {
     pub statuses: AsyncMutex<HashMap<ServerType, ServerStatus>>,
     pub(super) vnc_settings: AsyncMutex<()>,
     pub(super) rdp_settings: AsyncMutex<()>,
+    pub(super) local_settings: AsyncMutex<()>,
     #[cfg(feature = "legacy-rdp-server")]
     pub(crate) rdp_approvals: std::sync::Arc<taomni_rdp_server_engine::ApprovalBroker>,
     /// Recent `server://output/<type>` lines, oldest first.

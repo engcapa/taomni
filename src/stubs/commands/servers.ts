@@ -163,14 +163,15 @@ export async function invokeServers<T>(cmd: string, args?: any): Promise<T> {
         delete saved.password;
         saved.passwordRef = "vault:stub-rdp-server-password";
       }
-      if (serverType === "vnc") {
+      if (serverType === "vnc" || serverType === "ssh" || serverType === "ftp") {
         if (saved.removePassword === true) {
           delete saved.passwordRef;
         } else if (typeof saved.password === "string" && saved.password) {
-          saved.passwordRef = "vault:stub-vnc-server-password";
+          saved.passwordRef = `vault:stub-${serverType}-server-password`;
         }
         delete saved.password;
         delete saved.removePassword;
+        delete saved.credentialMigrationRequired;
       }
       const configs = readStubServerConfigs();
       configs[serverType] = saved;

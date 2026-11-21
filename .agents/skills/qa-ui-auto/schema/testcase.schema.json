@@ -981,8 +981,8 @@
           "description": "Native Local servers SSH case. Use the isolated server for authenticated SFTP and PTY command output, then check the listener closes."
         },
         "assert_signed_servers_host": {
-          "enum": ["running", "disabled"],
-          "description": "Native signed Local servers case. Match the host to the package and observe its writer lease and HTTP endpoint."
+          "enum": ["running", "backup", "disabled"],
+          "description": "Native signed Local servers case. Check the installed host, listener, settings, Vault, writer lease and running backup."
         },
         "assert_signed_mail_host": {
           "enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "disabled"],

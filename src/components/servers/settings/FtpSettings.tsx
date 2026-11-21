@@ -1,6 +1,7 @@
 import { useT } from "../../../lib/i18n";
 import type { ServerConfig } from "../../../lib/servers";
 import { CheckboxField, NumberField, PathField } from "../fields";
+import { LocalServerPassword } from "./LocalServerPassword";
 
 interface Props {
   config: ServerConfig;
@@ -29,6 +30,7 @@ export function FtpSettings({ config, onChange }: Props) {
         value={allowAnonymous}
         onChange={(v) => onChange({ allowAnonymous: v })}
       />
+      <LocalServerPassword type="ftp" config={config} onChange={onChange} />
       <NumberField
         label={t("servers.fields.maxConnections")}
         value={maxConnections}

@@ -950,3 +950,4 @@ cases:
 - TC-SERVERS-002-tab-singleton-native
 - TC-SERVERS-003-tab-functional-native
 - TC-SERVERS-004-local-ssh-sftp-native
+- TC-SERVERS-005-local-ssh-credential-browser

@@ -4,7 +4,7 @@ use std::{fs::File, io::BufReader};
 
 use rusqlite::Connection;
 use serde::de::DeserializeOwned;
-use taomni_server_process::{rdp, vnc};
+use taomni_server_process::{local, rdp, vnc};
 
 use super::archive_writer::StagedFile;
 
@@ -24,6 +24,16 @@ pub(super) fn module_owned_rows(
             rows.push(rdp::SERVER_TYPE);
         } else if !includes_sessions {
             return Err("Save the migrated RDP Server settings with Vault unlocked before backing up module data separately.".into());
+        }
+    }
+    if let Some(record) = staged_settings::<local::StoredSettings>(files, local::CONFIG_PATH)? {
+        record.validate().map_err(|error| error.to_string())?;
+        for (kind, config) in &record.settings {
+            if !local::needs_legacy_password(config) {
+                rows.push(kind.as_str());
+            } else if !includes_sessions {
+                return Err("Save the migrated Local servers settings with Vault unlocked before backing up module data separately.".into());
+            }
         }
     }
     Ok(rows)

@@ -2,10 +2,11 @@
 
 ## 2026-11-22 当前进展
 
+- Local servers 0.1.1 接管原 `server_configs` 中的八类本地服务配置。原 SSH 和 FTP 密码在首次保存时进入专用 Vault 凭据。原库和 SSH 主机身份保留供旧版回滚。正式基座移出 Local servers 引擎，隔离 QA 保留旧路径用于回归。TC-MODULES-066 覆盖真实 HTTP、SSH/SFTP、运行中备份和停用。
 - Local servers 0.1.0 接入签名宿主。启用后八类服务由该进程运行，首次安装可接管已有 SSH host key，核心保留原控制面。TC-MODULES-066 通过真实 HTTP 和写租约观察停用。服务设置仍由原核心表提供，模块设置迁移和全部协议验收待完成。
 - SSH/SFTP 和 Telnet 也迁入 `taomni-local-servers-engine`。终端和本地服务器复用 `taomni-pty` 的平台 shell、PTY 和集成脚本，工作区 SDK 环境仍由核心传入。TC-SERVERS-004 检查真实鉴权、SFTP 文件、PTY 命令和监听端口回收。签名 Servers 宿主仍待接线。
 - HTTP、FTP、TFTP、Cron、iperf 和 NFS 的实现迁入 `taomni-local-servers-engine`。Local servers 继续经原 IPC 使用这六种实现。TC-SERVERS-003 增加回环 HTTP 文件字节和停止后端口关闭检查。SSH/SFTP、Telnet 与签名 Servers 宿主继续按 TASK-018 迁移。
-- `7057ee03f` 的 Browser 三端各通过 26/26，全部 Browser 分片已在 Native 构建期间收取。联合发布演练从 `617bce843` 构建四目标候选与 RDP Server 包，版本为 0.6.0，已通过工作流选集和模块清单检查。 [三端 QA](https://github.com/engcapa/taomni/actions/runs/44950797093) · [联合构建](https://github.com/engcapa/taomni/actions/runs/44951621527)
+- `7057ee03f` 三端 Browser 各通过 26/26，Native 为 Linux 33/33、Windows 32/32、macOS 32/32。18 个分片均在执行阶段收取，覆盖完整崩溃回归。TC-MODULES-065 的 macOS 实屏采集和输入通过，签名通过 hardened runtime 验证，Gatekeeper 返回 3。联合发布演练从 `617bce843` 已收齐四目标 RDP Server 签名包，0.6.0 Linux deb 进入真实安装升级和 `noexec` 验证。 [三端 QA](https://github.com/engcapa/taomni/actions/runs/44950797093) · [联合构建](https://github.com/engcapa/taomni/actions/runs/44951621527) · [Linux 实装](https://github.com/engcapa/taomni/actions/runs/44956421239)
 - Release Bundle 增加 `modules` 选项。选中的模块复用独立模块签名流程，并与核心安装件使用同一源码。联合发布核对已有目录的签名和包，再合并本次变更。未变更条目保留原 URL，首装名单继续冻结。空 `tag` 支持用当前候选模块演练构建，正式发布要求稳定模块与 draft Release。
 - 在 `d08c7a86f` 的 Linux Native 分片中，VNC Server 首次启动、运行中备份、停止和禁用均通过。重新启用后原用例在点击启动后立即探测写租约。失败截图保存时 daemon 已显示运行，日志也记录了新监听。用例先等运行状态，再保留真实端口、鉴权与写租约断言。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44945992713)
 - 三端 RDP Server 的签名工件改由各平台独立构建。TC-MODULES-065 新增 macOS 固定证书和 hardened runtime 验证，并复用独立桌面窗口检查实际远程输入与成像。正式 DMG 升级后的 TCC 授权复用仍按 G2 验证。
@@ -587,7 +588,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-015 | 已取消 | 历史设计 `7bc498b35` 中为 LanChat 迁移，已由用户明确删除决定取消；主设计已保留编号并清理前置依赖。旧库保持原位，不读取、迁移或删除，不创建替代插件。 |
 | TASK-016 RDP/VNC 客户端 | 独立宿主、签名前端与核心依赖裁剪已接入 | VNC 的 Windows 按键辅助进程已有回执。RDP 签名包验证原会话、实际输入、证书迁移与读取旧备份，三端阶段性 p95 均低于 130 ms。最终安装包、新旧版本连续升级和同一候选的三端生命周期继续验收。 |
 | TASK-017 RDP/VNC 服务端 | 已接入签名宿主与配置迁移，原生验收进行中 | 完成签名包的真实连接、停用和备份验收，并补 macOS 系统权限、Windows 和 macOS 的 VNC 系统服务以及正式安装件升级结果。 |
-| TASK-018 Servers | 六种实现已抽取，仍由原入口运行 | SSH/SFTP、Telnet、签名宿主、配置迁移、服务生命周期和原有功能等价待闭合。 |
+| TASK-018 Servers | 签名宿主、配置迁移和默认依赖裁剪已接入 | 多端签名包、原配置与身份恢复、全部服务等价和运行中清理回执待验收。 |
 | TASK-019 SocksCap | 待前置闭合 | 提权/驱动/辅助进程、文件与恢复日志、卸载清理迁出。 |
 | TASK-020 截图 OCR/录制 | 待前置闭合 | OCR/录制插件；截图入口、滚动截图与采集保持核心归属。 |
 | TASK-021 本地语音 | 待前置闭合 | 本地 ASR/FIM 引擎和模型插件；云 ASR/麦克风保持核心归属。 |

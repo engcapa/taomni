@@ -63,7 +63,10 @@ pub(crate) fn check_restore_dependencies(
     let restored: BTreeSet<_> = restore_owners(profile, manifest)?.into_iter().collect();
     let plugins = profile.join("plugins");
     for owner in discover_owners(&plugins)? {
-        let restored_with_vault = if owner == taomni_server_process::rdp::SLUG {
+        let restored_with_vault = if matches!(
+            owner.as_str(),
+            taomni_server_process::rdp::SLUG | taomni_server_process::local::SLUG
+        ) {
             manifest
                 .plugin_datasets
                 .iter()
@@ -76,20 +79,7 @@ pub(crate) fn check_restore_dependencies(
             let slug = PluginSlug::parse(&owner).map_err(|e| e.to_string())?;
             let _lease = PluginDataLease::try_acquire(&root, &slug)
                 .map_err(|e| format!("Cannot check encrypted plugin data for {owner}: {e}"))?;
-            if owner == taomni_server_process::vnc::SLUG
-                && !taomni_server_process::vnc::SettingsFile::new(root.path())
-                    .load()
-                    .map_err(|error| error.to_string())?
-                    .is_some_and(|record| record.settings.password_ref.is_some())
-            {
-                continue;
-            }
-            if owner == taomni_server_process::rdp::SLUG
-                && !taomni_server_process::rdp::SettingsFile::new(root.path())
-                    .load()
-                    .map_err(|error| error.to_string())?
-                    .is_some_and(|record| record.password_ref().is_some())
-            {
+            if !has_vault_dependency(&owner, root.path()).map_err(|error| error.to_string())? {
                 continue;
             }
             let data = retained_data::discover(&plugins, &owner, 1).map_err(|e| e.to_string())?;
@@ -117,6 +107,27 @@ pub(crate) fn check_restore_dependencies(
         );
     }
     Ok(())
+}
+
+fn has_vault_dependency(owner: &str, profile: &Path) -> std::io::Result<bool> {
+    use taomni_server_process::{local, rdp, vnc};
+    match owner {
+        vnc::SLUG => Ok(vnc::SettingsFile::new(profile)
+            .load()?
+            .is_some_and(|record| record.settings.password_ref.is_some())),
+        rdp::SLUG => Ok(rdp::SettingsFile::new(profile)
+            .load()?
+            .is_some_and(|record| record.password_ref().is_some())),
+        local::SLUG => Ok(local::SettingsFile::new(profile)
+            .load()?
+            .is_some_and(|record| {
+                record
+                    .settings
+                    .values()
+                    .any(|config| local::password_ref(config).is_some())
+            })),
+        _ => Ok(true),
+    }
 }
 
 pub(crate) fn destination(

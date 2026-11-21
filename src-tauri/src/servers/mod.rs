@@ -11,18 +11,23 @@
 //! [`engine::set_status`] (which updates the registry and emits
 //! `server://status/<type>`), and `autostart_servers` runs at startup.
 
+#[cfg(feature = "legacy-local-servers")]
 pub mod cron;
 
 pub mod db;
 
 pub mod engine;
 
+#[cfg(feature = "legacy-local-servers")]
 pub mod ftp;
 
+#[cfg(feature = "legacy-local-servers")]
 pub mod http;
 
+#[cfg(feature = "legacy-local-servers")]
 pub mod iperf;
 
+#[cfg(feature = "legacy-local-servers")]
 pub mod nfs;
 
 pub mod process;
@@ -30,10 +35,13 @@ pub mod process;
 pub mod rdp;
 mod rdp_config;
 
+#[cfg(feature = "legacy-local-servers")]
 pub mod ssh;
 
+#[cfg(feature = "legacy-local-servers")]
 pub mod telnet;
 
+#[cfg(feature = "legacy-local-servers")]
 pub mod tftp;
 
 pub mod vnc;
@@ -64,6 +72,7 @@ mod model;
 mod registry;
 
 mod lifetime;
+mod local_config;
 mod local_host;
 
 mod probes;

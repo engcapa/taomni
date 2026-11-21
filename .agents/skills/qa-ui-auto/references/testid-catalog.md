@@ -3231,6 +3231,9 @@
 
 - `[data-testid="server-field-http-root-dir"]` — interactive [optional] — F-Servers-1.server-field-http-root-dir
 - `[data-testid="server-field-ssh-password"]` — interactive [optional] — F-Servers-1.server-field-ssh-password
+- `[data-testid="server-field-ssh-remove-password"]` — interactive [optional] — F-Servers-1.server-field-ssh-remove-password
+- `[data-testid="server-field-ftp-password"]` — interactive [optional] — F-Servers-1.server-field-ftp-password
+- `[data-testid="server-field-ftp-remove-password"]` — interactive [optional] — F-Servers-1.server-field-ftp-remove-password
 - `[data-testid="server-field-ssh-root-dir"]` — interactive [optional] — F-Servers-1.server-field-ssh-root-dir
 - `[data-testid="sidebar-tool-servers"]` — interactive [optional] — F-Servers-1.sidebar-tool-servers
 - `[data-testid="servers-tab-panel"]` — display [optional] — F-Servers-1.servers-tab-panel

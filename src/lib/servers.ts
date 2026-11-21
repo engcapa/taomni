@@ -26,9 +26,9 @@ export interface ServerConfig {
   [key: string]: unknown;
 }
 
-export function vncSettingsNeedVault(config: ServerConfig): boolean {
-  return isTauriRuntime() &&
-    config.removePassword !== true &&
+export function serverSettingsNeedVault(type: ServerType, config: ServerConfig): boolean {
+  return (type === "vnc" || type === "ssh" || type === "ftp") &&
+    isTauriRuntime() && config.removePassword !== true &&
     (Boolean(config.password) || Boolean(config.passwordRef) || config.credentialMigrationRequired === true);
 }
 

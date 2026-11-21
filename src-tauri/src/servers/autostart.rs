@@ -41,6 +41,7 @@ pub async fn autostart_servers(app: AppHandle) {
             }
         }
     };
+    super::local_config::project(&app.state::<AppState>(), &mut configs);
     if let Err(error) = super::vnc_config::project(&app.state::<AppState>(), &mut configs) {
         configs.remove("vnc");
         tracing::warn!("autostart VNC Server: {error}");

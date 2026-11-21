@@ -41,18 +41,20 @@ pub(crate) fn owner_requires_vault(slug: &str) -> bool {
     slug == taomni_plugin_services::MFA_FIXED_KEY_OWNER.slug
         || slug == taomni_server_process::vnc::SLUG
         || slug == taomni_server_process::rdp::SLUG
+        || slug == taomni_server_process::local::SLUG
 }
 
 pub(crate) fn dataset_requires_vault(slug: &str, files: &[PluginDataFile]) -> bool {
-    use taomni_server_process::rdp;
+    use taomni_server_process::{local, rdp};
 
-    if slug == rdp::SLUG {
-        // Earlier RDP Server archives contained just the TLS identity.
-        return files
-            .iter()
-            .any(|file| file.path.eq_ignore_ascii_case(rdp::CONFIG_FILENAME));
-    }
-    owner_requires_vault(slug)
+    let credentials_file = match slug {
+        rdp::SLUG => rdp::CONFIG_FILENAME,
+        local::SLUG => local::CONFIG_FILENAME,
+        _ => return owner_requires_vault(slug),
+    };
+    files
+        .iter()
+        .any(|file| file.path.eq_ignore_ascii_case(credentials_file))
 }
 
 impl PluginDataSet {

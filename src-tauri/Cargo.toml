@@ -104,7 +104,7 @@ taomni-screenshot-ocr = { path = "crates/taomni-screenshot-ocr", optional = true
 taomni-screenshot-recording = { path = "crates/taomni-screenshot-recording", optional = true }
 taomni-server-process = { path = "crates/taomni-server-process" }
 taomni-pty = { path = "crates/taomni-pty" }
-taomni-local-servers-engine = { path = "crates/taomni-local-servers-engine" }
+taomni-local-servers-engine = { path = "crates/taomni-local-servers-engine", optional = true }
 taomni-rdp-server-engine = { path = "crates/taomni-rdp-server-engine", optional = true }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-rdp-client-api = { path = "crates/taomni-rdp-client-api" }
@@ -313,6 +313,7 @@ default = ["hbase-kerberos", "voice-capture", "asr-whisper", "asr-sherpa"]
 legacy-vnc-client = ["dep:taomni-vnc-engine", "dep:taomni-vnc-key-protocol"]
 legacy-rdp-client = ["dep:taomni-rdp-client-engine"]
 legacy-rdp-server = ["dep:taomni-rdp-server-engine", "rdp-server-audio"]
+legacy-local-servers = ["dep:taomni-local-servers-engine"]
 legacy-screenshot-media = ["dep:taomni-screenshot-ocr", "dep:taomni-screenshot-recording"]
 # Dedicated hosted test harness: use the production pinned key on every thread
 # instead of the normal unit-fixture key. Production verification is unchanged.

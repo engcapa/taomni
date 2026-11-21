@@ -45,7 +45,7 @@ pub fn serve() -> io::Result<()> {
                 .ok_or_else(|| io::Error::other("Local servers requires profile ownership"))?;
             Ok(Arc::new(Host {
                 running: Mutex::new(HashMap::new()),
-                identity: Arc::new(identity::Identity::new(storage.root().path())),
+                data: Arc::new(identity::Data::new(storage.root().path())),
                 runtime: tokio::runtime::Builder::new_multi_thread()
                     .worker_threads(2)
                     .enable_all()
@@ -57,7 +57,7 @@ pub fn serve() -> io::Result<()> {
 
 struct Host {
     running: Mutex<HashMap<Kind, Running>>,
-    identity: Arc<identity::Identity>,
+    data: Arc<identity::Data>,
     runtime: tokio::runtime::Runtime,
 }
 
@@ -70,7 +70,7 @@ struct Running {
 
 impl PluginHandler for Host {
     fn snapshot_provider(&self) -> Option<Arc<dyn SnapshotProvider>> {
-        Some(self.identity.clone())
+        Some(self.data.clone())
     }
 
     fn invoke(
@@ -85,6 +85,22 @@ impl PluginHandler for Host {
             .lock()
             .map_err(|_| failed("Local server status is unavailable"))?;
         match method {
+            local::SAVE_SETTINGS => {
+                let request: local::StartRequest = decode(params)?;
+                let mut record = self
+                    .data
+                    .settings
+                    .load()
+                    .map_err(|error| failed(error.to_string()))?
+                    .unwrap_or_default();
+                record.settings.insert(request.kind, request.config);
+                operation.check_current()?;
+                self.data
+                    .settings
+                    .save(&record)
+                    .map_err(|error| failed(error.to_string()))?;
+                Ok(Value::Null)
+            }
             local::START => {
                 let request: local::StartRequest = decode(params)?;
                 if running
@@ -153,7 +169,7 @@ impl Host {
         let started = self.runtime.block_on(async {
             match request.kind {
                 Kind::Ssh => {
-                    let directory = self.identity.directory()?;
+                    let directory = self.data.directory()?;
                     engine::ssh::start(ctx, config, &directory).await
                 }
                 Kind::Ftp => engine::ftp::start(ctx, config).await,

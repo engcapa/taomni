@@ -290,6 +290,25 @@ def setup_servers(ctx):
     shutil.copyfile(archive, destination)
     (owned / "provenance.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
     ctx.signed_servers = {"host": host, "receipt": info}
+    rows = {
+        "http": json.dumps({"port": 28489, "bindAddress": "127.0.0.1", "rootDir": ctx.values["local_servers_http_root"]}),
+        "ssh": json.dumps({
+            "port": 28491, "bindAddress": "127.0.0.1", "rootDir": ctx.values["local_servers_ssh_root"],
+            "password": ctx.values["local_servers_ssh_password"], "loginShell": False,
+        }),
+        "vnc": '{"port":15900}',
+        "rdp": '{"port":13389}',
+    }
+    database = isolated_data_root(ctx) / "taomni.db"
+    with closing(sqlite3.connect(database)) as connection, connection:
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS server_configs "
+            "(server_type TEXT PRIMARY KEY, config_json TEXT NOT NULL, updated_at INTEGER NOT NULL)"
+        )
+        connection.executemany(
+            "INSERT INTO server_configs VALUES (?, ?, 1)", rows.items(),
+        )
+    ctx.signed_servers["legacy_rows"] = rows
     ctx.values.update(local_servers_archive=destination.as_posix(), local_servers_signature=signature)
 
 

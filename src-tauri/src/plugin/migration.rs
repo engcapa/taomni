@@ -384,6 +384,7 @@ fn reconcile_pending(
                     || valid_mail_commit(entry)
                     || valid_vnc_retention(entry)
                     || valid_rdp_pin_commit(entry)
+                    || super::migration_local_servers::valid_commit(entry)
                     || super::migration_rdp_server::valid_commit(entry)
                     || super::migration_vnc_server::valid_commit(entry))
                     && !committed.contains(&entry.item) =>
