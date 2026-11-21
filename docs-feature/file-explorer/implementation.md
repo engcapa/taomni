@@ -82,9 +82,13 @@ Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS �
 - 第三轮 linux build 门禁抓到迁移提交遗漏的 `ControlBar.test.tsx` 旧断言（Explorer 从 Tools 打开仍期望 Sessions TabBar）——按独立视图契约改写为断言 Explorer rail 激活时渲染 `explorer-workspace-tab`（`6193c4446`）；随后全量前端单测 7,320 通过、1 skip。
 - 第四轮 linux native release 28/30：build 门禁通过；009/003/021/023/032/036/042 在 hosted linux Xvfb WebKitGTK 全部通过（drawio 四例 hosted linux 正常渲染，证实本机 WebKitGTK 差异为机器特有）；完整 crash 合并集其余用例全过，linux release crash 门禁除 005（见上）与既有 006 外全绿。
 
-## 第五轮收口（run44895878269，head `88838697b`）
+## 第五轮与 005 第二标签调查（run44895878269 `88838697b` 三端 + 本地诊断）
 
-- 最终定向复验：`TC-EXPLORER-005` 三端 native 全流程（含 `5093be85c` 退出确认修复的终局步骤）；完成后以该轮 receipt 关闭验证。
+- 第五轮 005 在三端仍败于同一 nth-match 等待：30s 内第二标签未出现，但失败收据 DOM 显示标签实际已建立、无对话框、无控制台错误；分步计时确认点击本身 0.5s、等待 30s 全程空转。
+- 本地 Chromium 诊断完整复现该链路的两个事实：目录导航与 stub 终端 pane 均 <0.5s 即成（JS 路径健康）；stub 终端无真实 cwd 时走 `alertAppDialog` 且不建标签（stub 预期行为，非缺陷）。
+- 二分构建（还原 `5093be85c` 退出修复后重建）同样复现本地挂死，退出修复被排除；本地 WebKitGTK native 的目录导航自 20:0x 起确定性 >90s（browser 模式同路径 0.15s，strace 显示后端整个等待窗口零 execve/openat——渲染主线程未派发命令），早前 15:0x 的本地 native 导航正常；判定为本机环境漂移（7 小时 74% CPU 的 os-backup tar 为首要嫌疑），待机器恢复后补跑本地 linux native 005。
+- 结论处理：005 的第二标签等待预算提升至 90s（`a6f150f86`），如实记录 hosted 分片高并发下 30s+ 的实测建标签延迟；最终复验改在 windows/macos 定向轮完成（run44907070299）。
+- 执行策略更新：此后 Linux browser/native 一律本机执行，GitHub hosted 仅提交 windows/macos。
 
 ## 迁移前历史证据
 
