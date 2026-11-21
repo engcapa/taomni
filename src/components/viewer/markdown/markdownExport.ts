@@ -12,6 +12,19 @@ import { openExternalUrl } from "../../../lib/sftp";
 
 export interface MarkdownExportResult { path?: string; openPath?: string; status: "saved" | "copied" | "print-opened" | "cancelled" | "opened"; drawio?: Omit<DrawioExportDocument, "xml"> }
 
+export const PNG_EXPORT_DPI = 300;
+const PNG_MAX_PIXELS = 40_000_000;
+const PNG_MAX_SIDE = 32700;
+
+/** Raster density for one long PNG; matches the PDF and per-diagram PNG
+ * standard and degrades instead of failing documents that are already valid
+ * at 96 DPI (the export length guards run before this is consulted). */
+export function pngExportScale(height: number, width = 800): number {
+  const target = PNG_EXPORT_DPI / 96;
+  const fit = Math.min(target, PNG_MAX_SIDE / height, Math.sqrt(PNG_MAX_PIXELS / (width * height)) * 0.999);
+  return Math.max(1, fit);
+}
+
 async function exportPng(root: HTMLElement, settings: MarkdownExportSettings, css: string): Promise<Blob> {
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:-100000px;top:0;width:800px;pointer-events:none;z-index:-1";
@@ -31,7 +44,9 @@ async function exportPng(root: HTMLElement, settings: MarkdownExportSettings, cs
     const width = 800, height = Math.ceil(wrapper.getBoundingClientRect().height);
     if (!height || height > 32700 || width * height > 40_000_000) throw new Error("Document is too long for a safe PNG export; use HTML or PDF instead");
     const { toBlob } = await import("html-to-image");
-    const blob = await toBlob(wrapper, { width, height, pixelRatio: 1, skipFonts: true, backgroundColor: settings.theme === "dark" ? "#191c22" : "#ffffff" });
+    // Mermaid/drawio diagrams rasterize with the page instead of being embedded
+    // as separate media: the whole document shares one 300 DPI canvas.
+    const blob = await toBlob(wrapper, { width, height, pixelRatio: pngExportScale(height, width), skipFonts: true, backgroundColor: settings.theme === "dark" ? "#191c22" : "#ffffff" });
     if (!blob || !blob.size) throw new Error("PNG export did not produce an image");
     return blob;
   } finally { host.remove(); }

@@ -1,10 +1,11 @@
 import io
 import unittest
 import zipfile
+import xml.etree.ElementTree as ET
 
 from PIL import Image
 
-from qa_ui_auto.markdown_docx_quality import inspect_diagrams, inspect_equations
+from qa_ui_auto.markdown_docx_quality import inspect_diagrams, inspect_equations, inspect_vector_text
 from qa_ui_auto.steps import StepError
 
 
@@ -64,6 +65,45 @@ class DocxDiagramQualityTest(unittest.TestCase):
         with document(pixel_width=3000, pixel_height=1500, drawing_width=9144000, drawing_height=4572000) as archive:
             with self.assertRaisesRegex(StepError, "content width"):
                 inspect_diagrams(archive)
+
+
+class WordVectorTextLayoutTest(unittest.TestCase):
+    def svg(self, markup):
+        return ET.fromstring(f"<svg xmlns='http://www.w3.org/2000/svg'>{markup}</svg>")
+
+    def test_accepts_plain_latin_and_cjk_labels_pinned_to_measured_positions(self):
+        svg = self.svg(
+            '<text text-anchor="start"><tspan x="-69.2" y="14" text-anchor="start">Banking</tspan>'
+            '<tspan x="-12.4" y="14" text-anchor="start"> Customer</tspan></text>'
+            '<text><tspan x="0" y="10" text-anchor="start">评估目标</tspan></text>'
+        )
+        self.assertEqual(inspect_vector_text(svg), 3)
+
+    def test_rejects_center_anchored_rows_that_office_renderers_start_align(self):
+        svg = self.svg('<text y="-10.1" text-anchor="middle"><tspan x="0" dy="15.4" text-anchor="middle">Banking Customer A</tspan></text>')
+        with self.assertRaisesRegex(StepError, "middle text anchor"):
+            inspect_vector_text(svg)
+
+    def test_rejects_a_plain_label_without_explicit_glyph_runs(self):
+        for markup, pattern in (("<text>Plain label</text>", "pinned"), ('<text><tspan>Plain label</tspan></text>', "inherits its position")):
+            with self.subTest(markup=markup), self.assertRaisesRegex(StepError, pattern):
+                inspect_vector_text(self.svg(markup))
+
+    def test_rejects_glyph_runs_with_invalid_measured_coordinates(self):
+        for name in ("x", "y"):
+            for value in ("", "NaN", "auto"):
+                with self.subTest(name=name, value=value), self.assertRaisesRegex(StepError, "coordinates"):
+                    attributes = {"x": "0", "y": "10"}
+                    attributes[name] = value
+                    inspect_vector_text(self.svg(f'<text><tspan x="{attributes["x"]}" y="{attributes["y"]}">Plain</tspan></text>'))
+
+    def test_keeps_contextual_script_and_empty_line_break_rows_owned_by_the_renderer(self):
+        svg = self.svg(
+            '<text text-anchor="middle"><tspan text-anchor="middle">مرحبا</tspan></text>'
+            '<text text-anchor="middle"/>'
+            '<text text-anchor="middle"><tspan x="0" text-anchor="middle"> </tspan></text>'
+        )
+        self.assertEqual(inspect_vector_text(svg), 0)
 
 
 class DocxEquationQualityTest(unittest.TestCase):

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from qa_ui_auto.export_quality import native, raster_grid_pixels
+from qa_ui_auto.export_quality import inspect_png_document, native, raster_grid_pixels
 from qa_ui_auto.native_steps import NativeStepContext
 from qa_ui_auto.steps import StepError
 
@@ -23,6 +23,38 @@ class NativeExportQualityTest(unittest.TestCase):
         counts = raster_grid_pixels(page)
         self.assertGreater(counts["red"], 250)
         self.assertGreater(counts["blue"], 250)
+
+    def test_document_png_must_rasterize_at_the_300_dpi_standard(self):
+        from PIL import Image, ImageDraw
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "quality.png"
+            image = Image.new("RGB", (2500, 9000), "white")
+            draw = ImageDraw.Draw(image)
+            draw.rectangle((100, 100, 2400, 8000), outline="black", width=12)
+            image.save(target, format="PNG")
+            result = inspect_png_document(target)
+            self.assertEqual(result["width"], 2500)
+            self.assertAlmostEqual(result["scale"], 3.125, places=3)
+
+    def test_document_png_below_high_density_or_over_canvas_limits_is_rejected(self):
+        from PIL import Image, ImageDraw
+        with tempfile.TemporaryDirectory() as directory:
+            low = Path(directory) / "low.png"
+            image = Image.new("RGB", (800, 3000), "white")
+            draw = ImageDraw.Draw(image)
+            draw.rectangle((50, 50, 750, 2950), outline="black", width=12)
+            image.save(low, format="PNG")
+            with self.assertRaisesRegex(StepError, "300 DPI standard"):
+                inspect_png_document(low)
+            huge = Path(directory) / "huge.png"
+            image = Image.new("L", (2500, 17000), "white")
+            image.save(huge, format="PNG")
+            with self.assertRaisesRegex(StepError, "canvas limits"):
+                inspect_png_document(huge)
+            blank = Path(directory) / "blank.png"
+            Image.new("RGB", (2500, 4000), "white").save(blank, format="PNG")
+            with self.assertRaisesRegex(StepError, "blank"):
+                inspect_png_document(blank)
 
     def test_inspects_and_records_from_actual_native_context(self):
         with tempfile.TemporaryDirectory() as directory:
