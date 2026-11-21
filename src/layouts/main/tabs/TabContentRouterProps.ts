@@ -102,7 +102,6 @@ export interface TabContentRouterProps {
   openDetachedVnc: (tabId: string, info: NonNullable<Tab["vnc"]>, title: string) => void;
   rdpTabs: Tab[];
   openDetachedRdp: (tabId: string, info: NonNullable<Tab["rdp"]>, title: string) => void;
-  fileBrowserTabs: Tab[];
   objectStorageTabs: Tab[];
   mailTabs: Tab[];
   handleEditSessionById: (sessionId: string) => void;

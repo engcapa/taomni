@@ -184,6 +184,7 @@ REGISTRY: dict[str, Fixture] = {
     "html_network_test": Fixture("html_network_test", html_network_test.setup, html_network_test.teardown),
     "file_open_raster": Fixture("file_open_raster", raster_files.setup, raster_files.teardown),
     "explorer_large_directory": Fixture("explorer_large_directory", explorer_files.setup_large, explorer_files.teardown),
+    "explorer_search_native": Fixture("explorer_search_native", explorer_files.setup_search_native, explorer_files.teardown),
     "workspace_compact_tree": Fixture("workspace_compact_tree", workspace_compact_tree.setup),
     "workspace_hidden_entries": Fixture("workspace_hidden_entries", workspace_hidden_entries.setup),
     "workspace_slow_lsp": Fixture("workspace_slow_lsp", workspace_slow_lsp.setup),

@@ -49,7 +49,7 @@ steps:
     name: qa-welcome-rs04-file
     double_click: true
 - wait_for:
-    selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
     timeout_sec: 15
 - click: '[data-testid="nav-mode-home"]'
 - wait_for:
@@ -96,7 +96,7 @@ verification:
     - step: 14
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-welcome-rs04-file\"]"}'
     - step: 16
-      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"file-browser\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"explorer-workspace-tab\"][data-tab-type=\"file-browser\"]", "timeout_sec": 15}}'
     - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"available\"]", "timeout_sec": 20}}'
     - step: 20

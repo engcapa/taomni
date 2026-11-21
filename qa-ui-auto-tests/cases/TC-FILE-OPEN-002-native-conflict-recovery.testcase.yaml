@@ -22,8 +22,8 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-file-open-native
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -139,8 +139,8 @@ steps:
     equals: 'Recovered draft exact bytes
 
       '
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - wait_for: '[data-testid="explorer-file-row"][data-name="binary.txt"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="binary.txt"]'
 - wait_for: '[data-testid="viewer-error"]'
@@ -160,8 +160,8 @@ steps:
     equals:
     - Retry repaired file
     - ''
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - wait_for: '[data-testid="explorer-file-row"][data-name="large.txt"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="large.txt"]'
 - wait_for: '[data-testid="viewer-large-file"]'

@@ -4,6 +4,7 @@ import { getAppPlatform } from "../../lib/runtime";
 import type { MenuItem } from "../ContextMenu";
 import type { ExplorerOperations } from "./useExplorerOperations";
 import { fileOpenMenu } from "./fileOpenMenu";
+import { EXPLORER_TEXT_FILE_TYPES } from "./explorerFileTypes";
 
 type Label = (zh: string, en: string) => string;
 export function explorerItemMenu(entries: FileEntry[], path: string, operations: ExplorerOperations, label: Label,
@@ -31,7 +32,10 @@ export function explorerItemMenu(entries: FileEntry[], path: string, operations:
 export function explorerEmptyMenu(path: string, operations: ExplorerOperations, label: Label, refresh: () => void): MenuItem[] {
   return [
     { label: label("新建文件夹", "New folder"), testId: "explorer-context-new-folder", icon: <FolderPlus />, disabled: operations.busy, onClick: () => void operations.create(true) },
-    { label: label("新建文本文件", "New text file"), testId: "explorer-context-new-file", icon: <FilePlus />, disabled: operations.busy, onClick: () => void operations.create(false) },
+    { label: label("新建文本文件", "New text file"), testId: "explorer-context-new-file", icon: <FilePlus />, children: EXPLORER_TEXT_FILE_TYPES.map((fileType) => ({
+      label: label(fileType.zh, fileType.en), testId: fileType.extension === "txt" ? "explorer-new-file" : `explorer-new-file-${fileType.extension}`,
+      disabled: operations.busy, onClick: () => void operations.create(false, fileType.extension),
+    })) },
     { label: "", separator: true },
     { label: label("粘贴", "Paste"), testId: "explorer-context-paste", icon: <ClipboardPaste />, disabled: operations.busy, onClick: () => void operations.paste() },
     { label: "", separator: true },

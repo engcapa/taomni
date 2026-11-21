@@ -31,8 +31,8 @@ steps:
     equals: name-asc
 - assert_visible: '[data-testid="tao-home-history-popover"]'
 - press: Escape
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
     key: Mod+l

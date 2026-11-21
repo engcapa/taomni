@@ -20,8 +20,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-export-quality
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -53,9 +53,9 @@ steps:
     path: ${fixture.markdown_native_exports}/report.html
     contains: File open Markdown
 - assert_count:
-    selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
     equal: 2
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - wait_for: '[data-testid="markdown-editor"]'
 - click: '[data-testid="markdown-export"]'
 - click: '[data-testid="markdown-export-docx"]'
@@ -128,7 +128,7 @@ verification:
     - step: 20
       expectation: "assert_file_contains:\n  contains: File open Markdown\n  path: ${fixture.markdown_native_exports}/report.html"
     - step: 21
-      expectation: "assert_count:\n  equal: 2\n  selector: '[data-testid=\"tab-item\"][data-tab-type=\"file-viewer\"]'"
+      expectation: "assert_count:\n  equal: 2\n  selector: '[data-testid=\"explorer-workspace-tab\"][data-tab-type=\"file-viewer\"]'"
     - step: 23
       expectation: 'wait_for: ''[data-testid="markdown-editor"]'''
     - step: 27

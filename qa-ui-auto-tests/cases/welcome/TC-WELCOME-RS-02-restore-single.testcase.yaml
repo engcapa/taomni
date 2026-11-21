@@ -38,7 +38,7 @@ steps:
     name: data-path
     equals: /preview
 - assert_count:
-    selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
     equal: 1
 - click: '[data-testid="nav-mode-home"]'
 - assert_not_visible: '[data-testid="welcome-restore-row"]'
@@ -47,7 +47,7 @@ steps:
 - click: '[data-testid="tao-home-history-restore"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - assert_count:
-    selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
     equal: 1
 - assert_no_runtime_errors: null
 - screenshot: F1.6-home-history-restore-single.png

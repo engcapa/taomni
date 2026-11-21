@@ -15,13 +15,14 @@ export interface ExplorerPreferences {
   pinnedPaths: string[];
   expandedPaths: string[];
   columnWidths: ExplorerColumnWidths;
+  searchRecursive: boolean;
 }
 
 export const EXPLORER_PREFERENCES_KEY = "taomni.explorer.view.v1";
 const defaults: ExplorerPreferences = {
   view: "details", sortKey: "name", sortDir: "asc", showHidden: false,
   preview: true, previewPosition: "right", previewWidth: 300, navVisible: true, navWidth: 210,
-  wrap: false, pinnedPaths: [], expandedPaths: [], columnWidths: {},
+  wrap: false, pinnedPaths: [], expandedPaths: [], columnWidths: {}, searchRecursive: false,
 };
 const listeners = new Set<() => void>();
 function readPreferences(): ExplorerPreferences {
@@ -43,6 +44,7 @@ function readPreferences(): ExplorerPreferences {
       wrap: p.wrap === true,
       pinnedPaths: paths(p.pinnedPaths), expandedPaths: paths(p.expandedPaths),
       columnWidths: readExplorerColumns(p.columnWidths),
+      searchRecursive: p.searchRecursive === true,
     };
   } catch { return { ...defaults }; }
 }

@@ -169,15 +169,22 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
       return true;
     } catch (error) { notify(String(error), true); return false; }
   }, [notify, refreshAll, tabId]);
-  const create = useCallback((directory: boolean) => run(async () => {
+  const create = useCallback((directory: boolean, extension = "txt") => run(async () => {
     const pane = useSftpStore.getState().sessions[tabId]?.local;
     if (!pane) return;
-    const base = directory ? label("新建文件夹", "New folder") : label("新建文本文档", "New text document");
-    const extension = directory ? "" : ".txt";
+    const names: Record<string, [string, string]> = {
+      txt: ["新建文本文档", "New text document"], md: ["新建 Markdown 文档", "New Markdown document"],
+      html: ["新建 HTML 文档", "New HTML document"], css: ["新建 CSS 文档", "New CSS document"],
+      js: ["新建 JavaScript 文件", "New JavaScript file"], ts: ["新建 TypeScript 文件", "New TypeScript file"],
+      json: ["新建 JSON 文档", "New JSON document"],
+    };
+    const localized = names[extension] ?? [extension.toUpperCase(), extension.toUpperCase()];
+    const base = directory ? label("新建文件夹", "New folder") : label(localized[0], localized[1]);
+    const suffix = directory ? "" : `.${extension}`;
     const existing = new Set(pane.entries.map((entry) => entry.name));
-    let name = `${base}${extension}`;
+    let name = `${base}${suffix}`;
     let i = 2;
-    while (existing.has(name)) name = `${base} (${i++})${extension}`;
+    while (existing.has(name)) name = `${base} (${i++})${suffix}`;
     const path = await localCreateEntry(pane.path, name, directory);
     await refreshAll();
     useSftpStore.getState().setSelection(tabId, "local", [path]);

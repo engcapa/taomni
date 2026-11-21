@@ -16,7 +16,7 @@ const HtmlPreview = lazy(() => import("./HtmlPreview").then((module) => ({ defau
 const MarkdownEditor = lazy(() => import("./markdown/MarkdownEditor").then((module) => ({ default: module.MarkdownEditor })));
 const hosts = new Map<string, number>();
 
-export function ViewerShell({ viewer, active = true, workspaceId }: { viewer: FileViewerTabInfo; active?: boolean; workspaceId?: string }) {
+export function ViewerShell({ viewer, active = true, workspaceId, host }: { viewer: FileViewerTabInfo; active?: boolean; workspaceId?: string; host?: "explorer" }) {
   const label = useViewerLabels();
   const key = documentPathKey(viewer.path);
   const document = useDocumentStore((state) => state.documents[key]);
@@ -64,7 +64,7 @@ export function ViewerShell({ viewer, active = true, workspaceId }: { viewer: Fi
     const handle = await writeStreamOpen(path);
     try { await writeStreamAppend(handle, new Uint8Array(bytes.bytes)); await writeStreamClose(handle); }
     catch (failure) { await writeStreamAbort(handle).catch(() => {}); throw failure; }
-    await openFile({ path }, { context: "viewer-save-as", workspaceId });
+    await openFile({ path }, { context: "viewer-save-as", workspaceId, host });
   };
   const showError = !document || !!document.error && !document.savedHash && !document.content;
   return <section className={`fv${active ? " fv-active" : ""}`} data-testid="file-viewer" data-path={viewer.path} data-kind={viewer.kind} data-active={active} data-dirty={document?.dirty ?? false} data-readonly={document?.readOnly || undefined} onKeyDown={(event) => {

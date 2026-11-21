@@ -307,7 +307,7 @@ export function createBuildRunSnapshotEntries(controllerContext: BuildRunSnapsho
         }
       } else if (
         tab.sessionId &&
-        ["sftp", "vnc", "rdp", "database", "redis", "hbase-shell", "proxy-test", "object-storage", "mail", "file-browser"].includes(tab.type)
+        ["sftp", "vnc", "rdp", "database", "redis", "hbase-shell", "proxy-test", "object-storage", "mail"].includes(tab.type)
       ) {
         const session = sessionsById.get(tab.sessionId);
         if (session && isResumeEligibleSavedSession(session)) {

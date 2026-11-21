@@ -22,8 +22,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-file-open-text
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -68,11 +68,11 @@ steps:
     path: ${fixture.file_open_root}/notes.txt
     sha256: ${fixture.file_open_saved_sha}
 - assert_disabled: '[data-testid="viewer-save"]'
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
 - wait_for: '[data-testid="file-viewer"] [data-testid="viewer-editor"] .cm-content'
 - assert_count:
-    selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
     equal: 1
 - assert_items:
     selector: '[data-testid="viewer-editor"] .cm-line'
@@ -86,7 +86,7 @@ steps:
     value: 'Unsaved close guard
 
       '
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - wait_for: '[data-testid="viewer-close-dialog"]'
 - click: '[data-testid="viewer-close-cancel"]'
 - assert_visible: '[data-testid="file-viewer"]'
@@ -98,7 +98,7 @@ steps:
 - assert_file_open_bytes:
     path: ${fixture.file_open_root}/notes.txt
     sha256: ${fixture.file_open_saved_sha}
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="viewer-close-discard"]'
 - wait_for:
     selector: '[data-testid="file-viewer"]'
@@ -132,7 +132,7 @@ steps:
 - assert_disabled: '[data-testid="viewer-save"]'
 - assert_no_runtime_errors: null
 - screenshot: file-open-text-save-close.png
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="binary.txt"]'
 - wait_for: '[data-testid="viewer-error"]'
 - click: '[data-testid="viewer-system"]'

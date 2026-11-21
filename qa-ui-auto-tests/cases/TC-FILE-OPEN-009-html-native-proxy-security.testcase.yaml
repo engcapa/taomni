@@ -24,8 +24,8 @@ timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-html-native-network
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -72,7 +72,7 @@ steps:
 - eval_readonly:
     expression: document.querySelector('.html-address input').value.endsWith('/next.html')
     expect_truthy: true
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="ribbon-settings"]'
 - fill:
     selector: '[data-testid="settings-search-input"]'
@@ -87,7 +87,8 @@ steps:
 - fill:
     selector: '[data-testid="html-preview-custom-proxy-panel"] input[type="number"]'
     value: ${fixture.html_network_custom_port}
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="custom.html"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
 - click: '[data-testid="html-console-toggle"]'
@@ -99,7 +100,7 @@ steps:
     equals: custom
 - assert_html_network:
     state: custom
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="ribbon-settings"]'
 - fill:
     selector: '[data-testid="settings-search-input"]'
@@ -107,7 +108,8 @@ steps:
 - select_option:
     selector: '[data-testid="html-preview-proxy-mode"]'
     value: none
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="none.html"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
 - click: '[data-testid="html-console-toggle"]'
@@ -119,7 +121,7 @@ steps:
     equals: none
 - assert_html_network:
     state: none
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="ribbon-settings"]'
 - fill:
     selector: '[data-testid="settings-search-input"]'
@@ -130,7 +132,8 @@ steps:
 - fill:
     selector: '[data-testid="html-preview-custom-proxy-panel"] input[type="number"]'
     value: ${fixture.html_network_invalid_port}
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="invalid.html"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
 - click: '[data-testid="html-console-toggle"]'
@@ -138,7 +141,7 @@ steps:
 - wait_for: '[data-testid="html-network-proxy"]'
 - assert_html_network:
     state: invalid
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="ribbon-settings"]'
 - fill:
     selector: '[data-testid="settings-search-input"]'
@@ -146,7 +149,8 @@ steps:
 - select_option:
     selector: '[data-testid="html-preview-proxy-mode"]'
     value: none
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="security.html"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
 - click: '[data-testid="html-console-toggle"]'
@@ -170,8 +174,8 @@ steps:
 - assert_text:
     selector: '[data-testid="html-console"]'
     contains: HTML_QA SECURITY DONE
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - wait_for: '[data-testid="explorer-file-row"][data-name="slow.html"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="slow.html"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
@@ -182,7 +186,7 @@ steps:
     target: slow
 - assert_html_network:
     state: slow-started
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - assert_html_network:
     state: cancelled
 - assert_no_runtime_errors: null
@@ -215,72 +219,72 @@ verification:
     actions:
     - 16
     - 31
-    - 38
-    - 45
-    - 50
-    - 57
-    - 63
+    - 39
+    - 46
+    - 52
+    - 59
+    - 66
     checkpoints:
     - step: 19
       expectation: Origin and application proxy both log actual GET with app forwarding provenance.
-    - step: 41
+    - step: 42
       expectation: Origin and independent proxy both log actual GET with custom provenance.
-    - step: 53
+    - step: 55
       expectation: Only the origin logs direct GET, neither proxy receives this phase.
-    - step: 65
+    - step: 68
       expectation: Bound non-listening custom proxy produces handled failure and zero direct origin requests for invalid phase.
     results:
     - 19
-    - 41
-    - 53
-    - 65
+    - 42
+    - 55
+    - 68
   - id: R3
     requirement: Local navigation owns browser-style history while traversal, cross-token, symlink and IPC requests are denied.
     actions:
     - 20
     - 23
     - 25
-    - 74
+    - 78
     checkpoints:
     - step: 21
       expectation: Next page code executes through the same token.
     - step: 26
       expectation: Back then forward returns to the readable next.html address.
-    - step: 75
-      expectation: Parent traversal never returns outside bytes.
-    - step: 76
-      expectation: Layered encoded traversal never returns outside bytes.
-    - step: 77
-      expectation: Actual symlink/junction outside the canonical root is refused.
-    - step: 78
-      expectation: A different token cannot read this root.
     - step: 79
+      expectation: Parent traversal never returns outside bytes.
+    - step: 80
+      expectation: Layered encoded traversal never returns outside bytes.
+    - step: 81
+      expectation: Actual symlink/junction outside the canonical root is refused.
+    - step: 82
+      expectation: A different token cannot read this root.
+    - step: 83
       expectation: IPC protocol fetch rejects in the real frame.
     results:
     - 21
     - 26
-    - 75
-    - 76
-    - 77
-    - 78
     - 79
+    - 80
+    - 81
+    - 82
+    - 83
   - id: R4
     requirement: Closing an HTML viewer invalidates the token and promptly cancels its active native HTTP stream.
     actions:
-    - 82
-    - 89
-    - 91
+    - 86
+    - 93
+    - 95
     checkpoints:
-    - step: 90
+    - step: 94
       expectation: The independent origin records the started real HTTP stream before closure.
-    - step: 92
+    - step: 96
       expectation: Origin sees the peer close rather than waiting for download completion or timeout.
-    - step: 93
+    - step: 97
       expectation: Viewer/protocol lifecycle leaves the app runtime healthy.
     results:
-    - 90
-    - 92
-    - 93
+    - 94
+    - 96
+    - 97
   visual:
   - check: Native frame and console visible
     method: automated

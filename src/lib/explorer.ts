@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { FileEntry } from "./sftp";
 
 export interface OperationFailure {
   path: string;
@@ -34,6 +35,18 @@ export interface LocalProperties {
   owner: string | null;
   group: string | null;
   symlinkTarget: string | null;
+}
+
+export interface ExplorerSearchEntry extends FileEntry {
+  relativePath: string;
+}
+
+export interface ExplorerSearchResults {
+  entries: ExplorerSearchEntry[];
+  scanned: number;
+  truncated: boolean;
+  cancelled: boolean;
+  failed: OperationFailure[];
 }
 
 export interface ExplorerProgress {
@@ -96,6 +109,10 @@ export function explorerReadPreviewBytes(path: string, maxBytes = 20 * 1024 * 10
 
 export function explorerReadPreviewText(path: string): Promise<PreviewText> {
   return invoke("explorer_read_preview_text", { path });
+}
+
+export function explorerSearchEntries(root: string, query: string, recursive: boolean, includeHidden: boolean, operationId: string): Promise<ExplorerSearchResults> {
+  return invoke("explorer_search_entries", { root, query, recursive, includeHidden, operationId });
 }
 
 export function explorerCancelOperation(operationId: string): Promise<void> {

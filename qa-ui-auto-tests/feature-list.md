@@ -15165,19 +15165,30 @@ id: F-EXPLORER-1
 title: Local File Explorer
 status: implemented
 area: files/explorer
-components: [ExplorerShell, ExplorerNavTree, ExplorerFileList, ExplorerPreviewPane]
+components: [ExplorerPlatformView, ExplorerSidebarPanel, ExplorerTabStrip, ExplorerShell, ExplorerNavTree, ExplorerFileList, ExplorerPreviewPane]
 files:
+  - src/components/explorer/ExplorerPlatformView.tsx
+  - src/components/explorer/ExplorerSidebarPanel.tsx
+  - src/components/explorer/ExplorerTabStrip.tsx
   - src/components/explorer/ExplorerShell.tsx
+  - src/components/explorer/ExplorerAddressBar.tsx
+  - src/components/explorer/ExplorerCommandBar.tsx
   - src/components/explorer/ExplorerNavTree.tsx
   - src/components/explorer/ExplorerFileList.tsx
+  - src/components/explorer/explorerFileTypes.ts
+  - src/components/explorer/useExplorerSearch.ts
   - src/components/explorer/preview/ExplorerPreviewPane.tsx
   - src/components/filebrowser/FilePanel.tsx
   - src/components/filebrowser/LocalFileBrowserPanel.tsx
   - src/lib/explorer.ts
   - src/lib/explorer/openExplorer.ts
+  - src/lib/explorer/tabRecovery.ts
+  - src/stores/explorerStore.ts
   - src/stores/sftp/navigation.ts
   - src/stores/workspaceExplorerActions.ts
+  - src/stubs/explorerSearch.ts
   - src-tauri/src/filebrowser/local_ops/mod.rs
+  - src-tauri/src/filebrowser/local_ops/search.rs
 controls:
   - id: explorer-main-menu-entry
     selector: '[data-testid="context-menu-item-file-explorer"]'
@@ -15191,12 +15202,23 @@ controls:
   - id: explorer-toast-error
     selector: '[data-testid="explorer-toast"].error'
     kind: display
-  - id: explorer-workspace-tab-ready
-    selector: '[data-testid="workspace-tab"][data-tab-kind="explorer"]'
-    aliases:
-    - ':nth-match([data-testid="workspace-tab"][data-tab-kind="explorer"], 1)'
-    - ':nth-match([data-testid="workspace-tab"][data-tab-kind="explorer"], 2)'
+  - id: explorer-rail-entry
+    selector: '[data-testid="side-tab-explorer"]'
+    kind: interactive
+  - id: explorer-platform-view
+    selector: '[data-testid="explorer-platform-view"]'
     kind: display
+  - id: explorer-tools-entry-removed
+    selector: '[data-testid="sidebar-tool-file-explorer"]'
+    kind: display
+    optional: true   # removed UI; only negative regression assertions remain
+  - id: explorer-workspace-tab-ready
+    selector: '[data-testid="explorer-workspace-tab"]'
+    aliases:
+    - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 1)'
+    - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 2)'
+    - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 5)'
+    kind: interactive
   - id: code-workspace-tool-rail-explorer
     selector: '[data-testid="code-workspace-tool-rail-explorer"]'
     kind: interactive
@@ -15348,11 +15370,8 @@ controls:
     aliases:
     - '[data-testid="explorer-file-row"] .ex-name'
     kind: interactive
-  - id: explorer-main-tab-icon
-    selector: '[data-testid="tab-item"][data-tab-type="file-browser"] .taomni-explorer-tab-icon path'
-    kind: display
   - id: explorer-workspace-tab-icon
-    selector: '[data-testid="workspace-tab"][data-tab-kind="explorer"] .taomni-explorer-tab-icon path'
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"] .taomni-explorer-tab-icon path'
     kind: display
   - id: explorer-files
     selector: '[data-testid="explorer-files"]'
@@ -15360,6 +15379,24 @@ controls:
   - id: explorer-filter
     selector: '[data-testid="explorer-filter"]'
     kind: interactive
+  - id: explorer-search-recursive
+    selector: '[data-testid="explorer-search-recursive"]'
+    kind: interactive
+  - id: explorer-search-clear
+    selector: '[data-testid="explorer-search-clear"]'
+    kind: interactive
+  - id: explorer-search-cancel
+    selector: '[data-testid="explorer-search-cancel"]'
+    kind: interactive
+  - id: explorer-search-retry
+    selector: '[data-testid="explorer-search-retry"]'
+    kind: interactive
+  - id: explorer-search-status
+    selector: '[data-testid="explorer-search-status"]'
+    kind: display
+  - id: explorer-search-result-path
+    selector: '[data-testid="explorer-search-result-path"]'
+    kind: display
   - id: explorer-forward
     selector: '[data-testid="explorer-forward"]'
     kind: interactive
@@ -15380,6 +15417,24 @@ controls:
     kind: display
   - id: explorer-new-file
     selector: '[data-testid="explorer-new-file"]'
+    kind: interactive
+  - id: explorer-new-file-md
+    selector: '[data-testid="explorer-new-file-md"]'
+    kind: interactive
+  - id: explorer-new-file-html
+    selector: '[data-testid="explorer-new-file-html"]'
+    kind: interactive
+  - id: explorer-new-file-css
+    selector: '[data-testid="explorer-new-file-css"]'
+    kind: interactive
+  - id: explorer-new-file-js
+    selector: '[data-testid="explorer-new-file-js"]'
+    kind: interactive
+  - id: explorer-new-file-ts
+    selector: '[data-testid="explorer-new-file-ts"]'
+    kind: interactive
+  - id: explorer-new-file-json
+    selector: '[data-testid="explorer-new-file-json"]'
     kind: interactive
   - id: explorer-new-folder
     selector: '[data-testid="explorer-new-folder"]'
@@ -15509,9 +15564,6 @@ controls:
   - id: explorer-view-list
     selector: '[data-testid="explorer-view-list"]'
     kind: interactive
-  - id: sidebar-tool-file-explorer
-    selector: '[data-testid="sidebar-tool-file-explorer"]'
-    kind: interactive
   - id: terminal-context-explorer
     selector: '[data-testid="terminal-context-explorer"]'
     kind: interactive
@@ -15520,7 +15572,7 @@ controls:
     kind: interactive
 -->
 
-已接入 Tools/主菜单、工作区导航与项目树、本地终端右键。保持原 File 会话关联与 SFTP 双栏。原型样式、导航/预览/选择、文件操作、回收站撤销及恢复由 TC-EXPLORER-001..005 验证；当前 GitHub 执行证据见 `docs-feature/file-explorer/implementation.md`，不以静态清单宣称原生通过。
+File Explorer 是 Sessions 下方的独立工作区，Tools 面板不再提供入口；主菜单、工作区导航、项目树、本地终端、Home 与历史恢复统一跳转到这里。目录与支持内部查看的文件共用独立标签，只有显式选择 Code Workspace 或系统应用才离开。新建支持 TXT、MD、HTML、CSS、JS、TS、JSON；搜索支持普通文本、递归、`*`/`?`/`**`/字符类、两种路径分隔符、相对路径、错误重试、进度与取消。TC-EXPLORER-001..009 覆盖导航、预览、选择、文件操作、恢复、多类型新建及真实磁盘搜索；当前执行证据见 `docs-feature/file-explorer/implementation.md`，不以静态清单宣称原生通过。
 
 ## 全局文件打开 / 预览 / 编辑
 
