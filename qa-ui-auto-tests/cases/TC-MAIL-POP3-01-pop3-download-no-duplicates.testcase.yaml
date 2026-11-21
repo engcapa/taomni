@@ -55,7 +55,7 @@ steps:
     timeout_sec: 60
 - mail_server_deliver:
     count: 3
-    prefix: Pop3-new
+    prefix: Pop3-added
 - click: '[data-testid="mail-sync-button"]:not([disabled])'
 - wait_for:
     selector: '[data-testid="mail-sync-button"]:not([disabled])'
@@ -73,16 +73,18 @@ steps:
 - mail_server_assert_list_matches:
     timeout_sec: 30
 - press:
-    selector: '[data-testid="mail-message-row"][data-subject="Pop3-new 0003"]'
+    selector: '[data-testid="mail-message-row"][data-subject="Pop3-added 0003"]'
     key: Enter
-- assert_text:
-    selector: '[data-testid="mail-reader-text"]'
-    contains: Pop3-new 0003
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent
+      ?? document.querySelector('.taomni-mail-reader-text')?.textContent
+      ?? '').includes('Pop3-added 0003')
     timeout_sec: 30
 - assert_no_runtime_errors: null
 - screenshot: mail-pop3-01-local-inbox.png
 - click: '[data-testid="mail-test-connection"]'
-- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: 'POP3 ok, SMTP ok'}
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'POP3 ok, SMTP ok'}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -121,7 +123,7 @@ verification:
     - step: 18
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 30}}'
     - step: 20
-      expectation: The plain-text reader renders the selected Pop3-new 0003 message.
+      expectation: The visible message reader renders the selected Pop3-added 0003 body in its active format.
     - step: 21
       expectation: '{"assert_no_runtime_errors": null}'
     results:
