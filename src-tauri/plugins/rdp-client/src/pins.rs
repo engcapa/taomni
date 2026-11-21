@@ -191,7 +191,7 @@ mod tests {
             .unwrap();
         assert!(
             pins.trust(trust("desktop.example", 3389, "EF"), &|| {
-            Err(RpcError::from_code(ErrorCode::RequestCancelled))
+                Err(RpcError::from_code(ErrorCode::RequestCancelled))
             })
             .is_err()
         );

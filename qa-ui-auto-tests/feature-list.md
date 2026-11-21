@@ -334,6 +334,7 @@ controls:
     - '[data-testid="module-action-enable-mfa"]'
     - '[data-testid="module-action-enable-vnc-client"]'
     - '[data-testid="module-action-enable-rdp-client"]'
+    - '[data-testid="module-action-enable-mail"]'
   - id: module-status-mfa
     selector: '[data-testid="module-status-mfa"]'
     kind: display
@@ -344,6 +345,7 @@ controls:
     - '[data-testid="module-action-disable-mfa"]'
     - '[data-testid="module-action-disable-vnc-client"]'
     - '[data-testid="module-action-disable-rdp-client"]'
+    - '[data-testid="module-action-disable-mail"]'
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
@@ -15865,6 +15867,9 @@ controls:
     kind: interactive
   - id: explorer-context-delete
     selector: '[data-testid="explorer-context-delete"]'
+    kind: interactive
+  - id: explorer-context-open-with
+    selector: '[data-testid="explorer-context-open-with"]'
     kind: interactive
   - id: explorer-context-new-file
     selector: '[data-testid="explorer-context-new-file"]'

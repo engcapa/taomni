@@ -1172,6 +1172,7 @@
 - `[data-testid="explorer-context-copy-path"]` — interactive — F-EXPLORER-1.explorer-context-copy-path
 - `[data-testid="explorer-context-cut"]` — interactive — F-EXPLORER-1.explorer-context-cut
 - `[data-testid="explorer-context-delete"]` — interactive — F-EXPLORER-1.explorer-context-delete
+- `[data-testid="explorer-context-open-with"]` — interactive — F-EXPLORER-1.explorer-context-open-with
 - `[data-testid="explorer-context-new-file"]` — interactive — F-EXPLORER-1.explorer-context-new-file
 - `[data-testid="explorer-context-new-folder"]` — interactive — F-EXPLORER-1.explorer-context-new-folder
 - `[data-testid="explorer-context-newtab"]` — interactive — F-EXPLORER-1.explorer-context-newtab
@@ -2715,11 +2716,13 @@
   ↳ `[data-testid="module-action-enable-mfa"]` — alias
   ↳ `[data-testid="module-action-enable-vnc-client"]` — alias
   ↳ `[data-testid="module-action-enable-rdp-client"]` — alias
+  ↳ `[data-testid="module-action-enable-mail"]` — alias
 - `[data-testid="module-status-mfa"]` — display — F-Modules-1.module-status-mfa
 - `[data-testid="module-action-disable-hello-plugin"]` — interactive — F-Modules-1.module-action-disable-hello-plugin
   ↳ `[data-testid="module-action-disable-mfa"]` — alias
   ↳ `[data-testid="module-action-disable-vnc-client"]` — alias
   ↳ `[data-testid="module-action-disable-rdp-client"]` — alias
+  ↳ `[data-testid="module-action-disable-mail"]` — alias
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
 - `[data-testid="module-action-install-hello-plugin"]` — interactive — F-Modules-1.module-action-install-hello-plugin
   ↳ `[data-testid="module-action-install-mfa"]` — alias
