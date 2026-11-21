@@ -1,0 +1,81 @@
+id: TC-MODULES-055
+title: The signed VNC host owns its Windows key helper
+description: >-
+  Install and enable the signed VNC module, open a saved connection and focus its
+  canvas. Use the Windows process table to match the helper to the installed
+  signed bytes and its host. Disable the module and verify the two processes and
+  the RFB connection close while the original application process stays alive.
+covers: [F-Modules-1, F9.1, F9.6]
+tags: [modules, vnc, lifecycle, native-boundary, p1]
+modes: [native]
+native_platforms: [Windows]
+fixtures: [reset_db, module_signed_vnc_archive, vnc_required]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.vnc_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.vnc_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- click: '[data-testid="module-action-enable-vnc-client"]'
+- wait_for: '[data-testid="module-action-disable-vnc-client"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- click: '[data-testid="session-proto-vnc"]'
+- fill: {selector: '[data-testid="session-host"]', value: '${fixture.vnc_host}'}
+- fill: {selector: '[data-testid="session-port"]', value: '${fixture.vnc_port}'}
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: qa-signed-vnc-keys}
+- click: '[data-testid="session-save"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-signed-vnc-keys"]'
+- click: '[data-testid="vnc-unencrypted-continue"]'
+- fill: {selector: '[data-testid="vnc-auth-password"]', value: '${env.QA_VNC_PASSWORD}'}
+- click: '[data-testid="vnc-auth-ok"]'
+- wait_for: {selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]', timeout_sec: 30}
+- eval_readonly:
+    expression: "document.querySelector('.vnc-container canvas')?.getContext('2d')?.getImageData(16, 16, 1, 1).data[3] === 255"
+    timeout_sec: 15
+- click: '[data-testid="vnc-canvas"]'
+- wait_for: '[data-testid="vnc-panel"][data-vnc-special-keys="captured"]'
+- assert_vnc_key_helper: running
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-vnc-client"]'
+- wait_for: '[data-testid="module-action-enable-vnc-client"]'
+- assert_vnc_key_helper: disabled
+- assert_file_contains: {path: '${fixture.vnc_events}', contains: '"type": "session_closed"'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The signed host owns the packaged Windows helper while the connected VNC viewer has focus.
+    actions: [5, 6, 7, 9, 19, 20, 21, 22, 23, 26]
+    checkpoints:
+    - {step: 8, expectation: The application accepts the signed package.}
+    - {step: 24, expectation: The native viewer negotiates the fixture framebuffer.}
+    - {step: 25, expectation: The connected viewer paints a frame from the fixture.}
+    - {step: 27, expectation: Special-key capture turns on with the canvas focused.}
+    - {step: 28, expectation: The Windows process table matches the installed host and helper to the archive and confirms their ancestry.}
+    results: [25, 27, 28]
+  - id: R2
+    requirement: Disabling the VNC module shuts down its Windows helper, host and active connection.
+    actions: [29, 30, 31]
+    checkpoints:
+    - {step: 32, expectation: The native module is ready to enable again.}
+    - {step: 33, expectation: Both signed child processes exit and the original core stays alive.}
+    - {step: 34, expectation: The RFB fixture observes the connection close.}
+    - {step: 35, expectation: The desktop has no uncaught runtime errors.}
+    results: [33, 34, 35]
+  visual:
+  - check: The focused viewer displays pixels from the fixture.
+    method: automated
+    reason: Read a rendered framebuffer pixel before checking process ownership.
+  native:
+  - check: Verify exact package bytes, Win32 process ownership and lifecycle using the desktop build.
+    method: automated
+    reason: Browser coverage uses a stub registry and cannot observe a Windows process.

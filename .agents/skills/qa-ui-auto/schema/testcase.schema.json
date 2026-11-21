@@ -944,6 +944,10 @@
           "properties": { "phase": { "enum": ["block", "rejected", "restore", "recovered"] } },
           "description": "Hosted Linux native only: owned noexec bind fault on one verified installed hello version, fixed real IPC rejection/recovery, unchanged code/data and native writer lease. No YAML paths, commands or registry mutations. Fault cleanup restores the original mount."
         },
+        "assert_vnc_key_helper": {
+          "enum": ["running", "disabled"],
+          "description": "Windows native signed VNC case only. Check exact installed host and helper bytes, process ownership and teardown while the original core stays running."
+        },
         "module_upgrade_probe": {
           "type": "object", "additionalProperties": false, "required": ["phase"],
           "properties": { "phase": { "enum": ["preflight", "pending", "repeat", "after-first-install", "legacy-restore-applied"] } },
