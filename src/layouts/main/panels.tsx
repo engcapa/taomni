@@ -2,8 +2,6 @@ import { lazy } from "react";
 import { useT } from "../../lib/i18n";
 
 
-export const RdpPanel = lazy(() => import("../../components/rdp/RdpPanel"));
-
 export const DbClientTab = lazy(() => import("../../components/database/DbClientTab"));
 
 export const RedisClientTab = lazy(() => import("../../components/database/RedisClientTab"));

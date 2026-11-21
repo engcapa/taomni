@@ -1,4 +1,4 @@
-import { type RdpFrameTile } from "../../../lib/rdp";
+import { type RdpFrameTile } from "../wire";
 
 /* ── Canvas helpers ─────────────────────────────────────────────────── */
 

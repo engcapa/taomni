@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CONNECTION_BAR_REVEAL_MS, RdpConnectionBar } from "./RdpConnectionBar";
-import { ctrlAltDelSequence, rdpNetworkQuality } from "../../lib/rdp";
+import { ctrlAltDelSequence, rdpNetworkQuality } from "./wire";
 
 function renderBar(overrides: Partial<Parameters<typeof RdpConnectionBar>[0]> = {}) {
   const handlers = {

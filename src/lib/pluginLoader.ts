@@ -70,10 +70,15 @@ export async function loadPluginFrontend<Props = PluginFrontendProps>(
     if (importer === defaultImporter && import.meta.env.DEV && !isTauriRuntime()) {
       if (manifest.slug === "hello-plugin") url = "/src-tauri/plugins/hello-plugin/frontend/index.js";
       if (manifest.slug === "vnc-client") url = "/src-tauri/plugins/vnc-client/renderer/VncPanel.tsx";
+      if (manifest.slug === "rdp-client") url = "/src-tauri/plugins/rdp-client/renderer/RdpPanel.tsx";
     }
     if (manifest.slug === "vnc-client") {
       const { installVncViewerHost } = await import("./vnc/viewerHost");
       installVncViewerHost();
+    }
+    if (manifest.slug === "rdp-client") {
+      const { installRdpViewerHost } = await import("./rdpViewerHost");
+      installRdpViewerHost();
     }
     // A fragment changes ESM identity for retry/reactivation without changing
     // the signed resource path or allowing a query through the native protocol.

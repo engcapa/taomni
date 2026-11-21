@@ -5,6 +5,7 @@ import { useT } from "../../lib/i18n";
 import { useWorkspaceSessionAccess } from "./useWorkspaceSessionAccess";
 import { WorkspaceAdditionalSessionPane } from "./WorkspaceAdditionalSessionPane";
 import VncSessionPane from "../plugins/VncSessionPane";
+import RdpSessionPane from "../plugins/RdpSessionPane";
 import { parsePathMappings } from "../filebrowser/PathMappingsEditor";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { FileBrowser } from "../filebrowser/FileBrowser";
@@ -27,7 +28,6 @@ import {
 } from "../../layouts/main/panels";
 
 const DbClientTab = lazy(() => import("../database/DbClientTab"));
-const RdpPanel = lazy(() => import("../rdp/RdpPanel"));
 
 const DB_ENGINES = new Set([
   "MySQL",
@@ -181,7 +181,7 @@ function WorkspaceProtocolPane({ workspace, tab, visible, active = visible, sess
     return (
       <div data-testid="workspace-session-pane" data-kind="rdp" data-session-id={session.id} className="h-full min-h-0 w-full" style={{ display: visible ? "block" : "none" }}>
         <Suspense fallback={<RdpLoadingPanel />}>
-          <RdpPanel
+          <RdpSessionPane
             tabId={tab.id}
             host={session.host}
             port={session.port}

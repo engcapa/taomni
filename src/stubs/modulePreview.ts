@@ -1,9 +1,11 @@
 import type { PluginManifest, PluginRecord } from "../lib/pluginRegistry";
+import rdpManifest from "../../src-tauri/plugins/rdp-client/module.json";
 import vncManifest from "../../src-tauri/plugins/vnc-client/module.json";
 
 /** Explicit browser-only fixture model. Never verifies or installs an archive. */
 export const MODULE_PREVIEW_KEY = "taomni.preview.modules.v1";
 const VNC_PREVIEW_KEY = "taomni.preview.modules.vnc.v1";
+const RDP_PREVIEW_KEY = "taomni.preview.modules.rdp.v1";
 export const previewHelloManifest: PluginManifest = {
   id: "taomni-plugin-hello-plugin", slug: "hello-plugin", name: "Hello Plugin", version: "0.1.0",
   coreApiVersion: "1", kind: "collaboration", status: "provisional",
@@ -14,7 +16,10 @@ export const previewHelloManifest: PluginManifest = {
   permissions: [], dataDir: "plugins/hello-plugin", backupPaths: ["plugins/hello-plugin/data"],
   legacyTables: [], vaultFixedKeys: [], snapshot: "rpc",
 };
-const previewVncManifest = vncManifest as PluginManifest;
+const desktopModules = [
+  { manifest: vncManifest as PluginManifest, key: VNC_PREVIEW_KEY },
+  { manifest: rdpManifest as PluginManifest, key: RDP_PREVIEW_KEY },
+];
 
 interface PreviewState { lifecycle: PluginRecord["lifecycle"]; values: string[]; version?: string; previousVersion?: string }
 
@@ -41,14 +46,16 @@ export function previewModuleRecord(state: PreviewState, manifest = previewHello
 export function invokeModulePreview(command: string, args?: Record<string, unknown>): unknown {
   if (command === "plugin_list" || command === "plugin_refresh") {
     const hello = readModulePreview();
-    const vnc = readPreview(VNC_PREVIEW_KEY);
     return [
       ...(hello ? [previewModuleRecord(hello)] : []),
-      ...(vnc ? [previewModuleRecord(vnc, previewVncManifest)] : []),
+      ...desktopModules.flatMap(({ manifest, key }) => {
+        const state = readPreview(key);
+        return state ? [previewModuleRecord(state, manifest)] : [];
+      }),
     ];
   }
-  const manifest = args?.slug === previewVncManifest.slug ? previewVncManifest : previewHelloManifest;
-  const key = manifest === previewVncManifest ? VNC_PREVIEW_KEY : MODULE_PREVIEW_KEY;
+  const { manifest, key } = desktopModules.find(({ manifest }) => manifest.slug === args?.slug)
+    ?? { manifest: previewHelloManifest, key: MODULE_PREVIEW_KEY };
   const state = readPreview(key);
   if (!state || args?.slug !== manifest.slug) throw new Error(`Module operation requires the desktop app: ${command}`);
   if (command === "plugin_set_enabled" && state.lifecycle !== "uninstalled") {

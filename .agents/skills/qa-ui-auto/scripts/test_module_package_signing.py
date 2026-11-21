@@ -129,15 +129,18 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
             entry = b"export default function Viewer() {}\n"
             (trusted / "index.js").write_bytes(entry)
             (trusted / "receipt.json").write_text(json.dumps({
-                "sourceSha": "a" * 40, "toolingSha": "b" * 40, "sha256": hashlib.sha256(entry).hexdigest(),
+                "sourceSha": "a" * 40, "toolingSha": "b" * 40, "slug": "vnc-client",
+                "sha256": hashlib.sha256(entry).hexdigest(),
             }), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "receipt"):
-                stage_frontend(trusted, payload, "c" * 40, "b" * 40)
+                stage_frontend(trusted, payload, "c" * 40, "b" * 40, "vnc-client")
+            with self.assertRaisesRegex(ValueError, "receipt"):
+                stage_frontend(trusted, payload, "a" * 40, "b" * 40, "rdp-client")
             (trusted / "index.js").write_bytes(b"changed")
             with self.assertRaisesRegex(ValueError, "receipt"):
-                stage_frontend(trusted, payload, "a" * 40, "b" * 40)
+                stage_frontend(trusted, payload, "a" * 40, "b" * 40, "vnc-client")
             (trusted / "index.js").write_bytes(entry)
-            stage_frontend(trusted, payload, "a" * 40, "b" * 40)
+            stage_frontend(trusted, payload, "a" * 40, "b" * 40, "vnc-client")
             self.assertEqual((candidate_frontend / "index.js").read_bytes(), entry)
 
     def test_source_module_metadata_and_unsigned_file_changes_are_rejected(self):

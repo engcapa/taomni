@@ -21,6 +21,7 @@ src-tauri/frameworks/
 /node_modules
 /dist
 /src-tauri/plugins/vnc-client/dist/
+/src-tauri/plugins/rdp-client/dist/
 
 
 # =============================================================================

@@ -10,7 +10,7 @@ on:
       module:
         description: Official QA module
         type: choice
-        options: [hello-plugin, mfa, mail, vnc-client]
+        options: [hello-plugin, mfa, mail, vnc-client, rdp-client]
         default: hello-plugin
       macos_runner:
         description: Hosted macOS package builder (both Darwin targets remain explicit)
@@ -18,7 +18,7 @@ on:
         options: [macos-latest, macos-15, macos-15-intel, macos-26]
         default: macos-latest
       native_macos_signing:
-        description: Sign the Mail, MFA or VNC host with the fixed macOS identity before packaging
+        description: Sign an official module host with the fixed macOS identity before packaging
         type: boolean
         default: false
   workflow_call:
@@ -68,14 +68,14 @@ jobs:
           NATIVE_MACOS_SIGNING: ${{ inputs.native_macos_signing }}
         run: |
           if [[ "$NATIVE_MACOS_SIGNING" == 'true' && "$QA_MODULE" == 'hello-plugin' ]]; then
-            echo 'Select MFA, Mail or VNC for the macOS host signature check.' >&2
+            echo 'Select an official business module for the macOS host signature check.' >&2
             exit 1
           fi
           case "$QA_MODULE" in
             hello-plugin) echo 'host_package=taomni-hello-plugin' >> "$GITHUB_OUTPUT" ;;
             mfa) echo 'host_package=taomni-plugin-mfa' >> "$GITHUB_OUTPUT" ;;
             mail) echo 'host_package=taomni-plugin-mail' >> "$GITHUB_OUTPUT" ;;
-            vnc-client) echo 'host_package=taomni-plugin-vnc-client' >> "$GITHUB_OUTPUT" ;;
+            vnc-client|rdp-client) echo "host_package=taomni-plugin-$QA_MODULE" >> "$GITHUB_OUTPUT" ;;
             *) echo 'Unknown official QA module.' >&2; exit 1 ;;
           esac
           test -n "$(git for-each-ref --format='%(refname)' --contains HEAD refs/remotes/origin/)" || {
@@ -104,7 +104,7 @@ jobs:
           approved = {('linux', 'X64'): 'linux-x86_64', ('windows', 'X64'): 'windows-x86_64',
                       ('macos', 'ARM64'): 'darwin-aarch64', ('macos', 'X64'): 'darwin-x86_64'}
           capability = {'hello-plugin': 'signed-module', 'mfa': 'signed-mfa', 'mail': 'signed-mail',
-                        'vnc-client': 'signed-vnc'}[os.environ['QA_MODULE']]
+                        'vnc-client': 'signed-vnc', 'rdp-client': 'signed-rdp'}[os.environ['QA_MODULE']]
           roster = set()
           if raw := os.environ.get('PACKAGE_NATIVE_BUILDS'):
               document = json.loads(raw)
@@ -130,18 +130,19 @@ jobs:
               output.write('sign_matrix=' + json.dumps({'include': [
                   {'platform': target['platform'], 'legacy_roster': target['legacy_roster']} for target in targets
               ]}, separators=(',', ':')) + '\n')
-              if os.environ['QA_MODULE'] == 'vnc-client':
+              if os.environ['QA_MODULE'] in {'vnc-client', 'rdp-client'}:
                   suffix = '-'.join(target['platform'] for target in targets)
-                  output.write(f"frontend_artifact=qa-vnc-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
+                  output.write(f"frontend_artifact=qa-{os.environ['QA_MODULE']}-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
           PY
 
-  vnc-frontend:
-    if: inputs.module == 'vnc-client'
+  desktop-frontend:
+    if: inputs.module == 'vnc-client' || inputs.module == 'rdp-client'
     needs: source
     uses: ./.github/workflows/build-vnc-frontend.yml
     with:
       source: ${{ needs.source.outputs.sha }}
       artifact: ${{ needs.source.outputs.frontend_artifact }}
+      module: ${{ inputs.module }}
 
   build:
     name: Build unsigned ${{ inputs.module || 'hello-plugin' }} (${{ matrix.platform }})
@@ -163,8 +164,8 @@ jobs:
         with:
           workspaces: src-tauri -> target
           shared-key: modular-official-${{ inputs.module || 'hello-plugin' }}-${{ matrix.target }}
-      - name: Prepare Perl for the Windows VNC TLS build
-        if: env.QA_MODULE == 'vnc-client' && runner.os == 'Windows'
+      - name: Prepare Perl for the Windows desktop client TLS build
+        if: (env.QA_MODULE == 'vnc-client' || env.QA_MODULE == 'rdp-client') && runner.os == 'Windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -209,7 +210,7 @@ jobs:
               if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
                   helper = 'taomni-vnc-key-helper.exe'
                   shutil.copyfile(binaries / helper, output / helper)
-              if slug != 'vnc-client' and manifest['entry'].get('frontend'):
+              if slug not in {'vnc-client', 'rdp-client'} and manifest['entry'].get('frontend'):
                   shutil.copytree(source / 'frontend', output / 'frontend')
 
           stage(os.environ['QA_MODULE'], 'unsigned-module')
@@ -257,10 +258,10 @@ jobs:
 
   sign:
     name: Sign official ${{ inputs.module || 'hello-plugin' }} (${{ matrix.platform }})
-    needs: [source, build, vnc-frontend]
+    needs: [source, build, desktop-frontend]
     # Fork pull requests cannot request a production signature. A manual or
     # reusable invocation runs the workflow revision trusted by its operator.
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'engcapa/taomni' && needs.build.result == 'success' && (needs.vnc-frontend.result == 'success' || (inputs.module != 'vnc-client' && needs.vnc-frontend.result == 'skipped')) }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'engcapa/taomni' && needs.build.result == 'success' && (needs.desktop-frontend.result == 'success' || (inputs.module != 'vnc-client' && inputs.module != 'rdp-client' && needs.desktop-frontend.result == 'skipped')) }}
     runs-on: ${{ inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-') && needs.source.outputs.macos_runner || 'ubuntu-24.04' }}
     timeout-minutes: 20
     strategy:
@@ -294,7 +295,7 @@ jobs:
           import json, os, pathlib, shutil
           root = pathlib.Path('candidate')
           module = os.environ['QA_MODULE']
-          assert module in {'hello-plugin', 'mfa', 'mail', 'vnc-client'}, 'Unknown official QA module'
+          assert module in {'hello-plugin', 'mfa', 'mail', 'vnc-client', 'rdp-client'}, 'Unknown official QA module'
           observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
           assert observed == {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': module}
           assert not any(p.is_symlink() for p in root.rglob('*'))
@@ -310,7 +311,7 @@ jobs:
                   binaries.add('taomni-vnc-key-helper.exe')
               allowed = {'module.json', *binaries}
               frontend = expected['entry'].get('frontend')
-              if frontend and slug != 'vnc-client':
+              if frontend and slug not in {'vnc-client', 'rdp-client'}:
                   assert (trusted_source / frontend).is_file()
                   for source in (trusted_source / 'frontend').rglob('*'):
                       assert not source.is_symlink()
@@ -339,16 +340,16 @@ jobs:
               (failing / 'module.json').write_text(json.dumps({**expected, 'version': '0.1.1'}), encoding='utf-8')
           PY
       - uses: actions/download-artifact@v4
-        if: env.QA_MODULE == 'vnc-client'
+        if: env.QA_MODULE == 'vnc-client' || env.QA_MODULE == 'rdp-client'
         with:
           name: ${{ needs.source.outputs.frontend_artifact }}
-          path: trusted-vnc-frontend
-      - name: Stage the verified VNC frontend bytes
-        if: env.QA_MODULE == 'vnc-client'
+          path: trusted-desktop-frontend
+      - name: Stage the verified desktop frontend bytes
+        if: env.QA_MODULE == 'vnc-client' || env.QA_MODULE == 'rdp-client'
         env:
           MODULE_SOURCE: ${{ needs.source.outputs.sha }}
           FRONTEND_TOOLING: ${{ github.workflow_sha }}
-        run: python scripts/stage-vnc-frontend.py trusted-vnc-frontend candidate/unsigned-module "$MODULE_SOURCE" "$FRONTEND_TOOLING"
+        run: python scripts/stage-vnc-frontend.py trusted-desktop-frontend candidate/unsigned-module "$MODULE_SOURCE" "$FRONTEND_TOOLING" "$QA_MODULE"
       - uses: actions/setup-node@v4
         if: inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-')
         with:
@@ -397,8 +398,8 @@ jobs:
                 --output "signed-module/$destination" --source-sha "$MODULE_SOURCE_SHA"
             done
           fi
-      - name: Sign the official Mail or VNC package
-        if: env.QA_MODULE == 'mail' || env.QA_MODULE == 'vnc-client'
+      - name: Sign the official business module package
+        if: env.QA_MODULE == 'mail' || env.QA_MODULE == 'vnc-client' || env.QA_MODULE == 'rdp-client'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

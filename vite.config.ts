@@ -35,6 +35,7 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     __TAOMNI_QA_COMPLETION_OBSERVATION__: JSON.stringify(mode === "qa"),
     __TAOMNI_QA_UPDATER__: JSON.stringify(mode === "qa"),
     __TAOMNI_BUNDLED_VNC_VIEWER__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview && !isTauriBuild)),
+    __TAOMNI_BUNDLED_RDP_VIEWER__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview && !isTauriBuild)),
     // Screenshot overlay startup marks (P0-0b): read by native QA only.
     __TAOMNI_QA_OVERLAY_TIMING__: JSON.stringify(mode === "qa"),
   },

@@ -68,6 +68,7 @@ use ironrdp::session::{ActiveStage, ActiveStageBuilder, ActiveStageOutput};
 use ironrdp::svc::{ChannelFlags, SvcMessage, SvcProcessorMessages};
 use ironrdp_tokio::{Framed, FramedRead, FramedWrite};
 use serde_json::json;
+pub use taomni_rdp_client_api::ConnectionTestResult as RdpConnectionTestResult;
 use tokio::sync::Notify;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
@@ -156,14 +157,6 @@ enum ControlOutcome {
     Continue,
     Disconnect,
     Reconnect { width: u16, height: u16 },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RdpConnectionTestResult {
-    pub width: u16,
-    pub height: u16,
-    pub protocol: String,
-    pub server_name: String,
 }
 
 const AUDIO_SAMPLE_RATE: u32 = 44_100;

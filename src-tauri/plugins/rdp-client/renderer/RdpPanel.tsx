@@ -1,12 +1,11 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Fullscreen, Minimize2 } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { useT } from "../../lib/i18n";
-import { type RdpNetworkInfo } from "../../lib/rdp";
-import { isTauriRuntime } from "../../lib/runtime";
-import { useRdpStore } from "../../stores/rdpStore";
+import { getCurrentWindow, isTauriRuntime, useT } from "../../../../src/lib/rdpViewerHost";
+import type { RdpPanelProps } from "../../../../src/lib/rdpViewerContract";
+import { type RdpNetworkInfo } from "./wire";
+import { useRdpStore } from "./rdpStore";
 import { RdpPanelView } from "./panel/RdpPanelView";
-import { type RdpPanelProps, type ScaleMode, type ViewMode } from "./panel/types";
+import type { ScaleMode, ViewMode } from "./panel/types";
 import { useRdpAudio } from "./panel/useRdpAudio";
 import { useRdpConnection } from "./panel/useRdpConnection";
 import { useRdpInput } from "./panel/useRdpInput";
@@ -204,5 +203,3 @@ export default function RdpPanel({
     remoteCursorCss={remoteCursorCss}
   />;
 }
-
-export { type RdpPanelProps } from "./panel/types";

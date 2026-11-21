@@ -10947,6 +10947,7 @@ dependencies = [
  "taomni-plugin-services",
  "taomni-plugin-stream",
  "taomni-profile-locks",
+ "taomni-rdp-client-api",
  "taomni-rdp-client-engine",
  "taomni-rdp-common",
  "taomni-redirector",
@@ -11182,6 +11183,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-plugin-rdp-client"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "taomni-plugin-api",
+ "taomni-plugin-sdk",
+ "taomni-rdp-client-api",
+ "taomni-rdp-client-engine",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "taomni-plugin-sdk"
 version = "0.1.0"
 dependencies = [
@@ -11222,6 +11237,7 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "rand 0.9.5",
+ "ring 0.17.14",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -11231,6 +11247,7 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util 0.7.19",
  "windows-sys 0.61.2",
+ "zeroize",
 ]
 
 [[package]]
@@ -11261,6 +11278,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-rdp-client-api"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "taomni-plugin-stream",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
 name = "taomni-rdp-client-engine"
 version = "0.1.0"
 dependencies = [
@@ -11279,6 +11307,7 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "taomni-file-uri",
+ "taomni-rdp-client-api",
  "taomni-rdp-common",
  "tempfile",
  "tokio",

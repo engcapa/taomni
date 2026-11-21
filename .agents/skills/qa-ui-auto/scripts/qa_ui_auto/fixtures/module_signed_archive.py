@@ -51,7 +51,7 @@ def load_artifact(root: Path, source_sha: str, expected_platform: str, slug: str
     if len(detached.splitlines()) != 4 or detached.splitlines()[2] != trusted:
         raise RuntimeError("Official module signature does not bind the expected metadata")
     frontend = None
-    if slug in {"hello-plugin", "vnc-client"}:
+    if slug in {"hello-plugin", "vnc-client", "rdp-client"}:
         with zipfile.ZipFile(archive) as zipped:
             frontend = zipped.read("frontend/index.js")
     return receipt, archive, detached, frontend
@@ -109,21 +109,33 @@ def setup_mfa(ctx):
 
 
 def setup_vnc(ctx):
+    setup_desktop_client(ctx, "vnc")
+
+
+def setup_rdp(ctx):
+    setup_desktop_client(ctx, "rdp")
+
+
+def setup_desktop_client(ctx, protocol):
     if (ctx.cfg.get("app") or {}).get("mode") != "native":
-        raise RuntimeError("Signed VNC input requires the native package verifier")
-    raw = os.environ.get("QA_SIGNED_VNC_ROOT")
+        raise RuntimeError("The signed desktop client requires the native package verifier")
+    setting = f"QA_SIGNED_{protocol.upper()}_ROOT"
+    raw = os.environ.get(setting)
     if not raw:
-        raise RuntimeError("QA_SIGNED_VNC_ROOT is required; build the signed VNC artifact first")
+        raise RuntimeError(f"{setting} is required to locate the signed artifact")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    receipt, archive, signature, frontend = load_artifact(Path(raw), source, platform_key(), "vnc-client")
+    receipt, archive, signature, frontend = load_artifact(Path(raw), source, platform_key(), f"{protocol}-client")
     if not frontend:
-        raise RuntimeError("The signed VNC package has no renderer bytes")
+        raise RuntimeError("The signed package has no renderer bytes")
     receipt["frontendSha256"] = hashlib.sha256(frontend).hexdigest()
-    owned = Path(ctx.case_dir).resolve() / "signed-vnc"
+    owned = Path(ctx.case_dir).resolve() / f"signed-{protocol}"
     owned.mkdir()
     destination = owned / archive.name
     shutil.copyfile(archive, destination)
     (owned / "provenance.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
-    ctx.values.update(vnc_signed_archive=destination.as_posix(), vnc_signed_signature=signature,
-                      vnc_signed_version=receipt["version"])
+    ctx.values.update({
+        f"{protocol}_signed_archive": destination.as_posix(),
+        f"{protocol}_signed_signature": signature,
+        f"{protocol}_signed_version": receipt["version"],
+    })
 

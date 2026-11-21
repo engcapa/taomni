@@ -1,13 +1,14 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { OUT_FRAME, OUT_FRAME_END, rdpConnect, rdpDisconnect } from "../../lib/rdp";
-import { useRdpStore, type RdpConnectionState } from "../../stores/rdpStore";
-import { DEFAULT_RDP_OPTIONS } from "../../types/rdp";
+import { rdpConnect, rdpDisconnect } from "../../../../src/lib/rdpViewerHost";
+import { OUT_FRAME, OUT_FRAME_END } from "./wire";
+import { useRdpStore, type RdpConnectionState } from "./rdpStore";
+import { DEFAULT_RDP_OPTIONS } from "../../../../src/types/rdp";
 import RdpPanel from "./RdpPanel";
 
-vi.mock("../../lib/rdp", async (importOriginal) => ({
-  ...await importOriginal<typeof import("../../lib/rdp")>(),
+vi.mock("../../../../src/lib/rdp", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../../../src/lib/rdp")>(),
   rdpConnect: vi.fn(),
   rdpDisconnect: vi.fn(),
 }));

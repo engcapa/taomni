@@ -34,7 +34,7 @@ const boundaries = [
   ["src/components/editor/workspace/virtualSpace", "src/components/editor/workspace/workspaceVirtualSpace.ts"],
   ["src/components/editor/workspace/searchPanel", "src/components/editor/workspace/editorSearchPanel.ts"],
   ["src/components/editor/workspace/lspSession", "src/components/editor/workspace/useWorkspaceLspSession.ts"],
-  ["src/components/rdp/panel", "src/components/rdp/RdpPanel.tsx"],
+  ["src-tauri/plugins/rdp-client/renderer/panel", "src-tauri/plugins/rdp-client/renderer/RdpPanel.tsx"],
   ["src/components/filebrowser/filePanel", "src/components/filebrowser/FilePanel.tsx"],
   ["src/components/filebrowser/browser", "src/components/filebrowser/FileBrowser.tsx"],
   ["src/components/database/schema", "src/components/database/SchemaTree.tsx"],

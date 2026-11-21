@@ -274,7 +274,7 @@ vi.mock("../../../components/terminal/TerminalPanel", () => ({
   },
 }));
 
-vi.mock("../../../components/rdp/RdpPanel", () => ({
+vi.mock("../../../components/plugins/RdpSessionPane", () => ({
   default: ({
     host,
     port,

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
-import { confirmAppDialog } from "../../../lib/appDialogs";
-import { writeFiles as writeClipboardFiles, writeText as writeClipboardText } from "../../../lib/clipboard";
-import { t as tr, useT } from "../../../lib/i18n";
+import {
+  confirmAppDialog, rdpConnect, rdpDisconnect, rdpTrustCertificate, t as tr, useT,
+  writeFiles as writeClipboardFiles, writeText as writeClipboardText,
+} from "../../../../../src/lib/rdpViewerHost";
 import {
   encodeAck,
   encodePing,
@@ -19,14 +20,11 @@ import {
   parseFrameTile,
   parseRdpCursorFrame,
   parseRdpWsText,
-  rdpConnect,
   rdpCursorToCss,
-  rdpDisconnect,
   RdpFrameBatchBuffer,
-  rdpTrustCertificate,
   type RdpNetworkInfo,
-} from "../../../lib/rdp";
-import type { useRdpStore } from "../../../stores/rdpStore";
+} from "../wire";
+import type { useRdpStore } from "../rdpStore";
 import { drawTileBatch, resizeCanvas } from "./canvas";
 import { useRdpAudio } from "./useRdpAudio";
 
@@ -36,7 +34,7 @@ export interface UseRdpConnectionContext {
   tabId: string;
   t: ReturnType<typeof useT>;
   viewportRef: import("react").RefObject<HTMLDivElement | null>;
-  initRef: import("react").RefObject<{ host: string; port: number; username: string | null | undefined; password: string | undefined; options: import("../../../types/rdp").RdpOptions; networkSettingsJson: string | null | undefined; }>;
+  initRef: import("react").RefObject<{ host: string; port: number; username: string | null | undefined; password: string | undefined; options: import("../../../../../src/types/rdp").RdpOptions; networkSettingsJson: string | null | undefined; }>;
   setRemoteCursorCss: import("react").Dispatch<import("react").SetStateAction<string>>;
   canvasRef: import("react").RefObject<HTMLCanvasElement | null>;
   audio: ReturnType<typeof useRdpAudio>;
@@ -45,9 +43,9 @@ export interface UseRdpConnectionContext {
   port: number;
   username: string | null | undefined;
   password: string | undefined;
-  options: import("../../../types/rdp").RdpOptions;
+  options: import("../../../../../src/types/rdp").RdpOptions;
   networkSettingsJson: string | null | undefined;
-  conn: import("../../../stores/rdpStore").RdpConnectionState;
+  conn: import("../rdpStore").RdpConnectionState;
 }
 
 export function useRdpConnection(context: UseRdpConnectionContext) {

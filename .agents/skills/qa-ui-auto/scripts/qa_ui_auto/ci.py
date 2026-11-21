@@ -114,6 +114,8 @@ def capabilities(cases, mode: str) -> list[str]:
                 result.add("signed-mfa")
             if "module_signed_vnc_archive" in fixtures:
                 result.add("signed-vnc")
+            if "module_signed_rdp_archive" in fixtures:
+                result.add("signed-rdp")
             if fixtures & {"module_legacy_install", "module_legacy_mfa"}:
                 result.add("legacy-installer")
             if fixtures & {"backup_cloud", "credential_store"}:

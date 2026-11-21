@@ -1,8 +1,8 @@
 import { useCallback, useRef } from "react";
-import { parseAudioFrame } from "../../../lib/rdp";
+import { parseAudioFrame } from "../wire";
 
 export interface UseRdpAudioContext {
-  initRef: import("react").RefObject<{ host: string; port: number; username: string | null | undefined; password: string | undefined; options: import("../../../types/rdp").RdpOptions; networkSettingsJson: string | null | undefined; }>;
+  initRef: import("react").RefObject<{ host: string; port: number; username: string | null | undefined; password: string | undefined; options: import("../../../../../src/types/rdp").RdpOptions; networkSettingsJson: string | null | undefined; }>;
 }
 
 export function useRdpAudio(context: UseRdpAudioContext) {

@@ -1,9 +1,9 @@
 import { Bot, PictureInPicture, PictureInPicture2, RefreshCw } from "lucide-react";
-import { useT } from "../../../lib/i18n";
-import { type RdpNetworkInfo } from "../../../lib/rdp";
-import { FT_BUTTON_ACTIVE_OVERRIDE, FT_BUTTON_STYLE, FT_ICON_BUTTON_STYLE, FT_SEPARATOR_STYLE } from "../../floating-toolbar/floatingToolbarStyles";
-import { ScreenshotMenuButton } from "../../screenshot/ScreenshotMenuButton";
-import { TabActions } from "../../tabbar/TabActionSlot";
+import {
+  FT_BUTTON_ACTIVE_OVERRIDE, FT_BUTTON_STYLE, FT_ICON_BUTTON_STYLE, FT_SEPARATOR_STYLE,
+  ScreenshotMenuButton, TabActions, useT,
+} from "../../../../../src/lib/rdpViewerHost";
+import { type RdpNetworkInfo } from "../wire";
 import { RdpConnectionBar } from "../RdpConnectionBar";
 import { type ScaleMode } from "./types";
 import { useRdpConnection } from "./useRdpConnection";
@@ -15,7 +15,7 @@ export interface RdpPanelViewProps {
   connection: ReturnType<typeof useRdpConnection>;
   visible: boolean;
   t: ReturnType<typeof useT>;
-  status: import("../../../stores/rdpStore").RdpConnectionStatus;
+  status: import("../rdpStore").RdpConnectionStatus;
   protocol: string;
   dims: string;
   showStage: boolean;
@@ -28,7 +28,7 @@ export interface RdpPanelViewProps {
   cycle: { icon: import("react").JSX.Element; label: string; hint: string; };
   detachedWindowControls: { onReattach: () => void; onToggleOsFullscreen: () => void; osFullscreen: boolean; } | undefined;
   currentFullscreen: boolean;
-  conn: import("../../../stores/rdpStore").RdpConnectionState;
+  conn: import("../rdpStore").RdpConnectionState;
   host: string;
   network: RdpNetworkInfo | null;
   barReveal: number;
@@ -78,6 +78,7 @@ export function RdpPanelView(inputs: RdpPanelViewProps) {
       ref={containerRef}
       className="rdp-panel"
       data-testid="rdp-panel"
+      data-frontend-source={import.meta.url}
       tabIndex={0}
       onKeyDown={input.onKey(true)}
       onKeyUp={input.onKey(false)}

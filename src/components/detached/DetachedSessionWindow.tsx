@@ -58,8 +58,8 @@ import { ChatDrawer } from "../chat/ChatDrawer";
 import { TaoRibbon } from "../tao/TaoRibbon";
 import { CcAgentBridge } from "../agent/CcAgentBridge";
 import VncSessionPane from "../plugins/VncSessionPane";
+import RdpSessionPane from "../plugins/RdpSessionPane";
 
-const RdpPanel = lazy(() => import("../rdp/RdpPanel"));
 const DbClientTab = lazy(() => import("../database/DbClientTab"));
 
 /* ── Handoff payload shapes ──────────────────────────────────────────── */
@@ -592,7 +592,7 @@ function renderInner(
       const p = params as DetachedRdpParams;
       return (
         <Suspense fallback={<LoadingScreen label={tr("rdp.loading")} />}>
-          <RdpPanel
+          <RdpSessionPane
             tabId={p.tabId ?? `detached-rdp-${id}`}
             host={p.host}
             port={p.port}

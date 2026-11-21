@@ -1,22 +1,29 @@
 //! Tauri commands and core-owned credentials, certificate pins, and routing
 //! for the RDP client engine.
 
+mod module_host;
 pub(crate) mod tls;
 mod transport;
 
+pub use taomni_rdp_client_api::RdpOptions;
 #[cfg(debug_assertions)]
 pub(crate) use taomni_rdp_client_engine::qa_graphics_capture;
-pub use taomni_rdp_client_engine::{RdpOptions, ws};
 
 use serde::Serialize;
 use taomni_rdp_client_engine::session::{RdpSessionConfig, test_ironrdp_connection};
 use tauri::State;
 use uuid::Uuid;
 
-use crate::rdp::ws::{RdpControl, RdpSpawnConfig, spawn_rdp_relay};
 use crate::state::AppState;
 use crate::terminal::network::NetworkSettings;
 use crate::vault::Vault;
+use taomni_rdp_client_api::SLUG;
+use taomni_rdp_client_engine::ws::{RdpControl, RdpSession, RdpSpawnConfig, spawn_rdp_relay};
+
+pub(crate) enum DesktopRdpSession {
+    Local(RdpSession),
+    Module(module_host::ModuleSession),
+}
 
 #[derive(Debug, Serialize)]
 pub struct RdpConnectResult {
@@ -85,8 +92,6 @@ pub async fn rdp_connect(
     options_json: Option<String>,
     network_settings_json: Option<String>,
 ) -> Result<RdpConnectResult, String> {
-    let session_id = Uuid::new_v4().to_string();
-
     let resolved_password = resolve_secret(&state.core.vault, password.as_deref())?;
     let mut options = RdpOptions::from_json(options_json.as_deref());
     apply_stored_certificate_pins(&state, &host, port, &mut options)?;
@@ -106,36 +111,50 @@ pub async fn rdp_connect(
     }
 
     let connect = transport::connector(host.clone(), port, network, options.gateway.clone());
-    let session = spawn_rdp_relay(RdpSpawnConfig {
-        host,
-        port,
-        username,
-        password: resolved_password,
-        options,
-        connect,
-    })
-    .await?;
-
-    let result = RdpConnectResult {
-        session_id: session_id.clone(),
-        ws_port: session.ws_port,
-        ws_token: session.ws_token.clone(),
+    let (result, session, reaper_cancel) = if state.plugins.get(SLUG).is_some() {
+        let (route, endpoint) = module_host::bind_route(connect).await?;
+        let request =
+            module_host::connection(host, port, username, resolved_password, options, endpoint);
+        let session = module_host::start(&state.plugins, request, route).await?;
+        let cancellation = session.route.closed();
+        let result = RdpConnectResult {
+            session_id: session.started.session_id.clone(),
+            ws_port: session.started.ws_port,
+            ws_token: session.started.ws_token.clone(),
+        };
+        (result, DesktopRdpSession::Module(session), cancellation)
+    } else {
+        let session = spawn_rdp_relay(RdpSpawnConfig {
+            host,
+            port,
+            username,
+            password: resolved_password,
+            options,
+            connect,
+        })
+        .await?;
+        let cancellation = session.cancel.clone();
+        let result = RdpConnectResult {
+            session_id: Uuid::new_v4().to_string(),
+            ws_port: session.ws_port,
+            ws_token: session.ws_token.clone(),
+        };
+        (result, DesktopRdpSession::Local(session), cancellation)
     };
 
     // Reap the session-map entry once the relay's cancellation token fires
     // (idle timeout, WS close, server disconnect, or explicit
     // `rdp_disconnect`). Without this the `RdpSession` would linger in the
     // map after its backend worker has already exited.
-    let reaper_cancel = session.cancel.clone();
     let reaper_sessions = state.legacy.remote_desktop.rdp_sessions.clone();
-    let reaper_id = session_id.clone();
+    let reaper_id = result.session_id.clone();
     state
         .legacy
         .remote_desktop
         .rdp_sessions
         .write()
         .await
-        .insert(session_id, session);
+        .insert(reaper_id.clone(), session);
     tokio::spawn(async move {
         reaper_cancel.cancelled().await;
         reaper_sessions.write().await.remove(&reaper_id);
@@ -146,10 +165,21 @@ pub async fn rdp_connect(
 
 #[tauri::command]
 pub async fn rdp_disconnect(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
-    let mut sessions = state.legacy.remote_desktop.rdp_sessions.write().await;
-    if let Some(s) = sessions.remove(&session_id) {
-        let _ = s.control_tx.send(RdpControl::Disconnect);
-        s.cancel.cancel();
+    let session = state
+        .legacy
+        .remote_desktop
+        .rdp_sessions
+        .write()
+        .await
+        .remove(&session_id);
+    match session {
+        Some(DesktopRdpSession::Local(local)) => {
+            let _ = local.control_tx.send(RdpControl::Disconnect);
+        }
+        Some(DesktopRdpSession::Module(module)) => {
+            module_host::close(&state.plugins, module).await;
+        }
+        None => {}
     }
     Ok(())
 }
@@ -203,20 +233,27 @@ pub async fn rdp_test_connection(
     }
 
     let reconnect = transport::connector(host.clone(), port, network, options.gateway.clone());
-    let transport = reconnect().await?;
-    let result = test_ironrdp_connection(
-        RdpSessionConfig {
-            transport,
-            host,
-            port,
-            username,
-            password: resolved_password,
-            options,
-            reconnect,
-        },
-        std::time::Duration::from_secs(45),
-    )
-    .await?;
+    let result = if state.plugins.get(SLUG).is_some() {
+        let (route, endpoint) = module_host::bind_route(reconnect).await?;
+        let request =
+            module_host::connection(host, port, username, resolved_password, options, endpoint);
+        module_host::test(&state.plugins, request, route).await?
+    } else {
+        let transport = reconnect().await?;
+        test_ironrdp_connection(
+            RdpSessionConfig {
+                transport,
+                host,
+                port,
+                username,
+                password: resolved_password,
+                options,
+                reconnect,
+            },
+            std::time::Duration::from_secs(45),
+        )
+        .await?
+    };
 
     Ok(format!(
         "RDP connection OK — protocol={}, desktop={}x{}, server={}",

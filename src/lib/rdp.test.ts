@@ -33,7 +33,7 @@ import {
   RDP_CURSOR_HIDDEN,
   rdpCursorToCss,
   wheelDeltaToRotationUnits,
-} from "./rdp";
+} from "../../src-tauri/plugins/rdp-client/renderer/wire";
 import {
   DEFAULT_RDP_OPTIONS,
   parseRdpOptions,

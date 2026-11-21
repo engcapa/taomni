@@ -136,7 +136,7 @@ class OfficialModuleArtifactTests(unittest.TestCase):
         self.assertEqual([step["if"] for step in secret_steps], [
             macos_condition,
             "env.QA_MODULE == 'hello-plugin' || env.QA_MODULE == 'mfa'",
-            "env.QA_MODULE == 'mail' || env.QA_MODULE == 'vnc-client'",
+            "env.QA_MODULE == 'mail' || env.QA_MODULE == 'vnc-client' || env.QA_MODULE == 'rdp-client'",
         ])
         guard = next(step for step in signing if step.get("name", "").startswith("Restrict QA signing"))
         for step in secret_steps:

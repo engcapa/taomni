@@ -10,6 +10,7 @@ mod handshake;
 pub mod native_channel;
 mod pool;
 mod receiver;
+pub mod routed_tcp;
 mod sender;
 
 use std::time::{Duration, Instant};

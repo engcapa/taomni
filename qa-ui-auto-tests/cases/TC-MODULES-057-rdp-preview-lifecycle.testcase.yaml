@@ -1,0 +1,75 @@
+id: TC-MODULES-057
+title: A saved RDP tab displays its module lifecycle in browser preview
+description: >-
+  A saved RDP tab opens the Module Store when the preview module is disabled.
+  Enabling mounts the module viewer in the same tab. Disabling it again
+  unmounts the canvas while keeping the saved session.
+covers: [F-Modules-1, F9.7]
+tags: [modules, rdp, p1]
+modes: [browser]
+fixtures: [reset_db, module_rdp_preview]
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- click: '[data-testid="session-proto-rdp"]'
+- fill: {selector: '[data-testid="session-host"]', value: rdp.example.test}
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: qa-preview-rdp}
+- click: '[data-testid="session-save"]'
+- open_session: {name: qa-preview-rdp, double_click: true}
+- wait_for: '[data-testid="auth-prompt"]'
+- fill: {selector: '[data-testid="auth-password"]', value: preview-only}
+- click: '[data-testid="auth-submit"]'
+- wait_for: '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="rdp-canvas"]', equal: 0}
+- click: '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-settings"]'
+- click: '[data-testid="module-action-enable-rdp-client"]'
+- wait_for: '[data-testid="module-action-disable-rdp-client"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="rdp"]'
+- wait_for: '[data-testid="rdp-panel"] [data-testid="rdp-canvas"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="rdp"]', equal: 1}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-rdp-client"]'
+- wait_for: '[data-testid="module-action-enable-rdp-client"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="rdp"]'
+- wait_for: '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="rdp-canvas"]', equal: 0}
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="rdp"]', equal: 1}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Enabling the RDP module from the saved tab swaps the disabled pane for one viewer.
+    actions: [10, 12, 13, 16, 17, 19, 20, 21]
+    checkpoints:
+    - {step: 14, expectation: The saved tab identifies the disabled RDP module.}
+    - {step: 15, expectation: The disabled tab has no RDP canvas.}
+    - {step: 22, expectation: The existing tab mounts the RDP canvas after enabling.}
+    - {step: 23, expectation: Enabling leaves exactly one RDP tab.}
+    results: [14, 15, 22, 23]
+  - id: R2
+    requirement: Disabling the preview module retains the same saved tab and removes the viewer.
+    actions: [24, 25, 26, 28, 29, 30]
+    checkpoints:
+    - {step: 31, expectation: The existing tab shows that the RDP module is disabled.}
+    - {step: 32, expectation: Disabling removes the RDP canvas.}
+    - {step: 33, expectation: The original RDP tab remains open.}
+    - {step: 34, expectation: The interaction produces no uncaught renderer errors.}
+    results: [31, 32, 33, 34]
+  visual:
+  - check: The RDP tab switches between the canvas and the module status.
+    method: automated
+    reason: The case observes the visible elements on either side of the transition.
+  native:
+  - check: The installed host connects to the runner-owned RDP server.
+    method: not-applicable
+    reason: TC-MODULES-056 verifies the signed package and transport in the desktop application.

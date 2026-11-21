@@ -207,14 +207,11 @@ pub(super) async fn stop_business_runtimes(state: &AppState) {
         .write()
         .await
         .clear();
-    for (_, session) in state
+    state
         .legacy
         .remote_desktop
         .rdp_sessions
         .write()
         .await
-        .drain()
-    {
-        session.cancel.cancel();
-    }
+        .clear();
 }

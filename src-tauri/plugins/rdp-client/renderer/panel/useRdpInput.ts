@@ -1,13 +1,13 @@
 import { useCallback } from "react";
-import { readFiles as readClipboardFiles, readText as readClipboardText } from "../../../lib/clipboard";
-import { applyExtended, ctrlAltDelSequence, encodeKey, encodePointer, encodeWheel, keyEventToScancode, mouseButtonMask, wheelDeltaToRotationUnits } from "../../../lib/rdp";
+import { readFiles as readClipboardFiles, readText as readClipboardText } from "../../../../../src/lib/rdpViewerHost";
+import { applyExtended, ctrlAltDelSequence, encodeKey, encodePointer, encodeWheel, keyEventToScancode, mouseButtonMask, wheelDeltaToRotationUnits } from "../wire";
 import { canvasPointFromClient } from "./canvas";
 import { useRdpConnection } from "./useRdpConnection";
 
 export interface UseRdpInputContext {
   connection: ReturnType<typeof useRdpConnection>;
   visible: boolean;
-  conn: import("../../../stores/rdpStore").RdpConnectionState;
+  conn: import("../rdpStore").RdpConnectionState;
   toggleOsFullscreen: () => void;
   detachedWindowControls: { onReattach: () => void; onToggleOsFullscreen: () => void; osFullscreen: boolean; } | undefined;
   osFullscreen: boolean;

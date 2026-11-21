@@ -142,6 +142,7 @@ class Fixture:
 REGISTRY: dict[str, Fixture] = {
     "module_preview": Fixture("module_preview", module_preview.setup),
     "module_vnc_preview": Fixture("module_vnc_preview", module_preview.setup_vnc),
+    "module_rdp_preview": Fixture("module_rdp_preview", module_preview.setup_rdp),
     "module_upgrade": Fixture("module_upgrade", module_upgrade.setup, module_upgrade.teardown),
     "module_legacy_install": Fixture("module_legacy_install", module_legacy_install.setup),
     "module_legacy_mfa": Fixture("module_legacy_mfa", module_legacy_mfa.setup),
@@ -155,6 +156,7 @@ REGISTRY: dict[str, Fixture] = {
     "module_signed_archive": Fixture("module_signed_archive", module_signed_archive.setup),
     "module_signed_mfa_archive": Fixture("module_signed_mfa_archive", module_signed_archive.setup_mfa),
     "module_signed_vnc_archive": Fixture("module_signed_vnc_archive", module_signed_archive.setup_vnc),
+    "module_signed_rdp_archive": Fixture("module_signed_rdp_archive", module_signed_archive.setup_rdp),
     "module_execution": Fixture("module_execution", module_execution.setup, module_execution.teardown),
     "markdown_testing": Fixture("markdown_testing", markdown_testing.setup, markdown_testing.teardown),
     "markdown_quality": Fixture("markdown_quality", markdown_quality.setup, markdown_quality.teardown),

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Minimize2, Minus, Pin, PinOff, X } from "lucide-react";
 
-import { useT } from "../../lib/i18n";
-import { rdpNetworkQuality, type RdpNetworkInfo } from "../../lib/rdp";
+import { useT } from "../../../../src/lib/rdpViewerHost";
+import { rdpNetworkQuality, type RdpNetworkInfo } from "./wire";
 
 const PINNED_KEY = "taomni.rdp.connectionBar.pinned";
 /** Unpinned, the bar shows this long after connecting or being revealed. */

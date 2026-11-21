@@ -4,7 +4,6 @@ mod cliprdr;
 mod frame;
 pub mod gateway;
 mod input;
-mod options;
 mod pdu;
 #[cfg(debug_assertions)]
 pub mod qa_graphics_capture;
@@ -16,4 +15,4 @@ pub mod tls;
 pub mod transport;
 pub mod ws;
 
-pub use options::{DriveRedirectOpt, GatewayOpt, RdpOptions};
+pub use taomni_rdp_client_api::{DriveRedirectOpt, GatewayOpt, RdpOptions};

@@ -1,0 +1,21 @@
+{
+  "id": "taomni-plugin-rdp-client",
+  "slug": "rdp-client",
+  "name": "RDP Client",
+  "description": "Connect to remote desktops with RDP, including RD Gateway, clipboard, audio and drive redirection.",
+  "version": "0.1.0",
+  "coreApiVersion": "1",
+  "kind": "remote-client",
+  "status": "provisional",
+  "platforms": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"],
+  "entry": { "host": "taomni-plugin-rdp-client", "frontend": "frontend/index.js", "protocol": 1 },
+  "tabs": [],
+  "commands": ["rdp/start", "rdp/close", "rdp/test"],
+  "permissions": [],
+  "dataDir": "plugins/rdp-client",
+  "dataSchemaVersion": 1,
+  "backupPaths": [],
+  "legacyTables": ["rdp_certificate_pins"],
+  "vaultFixedKeys": [],
+  "snapshot": "file"
+}

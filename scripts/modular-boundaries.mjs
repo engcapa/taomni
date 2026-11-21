@@ -39,9 +39,10 @@ function sharedLibraryViolations(root) {
       }
     }
   }
-  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-engine", "taomni-mail-engine", "taomni-vnc-api", "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector"]) {
+  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api", "taomni-rdp-client-engine", "taomni-mail-engine", "taomni-vnc-api", "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector"]) {
     const directory = path.join(root, "src-tauri/crates", name);
     const manifest = fs.readFileSync(path.join(directory, "Cargo.toml"), "utf8");
+    const usesRoutedTcp = name === "taomni-rdp-client-api";
     for (const match of manifest.matchAll(/\bpackage\s*=\s*"(tauri(?:-[^"\s]+)?|wry|taomni|taomni-plugin-[^"\s]+)"/g)) {
       errors.push(`${name}/Cargo.toml: aliased dependency links application/plugin package ${match[1]}`);
     }
@@ -49,6 +50,10 @@ function sharedLibraryViolations(root) {
       const packageName = value.match(/\bpackage\s*=\s*"([^"]+)"/)?.[1] ?? dependency;
       const dependencyPath = value.match(/\bpath\s*=\s*"([^"]+)"/)?.[1];
       const resolvedPath = dependencyPath ? path.resolve(directory, dependencyPath) : undefined;
+      if (usesRoutedTcp && dependency === "taomni-plugin-stream" && packageName === dependency
+        && resolvedPath === path.join(root, "src-tauri/crates/taomni-plugin-stream")) {
+        continue;
+      }
       if (/^(?:tauri(?:-|$)|wry$|taomni$|taomni-plugin-)/.test(packageName)
         || resolvedPath === path.join(root, "src-tauri")
         || resolvedPath?.startsWith(path.join(root, "src-tauri/plugins") + path.sep)) {
@@ -59,7 +64,8 @@ function sharedLibraryViolations(root) {
       }
     }
     for (const filename of rustFiles(path.join(directory, "src"))) {
-      const source = fs.readFileSync(filename, "utf8").replace(/\/\/[^\n]*/g, "");
+      let source = fs.readFileSync(filename, "utf8").replace(/\/\/[^\n]*/g, "");
+      if (usesRoutedTcp) source = source.replace(/\btaomni_plugin_stream::routed_tcp::/g, "");
       if (/\b(?:tauri(?:_[\w]+)?|wry|taomni_lib|taomni_plugin_[\w]+)::|\bcrate::(?:state|servers|rdp|config|vault)::/.test(source)) {
         errors.push(`${path.relative(root, filename)}: shared library must not import application/plugin state`);
       }

@@ -1,4 +1,4 @@
-import type { RdpOptions } from "../../../types/rdp";
+import type { RdpOptions } from "../types/rdp";
 
 export interface RdpPanelProps {
   tabId: string;
@@ -25,8 +25,3 @@ export interface RdpPanelProps {
     osFullscreen: boolean;
   };
 }
-
-export type ScaleMode = "fit" | "one";
-
-// View state for the single "enlarge" button: normal <-> OS fullscreen.
-export type ViewMode = "normal" | "fullscreen";
