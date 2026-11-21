@@ -26,9 +26,27 @@ const theme = EditorView.theme({
   ".cm-scroller": { overflow: "auto", lineHeight: "1.65" },
   ".cm-gutters": { backgroundColor: "var(--bg)", color: "var(--muted)", border: "none", minWidth: "52px" },
   ".cm-lineNumbers .cm-gutterElement": { padding: "0 14px 0 8px" },
-  ".cm-activeLine, .cm-activeLineGutter": { backgroundColor: "var(--taomni-hover)" },
+  ".cm-activeLine, .cm-activeLineGutter": { backgroundColor: "var(--hover, var(--taomni-hover))" },
   ".cm-cursor": { borderLeftColor: "var(--accent-s)" },
-  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": { backgroundColor: "var(--sel)" },
+  // Beat CodeMirror's built-in &light.cm-focused > .cm-scroller > .cm-selectionLayer
+  // .cm-selectionBackground (#d7d4f0) and unfocused (#d9d9d9) rules so dark themes
+  // keep readable text contrast instead of washing out the selection.
+  "& > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground": {
+    backgroundColor: "var(--editor-sel-unfocused, var(--sel)) !important",
+  },
+  "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
+    backgroundColor: "var(--editor-sel, var(--sel)) !important",
+  },
+  "::selection": { backgroundColor: "var(--editor-sel, var(--sel))" },
+  ".cm-selectionMatch": {
+    backgroundColor: "var(--editor-sel-match-bg, var(--taomni-editor-selection-match-bg))",
+    outline: "1px solid var(--editor-sel-match-border, var(--taomni-editor-selection-match-border))",
+    borderRadius: "2px",
+  },
+  ".cm-selectionMatch.cm-selectionMatch-main": {
+    backgroundColor: "transparent",
+    outline: "none",
+  },
   ".cm-panels": { backgroundColor: "var(--card)", color: "var(--text)", fontSize: "12px" },
   ".cm-search": { padding: "6px 10px" },
   ".cm-textfield": { backgroundColor: "var(--card)", border: "1px solid var(--input-b)", borderRadius: "5px", padding: "3px 6px" },

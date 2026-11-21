@@ -26,6 +26,7 @@
   --taomni-selected: #dbeafe;
   --taomni-selected-border: #93c5fd;
   --taomni-editor-selection-bg: rgba(37, 99, 235, 0.26);
+  --taomni-editor-selection-unfocused-bg: rgba(37, 99, 235, 0.14);
   --taomni-editor-selection-text: #0f172a;
   --taomni-editor-selection-match-bg: rgba(245, 158, 11, 0.24);
   --taomni-editor-selection-match-border: rgba(245, 158, 11, 0.58);
@@ -198,6 +199,7 @@ html[data-app-theme="dark"] {
   --taomni-selected: #293b55;
   --taomni-selected-border: #5c8fd6;
   --taomni-editor-selection-bg: rgba(92, 143, 214, 0.4);
+  --taomni-editor-selection-unfocused-bg: rgba(92, 143, 214, 0.22);
   --taomni-editor-selection-text: #eef2f7;
   --taomni-editor-selection-match-bg: rgba(225, 177, 75, 0.3);
   --taomni-editor-selection-match-border: rgba(225, 177, 75, 0.72);
