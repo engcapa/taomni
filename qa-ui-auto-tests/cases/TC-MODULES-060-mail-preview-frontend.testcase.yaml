@@ -22,7 +22,7 @@ steps:
 - click: '[data-testid="module-action-enable-mail"]'
 - wait_for: '[data-testid="module-action-disable-mail"]'
 - click: '[data-testid="nav-mode-home"]'
-- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="home-toolbar-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mail"]'
 - wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]'
 - mail_server_assert_list_matches: {timeout_sec: 30}
@@ -38,7 +38,7 @@ steps:
 - wait_for: '[data-testid="module-action-enable-mail"]'
 - wait_for: {selector: '[data-testid="mail-client-tab"], [data-testid="mail-unified-tab"]', state: detached}
 - click: '[data-testid="nav-mode-home"]'
-- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="home-toolbar-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mail"]'
 - wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 1}
