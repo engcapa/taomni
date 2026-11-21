@@ -71,7 +71,8 @@ describe("NotepadEditor UI workbench", () => {
 
     // Primary editor testid & save button state preserved for QA contracts
     expect(screen.getByTestId("viewer-editor")).toBeInTheDocument();
-    expect(screen.getByTestId("viewer-save")).toBeEnabled();
+    // Shared save contract: enabled only for a dirty, writable document.
+    expect(screen.getByTestId("viewer-save")).toBeDisabled();
     expect(screen.getByTestId("viewer-cursor").textContent).toMatch(/1/);
 
     // Clicking INS/OVR toggles overwrite mode indicator
@@ -83,6 +84,17 @@ describe("NotepadEditor UI workbench", () => {
     // Clicking Find toolbar button opens Find bar
     fireEvent.click(screen.getByTestId("notepad-tool-find"));
     expect(screen.getByTestId("notepad-find-bar")).toBeInTheDocument();
+  });
+
+  it("enables the shared save control only when the document is dirty and writable", () => {
+    const doc = makeDoc();
+    useDocumentStore.setState({ documents: { [doc.key]: doc } });
+    const mounted = render(<NotepadEditor document={doc} onError={vi.fn()} onCursorChange={vi.fn()} />);
+    expect(screen.getByTestId("viewer-save")).toBeDisabled();
+    mounted.rerender(<NotepadEditor document={{ ...doc, dirty: true }} onError={vi.fn()} onCursorChange={vi.fn()} />);
+    expect(screen.getByTestId("viewer-save")).toBeEnabled();
+    mounted.rerender(<NotepadEditor document={{ ...doc, dirty: true, readOnly: true }} onError={vi.fn()} onCursorChange={vi.fn()} />);
+    expect(screen.getByTestId("viewer-save")).toBeDisabled();
   });
 
   it("renders large-file chunk preview banner with prev/next buttons when large=true", () => {
@@ -100,6 +112,7 @@ describe("NotepadEditor UI workbench", () => {
     expect(screen.getByTestId("viewer-large-file")).toBeInTheDocument();
     expect(screen.getByTestId("viewer-chunk-prev")).toBeDisabled();
     expect(screen.getByTestId("viewer-chunk-next")).toBeEnabled();
-    expect(screen.getByTestId("viewer-save")).toBeEnabled();
+    // Large-file chunk previews are read-only, so the shared save control stays disabled.
+    expect(screen.getByTestId("viewer-save")).toBeDisabled();
   });
 });
