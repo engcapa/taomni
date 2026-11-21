@@ -15815,6 +15815,15 @@ controls:
   - id: markdown-format-bold
     selector: '[data-testid="markdown-format-bold"]'
     kind: interactive
+  - id: markdown-format-italic
+    selector: '[data-testid="markdown-format-italic"]'
+    kind: interactive
+  - id: markdown-format-quote
+    selector: '[data-testid="markdown-format-quote"]'
+    kind: interactive
+  - id: markdown-insert-menu
+    selector: '[data-testid="markdown-insert-menu"]'
+    kind: interactive
   - id: markdown-outline
     selector: '[data-testid="markdown-outline"]'
     kind: interactive
@@ -16340,5 +16349,6 @@ The retired Tao-specific key/save selectors are retained as optional absence ass
 
 真实用户 testing.md 回归由 TC-FILE-OPEN-027/028 验证 Live 表格内联格式、Word 流程图线身、draw.io 时序连接点和可搜索 PDF，并核对原文 SHA。实际 draw.io Desktop / LibreOffice 视觉证据另行留存；不将内部 maxGraph 预览当作外部编辑器验收。
 
-TC-FILE-OPEN-029/030 覆盖 Markdown Live 的实际拖选与选区对比度、深色源码标记以及 Live、源码和分栏的共享查找替换控件。
+TC-FILE-OPEN-029/030 覆盖 Markdown Live 的实际拖选与选区对比度、深色源码标记与深色源码选区（聚焦/失焦且不遮盖活动行），以及 Live、源码和分栏的共享查找替换控件。
 TC-FILE-OPEN-031/032 覆盖左侧工具栏的 draw.io 导入、Live 和分栏预览与 draw.io Desktop 原图的像素比较，以及导出后可编辑节点和连线的往返校验。
+TC-FILE-OPEN-045 覆盖深色主题下 Markdown Live 编辑、源码与分栏模式的选区对比度（含局部浅色/深色预览外观覆盖）、格式工具栏（标题/粗体/斜体/引用）、专注模式、大纲切换与 `/` 插入菜单的真实保存往返。
