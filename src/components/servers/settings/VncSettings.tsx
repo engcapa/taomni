@@ -18,17 +18,20 @@ export function VncSettings({ config, onChange }: Props) {
     <div className="flex flex-col">
       <PasswordField
         label={t("servers.fields.password")}
+        testId="server-field-vnc-password"
         value={password}
         onChange={(v) => onChange({ password: v })}
       />
       <CheckboxField
         label={t("servers.fields.viewOnly")}
+        testId="server-field-vnc-view-only"
         checkboxLabel={t("servers.fields.viewOnly")}
         value={viewOnly}
         onChange={(v) => onChange({ viewOnly: v })}
       />
       <CheckboxField
         label={t("servers.fields.sharedDesktop")}
+        testId="server-field-vnc-shared"
         checkboxLabel={t("servers.fields.sharedDesktop")}
         value={sharedDesktop}
         onChange={(v) => onChange({ sharedDesktop: v })}

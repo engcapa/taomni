@@ -1,0 +1,63 @@
+id: TC-MODULES-064
+title: Local servers retains VNC configuration and singleton behavior
+description: Edit the existing VNC settings, verify persistence through reload, and confirm the browser preview reports its desktop-only Start boundary.
+covers: [F-Servers-1]
+tags: [modules, servers, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-vnc-settings"]'
+- fill: {selector: '[data-testid="server-field-bind-address"]', value: '127.0.0.1'}
+- fill: {selector: '[data-testid="server-field-port"]', value: '15900'}
+- fill: {selector: '[data-testid="server-field-vnc-password"]', value: 'qaVNC7pw'}
+- click: '[data-testid="server-field-vnc-view-only"]'
+- click: '[data-testid="server-field-vnc-shared"]'
+- click: '[data-testid="servers-dialog-apply"]'
+- reload_window: null
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-vnc"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="servers"]', equal: 1}
+- assert_attribute: {selector: '[data-testid="server-field-bind-address"]', name: value, equals: '127.0.0.1'}
+- assert_attribute: {selector: '[data-testid="server-field-port"]', name: value, equals: '15900'}
+- assert_attribute: {selector: '[data-testid="server-field-vnc-password"]', name: value, equals: 'qaVNC7pw'}
+- assert_visible: '[data-testid="server-field-vnc-view-only"]:checked'
+- assert_visible: '[data-testid="server-field-vnc-shared"]:not(:checked)'
+- click: '[data-testid="server-row-vnc-start"]'
+- wait_for: '[data-testid="server-row-vnc"][data-status="error"]'
+- assert_text: {selector: '[data-testid="server-log"]', contains: 'Local servers run only in the desktop build'}
+- assert_disabled: '[data-testid="server-row-vnc-stop"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: retained-settings
+    requirement: Local servers keeps the VNC settings in a single tab through reload and reports the browser Start limitation.
+    actions: [5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 24]
+    checkpoints:
+    - {step: 18, expectation: Reopening Local servers reuses a single tab.}
+    - {step: 19, expectation: The persisted bind address is displayed after reload.}
+    - {step: 20, expectation: The persisted port is displayed after reload.}
+    - {step: 21, expectation: The preview restored the entered test password.}
+    - {step: 22, expectation: View-only mode remains selected.}
+    - {step: 23, expectation: Shared desktop remains unchecked.}
+    - {step: 25, expectation: The row indicates that Start failed in the preview.}
+    - {step: 26, expectation: The log explains that desktop mode is required.}
+    - {step: 27, expectation: The server cannot be stopped because it never started in preview.}
+    - {step: 28, expectation: Editing and reopening the VNC form produces no runtime errors.}
+    results: [18, 19, 20, 21, 22, 23, 25, 26, 27, 28]
+  visual:
+  - check: The restored form and preview error are visible in the existing Local servers tab.
+    method: automated
+    reason: The case reads the displayed fields, log and control state.
+  native:
+  - check: Native startup and cleanup are covered by TC-MODULES-063.
+    method: not-applicable
+    reason: This case verifies browser preview and its own persisted settings.

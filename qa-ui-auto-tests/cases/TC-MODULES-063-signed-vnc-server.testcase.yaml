@@ -1,0 +1,87 @@
+id: TC-MODULES-063
+title: Signed VNC Server starts and stops an X11 daemon from Local servers
+description: Verify offline installation, a real loopback VNC listener, explicit stop, disable while serving, and reuse of the same settings after enabling the module again.
+covers: [F-Modules-1, F-Servers-1]
+tags: [modules, servers, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux]
+fixtures: [reset_db, linux_x11_required, module_signed_vnc_server_archive]
+timeout_sec: 210
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.vnc_daemon_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.vnc_daemon_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-vnc-server"]'
+- wait_for: '[data-testid="module-action-disable-vnc-server"]'
+- assert_signed_vnc_daemon: idle
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-vnc"]'
+- fill: {selector: '[data-testid="server-field-bind-address"]', value: '127.0.0.1'}
+- fill: {selector: '[data-testid="server-field-port"]', value: '${fixture.vnc_daemon_port}'}
+- fill: {selector: '[data-testid="server-field-vnc-password"]', value: 'qaVNC7pw'}
+- click: '[data-testid="server-field-vnc-view-only"]'
+- click: '[data-testid="server-row-vnc-start"]'
+- wait_for: '[data-testid="server-row-vnc"][data-status="running"]'
+- assert_text: {selector: '[data-testid="server-log"]', contains: 'starting x11vnc', timeout_sec: 10}
+- assert_signed_vnc_daemon: running
+- click: '[data-testid="server-row-vnc-stop"]'
+- wait_for: '[data-testid="server-row-vnc"][data-status="stopped"]'
+- assert_signed_vnc_daemon: stopped
+- click: '[data-testid="server-row-vnc-start"]'
+- wait_for: '[data-testid="server-row-vnc"][data-status="running"]'
+- assert_signed_vnc_daemon: running
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-vnc-server"]'
+- wait_for: '[data-testid="module-action-enable-vnc-server"]'
+- assert_signed_vnc_daemon: disabled
+- click: '[data-testid="module-action-enable-vnc-server"]'
+- wait_for: '[data-testid="module-action-disable-vnc-server"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-vnc"]'
+- wait_for: '[data-testid="server-row-vnc"][data-status="stopped"]'
+- assert_attribute: {selector: '[data-testid="server-field-port"]', name: value, equals: '${fixture.vnc_daemon_port}'}
+- assert_attribute: {selector: '[data-testid="server-field-bind-address"]', name: value, equals: '127.0.0.1'}
+- click: '[data-testid="server-row-vnc-start"]'
+- assert_signed_vnc_daemon: running
+- click: '[data-testid="server-row-vnc-stop"]'
+- wait_for: '[data-testid="server-row-vnc"][data-status="stopped"]'
+- assert_signed_vnc_daemon: stopped
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-daemon
+    requirement: The real server follows the signed module and the existing Start and Stop controls.
+    actions: [7, 9, 15, 17, 18, 19, 20, 21, 25, 28, 33, 36, 46, 48]
+    checkpoints:
+    - {step: 11, expectation: The installed host bytes match the signed archive and no daemon is running.}
+    - {step: 24, expectation: The host holds its write lease and the daemon answers on the selected loopback port.}
+    - {step: 27, expectation: Stop releases the listener while the enabled host remains loaded.}
+    - {step: 35, expectation: Disabling a running module releases its writer lease and the listener.}
+    - {step: 43, expectation: The existing Servers tab has released the former active instance.}
+    - {step: 44, expectation: The server configuration retains the same port.}
+    - {step: 45, expectation: The server configuration retains the same loopback address.}
+    - {step: 47, expectation: The module can start the daemon again in the same desktop process.}
+    - {step: 50, expectation: The final Stop releases the listener again.}
+    - {step: 51, expectation: The module and Local servers complete the workflow without renderer errors.}
+    results: [11, 24, 27, 35, 43, 44, 45, 47, 50, 51]
+  visual:
+  - check: The existing Servers row shows the current state, retained settings and daemon logs.
+    method: automated
+    reason: The case checks the actual mounted pane at each transition.
+  native:
+  - check: Signed package bytes, exclusive writer lease, and a real RFB greeting on an isolated X11 desktop.
+    method: automated
+    reason: These observations come from the native install directory, OS file lock and loopback socket.

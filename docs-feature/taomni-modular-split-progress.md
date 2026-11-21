@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- VNC Server 0.1.0 由签名宿主监督系统 daemon。核心通过原 Local servers 入口传递当前配置，并在宿主退出后释放本地服务的运行锁。默认 Cargo 闭包排除 VNC Server 宿主，签名打包已接入 QA 工作流。TC-MODULES-063 检查 Linux X11 的真实回环连接、停止和禁用，TC-MODULES-064 检查 Browser 的配置持久化。旧配置迁移、Windows 真实 daemon 与 macOS 系统指引仍待验收。
+- Screenshot 修复提交 `9d63c0b67` 已在三端复验。录制旧批次的 18 个分片已核对。三端 Browser 各 26/26，Linux 和 Windows Native 各 32/32。macOS Native 31/33，失败为 MP4 采集时间戳和此前出现过的系统文件面板超时。离线 OCR 旧批次的三个平台均已收到真实 WASM 识别文字，遮挡尚待修复版回执。 [录制原始分片](https://github.com/engcapa/taomni/actions/runs/44931597033) · [离线 OCR 原始分片](https://github.com/engcapa/taomni/actions/runs/44933996901) · [三端复验](https://github.com/engcapa/taomni/actions/runs/44938925840)
 - Windows 的签名包已从本地 WASM 与语言文件识别测试截图。WASM 返回无列标题的 TSV，遮挡解析此前只接受带标题的 CLI 输出。0.1.4 解析两种格式，单测检查实际词框，TC-MODULES-061 继续要求真实离线识别和 email 遮挡框均成功。 [Windows 原始回执](https://github.com/engcapa/taomni/actions/runs/44933996901)
 - macOS 录制回执显示一次 CoreGraphics 取帧调用阻塞 1145 ms，返回画面像素与原画相符，但时间戳早于原画约 1166 ms。录制期间遇到超过 250 ms 的取帧调用时保留上一帧，读取像素缓慢时继续使用已经取得的采集时间。沿用现有原画与播放时间轴断言复验。 [原始比较](https://github.com/engcapa/taomni/actions/runs/44931597033)
 - Screenshot 0.1.3 的录制浮窗从签名包动态加载。核心分配窗口、系统剪贴板和保存路径。TC-MODULES-062 同时检查签名 RecorderBar 与真实编码，Browser 继续覆盖原操作。生产构建弃用录制渲染器的兼容副本，隔离 QA 保留该版本用于旧入口回归。
@@ -570,7 +572,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-014 MFA | 签名安装门通过；已提交 profile 的业务接管待复验 | 独立 store actor、作用域 KeyProvider、snapshot、可信包安装已有三端结果。`76c3f94e9` 接入已提交 profile 的宿主命令和旧归档恢复。新装 profile 的模块入口、实际旧安装的升级触发、capture RPC、动态 UI、相关 G 门与迁出后三态还原待闭合。 |
 | TASK-015 | 已取消 | 历史设计 `7bc498b35` 中为 LanChat 迁移，已由用户明确删除决定取消；主设计已保留编号并清理前置依赖。旧库保持原位，不读取、迁移或删除，不创建替代插件。 |
 | TASK-016 RDP/VNC 客户端 | 独立宿主、签名前端与核心依赖裁剪已接入 | VNC 的 Windows 按键辅助进程已有回执。RDP 签名包验证原会话、实际输入、证书迁移与读取旧备份，三端阶段性 p95 均低于 130 ms。最终安装包、新旧版本连续升级和同一候选的三端生命周期继续验收。 |
-| TASK-017 RDP/VNC 服务端 | 待前置闭合 | 两个插件宿主、共享采集/公共库、系统权限和平台边界。 |
+| TASK-017 RDP/VNC 服务端 | 实施中 | VNC Server 迁出 daemon 监督，开始 Native 验证。服务端配置与备份迁移、RDP Server 宿主、系统权限和其余平台验证仍待完成。 |
 | TASK-018 Servers | 待前置闭合 | 配置迁移、服务生命周期、目录与原有功能等价。 |
 | TASK-019 SocksCap | 待前置闭合 | 提权/驱动/辅助进程、文件与恢复日志、卸载清理迁出。 |
 | TASK-020 截图 OCR/录制 | 待前置闭合 | OCR/录制插件；截图入口、滚动截图与采集保持核心归属。 |

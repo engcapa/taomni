@@ -1,0 +1,13 @@
+[package]
+name = "taomni-server-process"
+version = "0.1.0"
+description = "Supervise system daemons for Taomni servers"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["io-util", "macros", "process", "rt"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+which = "8"

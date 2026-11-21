@@ -34,6 +34,7 @@ members = [
     "crates/taomni-screenshot-api",
     "crates/taomni-screenshot-ocr",
     "crates/taomni-screenshot-recording",
+    "crates/taomni-server-process",
     "crates/taomni-sqlite-snapshot",
     "crates/taomni-vnc-api",
     "crates/taomni-vnc-engine",
@@ -45,6 +46,7 @@ members = [
     "plugins/screenshot",
     "plugins/sockscap/tools",
     "plugins/vnc-client",
+    "plugins/vnc-server",
     "plugins/vnc-client/key-helper",
     "vendor/ironrdp-acceptor",
     "vendor/ironrdp-bulk",
@@ -95,6 +97,7 @@ taomni-capture = { path = "crates/taomni-capture" }
 taomni-screenshot-api = { path = "crates/taomni-screenshot-api" }
 taomni-screenshot-ocr = { path = "crates/taomni-screenshot-ocr", optional = true }
 taomni-screenshot-recording = { path = "crates/taomni-screenshot-recording", optional = true }
+taomni-server-process = { path = "crates/taomni-server-process" }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-rdp-client-api = { path = "crates/taomni-rdp-client-api" }
 taomni-rdp-client-engine = { path = "crates/taomni-rdp-client-engine", optional = true }

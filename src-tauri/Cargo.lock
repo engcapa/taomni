@@ -10955,6 +10955,7 @@ dependencies = [
  "taomni-screenshot-api",
  "taomni-screenshot-ocr",
  "taomni-screenshot-recording",
+ "taomni-server-process",
  "taomni-sqlite-snapshot",
  "taomni-vnc-api",
  "taomni-vnc-engine",
@@ -11310,6 +11311,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-plugin-vnc-server"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "taomni-plugin-api",
+ "taomni-plugin-sdk",
+ "taomni-server-process",
+ "tokio",
+ "tokio-util 0.7.19",
+ "uuid",
+ "which",
+]
+
+[[package]]
 name = "taomni-profile-locks"
 version = "0.1.0"
 dependencies = [
@@ -11438,6 +11454,16 @@ dependencies = [
  "mp4",
  "openh264",
  "taomni-screenshot-api",
+]
+
+[[package]]
+name = "taomni-server-process"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tokio",
+ "tokio-util 0.7.19",
+ "which",
 ]
 
 [[package]]

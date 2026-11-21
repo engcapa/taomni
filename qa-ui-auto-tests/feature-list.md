@@ -333,6 +333,7 @@ controls:
     aliases:
     - '[data-testid="module-action-enable-mfa"]'
     - '[data-testid="module-action-enable-vnc-client"]'
+    - '[data-testid="module-action-enable-vnc-server"]'
     - '[data-testid="module-action-enable-rdp-client"]'
     - '[data-testid="module-action-enable-mail"]'
     - '[data-testid="module-action-enable-screenshot"]'
@@ -345,6 +346,7 @@ controls:
     aliases:
     - '[data-testid="module-action-disable-mfa"]'
     - '[data-testid="module-action-disable-vnc-client"]'
+    - '[data-testid="module-action-disable-vnc-server"]'
     - '[data-testid="module-action-disable-rdp-client"]'
     - '[data-testid="module-action-disable-mail"]'
     - '[data-testid="module-action-disable-screenshot"]'
@@ -6007,6 +6009,7 @@ files:
   - src/components/servers/ServerRow.tsx
   - src/components/servers/ServerSettings.tsx
   - src/components/servers/CommonSettings.tsx
+  - src/components/servers/settings/VncSettings.tsx
   - src/components/servers/ServerOutputLog.tsx
   - src/components/servers/fields.tsx
   - src/lib/servers.ts
@@ -6016,6 +6019,10 @@ files:
   - src/layouts/main/TabContentRouter.tsx
   - src/components/tabbar/TabBar.tsx
   - src-tauri/src/servers/tab_lock.rs
+  - src-tauri/src/servers/vnc.rs
+  - src-tauri/src/servers/lifetime.rs
+  - src-tauri/plugins/vnc-server/module.json
+  - src-tauri/plugins/vnc-server/src/daemon.rs
   - src-tauri/src/servers/mod.rs
   - src-tauri/src/windowing/mod.rs
 controls:
@@ -6086,6 +6093,34 @@ controls:
     selector: '[data-testid="server-row-rdp"]'
     kind: interactive
     optional: true
+  - id: server-row-vnc
+    selector: '[data-testid="server-row-vnc"]'
+    kind: interactive
+    optional: true
+  - id: server-row-vnc-start
+    selector: '[data-testid="server-row-vnc-start"]'
+    kind: interactive
+    optional: true
+  - id: server-row-vnc-stop
+    selector: '[data-testid="server-row-vnc-stop"]'
+    kind: interactive
+    optional: true
+  - id: server-row-vnc-settings
+    selector: '[data-testid="server-row-vnc-settings"]'
+    kind: interactive
+    optional: true
+  - id: server-field-vnc-password
+    selector: '[data-testid="server-field-vnc-password"]'
+    kind: interactive
+    optional: true
+  - id: server-field-vnc-view-only
+    selector: '[data-testid="server-field-vnc-view-only"]'
+    kind: interactive
+    optional: true
+  - id: server-field-vnc-shared
+    selector: '[data-testid="server-field-vnc-shared"]'
+    kind: interactive
+    optional: true
   # Per-row Start / Stop / Settings actions (dynamic: server-row-${type}-{start,stop,settings}).
   - id: server-row-ssh-start
     selector: '[data-testid="server-row-ssh-start"]'
@@ -6134,6 +6169,7 @@ controls:
 - 输出/状态分别通过 `server://output/<type>` / `server://status/<type>` 事件流推送；后端 `ServerRegistry` 另按类型保留最近 500 行输出（`list_server_logs`），重新打开页签可恢复日志，清空按钮同时清空后端历史（`clear_server_log`）；Apply 保存所有 dirty 配置，对运行中且端口已改的服务器提示 `Restart server to apply port change`；有未保存修改时 Cancel 会确认丢弃，切换到其他页签再切回会保留未保存草稿
 - i18n key 在 `servers.*`（en / zh-CN 双语）；前端 store 为 `serversStore`，IPC + 类型 + `SERVER_DEFS` 在 `src/lib/servers.ts`，单实例页签协调逻辑在 `src/lib/serversTab.ts`
 - **e2e 测试覆盖**：`TC-SERVERS-001-tab-singleton-browser`、`TC-auto-F-Servers-1-servers-dialog` 覆盖浏览器单实例页签及跨上下文互斥，`TC-SERVERS-002-tab-singleton-native` 覆盖原生双进程 OS `ModuleLock` 与热路由切换，`TC-SERVERS-003-tab-functional-native` 覆盖原生 HTTP 启停、日志、热改端口提示及配置持久化
+- VNC 由签名 `vnc-server` 宿主启动和监督系统 daemon。Linux X11 的 `TC-MODULES-063` 验证离线安装、真实回环连接、停止及禁用后的端口与租约释放。`TC-MODULES-064` 在 Browser 核对端口、绑定地址、密码及两个选项的保存和恢复。
 
 ### 22.2 RDP Server（与 Windows 远程桌面对齐）🚧
 

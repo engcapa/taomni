@@ -12,6 +12,7 @@ import os
 import platform
 from pathlib import Path
 import shutil
+import socket
 import subprocess
 import zipfile
 
@@ -165,6 +166,38 @@ def setup_screenshot(ctx):
     (owned / "provenance.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
     ctx.signed_screenshot = {"host": host, "receipt": info}
     ctx.values.update(screenshot_signed_archive=destination.as_posix(), screenshot_signed_signature=signature)
+
+
+VNC_SERVER_CASE = "TC-MODULES-063"
+
+
+def setup_vnc_server(ctx):
+    if ctx.case_id != VNC_SERVER_CASE or (ctx.cfg.get("app") or {}).get("mode") != "native":
+        raise RuntimeError("Signed VNC Server input requires its registered native case")
+    setting = "QA_SIGNED_VNC_SERVER_ROOT"
+    raw = os.environ.get(setting)
+    if not raw:
+        raise RuntimeError(f"{setting} is required to locate the signed artifact")
+    source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    manifest = Path(__file__).resolve().parents[6] / "src-tauri/plugins/vnc-server/module.json"
+    version = json.loads(manifest.read_text(encoding="utf-8"))["version"]
+    info, archive, signature, _ = load_artifact(
+        Path(raw), source, platform_key(), "vnc-server", version=version,
+    )
+    host = "taomni-plugin-vnc-server.exe" if platform.system() == "Windows" else "taomni-plugin-vnc-server"
+    with zipfile.ZipFile(archive) as package, package.open(host) as binary:
+        info["hostSha256"] = hashlib.file_digest(binary, "sha256").hexdigest()
+    owned = Path(ctx.case_dir).resolve() / "signed-vnc-server"
+    owned.mkdir()
+    destination = owned / archive.name
+    shutil.copyfile(archive, destination)
+    (owned / "provenance.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+    ctx.signed_vnc_daemon = {"host": host, "receipt": info, "port": port}
+    ctx.values.update(vnc_daemon_archive=destination.as_posix(), vnc_daemon_signature=signature,
+                      vnc_daemon_port=port)
 
 
 def setup_desktop_client(ctx, protocol):

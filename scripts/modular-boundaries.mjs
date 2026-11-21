@@ -39,7 +39,7 @@ function sharedLibraryViolations(root) {
       }
     }
   }
-  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api", "taomni-rdp-client-engine", "taomni-mail-engine", "taomni-vnc-api", "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector", "taomni-screenshot-api", "taomni-screenshot-ocr", "taomni-screenshot-recording"]) {
+  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api", "taomni-rdp-client-engine", "taomni-mail-engine", "taomni-vnc-api", "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector", "taomni-screenshot-api", "taomni-screenshot-ocr", "taomni-screenshot-recording", "taomni-server-process"]) {
     const directory = path.join(root, "src-tauri/crates", name);
     const manifest = fs.readFileSync(path.join(directory, "Cargo.toml"), "utf8");
     const usesRoutedTcp = name === "taomni-rdp-client-api" || name === "taomni-screenshot-api";
@@ -179,6 +179,7 @@ export function modularBoundaryViolations(root, { linuxTreeFile, mfaTreeFile, mf
     ...hostViolations(root, "mfa", "MFA", mfaHostTreeFile),
     ...hostViolations(root, "mail", "Mail", mailHostTreeFile),
     ...hostViolations(root, "screenshot", "Screenshot"),
+    ...hostViolations(root, "vnc-server", "VNC Server"),
   ];
   const consumers = ["screenshot", "mfa", "mobile"];
   for (const consumer of consumers) {

@@ -116,6 +116,16 @@ class OfficialPackageRunnerTests(unittest.TestCase):
         self.assertEqual(json.loads(values["build_matrix"])["include"][0]["target"], "aarch64-apple-darwin")
         self.assertEqual(self.roster_targets(values, "sign_matrix"), {"darwin-aarch64": False})
 
+    def test_vnc_server_has_its_own_package_selection(self):
+        builds = {"include": [
+            {"platform_key": "linux", "arch": "X64", "capabilities": ["signed-local-vnc"]},
+            {"platform_key": "windows", "arch": "X64", "capabilities": ["signed-vnc"]},
+        ]}
+        with tempfile.TemporaryDirectory() as directory:
+            values = self.admit("macos-26", Path(directory) / "output", json.dumps(builds), "vnc-server")
+        self.assertEqual(self.roster_targets(values, "sign_matrix"), {"linux-x86_64": False})
+        self.assertNotIn("frontend_artifact", values)
+
     def test_parallel_desktop_client_builds_use_distinct_frontend_artifacts(self):
         for client in ("vnc", "rdp"):
             for platform, arch, target in [("linux", "X64", "linux-x86_64"),

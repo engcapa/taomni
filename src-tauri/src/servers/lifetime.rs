@@ -11,6 +11,7 @@ use crate::servers::engine;
 use crate::servers::engine::ServerCtx;
 use crate::servers::engine::set_status;
 use crate::state::AppState;
+use std::time::Duration;
 use tauri::AppHandle;
 use tauri::State;
 use tokio::task::JoinHandle;
@@ -18,8 +19,7 @@ use tokio_util::sync::CancellationToken;
 
 /* ---------------------------- internals ----------------------------- */
 
-/// Tear down a running server: cancel its token, abort its supervisor (and any
-/// auto-stop timer), remove it from the registry, and publish `Stopped`.
+/// Cancel the server and its auto-stop timer, then publish `Stopped`.
 /// Safe to call when nothing is running (no-op apart from publishing Stopped).
 pub(super) async fn stop_internal(
     app: &AppHandle,
@@ -28,12 +28,11 @@ pub(super) async fn stop_internal(
 ) -> ServerStatus {
     {
         let mut running = registry.running.lock().await;
-        if let Some(active) = running.remove(&server_type) {
-            active.cancel.cancel();
-            active.task.abort();
-            if let Some(t) = active.auto_stop_task {
+        if let Some(mut active) = running.remove(&server_type) {
+            if let Some(t) = active.auto_stop_task.take() {
                 t.abort();
             }
+            finish_server(server_type, active).await;
         }
     }
     let info = ServerStatus::stopped(server_type);
@@ -57,14 +56,11 @@ pub(super) fn spawn_auto_stop(
         tokio::select! {
             _ = tokio::time::sleep(std::time::Duration::from_secs(seconds)) => {
                 log.line(format!("Auto-stopped after {}s", seconds));
-                // Minimal teardown that never aborts this task itself: cancel
-                // the server token, abort its supervisor, drop the entry.
                 {
                     let mut running = registry.running.lock().await;
                     if let Some(active) = running.remove(&server_type) {
-                        active.cancel.cancel();
-                        active.task.abort();
                         // active.auto_stop_task is this very task — just drop it.
+                        finish_server(server_type, active).await;
                     } else {
                         // Already stopped elsewhere; nothing to do.
                         return;
@@ -75,6 +71,46 @@ pub(super) fn spawn_auto_stop(
             _ = cancel.cancelled() => {
                 // Server stopped (manually or on error) before the timer fired.
             }
+        }
+    })
+}
+
+async fn finish_server(server_type: ServerType, mut active: ActiveServer) {
+    active.cancel.cancel();
+    if server_type == ServerType::Vnc {
+        // The installed module's monitor forwards cancellation to its own
+        // daemon and waits until the underlying process has been reaped.
+        if tokio::time::timeout(Duration::from_secs(12), &mut active.task)
+            .await
+            .is_ok()
+        {
+            return;
+        }
+    }
+    active.task.abort();
+}
+
+fn watch_vnc_exit(
+    ctx: ServerCtx,
+    registry: std::sync::Arc<ServerRegistry>,
+    task: JoinHandle<()>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        if let Err(error) = task.await {
+            ctx.log.line(format!("VNC server monitor stopped: {error}"));
+        }
+        // Manual and automatic stops already own the registry and publish
+        // Stopped after the module has reaped its process.
+        let mut running = tokio::select! {
+            biased;
+            _ = ctx.cancel.cancelled() => return,
+            running = registry.running.lock() => running,
+        };
+        if let Some(active) = running.remove(&ServerType::Vnc) {
+            if let Some(timer) = &active.auto_stop_task {
+                timer.abort();
+            }
+            set_status(&ctx.app, &registry, ServerStatus::stopped(ServerType::Vnc)).await;
         }
     })
 }
@@ -138,7 +174,7 @@ pub async fn start_local_server(
     let cancel = CancellationToken::new();
     let ctx = ServerCtx::new(app.clone(), st, cancel.clone());
     let log = ctx.log.clone();
-    let started = match engine::start(ctx, config.clone()).await {
+    let started = match engine::start(ctx.clone(), config.clone()).await {
         Ok(s) => s,
         Err(e) => {
             cancel.cancel();
@@ -178,18 +214,23 @@ pub async fn start_local_server(
 
     {
         let mut running = state.legacy.servers.running.lock().await;
+        let task = if st == ServerType::Vnc {
+            watch_vnc_exit(ctx, state.legacy.servers.clone(), started.task)
+        } else {
+            started.task
+        };
         running.insert(
             st,
             ActiveServer {
                 cancel,
-                task: started.task,
+                task,
                 auto_stop_task,
                 status: running_status.clone(),
                 _process_lock: process_lock,
             },
         );
+        set_status(&app, &state.legacy.servers, running_status.clone()).await;
     }
-    set_status(&app, &state.legacy.servers, running_status.clone()).await;
     Ok(running_status)
 }
 

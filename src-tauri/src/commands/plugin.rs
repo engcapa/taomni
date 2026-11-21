@@ -185,6 +185,8 @@ pub async fn plugin_invoke(
     state: State<'_, AppState>,
 ) -> Result<Value, taomni_plugin_api::RpcError> {
     if (slug == crate::vnc::MODULE_SLUG && command.starts_with("vnc/"))
+        || (slug == taomni_server_process::vnc::SLUG
+            && taomni_server_process::vnc::COMMANDS.contains(&command.as_str()))
         || (slug == taomni_screenshot_api::SLUG
             && taomni_screenshot_api::COMMANDS.contains(&command.as_str()))
         || (slug == taomni_mail_api::SLUG

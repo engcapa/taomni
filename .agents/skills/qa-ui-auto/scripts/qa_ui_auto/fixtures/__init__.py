@@ -161,6 +161,7 @@ REGISTRY: dict[str, Fixture] = {
     "module_signed_rdp_archive": Fixture("module_signed_rdp_archive", module_signed_archive.setup_rdp),
     "module_signed_mail_archive": Fixture("module_signed_mail_archive", module_signed_archive.setup_mail),
     "module_signed_screenshot_archive": Fixture("module_signed_screenshot_archive", module_signed_archive.setup_screenshot),
+    "module_signed_vnc_server_archive": Fixture("module_signed_vnc_server_archive", module_signed_archive.setup_vnc_server),
     "module_execution": Fixture("module_execution", module_execution.setup, module_execution.teardown),
     "markdown_testing": Fixture("markdown_testing", markdown_testing.setup, markdown_testing.teardown),
     "markdown_quality": Fixture("markdown_quality", markdown_quality.setup, markdown_quality.teardown),

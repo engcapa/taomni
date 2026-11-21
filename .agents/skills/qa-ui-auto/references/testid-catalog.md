@@ -2749,6 +2749,7 @@
 - `[data-testid="module-action-enable-hello-plugin"]` — interactive — F-Modules-1.module-action-enable-hello-plugin
   ↳ `[data-testid="module-action-enable-mfa"]` — alias
   ↳ `[data-testid="module-action-enable-vnc-client"]` — alias
+  ↳ `[data-testid="module-action-enable-vnc-server"]` — alias
   ↳ `[data-testid="module-action-enable-rdp-client"]` — alias
   ↳ `[data-testid="module-action-enable-mail"]` — alias
   ↳ `[data-testid="module-action-enable-screenshot"]` — alias
@@ -2756,6 +2757,7 @@
 - `[data-testid="module-action-disable-hello-plugin"]` — interactive — F-Modules-1.module-action-disable-hello-plugin
   ↳ `[data-testid="module-action-disable-mfa"]` — alias
   ↳ `[data-testid="module-action-disable-vnc-client"]` — alias
+  ↳ `[data-testid="module-action-disable-vnc-server"]` — alias
   ↳ `[data-testid="module-action-disable-rdp-client"]` — alias
   ↳ `[data-testid="module-action-disable-mail"]` — alias
   ↳ `[data-testid="module-action-disable-screenshot"]` — alias
@@ -3239,6 +3241,13 @@
 - `[data-testid="server-row-ftp"]` — interactive [optional] — F-Servers-1.server-row-ftp
 - `[data-testid="server-row-http"]` — interactive [optional] — F-Servers-1.server-row-http
 - `[data-testid="server-row-rdp"]` — interactive [optional] — F-Servers-1.server-row-rdp
+- `[data-testid="server-row-vnc"]` — interactive [optional] — F-Servers-1.server-row-vnc
+- `[data-testid="server-row-vnc-start"]` — interactive [optional] — F-Servers-1.server-row-vnc-start
+- `[data-testid="server-row-vnc-stop"]` — interactive [optional] — F-Servers-1.server-row-vnc-stop
+- `[data-testid="server-row-vnc-settings"]` — interactive [optional] — F-Servers-1.server-row-vnc-settings
+- `[data-testid="server-field-vnc-password"]` — interactive [optional] — F-Servers-1.server-field-vnc-password
+- `[data-testid="server-field-vnc-view-only"]` — interactive [optional] — F-Servers-1.server-field-vnc-view-only
+- `[data-testid="server-field-vnc-shared"]` — interactive [optional] — F-Servers-1.server-field-vnc-shared
 - `[data-testid="server-row-ssh-start"]` — interactive [optional] — F-Servers-1.server-row-ssh-start
 - `[data-testid="server-row-ssh-stop"]` — interactive [optional] — F-Servers-1.server-row-ssh-stop
 - `[data-testid="server-row-ssh-settings"]` — interactive [optional] — F-Servers-1.server-row-ssh-settings

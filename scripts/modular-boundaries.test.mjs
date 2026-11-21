@@ -11,7 +11,7 @@ function fixture(t, manifest = "") {
   const shared = ["taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api",
     "taomni-rdp-client-engine", "taomni-mail-engine", "taomni-mfa-engine", "taomni-vnc-api",
     "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector", "taomni-screenshot-api",
-    "taomni-screenshot-ocr", "taomni-screenshot-recording"];
+    "taomni-screenshot-ocr", "taomni-screenshot-recording", "taomni-server-process"];
   for (const child of ["src/screenshot", "src/mfa", "src/mobile", "src/servers", "src/config",
     "crates/taomni-capture/src", ...shared.map(name => `crates/${name}/src`)]) {
     fs.mkdirSync(path.join(root, "src-tauri", child), { recursive: true });
