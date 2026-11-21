@@ -402,7 +402,7 @@ jobs:
             done
           fi
       - name: Sign the official business module package
-        if: env.QA_MODULE == 'mail' || env.QA_MODULE == 'vnc-client' || env.QA_MODULE == 'rdp-client' || env.QA_MODULE == 'screenshot'
+        if: env.QA_MODULE != 'hello-plugin' && env.QA_MODULE != 'mfa'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

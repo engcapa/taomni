@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- VNC Server 0.1.1 三端 Browser 各通过 23/23，覆盖配置、单实例和完整崩溃回归。原生签名任务已完成构建和工件校验，打包步骤的条件遗漏了 VNC Server。已让通过清单校验的业务模块统一进入签名，保留原失败日志供复验。 [新版回执](https://github.com/engcapa/taomni/actions/runs/44943027023) · [原签名日志](https://github.com/engcapa/taomni/actions/runs/44940689515/job/136959079197)
 - 截图修复版在 Linux Native 通过 32/32。macOS GIF 的像素和时间轴比对通过，成片为 4330 ms，超过用例原有的 4200 ms 上限。录制改为以实际停止请求的时间收尾，慢取帧返回后的时间不计入成片。 [原始回执](https://github.com/engcapa/taomni/actions/runs/44938925840)
 - VNC Server 0.1.1 导入旧库的 VNC 配置到模块目录，保留旧库回滚行。首次使用时从旧配置读取密码并写入 Vault，后续由核心按 VNC 凭据类型解析。运行中的备份通过宿主快照保存配置及配套 Vault。TC-MODULES-063 核对旧行、迁移回执、实际鉴权、备份和停用后的资源回收。首轮 Browser 发现模块化标签容器漏掉原有标识，已恢复并让表单用例等待关联配置。 [首轮回执](https://github.com/engcapa/taomni/actions/runs/44940689515)
 - VNC Server 0.1.0 由签名宿主监督系统 daemon。核心通过原 Local servers 入口传递当前配置，并在宿主退出后释放本地服务的运行锁。默认 Cargo 闭包排除 VNC Server 宿主，签名打包已接入 QA 工作流。TC-MODULES-063 检查 Linux X11 的真实回环连接、停止和禁用，TC-MODULES-064 检查 Browser 的配置持久化。旧配置迁移、Windows 真实 daemon 与 macOS 系统指引仍待验收。
