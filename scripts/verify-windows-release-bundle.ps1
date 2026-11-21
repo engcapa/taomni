@@ -8,8 +8,6 @@ $ErrorActionPreference = "Stop"
 $ReleaseDir = (Resolve-Path -LiteralPath $ReleaseDir).Path
 $dlls = @("sherpa-onnx-c-api.dll", "sherpa-onnx-cxx-api.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll")
 $sockscapStaging = Join-Path $PSScriptRoot "../src-tauri/resources/sockscap/windows"
-$vncHelperPath = "resources/vnc/windows/taomni-vnc-key-helper.exe"
-$vncHelperSource = Join-Path $PSScriptRoot "../src-tauri/$vncHelperPath"
 $sockscapRuntime = @("sockscap-helper.exe", "WinDivert.dll", "WinDivert64.sys")
 if (Test-Path -LiteralPath (Join-Path $sockscapStaging "xray.exe") -PathType Leaf) {
   $sockscapRuntime += "xray.exe"
@@ -47,10 +45,8 @@ public static class TaomniRuntimeLoader {
     $executables = @(Get-ChildItem -LiteralPath $directory -Recurse -File -Filter taomni.exe)
     if ($executables.Count -ne 1) { throw "Expected one taomni.exe in $directory" }
     $appDir = $executables[0].DirectoryName
-    $vncHelper = Join-Path $appDir $vncHelperPath
-    if (-not (Test-Path -LiteralPath $vncHelper -PathType Leaf) -or
-        (Get-FileHash -LiteralPath $vncHelper).Hash -ne (Get-FileHash -LiteralPath $vncHelperSource).Hash) {
-      throw "The Windows installer must contain the staged VNC key helper"
+    if (Get-ChildItem -LiteralPath $directory -Recurse -File -Filter taomni-vnc-key-helper.exe) {
+      throw "The Windows installer contains the independently shipped VNC key helper"
     }
     $sockscapDir = Join-Path $appDir "resources/sockscap"
     foreach ($platform in @("linux", "macos")) {

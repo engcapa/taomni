@@ -1,13 +1,8 @@
 {
-  "build": {
-    "beforeDevCommand": "pwsh -NoProfile -File scripts/stage-vnc-key-helper.ps1 && pnpm dev",
-    "beforeBuildCommand": "pnpm build && pwsh -NoProfile -File scripts/stage-vnc-key-helper.ps1 -Configuration release"
-  },
   "bundle": {
     "resources": [
       "resources/licenses/*",
-      "resources/sockscap/windows/**/*",
-      "resources/vnc/windows/**/*"
+      "resources/sockscap/windows/**/*"
     ]
   }
 }

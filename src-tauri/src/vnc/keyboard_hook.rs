@@ -42,7 +42,7 @@ mod imp {
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
     use taomni_vnc_key_protocol::{HelperLine, parse_helper_line};
-    use tauri::{AppHandle, Emitter, Manager};
+    use tauri::{AppHandle, Emitter};
 
     use super::{SPECIAL_KEY_EVENT, SpecialKeyCaptureStatus};
 
@@ -58,18 +58,9 @@ mod imp {
     static HOOK_CALLS: AtomicU64 = AtomicU64::new(0);
     static INTERCEPTED: AtomicU64 = AtomicU64::new(0);
 
-    fn helper_path(app: &AppHandle) -> std::io::Result<std::path::PathBuf> {
+    fn helper_path() -> std::io::Result<std::path::PathBuf> {
         const NAME: &str = "taomni-vnc-key-helper.exe";
         let alongside = std::env::current_exe()?.with_file_name(NAME);
-        if cfg!(debug_assertions) && alongside.is_file() {
-            return Ok(alongside);
-        }
-        if let Ok(resource_root) = app.path().resource_dir() {
-            let bundled = resource_root.join("resources/vnc/windows").join(NAME);
-            if bundled.is_file() {
-                return Ok(bundled);
-            }
-        }
         if alongside.is_file() {
             return Ok(alongside);
         }
@@ -77,7 +68,7 @@ mod imp {
     }
 
     fn spawn(app: AppHandle) -> std::io::Result<Helper> {
-        let mut child = Command::new(helper_path(&app)?)
+        let mut child = Command::new(helper_path()?)
             .arg(std::process::id().to_string())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())

@@ -287,8 +287,8 @@ wry = { path = "vendor/wry" }
 winscard = { path = "vendor/winscard" }
 
 [features]
-default = ["hbase-kerberos", "rdp-server-audio", "voice-capture", "asr-whisper", "asr-sherpa", "legacy-vnc-client"]
-# Until the first production VNC catalog is available, normal builds can also open legacy sessions.
+default = ["hbase-kerberos", "rdp-server-audio", "voice-capture", "asr-whisper", "asr-sherpa"]
+# Isolated QA exercises both the pre-module relay and the signed host.
 legacy-vnc-client = ["dep:taomni-vnc-engine", "dep:taomni-vnc-key-protocol"]
 # Dedicated hosted test harness: use the production pinned key on every thread
 # instead of the normal unit-fixture key. Production verification is unchanged.

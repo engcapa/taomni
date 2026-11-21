@@ -36,10 +36,10 @@ keeps the helper's input pipe open for the life of the owner. The helper
 handles the existing special keys while a window owned by that process is
 in the foreground.
 
-The transition installer stages the helper under
-`resources/vnc/windows/`. Development and native QA builds use the helper
+Native QA builds enable the legacy relay explicitly and stage its helper
 beside the application binary. Native QA ties both binaries to the build
-identity and verifies early and normal owner-pipe exit.
+identity and verifies early and normal owner-pipe exit. The release installer
+checks its MSI and NSIS payloads for absence of the helper.
 
 Windows VNC packages stage the helper beside the module host before signing the
 archive. The signature covers the helper's bytes. An installed module starts its
