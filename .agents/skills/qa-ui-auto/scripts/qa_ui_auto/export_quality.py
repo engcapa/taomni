@@ -7,7 +7,32 @@ import zipfile
 
 from .steps import StepError
 
-EXPORT_KINDS = {"pdf", "docx", "drawio", "drawio-png", "testing-pdf", "testing-docx"}
+EXPORT_KINDS = {"pdf", "docx", "png-doc", "drawio", "drawio-png", "testing-pdf", "testing-docx"}
+
+
+def inspect_png_document(path):
+    """The whole-document PNG must rasterize at the shared 300 DPI standard.
+
+    A 96 DPI capture renders Mermaid/drawio diagrams as blurry 1:1 pixels.
+    The export lays the document out at a fixed 800 CSS px width and scales it
+    by 300/96 with graceful degradation for long documents; a capture below
+    2x cannot be a normal-length export at the required density.
+    """
+    from PIL import Image, ImageStat
+
+    with Image.open(path) as image:
+        if image.format != "PNG":
+            raise StepError(f"Document PNG has an unexpected format: {image.format}")
+        width, height = image.size
+        rgb = image.convert("RGB")
+    scale = width / 800
+    if not (2.0 <= scale <= 300 / 96 + 0.01):
+        raise StepError(f"Document PNG was rasterized at {scale:.2f}x instead of the 300 DPI standard")
+    if width * height > 40_000_000 or max(width, height) > 32_700:
+        raise StepError("Document PNG exceeds the safe canvas limits")
+    if max(ImageStat.Stat(rgb).stddev) < 3:
+        raise StepError("Document PNG is blank")
+    return {"width": width, "height": height, "scale": round(scale, 3)}
 
 
 def inspect_swimlane_png(path):
@@ -47,6 +72,8 @@ def raster_grid_pixels(image):
 def inspect_quality(path, kind):
     if kind == "drawio-png":
         return inspect_swimlane_png(path)
+    if kind == "png-doc":
+        return inspect_png_document(path)
     if kind in {"testing-pdf", "testing-docx"}:
         from .markdown_testing_quality import inspect_testing
         return inspect_testing(path, kind)
@@ -96,16 +123,18 @@ def inspect_quality(path, kind):
         settings = archive.read("word/settings.xml")
         if b"doNotAutoCompressPictures" not in settings:
             raise StepError("Word export allows automatic picture compression")
-        from .markdown_docx_quality import inspect_diagrams
+        from .markdown_docx_quality import inspect_diagrams, inspect_vector_text
         diagrams = inspect_diagrams(archive, minimum_dpi=590)
         vectors = [name for name in archive.namelist() if name.startswith("word/media/") and name.endswith(".svg")]
         if len(vectors) != 3:
             raise StepError("Word must preserve both Mermaid diagrams and the SVG image as vectors")
         labels = []
+        positioned_runs = 0
         for name in vectors:
             svg = ET.fromstring(archive.read(name))
             if any(node.tag.rsplit("}", 1)[-1] in {"foreignObject", "style"} for node in svg.iter()):
                 raise StepError("Word vector still depends on HTML or scoped CSS")
+            positioned_runs += inspect_vector_text(svg)
             for node in svg.iter():
                 if node.tag.rsplit("}", 1)[-1] == "text" and "".join(node.itertext()).strip():
                     if not node.get("font-size") or not node.get("fill"):
@@ -121,7 +150,8 @@ def inspect_quality(path, kind):
         rasters = [Image.open(io.BytesIO(archive.read(name))).size for name in archive.namelist() if name.endswith(".png") and name.startswith("word/media/")]
         if (1600, 800) not in rasters:
             raise StepError("Word export downsampled the original raster image")
-        return dict(vectorCount=len(vectors), labels=labels, diagrams=diagrams, originalRasterSize=[1600, 800])
+        return dict(vectorCount=len(vectors), labels=labels, diagrams=diagrams, originalRasterSize=[1600, 800],
+                    positionedRuns=positioned_runs)
 
 
 def native(ctx, args):

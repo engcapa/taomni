@@ -597,7 +597,7 @@
           },
           "description": "Independent exact UTF-8/SHA256/absence oracle inside file_open_files fixture or a DOM-observed controlled viewer temp. remember stores the observed path for post-close absence checks. Browser reads VFS only; native reads real host bytes."
         },
-        "assert_export_quality": {"type":"object","additionalProperties":false,"required":["path","kind"],"properties":{"path":{"type":"string","minLength":1},"kind":{"enum":["pdf","docx","drawio","drawio-png","testing-pdf","testing-docx"]}}},
+        "assert_export_quality": {"type":"object","additionalProperties":false,"required":["path","kind"],"properties":{"path":{"type":"string","minLength":1},"kind":{"enum":["pdf","docx","png-doc","drawio","drawio-png","testing-pdf","testing-docx"]}}},
         "assert_drawio_preview": {"enum": ["live", "split"]},
         "assert_drawio_roundtrip": {"enum": ["download", "save"]},
         "assert_download": {
@@ -605,7 +605,7 @@
           "properties": {
             "trigger": {"$ref": "#/$defs/selector"},
             "filename": {"type": "string", "minLength": 1},
-            "artifact": {"enum": ["pdf", "docx", "drawio", "drawio-png", "testing-pdf", "testing-docx"]},
+            "artifact": {"enum": ["pdf", "docx", "png-doc", "drawio", "drawio-png", "testing-pdf", "testing-docx"]},
             "contains": {"type": "array", "items": {"type": "string"}}
           },
           "description": "Browser only: click the real export control, wait for actual Playwright download, retain artifact and assert filename/nonempty/content bytes. Not native disk or dialog evidence."
