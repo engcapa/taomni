@@ -315,7 +315,11 @@ export function NotepadEditor({
         const target = e.target as HTMLElement | null;
         if (target?.closest(".np-modal, .np-find-bar") && target.tagName === "INPUT") return;
         const cmd = useNotepadKeymap.getState().findCommandByEvent(e.nativeEvent);
-        if (cmd) {
+        // Delete is advertised as the Edit > Delete accelerator, but the plain
+        // key must stay a native forward-delete inside the editor. The menu item
+        // still works through the command registry.
+        const plainDelete = e.key === "Delete" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
+        if (cmd && !plainDelete) {
           e.preventDefault();
           e.stopPropagation();
           void actions.registry.execute(cmd);

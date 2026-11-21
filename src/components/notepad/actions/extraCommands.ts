@@ -159,13 +159,9 @@ export function createExtraCommandMap(ctx: NotepadActionContext): Record<string,
       const view = activeView(ctx);
       if (!view || ctx.effectiveReadOnly) return;
       const sel = view.state.selection.main;
-      if (sel.empty) {
-        const line = view.state.doc.lineAt(sel.head);
-        const next = Math.min(line.to + 1, view.state.doc.length);
-        view.dispatch({ changes: { from: line.from, to: next } });
-      } else {
-        view.dispatch({ changes: { from: sel.from, to: sel.to } });
-      }
+      // Delete removes the selection only; with an empty selection the editor's
+      // native forward-delete must keep working, so this command is a no-op.
+      if (!sel.empty) view.dispatch({ changes: { from: sel.from, to: sel.to } });
     },
     "edit.pasteSpecial": () => ctx.setPickerModal({ kind: "pasteSpecial" }),
     "edit.clipboardHistory": () => ctx.setPickerModal({ kind: "clipboardHistory" }),
