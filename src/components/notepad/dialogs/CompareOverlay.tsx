@@ -68,7 +68,7 @@ export function CompareOverlay({
       <div className="np-modal wide" style={{ width: "min(960px, calc(100vw - 32px))" }}>
         <div className="np-modal-header">
           <span>{label("文档对比", "Compare Documents")} ({diffCount} {label("处差异行", "differences")})</span>
-          <button type="button" className="np-btn" onClick={onClose}><X size={14} /></button>
+          <button type="button" className="np-btn" data-testid="notepad-compare-close" onClick={onClose}><X size={14} /></button>
         </div>
 
         <div className="flex items-center gap-4 text-[12px]">

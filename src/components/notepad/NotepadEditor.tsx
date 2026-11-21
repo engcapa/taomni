@@ -309,6 +309,7 @@ export function NotepadEditor({
           if (sessionModal) { e.preventDefault(); e.stopPropagation(); setSessionModal(null); return; }
           if (prefsOpen) { e.preventDefault(); e.stopPropagation(); setPrefsOpen(false); return; }
           if (mapperOpen) { e.preventDefault(); e.stopPropagation(); setMapperOpen(false); return; }
+          if (store.compare) { e.preventDefault(); e.stopPropagation(); store.setCompare(null); return; }
           if (aboutOpen) { e.preventDefault(); e.stopPropagation(); setAboutOpen(false); return; }
         }
         const target = e.target as HTMLElement | null;
