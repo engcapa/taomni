@@ -7,6 +7,8 @@ import {
   viewerTextForDisk, viewerWriteText, type ViewerDocument, type ViewerEol, type ViewerTextData, type ViewerWriteAck,
 } from "../lib/viewer";
 import { readViewerDrafts, writeViewerDrafts } from "./viewerDrafts";
+import { notepadBackupList, notepadBackupRead } from "../lib/notepad/ipc";
+import { useNotepadStore } from "./notepadStore";
 
 export interface ViewerCloseRequest { paths: string[]; proceed: () => void; cancel?: () => void }
 interface DocumentState {
@@ -125,7 +127,33 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
           if (forceEdit && data.truncated) throw new Error("too_large: File grew beyond the 20 MB editing limit");
           document = { ...document, large: (large || data.truncated) && !forceEdit, readOnly: !!readOnlyReason || data.truncated || (large && !forceEdit), readOnlyReason,
             nextOffset: data.nextOffset ?? (data.truncated ? VIEWER_TEXT_CHUNK_SIZE : stat.size) };
-          const draft = !readOnlyReason && !document.large ? readViewerDrafts()[key] : undefined;
+          let draft = !readOnlyReason && !document.large ? readViewerDrafts()[key] : undefined;
+          if (!readOnlyReason && !document.large && document.kind === "text") {
+            try {
+              const backups = await notepadBackupList();
+              const match = backups.find((b) => b.docId === key || (b.path && documentPathKey(b.path) === key));
+              if (match) {
+                const loaded = await notepadBackupRead(match.id);
+                if (generations.get(key) !== generation) return;
+                const eol = loaded.entry.eol === "CRLF" || loaded.entry.eol === "CR" ? loaded.entry.eol : "LF";
+                document = {
+                  ...document,
+                  content: normalizeViewerText(loaded.content),
+                  savedHash: loaded.entry.savedHash || data.hash,
+                  encoding: loaded.entry.encoding || document.encoding,
+                  bom: loaded.entry.bom,
+                  eol,
+                  dirty: true,
+                  restored: true,
+                  external: loaded.entry.savedHash && loaded.entry.savedHash !== data.hash ? data : undefined,
+                };
+                useNotepadStore.getState().patchDoc(key, { backupState: "saved", lastBackupAt: loaded.entry.updatedAt * 1000 });
+                draft = undefined;
+              }
+            } catch {
+              // Fallback to localStorage draft if backup IPC is unavailable
+            }
+          }
           if (draft) {
             document = { ...document, ...draft, key, path, dirty: true, restored: true,
               external: draft.savedHash !== data.hash ? data : undefined };

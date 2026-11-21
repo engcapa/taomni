@@ -114,6 +114,7 @@ export interface NotepadDocState {
   largeEditConfirmed: boolean;
   detectedEncoding?: string;
   lastBackupAt?: number;
+  backupState?: "idle" | "saving" | "saved" | "error";
   find: NotepadFindState;
 }
 
@@ -196,6 +197,7 @@ export function createDefaultDocState(docId: string, titleHint?: string): Notepa
     beginSelectAnchor: null,
     activeMatch: null,
     largeEditConfirmed: false,
+    backupState: "idle",
     find: defaultFindState(),
   };
 }

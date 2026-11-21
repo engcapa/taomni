@@ -8,6 +8,10 @@ import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { ViewerDirtyIndicator } from "../viewer/ViewerDirtyIndicator";
 import { ExplorerTabIcon } from "./ExplorerTabIcon";
 import { useExplorerLabels } from "./explorerLabels";
+import { FilePlus2 as NpFilePlus, Pin as NpPin } from "lucide-react";
+import { openUntitledNotepadDocument } from "../../lib/openFile";
+import { documentPathKey } from "../../lib/openFile/pathIdentity";
+import { useDocumentStore } from "../../stores/documentStore";
 
 export function ExplorerTabStrip() {
   const tabs = useExplorerStore((state) => state.tabs);
@@ -16,6 +20,11 @@ export function ExplorerTabStrip() {
   const closeTab = useExplorerStore((state) => state.closeTab);
   const closeTabs = useExplorerStore((state) => state.closeTabs);
   const moveTab = useExplorerStore((state) => state.moveTab);
+  const togglePinTab = useExplorerStore((state) => state.togglePinTab);
+  const closeTabsLeft = useExplorerStore((state) => state.closeTabsLeft);
+  const closeTabsRight = useExplorerStore((state) => state.closeTabsRight);
+  const closeUnmodifiedTabs = useExplorerStore((state) => state.closeUnmodifiedTabs);
+  const closeUnpinnedTabs = useExplorerStore((state) => state.closeUnpinnedTabs);
   const label = useExplorerLabels();
   const scroll = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<{ tab: Tab; x: number; y: number } | null>(null);
@@ -25,10 +34,17 @@ export function ExplorerTabStrip() {
   };
   const menuItems = (tab: Tab): MenuItem[] => {
     const index = tabs.findIndex((item) => item.id === tab.id);
+    const docs = useDocumentStore.getState().documents;
     return [
+      { label: tab.pinned ? label("取消固定标签", "Unpin tab") : label("固定标签", "Pin tab"), testId: "explorer-tab-context-pin", icon: <NpPin />, onClick: () => togglePinTab(tab.id) },
+      { label: "", separator: true },
       { label: label("关闭", "Close"), testId: "explorer-tab-context-close", icon: <X />, onClick: () => closeTab(tab.id) },
-      { label: label("关闭其他标签", "Close others"), testId: "explorer-tab-context-close-others", onClick: () => closeTabs(tabs.filter((item) => item.id !== tab.id).map((item) => item.id)) },
-      { label: label("全部关闭", "Close all"), testId: "explorer-tab-context-close-all", onClick: () => closeTabs(tabs.map((item) => item.id)) },
+      { label: label("关闭其他标签", "Close others"), testId: "explorer-tab-context-close-others", onClick: () => closeTabs(tabs.filter((item) => item.id !== tab.id && !item.pinned).map((item) => item.id)) },
+      { label: label("关闭左侧标签", "Close tabs to the left"), testId: "explorer-tab-context-close-left", disabled: index <= 0, onClick: () => closeTabsLeft(tab.id) },
+      { label: label("关闭右侧标签", "Close tabs to the right"), testId: "explorer-tab-context-close-right", disabled: index >= tabs.length - 1, onClick: () => closeTabsRight(tab.id) },
+      { label: label("关闭未修改标签", "Close unmodified tabs"), testId: "explorer-tab-context-close-unmodified", onClick: () => closeUnmodifiedTabs((t) => Boolean(t.fileViewer && docs[documentPathKey(t.fileViewer.path)]?.dirty)) },
+      { label: label("关闭未固定标签", "Close unpinned tabs"), testId: "explorer-tab-context-close-unpinned", onClick: () => closeUnpinnedTabs() },
+      { label: label("全部关闭", "Close all"), testId: "explorer-tab-context-close-all", onClick: () => closeTabs(tabs.filter((item) => !item.pinned).map((item) => item.id)) },
       { label: "", separator: true },
       { label: label("向左移动", "Move left"), testId: "explorer-tab-context-move-left", icon: <ChevronLeft />, disabled: index <= 0, onClick: () => moveTab(tab.id, index - 1) },
       { label: label("向右移动", "Move right"), testId: "explorer-tab-context-move-right", icon: <ChevronRight />, disabled: index === tabs.length - 1, onClick: () => moveTab(tab.id, index + 1) },
@@ -59,6 +75,7 @@ export function ExplorerTabStrip() {
           if (event.key === "Enter" || event.key === " ") { event.preventDefault(); activate(tab.id); }
         }}
       >
+        {tab.pinned && <NpPin className="h-3 w-3 shrink-0 text-[var(--taomni-accent)]" data-testid="explorer-tab-pin-badge" />}
         {tab.type === "file-browser" ? <ExplorerTabIcon /> : <FileText className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-accent)]" />}
         <span className="truncate">{tab.title}</span>
         {tab.fileViewer && <ViewerDirtyIndicator path={tab.fileViewer.path} />}
@@ -68,6 +85,9 @@ export function ExplorerTabStrip() {
     <button type="button" data-testid="explorer-tab-new-home" title={label("新建主目录标签", "New home tab")} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => {
       void openExplorer(undefined, { forceNew: true }).catch((error) => useAppStore.getState().setStatusMessage(String(error)));
     }}><Plus className="h-3.5 w-3.5" /></button>
+    <button type="button" data-testid="explorer-tab-new-notepad" title={label("新建文本文档", "New Notepad document")} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => {
+      openUntitledNotepadDocument({ host: "explorer" });
+    }}><NpFilePlus className="h-3.5 w-3.5" /></button>
     <div className="h-full min-w-[24px] flex-1" data-window-drag />
     {menu && <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={menuItems(menu.tab)} />}
   </div>;
