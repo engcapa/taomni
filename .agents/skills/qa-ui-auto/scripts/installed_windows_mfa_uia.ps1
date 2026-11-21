@@ -14,7 +14,34 @@ trap {
     [Console]::Error.WriteLine(($diagnostic | ConvertTo-Json -Compress))
     exit 1
 }
-Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Windows.Forms
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Windows.Forms, WindowsBase
+Add-Type @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+
+public static class OwnedDesktopClick {
+    [StructLayout(LayoutKind.Sequential)]
+    struct Point { public int X; public int Y; }
+
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr window);
+    [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr window, uint flags);
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point point);
+    [DllImport("user32.dll", SetLastError = true)] static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
+
+    public static void Click(IntPtr window, int x, int y) {
+        SetForegroundWindow(window);
+        var point = new Point { X = x, Y = y };
+        if (GetForegroundWindow() != window || GetAncestor(WindowFromPoint(point), 2) != window)
+            throw new InvalidOperationException("The hit point is outside the owned application window");
+        if (!SetCursorPos(x, y)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        mouse_event(2, 0, 0, 0, UIntPtr.Zero);
+        mouse_event(4, 0, 0, 0, UIntPtr.Zero);
+    }
+}
+'@
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $fixture = [Console]::In.ReadToEnd() | ConvertFrom-Json
 $automation = [System.Windows.Automation.AutomationElement]
@@ -55,9 +82,10 @@ function Invoke-Button($Root, [string]$Name) {
         $pattern.Invoke()
         return
     }
-    $button.SetFocus()
-    if (-not $button.Current.HasKeyboardFocus) { throw 'The owned button did not receive keyboard focus' }
-    [System.Windows.Forms.SendKeys]::SendWait(' ')
+    $rect = $button.Current.BoundingRectangle
+    if ($rect.IsEmpty) { throw 'The owned button has no visible rectangle' }
+    [OwnedDesktopClick]::Click([IntPtr]$Root.Current.NativeWindowHandle,
+        [int]($rect.X + $rect.Width / 2), [int]($rect.Y + $rect.Height / 2))
 }
 
 function Set-Value($Element, [string]$Value) {
