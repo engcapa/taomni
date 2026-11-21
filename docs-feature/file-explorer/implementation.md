@@ -56,6 +56,28 @@ Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS �
 - ControlBar 仅在 `activeSideTab === "explorer"` 时渲染 ExplorerTabStrip；主题/设置切换离开 Explorer 表面后直接点击 `explorer-workspace-tab` 的既有用例步骤（001 第二/三次入口、004 两轮主题、007 两轮、009 四轮、010、013、029、037、038）全部补上 `side-tab-explorer` rail 返回；001 另对异步入口后的计数断言补 wait。
 - 产品取消搜索后的状态为 `data-state="cancelled"` 而非用例误写的 `done`（stub 缺陷曾掩盖此路径）；008/009 断言已对齐真实状态机。
 - 008 扩展 R5：`Show hidden files` 偏好驱动搜索包含性，`.hidden*` 默认 0 结果、开启后 1 结果、关闭后重新排除；009 扩展 R4：`entry-*.txt` 在 10,000 真实文件上触发 1000 结果上限并显式提示截断。
+- 005 关闭/重开 Sessions 终端标签的两处 `tab-item` 交互发生在 Explorer 表面激活时（ControlBar 此时渲染 Explorer strip 而非 Sessions TabBar），补 `side-tab-sessions` 返回；009 native 端 10,000 文件扫描快于用例观察间隔（GitHub macOS 第一轮同样无法观察到 searching 态），改为断言确定性 settled done 状态，执行中取消由 008 延迟 stub 与 Rust search 取消单测覆盖（`ce9f7327e`、`dabdfc767`）。
+
+## 本轮本地 Linux 证据（qa debug 二进制，复用既有 desktop :40004）
+
+- 合并 `origin/main`（`6b8e350cb`，PR #846 快进）后在合并头重跑受影响 browser 全集 35/35 通过（`qa-ui-auto-report/run-20261121-163*/summary.json`，EXITCODE=0）；Node 22 `tsc -b`、136 项聚焦 Vitest（explorer/viewer/restore/registry/openFile）、`pnpm check:refactor` 与 `audit --gate` 通过。
+- 本地 `keep_runs: 5` 曾旋转删除早期 run 目录（`_local/*.log` 保留逐条结果），已改 `keep_runs: 40` 并在合并头重跑再生收据；早期数字以下列条目为准。
+- 受影响 browser 用例 35/35 全部通过，含 001 入口/去重/恢复、002-008 全部 Explorer 用例、迁移后的 FILE-OPEN browser 集合、TAO-HOME-031 与 WELCOME-RS-02/04。
+- 受影响 native 用例 20 个：修复后 14-16 通过；`TC-EXPLORER-003`（X11 真实指针拖放为 GitHub Xvfb+Openbox 配置调优，本机共享桌面拖放不生效）与 `TC-EXPLORER-005`（本机 bashrc 提示符使 idle-prompt 探测不置 terminal-ready）为本机环境边界，hosted 已通过；drawio 渲染 021/032/036/042 本机 WebKitGTK 2.50.4 不渲染图元（Chromium 与 hosted WebView2/WKWebView 均正常，禁用 dmabuf 无效），属本机 WebView 环境差异，hosted linux Xvfb 待第三轮覆盖。
+- 本机 native 首轮 15 个失败中 12 个为容器重置丢失 `xdotool`/`wmctrl`/`xclip`（已 `apt-get install` 恢复；容器重启后需手工重装）；`TC-FILE-OPEN-009` 三轮改造后本机 native 通过。
+- `crash-regression` browser 16 通过、`TC-FILE-OPEN-008` 因本地无 POSIX SSH PTY 显式 skip（hosted 覆盖）、`TC-MOBILE-012` 首跑因子进程未继承 Node22 PATH 使用系统 pnpm 11 失败，修正 PATH 后单独重跑通过；native 18 通过、`TC-FILE-OPEN-006` 为 main 既有已记录竞态（`docs-issue` f11b37cf3，与本分支无关，hosted 第二轮 Windows/macOS 同样失败）、`TC-MOBILE-013` 需 appcache 内 playwright chromium（本地未预置，hosted 覆盖）、008 与 WS-054 为本地环境 skip。
+- 本机失败与 skip 均有 hosted 对应执行，不以本机边界宣称通过；也不将本机环境差异当作产品回归。
+
+## GitHub hosted 第二轮（run44880061565，head `ce9f7327e`，native release）
+
+- Windows browser 45/45 + 3/3（crash），macOS browser 44/45 + 3/3；唯一失败 `TC-EXPLORER-002`（macOS 预览未按时消失，Windows/本机/第一轮均过，按 flake 处理并入第三轮复验）。
+- macOS native 43/46：除 `TC-EXPLORER-009`（旧即时取消设计如预测败于 cancel 按钮消失竞态，`dabdfc767` 已重设计）与 `TC-FILE-OPEN-006`（既有已记录竞态）外全过。
+- Windows native 42/46：除 009/006 同上、`TC-EXPLORER-005` 终局暴露**真实迁移缺口**——仅剩独立 Explorer 标签时 `confirmExitWithOpenTabs` 只数 Sessions 标签导致静默退出；已修复为同时计入 explorerStore 可关闭标签（`5093be85c`，含 3 项新单测）。另 `TC-FILE-OPEN-023` 败于 QA 对话框自动化脚本自身 WM_GETTEXT 探测（非产品代码），并入第三轮复验。
+- 该轮三端 browser 与 native crash、SFTP 契约 job 全部 success；receipt 与 build hash 已按 shard 流式下载核对（windows release `a3e7d616…`、macos release `ef8459d3…`）。
+
+## GitHub hosted 第三轮（run44886766477，head `5093be85c`，含 linux）
+
+- 定向复验集：`TC-EXPLORER-002/003/005/009` 与 `TC-FILE-OPEN-021/023/032/036/042`；平台首次纳入 linux（Xvfb release），自动并入完整 `crash-regression`，同时补齐 linux release 二进制门禁。
 
 ## 迁移前历史证据
 
