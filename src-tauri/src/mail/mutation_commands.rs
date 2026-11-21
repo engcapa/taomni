@@ -24,21 +24,19 @@ pub async fn mail_mark_read(
     }
     let account = resolve_config(&state, config)?;
     let db = state.mail_db(&account.config.session_id)?;
-    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        read_actions::mark_read_cached(
-            &pool,
-            &account,
-            &handle,
-            &db,
-            &folder,
-            uids.unwrap_or_default(),
-            all.unwrap_or(false),
-        )
-    })
+    let transport = read_actions::ReadFlagTransport::new(
+        state.legacy.mail.mail_imap_pool.clone(),
+        account,
+        Some(state.plugins.clone()),
+    );
+    read_actions::mark_read_cached(
+        transport,
+        db,
+        &folder,
+        uids.unwrap_or_default(),
+        all.unwrap_or(false),
+    )
     .await
-    .map_err(|e| format!("mail mark read task failed: {e}"))?
 }
 
 #[tauri::command]

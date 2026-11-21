@@ -1009,19 +1009,19 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 - v1.1（2026-11-14 20:22 澄清后）：第 5 项改按客户端 / 服务端两类，RDP / VNC 拆为 4 个插件，插件总数 10→12；第 4 项确认理解正确；新增 §4.1 暂定插件（后续可能移除）。
 - v1.0（2026-11-14 18:22 决策后）：初稿；§13 全部 5 项已决策，§13.2 三处解释待确认。
 
-**M0 验证记录（2026-11-19）**
+**M0 验证记录（2026-11-21）**
 
 | 验证门 | 已取得的结果 | 剩余验证 |
 |---|---|---|
 | G1 macOS 宿主启动 | macOS 26 ARM64 的候选 DMG 与签名 MFA 宿主均使用固定证书及 hardened runtime。实际安装后带隔离属性的宿主成功启动，两个主体的 Gatekeeper 评估均返回 3。 [实装回执](https://github.com/engcapa/taomni/actions/runs/44816840208) | 在最终候选上复验宿主启动及分发信任。 |
-| G2 macOS 系统权限 | 核心提供 `capture.still`。实装候选从 0.5.10 升级后，两版核心以同一签名身份保留了屏幕录制和辅助功能授权。 [实装回执](https://github.com/engcapa/taomni/actions/runs/44816840208) | 补齐实装后的宿主取帧、原生输入和各用途的权限归属证据。 |
+| G2 macOS 系统权限 | 同一签名身份的核心升级后保留屏幕录制和辅助功能授权。macOS 26 ARM64 的已安装签名 MFA 通过核心 `capture.still` 读取窗口并识别账号。 [授权保持](https://github.com/engcapa/taomni/actions/runs/44816840208) · [实装采集](https://github.com/engcapa/taomni/actions/runs/44824402835) | 补齐正式候选的原生输入及各模块权限归属。 |
 | G3 Windows 系统保护 | GitHub Windows Runner 在 Defender 实时保护开启时从 `LOCALAPPDATA` 成功启动带 Internet 区域标记的 Hello 和 MFA。启动前后均确认实时保护开启。 [Defender 工件](https://github.com/engcapa/taomni/actions/runs/44628961420) | 正式 Authenticode 资产和实际 SmartScreen 分发信誉。 |
 | G4 Linux `noexec` | deb、RPM 和 AppImage 均验证宿主拒绝、用户按指引迁移 profile、原 Vault 与 MFA 连续读写。 [安装验证](taomni-modular-installed-upgrade-verification.md#linux-安装格式的-noexec-恢复) | 正式首发产物按同场景复验。 |
-| G5 帧吞吐 | 三端 loopback 连续帧全部交付，Linux X11 与 macOS 26 ARM64 的采集和编码对照通过原预算。最近的 Windows 双路径样本 p95 为 71.82 和 73.79 ms，落在 130 ms 的模块化上限内。 [Windows 原始样本](https://github.com/engcapa/taomni/actions/runs/44649616170) | 用匹配源码和发行包执行同一用例并归档每条路径的 p95、首帧、帧率及带宽。 |
-| G6 强制退出 | Linux deb 和 macOS 26 ARM64 DMG 实装后强杀核心，签名 MFA 宿主均在驱动清理前退出。重开后原账号继续计数。 [Linux 安装验证](taomni-modular-installed-upgrade-verification.md#linux-已安装应用的强制退出) · [macOS 安装验证](https://github.com/engcapa/taomni/actions/runs/44816840208) | 收齐 Windows MSI 实装回执并在最终候选上复验三端。 |
+| G5 帧吞吐 | 签名 RDP 查看器的 Linux、Windows 和 macOS 26 分别测得 p95 84.00、46.90、76.00 ms，每端均收到 40/40 个样本，均在 130 ms 上限内。独立探针通过首帧、动画帧率和带宽检查。 [Linux](https://github.com/engcapa/taomni/actions/runs/44890131445) · [Windows 与 macOS](https://github.com/engcapa/taomni/actions/runs/44888211385) | 在同一正式候选 SHA 上复测并绑定各平台签名包与原始样本。 |
+| G6 强制退出 | Linux deb、Windows MSI 和 macOS 26 ARM64 DMG 各有实装强退回执。签名 MFA 宿主在驱动清理前退出，重开后原账号继续计数。 [Linux 安装验证](taomni-modular-installed-upgrade-verification.md#linux-已安装应用的强制退出) · [Windows 实装](https://github.com/engcapa/taomni/actions/runs/44886832952) · [macOS 实装](https://github.com/engcapa/taomni/actions/runs/44816840208) | 用同一正式候选验证三端及各业务宿主的资源回收。 |
 | G7 无重启生命周期 | Linux、Windows、macOS Intel 的签名模块更新和回滚经过实际宿主重新握手，保留禁用偏好及原数据。 [三端结果](https://github.com/engcapa/taomni/actions/runs/44287815253) | 正式业务宿主逐个验证状态、资源释放与回滚。 |
 | G8 验签与路径 | 四种原生运行配置通过正式公钥校验的包安装和篡改拒绝。签名目录和原子发布另有下载与发布契约。 [安装用例](https://github.com/engcapa/taomni/actions/runs/43804951477) · [发布契约](https://github.com/engcapa/taomni/actions/runs/44393439596) | 正式首发目录与每个首批包的签名及拒绝用例。 |
-| G9 核心依赖闭包 | 采集、RDP 和 MFA 的共享库通过边界检查，已建立体积和依赖基线。 [基线](taomni-modular-split-baseline-20261115.md) | 业务迁出后的核心 Cargo、前端产物、bundle 资源和 helper 清单。 |
+| G9 核心依赖闭包 | `b97d58d22` 的四个默认核心 Cargo 构建目标排除了 RDP/VNC 客户端引擎及宿主，生产 Vite 清单也排除了对应查看器。 [四目标依赖清单](https://github.com/engcapa/taomni/actions/runs/44879692505) | 核对其他首批模块的依赖裁剪与四个真实安装包的产物清单。 |
 | G10 协议与取消 | 三端各 37 项实际进程测试覆盖监督、取消、Vault 撤销、profile 作用域和快照。 [宿主结果](https://github.com/engcapa/taomni/actions/runs/44020928836) | 首批业务的完整请求、错误和资源释放验收。 |
 | G11 多进程 profile | 现有入口已统一持锁，得到宿主生命周期和实际快照、正常重启的证据。 [进程及还原证据](taomni-modular-split-progress.md) | 所有正式入口的多实例矩阵、迁出的 re-exec 与核心产物裁剪。 |
 

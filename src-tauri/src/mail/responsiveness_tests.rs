@@ -128,16 +128,17 @@ fn folder_read_includes_uncached_mail_and_recovers_a_lost_store_response() {
     drop(conn);
     let db = Arc::new(coordination::mailbox_database(path));
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let result = read_actions::mark_read_cached(
-        &MailImapPool::new(),
-        &account,
-        runtime.handle(),
-        &db,
-        "INBOX",
-        vec![],
-        true,
-    )
-    .unwrap();
+    let transport =
+        read_actions::ReadFlagTransport::new(Arc::new(MailImapPool::new()), account.clone(), None);
+    let result = runtime
+        .block_on(read_actions::mark_read_cached(
+            transport,
+            db.clone(),
+            "INBOX",
+            vec![],
+            true,
+        ))
+        .unwrap();
     assert_eq!(result.marked, 699);
     assert_eq!(result.unread, Some(0));
     assert!((1..=700).all(|uid| fake.flags("INBOX", uid).contains(&"\\Seen".into())));

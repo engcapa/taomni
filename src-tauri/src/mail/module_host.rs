@@ -13,8 +13,9 @@ use lettre::address::Envelope;
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, FolderSubscription, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE,
-    ImapFlagUpdate, ImapFolderTree, IncomingTest, SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, SLUG,
-    SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
+    ImapFlagUpdate, ImapFolderTree, IncomingTest, LIST_IMAP_UNREAD, SEARCH_IMAP, SEND_SMTP,
+    SET_IMAP_FLAGS, SLUG, SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND,
+    SmtpConnection, SmtpDelivery,
     imap_exchange::{ImapExchange, read_frame, write_frame},
 };
 use taomni_mail_engine::imap_sync::{
@@ -55,6 +56,10 @@ pub(super) fn searches_imap(registry: &PluginRegistry) -> bool {
 
 pub(super) fn sets_imap_flags(registry: &PluginRegistry) -> bool {
     supports(registry, SET_IMAP_FLAGS)
+}
+
+pub(super) fn lists_imap_unread(registry: &PluginRegistry) -> bool {
+    supports(registry, LIST_IMAP_UNREAD)
 }
 
 pub(super) async fn sync_imap_headers(
@@ -122,6 +127,14 @@ pub(super) async fn set_imap_flags(
         return Err("Mail module returned an incomplete flag update".into());
     }
     Ok(())
+}
+
+pub(super) async fn list_imap_unread(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    folder: &str,
+) -> Result<Vec<u32>, String> {
+    exchange_imap(registry, account, LIST_IMAP_UNREAD, &folder).await
 }
 
 async fn exchange_imap<T: DeserializeOwned + Send + 'static>(

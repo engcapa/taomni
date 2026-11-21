@@ -60,6 +60,7 @@ steps:
 - mail_server_assert_list_matches:
     timeout_sec: 30
     unread: true
+- assert_disabled: '[data-testid="mail-mark-folder-read"]'
 - screenshot: mail-bulk-01-read.png
 - click:
     selector: '[data-testid="mail-message-row"]:nth-child(1)'
@@ -178,109 +179,112 @@ verification:
       expectation: No visible messages are unread.
     - step: 16
       expectation: Cached UI counts match the server.
-    - step: 21
+    - step: 22
       expectation: Background work does not restore stale unread flags during selection.
+    - step: 17
+      expectation: The all-read action is disabled after the server confirms zero unread messages.
     results:
     - 14
     - 15
     - 16
-    - 21
+    - 22
+    - 17
   - id: R2
     requirement: Modified row clicks select a range; bulk deletion moves only those messages to Trash.
     actions:
-    - 18
     - 19
-    - 23
-    checkpoints:
-    - step: 20
-      expectation: Three messages are visibly selected.
-    - step: 24
-      expectation: Trash contains exactly the three selected messages.
-    - step: 25
-      expectation: INBOX retains its other 27 messages.
-    - step: 26
-      expectation: Completed deletion clears the selection.
-    results:
     - 20
     - 24
+    checkpoints:
+    - step: 21
+      expectation: Three messages are visibly selected.
+    - step: 25
+      expectation: Trash contains exactly the three selected messages.
+    - step: 26
+      expectation: INBOX retains its other 27 messages.
+    - step: 27
+      expectation: Completed deletion clears the selection.
+    results:
+    - 21
     - 25
     - 26
+    - 27
   - id: R3
     requirement: Select-all and permanent deletion retain a confirmation and cancellation path.
     actions:
-    - 27
-    - 29
-    - 31
-    - 33
-    - 36
-    - 38
-    checkpoints:
-    - step: 28
-      expectation: Switching to Trash during background sync eventually shows all three moved messages
-        without requiring a second click or manual Sync.
-    - step: 30
-      expectation: Select-all selects the three displayed messages.
-    - step: 34
-      expectation: Cancellation leaves the three messages on the server.
-    - step: 39
-      expectation: Confirmation removes the three messages from Trash.
-    - step: 41
-      expectation: The deleted messages disappear from the list.
-    results:
     - 28
     - 30
+    - 32
     - 34
+    - 37
     - 39
-    - 41
+    checkpoints:
+    - step: 29
+      expectation: Switching to Trash during background sync eventually shows all three moved messages
+        without requiring a second click or manual Sync.
+    - step: 31
+      expectation: Select-all selects the three displayed messages.
+    - step: 35
+      expectation: Cancellation leaves the three messages on the server.
+    - step: 40
+      expectation: Confirmation removes the three messages from Trash.
+    - step: 42
+      expectation: The deleted messages disappear from the list.
+    results:
+    - 29
+    - 31
+    - 35
+    - 40
+    - 42
   - id: R4
     requirement: A pending folder-read operation must allow deleting a new selection, move exactly those
       three messages and retain all remaining mail.
     actions:
-    - 43
     - 44
     - 45
-    - 47
+    - 46
     - 48
-    - 50
+    - 49
     - 51
-    - 56
+    - 52
+    - 57
     checkpoints:
-    - step: 46
+    - step: 47
       expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 30, ''unread'': True}}'
-    - step: 49
+    - step: 50
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-mark-folder-read"]'', ''name'':
         ''aria-busy'', ''equals'': ''true''}}'
-    - step: 52
+    - step: 53
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'':
         ''3 selected''}}'
-    - step: 53
-      expectation: '{''assert_enabled'': ''[data-testid="mail-delete-selected"]''}'
     - step: 54
+      expectation: '{''assert_enabled'': ''[data-testid="mail-delete-selected"]''}'
+    - step: 55
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-mark-folder-read"]'', ''name'':
         ''aria-busy'', ''equals'': ''true''}}'
-    - step: 57
+    - step: 58
       expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Trash'', ''equals'': 3, ''timeout_sec'':
         40}}'
-    - step: 58
-      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''INBOX'', ''equals'': 30}}'
     - step: 59
-      expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 40, ''unread'': True}}'
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''INBOX'', ''equals'': 30}}'
     - step: 60
+      expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 40, ''unread'': True}}'
+    - step: 61
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'':
         ''0 selected''}}'
-    - step: 61
+    - step: 62
       expectation: Reading flags and deleting the selection concurrently produces no runtime errors.
     results:
-    - 46
-    - 49
-    - 52
+    - 47
+    - 50
     - 53
     - 54
-    - 57
+    - 55
     - 58
     - 59
     - 60
     - 61
+    - 62
   visual:
   - check: Selected rows, selection count and Delete selected button are visible without clipping.
     method: manual

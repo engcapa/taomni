@@ -11,7 +11,7 @@ use crate::cache::MailCacheSettings;
 use crate::imap_auth::{MailAuthMode, MailProvider, authenticate};
 use crate::imap_folders::{imap_list_folders, imap_set_subscription};
 use crate::imap_messages::Mailbox;
-use crate::imap_mutations::imap_set_flags;
+use crate::imap_mutations::{imap_set_flags, unread_uids};
 use crate::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest, StepParams,
     imap_has_capability, imap_sync_folder_step, sync_folder_round,
@@ -97,6 +97,13 @@ impl ImapSession {
         match self {
             Self::Plain(session) => imap_set_flags(session, folder, uids, add, remove),
             Self::Tls(session) => imap_set_flags(session, folder, uids, add, remove),
+        }
+    }
+
+    pub fn unread_uids(&mut self, folder: &str) -> Result<Vec<u32>, String> {
+        match self {
+            Self::Plain(session) => unread_uids(session, folder),
+            Self::Tls(session) => unread_uids(session, folder),
         }
     }
 }

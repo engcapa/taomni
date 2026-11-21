@@ -2,6 +2,7 @@
 
 ## 2026-11-21 当前进展
 
+- Mail 0.1.10 将全部已读的未读 UID 查询和标记批次交给签名宿主。核心逐批提交缓存，结束时用服务器剩余未读修正计数。TC-MODULES-059 核对真实服务器和列表均清除未读，TC-MAIL-BULK-01 检查收到确认后按钮变为不可用。
 - `662d66d07` 的 Linux Native 为 36/37，Git Clone 和完整崩溃回归通过。TC-MODULES-059 的失败页面显示 Archive 在首次取消订阅前已丢失订阅标记。修复将 LIST/LSUB 文件夹属性与 EXAMINE/STATUS 同步数据分别写入，TC-MAIL-FOLDER-01 增加选中 Archive 抓取新邮件后的订阅断言。 [失败分片](https://github.com/engcapa/taomni/actions/runs/44904055836)
 - `662d66d07` 的 Linux、Windows 和 macOS 26 Browser 各 37/37。六个 Browser 分片在 Native 构建期间逐片下载，TC-MODULES-060 三端均已通过。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44904055836)
 - Mail 0.1.9 将 IMAP 星标、标签及已读标记更新交给签名宿主。客户端在收到确认后更新缓存。核心在异步请求中止时取消待执行或执行中的宿主调用。TC-MODULES-059 检查真实服务器的加星和取消星标，TC-MAIL-KEYS-01 比对 Browser 和 Native 的列表及星标 UID。
@@ -551,7 +552,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-023 发布验收 | 目录签名、首装名单和独立模块发布准备已验证 | 发布工具覆盖已暂存模块的签名、声明平台、描述和摘要。核心发布继承签名目录，独立发布保留原模块的资产地址。正式模块构建矩阵、系统签名、首批目录及最终两种安装集合的回归和性能仍待交付。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
 | TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
-| TASK-026 Mail | 独立宿主已实现缓存、草稿与备份，签名自动首装与导入验证中 | 核心保存会话设置。独立宿主读取缓存并读写草稿，运行时备份由宿主导出。首次升级准备验签包，下次启动导入 SQLite、原件及附件。剩余工作包括正式前端、收发和同步的宿主接管、作用域核心服务、实装升级与模块发布验收。 |
+| TASK-026 Mail | 签名前端及部分原生业务已迁入独立宿主 | 独立宿主提供签名页面、连接测试、SMTP 发送、IMAP 文件夹与邮件头同步、搜索和标记，已接入只读导入及备份导出。正文同步和归档、核心过渡缓存与完整后台任务、首发安装升级和回滚验收继续推进。 |
 | TASK-027 G1–G11 全门禁收口 | 新增任务，未闭合 | G1–G11 的当前证据仍存在正式发行包、业务模块、核心依赖闭包、系统信任和完整入口矩阵缺口；必须用匹配源码的 GitHub runner receipt 逐项闭合后才能进入生产发布。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。

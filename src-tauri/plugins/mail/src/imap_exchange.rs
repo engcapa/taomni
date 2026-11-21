@@ -80,6 +80,19 @@ pub(super) fn set_flags(
     )
 }
 
+pub(super) fn list_unread(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: ImapExchange,
+) -> Result<Result<(), String>, RpcError> {
+    transfer(runtime, operation, request, |session, folder: String| {
+        if folder.trim().is_empty() {
+            return Err("IMAP unread lookup requires a folder".into());
+        }
+        session.unread_uids(&folder)
+    })
+}
+
 fn validate_folder(account_id: &str, folder: &str) -> Result<(), String> {
     if account_id.trim().is_empty() || folder.trim().is_empty() {
         return Err("Mail IMAP requests require an account and folder".into());
