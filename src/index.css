@@ -30,3 +30,4 @@
 @import "./styles/sockscap.css";
 
 @source not "../src-tauri/plugins/vnc-client/renderer";
+@source not "../src-tauri/plugins/mail/renderer";

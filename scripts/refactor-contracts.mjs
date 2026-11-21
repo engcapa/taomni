@@ -32,7 +32,9 @@ export function facadeExports(file) {
 }
 export function frontendEvents() {
   const names = new Set();
-  for (const file of [...files("src", ".ts"), ...files("src", ".tsx")].filter((file) => !file.includes(".test.") && !file.includes("/stubs/"))) {
+  const sources = ["src", "src-tauri/plugins/mail/renderer"];
+  const frontend = sources.flatMap((dir) => [...files(dir, ".ts"), ...files(dir, ".tsx")]);
+  for (const file of frontend.filter((file) => !file.includes(".test.") && !file.includes("/stubs/"))) {
     const source = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true);
     const visit = (node) => {
       if (ts.isCallExpression(node) && /^(listen|emit|emitTo|once)$/.test(node.expression.getText(source))) {

@@ -1,7 +1,7 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 
-@source "../../../../src/components/mail";
+@source "./";
 
 /* ── Mail message reader (Thunderbird-like paper surface) ───────────────────
  * HTML mail expects a light document canvas. Keep app chrome themed, but isolate

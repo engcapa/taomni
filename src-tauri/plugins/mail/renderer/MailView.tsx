@@ -1,6 +1,6 @@
 import { useLayoutEffect } from "react";
-import { MailClientTab } from "../../../../src/components/mail/MailClientTab";
-import { MailUnifiedTab } from "../../../../src/components/mail/MailUnifiedTab";
+import { MailClientTab } from "./MailClientTab";
+import { MailUnifiedTab } from "./MailUnifiedTab";
 import type { MailRendererProps } from "../../../../src/lib/mail/rendererContract";
 import mailStyles from "./mail.css?inline";
 

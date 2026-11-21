@@ -76,7 +76,7 @@ const boundaries = [
   ["src/components/editor/workspace/hooks", "src/components/editor/CodeWorkspaceTab.tsx"],
   ["src/components/editor/workspace/views", "src/components/editor/CodeWorkspaceTab.tsx"],
   ["src/components/database/client", "src/components/database/DbClientTab.tsx"],
-  ["src/components/mail/client", "src/components/mail/MailClientTab.tsx"],
+  ["src-tauri/plugins/mail/renderer/client", "src-tauri/plugins/mail/renderer/MailClientTab.tsx"],
   ["src/components/git/workspace", "src/components/git/WorkspaceGitManager.tsx"],
   ["src/components/git/panel", "src/components/git/GitPanel.tsx"],
   ["src/components/terminal/panel", "src/components/terminal/TerminalPanel.tsx"],

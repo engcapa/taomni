@@ -7394,8 +7394,8 @@ status: done
 area: mail/compose
 components: [MailClientTab, RecipientField]
 files:
-  - src/components/mail/MailClientTab.tsx
-  - src/components/mail/RecipientField.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/RecipientField.tsx
   - src/lib/mailRecipients.ts
   - src/lib/mail.ts
   - src-tauri/src/mail/mod.rs
@@ -7459,10 +7459,10 @@ status: done
 area: mail/compose
 components: [MailClientTab, RichMailEditor, RecipientField]
 files:
-  - src/components/mail/MailClientTab.tsx
-  - src/components/mail/client/MailComposer.tsx
-  - src/components/mail/RichMailEditor.tsx
-  - src/components/mail/RecipientField.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/client/MailComposer.tsx
+  - src-tauri/plugins/mail/renderer/RichMailEditor.tsx
+  - src-tauri/plugins/mail/renderer/RecipientField.tsx
   - src/lib/mailHtml.ts
   - src/lib/mail.ts
   - src/stubs/tauri-core.ts
@@ -7593,7 +7593,7 @@ status: done
 area: mail/sync
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mail.ts
   - src-tauri/src/mail/mod.rs
   - src-tauri/src/mail/imap_transport.rs
@@ -7674,7 +7674,7 @@ status: done
 area: mail/sync
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailSync.ts
   - src/lib/mail.ts
   - src/lib/quickConnect.ts
@@ -7726,7 +7726,7 @@ status: done
 area: mail/compose
 components: [MailClientTab, SessionEditor]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailThreads.ts
   - src/lib/mail.ts
   - src/components/session/SessionEditor.tsx
@@ -7768,7 +7768,7 @@ status: done
 area: mail/search
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mail.ts
   - src/stubs/mailServerStub.ts
   - src-tauri/src/mail/search.rs
@@ -7818,7 +7818,7 @@ status: done
 area: mail/organize
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailTags.ts
   - src/stubs/tauri-core.ts
 controls:
@@ -7853,7 +7853,7 @@ status: done
 area: mail/compose
 components: [MailClientTab, SessionEditor, MailIdentitiesEditor]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailIdentities.ts
   - src/components/session/MailIdentitiesEditor.tsx
   - src/components/session/SessionEditor.tsx
@@ -7903,7 +7903,7 @@ status: done
 area: mail/sync
 components: [MailClientTab, SessionEditor]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/components/session/SessionEditor.tsx
   - src/lib/mail.ts
   - src/lib/lanNotify.ts
@@ -7937,10 +7937,10 @@ status: done
 area: mail/folders
 components: [MailClientTab, SessionEditor]
 files:
-  - src/components/mail/MailClientTab.tsx
-  - src/components/mail/client/subscriptionSnapshots.ts
-  - src/components/mail/client/useMailSubscriptions.ts
-  - src/components/mail/client/useMailCacheState.ts
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/client/subscriptionSnapshots.ts
+  - src-tauri/plugins/mail/renderer/client/useMailSubscriptions.ts
+  - src-tauri/plugins/mail/renderer/client/useMailCacheState.ts
   - src/lib/mailFolders.ts
   - src/components/session/SessionEditor.tsx
   - src-tauri/src/mail/folders.rs
@@ -7989,7 +7989,7 @@ status: done
 area: mail/list
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailShortcuts.ts
   - src/lib/mailMutations.ts
   - src-tauri/src/mail/mutations.rs
@@ -8035,7 +8035,7 @@ status: done
 area: mail/compose
 components: [MailClientTab, SessionEditor]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailOutbox.ts
   - src/components/session/SessionEditor.tsx
   - src-tauri/src/mail/mod.rs
@@ -8125,8 +8125,8 @@ status: partial
 area: mail/lists
 components: [MailClientTab, MailMessageBodyView, MailHtmlReader]
 files:
-  - src/components/mail/MailClientTab.tsx
-  - src/components/mail/MailHtmlReader.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailHtmlReader.tsx
   - src/lib/mailto.ts
   - src-tauri/src/mail/lists.rs
   - src-tauri/src/mail/mbox.rs
@@ -8152,7 +8152,7 @@ status: done
 area: mail/attachments
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailAttachReminder.ts
   - src-tauri/src/mail/parts.rs
   - src-tauri/src/mail/mod.rs
@@ -8187,7 +8187,7 @@ area: mail/account
 components: [SessionEditor, MailClientTab]
 files:
   - src/components/session/SessionEditor.tsx
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src-tauri/src/mail/autoconfig.rs
   - src-tauri/src/mail/certs.rs
   - src-tauri/crates/taomni-mail-engine/src/imap_auth.rs
@@ -8268,7 +8268,7 @@ status: partial
 area: mail/calendar
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailInvite.ts
   - src-tauri/src/mail/calendar.rs
 controls:
@@ -8319,8 +8319,8 @@ status: done
 area: mail/filters
 components: [MailFiltersPanel, MailClientTab]
 files:
-  - src/components/mail/MailFiltersPanel.tsx
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailFiltersPanel.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailFilters.ts
   - src-tauri/src/mail/filters.rs
 controls:
@@ -8433,7 +8433,7 @@ status: done
 area: mail/unified
 components: [MailUnifiedTab, Sidebar, ControlBar]
 files:
-  - src/components/mail/MailUnifiedTab.tsx
+  - src-tauri/plugins/mail/renderer/MailUnifiedTab.tsx
   - src/lib/mailUnified.ts
   - src/layouts/MainLayout.tsx
 controls:
@@ -8530,7 +8530,7 @@ status: partial
 area: mail/contacts
 components: [MailAddressBookPanel, MailClientTab, SessionEditor]
 files:
-  - src/components/mail/MailAddressBookPanel.tsx
+  - src-tauri/plugins/mail/renderer/MailAddressBookPanel.tsx
   - src/lib/mailContacts.ts
   - src-tauri/src/mail/contacts.rs
   - src-tauri/crates/taomni-mail-engine/src/contacts.rs
@@ -8625,7 +8625,7 @@ status: partial
 area: mail/calendar
 components: [MailAgendaPanel, MailClientTab, SessionEditor]
 files:
-  - src/components/mail/MailAgendaPanel.tsx
+  - src-tauri/plugins/mail/renderer/MailAgendaPanel.tsx
   - src/lib/mailCalendar.ts
   - src-tauri/src/mail/caldav.rs
   - src-tauri/src/mail/webdav.rs
@@ -8696,10 +8696,10 @@ area: mail/storage
 components: [MailStorageSettings, MailArchivePanel, MailArchiveDialog, SessionEditor, MailClientTab]
 files:
   - src/components/mail/MailStorageSettings.tsx
-  - src/components/mail/MailArchivePanel.tsx
-  - src/components/mail/MailArchiveDialog.tsx
+  - src-tauri/plugins/mail/renderer/MailArchivePanel.tsx
+  - src-tauri/plugins/mail/renderer/MailArchiveDialog.tsx
   - src/components/session/SessionEditor.tsx
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mail.ts
   - src/lib/mailFolders.ts
   - src/stubs/mailArchiveStub.ts
@@ -16266,7 +16266,7 @@ files:
   - src/components/settings/FileOpenSettings.tsx
   - src/components/chat/useChatFileLinks.ts
   - src/components/terminal/panel/fileLinks.ts
-  - src/components/mail/client/createAttachmentActions.tsx
+  - src-tauri/plugins/mail/renderer/client/createAttachmentActions.tsx
   - src/components/viewer/ViewerShell.tsx
   - src/components/viewer/TextEditor.tsx
   - src/components/viewer/ImageViewer.tsx

@@ -76,9 +76,9 @@ function bindRendererHost(): Plugin {
       for (const id of this.getModuleIds()) {
         if (!id.startsWith(coreRoot)) continue;
         const path = corePath(id);
-        // Mail's existing sources move with the renderer. Other application
-        // code is accessed only through the platform exports above.
-        if (!/^components\/mail\//.test(path) && !/^lib\/mail(?:[A-Z/]|\.ts$|to\.ts$)/.test(path)) {
+        // Mail's shared request types and codecs are allowed in the package.
+        // Platform operations use the core exports above.
+        if (!/^lib\/mail(?:[A-Z/]|\.ts$|to\.ts$)/.test(path)) {
           this.error(`Mail frontend bundles an application implementation: ${path}`);
         }
       }
