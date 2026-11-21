@@ -273,6 +273,17 @@ export function shuffleLinesList(lines: string[], rng: () => number = Math.rando
   return copy;
 }
 
+/**
+ * Fisher-Yates shuffle of a resolved line span. A trailing empty element only means
+ * "segment ends with a newline", so it stays at the end instead of being shuffled into the body.
+ */
+function shuffleSpanLines(lines: string[], rng: () => number): string[] {
+  const hasTrailingNewline = lines.length > 1 && lines[lines.length - 1] === "";
+  const body = hasTrailingNewline ? lines.slice(0, -1) : lines;
+  const shuffled = shuffleLinesList(body, rng);
+  return hasTrailingNewline ? [...shuffled, ""] : shuffled;
+}
+
 export const dedupeLines = (text: string, range: TextRange, wholeIfEmpty = true) =>
   applyLineTransform(text, range, wholeIfEmpty, dedupeLinesList);
 
@@ -288,9 +299,20 @@ export const removeBlankLines = (text: string, range: TextRange, wholeIfEmpty = 
 export const reverseLines = (text: string, range: TextRange, wholeIfEmpty = true) =>
   applyLineTransform(text, range, wholeIfEmpty, reverseLinesList);
 
-export const shuffleLines = (
+export function shuffleLines(
   text: string,
   range: TextRange,
-  wholeIfEmpty = true,
+  wholeIfEmpty?: boolean,
+  rng?: () => number,
+): TextTransformResult;
+export function shuffleLines(text: string, range: TextRange, rng: () => number): TextTransformResult;
+export function shuffleLines(
+  text: string,
+  range: TextRange,
+  wholeIfEmptyOrRng: boolean | (() => number) = true,
   rng: () => number = Math.random,
-) => applyLineTransform(text, range, wholeIfEmpty, (lines) => shuffleLinesList(lines, rng));
+): TextTransformResult {
+  const wholeIfEmpty = typeof wholeIfEmptyOrRng === "boolean" ? wholeIfEmptyOrRng : true;
+  const random = typeof wholeIfEmptyOrRng === "function" ? wholeIfEmptyOrRng : rng;
+  return applyLineTransform(text, range, wholeIfEmpty, (lines) => shuffleSpanLines(lines, random));
+}

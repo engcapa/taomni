@@ -13,6 +13,12 @@ export interface NotepadCommandDefinition {
   id: string;
   titleKey: string;
   defaultLabel: string;
+  /**
+   * Simplified Chinese UI label. Optional in the type so legacy constructors keep
+   * compiling, but every catalog entry fills it in; resolve per locale with
+   * `commandLabel(def, locale)`.
+   */
+  zhLabel?: string;
   category: NotepadCommandCategory;
   defaultShortcut?: string;
   macosShortcut?: string;

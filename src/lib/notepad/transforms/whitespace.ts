@@ -1,5 +1,11 @@
 import { applyLineTransform, type TextRange, type TextTransformResult } from "./lines";
 
+/** Tab size used by the TAB/space conversions; non-finite or < 1 values fall back to the default. */
+function normalizeTabWidth(tabWidth: number): number {
+  if (!Number.isFinite(tabWidth)) return 4;
+  return Math.max(1, Math.floor(tabWidth));
+}
+
 export function trimTrailingSpacesList(lines: string[]): string[] {
   return lines.map((line) => line.replace(/[ \t]+$/, ""));
 }
@@ -12,8 +18,9 @@ export function trimBothSpacesList(lines: string[]): string[] {
   return lines.map((line) => line.replace(/^[ \t]+|[ \t]+$/g, ""));
 }
 
+/** Convert every TAB to the spaces needed to reach the next tab stop (column aware, all occurrences). */
 export function tabsToSpacesList(lines: string[], tabWidth = 4): string[] {
-  const width = Math.max(1, Math.floor(tabWidth));
+  const width = normalizeTabWidth(tabWidth);
   return lines.map((line) => {
     let out = "";
     let col = 0;
@@ -31,14 +38,16 @@ export function tabsToSpacesList(lines: string[], tabWidth = 4): string[] {
   });
 }
 
+/** Convert every run of `tabWidth` spaces (not only leading indentation) to a single TAB. */
 export function spacesToTabsAllList(lines: string[], tabWidth = 4): string[] {
-  const width = Math.max(1, Math.floor(tabWidth));
+  const width = normalizeTabWidth(tabWidth);
   const pattern = new RegExp(` {${width}}`, "g");
   return lines.map((line) => line.replace(pattern, "\t"));
 }
 
+/** Convert runs of `tabWidth` spaces in the leading indentation only to TABs. */
 export function spacesToTabsLeadingList(lines: string[], tabWidth = 4): string[] {
-  const width = Math.max(1, Math.floor(tabWidth));
+  const width = normalizeTabWidth(tabWidth);
   const pattern = new RegExp(`^( {${width}})+`);
   return lines.map((line) => line.replace(pattern, (match) => "\t".repeat(match.length / width)));
 }
