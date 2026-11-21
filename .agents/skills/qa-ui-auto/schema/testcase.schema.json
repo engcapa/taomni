@@ -128,6 +128,7 @@
           "java_sample_projects",
           "java25_projects",
           "git_diff_repo",
+          "git_clone_source",
           "welcome_recents",
           "editor_typing_fixtures",
           "restore_24tab_fixtures",

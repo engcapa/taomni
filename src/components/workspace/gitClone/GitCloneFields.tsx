@@ -249,7 +249,7 @@ export function GitCloneFields({
               aria-label="http.proxy"
               value={appProxyReadOnly ? appProxy : form.httpProxy}
               readOnly={appProxyReadOnly}
-              disabled={disabled || form.proxyMode === "none" || appProxyReadOnly}
+              disabled={disabled || form.proxyMode === "none"}
               onChange={(event) => onChange({ httpProxy: event.target.value })}
             />
           </div>
@@ -262,7 +262,7 @@ export function GitCloneFields({
               aria-label="https.proxy"
               value={appProxyReadOnly ? appProxy : form.httpsProxy}
               readOnly={appProxyReadOnly}
-              disabled={disabled || form.proxyMode === "none" || appProxyReadOnly}
+              disabled={disabled || form.proxyMode === "none"}
               onChange={(event) => onChange({ httpsProxy: event.target.value })}
             />
           </div>

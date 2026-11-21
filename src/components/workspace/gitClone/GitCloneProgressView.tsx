@@ -15,6 +15,16 @@ export function GitCloneProgressView({ task }: GitCloneProgressViewProps) {
     : null;
   return (
     <div data-testid="workspace-git-clone-progress" data-phase={task.phase} className="space-y-4">
+      <div className="space-y-1 text-[11px] text-[var(--taomni-text-muted)]">
+        <p className="truncate" title={task.request.url}>
+          <span className="font-semibold">{t("gitClone.url")}: </span>
+          <code className="taomni-mono">{task.request.url}</code>
+        </p>
+        <p className="truncate" title={task.request.destination}>
+          <span className="font-semibold">{t("gitClone.destination")}: </span>
+          <code className="taomni-mono">{task.request.destination}</code>
+        </p>
+      </div>
       <div className="rounded-lg border p-3" style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}>
         <div className="flex items-center justify-between gap-2">
           <strong data-testid="workspace-git-clone-phase" className="text-[13px] text-[var(--taomni-text)]">
@@ -22,7 +32,7 @@ export function GitCloneProgressView({ task }: GitCloneProgressViewProps) {
           </strong>
           {task.percent !== null && (
             <span data-testid="workspace-git-clone-percent" className="taomni-mono text-[12px] text-[var(--taomni-accent)]">
-              {Math.round(task.percent)}%
+              {t("gitClone.overallPercent", { percent: Math.round(task.percent) })}
             </span>
           )}
         </div>

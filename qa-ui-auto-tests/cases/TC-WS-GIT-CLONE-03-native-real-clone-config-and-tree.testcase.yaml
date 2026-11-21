@@ -1,0 +1,144 @@
+id: TC-WS-GIT-CLONE-03-native-real-clone-config-and-tree
+title: Native Git clone import creates a real workspace with branch, identity and proxy configuration
+description: The packaged app clones an isolated local Git repository through a real Git subprocess.
+  It verifies the configured parent directory, development branch, repository-local user.name/user.email
+  and proxy values, branch-only bytes, the published workspace and its project tree. Native only.
+modes:
+- native
+covers:
+- F-WS-2
+- F25.1
+tags:
+- p1
+- workspace
+- git
+- clone
+- native
+fixtures:
+- reset_db
+- git_clone_source
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-git-clone-03
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-switcher-button"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-clone-git"]'
+- wait_for: '[data-testid="workspace-git-clone-modal"]'
+- eval_readonly:
+    expression: (document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-git-clone-location"]')?.value || "").split(String.fromCharCode(92)).join("/").endsWith("taomni-workspaces")
+    expect_truthy: true
+- fill:
+    selector: '[data-testid="workspace-git-clone-url"]'
+    value: ${fixture.git_clone_url}
+- fill:
+    selector: '[data-testid="workspace-git-clone-name"]'
+    value: ${fixture.git_clone_workspace_name}
+- fill:
+    selector: '[data-testid="workspace-git-clone-location"]'
+    value: ${fixture.git_clone_parent}
+- fill:
+    selector: '[data-testid="workspace-git-clone-branch"]'
+    value: ${fixture.git_clone_branch}
+- fill:
+    selector: '[data-testid="workspace-git-clone-user-name"]'
+    value: QA Clone User
+- fill:
+    selector: '[data-testid="workspace-git-clone-user-email"]'
+    value: qa-clone@example.invalid
+- click: '[data-testid="workspace-git-clone-proxy-custom"]'
+- fill:
+    selector: '[data-testid="workspace-git-clone-http-proxy"]'
+    value: http://192.168.0.110:31028
+- fill:
+    selector: '[data-testid="workspace-git-clone-https-proxy"]'
+    value: http://192.168.0.110:31028
+- click: '[data-testid="workspace-git-clone-start"]'
+- wait_for:
+    selector: '[data-testid="workspace-git-clone-success"]'
+    timeout_sec: 180
+- assert_text:
+    selector: '[data-testid="workspace-git-clone-success"]'
+    contains: ${fixture.git_clone_destination}
+- click: '[data-testid="workspace-git-clone-close"]'
+- wait_for: '[data-testid="workspace-switcher-button"]'
+- assert_text:
+    selector: '[data-testid="workspace-switcher-button"]'
+    contains: ${fixture.git_clone_workspace_name}
+- wait_for: '[data-testid="code-workspace-tree-root"][data-root-path="${fixture.git_clone_destination}"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="${fixture.git_clone_main_file}"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="${fixture.git_clone_branch_file}"]'
+- assert_file_contains:
+    path: ${fixture.git_clone_destination}/.git/HEAD
+    contains: refs/heads/${fixture.git_clone_branch}
+- assert_file_contains:
+    path: ${fixture.git_clone_destination}/.git/config
+    contains: name = QA Clone User
+- assert_file_contains:
+    path: ${fixture.git_clone_destination}/.git/config
+    contains: email = qa-clone@example.invalid
+- assert_file_contains:
+    path: ${fixture.git_clone_destination}/.git/config
+    contains: proxy = http://192.168.0.110:31028
+- assert_file_contains:
+    path: ${fixture.git_clone_destination}/${fixture.git_clone_branch_file}
+    contains: develop-only
+- assert_file_exists:
+    path: ${fixture.git_clone_destination}/src/main.ts
+- assert_no_runtime_errors: null
+- screenshot: git-clone-native-workspace.png
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: The native dialog opens with the default parent directory ending in taomni-workspaces and
+      accepts the URL, name, parent, branch, identity and custom proxy values.
+    actions: [5, 6]
+    checkpoints:
+    - step: 7
+      expectation: The native clone dialog is visible.
+    - step: 8
+      expectation: The default parent location ends with taomni-workspaces.
+    results: [7, 8]
+  - id: R2
+    requirement: The real Git clone succeeds, the workspace is published with the configured name and
+      root, and the branch-only project tree files are visible.
+    actions: [18, 21]
+    checkpoints:
+    - step: 19
+      expectation: The real clone reaches the success summary.
+    - step: 23
+      expectation: The published workspace name is visible in the switcher.
+    - step: 26
+      expectation: The branch-only file is visible under the published root.
+    results: [19, 23, 26]
+  - id: R3
+    requirement: Repository bytes prove the requested develop branch, repository-local identity and proxy
+      configuration, without claiming global Git settings changed.
+    actions: [18]
+    checkpoints:
+    - step: 27
+      expectation: HEAD points at the requested develop branch.
+    - step: 28
+      expectation: The repository-local user.name matches the form.
+    - step: 30
+      expectation: The repository-local proxy matches the form.
+    - step: 32
+      expectation: The cloned source file exists on disk.
+    results: [27, 28, 30, 32]
+  - id: R4
+    requirement: The native case completes without uncaught runtime errors.
+    actions: [18]
+    checkpoints:
+    - step: 33
+      expectation: No uncaught runtime errors occurred.
+    results: [33]
+  visual:
+  - check: Native dialog defaults, clone success summary and the resulting project tree.
+    method: manual
+    reason: The retained git-clone-native-workspace.png screenshot is reviewed for state presentation in the packaged WebView.
+  native:
+  - check: Real Git subprocess, branch checkout, repository-local identity/proxy config, disk bytes and workspace publication.
+    method: automated
+    reason: Executed with the packaged QA binary on the current platform; hosted Windows/Linux/macOS runs are recorded separately.

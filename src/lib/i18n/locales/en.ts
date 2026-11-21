@@ -4749,6 +4749,7 @@ const dict = {
     phaseCancelled: "Clone cancelled",
     phaseCancelling: "Cancelling clone…",
     objects: "{done} / {total} objects",
+    overallPercent: "{percent}% overall",
     backgroundHint: "Closing this dialog keeps the clone running. Reopen it from the workspace + menu.",
     duplicateTask: "A Git clone is already running.",
     duplicateDestination: "A Git clone is already running for this destination.",

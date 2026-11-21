@@ -2302,6 +2302,31 @@
 - `[data-testid="workspace-tab-filter-local"]` — interactive — F-WS-2.workspace-tab-filter-local
 - `[data-testid="workspace-tab-filter-other"]` — interactive — F-WS-2.workspace-tab-filter-other
 - `[data-testid="workspace-tab-categories"]` — display — F-WS-2.workspace-tab-categories
+- `[data-testid="workspace-git-clone-modal"]` — display — F-WS-2.workspace-git-clone-modal
+- `[data-testid="workspace-plus-clone-git"]` — interactive — F-WS-2.workspace-plus-clone-git
+- `[data-testid="workspace-switcher-clone-git"]` — interactive [optional] — F-WS-2.workspace-switcher-clone-git
+- `[data-testid="workspace-git-clone-url"]` — interactive — F-WS-2.workspace-git-clone-url
+- `[data-testid="workspace-git-clone-name"]` — interactive — F-WS-2.workspace-git-clone-name
+- `[data-testid="workspace-git-clone-location"]` — interactive — F-WS-2.workspace-git-clone-location
+- `[data-testid="workspace-git-clone-branch"]` — interactive — F-WS-2.workspace-git-clone-branch
+- `[data-testid="workspace-git-clone-branch-detect"]` — interactive — F-WS-2.workspace-git-clone-branch-detect
+- `[data-testid="workspace-git-clone-user-name"]` — interactive — F-WS-2.workspace-git-clone-user-name
+- `[data-testid="workspace-git-clone-user-email"]` — interactive — F-WS-2.workspace-git-clone-user-email
+- `[data-testid="workspace-git-clone-proxy-app"]` — interactive — F-WS-2.workspace-git-clone-proxy-app
+- `[data-testid="workspace-git-clone-proxy-custom"]` — interactive — F-WS-2.workspace-git-clone-proxy-custom
+- `[data-testid="workspace-git-clone-proxy-none"]` — interactive — F-WS-2.workspace-git-clone-proxy-none
+- `[data-testid="workspace-git-clone-http-proxy"]` — interactive — F-WS-2.workspace-git-clone-http-proxy
+- `[data-testid="workspace-git-clone-https-proxy"]` — interactive — F-WS-2.workspace-git-clone-https-proxy
+- `[data-testid="workspace-git-clone-destination"]` — display — F-WS-2.workspace-git-clone-destination
+- `[data-testid="workspace-git-clone-start"]` — interactive — F-WS-2.workspace-git-clone-start
+- `[data-testid="workspace-git-clone-close"]` — interactive — F-WS-2.workspace-git-clone-close
+- `[data-testid="workspace-git-clone-cancel"]` — interactive — F-WS-2.workspace-git-clone-cancel
+- `[data-testid="workspace-git-clone-retry"]` — interactive — F-WS-2.workspace-git-clone-retry
+- `[data-testid="workspace-git-clone-progress"]` — display — F-WS-2.workspace-git-clone-progress
+- `[data-testid="workspace-git-clone-phase"]` — display — F-WS-2.workspace-git-clone-phase
+- `[data-testid="workspace-git-clone-percent"]` — display — F-WS-2.workspace-git-clone-percent
+- `[data-testid="workspace-git-clone-success"]` — display — F-WS-2.workspace-git-clone-success
+- `[data-testid="workspace-git-clone-cancelled"]` — display — F-WS-2.workspace-git-clone-cancelled
 
 ## main/workspace-platform (F-WS-3)
 

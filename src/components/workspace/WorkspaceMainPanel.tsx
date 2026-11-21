@@ -40,6 +40,7 @@ export const WorkspaceMainPanel = memo(function WorkspaceMainPanel({ visible = t
       {workspaces.map((workspace) => (
         <WorkspaceCanvas key={workspace.id} workspaceId={workspace.id} visible={visible && workspace.id === activeId} onCommandsChange={onCommandsChange} onEditSession={onEditSession} />
       ))}
+      <WorkspaceGitCloneModal />
     </div>
   );
 });
@@ -171,7 +172,6 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEdi
         onClose={closeSessionPicker}
       />
       <WorkspaceFsModals request={visible ? fsModal : null} initialPath={workspace.rootFolders[0]?.path} onCancel={closeFsModal} onSubmit={submitFsModal} />
-      <WorkspaceGitCloneModal />
     </div>
   );
 }

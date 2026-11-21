@@ -4726,6 +4726,7 @@ export const zhCN: DeepPartial<typeof en> = {
     phaseCancelled: "克隆已取消",
     phaseCancelling: "正在取消克隆…",
     objects: "{done} / {total} 个对象",
+    overallPercent: "总进度 {percent}%",
     backgroundHint: "关闭对话框不会中断克隆；可从工作区“+”菜单重新打开查看进度。",
     duplicateTask: "已有 Git 克隆任务在运行。",
     duplicateDestination: "该目标目录已有克隆任务在运行。",
