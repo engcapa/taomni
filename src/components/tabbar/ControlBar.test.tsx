@@ -102,7 +102,11 @@ function renderControlBar(
 }
 
 describe("ControlBar settings button", () => {
-  beforeEach(() => { useAppStore.setState({ activeSideTab: "sessions" }); useTabOverviewStore.getState().close(); });
+  beforeEach(() => {
+    useAppStore.setState({ activeSideTab: "sessions", tabs: [], activeTabId: null });
+    useExplorerStore.setState({ tabs: [], activeTabId: null });
+    useTabOverviewStore.getState().close();
+  });
   it("moves the screenshot entry out of the shared toolbar (rail owns it now)", () => {
     renderControlBar(vi.fn());
     // v6.1 AC-04: the ScreenshotMenuButton lives in the primary rail's bottom
@@ -113,7 +117,6 @@ describe("ControlBar settings button", () => {
   });
   afterEach(() => {
     cleanup();
-    useExplorerStore.setState({ tabs: [], activeTabId: null });
     vi.clearAllMocks();
     tabBarMocks.props.length = 0;
     openTabsMocks.props.length = 0;
