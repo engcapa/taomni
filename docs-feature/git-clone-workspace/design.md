@@ -300,7 +300,7 @@ Native 模式不使用 stub，验证真实 Git 与磁盘。
 | AC-08 | 关闭对话框不取消任务；菜单显示进行中百分比；重新打开恢复同一任务与进度。 |
 | AC-09 | 成功后创建并切换工作区、登记 Home 最近工作区、展开项目树根目录；仓库本地 `user.name/user.email/http.proxy/https.proxy` 符合表单；分支正确检出。 |
 | AC-10 | token 只在用户选择时写入 vault，并以 `taomni-auth.origin.tokenRef` 复用；`.git/config` 与日志不含 token 明文；URL userinfo 被拒绝。 |
-| AC-11 | 失败显示 Git 错误摘要，不发布半成品；重试可用；相同目标不会并发克隆。 |
+| AC-11 | 失败显示 Git 错误摘要；本次创建的目标目录不发布半成品，已存在空目录则保留并明确提示残留位置；干净目标可重试；相同目标不会并发克隆。 |
 | AC-12 | 浏览器（stub）与 Windows native（真实 Git/磁盘）用例通过；Linux/macOS browser+native 在 GitHub hosted runner 通过；受影响既有用例与 crash-regression 通过。 |
 
 ## 8. 决策记录（DEC）
