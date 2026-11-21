@@ -1,7 +1,7 @@
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
-import { history } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
-import { drawSelection, EditorView, highlightActiveLine, highlightActiveLineGutter, lineNumbers } from "@codemirror/view";
+import { drawSelection, EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from "@codemirror/view";
 import { createBookmarksAndHistoryExtension } from "./bookmarksAndHistory";
 import { createColumnSelectionExtension } from "./columnSelection";
 import { createMarksExtension } from "./marksAndTokens";
@@ -100,6 +100,11 @@ export function buildNotepadExtensions(options: {
       onToggleBookmark: options.onToggleBookmark,
     }),
     createMarksExtension({ rules: options.marks }),
+    // The workbench used to rely on the browser's default contenteditable
+    // editing for Enter/Backspace/arrows. WebKitGTK then duplicated line breaks
+    // under fast WebDriver key streams. Bind the standard editing commands so
+    // the editor owns them (the previous shared TextEditor did the same).
+    keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
     EditorView.updateListener.of((update) => {
       options.onUpdate?.(update.view);
     }),

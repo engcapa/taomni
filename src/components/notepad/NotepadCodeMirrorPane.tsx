@@ -176,7 +176,19 @@ export function NotepadCodeMirrorPane({
   }, [paneIndex, compartments]);
 
   useEffect(() => {
-    syncViewDocumentText(viewRef.current, content);
+    // Fast native/WebDriver key streams can update CodeMirror between React
+    // renders: the `content` prop arriving here may still be the previous
+    // document, and rebuilding the view from it would reorder or duplicate the
+    // user's text. Defer the external-sync check to the next animation frame so
+    // an in-flight local edit can finish rendering; if the view already holds
+    // the latest content the diff is a no-op.
+    const frame = requestAnimationFrame(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      if (view.state.doc.toString() === content) return;
+      syncViewDocumentText(view, content);
+    });
+    return () => cancelAnimationFrame(frame);
   }, [content]);
 
   useEffect(() => {
