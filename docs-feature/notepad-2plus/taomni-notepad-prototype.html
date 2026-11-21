@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Taomni Notepad 工作台 — 高保真交互原型 v2（设计对象，非产品实现）</title>
+<style>
+:root{
+  --bg:#f8fafc;--panel:#f1f5f9;--chrome:#e8eef5;--chrome-b:#cbd5e1;--card:#fff;--card-b:#e2e8f0;
+  --accent:#1e40af;--accent-s:#3b82f6;--sel:#dbeafe;--sel-b:#93c5fd;--hover:rgba(15,23,42,.06);--hover2:rgba(15,23,42,.11);
+  --text:#0f172a;--muted:#64748b;--subtle:#94a3b8;--divider:#e2e8f0;--ok:#10b981;--warn:#f59e0b;--danger:#ef4444;
+  --input:#fff;--input-b:#cbd5e1;--code-bg:#fff;--shadow:0 16px 40px -8px rgba(15,23,42,.28);
+  --m0:#fde68a;--m1:#bbf7d0;--m2:#bfdbfe;--m3:#fbcfe8;--m4:#ddd6fe;--m5:#fed7aa;--fa:#fef08a;--fc:#fb923c;--curline:rgba(59,130,246,.07);
+  --sans:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,"Noto Sans Mono CJK SC",monospace;
+  --fs:13px;--lh:21px;
+}
+html.dark{
+  --bg:#1e1f22;--panel:#23252a;--chrome:#16171a;--chrome-b:#2e3138;--card:#26282e;--card-b:#35383f;
+  --accent:#6aa6f8;--accent-s:#8bbcff;--sel:#25354d;--sel-b:#4d7ec4;--hover:rgba(255,255,255,.06);--hover2:rgba(255,255,255,.12);
+  --text:#e6eaf0;--muted:#9ca3ad;--subtle:#6e7582;--divider:#2e3138;--ok:#34d399;--warn:#fbbf24;--danger:#f87171;
+  --input:#1b1c20;--input-b:#3a3e46;--code-bg:#1a1b1f;--shadow:0 20px 48px -10px rgba(0,0,0,.7);
+  --m0:#6b5a12;--m1:#1f5a3a;--m2:#1f4a7a;--m3:#6a2850;--m4:#4a3a8a;--m5:#7a4a1a;--fa:#5a4f10;--fc:#c2570c;--curline:rgba(139,188,255,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);font-size:12.5px;line-height:1.4;color:var(--text);background:#0b1020;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+button,input,select,textarea{font:inherit;color:inherit;background:none;border:0;outline:0}
+button{cursor:pointer;white-space:nowrap}
+svg.i{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:var(--chrome-b);border-radius:5px}::-webkit-scrollbar-track{background:transparent}
+.sp{flex:1}.mut{color:var(--muted)}.mono{font-family:var(--mono)}
+#proto{background:#0b1020;color:#cbd5e1;padding:6px 14px;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;border-bottom:1px solid #1e293b;font-size:12px}
+#proto b{color:#fff}#proto .grp{display:flex;align-items:center;gap:4px}#proto .lbl{color:#64748b}
+#proto button{padding:3px 9px;border-radius:5px;border:1px solid #334155;color:#cbd5e1}#proto button.on{background:#2563eb;border-color:#2563eb;color:#fff}#proto button:hover:not(.on){background:#1e293b}
+#hint{background:#111a33;color:#93c5fd;padding:5px 14px;font-size:12px;border-bottom:1px solid #1e293b;min-height:26px}
+#stage{flex:1;min-height:0;padding:10px;display:flex;justify-content:center}
+#app{width:100%;max-width:1560px;height:100%;border-radius:10px;overflow:hidden;background:var(--chrome);display:flex;flex-direction:column;border:1px solid #1e293b;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#titlebar{height:28px;background:var(--chrome);border-bottom:1px solid var(--chrome-b);display:flex;align-items:center;padding:0 10px;gap:8px;color:var(--muted);font-size:11.5px;flex:none}
+#titlebar .dots{display:flex;gap:6px}#titlebar .dots i{width:10px;height:10px;border-radius:50%;background:var(--chrome-b)}
+#shell{flex:1;min-height:0;display:flex}
+#rail{width:44px;background:var(--chrome);border-right:1px solid var(--chrome-b);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:2px;flex:none}
+.rbtn{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--muted)}.rbtn.on{background:var(--sel);color:var(--accent)}
+#colmain{flex:1;min-width:0;display:flex;flex-direction:column}
+#apptabs{height:32px;background:var(--chrome);display:flex;align-items:flex-end;padding:0 6px;gap:2px;border-bottom:1px solid var(--chrome-b);flex:none}
+.atab{height:27px;padding:0 12px;border-radius:7px 7px 0 0;display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}.atab.on{background:var(--bg);color:var(--text);box-shadow:inset 0 2px 0 var(--accent-s)}
+#nproot{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg);position:relative}
+#menubar{display:flex;gap:0;padding:2px 6px;border-bottom:1px solid var(--divider);background:var(--bg);flex:none;align-items:center}
+#menubar button{padding:3px 9px;border-radius:5px;font-size:12px}#menubar button:hover,#menubar button.open{background:var(--hover2)}
+#toolbar{display:flex;align-items:center;gap:1px;padding:3px 8px;border-bottom:1px solid var(--divider);background:var(--bg);flex:none;overflow-x:auto}
+.ibtn{width:27px;height:27px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);flex:none}.ibtn:hover{background:var(--hover);color:var(--text)}.ibtn.on{background:var(--sel);color:var(--accent)}.ibtn.rec{color:var(--danger)}
+.vsep{width:1px;height:18px;background:var(--divider);margin:0 5px;flex:none}
+#workrow{flex:1;min-height:0;display:flex}
+#center{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+#panes{flex:1;min-height:0;display:flex;position:relative}
+#panes.v{flex-direction:row}#panes.h{flex-direction:column}
+.pane{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;position:relative;background:var(--bg)}
+#panes.v .pane+.pane{border-left:2px solid var(--chrome-b)}#panes.h .pane+.pane{border-top:2px solid var(--chrome-b)}
+.pane.focus .tabs{box-shadow:inset 0 -2px 0 var(--accent-s)}
+.tabs{display:flex;align-items:flex-end;gap:1px;background:var(--chrome);border-bottom:1px solid var(--chrome-b);padding:3px 4px 0;overflow-x:auto;flex:none;min-height:30px}
+.tab{height:26px;max-width:190px;padding:0 6px 0 9px;border-radius:6px 6px 0 0;display:flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;flex:none;position:relative}
+.tab:hover{background:var(--hover)}.tab.on{background:var(--bg);color:var(--text);box-shadow:inset 0 2px 0 var(--accent-s)}
+.tab .tt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tab .dirty{width:7px;height:7px;border-radius:50%;background:var(--warn);flex:none}
+.tab .x{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;opacity:.55}.tab .x:hover{background:var(--hover2);opacity:1}
+.tab.pinned{background:color-mix(in srgb,var(--accent-s) 10%,transparent)}.tab.pinned .x{display:none}.tab svg.i{width:12px;height:12px}
+.tab.ro .tt::after{content:" 🔒";font-size:10px}.tab.dragover{box-shadow:inset 2px 0 0 var(--accent-s)}
+.banners{flex:none}.banner{display:flex;align-items:center;gap:8px;padding:5px 12px;font-size:12px;border-bottom:1px solid var(--divider)}
+.banner.warn{background:color-mix(in srgb,var(--warn) 15%,var(--bg))}.banner.info{background:var(--sel);color:var(--accent)}.banner.err{background:color-mix(in srgb,var(--danger) 13%,var(--bg))}
+.cbtn{flex:none;height:24px;padding:0 9px;border-radius:6px;display:inline-flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--input-b)}
+.cbtn:hover{background:var(--hover)}.cbtn.pri{background:var(--accent-s);border-color:var(--accent-s);color:#fff}.cbtn.pri:hover{filter:brightness(1.08)}.cbtn.dng{background:var(--danger);border-color:var(--danger);color:#fff}.cbtn.on{background:var(--sel);color:var(--accent)}
+.ed{flex:1;min-height:0;position:relative;display:flex}
+.sc{flex:1;min-width:0;overflow:auto;position:relative;background:var(--code-bg)}
+.inner{position:relative;min-height:100%;width:max-content;min-width:100%;padding-bottom:40px}
+.wrapon .inner{width:100%}
+.bd{font-family:var(--mono);font-size:var(--fs);line-height:var(--lh);tab-size:4}
+.row{display:flex;min-height:var(--lh)}
+.row.cur{background:var(--curline)}.row.bm{background:color-mix(in srgb,var(--accent-s) 12%,transparent)}
+.gt{width:var(--gw);flex:none;display:flex;align-items:flex-start;justify-content:flex-end;position:sticky;left:0;background:var(--panel);color:var(--subtle);border-right:1px solid var(--divider);user-select:none;z-index:2;font-size:calc(var(--fs) - 1px);padding-right:6px;gap:3px}
+.nonum .no{display:none}
+.gt .cg{width:3px;align-self:stretch;flex:none}.gt .cg.c1{background:var(--warn)}.gt .cg.c2{background:var(--ok)}
+.hidechg .cg{background:none!important}
+.gt .bk{width:10px;height:var(--lh);flex:none;cursor:pointer;position:relative}.row.bm .gt .bk::after{content:"";position:absolute;left:1px;top:calc(var(--lh)/2 - 4px);width:8px;height:8px;border-radius:50%;background:var(--accent-s)}
+.gt .no{margin-left:auto;cursor:default}
+.tx{flex:1;white-space:pre;padding:0 8px}
+.wrapon .tx{white-space:pre-wrap;word-break:break-all}
+.ed textarea{position:absolute;top:0;bottom:0;left:var(--gw);right:0;width:calc(100% - var(--gw));padding:0 8px;font-family:var(--mono);font-size:var(--fs);line-height:var(--lh);tab-size:4;color:transparent;caret-color:var(--text);background:transparent;resize:none;overflow:hidden;white-space:pre;z-index:1;border:0}
+.wrapon .ed textarea{white-space:pre-wrap;word-break:break-all}
+.ed textarea::selection{background:color-mix(in srgb,var(--accent-s) 38%,transparent)}
+.mk0{background:var(--m0)}.mk1{background:var(--m1)}.mk2{background:var(--m2)}.mk3{background:var(--m3)}.mk4{background:var(--m4)}.mk5{background:var(--m5)}
+.fa{background:var(--fa);border-radius:2px}.fc{background:var(--fc);color:#000;border-radius:2px}.lk{text-decoration:underline;color:var(--accent-s)}
+.sy{color:var(--subtle)}.eol{display:inline-block;width:0;overflow:visible;white-space:nowrap;color:var(--subtle);font-size:.78em;font-family:var(--sans);padding-left:4px}
+i.ig{display:inline-block;width:0;height:1em;position:relative}i.ig::before{content:"";position:absolute;left:0;top:-5px;height:var(--lh);border-left:1px dotted var(--subtle)}
+.rl{position:absolute;top:0;bottom:0;width:0;border-left:1px dashed color-mix(in srgb,var(--danger) 45%,transparent);pointer-events:none;z-index:0}
+.empty{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:var(--bg);z-index:5}
+.empty h3{font-size:15px}.empty .rc{width:420px;max-height:200px;overflow:auto;border:1px solid var(--divider);border-radius:8px;background:var(--card)}
+.rcitem{display:flex;padding:6px 10px;gap:8px;cursor:pointer}.rcitem:hover{background:var(--hover)}
+#mini{width:132px;flex:none;position:relative;background:var(--code-bg);overflow:hidden;cursor:pointer;border-left:1px solid var(--divider)}
+#status{height:22px;background:var(--chrome);border-top:1px solid var(--chrome-b);display:flex;align-items:center;padding:0 6px;gap:2px;color:var(--muted);font-size:11px;flex:none;white-space:nowrap;overflow:hidden}
+#status .it{padding:1px 8px;border-radius:4px}#status button.it:hover{background:var(--hover2);color:var(--text)}#status .bar{width:1px;height:12px;background:var(--divider);margin:0 2px}
+.chip{display:inline-flex;align-items:center;font-size:10.5px;padding:0 7px;border-radius:9px;background:var(--sel);color:var(--accent);font-weight:600;margin-left:4px}
+.chip.warn{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--warn)}.chip.rec{background:var(--danger);color:#fff}
+#dockR{width:272px;flex:none;border-left:1px solid var(--chrome-b);display:none;flex-direction:column;background:var(--panel);overflow:hidden}
+#dockB{height:210px;flex:none;border-top:1px solid var(--chrome-b);display:none;flex-direction:column;background:var(--panel)}
+.dp{display:flex;flex-direction:column;min-height:0;flex:1;border-bottom:1px solid var(--divider);background:var(--panel)}
+.dp>.hd{display:flex;align-items:center;gap:6px;padding:4px 8px;font-weight:700;font-size:11.5px;border-bottom:1px solid var(--divider);flex:none}
+.dp>.bdy{flex:1;overflow:auto;min-height:0;font-size:12px}
+.float{position:absolute;width:340px;height:300px;z-index:35;border:1px solid var(--card-b);border-radius:9px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;background:var(--panel)}
+.float>.dp>.hd{cursor:move}
+.rrow{padding:2px 10px;cursor:pointer;font-family:var(--mono);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rrow:hover{background:var(--hover)}.rrow.f{font-family:var(--sans);font-weight:700;background:var(--hover);cursor:default}
+.rrow b{background:var(--fa);font-weight:400}
+table.t{border-collapse:collapse;width:100%}table.t td,table.t th{padding:3px 8px;border-bottom:1px solid var(--divider);text-align:left;font-size:12px}table.t th{background:var(--hover);position:sticky;top:0;font-weight:600}table.t tr.sl{background:var(--sel)}table.t tbody tr:hover{background:var(--hover)}
+.menu{position:fixed;background:var(--card);border:1px solid var(--card-b);border-radius:9px;box-shadow:var(--shadow);padding:4px;min-width:230px;z-index:80;font-size:12px;max-height:80vh;overflow:auto}
+.mi{display:flex;align-items:center;gap:9px;height:26px;padding:0 9px;border-radius:5px;width:100%;text-align:left;position:relative}
+.mi:hover{background:var(--hover2)}.mi .k{margin-left:auto;color:var(--muted);font-size:11px;padding-left:22px}.mi .ck{width:12px;color:var(--accent)}.mi.dis{opacity:.4;pointer-events:none}
+.mi.sub::after{content:"›";margin-left:auto;color:var(--muted)}.mi .k+.k{display:none}
+.msep{height:1px;background:var(--divider);margin:4px 2px}
+.submenu{position:fixed}
+.modal-bg{position:absolute;inset:0;background:rgba(2,6,23,.45);z-index:70;display:flex;align-items:center;justify-content:center}
+.modal{background:var(--card);border:1px solid var(--card-b);border-radius:12px;box-shadow:var(--shadow);width:560px;max-width:94%;max-height:92%;display:flex;flex-direction:column}
+.modal h3{font-size:14px;padding:13px 18px 4px;flex:none}.modal .mb{padding:6px 18px 12px;overflow:auto;flex:1}.modal .mf{display:flex;gap:8px;justify-content:flex-end;padding:10px 18px 13px;border-top:1px solid var(--divider);flex:none;align-items:center}
+.fld{display:flex;align-items:center;gap:10px;margin:7px 0}.fld>label{width:96px;color:var(--muted);flex:none}
+.inp,.sel{height:27px;border:1px solid var(--input-b);background:var(--input);border-radius:6px;padding:0 8px;min-width:120px}.inp:focus,.sel:focus{border-color:var(--accent-s)}
+textarea.inp{height:auto;padding:6px 8px;font-family:var(--mono);resize:vertical}
+.note{font-size:11.5px;color:var(--muted);margin:4px 0}.warnbox{background:color-mix(in srgb,var(--warn) 16%,var(--bg));border:1px solid color-mix(in srgb,var(--warn) 50%,transparent);padding:7px 10px;border-radius:7px;margin:7px 0;font-size:12px}
+.errbox{background:color-mix(in srgb,var(--danger) 12%,var(--bg));border:1px solid color-mix(in srgb,var(--danger) 45%,transparent);padding:7px 10px;border-radius:7px;margin:7px 0}
+.toast{position:absolute;right:14px;bottom:32px;background:var(--card);border:1px solid var(--card-b);box-shadow:var(--shadow);border-radius:9px;padding:8px 12px;z-index:90;font-size:12px;max-width:420px;animation:pop .2s}
+@keyframes pop{0%{transform:translateY(8px);opacity:0}100%{transform:none;opacity:1}}
+#find{position:absolute;right:16px;top:8px;width:520px;background:var(--card);border:1px solid var(--card-b);border-radius:10px;box-shadow:var(--shadow);z-index:30;display:none;flex-direction:column;font-size:12px}
+#find.compact .fbody2,#find.compact .ftabs{display:none}
+#find .fh{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--divider);cursor:move}
+.ftabs{display:flex;gap:2px;padding:4px 8px 0}.ftabs button{padding:3px 10px;border-radius:5px 5px 0 0;color:var(--muted)}.ftabs button.on{background:var(--sel);color:var(--accent);font-weight:600}
+.fb{padding:8px 12px;display:flex;flex-direction:column;gap:6px}.fr{display:flex;gap:6px;align-items:center}.fr label.l{width:62px;color:var(--muted);flex:none}.fr .inp{flex:1}
+.opts{display:flex;flex-wrap:wrap;gap:4px 12px}.opts label{display:flex;align-items:center;gap:4px}
+.btns{display:flex;flex-wrap:wrap;gap:5px}
+.seg{display:inline-flex;background:var(--hover);border-radius:6px;padding:2px;gap:2px}.seg button{padding:2px 9px;border-radius:4px;color:var(--muted)}.seg button.on{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+#cmp{position:absolute;inset:0;background:var(--bg);z-index:25;display:none;flex-direction:column}
+#cmp .ch{display:flex;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--divider)}
+#cmp .cb{flex:1;display:flex;min-height:0}#cmp .cc{flex:1;overflow:auto;font-family:var(--mono);font-size:12px;border-right:1px solid var(--divider);background:var(--code-bg)}
+.cl{display:flex;min-height:19px;white-space:pre}.cl .n{width:42px;flex:none;color:var(--subtle);text-align:right;padding-right:8px;background:var(--panel)}.cl.add{background:color-mix(in srgb,var(--ok) 22%,transparent)}.cl.del{background:color-mix(in srgb,var(--danger) 20%,transparent)}.cl.pad{background:repeating-linear-gradient(45deg,transparent 0 4px,var(--hover) 4px 8px)}
+.drop{position:absolute;inset:0;background:color-mix(in srgb,var(--accent-s) 18%,transparent);border:3px dashed var(--accent-s);z-index:60;display:none;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--accent)}
+.fs-on #menubar,.fs-on #toolbar,.fs-on #status,.fs-on .tabs,.fs-on #titlebar,.fs-on #rail,.fs-on #apptabs{display:none!important}
+.po-on #menubar,.po-on #toolbar,.po-on .tabs,.po-on #status{display:none!important}
+.focus-on .sc{padding:0 12%}
+.drawer{position:absolute;right:0;top:0;bottom:0;width:430px;background:var(--card);border-left:1px solid var(--card-b);box-shadow:var(--shadow);z-index:75;display:none;flex-direction:column}.drawer .dh{padding:12px 16px;font-weight:700;border-bottom:1px solid var(--divider);display:flex}.drawer .db{padding:10px 16px;overflow:auto;flex:1;font-size:12px}
+.drawer .db h4{margin:10px 0 4px}.drawer .db p{margin:4px 0;color:var(--muted)}.dec{border:1px solid var(--divider);border-radius:8px;padding:8px 10px;margin:8px 0}
+.page{background:#fff;color:#111;width:300px;height:400px;padding:22px 22px;font:9px/1.35 var(--mono);overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.3);position:relative;flex:none}
+.page .ph,.page .pf{position:absolute;left:22px;right:22px;color:#555;font-size:8px}.page .ph{top:8px}.page .pf{bottom:8px;text-align:center}
+</style>
+</head>
+<body>
+<div id="proto">
+  <b>Taomni Notepad 工作台 · 原型 v2</b><span class="lbl">设计对象，不是产品实现</span>
+  <div class="grp"><span class="lbl">平台</span><button data-p="plat" data-v="win" class="on">Windows/Linux</button><button data-p="plat" data-v="mac">macOS</button></div>
+  <div class="grp"><span class="lbl">主题</span><button data-p="theme" data-v="light" class="on">浅色</button><button data-p="theme" data-v="dark">深色</button></div>
+  <div class="grp"><span class="lbl">场景</span>
+    <button data-p="extmod">外部修改当前文件</button><button data-p="crash">崩溃后重启</button><button data-p="tamper">宏文件被外部改动</button><button data-p="remote">打开远程文件</button><button data-p="big12">打开 12 MB</button><button data-p="big35">打开 35 MB</button><button data-p="elev">打开需提权文件</button><button data-p="gbk">打开 GBK 文件</button></div>
+  <div class="grp"><button data-p="decisions">待用户决策</button><button data-p="about">原型覆盖范围</button></div>
+</div>
+<div id="hint">试试：Ctrl+H 打开替换；编辑 → 行操作 → 排序；视图 → 双视图；宏 → 开始录制。所有数据为示例数据，不会读写真实文件。</div>
+<div id="stage"><div id="app">
+  <div id="titlebar"><div class="dots"><i></i><i></i><i></i></div><span>Taomni</span><span class="sp"></span><span id="ttl">Notepad 工作台</span><span class="sp"></span></div>
+  <div id="shell">
+    <div id="rail"><div class="rbtn"><svg class="i" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg></div><div class="rbtn"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg></div><div class="rbtn on" title="Notepad 工作台"><svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></div><div class="rbtn"><svg class="i" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg></div></div>
+    <div id="colmain">
+      <div id="apptabs"><div class="atab">欢迎</div><div class="atab">终端 · prod-web01</div><div class="atab on"><svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>Notepad</div></div>
+      <div id="nproot">
+        <div id="menubar"></div><div id="toolbar"></div>
+        <div id="workrow">
+          <div id="center">
+            <div id="panes" class="v">
+              <div class="pane" id="pane0"><div class="tabs"></div><div class="banners"></div><div class="ed"><div class="sc"><div class="inner"><div class="bd"></div><textarea spellcheck="false" wrap="off"></textarea><div class="rl"></div></div></div><div class="empty"></div></div></div>
+              <div class="pane" id="pane1" style="display:none"><div class="tabs"></div><div class="banners"></div><div class="ed"><div class="sc"><div class="inner"><div class="bd"></div><textarea spellcheck="false" wrap="off"></textarea><div class="rl"></div></div></div><div class="empty"></div></div></div>
+            </div>
+            <div id="dockB"></div>
+            <div id="find"></div>
+            <div id="cmp"></div>
+          </div>
+          <div id="dockR"></div>
+        </div>
+        <div id="status"></div>
+        <div class="drop" id="drop">释放以打开文件（文件夹将打开其中文本文件，上限 20 个）</div>
+      </div>
+    </div>
+  </div>
+  <div class="drawer" id="drawer"><div class="dh"><span id="dtitle"></span><span class="sp"></span><button class="ibtn" id="dclose">✕</button></div><div class="db" id="dbody"></div></div>
+</div></div>
+
+<script>
+(()=>{'use strict';
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const IC={new:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/>',open:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1H3z"/><path d="M3 10h18l-2 8a2 2 0 0 1-2 1H5a2 2 0 0 1-2-2z"/>',save:'<path d="M5 3h11l4 4v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3M7 21v-7h10v7"/>',saveall:'<path d="M7 7h9l3 3v9H7z"/><path d="M4 16V4h10M10 7v3h5"/>',undo:'<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',redo:'<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>',cut:'<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.5 8.5L20 20M8.5 15.5L20 4"/>',copy:'<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',paste:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9z"/>',find:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>',replace:'<path d="M4 7h12l-3-3M20 17H8l3 3"/>',ff:'<path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="2.5"/><path d="M14 15l2.5 2.5"/>',wrap:'<path d="M3 6h18M3 12h14a3 3 0 0 1 0 6h-4M3 18h5"/><path d="M15 15l-2 3 2 3"/>',sym:'<path d="M13 4v16M17 4v16M13 4H9a4 4 0 0 0 0 8h4"/>',map:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',split:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/>',sync:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',rec:'<circle cx="12" cy="12" r="6" fill="currentColor"/>',stop:'<rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor"/>',play:'<path d="M7 5l12 7-12 7z" fill="currentColor"/>',print:'<path d="M6 9V3h12v6M6 17H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7"/>',x:'<path d="M6 6l12 12M18 6L6 18"/>',pin:'<path d="M12 17v5M8 3h8l-1 7 3 3H6l3-3z"/>',bm:'<path d="M6 3h12v18l-6-4-6 4z"/>',list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'};
+const ic=n=>`<svg class="i" viewBox="0 0 24 24">${IC[n]||''}</svg>`;
+const S={plat:'win',split:false,orient:'v',sync:false,av:0,views:[{tabs:[],active:null},{tabs:[],active:null}],docs:{},mru:[],recent:[],closed:[],sessions:[],
+ prefs:{wrap:false,fs:13,backupSec:30,backupMode:'none',restore:true,recentMax:50,eol:'LF',enc:'UTF-8',untitled:'新建 {n}',links:true,ruler:true,rulerCol:80,lineNum:true,askWhole:true,lineCopy:true,engine:'https://www.bing.com/search?q=',showChg:true},
+ sym:{space:false,tab:false,eol:false,nonprint:false,indent:false},ins:true,zoom:0,vs:false,anchor:null,
+ panels:{minimap:{open:false,pos:'right'},doclist:{open:false,pos:'right'},chars:{open:false,pos:'right'},results:{open:false,pos:'bottom'}},
+ ui:{menubar:true,toolbar:true,statusbar:true},mode:'',keymap:{},macro:{rec:false,buf:[],saved:[],hash:'',tampered:false},
+ backups:[],lastBackup:null,results:[],find:{q:'',r:'',mode:'normal',case:false,word:false,wrap:true,back:false,insel:false,dotall:false,hl:true,inc:false,tab:'find'},hist:{find:[],replace:[]},cur:null,clipHist:[],mark:{},sortBy:'name'};
+let nid=1,clipboard='';
+const FS=[
+ {path:'~/Documents/deploy-notes.txt',text:`# Taomni 发布检查清单 2026-11-21\nhost-b  10.0.2.12\nhost-a  10.0.1.11\nhost-c  10.0.3.13\nhost-a  10.0.1.11\nhost-a  10.0.1.11\n\n步骤 10：验证健康检查   \n步骤 2：停止旧服务\n步骤 33：回滚预案\n\t缩进的一行（Tab）\nTODO: 联系负责人 ZhangSan \nhttps://taomni.example/docs/release-notes\nERROR 502 upstream timed out\nWarn: disk usage 91%\nERROR 500 db connection reset`},
+ {path:'~/Documents/hosts.conf',text:`# hosts.conf\n10.0.1.11 web-01\n10.0.1.12 web-02\n10.0.2.21 db-01\n10.0.2.22 db-02\n10.0.3.31 cache-01`,enc:'UTF-8'},
+ {path:'~/Logs/app.log',text:Array.from({length:60},(_,i)=>`2026-11-21 10:${String(i%60).padStart(2,'0')}:${String((i*7)%60).padStart(2,'0')} ${['INFO','INFO','WARN','ERROR'][i%4]} request #${1000+i} ${['/api/login','/api/list','/api/save'][i%3]} ${20+(i*13)%300}ms`).join('\n')},
+ {path:'~/Documents/中文说明-GBK.txt',text:'Taomni 记事本：支持多种字符集。\n本文件原始字节为 GBK 编码。\n请使用“编码 → 按编码重新解释”切换。',garbled:'Taomni 记事本锛氭敮鎸佸绉嶅瓧绗﹂泦銆俓n鏈枃浠跺師濮嬪瓧鑺備负 GBK 缂栫爜銆俓n璇蜂娇鐢ㄢ€滅紪鐮?鈫?鎸夌紪鐮侀噸鏂拌В閲娾€濆垏鎹€?',enc:'GBK',autodetect:true},
+ {path:'~/Logs/access-12MB.log',size:'12.0 MB',big:true,text:Array.from({length:200},(_,i)=>`10.0.0.${i%250} - - [21/Nov/2026:10:${i%60}:00] "GET /item/${i} HTTP/1.1" 200 ${500+i}`).join('\n')},
+ {path:'~/Logs/dump-35MB.sql',size:'35.0 MB',huge:true,text:''},
+ {path:'prod-web01:/var/log/nginx/error.log',remote:true,text:'2026/11/21 10:01:02 [error] upstream timed out\n2026/11/21 10:01:09 [warn] conn reset by peer\n2026/11/21 10:02:12 [error] no live upstreams'},
+ {path:'/etc/app/config.ini',elev:true,text:'[server]\nport=8080\nlog_level=info\n'}];
+const baseName=p=>p.split(/[\\/:]/).pop();
+function mkDoc(o){const d=Object.assign({id:'d'+nid++,name:'',path:null,text:'',enc:'UTF-8',bom:false,eol:'LF',ro:false,remote:false,pinned:false,bm:new Set(),marks:[],view:0,sel:[0,0]},o);if(!d.name)d.name=d.path?baseName(d.path):'';d.orig=d.text;d.saved=d.text;d.savedEnc=d.enc;d.savedEol=d.eol;d.disk=d.text;return d}
+const isDirty=d=>d.text!==d.saved||d.enc!==d.savedEnc||d.eol!==d.savedEol;
+function untitledName(){let n=1;const used=new Set(Object.values(S.docs).map(d=>d.name));while(used.has(S.prefs.untitled.replace('{n}',n)))n++;return S.prefs.untitled.replace('{n}',n)}
+const panes=[0,1].map(i=>{const el=$('#pane'+i);return{i,el,tabs:$('.tabs',el),ban:$('.banners',el),sc:$('.sc',el),inner:$('.inner',el),bd:$('.bd',el),ta:$('textarea',el),rl:$('.rl',el),empty:$('.empty',el),doc:null}});
+const ap=()=>panes[S.av],ad=()=>ap().doc;
+function toast(m,t=3200){$$('.toast').forEach(x=>x.remove());const e=document.createElement('div');e.className='toast';e.textContent=m;$('#nproot').append(e);setTimeout(()=>e.remove(),t)}
+/* ---------- modal ---------- */
+function modal(title,body,btns,o={}){const bg=document.createElement('div');bg.className='modal-bg';bg.innerHTML=`<div class="modal" style="${o.w?'width:'+o.w+'px':''}"><h3>${title}</h3><div class="mb">${body}</div><div class="mf">${o.foot||''}<span class="sp"></span></div></div>`;const mf=$('.mf',bg);const close=()=>{bg.remove()};
+ (btns||[{t:'关闭'}]).forEach(b=>{const x=document.createElement('button');x.className='cbtn '+(b.c||'');x.textContent=b.t;x.onclick=()=>{if(b.fn&&b.fn(bg,close)===false)return;close()};mf.append(x)});
+ $('#nproot').append(bg);bg.close=close;const f=$('input:not([type=checkbox]):not([type=radio]),textarea',bg);if(f&&!o.nofocus)f.focus();return bg}
+/* ---------- commands ---------- */
+const C={};
+function def(id,label,key,fn,rec){C[id]={id,label,key,fn,rec:!!rec};S.keymap[id]=key||''}
+function run(id,args={}){const c=C[id];if(!c){toast('原型未实现：'+id);return}
+ if(S.macro.rec&&c.rec&&!S.macro.playing)S.macro.buf.push({id,args});
+ c.fn(args);sync()}
+const mod=()=>S.plat==='mac'?'⌘':'Ctrl';
+function kd(k){if(!k)return'';return k.split('+').map(p=>p==='Mod'?(S.plat==='mac'?'⌘':'Ctrl'):p==='Alt'?(S.plat==='mac'?'⌥':'Alt'):p==='Shift'?(S.plat==='mac'?'⇧':'Shift'):p).join(S.plat==='mac'?'':'+')}
+function combo(e){if(['Control','Shift','Alt','Meta'].includes(e.key))return'';let k=e.key.length===1?e.key.toUpperCase():e.key;if(k===' ')k='Space';return(e.ctrlKey||e.metaKey?'Mod+':'')+(e.altKey?'Alt+':'')+(e.shiftKey?'Shift+':'')+k}
+/* ---------- text helpers ---------- */
+function lineStarts(t){const a=[0];for(let i=0;i<t.length;i++)if(t[i]==='\n')a.push(i+1);return a}
+function lineOf(t,pos){let n=0;for(let i=0;i<pos&&i<t.length;i++)if(t[i]==='\n')n++;return n}
+let progEdit=0;
+function edit(p,s,e,text,ns,ne){progEdit++;try{editInner(p,s,e,text,ns,ne)}finally{progEdit--}}
+function editInner(p,s,e,text,ns,ne){const ta=p.ta;ta.focus({preventScroll:true});ta.setSelectionRange(s,e);const before=ta.value;
+ let ok=false;try{ok=text===''?(s===e?true:document.execCommand('delete')):document.execCommand('insertText',false,text)}catch(_){}
+ if(ta.value===before&&(text!==''||s!==e)){ta.setRangeText(text,s,e,'end');ta.dispatchEvent(new Event('input'))}
+ const a=ns==null?s+text.length:ns,b=ne==null?a:ne;ta.setSelectionRange(a,b)}
+function writable(){const d=ad();if(!d){toast('没有打开的文档');return false}if(d.ro){toast(d.remote?'远程文件是只读临时副本，不能写回':'文档处于只读状态（编辑 → 只读切换）');return false}return true}
+function sel(){const ta=ap().ta;return{s:ta.selectionStart,e:ta.selectionEnd,t:ta.value}}
+function lineRange(p,wholeIfNone){const{s,e,t}=sel();if(s===e){if(wholeIfNone)return{s:0,e:t.length,whole:true};const ls=t.lastIndexOf('\n',s-1)+1;let le=t.indexOf('\n',s);if(le<0)le=t.length;return{s:ls,e:le,whole:false,cur:true}}
+ const ls=t.lastIndexOf('\n',s-1)+1;let le=t.indexOf('\n',(e>s&&t[e-1]==='\n')?e-1:e);if(le<0)le=t.length;return{s:ls,e:le,whole:false}}
+function lineOp(fn,label){if(!writable())return;const p=ap(),r=lineRange(p,true);const go=()=>{const t=p.ta.value,lines=t.slice(r.s,r.e).split('\n'),out=fn(lines);if(out===null)return;const txt=out.join('\n');if(txt===t.slice(r.s,r.e)){toast(label+'：没有变化');return}edit(p,r.s,r.e,txt,r.s,r.s+txt.length);toast(label+'：'+lines.length+' 行 → '+out.length+' 行')};
+ if(r.whole&&S.prefs.askWhole){const n=p.ta.value.split('\n').length;modal('未选中文本',`<p>“${esc(label)}”将作用于整个文档（共 ${n} 行）。</p><label style="display:flex;gap:6px;margin-top:8px"><input type="checkbox" id="nask"> 以后不再提示（可在首选项恢复）</label><p class="note">Ctrl+Z 可撤销。选中若干行再执行则只处理选中的行。</p>`,[{t:'取消'},{t:'继续',c:'pri',fn:b=>{if($('#nask',b).checked)S.prefs.askWhole=false;go()}}])}else go()}
+function charOp(fn,label){if(!writable())return;const p=ap(),{s,e,t}=sel();if(s===e){toast('请先选择文本：'+label);return}const out=fn(t.slice(s,e));edit(p,s,e,out,s,s+out.length)}
+/* ---------- transforms (pure) ---------- */
+const T={
+ sort:(kind,desc)=>L=>{const n=x=>parseFloat(x.replace(',','.'))||0;const key={lex:x=>x,ci:x=>x.toLowerCase(),loc:x=>x,int:x=>parseInt(x.match(/-?\d+/)?.[0]||'0',10),dc:x=>n(x.match(/-?[\d.,]+/)?.[0]||'0'),dd:x=>parseFloat(x.match(/-?[\d.]+/)?.[0]||'0'),len:x=>x.length}[kind];
+  const cmp=kind==='loc'?(a,b)=>a.localeCompare(b,'zh'):(a,b)=>{const x=key(a),y=key(b);return x<y?-1:x>y?1:0};const idx=L.map((v,i)=>[v,i]);idx.sort((a,b)=>(desc?-1:1)*cmp(a[0],b[0])||a[1]-b[1]);return idx.map(x=>x[0])},
+ dedupe:L=>{const s=new Set();return L.filter(x=>!s.has(x)&&s.add(x))},dedupeAdj:L=>L.filter((x,i)=>i===0||x!==L[i-1]),
+ rmEmpty:L=>L.filter(x=>x!==''),rmBlank:L=>L.filter(x=>x.trim()!==''),reverse:L=>[...L].reverse(),
+ shuffle:L=>{const a=[...L];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a},
+ trimT:L=>L.map(x=>x.replace(/[ \t]+$/,'')),trimL:L=>L.map(x=>x.replace(/^[ \t]+/,'')),trimB:L=>L.map(x=>x.trim()),
+ t2s:L=>L.map(x=>x.replace(/\t/g,'    ')),s2t:L=>L.map(x=>x.replace(/ {4}/g,'\t')),s2tl:L=>L.map(x=>x.replace(/^( {4})+/,m=>'\t'.repeat(m.length/4))),
+ cases:{upper:s=>s.toUpperCase(),lower:s=>s.toLowerCase(),proper:s=>s.toLowerCase().replace(/(^|[^\p{L}\p{N}])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase()),properBlend:s=>s.replace(/(^|[^\p{L}\p{N}])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase()),sentence:s=>s.toLowerCase().replace(/(^\s*|[.!?。！？]\s+)(\p{L})/gu,(m,a,b)=>a+b.toUpperCase()),sentenceBlend:s=>s.replace(/(^\s*|[.!?。！？]\s+)(\p{L})/gu,(m,a,b)=>a+b.toUpperCase()),invert:s=>[...s].map(c=>c===c.toUpperCase()?c.toLowerCase():c.toUpperCase()).join(''),random:s=>[...s].map(c=>Math.random()<.5?c.toUpperCase():c.toLowerCase()).join('')}};
+const CASES=[['upper','全部大写','Mod+Shift+U'],['lower','全部小写','Mod+U'],['proper','首字母大写','' ],['properBlend','首字母大写（保留其余）',''],['sentence','句子首字母大写',''],['sentenceBlend','句子首字母大写（保留其余）',''],['invert','大小写反转',''],['random','随机大小写','']];
+/* ---------- commands: file ---------- */
+def('new','新建','Mod+N',()=>{const d=mkDoc({name:untitledName(),eol:S.prefs.eol,enc:S.prefs.enc});open(d)},true);
+def('open','打开…','Mod+O',()=>openDialog());
+def('save','保存','Mod+S',()=>saveDoc(ad()));
+def('saveas','另存为…','Mod+Alt+S',()=>saveAsDialog(ad(),false));
+def('savecopy','保存副本…','',()=>saveAsDialog(ad(),true));
+def('saveall','全部保存','Mod+Shift+S',()=>{const fails=[];Object.values(S.docs).filter(isDirty).forEach(d=>{if(d.ro||d.remote)fails.push(d.name+'：只读');else if(!d.path)fails.push(d.name+'：未命名，需先另存为');else if(d.elev)fails.push(d.name+'：无写权限（需提权或另存为）');else doSave(d)});if(fails.length)modal('全部保存：部分未保存',`<p>以下文档没有保存，已逐个列出：</p><ul style="margin:8px 0 0 18px">${fails.map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`);else toast('全部保存完成')});
+def('rename','重命名…','',()=>{const d=ad();if(!d)return;if(!d.path||d.remote){toast(d.remote?'远程副本不能重命名':'未命名文档请先另存为');return}const b=modal('重命名文件',`<div class="fld"><label>当前</label><span class="mono">${esc(d.path)}</span></div><div class="fld"><label>新文件名</label><input class="inp" id="rn" style="flex:1" value="${esc(d.name)}"></div><div id="rne"></div>`,[{t:'取消'},{t:'重命名',c:'pri',fn:b=>{const n=$('#rn',b).value.trim();if(!n||/[\\/]/.test(n)){$('#rne',b).innerHTML='<div class="errbox">文件名无效</div>';return false}const dir=d.path.replace(/[^\\/]+$/,'');if(Object.values(S.docs).some(x=>x!==d&&x.path===dir+n)||FS.some(f=>f.path===dir+n&&f.path!==d.path)){$('#rne',b).innerHTML='<div class="errbox">已存在同名文件，保持原名</div>';return false}d.path=dir+n;d.name=n;recent(d);toast('已重命名为 '+n+'；标签、最近文件已同步')}}])});
+def('trash','移至回收站…','',()=>{const d=ad();if(!d)return;if(!d.path||d.remote){toast('只有本地已保存的文件可移至回收站');return}modal('移至回收站（待决策项）',`<p>将把 <b>${esc(d.path)}</b> 移至系统回收站（Windows 回收站 / macOS 废纸篓 / Linux Trash），并关闭此标签。</p><div class="warnbox">该功能在决策表里是“待定”，此处是推荐方案的演示：删除前确认，删除后从最近文件与会话里清除路径。</div>`,[{t:'取消'},{t:'移至回收站',c:'dng',fn:()=>{S.recent=S.recent.filter(r=>r.path!==d.path);forceClose(d.id);toast('已移至回收站')}}])});
+def('close','关闭','Mod+W',()=>d_close([ad()]));
+def('closeall','全部关闭','Mod+Shift+W',()=>d_close(Object.values(S.docs).filter(d=>!d.pinned)));
+def('closeothers','关闭其余','',()=>d_close(Object.values(S.docs).filter(d=>d!==ad()&&!d.pinned)));
+def('closeunpinned','关闭未固定','',()=>d_close(Object.values(S.docs).filter(d=>!d.pinned)));
+def('closeleft','关闭左侧','',()=>sideClose(-1));def('closeright','关闭右侧','',()=>sideClose(1));
+def('closeunmod','关闭未修改','',()=>d_close(Object.values(S.docs).filter(d=>!isDirty(d)&&!d.pinned)));
+def('reopen','恢复最近关闭','Mod+Shift+T',()=>{const c=S.closed.pop();if(!c){toast('没有最近关闭的文件');return}open(mkDoc(c))});
+def('reload','从磁盘重载','',()=>{const d=ad();if(!d||!d.path){toast('未命名文档没有磁盘文件');return}const go=()=>{d.text=d.disk;d.saved=d.disk;d.bm.clear();d.marks=[];loadPane(S.av);sync();toast('已从磁盘重载；书签与标记已清除')};if(isDirty(d))modal('从磁盘重载',`<p>重载会丢弃 <b>${esc(d.name)}</b> 的未保存修改，并清除书签与令牌样式。</p>`,[{t:'取消'},{t:'重载',c:'pri',fn:go}]);else go()});
+def('print','打印…','Mod+P',()=>printDialog());def('printnow','立即打印','',()=>toast('已用默认打印机和上次设置发送（系统打印对话框不弹出）'));
+def('toggleRo','只读切换（编辑器内）','',()=>{const d=ad();if(!d)return;d.ro=!d.ro;paintAll();toast(d.ro?'已设为只读（随会话保存）':'已取消只读')});
+def('toggleRoAll','全部文档只读切换','',()=>{const v=!Object.values(S.docs).every(d=>d.ro);Object.values(S.docs).forEach(d=>d.ro=v||d.remote);paintAll();toast(v?'全部文档已只读':'已取消（远程副本仍只读）')});
+def('toggleRoFile','切换文件只读属性','',()=>{const d=ad();if(!d||!d.path||d.remote){toast('仅本地文件');return}d.fileRo=!d.fileRo;toast(d.fileRo?'已设置磁盘文件只读属性（macOS/Linux 为取消写权限位）':'已清除磁盘只读属性')});
+def('extopen','用系统默认程序打开','',()=>toast('将用系统关联程序打开 '+(ad()?.path||'')));
+def('revealdir','在文件管理器中显示',null,()=>toast({win:'资源管理器',mac:'Finder',}[S.plat]?'在 '+({win:'资源管理器 / 文件管理器',mac:'Finder'}[S.plat])+' 中显示所在文件夹':''));
+def('termdir','在终端打开所在文件夹','',()=>toast({win:'将在 cmd / PowerShell（首选项二选一）中打开',mac:'将在 Terminal 中打开'}[S.plat]||'将在系统默认终端中打开'));
+function sideClose(dir){const v=S.views[S.av];const d=ad();const i=v.tabs.indexOf(d?.id);if(i<0)return;const ids=dir<0?v.tabs.slice(0,i):v.tabs.slice(i+1);d_close(ids.map(x=>S.docs[x]).filter(x=>!x.pinned))}
+function d_close(list){list=list.filter(Boolean);const q=[...list];const next=()=>{const d=q.shift();if(!d){sync();return}if(!S.docs[d.id])return next();if(!isDirty(d)){forceClose(d.id);return next()}
+ activate(d.id);const b=modal('保存更改？',`<p><b>${esc(d.name)}</b> 有未保存的修改。</p>${q.length?`<p class="note">还有 ${q.length} 个文档待处理；任一取消则整体取消，不半关。</p>`:''}`,[{t:'取消',fn:()=>{q.length=0}},{t:'不保存',fn:()=>{forceClose(d.id);next()}},{t:'保存',c:'pri',fn:()=>{if(!d.path||d.ro||d.elev){q.length=0;run('saveas');return}doSave(d);forceClose(d.id);next()}}])};next()}
+function forceClose(id){const d=S.docs[id];if(!d)return;if(d.path&&!d.remote){S.closed.push({name:d.name,path:d.path,text:d.disk,enc:d.enc,eol:d.eol});recent(d)}
+ S.views.forEach((v,i)=>{const k=v.tabs.indexOf(id);if(k>=0){v.tabs.splice(k,1);if(v.active===id)v.active=v.tabs[Math.max(0,k-1)]||null}});delete S.docs[id];S.mru=S.mru.filter(x=>x!==id);panes.forEach((p,i)=>loadPane(i))}
+function recent(d){if(!d.path||d.remote)return;S.recent=S.recent.filter(r=>r.path!==d.path);S.recent.unshift({name:d.name,path:d.path,t:new Date().toLocaleTimeString()});S.recent.length=Math.min(S.recent.length,S.prefs.recentMax)}
+function doSave(d){if(S.prefs.backupMode!=='none'&&d.path){S.backups.unshift({name:d.name+(S.prefs.backupMode==='simple'?'.bak':'.'+Date.now()),kind:'保存时备份',len:d.disk.length,t:new Date().toLocaleTimeString()})}
+ d.saved=d.text;d.savedEnc=d.enc;d.savedEol=d.eol;d.disk=d.text;toast('已保存 '+d.name)}
+function saveDoc(d){if(!d)return;if(d.remote){toast('远程文件是只读临时副本，不能写回；可“另存为”到本地');return}if(d.ro){toast('只读文档不能保存');return}if(!d.path){saveAsDialog(d,false);return}
+ if(d.elev){const plat={win:'Windows 将弹出 UAC 请求以管理员身份保存。',mac:'macOS 将弹出系统授权对话框以管理员身份保存。',linux:'Linux 无通用提权通道：请检查权限，或另存为到可写位置。'}[S.plat==='mac'?'mac':'win'];
+  const b=modal('没有写入权限',`<p><b>${esc(d.path)}</b> 需要更高权限才能写入。</p><div class="warnbox">${S.plat==='win'?'':''}${plat}</div><p class="note">提权失败也不会静默丢失：始终保留“另存为”出口。</p>`,[{t:'取消'},{t:'另存为…',fn:()=>{saveAsDialog(d,false)}},{t:'提权保存',c:'pri',fn:()=>{d.elev=false;doSave(d);toast('已提权保存（演示）')}}]);return}
+ doSave(d)}
+function saveAsDialog(d,copy){if(!d)return;const b=modal(copy?'保存副本':'另存为',`<div class="fld"><label>文件名</label><input class="inp" id="sn" style="flex:1" value="${esc(copy?'副本-'+d.name:(d.path?d.name:d.name+'.txt'))}"></div><div class="fld"><label>位置</label><input class="inp" id="sd" style="flex:1" value="~/Documents/"></div><div class="fld"><label>编码</label><select class="sel" id="se">${['UTF-8','UTF-8 BOM','UTF-16 LE','UTF-16 BE','GBK','Windows-1252'].map(e=>`<option ${e===d.enc?'selected':''}>${e}</option>`).join('')}</select><label style="width:auto">行尾</label><select class="sel" id="sl"><option ${d.eol==='LF'?'selected':''}>LF</option><option ${d.eol==='CRLF'?'selected':''}>CRLF</option><option ${d.eol==='CR'?'selected':''}>CR</option></select></div><p class="note">${copy?'保存副本：写入新文件，继续编辑当前文件。':'另存为：写入新文件，并继续编辑新文件。'}</p>`,[{t:'取消'},{t:'保存',c:'pri',fn:b=>{const n=$('#sn',b).value.trim(),dir=$('#sd',b).value.trim();if(!n)return false;const path=dir+n;
+  if(copy){toast('已保存副本到 '+path);return}
+  d.path=path;d.name=n;d.enc=$('#se',b).value;d.eol=$('#sl',b).value;d.remote=false;d.ro=false;d.elev=false;doSave(d);recent(d)}}])}
+function openDialog(){const rows=FS.map((f,i)=>`<tr data-i="${i}" style="cursor:pointer"><td>${esc(baseName(f.path))}</td><td class="mut">${esc(f.path)}</td><td class="mut">${f.size||''}${f.remote?'远程':''}${f.elev?'需提权':''}${f.autodetect?'GBK':''}</td></tr>`).join('');
+ const b=modal('打开文件（示例文件系统）',`<div style="max-height:300px;overflow:auto;border:1px solid var(--divider);border-radius:7px"><table class="t"><thead><tr><th>名称</th><th>路径</th><th>说明</th></tr></thead><tbody>${rows}</tbody></table></div><p class="note">也可以把真实文本文件拖进窗口（只读取内容，不写回）。</p>`,[{t:'关闭'}],{w:640});
+ $$('tr[data-i]',b).forEach(tr=>tr.ondblclick=tr.onclick=()=>{b.remove();openFS(FS[+tr.dataset.i])})}
+function openFS(f){const ex=Object.values(S.docs).find(d=>d.path===f.path);if(ex){activate(ex.id);return}
+ if(f.huge){modal('无法编辑',`<div class="errbox"><b>${esc(baseName(f.path))}</b>（${f.size}）超过 20 MB 硬上限，拒绝打开编辑。</div><p class="note">上限：可编辑 5 MB · 只读分块浏览 5–20 MB · 超过 20 MB 拒绝（P0 不改上限，50 MB 仅作 spike S-4）。可用“在外部打开”交给系统程序。</p>`);return}
+ const d=mkDoc({path:f.path,text:f.garbled&&!f.decoded?f.garbled:f.text,enc:f.autodetect?'UTF-8':'UTF-8',eol:'LF',remote:!!f.remote,ro:!!f.remote||!!f.big,elev:!!f.elev,bigRO:!!f.big,fsRef:f});
+ if(f.autodetect){d.detected='GBK'}open(d);recent(d)}
+function open(d,view){view=view??S.av;S.docs[d.id]=d;d.view=view;S.views[view].tabs.push(d.id);S.views[view].active=d.id;S.av=view;S.mru=[d.id,...S.mru.filter(x=>x!==d.id)];panes.forEach((p,i)=>loadPane(i));sync()}
+function activate(id){const vi=S.views.findIndex(v=>v.tabs.includes(id));if(vi<0)return;S.views[vi].active=id;S.av=vi;S.mru=[id,...S.mru.filter(x=>x!==id)];loadPane(vi);sync()}
+/* ---------- panes ---------- */
+function loadPane(i){const p=panes[i],v=S.views[i];const d=v.active?S.docs[v.active]:null;p.doc=d;if(d){p.ta.value=d.text;p.ta.readOnly=d.ro}paint(p);if(d){const s=d.sel||[0,0];try{p.ta.setSelectionRange(Math.min(s[0],d.text.length),Math.min(s[1],d.text.length))}catch(_){}}}
+function lcsMatch(a,b){const n=a.length,m=b.length,w=m+1,dp=new Uint16Array((n+1)*w);for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)dp[i*w+j]=a[i]===b[j]?dp[(i+1)*w+j+1]+1:Math.max(dp[(i+1)*w+j],dp[i*w+j+1]);const mt=new Array(m).fill(false);let i=0,j=0;while(i<n&&j<m){if(a[i]===b[j]){mt[j]=true;i++;j++}else if(dp[(i+1)*w+j]>=dp[i*w+j+1])i++;else j++}return mt}
+function buildRe(o,forceG=true){let s=o.q;if(!s)return null;if(o.mode==='ext')s=unesc(s);if(o.mode!=='re')s=s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');if(o.word)s='\\b(?:'+s+')\\b';try{return new RegExp(s,(forceG?'g':'')+(o.case?'':'i')+'m'+(o.dotall&&o.mode==='re'?'s':''))}catch(e){return null}}
+function unesc(s){return s.replace(/\\(n|r|t|0|x[0-9a-fA-F]{2}|\\)/g,(m,c)=>c==='n'?'\n':c==='r'?'\r':c==='t'?'\t':c==='0'?'\0':c==='\\'?'\\':String.fromCharCode(parseInt(c.slice(1),16)))}
+function allMatches(re,t,cap=3000){const r=[];if(!re)return r;re.lastIndex=0;let m;while((m=re.exec(t))&&r.length<cap){if(m[0]==='')re.lastIndex++;else r.push([m.index,m.index+m[0].length])}return r}
+const URLRE=/https?:\/\/[^\s<>"']+/g;
+function paint(p){const d=p.doc;const empty=!d;p.sc.style.display=empty?'none':'';p.empty.style.display=empty?'flex':'none';$('.ed',p.el).classList.toggle('wrapon',S.prefs.wrap);
+ if(empty){p.empty.innerHTML=`<h3>没有打开的文档</h3><div class="mut">新建或打开文件，或从最近文件继续</div><div style="display:flex;gap:6px"><button class="cbtn pri" data-a="new">新建</button><button class="cbtn" data-a="open">打开…</button><button class="cbtn" data-a="loadSession">加载会话…</button><button class="cbtn" data-a="reopen">恢复最近关闭</button></div><div class="rc">${S.recent.length?S.recent.map(r=>`<div class="rcitem" data-recent="${esc(r.path)}"><span>${esc(r.name)}</span><span class="mut" style="margin-left:auto">${esc(r.path)}</span></div>`).join(''):'<div class="rcitem mut">暂无最近文件</div>'}</div>`;p.rl.style.display='none';return}
+ const t=d.text,lines=t.split('\n'),starts=lineStarts(t);if(p.ta.value!==t)p.ta.value=t;p.ta.readOnly=d.ro;
+ const ln=String(lines.length).length;document.documentElement.style.setProperty('--gw',(S.prefs.lineNum?Math.max(3,ln)*8+36:30)+'px');
+ const cls=new Array(t.length).fill('');const add=(s,e,c)=>{for(let i=s;i<e&&i<t.length;i++)cls[i]=c};
+ if(S.prefs.links){URLRE.lastIndex=0;let m;while((m=URLRE.exec(t)))add(m.index,m.index+m[0].length,'lk')}
+ d.marks.forEach(mk=>{allMatches(buildRe(mk.re),t).forEach(([s,e])=>add(s,e,'mk'+mk.style))});
+ const f=S.find;if($('#find').style.display==='flex'&&f.hl&&f.q){allMatches(buildRe(f),t).forEach(([s,e])=>add(s,e,'fa'))}
+ if(S.cur&&S.cur.id===d.id)add(S.cur.s,S.cur.e,'fc');
+ const chgOn=S.prefs.showChg&&lines.length<1500;let st=null;if(chgOn){const sl=d.saved.split('\n'),ol=d.orig.split('\n');const ms=lcsMatch(sl,lines),mo=lcsMatch(ol,lines);st=lines.map((_,i)=>!ms[i]?'c1':!mo[i]?'c2':'')}
+ const caretLine=lineOf(t,p.ta.selectionStart||0);let html='';
+ for(let i=0;i<lines.length;i++){const L=lines[i],s0=starts[i];let h='',col=0,run='',rc=null;const flush=()=>{if(run){h+=rc?`<span class="${rc}">${run}</span>`:run;run=''}};
+  const lead=L.match(/^[ \t]*/)[0].length;
+  for(let j=0;j<L.length;j++){const c=L[j];let c2=cls[s0+j]||'',out;
+   if(S.sym.indent&&j<lead&&c===' '&&col%4===0){flush();h+='<i class="ig"></i>'}
+   if(c==='\t'){const n=4-(col%4);out=S.sym.tab?'<span class="sy">→</span>'+' '.repeat(n-1):'\t';col+=n}
+   else if(c===' '){out=S.sym.space?'<span class="sy">·</span>':' ';col++}
+   else if(c.charCodeAt(0)<32||c==='\u200b'){out=S.sym.nonprint?'<span class="sy">▯</span>':esc(c);col++}
+   else{out=esc(c);col+=(c.charCodeAt(0)>0x2e80?2:1)}
+   const ck=c2+(c2&&out.startsWith('<span')?' ':'');if(c2!==rc){flush();rc=c2}run+=out}
+  flush();if(S.sym.eol)h+=`<span class="eol">${d.eol}</span>`;
+  html+=`<div class="row${d.bm.has(i)?' bm':''}${i===caretLine?' cur':''}" data-i="${i}"><span class="gt"><i class="cg ${st?st[i]:''}"></i><b class="bk" data-ln="${i}"></b><u class="no">${i+1}</u></span><span class="tx">${h||'\u200b'}</span></div>`}
+ p.bd.innerHTML=html;p.inner.classList.toggle('nonum',!S.prefs.lineNum);
+ const cw=measureCw();p.rl.style.display=S.prefs.ruler?'':'none';p.rl.style.left='calc(var(--gw) + 8px + '+(S.prefs.rulerCol*cw)+'px)'}
+let _cw=0,_cwFs=0;function measureCw(){const fs=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fs'))||13;if(_cwFs===fs)return _cw;const s=document.createElement('span');s.style.cssText=`font:${fs}px var(--mono);position:absolute;visibility:hidden;white-space:pre`;s.textContent='0'.repeat(50);document.body.append(s);_cw=s.getBoundingClientRect().width/50;_cwFs=fs;s.remove();return _cw}
+function applyFont(){const fs=Math.max(8,Math.min(32,S.prefs.fs+S.zoom));document.documentElement.style.setProperty('--fs',fs+'px');document.documentElement.style.setProperty('--lh',Math.round(fs*1.6)+'px');_cwFs=0}
+function paintAll(){panes.forEach(paint)}
+function caretInfo(){const p=ap(),d=p.doc;if(!d)return null;const t=p.ta.value,s=p.ta.selectionStart,e=p.ta.selectionEnd;const ls=t.lastIndexOf('\n',s-1)+1;return{ln:lineOf(t,s)+1,col:s-ls+1,sel:e-s,selLines:e>s?lineOf(t,e)-lineOf(t,s)+1:0,len:t.length,lines:t.split('\n').length,pos:s}}
+function ensureVisible(p,pos){const ln=lineOf(p.ta.value,pos);const row=p.bd.children[ln];if(!row)return;const top=row.offsetTop,bot=top+row.offsetHeight,sc=p.sc;if(top<sc.scrollTop+4)sc.scrollTop=Math.max(0,top-40);else if(bot>sc.scrollTop+sc.clientHeight-20)sc.scrollTop=bot-sc.clientHeight+60}
+/* textareas */
+panes.forEach(p=>{const ta=p.ta;
+ ta.addEventListener('focus',()=>{if(S.av!==p.i){S.av=p.i;sync()}});
+ ta.addEventListener('input',e=>{const d=p.doc;if(!d)return;const old=d.text,nt=ta.value;const delta=nt.split('\n').length-old.split('\n').length;const cl=lineOf(nt,ta.selectionStart);
+  if(delta){const nb=new Set();d.bm.forEach(i=>{if(i>cl-(delta>0?1:0)&&delta>0)nb.add(i+delta);else if(delta<0&&i>cl)nb.add(i+delta);else nb.add(i)});d.bm=nb}
+  d.text=nt;if(S.macro.rec&&!S.macro.playing&&!progEdit&&e.inputType&&(e.inputType==='insertText'||e.inputType==='insertLineBreak')&&!e.__rec)S.macro.buf.push({id:'type',args:{text:e.inputType==='insertLineBreak'?'\n':(e.data||'')}});
+  paintAll();status();renderTabs();refreshPanels()});
+ ta.addEventListener('keydown',e=>{if(!S.ins&&e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&ta.selectionStart===ta.selectionEnd&&ta.value[ta.selectionStart]!=='\n'&&ta.selectionStart<ta.value.length)ta.setSelectionRange(ta.selectionStart,ta.selectionStart+1)});
+ ['keyup','mouseup','click'].forEach(ev=>ta.addEventListener(ev,e=>{if(p.doc)p.doc.sel=[ta.selectionStart,ta.selectionEnd];updateCur(p);status();
+  if(ev==='click'&&(e.ctrlKey||e.metaKey)&&S.prefs.links){const t=ta.value,pos=ta.selectionStart;URLRE.lastIndex=0;let m;while((m=URLRE.exec(t))){if(pos>=m.index&&pos<=m.index+m[0].length){toast('将在系统浏览器打开：'+m[0]);break}}}}));
+ p.sc.addEventListener('scroll',()=>{if(S.sync&&S.split&&!p.sc._lock){const o=panes[1-p.i];o.sc._lock=true;o.sc.scrollTop=p.sc.scrollTop;o.sc.scrollLeft=p.sc.scrollLeft;requestAnimationFrame(()=>o.sc._lock=false)}drawMini()});
+ p.bd.addEventListener('click',e=>{const b=e.target.closest('.bk');if(b&&p.doc){const i=+b.dataset.ln;p.doc.bm.has(i)?p.doc.bm.delete(i):p.doc.bm.add(i);paint(p)}});
+ p.el.addEventListener('mousedown',()=>{if(S.av!==p.i){S.av=p.i;sync()}},true);
+});
+document.addEventListener('selectionchange',()=>{const p=ap();if(document.activeElement===p.ta){updateCur(p);status()}});
+function updateCur(p){if(!p.doc)return;const l=lineOf(p.ta.value,p.ta.selectionStart);$$('.row.cur',p.bd).forEach(r=>r.classList.remove('cur'));p.bd.children[l]?.classList.add('cur')}
+document.addEventListener('copy',cc);document.addEventListener('cut',cc);
+function cc(e){const p=ap();if(document.activeElement!==p.ta)return;const{s,e:en,t}=sel();let txt=t.slice(s,en);if(s===en&&S.prefs.lineCopy){const r=lineRange(p,false);txt=t.slice(r.s,r.e)+'\n';e.clipboardData.setData('text/plain',txt);e.preventDefault();if(e.type==='cut'&&writable())edit(p,r.s,Math.min(r.e+1,t.length),'',r.s)}
+ if(txt){clipboard=txt;S.clipHist.unshift(txt);S.clipHist=[...new Set(S.clipHist)].slice(0,20)}}
+/* ---------- tabs ---------- */
+function renderTabs(){panes.forEach((p,i)=>{const v=S.views[i];const ids=[...v.tabs.filter(id=>S.docs[id]?.pinned),...v.tabs.filter(id=>!S.docs[id]?.pinned)];v.tabs=ids;
+ p.tabs.innerHTML=ids.map(id=>{const d=S.docs[id];return`<div class="tab${v.active===id?' on':''}${d.pinned?' pinned':''}${d.ro?' ro':''}" draggable="true" data-did="${id}" data-v="${i}" title="${esc(d.path||d.name)}">${d.pinned?ic('pin'):''}<span class="tt">${esc(d.name)}</span>${isDirty(d)?'<i class="dirty"></i>':''}<button class="x" data-a="closeTab" data-did="${id}">${ic('x')}</button></div>`}).join('');
+ p.el.classList.toggle('focus',S.split&&S.av===i)});
+ $('#ttl').textContent=(ad()?ad().name+(isDirty(ad())?' ●':'')+' — ':'')+'Notepad 工作台'}
+$('#panes').addEventListener('dragstart',e=>{const t=e.target.closest('.tab');if(t)e.dataTransfer.setData('text/x-did',t.dataset.did)});
+$('#panes').addEventListener('dragover',e=>{if(e.dataTransfer.types.includes('text/x-did')){e.preventDefault();$$('.tab.dragover').forEach(x=>x.classList.remove('dragover'));e.target.closest('.tab')?.classList.add('dragover')}});
+$('#panes').addEventListener('drop',e=>{const id=e.dataTransfer.getData('text/x-did');if(!id)return;e.preventDefault();$$('.tab.dragover').forEach(x=>x.classList.remove('dragover'));const pane=e.target.closest('.pane');if(!pane)return;const vi=+pane.id.slice(4);const tgt=e.target.closest('.tab');
+ S.views.forEach(v=>{v.tabs=v.tabs.filter(x=>x!==id);if(v.active===id)v.active=v.tabs[0]||null});const arr=S.views[vi].tabs;const k=tgt?arr.indexOf(tgt.dataset.did):-1;k>=0?arr.splice(k,0,id):arr.push(id);S.views[vi].active=id;S.av=vi;if(vi===1&&!S.split)S.split=true;panes.forEach((p,i)=>loadPane(i));sync()});
+function tabMenu(e,id){const d=S.docs[id];activate(id);const v=S.av;showMenu(e.clientX,e.clientY,[{l:'关闭',a:'close'},{l:'关闭其余',a:'closeothers'},{l:'关闭左侧',a:'closeleft'},{l:'关闭右侧',a:'closeright'},{l:'关闭未修改',a:'closeunmod'},{l:'关闭未固定',a:'closeunpinned'},{sep:1},{l:d.pinned?'取消固定':'固定标签',a:'pin'},{l:'克隆到另一视图',a:'clone'},{l:'移到另一视图',a:'moveView'},{sep:1},{l:'复制完整路径',a:'copyPath'},{l:'重命名…',a:'rename'},{l:'在文件管理器中显示',a:'revealdir'}])}
+def('pin','固定/取消固定标签','',()=>{const d=ad();if(d)d.pinned=!d.pinned},false);
+def('closeTab','',null,a=>d_close([S.docs[a.did]]));
+def('clone','克隆文档到另一视图','',()=>{const d=ad();if(!d)return;const o=1-S.av;S.split=true;if(!S.views[o].tabs.includes(d.id))S.views[o].tabs.push(d.id);S.views[o].active=d.id;panes.forEach((p,i)=>loadPane(i));toast('同一缓冲区显示在两个视图中，两边编辑同步')});
+def('moveView','移到另一视图','',()=>{const d=ad();if(!d)return;const o=1-S.av;S.split=true;S.views[S.av].tabs=S.views[S.av].tabs.filter(x=>x!==d.id);S.views[S.av].active=S.views[S.av].tabs[0]||null;S.views[o].tabs.push(d.id);S.views[o].active=d.id;S.av=o;panes.forEach((p,i)=>loadPane(i))});
+def('split','双视图','',()=>{S.split=!S.split;if(!S.split){const o=S.views[1];o.tabs.forEach(id=>{if(!S.views[0].tabs.includes(id))S.views[0].tabs.push(id)});o.tabs=[];o.active=null;S.av=0;panes.forEach((p,i)=>loadPane(i))}else if(!S.views[1].tabs.length&&ad()){run('clone')}});
+def('rotate','旋转分割方向','',()=>{S.orient=S.orient==='v'?'h':'v'});
+def('syncscroll','同步滚动','',()=>{S.sync=!S.sync});
+def('mru','文档切换器（MRU）','',()=>mruDialog());
+function mruDialog(){let i=1;const ids=S.mru.filter(x=>S.docs[x]);if(!ids.length)return;const b=modal('文档切换器（最近使用顺序）',`<div id="mrul">${ids.map((id,k)=>`<div class="rcitem" data-id="${id}" style="${k===i?'background:var(--sel)':''}"><span>${esc(S.docs[id].name)}</span><span class="mut" style="margin-left:auto">${esc(S.docs[id].path||'未命名')}</span></div>`).join('')}</div><p class="note">真实应用中按住 ${mod()}+Tab 循环、松开确认；浏览器会占用 Ctrl+Tab，所以此处用对话框演示。↑↓ 选择，Enter 切换。</p>`,[{t:'关闭'}],{w:480});
+ const paintSel=()=>$$('.rcitem',b).forEach((r,k)=>r.style.background=k===i?'var(--sel)':'');
+ b.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){i=(i+1)%ids.length;paintSel();e.preventDefault()}else if(e.key==='ArrowUp'){i=(i-1+ids.length)%ids.length;paintSel();e.preventDefault()}else if(e.key==='Enter'){b.remove();activate(ids[i])}});
+ $$('.rcitem',b).forEach(r=>r.onclick=()=>{b.remove();activate(r.dataset.id)});b.tabIndex=0;b.focus()}
+/* ---------- edit commands ---------- */
+def('undo','撤销','Mod+Z',()=>{ap().ta.focus();document.execCommand('undo')});
+def('redo','重做','Mod+Y',()=>{ap().ta.focus();document.execCommand('redo')});
+def('cut','剪切','Mod+X',()=>{if(!writable())return;ap().ta.focus();document.execCommand('cut')});
+def('copy','复制','Mod+C',()=>{ap().ta.focus();document.execCommand('copy')});
+def('paste','粘贴','Mod+V',async()=>{if(!writable())return;try{const t=await navigator.clipboard.readText();edit(ap(),sel().s,sel().e,t)}catch(_){if(clipboard)edit(ap(),sel().s,sel().e,clipboard);else toast('浏览器未授权读取剪贴板；真实应用不受此限制')}});
+def('selectall','全选','Mod+A',()=>{const ta=ap().ta;ta.focus();ta.select()});
+def('del','删除','Delete',()=>{if(!writable())return;const{s,e}=sel();if(s!==e)edit(ap(),s,e,'')});
+def('type','（输入文本）',null,a=>{if(writable()){const{s,e}=sel();edit(ap(),s,e,a.text)}},true);
+def('pasteSpecial','特殊粘贴：HTML/RTF 源码','',()=>toast('示意：粘贴剪贴板里 HTML / RTF 的源码文本，而不是渲染效果；二进制模式保留 NUL 等字符（设计 §5.2）'));
+def('beginEnd','开始/结束选择','',()=>{const p=ap();if(S.anchor==null){S.anchor=sel().s;toast('已设置选区起点，移动光标后再次执行以完成选择')}else{const a=S.anchor,b=sel().s;S.anchor=null;p.ta.setSelectionRange(Math.min(a,b),Math.max(a,b));toast('已选择 '+Math.abs(a-b)+' 个字符')}});
+def('toggleIns','插入/改写模式','Insert',()=>{S.ins=!S.ins});
+def('vspace','虚拟空格','',()=>{S.vs=!S.vs;toast(S.vs?'虚拟空格开启（原型仅切换状态；真实实现用 CodeMirror 6 扩展）':'虚拟空格关闭')});
+def('dupline','复制行','Mod+D',()=>{if(!writable())return;const p=ap(),r=lineRange(p,false),t=p.ta.value,seg=t.slice(r.s,r.e);edit(p,r.e,r.e,'\n'+seg,r.e+1,r.e+1+seg.length)},true);
+def('moveup','上移一行','Mod+Shift+ArrowUp',()=>moveLine(-1),true);def('movedown','下移一行','Mod+Shift+ArrowDown',()=>moveLine(1),true);
+function moveLine(dir){if(!writable())return;const p=ap(),r=lineRange(p,false),t=p.ta.value;if(dir<0&&r.s===0||dir>0&&r.e>=t.length)return;
+ if(dir<0){const ps=t.lastIndexOf('\n',r.s-2)+1;const prev=t.slice(ps,r.s-1),cur=t.slice(r.s,r.e);edit(p,ps,r.e,cur+'\n'+prev,ps,ps+cur.length)}else{let ne=t.indexOf('\n',r.e+1);if(ne<0)ne=t.length;const cur=t.slice(r.s,r.e),next=t.slice(r.e+1,ne);edit(p,r.s,ne,next+'\n'+cur,r.s+next.length+1,r.s+next.length+1+cur.length)}}
+def('join','合并行','Mod+J',()=>{if(!writable())return;const p=ap(),{s,e,t}=sel();let r=lineRange(p,false);if(s===e){let ne=t.indexOf('\n',r.e+1);if(r.e>=t.length)return;if(ne<0)ne=t.length;r={s:r.s,e:ne}}const seg=t.slice(r.s,r.e).split('\n').map((x,i)=>i?x.trimStart():x).join(' ');edit(p,r.s,r.e,seg,r.s,r.s+seg.length)},true);
+def('splitLine','拆分长行（垂直标尺处）','',()=>lineOp(L=>L.flatMap(x=>{const o=[];let s=x;const w=S.prefs.rulerCol;while(s.length>w){o.push(s.slice(0,w));s=s.slice(w)}o.push(s);return o}),'拆分长行（'+S.prefs.rulerCol+' 列）'),true);
+def('blankAbove','在上方插入空行','Mod+Alt+Enter',()=>{if(!writable())return;const p=ap(),r=lineRange(p,false);edit(p,r.s,r.s,'\n',r.s)},true);
+def('blankBelow','在下方插入空行','Mod+Shift+Enter',()=>{if(!writable())return;const p=ap(),r=lineRange(p,false);edit(p,r.e,r.e,'\n',r.e+1)},true);
+[['lex','字典序'],['ci','忽略大小写'],['loc','本地化'],['int','整数'],['dc','小数（逗号）'],['dd','小数（点）'],['len','按行长']].forEach(([k,l])=>[false,true].forEach(desc=>def('sort_'+k+(desc?'_d':'_a'),'排序：'+l+(desc?' 降序':' 升序'),'',()=>lineOp(T.sort(k,desc),'排序（'+l+(desc?'，降序':'，升序')+'）'),true)));
+[['dedupe','删除重复行',T.dedupe],['dedupeAdj','删除连续重复行',T.dedupeAdj],['rmEmpty','删除空行',T.rmEmpty],['rmBlank','删除空白行（含仅空白字符）',T.rmBlank],['reverse','反转行序',T.reverse],['shuffle','随机打乱',T.shuffle],['trimT','去除行尾空白',T.trimT],['trimL','去除行首空白',T.trimL],['trimB','去除两端空白',T.trimB],['t2s','Tab 转空格',T.t2s],['s2t','空格转 Tab（全部）',T.s2t],['s2tl','空格转 Tab（仅行首）',T.s2tl]].forEach(([id,l,fn])=>def(id,l,'',()=>lineOp(fn,l),true));
+def('eol2space','行尾换行转空格','',()=>{if(!writable())return;const p=ap(),{s,e,t}=sel();const a=s===e?0:s,b=s===e?t.length:e;const seg=t.slice(a,b).replace(/\s*\n\s*/g,' ');edit(p,a,b,seg,a,a+seg.length)},true);
+CASES.forEach(([k,l,key])=>def('case_'+k,'大小写：'+l,key,()=>charOp(T.cases[k],l),true));
+def('redact','选区脱敏（█）','',()=>charOp(s=>s.replace(/[^\n]/g,'█'),'脱敏'),true);def('redactDot','选区脱敏（●）','',()=>charOp(s=>s.replace(/[^\n]/g,'●'),'脱敏'),true);
+def('insDateShort','插入日期时间（短）','',()=>insText(new Date().toLocaleString('zh-CN',{hour12:false})),true);
+def('insDateLong','插入日期时间（长）','',()=>insText(new Date().toLocaleString('zh-CN',{dateStyle:'full',timeStyle:'medium'})),true);
+def('insDateCustom','插入日期时间（自定义格式）…','',()=>{modal('自定义日期时间格式',`<div class="fld"><label>格式</label><input class="inp" id="df" style="flex:1" value="yyyy-MM-dd HH:mm:ss"></div><p class="note">支持 yyyy MM dd HH mm ss；预览：<span id="dpv"></span></p>`,[{t:'取消'},{t:'插入',c:'pri',fn:b=>{insText(fmtDate($('#df',b).value))}}]);const u=()=>$('#dpv').textContent=fmtDate($('#df').value);$('#df').oninput=u;u()});
+function fmtDate(f){const n=new Date(),z=(x,l=2)=>String(x).padStart(l,'0');return f.replace(/yyyy/g,n.getFullYear()).replace(/MM/g,z(n.getMonth()+1)).replace(/dd/g,z(n.getDate())).replace(/HH/g,z(n.getHours())).replace(/mm/g,z(n.getMinutes())).replace(/ss/g,z(n.getSeconds()))}
+function insText(t){if(writable()){const{s,e}=sel();edit(ap(),s,e,t)}}
+def('colEditor','列编辑器…','Alt+C',()=>{const b=modal('列编辑器',`<div class="seg" id="cet"><button class="on" data-m="t">文本</button><button data-m="n">数字序列</button></div><div id="cet1" class="fld"><label>插入文本</label><input class="inp" id="cx" style="flex:1" value="- "></div><div id="cet2" style="display:none"><div class="fld"><label>起始值</label><input class="inp" id="c0" value="1" style="min-width:70px;width:70px"><label style="width:auto">步长</label><input class="inp" id="c1" value="1" style="min-width:60px;width:60px"><label style="width:auto">重复</label><input class="inp" id="c2" value="1" style="min-width:60px;width:60px"></div><div class="fld"><label>进制</label><select class="sel" id="cb"><option value="10">十进制</option><option value="16">十六进制</option><option value="8">八进制</option><option value="2">二进制</option></select><label style="width:auto">前导零</label><input type="checkbox" id="cz"></div></div><p class="note">在选中的每一行的光标列处插入（原型用“多行选区 + 起始列”代替矩形选区；真实实现基于 CodeMirror 6 的列选区/多光标）。预览：<span id="cpv" class="mono"></span></p>`,[{t:'取消'},{t:'确定',c:'pri',fn:b=>{colApply(b)}}],{w:520});
+ let m='t';$$('#cet button',b).forEach(x=>x.onclick=()=>{m=x.dataset.m;$$('#cet button',b).forEach(y=>y.classList.toggle('on',y===x));$('#cet1',b).style.display=m==='t'?'':'none';$('#cet2',b).style.display=m==='n'?'':'none';pv()});b._m=()=>m;
+ const pv=()=>{$('#cpv',b).textContent=[0,1,2].map(i=>colText(b,i)).join(' | ')};b.addEventListener('input',pv);pv()});
+function colText(b,i){if(b._m()==='t')return $('#cx',b).value;const st=parseInt($('#c0',b).value)||0,sp=parseInt($('#c1',b).value)||1,rp=Math.max(1,parseInt($('#c2',b).value)||1),base=+$('#cb',b).value;let s=(st+sp*Math.floor(i/rp)).toString(base).toUpperCase();if($('#cz',b).checked)s=s.padStart(3,'0');return s}
+function colApply(b){if(!writable())return;const p=ap(),{s,e,t}=sel();const ls=t.lastIndexOf('\n',s-1)+1;const col=s-ls;const a=lineOf(t,s),z=lineOf(t,e);const lines=t.split('\n');let k=0;for(let i=a;i<=Math.max(a,z);i++){const L=lines[i];lines[i]=L.slice(0,col).padEnd(col,' ')+colText(b,k++)+L.slice(col)}const st=lineStarts(t)[a];const en=lineStarts(t)[Math.max(a,z)]+t.split('\n')[Math.max(a,z)].length;edit(p,st,en,lines.slice(a,Math.max(a,z)+1).join('\n'));toast('已向 '+k+' 行插入（第 '+(col+1)+' 列）')}
+def('multiNext','选择下一个相同词','Mod+Shift+D',()=>{const p=ap(),{s,e,t}=sel();const w=s===e?(t.slice(0,s).match(/[\p{L}\p{N}_]*$/u)[0]+t.slice(s).match(/^[\p{L}\p{N}_]*/u)[0]):t.slice(s,e);if(!w)return;const i0=s===e?s-t.slice(0,s).match(/[\p{L}\p{N}_]*$/u)[0].length:e;let i=t.indexOf(w,i0);if(i<0)i=t.indexOf(w);p.ta.setSelectionRange(i,i+w.length);ensureVisible(p,i);toast('原型仅选中下一个同词；真实实现为多选区编辑（CodeMirror 6 多光标，含 Select All / 撤销最近多选 / 跳过）')});
+def('clipHistory','剪贴板历史…','Mod+Shift+V',()=>{const items=S.clipHist.length?S.clipHist:['（暂无：先复制几段文字）'];const b=modal('剪贴板历史',`<div style="max-height:260px;overflow:auto;border:1px solid var(--divider);border-radius:7px">${items.map((x,i)=>`<div class="rcitem mono" data-i="${i}" style="white-space:pre;overflow:hidden">${esc(x.slice(0,120))}</div>`).join('')}</div><p class="note">双击一条粘贴到光标处。多光标处分别粘贴不同条目：见设计 §5.2。</p>`,[{t:'关闭'}],{w:520});$$('.rcitem',b).forEach(r=>r.ondblclick=()=>{b.remove();if(S.clipHist[r.dataset.i])insText(S.clipHist[r.dataset.i])})});
+def('dragtxt','拖动选区文本','',()=>toast('浏览器文本框原生支持拖动选区文本；真实实现可在首选项关闭'));
+/* ---------- search ---------- */
+def('find','查找…','Mod+F',()=>showFind('find'));def('replace','替换…','Mod+H',()=>showFind('replace'));def('findfiles','在文件中查找…','Mod+Shift+F',()=>showFind('files'));def('markdlg','标记…','Mod+M',()=>showFind('mark'));
+def('findnext','查找下一个','F3',()=>findStep(false));def('findprev','查找上一个','Shift+F3',()=>findStep(true));
+def('selfind','选中即查（下一个）','Mod+F3',()=>{const{s,e,t}=sel();if(s!==e){S.find.q=t.slice(s,e);S.find.mode='normal'}findStep(false)});
+def('selfindv','选中即查（Volatile，不改查找框）','',()=>{const{s,e,t}=sel();if(s===e)return;const o={...S.find,q:t.slice(s,e),mode:'normal'};findStep(false,o)});
+def('incfind','增量查找','Mod+Alt+I',()=>{S.find.inc=true;showFind('find')});
+def('findall','全部查找（当前文档）','',()=>findAll(false));def('findalldocs','全部查找（所有打开文档）','',()=>findAll(true));
+def('replaceall','全部替换（当前文档）','',()=>replaceAll(false));def('replacealldocs','在所有打开文档中替换','',()=>replaceAll(true));
+def('count','计数','',()=>{const re=buildRe(S.find);if(!re){toast(S.find.q?'正则表达式无效':'请输入查找内容');return}toast('共 '+allMatches(re,ad().text).length+' 处匹配')});
+def('markall','标记全部','',()=>{const d=ad();if(!d||!S.find.q)return;const st=+(S.find.style||0);d.marks.push({style:st,re:{q:S.find.q,mode:S.find.mode,case:S.find.case,word:S.find.word}});paintAll();toast('已标记全部出现处（样式 '+(st+1)+'）')});
+def('clearmarks','清除全部标记','',()=>{ad().marks=[];paintAll()});
+def('markbm','标记并为匹配行加书签','',()=>{const d=ad(),re=buildRe(S.find);if(!d||!re)return;allMatches(re,d.text).forEach(([s])=>d.bm.add(lineOf(d.text,s)));paintAll();toast('匹配行已加书签')});
+for(let i=1;i<=5;i++){def('tok'+i,'令牌样式 '+i+'：高亮选中词','',()=>{const d=ad(),{s,e,t}=sel();if(s===e)return;d.marks.push({style:i,re:{q:t.slice(s,e),mode:'normal',case:true,word:false}});paintAll()});def('tokclr'+i,'清除令牌样式 '+i,'',()=>{const d=ad();d.marks=d.marks.filter(m=>m.style!==i);paintAll()})}
+def('goto','转到…','Mod+G',()=>{const p=ap(),d=ad();if(!d)return;const ci=caretInfo();const b=modal('转到',`<div class="seg" id="gt"><button class="on" data-m="l">行</button><button data-m="o">偏移</button></div><div class="fld"><label>当前</label><span id="gcur"></span></div><div class="fld"><label>目标</label><input class="inp" id="gv" placeholder="行号，可写 行:列"></div><div class="fld"><label>范围</label><span class="mut">1 – <span id="gmax"></span></span></div><div id="ge"></div>`,[{t:'取消'},{t:'转到',c:'pri',fn:b=>{const m=b._m;const v=$('#gv',b).value.trim();const t=p.ta.value;let pos;if(m==='l'){const[l,c]=v.split(':').map(x=>parseInt(x));const ls=lineStarts(t);if(!l||l<1||l>ls.length){$('#ge',b).innerHTML='<div class="errbox">行号超出范围</div>';return false}pos=ls[l-1]+Math.max(0,(c||1)-1)}else{const o=parseInt(v);if(isNaN(o)||o<0||o>t.length){$('#ge',b).innerHTML='<div class="errbox">偏移超出范围</div>';return false}pos=o}p.ta.focus();p.ta.setSelectionRange(pos,pos);ensureVisible(p,pos);updateCur(p);status()}}]);b._m='l';
+ const up=()=>{$('#gcur',b).textContent=b._m==='l'?'第 '+ci.ln+' 行，第 '+ci.col+' 列':'偏移 '+ci.pos;$('#gmax',b).textContent=b._m==='l'?ci.lines:ci.len};up();$$('#gt button',b).forEach(x=>x.onclick=()=>{b._m=x.dataset.m;$$('#gt button',b).forEach(y=>y.classList.toggle('on',y===x));up()})});
+function bmNav(dir){const p=ap(),d=ad();if(!d||!d.bm.size){toast('没有书签');return}const cl=lineOf(p.ta.value,p.ta.selectionStart);const arr=[...d.bm].sort((a,b)=>a-b);let n=dir>0?arr.find(x=>x>cl):[...arr].reverse().find(x=>x<cl);if(n==null)n=dir>0?arr[0]:arr[arr.length-1];const pos=lineStarts(p.ta.value)[n];p.ta.setSelectionRange(pos,pos);ensureVisible(p,pos);updateCur(p);status()}
+def('bmToggle','切换书签','Mod+F2',()=>{const p=ap(),d=ad(),l=lineOf(p.ta.value,p.ta.selectionStart);d.bm.has(l)?d.bm.delete(l):d.bm.add(l);paint(p)});
+def('bmNext','下一个书签','F2',()=>bmNav(1));def('bmPrev','上一个书签','Shift+F2',()=>bmNav(-1));def('bmClear','清除全部书签','',()=>{ad().bm.clear();paintAll()});
+function bmLines(f){const d=ad(),p=ap();if(!d||!writable())return;const L=d.text.split('\n');const r=f(L,d.bm);if(r){edit(p,0,d.text.length,r.join('\n'),0)}}
+def('bmCut','剪切书签行','',()=>{const d=ad();if(!d.bm.size)return;clipboard=[...d.bm].sort((a,b)=>a-b).map(i=>d.text.split('\n')[i]).join('\n')+'\n';S.clipHist.unshift(clipboard);bmLines((L,b)=>L.filter((_,i)=>!b.has(i)));d.bm.clear();paintAll()});
+def('bmCopy','复制书签行','',()=>{const d=ad();clipboard=[...d.bm].sort((a,b)=>a-b).map(i=>d.text.split('\n')[i]).join('\n')+'\n';S.clipHist.unshift(clipboard);toast('已复制 '+d.bm.size+' 个书签行')});
+def('bmPaste','粘贴替换书签行','',()=>{const d=ad();if(!clipboard)return;const rep=clipboard.replace(/\n$/,'').split('\n');let k=0;bmLines((L,b)=>L.map((x,i)=>b.has(i)?(rep[k++%rep.length]):x))});
+def('bmDel','删除书签行','',()=>{bmLines((L,b)=>L.filter((_,i)=>!b.has(i)));ad().bm.clear();paintAll()});
+def('bmDelNon','删除未书签行','',()=>{bmLines((L,b)=>L.filter((_,i)=>b.has(i)));const n=ad().bm.size;ad().bm=new Set([...Array(n).keys()]);paintAll()});
+def('bmInvert','反转书签','',()=>{const d=ad(),n=d.text.split('\n').length,nb=new Set();for(let i=0;i<n;i++)if(!d.bm.has(i))nb.add(i);d.bm=nb;paintAll()});
+function chgNav(dir){const p=ap(),d=ad();const L=d.text.split('\n'),ms=lcsMatch(d.saved.split('\n'),L);const bad=ms.map((m,i)=>m?-1:i).filter(i=>i>=0);if(!bad.length){toast('没有未保存的变更');return}const cl=lineOf(p.ta.value,p.ta.selectionStart);let n=dir>0?bad.find(i=>i>cl):[...bad].reverse().find(i=>i<cl);if(n==null)n=dir>0?bad[0]:bad[bad.length-1];const pos=lineStarts(p.ta.value)[n];p.ta.setSelectionRange(pos,pos);ensureVisible(p,pos);updateCur(p);status()}
+def('chgNext','下一处变更','Alt+Shift+ArrowDown',()=>chgNav(1));def('chgPrev','上一处变更','Alt+Shift+ArrowUp',()=>chgNav(-1));def('chgClear','清除变更历史','',()=>{const d=ad();d.saved=d.text;d.orig=d.text;paintAll();toast('变更历史已清除（不影响脏标记以外的保存状态）')});
+def('chgToggle','变更历史边距','',()=>{S.prefs.showChg=!S.prefs.showChg});
+function findStep(back,o){o=o||S.find;const p=ap(),d=ad();if(!d)return;const re=buildRe(o);if(!re){toast(o.q?'正则表达式无效':'请先输入查找内容');return}
+ const t=d.text,all=allMatches(re,t);if(!all.length){S.cur=null;paintAll();toast('未找到：'+o.q);return}
+ const{s,e}=sel();let m;if(!back){m=all.find(x=>x[0]>=(S.cur&&S.cur.id===d.id&&S.cur.s===s?e:s));if(!m&&(o.wrap||o===S.find&&S.find.wrap)){m=all[0];toast('已循环到文档开头')}}else{m=[...all].reverse().find(x=>x[1]<=s);if(!m&&o.wrap){m=all[all.length-1];toast('已循环到文档末尾')}}
+ if(!m){toast('已到达文档'+(back?'开头':'末尾'));return}
+ S.cur={id:d.id,s:m[0],e:m[1]};p.ta.setSelectionRange(m[0],m[1]);paint(p);ensureVisible(p,m[0]);status();recHist('find',o.q)}
+function recHist(k,v){if(!v)return;S.hist[k]=[v,...S.hist[k].filter(x=>x!==v)].slice(0,10);$('#fh_'+k)&&($('#fh_'+k).innerHTML=S.hist[k].map(x=>`<option value="${esc(x)}">`).join(''))}
+function findAll(docs){const re=buildRe(S.find);if(!re){toast('请输入有效的查找内容');return}const list=docs?Object.values(S.docs):[ad()];const res=[];list.forEach(d=>{const L=d.text.split('\n'),st=lineStarts(d.text);allMatches(re,d.text).forEach(([s,e])=>{const ln=lineOf(d.text,s);res.push({doc:d.id,name:d.name,ln,col:s-st[ln],s,e,text:L[ln],len:e-s})})});S.results=res;S.resultsTitle='查找“'+S.find.q+'”：'+res.length+' 处，'+new Set(res.map(r=>r.doc)).size+' 个文档';S.panels.results.open=true;recHist('find',S.find.q);sync()}
+function replaceAll(docs){const f=S.find,re=buildRe(f);if(!re){toast('请输入有效的查找内容');return}const list=docs?Object.values(S.docs).filter(d=>!d.ro):[ad()];const rep=f.mode==='ext'?unesc(f.r):f.r;const n=list.reduce((a,d)=>a+allMatches(re,d.text).length,0);
+ const go=()=>{let tot=0;list.forEach(d=>{const r2=buildRe(f),c=allMatches(r2,d.text).length;if(!c)return;tot+=c;const nt=d.text.replace(buildRe(f),f.mode==='re'?rep:()=>rep);if(d===ad()){edit(ap(),0,d.text.length,nt,0)}else{d.text=nt}});paintAll();renderTabs();recHist('replace',f.r);toast('已替换 '+tot+' 处'+(docs?'（'+list.length+' 个文档）':''))};
+ if(docs){modal('在所有打开文档中替换',`<p>将在 ${list.length} 个可写文档中共替换 <b>${n}</b> 处。</p><div style="max-height:160px;overflow:auto;border:1px solid var(--divider);border-radius:7px">${list.map(d=>`<div class="rcitem"><span>${esc(d.name)}</span><span class="mut" style="margin-left:auto">${allMatches(buildRe(f),d.text).length} 处</span></div>`).join('')}</div><p class="note">只读 / 远程文档自动跳过。替换可用各文档的撤销回退。</p>`,[{t:'取消'},{t:'全部替换',c:'pri',fn:go}])}else go()}
+const VF=[{path:'~/notes/release.md',text:'# Release\nERROR budget burn 12%\nall green'},{path:'~/notes/oncall.txt',text:'ERROR 503 at 02:11\nwarn: retries\nERROR 500 at 04:40'},{path:'~/notes/todo.txt',text:'buy milk\nERROR handling tests\nship it'}];
+function findFiles(){const f=S.find,re=buildRe(f);if(!re){toast('请输入有效的查找内容');return}const res=[];VF.forEach(v=>{const L=v.text.split('\n'),st=lineStarts(v.text);allMatches(re,v.text).forEach(([s,e])=>{const ln=lineOf(v.text,s);res.push({file:v.path,ln,col:s-st[ln],text:L[ln],len:e-s})})});S.results=res.map(r=>({...r,doc:null,name:r.file}));S.resultsTitle='在文件中查找“'+f.q+'”（示例目录 ~/notes）：'+res.length+' 处';S.panels.results.open=true;sync()}
+function showFind(tab){const f=S.find;f.tab=tab;const el=$('#find');el.style.display='flex';const{s,e,t}=sel();if(ad()&&s!==e&&!t.slice(s,e).includes('\n'))f.q=t.slice(s,e);renderFind();$('#fq').focus();$('#fq').select();paintAll()}
+function renderFind(){const f=S.find,el=$('#find');const tabs=[['find','查找'],['replace','替换'],['files','在文件中查找'],['mark','标记']];
+ el.innerHTML=`<div class="fh" id="fdrag"><b>${tabs.find(x=>x[0]===f.tab)[1]}</b><span class="mut">· 当前文档 / 打开文档 / 目录</span><span class="sp"></span><button class="ibtn" data-a="findCompact" title="紧凑模式">${ic('list')}</button><input type="range" id="fop" min="40" max="100" value="${Math.round((+el.dataset.op||1)*100)}" title="透明度" style="width:60px"><button class="ibtn" data-a="findClose">${ic('x')}</button></div>
+ <div class="ftabs">${tabs.map(([k,l])=>`<button class="${f.tab===k?'on':''}" data-ft="${k}">${l}</button>`).join('')}</div>
+ <div class="fb"><div class="fr"><label class="l">查找</label><input class="inp" id="fq" list="fh_find" value="${esc(f.q)}"><datalist id="fh_find">${S.hist.find.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>
+ ${f.tab==='replace'||f.tab==='files'?`<div class="fr"><label class="l">替换为</label><input class="inp" id="fr" list="fh_replace" value="${esc(f.r)}"><datalist id="fh_replace">${S.hist.replace.map(x=>`<option value="${esc(x)}">`).join('')}</datalist><button class="ibtn" data-a="swapFR" title="互换">${ic('replace')}</button></div>`:''}
+ ${f.tab==='files'?`<div class="fr"><label class="l">目录</label><input class="inp" value="~/notes" readonly><label class="l" style="width:auto">过滤</label><input class="inp" value="*.txt;*.md" style="max-width:110px"></div>`:''}
+ ${f.tab==='mark'?`<div class="fr"><label class="l">样式</label><div class="seg">${[1,2,3,4,5].map(i=>`<button class="${(f.style||0)===i-1?'on':''}" data-st="${i-1}"><span class="mk${i-1}" style="padding:0 8px">样式${i}</span></button>`).join('')}</div></div>`:''}
+ <div class="fr"><label class="l">模式</label><div class="seg"><button class="${f.mode==='normal'?'on':''}" data-fm="normal">普通</button><button class="${f.mode==='ext'?'on':''}" data-fm="ext">扩展 (\\n \\t \\0 \\x)</button><button class="${f.mode==='re'?'on':''}" data-fm="re">正则</button></div></div>
+ <div class="opts fbody2">${[['case','区分大小写'],['word','全词匹配'],['wrap','循环'],['back','反向'],['insel','仅选区内'],['dotall','. 匹配换行'],['hl','高亮全部'],['inc','增量查找']].map(([k,l])=>`<label><input type="checkbox" data-fo="${k}" ${f[k]?'checked':''}> ${l}</label>`).join('')}</div>
+ <div id="fmsg" class="note" style="min-height:16px"></div>
+ <div class="btns fbody2">${f.tab==='find'?`<button class="cbtn pri" data-a="findnext">查找下一个</button><button class="cbtn" data-a="findprev">上一个</button><button class="cbtn" data-a="count">计数</button><button class="cbtn" data-a="findall">全部查找（当前）</button><button class="cbtn" data-a="findalldocs">全部查找（所有文档）</button>`:''}
+ ${f.tab==='replace'?`<button class="cbtn pri" data-a="findnext">查找下一个</button><button class="cbtn" data-a="replaceOne">替换</button><button class="cbtn" data-a="replaceall">全部替换</button><button class="cbtn" data-a="replacealldocs">在所有打开文档中替换</button>`:''}
+ ${f.tab==='files'?`<button class="cbtn pri" data-a="findFilesGo">在文件中查找</button><button class="cbtn" data-a="replaceFilesGo">在文件中替换…</button>`:''}
+ ${f.tab==='mark'?`<button class="cbtn pri" data-a="markall">标记全部</button><button class="cbtn" data-a="markbm">标记并加书签</button><button class="cbtn" data-a="clearmarks">清除标记</button>`:''}</div></div>`;
+ const q=$('#fq');q.oninput=()=>{f.q=q.value;if(f.inc&&ad())incrementalJump();paintAll();fmsg()};const r=$('#fr');if(r)r.oninput=()=>f.r=r.value;
+ q.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();run(e.shiftKey?'findprev':'findnext')}};if(r)r.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();run('replaceOne')}};
+ $('#fop').oninput=e=>{el.dataset.op=e.target.value/100;el.style.opacity=e.target.value/100};el.style.opacity=el.dataset.op||1;fmsg()}
+function fmsg(){const f=S.find,m=$('#fmsg');if(!m)return;if(!f.q){m.textContent='';return}const re=buildRe(f);if(!re){m.innerHTML='<span style="color:var(--danger)">正则表达式无效</span>';return}m.textContent='当前文档匹配 '+(ad()?allMatches(re,ad().text).length:0)+' 处'}
+function incrementalJump(){const p=ap(),d=ad(),re=buildRe(S.find);if(!re||!d)return;const all=allMatches(re,d.text);const from=sel().s;const m=all.find(x=>x[0]>=from)||all[0];if(m){S.cur={id:d.id,s:m[0],e:m[1]};p.ta.setSelectionRange(m[0],m[1]);ensureVisible(p,m[0])}}
+def('replaceOne','替换','',()=>{if(!writable())return;const f=S.find,re=buildRe(f,false),p=ap(),{s,e,t}=sel();if(!re)return;const sl=t.slice(s,e);const full=new RegExp('^(?:'+re.source+')$',re.flags);if(s!==e&&full.test(sl)){const out=sl.replace(re,f.mode==='re'?(f.mode==='ext'?unesc(f.r):f.r):()=>f.mode==='ext'?unesc(f.r):f.r);edit(p,s,e,out,s,s+out.length);S.cur=null;recHist('replace',f.r)}findStep(false)});
+def('swapFR','',null,()=>{const f=S.find;[f.q,f.r]=[f.r,f.q];renderFind()});
+def('findCompact','',null,()=>$('#find').classList.toggle('compact'));def('findClose','',null,()=>{$('#find').style.display='none';S.cur=null;paintAll()});
+def('findFilesGo','',null,findFiles);
+def('replaceFilesGo','',null,()=>{const re=buildRe(S.find);if(!re)return;const n=VF.reduce((a,v)=>a+allMatches(re,v.text).length,0);modal('在文件中替换：预览',`<p>将在示例目录 ~/notes 的 ${VF.length} 个文件中替换 <b>${n}</b> 处（原型不写盘）。</p><p class="note">真实实现复用 FindInFilesPanel 的替换预览：逐文件逐处勾选，写入前以哈希校验防冲突。</p>`,[{t:'取消'},{t:'确认替换',c:'pri',fn:()=>toast('原型：已模拟替换 '+n+' 处')}])});
+$('#find').addEventListener('click',e=>{const t=e.target.closest('[data-ft]');if(t){S.find.tab=t.dataset.ft;renderFind();return}const m=e.target.closest('[data-fm]');if(m){S.find.mode=m.dataset.fm;renderFind();paintAll();return}const st=e.target.closest('[data-st]');if(st){S.find.style=+st.dataset.st;renderFind()}});
+$('#find').addEventListener('change',e=>{const k=e.target.dataset.fo;if(k){S.find[k]=e.target.checked;paintAll();fmsg()}});
+(()=>{const f=$('#find');let dx,dy,mv=0;f.addEventListener('mousedown',e=>{const h=e.target.closest('#fdrag');if(!h||e.target.closest('button,input'))return;mv=1;const r=f.getBoundingClientRect(),pr=f.offsetParent.getBoundingClientRect();dx=e.clientX-r.left+pr.left;dy=e.clientY-r.top+pr.top});document.addEventListener('mousemove',e=>{if(!mv)return;f.style.left=(e.clientX-dx)+'px';f.style.top=(e.clientY-dy)+'px';f.style.right='auto'});document.addEventListener('mouseup',()=>mv=0)})();
+/* ---------- view commands ---------- */
+const tg=(id,l,fn)=>def(id,l,'',fn);
+def('wrap','自动换行','',()=>{S.prefs.wrap=!S.prefs.wrap});
+['space','tab','eol','nonprint','indent'].forEach((k,i)=>def('sym_'+k,'显示：'+['空格','Tab','行尾','不可见字符','缩进线'][i],'',()=>{S.sym[k]=!S.sym[k]}));
+def('sym_all','显示全部符号','',()=>{const v=!Object.values(S.sym).every(Boolean);Object.keys(S.sym).forEach(k=>S.sym[k]=v)});
+def('linenum','行号边距','',()=>{S.prefs.lineNum=!S.prefs.lineNum});def('ruler','垂直标尺','',()=>{S.prefs.ruler=!S.prefs.ruler});
+def('zoomin','放大','Mod+=',()=>{S.zoom=Math.min(S.zoom+1,12);applyFont()});def('zoomout','缩小','Mod+-',()=>{S.zoom=Math.max(S.zoom-1,-5);applyFont()});def('zoom0','恢复缩放','Mod+0',()=>{S.zoom=0;applyFont()});
+def('minimap','文档地图','',()=>togglePanel('minimap'));def('doclist','文档列表','',()=>togglePanel('doclist'));def('chars','字符面板','',()=>togglePanel('chars'));def('resultsP','搜索结果窗口','F7',()=>togglePanel('results'));
+function togglePanel(k){S.panels[k].open=!S.panels[k].open}
+def('fullscreen','全屏','F11',()=>{S.mode=S.mode==='fs'?'':'fs'});def('postit','Post-It','F12',()=>{S.mode=S.mode==='po'?'':'po'});def('focusmode','专注模式','',()=>{S.mode=S.mode==='focus'?'':'focus'});
+def('menubar','菜单栏','',()=>{S.ui.menubar=!S.ui.menubar});def('toolbarT','工具栏','',()=>{S.ui.toolbar=!S.ui.toolbar});def('statusbarT','状态栏','',()=>{S.ui.statusbar=!S.ui.statusbar});
+def('theme','切换浅色/深色','',()=>{document.documentElement.classList.toggle('dark');document.documentElement.classList.toggle('light')});
+def('summary','文件摘要…','',()=>{const d=ad();if(!d)return;const t=d.text;modal('文件摘要',`<table class="t"><tr><td>完整路径</td><td class="mono">${esc(d.path||'（未保存）')}</td></tr><tr><td>修改时间</td><td>${new Date().toLocaleString('zh-CN')}</td></tr><tr><td>字节数</td><td>${new TextEncoder().encode(t).length}</td></tr><tr><td>字符数</td><td>${[...t].length}</td></tr><tr><td>词数</td><td>${(t.match(/\S+/g)||[]).length}</td></tr><tr><td>行数</td><td>${t.split('\n').length}</td></tr><tr><td>编码 / 行尾</td><td>${d.enc} / ${d.eol}</td></tr></table>`)});
+def('copyPath','复制路径信息','',()=>{const d=ad();if(!d)return;copy(d.path||d.name);toast('已复制路径：'+(d.path||d.name))});
+def('copyName','复制文件名','',()=>{copy(ad()?.name||'');toast('已复制文件名')});def('copyDir','复制所在目录','',()=>{copy((ad()?.path||'').replace(/[^\\/]+$/,''));toast('已复制所在目录')});
+def('copyAllPaths','复制全部打开文件的路径','',()=>{copy(Object.values(S.docs).map(d=>d.path||d.name).join('\n'));toast('已复制 '+Object.keys(S.docs).length+' 条路径')});
+function copy(t){clipboard=t;try{navigator.clipboard.writeText(t)}catch(_){}}
+def('selOpen','把选区当作路径打开','',()=>{const{s,e,t}=sel();const v=t.slice(s,e).trim();const f=FS.concat(VF).find(x=>x.path===v||baseName(x.path)===v);if(f)openFS(f);else toast(v?'路径不存在：'+v:'请先选择一个路径')});
+def('selReveal','把选区当作文件夹在文件管理器中打开','',()=>toast('将在文件管理器中打开选区指向的文件夹'));
+def('selSearch','用搜索引擎搜索选区','',()=>{const{s,e,t}=sel();toast(t.slice(s,e)?'将在浏览器打开：'+S.prefs.engine+encodeURIComponent(t.slice(s,e)):'请先选择文本')});
+/* encoding */
+const ENCS=[['Unicode',['UTF-8','UTF-8 BOM','UTF-16 LE','UTF-16 BE','UTF-16 LE BOM','UTF-16 BE BOM']],['东亚 ANSI',['GBK','GB18030','Big5','Shift-JIS','EUC-JP','EUC-KR']],['西欧 / 拉丁',['Windows-1252','ISO-8859-1','ISO-8859-15','Windows-1250']],['西里尔 / 希腊',['Windows-1251','KOI8-R','ISO-8859-5','Windows-1253']]];
+def('encdlg','编码…','',()=>encDialog());
+function encDialog(){const d=ad();if(!d)return;const b=modal('文件编码',`<div class="note">当前：<b>${d.enc}</b>${d.detected?'（打开时自动检测：'+d.detected+'）':''}</div><div class="seg" id="em"><button class="on" data-m="re">按编码重新解释（重读字节）</button><button data-m="cv">转换为（改变保存字节）</button></div><input class="inp" id="ef" placeholder="筛选编码…" style="width:100%;margin:8px 0"><div id="el" style="max-height:200px;overflow:auto;border:1px solid var(--divider);border-radius:7px;padding:4px">${ENCS.map(([g,l])=>`<div class="note" style="margin:6px 8px 2px"><b>${g}</b></div>${l.map(x=>`<label style="display:flex;gap:6px;padding:3px 10px"><input type="radio" name="enc" value="${x}" ${x===d.enc?'checked':''}> ${x}</label>`).join('')}`).join('')}</div><div id="ew"></div><p class="note" id="eh">重新解释会丢弃当前未保存修改。ANSI 选择在所有平台始终可用，不靠猜。</p>`,[{t:'取消'},{t:'应用',c:'pri',fn:b=>{const enc=$('input[name=enc]:checked',b).value;if(b._m==='re'){if(isDirty(d)&&!b._ok){$('#ew',b).innerHTML='<div class="warnbox">有未保存修改，重新解释会丢弃它们。再次点击“应用”确认。</div>';b._ok=1;return false}const f=d.fsRef;if(f&&f.garbled){d.text=enc==='GBK'||enc==='GB18030'?f.text:f.garbled;d.saved=d.text;d.disk=d.text}d.enc=enc;d.savedEnc=enc;loadPane(S.av);toast('已按 '+enc+' 重新解释')}else{const lost=encLoss(d.text,enc);if(lost&&!b._ok){$('#ew',b).innerHTML=`<div class="warnbox">转换为 <b>${enc}</b> 会丢失 <b>${lost}</b> 个无法表示的字符。再次点击“应用”仍要转换。</div>`;b._ok=1;return false}d.enc=enc;toast('已转换为 '+enc+'（保存时按此编码写入）')}}}],{w:520});b._m='re';
+ $$('#em button',b).forEach(x=>x.onclick=()=>{b._m=x.dataset.m;b._ok=0;$('#ew',b).innerHTML='';$$('#em button',b).forEach(y=>y.classList.toggle('on',y===x));$('#eh',b).textContent=b._m==='re'?'重新解释会丢弃当前未保存修改。':'转换前先校验：转换后字符数不变才直接保存，否则警告丢失字符数。'});
+ $('#ef',b).oninput=e=>$$('#el label',b).forEach(l=>l.style.display=l.textContent.toLowerCase().includes(e.target.value.toLowerCase())?'':'none')}
+function encLoss(t,enc){if(/Windows-125\d|ISO-8859/.test(enc))return[...t].filter(c=>c.charCodeAt(0)>255&&!/[€‘’“”…•–—™]/.test(c)).length;if(/GBK|GB18030|Big5|Shift|EUC/.test(enc))return[...t].filter(c=>/[\u{1F300}-\u{1FAFF}]/u.test(c)).length;return 0}
+['LF','CRLF','CR'].forEach(k=>def('eol_'+k,'行尾转换为 '+k,'',()=>{const d=ad();if(!d)return;d.eol=k;toast('行尾统一为 '+k+'，混合行尾已修复')}));
+/* tools */
+function sha(alg,buf){return crypto.subtle.digest(alg,buf).then(b=>[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''))}
+function md5(s){const r=(x,c)=>(x<<c)|(x>>>(32-c));const K=Array.from({length:64},(_,i)=>Math.floor(Math.abs(Math.sin(i+1))*4294967296)),Sh=[7,12,17,22,5,9,14,20,4,11,16,23,6,10,15,21];const b=new TextEncoder().encode(s),l=b.length,n=((l+8>>6)+1)*16,w=new Uint32Array(n);for(let i=0;i<l;i++)w[i>>2]|=b[i]<<(i%4*8);w[l>>2]|=0x80<<(l%4*8);w[n-2]=l*8;let a=1732584193,bb=-271733879,c=-1732584194,d=271733878;for(let i=0;i<n;i+=16){let A=a,B=bb,Cc=c,D=d;for(let j=0;j<64;j++){let f,g;if(j<16){f=(B&Cc)|(~B&D);g=j}else if(j<32){f=(D&B)|(~D&Cc);g=(5*j+1)%16}else if(j<48){f=B^Cc^D;g=(3*j+5)%16}else{f=Cc^(B|~D);g=(7*j)%16}const t=D;D=Cc;Cc=B;B=(B+r((A+f+K[j]+w[i+g])|0,Sh[(j>>4)*4+j%4]))|0;A=t}a=(a+A)|0;bb=(bb+B)|0;c=(c+Cc)|0;d=(d+D)|0}return[a,bb,c,d].map(x=>[0,8,16,24].map(s=>((x>>>s)&255).toString(16).padStart(2,'0')).join('')).join('')}
+def('hash','哈希工具…','',()=>{const{s,e,t}=sel();const b=modal('哈希工具',`<div class="seg" id="hs"><button class="on" data-m="sel">选区</button><button data-m="file">当前文件</button><button data-m="txt">输入文本</button></div><textarea class="inp" id="hin" rows="3" style="width:100%;margin:8px 0" placeholder="输入文本…"></textarea><table class="t" id="hout"></table><p class="note">MD5 / SHA-1 / SHA-256 / SHA-512。Rust 端 md-5、sha1、sha2 已在依赖里，无需新增库（设计 §2）。</p>`,[{t:'关闭'}],{w:640});let m='sel';
+ const calc=async()=>{const src=m==='sel'?t.slice(s,e):m==='file'?(ad()?.text||''):$('#hin',b).value;const enc=new TextEncoder().encode(src);const rows=[['MD5',md5(src)],['SHA-1',await sha('SHA-1',enc)],['SHA-256',await sha('SHA-256',enc)],['SHA-512',await sha('SHA-512',enc)]];$('#hout',b).innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td class="mono" style="word-break:break-all;font-size:11px">${r[1]}</td></tr>`).join('')};
+ $$('#hs button',b).forEach(x=>x.onclick=()=>{m=x.dataset.m;$$('#hs button',b).forEach(y=>y.classList.toggle('on',y===x));$('#hin',b).style.display=m==='txt'?'':'none';calc()});$('#hin',b).style.display='none';$('#hin',b).oninput=calc;calc()});
+const u8=s=>btoa(String.fromCharCode(...new TextEncoder().encode(s))),d8=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
+const MIME={b64e:['Base64 编码',u8],b64d:['Base64 解码',d8],urle:['URL 编码',encodeURIComponent],urld:['URL 解码',decodeURIComponent],qpe:['Quoted-Printable 编码',s=>[...new TextEncoder().encode(s)].map(c=>c>126||c<32&&c!==10||c===61?'='+c.toString(16).toUpperCase().padStart(2,'0'):String.fromCharCode(c)).join('')],qpd:['Quoted-Printable 解码',s=>decodeURIComponent(s.replace(/=\r?\n/g,'').replace(/=([0-9A-F]{2})/gi,'%$1'))],a2h:['ASCII → 十六进制',s=>[...new TextEncoder().encode(s)].map(c=>c.toString(16).padStart(2,'0')).join(' ')],h2a:['十六进制 → ASCII',s=>new TextDecoder().decode(Uint8Array.from(s.trim().split(/\s+/).map(x=>parseInt(x,16))))],a2d:['ASCII → 十进制',s=>[...new TextEncoder().encode(s)].join(' ')],a2b:['ASCII → 二进制',s=>[...new TextEncoder().encode(s)].map(c=>c.toString(2).padStart(8,'0')).join(' ')]};
+def('mime','MIME / Converter 工具…','',()=>{const{s,e,t}=sel();const b=modal('MIME 工具与进制转换',`<div class="fld"><label>操作</label><select class="sel" id="mo">${Object.entries(MIME).map(([k,v])=>`<option value="${k}">${v[0]}</option>`).join('')}</select></div><textarea class="inp" id="mi" rows="3" style="width:100%">${esc(t.slice(s,e)||'Taomni 记事本')}</textarea><div id="me"></div><textarea class="inp" id="mout" rows="3" readonly style="width:100%;margin-top:6px"></textarea>`,[{t:'关闭'},{t:'替换选区',c:'pri',fn:b=>{if(!writable())return false;const{s,e}=sel();if(s===e){toast('请先选择文本');return false}edit(ap(),s,e,$('#mout',b).value)}}],{w:560});
+ const c=()=>{try{$('#mout',b).value=MIME[$('#mo',b).value][1]($('#mi',b).value);$('#me',b).innerHTML=''}catch(x){$('#mout',b).value='';$('#me',b).innerHTML='<div class="errbox">输入不是有效的编码内容</div>'}};b.addEventListener('input',c);b.addEventListener('change',c);c()});
+def('hashMenu','',null,()=>run('hash'));
+/* ---------- macros ---------- */
+async function macroHash(){return sha('SHA-256',new TextEncoder().encode(JSON.stringify(S.macro.saved)))}
+def('macroRec','开始录制','Mod+Shift+R',()=>{if(S.macro.rec)return;S.macro.rec=true;S.macro.buf=[];toast('正在录制已注册的文本命令；弹窗类操作与语言选择不可录')});
+def('macroStop','停止录制','Mod+Shift+T',()=>{if(!S.macro.rec)return;S.macro.rec=false;toast('已录制 '+S.macro.buf.length+' 步，可回放或保存')});
+def('macroPlay','回放','Mod+Shift+P',()=>playMacro(S.macro.buf,1));
+function playMacro(steps,n,untilEnd){if(!steps.length){toast('没有可回放的宏');return}S.macro.playing=true;let k=0,guard=0;const p=ap();
+ const once=()=>{steps.forEach(s=>{if(s.id==='type'){C.type.fn(s.args)}else C[s.id]?.fn(s.args||{})})};
+ try{if(untilEnd){while(guard++<5000){const before=sel().s,ln=lineOf(p.ta.value,before);if(ln>=p.ta.value.split('\n').length-1)break;once();k++;if(sel().s===before)break}}else{for(;k<n;k++)once()}}finally{S.macro.playing=false}sync();toast('宏已运行 '+k+' 次')}
+def('macroRunN','多次运行…','',()=>{const b=modal('多次运行宏',`<div class="fld"><label>宏</label><select class="sel" id="mn"><option value="-1">当前录制缓冲区</option>${S.macro.saved.map((m,i)=>`<option value="${i}">${esc(m.name)}</option>`).join('')}</select></div><div class="fld"><label>次数</label><input class="inp" id="mc" value="3" style="width:70px;min-width:0"></div><label style="display:flex;gap:6px"><input type="checkbox" id="mu"> 运行到文件末尾为止</label>`,[{t:'取消'},{t:'运行',c:'pri',fn:b=>{const i=+$('#mn',b).value;playMacro(i<0?S.macro.buf:S.macro.saved[i].steps,Math.max(1,parseInt($('#mc',b).value)||1),$('#mu',b).checked)}}])});
+def('macroSave','保存当前录制的宏…','',()=>{if(!S.macro.buf.length){toast('没有可保存的录制');return}let key='';const b=modal('保存宏',`<div class="fld"><label>名称</label><input class="inp" id="mnm" style="flex:1" value="宏 ${S.macro.saved.length+1}"></div><div class="fld"><label>快捷键</label><input class="inp" id="mkk" readonly placeholder="点击后按下快捷键（可留空）" style="flex:1"></div><div id="mke"></div><p class="note">共 ${S.macro.buf.length} 步：${S.macro.buf.slice(0,8).map(s=>C[s.id].label||s.id).join(' → ')}${S.macro.buf.length>8?' …':''}</p>`,[{t:'取消'},{t:'保存',c:'pri',fn:async b=>{const name=$('#mnm',b).value.trim();if(!name)return false;S.macro.saved.push({name,key,steps:JSON.parse(JSON.stringify(S.macro.buf))});S.macro.hash=await macroHash();S.macro.tampered=false;rebuildKeys();rebuildMenus();toast('宏“'+name+'”已保存到 macros.json（含 SHA-256 校验）')}}]);
+ const k=$('#mkk',b);k.onkeydown=e=>{e.preventDefault();const c=combo(e);if(!c)return;const cf=conflict(c);if(cf){$('#mke',b).innerHTML=`<div class="warnbox">与“${esc(cf)}”冲突，保存后将覆盖该绑定。</div>`}else $('#mke',b).innerHTML='';key=c;k.value=kd(c)}});
+def('macroPlaySaved','',null,a=>{const m=S.macro.saved[a.i];if(m&&checkMacro())playMacro(m.steps,1)});
+function checkMacro(){if(S.macro.tampered){toast('macros.json 校验失败，已拒绝运行；请在宏菜单里“校验并清除警告”');return false}return true}
+def('macroMgr','宏管理 / 快捷键映射器…','',()=>keymapDialog('macros'));
+def('macroValidate','校验宏文件','',async()=>{const h=await macroHash();if(h!==S.macro.hash){modal('宏文件校验',`<div class="errbox"><b>校验和不一致</b><br><span class="mono" style="font-size:11px">存储：${S.macro.hash.slice(0,32)}…<br>当前：${h.slice(0,32)}…</span></div><p>macros.json 可能被编辑器之外的程序修改过。确认内容无误后可接受当前内容。</p>`,[{t:'保持拒绝'},{t:'接受当前内容',c:'pri',fn:()=>{S.macro.hash=h;S.macro.tampered=false;rebuildMenus();toast('已接受并重新计算校验和')}}])}else{S.macro.tampered=false;rebuildMenus();toast('校验通过：macros.json 未被外部改动')}});
+/* compare */
+def('cmpOther','与另一个打开的文档对比…','',()=>cmpDialog());
+function cmpDialog(){const d=ad();if(!d)return;const others=Object.values(S.docs).filter(x=>x!==d);const b=modal('文件对比',`<div class="fld"><label>左侧</label><b>${esc(d.name)}</b></div><div class="fld"><label>右侧</label><select class="sel" id="cs" style="flex:1"><option value="doc">另一个打开的文档</option><option value="disk">当前文件的磁盘版本</option><option value="clip">剪贴板内容</option><option value="sel">当前选区（与剪贴板）</option></select></div><div class="fld" id="cdw"><label>文档</label><select class="sel" id="cd" style="flex:1">${others.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')||'<option value="">（没有其他文档）</option>'}</select></div><p class="note">统一用 @codemirror/merge MergeView 作 diff 内核，单次对比上限 5 MB（设计 DEC-10）。</p>`,[{t:'取消'},{t:'对比',c:'pri',fn:b=>{const m=$('#cs',b).value;let a=d.text,c2,l2;if(m==='doc'){const o=S.docs[$('#cd',b).value];if(!o){toast('没有可对比的文档');return false}c2=o.text;l2=o.name}else if(m==='disk'){c2=d.disk;l2=d.name+'（磁盘）'}else if(m==='clip'){c2=clipboard||'（剪贴板为空）';l2='剪贴板'}else{const{s,e,t}=sel();a=t.slice(s,e);c2=clipboard||'';l2='剪贴板';if(!a){toast('请先选择文本');return false}}showCmp(a,c2,d.name+(m==='sel'?'（选区）':''),l2)}}]);
+ $('#cs',b).onchange=e=>$('#cdw',b).style.display=e.target.value==='doc'?'':'none'}
+function diffLines(A,B){const n=A.length,m=B.length,w=m+1,dp=new Uint16Array((n+1)*w);for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)dp[i*w+j]=A[i]===B[j]?dp[(i+1)*w+j+1]+1:Math.max(dp[(i+1)*w+j],dp[i*w+j+1]);const out=[];let i=0,j=0;while(i<n||j<m){if(i<n&&j<m&&A[i]===B[j]){out.push(['=',i,j]);i++;j++}else if(j<m&&(i>=n||dp[i*w+j+1]>=dp[(i+1)*w+j])){out.push(['+',null,j]);j++}else{out.push(['-',i,null]);i++}}return out}
+function showCmp(a,b,la,lb,opts){opts=opts||{ws:false,ci:false};const el=$('#cmp');el.style.display='flex';const norm=s=>{s=opts.ci?s.toLowerCase():s;return opts.ws?s.replace(/\s+/g,' ').trim():s};const A=a.split('\n'),B=b.split('\n');const df=diffLines(A.map(norm),B.map(norm));const cnt=df.filter(x=>x[0]!=='=').length;
+ const L=[],R=[];df.forEach(([k,i,j])=>{if(k==='=')L.push(row(i+1,A[i],'')),R.push(row(j+1,B[j],''));else if(k==='-')L.push(row(i+1,A[i],'del')),R.push(row('','','pad'));else L.push(row('','','pad')),R.push(row(j+1,B[j],'add'))});function row(n,t,c){return`<div class="cl ${c}"><span class="n">${n}</span><span>${esc(t)||'\u200b'}</span></div>`}
+ el.innerHTML=`<div class="ch"><b>文件对比</b><span class="mut">${cnt?cnt+' 处差异':'两侧相同'}</span><label><input type="checkbox" id="cw" ${opts.ws?'checked':''}> 忽略空白</label><label><input type="checkbox" id="cci" ${opts.ci?'checked':''}> 忽略大小写</label><button class="cbtn" id="cnx">下一处差异</button><span class="sp"></span><span class="mut">${esc(la)} ⇄ ${esc(lb)}</span><button class="cbtn" id="ccl">关闭对比</button></div><div class="cb"><div class="cc" id="cl1">${L.join('')}</div><div class="cc" id="cl2" style="border:0">${R.join('')}</div></div>`;
+ const c1=$('#cl1'),c2=$('#cl2');c1.onscroll=()=>c2.scrollTop=c1.scrollTop;c2.onscroll=()=>c1.scrollTop=c2.scrollTop;$('#ccl').onclick=()=>el.style.display='none';$('#cw').onchange=$('#cci').onchange=()=>showCmp(a,b,la,lb,{ws:$('#cw').checked,ci:$('#cci').checked});let k=-1;$('#cnx').onclick=()=>{const ds=$$('.cl.add,.cl.del',c1).concat([]);const all=$$('.cl',c1);const idx=all.map((x,i)=>/add|del|pad/.test(x.className)||/add|del|pad/.test($$('.cl',c2)[i].className)?i:-1).filter(i=>i>=0);k=(k+1)%Math.max(1,idx.length);if(idx.length)c1.scrollTop=all[idx[k]].offsetTop-40}}
+/* print */
+def('printdlg','打印…','',()=>printDialog());
+function printDialog(){const d=ad();if(!d)return;const o={ln:true,ml:20,hd:'{name}',ft:'第 {page} 页',color:'wysiwyg'};const b=modal('打印',`<div style="display:flex;gap:16px"><div style="flex:1;min-width:0"><div class="fld"><label>范围</label><select class="sel" id="pr"><option>全文</option><option>当前选区</option></select></div><label style="display:flex;gap:6px;margin:6px 0"><input type="checkbox" id="pln" checked> 打印行号</label><div class="fld"><label>页边距</label><input class="inp" id="pml" value="20" style="width:64px;min-width:0"> mm</div><div class="fld"><label>页眉</label><input class="inp" id="phd" value="{name}" style="flex:1"></div><div class="fld"><label>页脚</label><input class="inp" id="pft" value="第 {page} 页" style="flex:1"></div><div class="fld"><label>颜色</label><select class="sel" id="pcl"><option value="wysiwyg">所见即所得</option><option value="bw">黑白</option><option value="inv">反色</option><option value="none">无背景色</option></select></div><p class="note">复用 Markdown 的“隐藏 iframe + 系统打印对话框”模式；“打印到 PDF”经系统 PDF 打印机，应用不内置 PDF 导出。</p></div><div id="prv" style="display:flex;gap:8px"></div></div>`,[{t:'取消'},{t:'打印到 PDF',fn:()=>{toast('已打开系统打印对话框，请选择“另存为 PDF”打印机');return false}},{t:'打印',c:'pri',fn:()=>toast('已打开系统打印对话框')}],{w:760});
+ const upd=()=>{const ln=$('#pln',b).checked,ml=+$('#pml',b).value||0,cl=$('#pcl',b).value;const L=d.text.split('\n'),per=34;const pages=[0,1].map(pg=>{const sl=L.slice(pg*per,pg*per+per);return`<div class="page" style="padding:${12+ml*.6}px ${10+ml*.6}px;${cl==='inv'?'background:#111;color:#eee':''}"><div class="ph">${esc($('#phd',b).value.replace('{name}',d.name))}</div>${sl.map((x,i)=>`<div style="white-space:pre;overflow:hidden">${ln?String(pg*per+i+1).padStart(3,' ')+'  ':''}${esc(x)}</div>`).join('')}<div class="pf">${esc($('#pft',b).value.replace('{page}',pg+1))}</div></div>`}).join('');$('#prv',b).innerHTML=pages};b.addEventListener('input',upd);b.addEventListener('change',upd);upd()}
+/* session / backup / recovery */
+def('saveSession','保存会话…','',()=>{const docs=Object.values(S.docs).filter(d=>d.path&&!d.remote);const j={version:1,app:'taomni-notepad',views:{split:S.split,orient:S.orient,active:ad()?.path||null},files:docs.map(d=>({path:d.path,view:S.views.findIndex(v=>v.tabs.includes(d.id)),selection:d.sel,encoding:d.enc,eol:d.eol,bookmarks:[...d.bm],readOnly:d.ro,pinned:d.pinned}))};const txt=JSON.stringify(j,null,2);modal('保存会话',`<div class="fld"><label>文件名</label><input class="inp" value="工作会话.taomni-session.json" style="flex:1"></div><textarea class="inp" readonly rows="14" style="width:100%;font-size:11px">${esc(txt)}</textarea><p class="note">会话不含未保存的脏内容（脏内容走自动备份）。远程只读副本与邮件附件不入会话。</p>`,[{t:'取消'},{t:'保存',c:'pri',fn:()=>{S.sessions.push(j);toast('会话已保存（演示）')}}],{w:620})});
+def('loadSession','加载会话…','',()=>{const sample={version:1,files:[{path:'~/Documents/hosts.conf'},{path:'~/Logs/app.log'},{path:'~/Documents/已删除的旧笔记.txt'}]};const list=[sample,...S.sessions];const b=modal('加载会话',`<div style="border:1px solid var(--divider);border-radius:7px">${list.map((s,i)=>`<div class="rcitem" data-i="${i}"><span>${i?'已保存会话 '+i:'运维周报.taomni-session.json'}</span><span class="mut" style="margin-left:auto">${s.files.length} 个文件</span></div>`).join('')}</div><p class="note">缺失的文件逐个提示并跳过，不整组失败。</p>`,[{t:'关闭'}]);$$('.rcitem',b).forEach(r=>r.onclick=()=>{b.remove();const s=list[+r.dataset.i];let ok=0;const miss=[];s.files.forEach(f=>{const x=FS.find(y=>y.path===f.path);if(x){openFS(x);ok++}else miss.push(f.path)});modal('会话已加载',`<p>已打开 <b>${ok}</b> 个文件。</p>${miss.length?`<div class="warnbox">${miss.length} 个文件缺失，已跳过：<br>${miss.map(esc).join('<br>')}</div>`:''}`)})});
+def('backupInfo','备份与恢复…','',()=>{const b=modal('备份与恢复',`<div class="note">自动备份目录：<span class="mono">应用数据目录/backup/notepad/</span>（不写原文件、不写远程）。每 ${S.prefs.backupSec} 秒备份已修改文件，每文件保留最近 10 份。</div><div style="max-height:260px;overflow:auto;border:1px solid var(--divider);border-radius:7px"><table class="t"><thead><tr><th>文件</th><th>类型</th><th>大小</th><th>时间</th></tr></thead><tbody>${S.backups.slice(0,40).map(x=>`<tr><td>${esc(x.name)}</td><td>${x.kind}</td><td>${x.len} 字符</td><td>${x.t}</td></tr>`).join('')||'<tr><td colspan="4" class="mut">还没有备份：编辑一个文档并等待片刻</td></tr>'}</tbody></table></div>`,[{t:'关闭'}],{w:620})});
+setInterval(()=>{const dirty=Object.values(S.docs).filter(d=>isDirty(d)&&!d.remote);if(!dirty.length)return;S._bt=(S._bt||0)+1;if(S._bt>=S.prefs.backupSec){S._bt=0;dirty.forEach(d=>S.backups.unshift({name:d.name+'.'+Date.now().toString(36),kind:'定期备份',len:d.text.length,t:new Date().toLocaleTimeString()}));S.backups.length=Math.min(S.backups.length,200);S.lastBackup=new Date().toLocaleTimeString();status()}},1000);
+function banner(p,cls,html){const e=document.createElement('div');e.className='banner '+cls;e.innerHTML=html;p.ban.append(e);return e}
+function updateBanners(){panes.forEach((p,i)=>{p.ban.innerHTML='';const d=p.doc;if(!d)return;if(d.remote)banner(p,'info',`${ic('pin')}<span>远程文件：只读临时副本，不写回、不备份。可“另存为”到本地。</span>`);if(d.bigRO)banner(p,'warn',`<span>12 MB 文件：只读分块浏览（每块 256 KB，当前显示前 200 行）。</span><span class="sp"></span><button class="cbtn" data-a="bigEdit">确认后编辑…</button>`);
+ if(d.ext)banner(p,'warn',`<span>“${esc(d.name)}”已被其他程序修改。</span><span class="sp"></span><button class="cbtn pri" data-a="extReload">重新加载</button><button class="cbtn" data-a="extDiff">比较差异</button><button class="cbtn" data-a="extKeep">保留我的版本</button>`);
+ if(d.recovered)banner(p,'info',`<span>已恢复未保存草稿，磁盘文件未被改动。</span><span class="sp"></span><button class="cbtn" data-a="backupInfo">查看备份</button><button class="cbtn" data-a="dismissRec">知道了</button>`);
+ if(d.detected&&d.enc==='UTF-8'&&d.text.includes('锛'))banner(p,'warn',`<span>自动检测为 ${d.detected}，当前按 UTF-8 显示出现乱码。</span><span class="sp"></span><button class="cbtn pri" data-a="encdlg">按编码重新解释…</button>`)})}
+def('bigEdit','',null,()=>{const d=ad();modal('确认编辑大文件',`<p>该文件超过 5 MB 可编辑上限。继续将只加载当前块并以只读外的“分块编辑”打开，行为受限（无多文档替换、无备份）。</p>`,[{t:'取消'},{t:'继续编辑',c:'pri',fn:()=>{d.ro=false;d.bigRO=false;loadPane(S.av);toast('已解除只读（分块编辑）')}}])});
+def('extReload','',null,()=>{const d=ad();d.text=d.disk;d.saved=d.disk;d.ext=false;loadPane(S.av)});def('extKeep','',null,()=>{ad().ext=false});def('extDiff','',null,()=>{const d=ad();showCmp(d.text,d.disk,d.name+'（我的版本）',d.name+'（磁盘版本）')});def('dismissRec','',null,()=>{ad().recovered=false});
+/* panels */
+const PN={minimap:'文档地图',doclist:'文档列表',chars:'字符面板',results:'搜索结果'};
+function panelBody(k){if(k==='minimap')return'<canvas id="miniC" style="width:100%;height:100%;display:block;cursor:pointer"></canvas>';
+ if(k==='doclist'){const rows=Object.values(S.docs).sort((a,b)=>S.sortBy==='ext'?(a.name.split('.').pop()>b.name.split('.').pop()?1:-1):S.sortBy==='path'?((a.path||'')>(b.path||'')?1:-1):(a.name>b.name?1:-1));return`<table class="t"><thead><tr><th data-sort="name">名称</th><th data-sort="ext">类型</th><th data-sort="path">路径</th><th>视图</th></tr></thead><tbody>${rows.map(d=>`<tr data-did="${d.id}" class="${ad()?.id===d.id?'sl':''}" style="cursor:pointer"><td>${esc(d.name)}${isDirty(d)?' ●':''}</td><td>${esc(d.name.split('.').pop())}</td><td class="mut">${esc(d.path||'—')}</td><td>${S.views.findIndex(v=>v.tabs.includes(d.id))+1}</td></tr>`).join('')}</tbody></table>`}
+ if(k==='chars'){let h='<div style="padding:6px"><label style="display:flex;gap:6px;margin-bottom:6px"><input type="checkbox" id="cent"> 双击插入 HTML 实体</label><div style="display:grid;grid-template-columns:repeat(8,1fr);gap:2px">';for(let i=32;i<256;i++)h+=`<div data-ch="${i}" title="${i} 0x${i.toString(16)} &amp;#${i};" style="border:1px solid var(--divider);text-align:center;padding:3px 0;cursor:pointer;font-family:var(--mono);background:var(--card)">${esc(String.fromCharCode(i))}</div>`;return h+'</div></div>'}
+ if(k==='results'){const g={};S.results.forEach(r=>(g[r.name]=g[r.name]||[]).push(r));return`<div class="rrow f" style="padding:4px 10px">${esc(S.resultsTitle||'尚无结果：使用“全部查找”')}</div>`+Object.entries(g).map(([n,rs])=>`<div class="rrow f">${esc(n)}（${rs.length}）</div>`+rs.map(r=>`<div class="rrow" data-rd="${r.doc||''}" data-rs="${r.s??''}" data-re="${r.e??''}" data-rf="${r.file||''}">第 ${r.ln+1} 行：${esc(r.text.slice(0,r.col))}<b>${esc(r.text.slice(r.col,r.col+r.len))}</b>${esc(r.text.slice(r.col+r.len))}</div>`).join('')).join('')}return''}
+let flt={};
+function renderPanel(k){const pn=S.panels[k];return`<div class="dp" data-pk="${k}"><div class="hd" data-pk="${k}"><span>${PN[k]}</span><span class="sp"></span><button class="ibtn" data-a="pmenu" data-k="${k}" title="停靠位置">⋯</button><button class="ibtn" data-a="pclose" data-k="${k}">${ic('x')}</button></div><div class="bdy" ${k==='minimap'?'style="overflow:hidden"':''}>${panelBody(k)}</div></div>`}
+def('pclose','',null,a=>{S.panels[a.k].open=false});
+def('pmenu','',null,a=>{const b=$(`[data-a=pmenu][data-k=${a.k}]`).getBoundingClientRect();showMenu(b.left,b.bottom,[['right','停靠到右侧'],['bottom','停靠到底部'],['float','浮动为独立窗口']].map(([p,l])=>({l,fn:()=>{S.panels[a.k].pos=p;sync()}})))});
+function refreshPanels(){const R=$('#dockR'),B=$('#dockB');const by=pos=>Object.keys(S.panels).filter(k=>S.panels[k].open&&S.panels[k].pos===pos);const r=by('right'),b=by('bottom'),f=by('float');
+ R.style.display=r.length?'flex':'none';B.style.display=b.length?'flex':'none';R.innerHTML=r.map(renderPanel).join('');B.innerHTML=b.map(renderPanel).join('');
+ $$('.float').forEach(x=>x.remove());f.forEach((k,i)=>{const e=document.createElement('div');e.className='float';e.style.left=(S.panels[k].x??(300+i*40))+'px';e.style.top=(S.panels[k].y??(120+i*40))+'px';e.innerHTML=renderPanel(k);$('#app').append(e)});
+ drawMini()}
+function drawMini(){const c=$('#miniC');if(!c||!ad())return;const w=c.clientWidth,h=c.clientHeight;if(!w)return;c.width=w;c.height=h;const g=c.getContext('2d'),L=ad().text.split('\n');const lh=Math.min(3,Math.max(1,h/Math.max(L.length,1)));const col=getComputedStyle(document.documentElement).getPropertyValue('--muted');g.fillStyle=col;g.globalAlpha=.55;L.forEach((x,i)=>{if(i*lh>h)return;g.fillRect(4,i*lh,Math.min(x.length,100)*(w-8)/110,Math.max(1,lh-.5))});g.globalAlpha=1;const sc=ap().sc;const tot=sc.scrollHeight||1;const vy=sc.scrollTop/tot*L.length*lh,vh=Math.max(10,sc.clientHeight/tot*L.length*lh);g.fillStyle='rgba(59,130,246,.25)';g.fillRect(0,vy,w,vh);g.strokeStyle='#3b82f6';g.strokeRect(.5,vy+.5,w-1,vh-1)}
+document.addEventListener('mousedown',e=>{const c=e.target.closest('#miniC');if(!c)return;const mv=ev=>{const r=c.getBoundingClientRect();const L=ad().text.split('\n').length,lh=Math.min(3,Math.max(1,c.clientHeight/L));const ln=(ev.clientY-r.top)/lh;const sc=ap().sc;sc.scrollTop=ln/L*sc.scrollHeight-sc.clientHeight/2};mv(e);const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up)};document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up)});
+(()=>{let dr=null;document.addEventListener('mousedown',e=>{const h=e.target.closest('.float .hd');if(!h||e.target.closest('button'))return;const f=h.closest('.float'),r=f.getBoundingClientRect(),ar=$('#app').getBoundingClientRect();dr={f,dx:e.clientX-r.left,dy:e.clientY-r.top,ar,k:h.dataset.pk}});document.addEventListener('mousemove',e=>{if(!dr)return;const x=e.clientX-dr.ar.left-dr.dx,y=e.clientY-dr.ar.top-dr.dy;dr.f.style.left=x+'px';dr.f.style.top=y+'px';S.panels[dr.k].x=x;S.panels[dr.k].y=y});document.addEventListener('mouseup',()=>dr=null)})();
+document.addEventListener('click',e=>{const r=e.target.closest('[data-rd],[data-rf]');if(r&&r.closest('.dp')){if(r.dataset.rd){activate(r.dataset.rd);const p=ap();p.ta.focus();p.ta.setSelectionRange(+r.dataset.rs,+r.dataset.re);S.cur={id:r.dataset.rd,s:+r.dataset.rs,e:+r.dataset.re};paint(p);ensureVisible(p,+r.dataset.rs)}else if(r.dataset.rf){const f=VF.find(x=>x.path===r.dataset.rf);openFS({path:f.path,text:f.text})}return}
+ const tr=e.target.closest('tr[data-did]');if(tr&&tr.closest('.dp')){activate(tr.dataset.did);return}const th=e.target.closest('th[data-sort]');if(th){S.sortBy=th.dataset.sort;refreshPanels();return}
+ const ch=e.target.closest('[data-ch]');if(ch&&!ch.dataset.once){}});
+document.addEventListener('dblclick',e=>{const ch=e.target.closest('[data-ch]');if(ch){const i=+ch.dataset.ch;insText($('#cent')?.checked?`&#${i};`:String.fromCharCode(i))}const rd=e.target.closest('[data-rd]');});
+document.addEventListener('click',e=>{const x=e.target.closest('[data-recent]');if(x){const f=FS.find(y=>y.path===x.dataset.recent);if(f)openFS(f);else openFS({path:x.dataset.recent,text:S.closed.find(c=>c.path===x.dataset.recent)?.text||''})}});
+/* ---------- menus ---------- */
+function showMenu(x,y,items,parent){$$('.menu').filter(m=>!parent||m!==parent).forEach(m=>{if(!parent)m.remove()});const m=document.createElement('div');m.className='menu'+(parent?' submenu':'');m.innerHTML=items.map((it,i)=>it.sep?'<div class="msep"></div>':`<button class="mi${it.sub?' sub':''}${it.dis?' dis':''}" data-i="${i}"><span class="ck">${it.chk&&it.chk()?'✓':''}</span><span>${it.l}${it.chip?`<span class="chip warn">${it.chip}</span>`:''}</span><span class="k">${it.a&&C[it.a]?kd(S.keymap[it.a]):(it.k?kd(it.k):'')}</span></button>`).join('');document.body.append(m);const r=m.getBoundingClientRect();m.style.left=Math.min(x,innerWidth-r.width-8)+'px';m.style.top=Math.min(y,innerHeight-r.height-8)+'px';
+ m.addEventListener('mouseover',e=>{const b=e.target.closest('.mi');$$('.submenu',document).forEach(s=>{if(s._owner===m)s.remove()});if(!b)return;const it=items[+b.dataset.i];if(it&&it.sub){const br=b.getBoundingClientRect();const s=showMenu(br.right-2,br.top,it.sub,m);s._owner=m}});
+ m.addEventListener('click',e=>{const b=e.target.closest('.mi');if(!b)return;const it=items[+b.dataset.i];if(it.sub)return;$$('.menu').forEach(x=>x.remove());$$('#menubar button').forEach(x=>x.classList.remove('open'));if(it.fn)it.fn();else if(it.a)run(it.a,it.args||{})});return m}
+const sortSub=()=>[['lex','字典序'],['ci','忽略大小写'],['loc','本地化'],['int','整数'],['dc','小数（逗号）'],['dd','小数（点）'],['len','按行长']].flatMap(([k,l])=>[{l:l+' 升序',a:'sort_'+k+'_a'},{l:l+' 降序',a:'sort_'+k+'_d'}]);
+function menus(){const sym=k=>()=>S.sym[k];const ck=(f)=>f;return{
+'文件':[{l:'新建',a:'new'},{l:'打开…',a:'open'},{l:'最近文件',sub:S.recent.length?[...S.recent.slice(0,10).map(r=>({l:r.name+'  — '+r.path,fn:()=>{const f=FS.find(y=>y.path===r.path);f?openFS(f):openFS({path:r.path,text:S.closed.find(c=>c.path===r.path)?.text||''})}})),{sep:1},{l:'打开全部最近文件',fn:()=>S.recent.slice(0,5).forEach(r=>{const f=FS.find(y=>y.path===r.path);f&&openFS(f)})},{l:'清空最近文件',fn:()=>{S.recent=[];sync()}}]:[{l:'（空）',dis:1}]},{a:'reopen',l:'恢复最近关闭'},{sep:1},{l:'保存',a:'save'},{l:'另存为…',a:'saveas'},{l:'保存副本…',a:'savecopy'},{l:'全部保存',a:'saveall'},{l:'重命名…',a:'rename'},{l:'移至回收站…',a:'trash',chip:'待定'},{l:'从磁盘重载',a:'reload'},{sep:1},{l:'会话',sub:[{l:'保存会话…',a:'saveSession'},{l:'加载会话…',a:'loadSession'},{sep:1},{l:'备份与恢复…',a:'backupInfo'}]},{l:'在外部打开',sub:[{l:'用系统默认程序',a:'extopen'},{l:'在文件管理器中显示',a:'revealdir'},{l:'在终端打开所在文件夹',a:'termdir'}]},{sep:1},{l:'打印…',a:'print'},{l:'立即打印',a:'printnow'},{sep:1},{l:'关闭',a:'close'},{l:'全部关闭',a:'closeall'},{l:'批量关闭',sub:['closeothers','closeunpinned','closeleft','closeright','closeunmod'].map(a=>({l:C[a].label,a}))}],
+'编辑':[{l:'撤销',a:'undo'},{l:'重做',a:'redo'},{sep:1},{l:'剪切',a:'cut'},{l:'复制',a:'copy'},{l:'粘贴',a:'paste'},{l:'特殊粘贴',a:'pasteSpecial'},{l:'剪贴板历史…',a:'clipHistory'},{l:'删除',a:'del'},{l:'全选',a:'selectall'},{sep:1},{l:'选择',sub:[{l:'开始/结束选择',a:'beginEnd'},{l:'选择下一个相同词',a:'multiNext'}]},{l:'插入',sub:[{l:'日期时间（短）',a:'insDateShort'},{l:'日期时间（长）',a:'insDateLong'},{l:'日期时间（自定义）…',a:'insDateCustom'},{sep:1},{l:'列编辑器…',a:'colEditor'}]},{l:'行操作',sub:[{l:'复制行',a:'dupline'},{l:'上移一行',a:'moveup'},{l:'下移一行',a:'movedown'},{l:'合并行',a:'join'},{l:'拆分长行',a:'splitLine'},{l:'在上方插入空行',a:'blankAbove'},{l:'在下方插入空行',a:'blankBelow'},{sep:1},{l:'排序',sub:sortSub()},{sep:1},...['dedupe','dedupeAdj','rmEmpty','rmBlank','reverse','shuffle'].map(a=>({l:C[a].label,a}))]},{l:'大小写转换',sub:CASES.map(([k,l])=>({l,a:'case_'+k}))},{l:'空白操作',sub:['trimT','trimL','trimB','t2s','s2t','s2tl','eol2space'].map(a=>({l:C[a].label,a}))},{sep:1},{l:'插入/改写模式',a:'toggleIns',chk:()=>!S.ins},{l:'虚拟空格',a:'vspace',chk:()=>S.vs},{l:'只读（编辑器内）',a:'toggleRo',chk:()=>ad()?.ro},{l:'全部文档只读切换',a:'toggleRoAll'},{l:'切换文件只读属性',a:'toggleRoFile'},{l:'变更历史边距',a:'chgToggle',chk:()=>S.prefs.showChg}],
+'搜索':[{l:'查找…',a:'find'},{l:'替换…',a:'replace'},{l:'在文件中查找…',a:'findfiles'},{sep:1},{l:'查找下一个',a:'findnext'},{l:'查找上一个',a:'findprev'},{l:'选中即查',a:'selfind'},{l:'选中即查（Volatile）',a:'selfindv'},{l:'增量查找',a:'incfind'},{sep:1},{l:'全部查找（当前文档）',a:'findall'},{l:'全部查找（所有打开文档）',a:'findalldocs'},{l:'在所有打开文档中替换',a:'replacealldocs'},{l:'搜索结果窗口',a:'resultsP',chk:()=>S.panels.results.open},{sep:1},{l:'标记…',a:'markdlg'},{l:'令牌样式',sub:[1,2,3,4,5].flatMap(i=>[{l:'样式 '+i+'：高亮选中词',a:'tok'+i},{l:'清除样式 '+i,a:'tokclr'+i}])},{l:'清除全部标记',a:'clearmarks'},{sep:1},{l:'转到…',a:'goto'},{l:'书签',sub:[{l:'切换书签',a:'bmToggle'},{l:'下一个书签',a:'bmNext'},{l:'上一个书签',a:'bmPrev'},{l:'清除全部书签',a:'bmClear'},{sep:1},{l:'剪切书签行',a:'bmCut'},{l:'复制书签行',a:'bmCopy'},{l:'粘贴替换书签行',a:'bmPaste'},{l:'删除书签行',a:'bmDel'},{l:'删除未书签行',a:'bmDelNon'},{l:'反转书签',a:'bmInvert'}]},{l:'变更历史',sub:[{l:'下一处变更',a:'chgNext'},{l:'上一处变更',a:'chgPrev'},{l:'清除变更历史',a:'chgClear'}]}],
+'视图':[{l:'双视图',a:'split',chk:()=>S.split},{l:'克隆文档到另一视图',a:'clone'},{l:'移到另一视图',a:'moveView'},{l:'旋转分割方向',a:'rotate'},{l:'同步滚动',a:'syncscroll',chk:()=>S.sync},{sep:1},{l:'自动换行',a:'wrap',chk:()=>S.prefs.wrap},{l:'显示符号',sub:[{l:'空格',a:'sym_space',chk:sym('space')},{l:'Tab',a:'sym_tab',chk:sym('tab')},{l:'行尾',a:'sym_eol',chk:sym('eol')},{l:'不可见字符',a:'sym_nonprint',chk:sym('nonprint')},{l:'缩进线',a:'sym_indent',chk:sym('indent')},{sep:1},{l:'全部显示/隐藏',a:'sym_all'}]},{l:'行号边距',a:'linenum',chk:()=>S.prefs.lineNum},{l:'垂直标尺',a:'ruler',chk:()=>S.prefs.ruler},{l:'缩放',sub:[{l:'放大',a:'zoomin'},{l:'缩小',a:'zoomout'},{l:'恢复',a:'zoom0'}]},{sep:1},{l:'文档地图',a:'minimap',chk:()=>S.panels.minimap.open},{l:'文档列表',a:'doclist',chk:()=>S.panels.doclist.open},{l:'字符面板',a:'chars',chk:()=>S.panels.chars.open},{sep:1},{l:'全屏',a:'fullscreen'},{l:'Post-It',a:'postit'},{l:'专注模式',a:'focusmode'},{sep:1},{l:'菜单栏',a:'menubar',chk:()=>S.ui.menubar},{l:'工具栏',a:'toolbarT',chk:()=>S.ui.toolbar},{l:'状态栏',a:'statusbarT',chk:()=>S.ui.statusbar},{l:'切换浅色 / 深色',a:'theme'},{sep:1},{l:'文件摘要…',a:'summary'}],
+'编码':[{l:'编码…（重新解释 / 转换）',a:'encdlg'},{sep:1},{l:'行尾转换为 CRLF（Windows）',a:'eol_CRLF'},{l:'行尾转换为 LF（Unix / macOS）',a:'eol_LF'},{l:'行尾转换为 CR（旧 Mac）',a:'eol_CR'}],
+'工具':[{l:'哈希工具…',a:'hash'},{l:'MIME / 进制转换…',a:'mime'},{l:'字符面板',a:'chars'},{sep:1},{l:'选区脱敏（█）',a:'redact'},{l:'选区脱敏（●）',a:'redactDot'},{sep:1},{l:'选区动作',sub:[{l:'把选区当作路径打开',a:'selOpen'},{l:'在文件管理器中打开选区',a:'selReveal'},{l:'用搜索引擎搜索选区',a:'selSearch'}]},{l:'复制路径信息',sub:[{l:'完整路径',a:'copyPath'},{l:'文件名',a:'copyName'},{l:'所在目录',a:'copyDir'},{l:'全部打开文件的路径',a:'copyAllPaths'}]},{sep:1},{l:'首选项…',fn:()=>prefsDialog()},{l:'快捷键映射器…',fn:()=>keymapDialog('cmds')}],
+'宏':[...(S.macro.tampered?[{l:'⚠ macros.json 被外部改动 — 校验并清除警告…',a:'macroValidate'},{sep:1}]:[]),{l:S.macro.rec?'● 正在录制…':'开始录制',a:'macroRec'},{l:'停止录制',a:'macroStop'},{l:'回放',a:'macroPlay'},{l:'多次运行…',a:'macroRunN'},{l:'保存当前录制的宏…',a:'macroSave'},{sep:1},...(S.macro.saved.length?S.macro.saved.map((m,i)=>({l:m.name,k:m.key,fn:()=>run('macroPlaySaved',{i})})):[{l:'（还没有已保存的宏）',dis:1}]),{sep:1},{l:'宏管理…',a:'macroMgr'},{l:'校验宏文件',a:'macroValidate'}],
+'对比':[{l:'与其他文档 / 磁盘版本 / 剪贴板对比…',a:'cmpOther'}],
+'窗口':[{l:'文档切换器（MRU）',a:'mru'},{l:'文档列表',a:'doclist'},{sep:1},...Object.values(S.docs).map(d=>({l:(ad()?.id===d.id?'● ':'')+d.name,fn:()=>activate(d.id)}))]}}
+let openBtn=null;
+function rebuildMenus(){const bar=$('#menubar');const keys=Object.keys(menus());bar.innerHTML=keys.map(k=>`<button data-menu="${k}">${k}</button>`).join('')+'<span class="sp"></span>'+(S.macro.rec?'<span class="chip rec">● 录制中 · '+S.macro.buf.length+' 步</span>':'')}
+$('#menubar').addEventListener('click',e=>{const b=e.target.closest('[data-menu]');if(!b)return;const was=b.classList.contains('open');$$('.menu').forEach(m=>m.remove());$$('#menubar button').forEach(x=>x.classList.remove('open'));if(was)return;b.classList.add('open');const r=b.getBoundingClientRect();showMenu(r.left,r.bottom+2,menus()[b.dataset.menu])});
+$('#menubar').addEventListener('mouseover',e=>{const b=e.target.closest('[data-menu]');if(!b||!$('.menu')||b.classList.contains('open'))return;b.click()});
+document.addEventListener('mousedown',e=>{if(!e.target.closest('.menu,#menubar'))$$('.menu').forEach(m=>m.remove()),$$('#menubar button').forEach(x=>x.classList.remove('open'))});
+$('#panes').addEventListener('contextmenu',e=>{const t=e.target.closest('.tab');if(t){e.preventDefault();tabMenu(e,t.dataset.did);return}if(e.target.closest('textarea')){e.preventDefault();showMenu(e.clientX,e.clientY,[{l:'剪切',a:'cut'},{l:'复制',a:'copy'},{l:'粘贴',a:'paste'},{sep:1},{l:'全选',a:'selectall'},{l:'切换书签',a:'bmToggle'},{l:'查找…',a:'find'}])}});
+/* toolbar */
+const TB=[['new','new','新建'],['open','open','打开'],['save','save','保存'],['saveall','saveall','全部保存'],0,['undo','undo','撤销'],['redo','redo','重做'],0,['cut','cut','剪切'],['copy','copy','复制'],['paste','paste','粘贴'],0,['find','find','查找'],['replace','replace','替换'],['findfiles','ff','在文件中查找'],0,['wrap','wrap','自动换行','wrap'],['sym_all','sym','显示全部符号'],['minimap','map','文档地图'],0,['split','split','双视图'],['syncscroll','sync','同步滚动'],0,['macroRec','rec','录制宏'],['macroStop','stop','停止'],['macroPlay','play','回放'],0,['print','print','打印']];
+function renderToolbar(){const on={wrap:S.prefs.wrap,sym_all:Object.values(S.sym).every(Boolean),minimap:S.panels.minimap.open,split:S.split,syncscroll:S.sync,macroRec:S.macro.rec};$('#toolbar').innerHTML=TB.map(t=>t?`<button class="ibtn${on[t[0]]?' on':''}${t[0]==='macroRec'&&S.macro.rec?' rec':''}" data-a="${t[0]}" title="${t[2]}">${ic(t[1])}</button>`:'<span class="vsep"></span>').join('')}
+/* status */
+function status(){const c=caretInfo(),d=ad();const st=$('#status');if(!d||!c){st.innerHTML='<span class="it">无文档</span>';return}
+ st.innerHTML=`<span class="it">行 ${c.ln}，列 ${c.col}${c.sel?' · 选 '+c.sel+(c.selLines>1?'（'+c.selLines+' 行）':''):''}</span><span class="bar"></span><span class="it">${c.lines} 行 · ${c.len} 字符</span><span class="sp"></span>${d.remote?'<span class="chip">远程只读副本</span>':''}${d.ro&&!d.remote?'<span class="chip warn">只读</span>':''}${S.macro.rec?'<span class="chip rec">● REC</span>':''}${S.lastBackup?`<span class="it" title="自动备份">备份 ${S.prefs.backupSec}s · ${S.lastBackup}</span>`:`<span class="it">自动备份 ${S.prefs.backupSec}s</span>`}<span class="bar"></span><button class="it" data-a="eolMenu">${d.eol}</button><button class="it" data-a="encdlg">${d.enc}</button><button class="it" data-a="toggleIns">${S.ins?'INS':'OVR'}</button><button class="it" data-a="zoom0">${Math.round((S.prefs.fs+S.zoom)/S.prefs.fs*100)}%</button>`}
+def('eolMenu','',null,()=>{const b=$('#status [data-a=eolMenu]').getBoundingClientRect();showMenu(b.left,b.top-90,['CRLF','LF','CR'].map(k=>({l:'转换为 '+k,a:'eol_'+k})))});
+/* dialogs: prefs / keymap */
+function prefsDialog(){const P=S.prefs;const pages={'常规':`<label class="fld"><input type="checkbox" data-pf="restore" ${P.restore?'checked':''}> 启动时记住并恢复上次会话</label><label class="fld"><input type="checkbox" data-pf="links" ${P.links?'checked':''}> 文本中的 URL 可点击（Ctrl+点击）</label><label class="fld"><input type="checkbox" data-pf="lineCopy" ${P.lineCopy?'checked':''}> 无选区时复制/剪切整行</label><label class="fld"><input type="checkbox" data-pf="askWhole" ${P.askWhole?'checked':''}> 无选区执行行操作时先确认</label>`,'编辑':`<div class="fld"><label>字号</label><input class="inp" data-pf="fs" value="${P.fs}" style="width:70px;min-width:0"></div><label class="fld"><input type="checkbox" data-pf="wrap" ${P.wrap?'checked':''}> 默认自动换行</label><div class="fld"><label>标尺列</label><input class="inp" data-pf="rulerCol" value="${P.rulerCol}" style="width:70px;min-width:0"></div>`,'新建文档':`<div class="fld"><label>默认编码</label><select class="sel" data-pf="enc">${['UTF-8','UTF-8 BOM','UTF-16 LE','GBK'].map(x=>`<option ${P.enc===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="fld"><label>默认行尾</label><select class="sel" data-pf="eol">${['LF','CRLF','CR'].map(x=>`<option ${P.eol===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="fld"><label>未命名规则</label><input class="inp" data-pf="untitled" value="${esc(P.untitled)}"></div><p class="note">不含“默认语言”：语言菜单与语法高亮已决策不支持。</p>`,'备份与会话':`<div class="fld"><label>备份间隔</label><input class="inp" data-pf="backupSec" value="${P.backupSec}" style="width:70px;min-width:0"> 秒（5–300）</div><div class="fld"><label>保存时备份</label><select class="sel" data-pf="backupMode"><option value="none" ${P.backupMode==='none'?'selected':''}>无</option><option value="simple" ${P.backupMode==='simple'?'selected':''}>简单 .bak</option><option value="verbose" ${P.backupMode==='verbose'?'selected':''}>带时间戳</option></select></div><p class="note">备份写在应用数据目录 backup/notepad/，不污染用户文件夹；每文件保留最近 10 份。</p>`,'最近文件':`<div class="fld"><label>最多保留</label><input class="inp" data-pf="recentMax" value="${P.recentMax}" style="width:70px;min-width:0"> 条</div>`,'查找':`<div class="fld"><label>搜索引擎</label><input class="inp" data-pf="engine" value="${esc(P.engine)}" style="flex:1"></div>`,'打印':'<p class="note">页眉页脚、行号、边距、颜色映射在打印对话框内设置，此处只保存默认值。</p>','大文件':'<table class="t"><tr><td>可编辑上限</td><td>5 MB</td></tr><tr><td>只读分块浏览</td><td>5 – 20 MB（分块 256 KB）</td></tr><tr><td>硬上限</td><td>20 MB（拒绝并说明）</td></tr><tr><td>50 MB</td><td>仅 spike，不承诺</td></tr></table>'};
+ const keys=Object.keys(pages);const b=modal('首选项',`<div style="display:flex;gap:14px;min-height:260px"><div id="pnav" style="width:110px;border-right:1px solid var(--divider)">${keys.map((k,i)=>`<button class="mi ${i?'':'on'}" data-pg="${k}" style="${i?'':'background:var(--sel)'}">${k}</button>`).join('')}</div><div id="pbody" style="flex:1">${pages[keys[0]]}</div></div>`,[{t:'完成',c:'pri'}],{w:640});
+ b.addEventListener('click',e=>{const g=e.target.closest('[data-pg]');if(g){$$('#pnav .mi',b).forEach(x=>x.style.background='');g.style.background='var(--sel)';$('#pbody',b).innerHTML=pages[g.dataset.pg]}});
+ b.addEventListener('change',e=>{const k=e.target.dataset.pf;if(!k)return;let v=e.target.type==='checkbox'?e.target.checked:e.target.value;if(['fs','backupSec','recentMax','rulerCol'].includes(k)){v=parseInt(v)||P[k];if(k==='backupSec')v=Math.max(5,Math.min(300,v))}P[k]=v;applyFont();sync()})}
+function conflict(c,except){return Object.entries(S.keymap).find(([id,k])=>k===c&&id!==except&&C[id]?.label)?.[0]&&C[Object.entries(S.keymap).find(([id,k])=>k===c&&id!==except&&C[id]?.label)[0]].label||(S.macro.saved.find(m=>m.key===c&&m.name!==except)?.name)}
+function keymapDialog(tab){let cur=tab;const b=modal('快捷键映射器',`<div class="seg" id="kt"><button data-t="cmds">命令</button><button data-t="macros">宏</button></div><input class="inp" id="kf" placeholder="筛选…" style="width:100%;margin:8px 0"><div id="kb" style="max-height:290px;overflow:auto;border:1px solid var(--divider);border-radius:7px"></div><div id="kmsg" class="note" style="min-height:18px"></div><p class="note">点“修改”后按下新的组合键；冲突会提示并允许覆盖。${S.plat==='mac'?'macOS 标准动作用 ⌘。':''}</p>`,[{t:'完成',c:'pri'}],{w:700});
+ const draw=()=>{$$('#kt button',b).forEach(x=>x.classList.toggle('on',x.dataset.t===cur));const f=$('#kf',b).value.toLowerCase();const rows=cur==='cmds'?Object.values(C).filter(c=>c.label&&c.label.toLowerCase().includes(f)).map(c=>`<tr><td>${esc(c.label)}</td><td class="mono">${kd(S.keymap[c.id])||'—'}</td><td><button class="cbtn" data-ed="${c.id}">修改</button></td></tr>`):S.macro.saved.map((m,i)=>`<tr><td>${esc(m.name)}</td><td class="mono">${kd(m.key)||'—'}</td><td><button class="cbtn" data-edm="${i}">修改</button><button class="cbtn dng" data-delm="${i}">删除</button></td></tr>`);$('#kb',b).innerHTML=`<table class="t"><thead><tr><th>${cur==='cmds'?'命令':'宏'}</th><th>快捷键</th><th></th></tr></thead><tbody>${rows.join('')||'<tr><td colspan="3" class="mut">没有宏</td></tr>'}</tbody></table>`};
+ $$('#kt button',b).forEach(x=>x.onclick=()=>{cur=x.dataset.t;draw()});$('#kf',b).oninput=draw;draw();
+ b.addEventListener('click',async e=>{const ed=e.target.closest('[data-ed],[data-edm]'),dl=e.target.closest('[data-delm]');if(dl){S.macro.saved.splice(+dl.dataset.delm,1);S.macro.hash=await macroHash();rebuildKeys();rebuildMenus();draw();return}if(!ed)return;const btn=ed;btn.textContent='按下新快捷键…';const h=ev=>{ev.preventDefault();ev.stopPropagation();const c=combo(ev);if(!c)return;document.removeEventListener('keydown',h,true);const id=ed.dataset.ed||S.macro.saved[+ed.dataset.edm].name;const cf=conflict(c,id);const apply=()=>{if(ed.dataset.ed)S.keymap[id]=c;else S.macro.saved[+ed.dataset.edm].key=c;rebuildKeys();draw()};if(cf){$('#kmsg',b).innerHTML=`<span style="color:var(--warn)">${kd(c)} 已被“${esc(cf)}”使用 </span><button class="cbtn" id="kov">覆盖</button>`;$('#kov',b).onclick=()=>{Object.keys(S.keymap).forEach(k=>{if(S.keymap[k]===c)S.keymap[k]=''});S.macro.saved.forEach(m=>{if(m.key===c)m.key=''});apply();$('#kmsg',b).textContent='已覆盖'};draw()}else{$('#kmsg',b).textContent='已设置 '+kd(c);apply()}};document.addEventListener('keydown',h,true)})}
+let REV={};function rebuildKeys(){REV={};Object.entries(S.keymap).forEach(([id,k])=>{if(k)REV[k]=id});S.macro.saved.forEach((m,i)=>{if(m.key)REV[m.key]='macro:'+i})}
+document.addEventListener('keydown',e=>{if(e.defaultPrevented||e.target.closest&&e.target.closest('.modal')&&e.key!=='Escape')return;if(e.key==='Escape'){if(S.mode){S.mode='';sync();return}$$('.menu').forEach(m=>m.remove());return}
+ const c=combo(e);const id=REV[c];if(!id)return;if(e.target.matches('input')&&!/^Mod\+(Shift\+)?[A-Z]$/.test(c)&&c.length<4)return;if(e.target.matches('input')&&['Mod+C','Mod+V','Mod+X','Mod+A','Mod+Z','Mod+Y'].includes(c))return;
+ e.preventDefault();if(id.startsWith('macro:'))run('macroPlaySaved',{i:+id.slice(6)});else run(id)});
+/* generic click */
+document.addEventListener('click',e=>{const a=e.target.closest('[data-a]');if(!a)return;e.stopPropagation();run(a.dataset.a,{...a.dataset})});
+document.addEventListener('click',e=>{const t=e.target.closest('.tab');if(t&&!e.target.closest('.x')){activate(t.dataset.did);ap().ta.focus()}});
+/* drag & drop */
+let dc=0;const root=$('#nproot');root.addEventListener('dragenter',e=>{if(e.dataTransfer.types.includes('Files')){dc++;$('#drop').style.display='flex'}});root.addEventListener('dragleave',()=>{if(--dc<=0){dc=0;$('#drop').style.display='none'}});root.addEventListener('dragover',e=>{if(e.dataTransfer.types.includes('Files'))e.preventDefault()});
+root.addEventListener('drop',e=>{if(!e.dataTransfer.files.length)return;e.preventDefault();dc=0;$('#drop').style.display='none';[...e.dataTransfer.files].slice(0,20).forEach(f=>{const r=new FileReader();r.onload=()=>open(mkDoc({name:f.name,path:'~/拖入/'+f.name,text:String(r.result).replace(/\r\n/g,'\n'),eol:/\r\n/.test(String(r.result))?'CRLF':'LF'}));r.readAsText(f)})});
+/* prototype controller */
+$('#proto').addEventListener('click',e=>{const b=e.target.closest('[data-p]');if(!b)return;const p=b.dataset.p,v=b.dataset.v;
+ if(p==='plat'){S.plat=v;$$('[data-p=plat]').forEach(x=>x.classList.toggle('on',x===b));sync()}
+ else if(p==='theme'){document.documentElement.className=v;$$('[data-p=theme]').forEach(x=>x.classList.toggle('on',x===b));drawMini();paintAll()}
+ else if(p==='extmod'){const d=ad();if(!d||!d.path){toast('请先切到一个已保存的本地文件');return}d.disk=d.disk+'\n# 外部程序追加 @'+new Date().toLocaleTimeString();if(isDirty(d)){d.ext=true;sync()}else{d.text=d.disk;d.saved=d.disk;loadPane(S.av);sync();toast('磁盘文件被外部修改：本地无改动，已静默重载（不弹横幅）')}}
+ else if(p==='crash'){crash()}
+ else if(p==='tamper'){if(!S.macro.saved.length){toast('先录制并保存一个宏');return}S.macro.saved[0].steps.push({id:'type',args:{text:'!'}});S.macro.tampered=true;rebuildMenus();toast('模拟：macros.json 被编辑器之外的程序改动。打开“宏”菜单查看警告')}
+ else if(p==='remote')openFS(FS[6]);else if(p==='big12')openFS(FS[4]);else if(p==='big35')openFS(FS[5]);else if(p==='elev')openFS(FS[7]);else if(p==='gbk')openFS(FS[3]);
+ else if(p==='decisions')drawer('待用户决策',decisionsHtml());else if(p==='about')drawer('原型覆盖范围',aboutHtml())});
+$('#dclose').onclick=()=>$('#drawer').style.display='none';function drawer(t,h){$('#dtitle').textContent=t;$('#dbody').innerHTML=h;$('#drawer').style.display='flex'}
+function decisionsHtml(){return`<p>以下 4 项尚未由用户确认。原型按“推荐”画出，但不代表已决定；结论回来后设计文档与任务会随之调整。</p>
+<div class="dec"><b>DEC-01 宿主架构（推荐 B）</b><p>B：新增专属 Notepad 工作台标签页，自带文档标签条/双视图/面板（原型当前画法）。A：保持“一个文件一个应用标签”，只在标签内加功能，双视图/固定/文档列表/MRU 改为受限实现。</p></div>
+<div class="dec"><b>DEC-02 面板停靠范围（推荐：受限）</b><p>受限：文档地图/文档列表/字符面板/搜索结果 4 个面板可停靠到右、下或浮动（原型画法）。通用：任意边缘、成组为标签页、拖动重排的完整停靠系统，工作量大幅增加。</p></div>
+<div class="dec"><b>DEC-03 移至回收站（推荐：做）</b><p>仓库已有 <code>trash</code> crate 与本地文件管理器的回收站实现，成本低。文件菜单里该项带“待定”标记。</p></div>
+<div class="dec"><b>DEC-04 书签是否统一（推荐：先分开）</b><p>查看器书签（F2 系列）与工作区书签（F11 系列）是否合并成同一份数据与快捷键。先分开可降低回归风险。</p></div>`}
+function aboutHtml(){return`<p>这是设计对象，用来评审布局、流程和交互，不是产品代码，也不读写真实文件。示例文件系统见“文件 → 打开”。</p>
+<h4>可交互（真实运行）</h4><p>新建/打开/保存/另存/副本/全部保存/重命名/关闭系列（含脏检查）；最近文件、恢复关闭、会话保存/加载；定期备份与保存时备份（备份列表）；崩溃后恢复；外部变更；编码重新解释与转换（含丢字警告）、EOL 转换；行操作（复制/移动/合并/拆分/空行/7 种排序×升降序/去重/删空行/反转/打乱）；大小写 8 种；空白操作；脱敏；列编辑器（文本/数字序列）；剪贴板历史；查找/替换/正则/扩展/全词/循环/反向/增量/计数/全部查找/全部替换/所有文档替换/搜索结果窗口；标记与令牌样式；书签及书签行批量操作；变更历史边距与导航；转到；双视图/克隆/同步滚动/拖动标签；固定标签；文档列表；文档地图；显示符号；换行/缩放/标尺；全屏/Post-It/专注；哈希/MIME/Converter；宏录制/回放/多次运行/保存/管理/校验；文件对比；打印预览；首选项；快捷键映射器（冲突检测）；拖放打开真实文本文件。</p>
+<h4>仅示意（原型简化，设计里有完整规格）</h4><p>多光标（只选下一个同词）；矩形选区（用多行选区代替）；虚拟空格；特殊粘贴；开始/结束选择为两步近似；提权保存只演示对话框；回收站为待定项；系统打印/PDF 不真正调起；Ctrl+Tab MRU 用对话框代替（浏览器占用该键）。</p>
+<h4>不在界面中出现</h4><p>43 项不支持功能（语法高亮、折叠、自动完成、插件、Run 菜单、拼写检查等）没有任何入口。</p>`}
+function crash(){const snap={docs:Object.values(S.docs).map(d=>({...d,bm:[...d.bm],dirtyText:isDirty(d)?d.text:null,wasDirty:isDirty(d)})),views:S.views.map(v=>({...v})),av:S.av};
+ if(!snap.docs.length){toast('没有可恢复的内容');return}
+ modal('模拟异常退出',`<p>应用被强制结束。重启后将：① 按上次会话重开 ${snap.docs.length} 个文件；② 从备份目录恢复 ${snap.docs.filter(d=>d.wasDirty).length} 个未保存草稿；③ 不弹“是否恢复”对话框，仅在标签内提示。</p>`,[{t:'取消'},{t:'重启应用',c:'pri',fn:()=>{S.docs={};S.mru=[];S.views=[{tabs:[],active:null},{tabs:[],active:null}];const bm={};snap.docs.forEach(o=>{const d=mkDoc({name:o.name,path:o.path,text:o.path?o.disk:(o.dirtyText??''),enc:o.enc,eol:o.eol,remote:o.remote,ro:o.ro,pinned:o.pinned});d.id=o.id;S.docs[d.id]=d;d.bm=new Set(o.bm);if(o.dirtyText!=null&&o.path){d.text=o.dirtyText;d.recovered=true}else if(!o.path&&o.dirtyText){d.saved='';d.recovered=true}});snap.views.forEach((v,i)=>{S.views[i].tabs=v.tabs.filter(id=>S.docs[id]);S.views[i].active=snap.views[i].active});S.av=snap.av;panes.forEach((p,i)=>loadPane(i));sync();toast('已恢复会话与草稿；磁盘文件未被改动')}}])}
+/* sync */
+function sync(){const root=document.documentElement,np=$('#nproot'),app=$('#app');app.classList.toggle('fs-on',S.mode==='fs');np.classList.toggle('po-on',S.mode==='po'||S.mode==='fs');np.classList.toggle('focus-on',S.mode==='focus');
+ $('#menubar').style.display=S.ui.menubar?'':'none';$('#toolbar').style.display=S.ui.toolbar?'':'none';$('#status').style.display=S.ui.statusbar?'':'none';
+ $('#panes').className=S.orient;$('#pane1').style.display=S.split?'':'none';applyFont();rebuildMenus();renderToolbar();renderTabs();paintAll();updateBanners();refreshPanels();status();$$('#toolbar .ibtn').forEach(()=>{});
+ if(S.mode==='fs'||S.mode==='po')$('#hint').textContent='按 Esc 退出'+(S.mode==='fs'?'全屏':'Post-It')+'模式';}
+/* init */
+Object.keys(C).forEach(id=>{});rebuildKeys();
+S.macro.hash='';
+const d1=mkDoc({path:FS[0].path,text:FS[0].text});const d2=mkDoc({path:FS[1].path,text:FS[1].text});const d3=mkDoc({path:FS[2].path,text:FS[2].text});const d4=mkDoc({name:'新建 1',text:'待办：\n1. 核对主机清单\n2. 备份数据库\n'});d4.saved='';
+[d1,d2,d3,d4].forEach(d=>{S.docs[d.id]=d;S.views[0].tabs.push(d.id)});S.views[0].active=d1.id;S.mru=[d1.id,d4.id,d2.id,d3.id];d2.pinned=true;
+S.recent=[{name:'hosts.conf',path:FS[1].path},{name:'app.log',path:FS[2].path}];
+sha('SHA-256',new TextEncoder().encode('[]')).then(h=>{S.macro.hash=h});
+applyFont();panes.forEach((p,i)=>loadPane(i));sync();
+setTimeout(()=>{ap().ta.focus()},50);
+window.__np={S,run,C};
+})();
+</script>
+</body>
+</html>
