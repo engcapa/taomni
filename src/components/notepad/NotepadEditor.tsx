@@ -297,6 +297,20 @@ export function NotepadEditor({
       data-testid="notepad-workbench"
       onKeyDown={(e) => {
         if (e.defaultPrevented || isImeComposing(e.nativeEvent)) return;
+        // Design §4.2: every Notepad dialog closes on Esc and returns to the editor.
+        if (e.key === "Escape" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          if (pickerModal) { e.preventDefault(); e.stopPropagation(); setPickerModal(null); return; }
+          if (lifecycleModal) { e.preventDefault(); e.stopPropagation(); setLifecycleModal(null); return; }
+          if (editModal) { e.preventDefault(); e.stopPropagation(); setEditModal(null); return; }
+          if (encodingOpen) { e.preventDefault(); e.stopPropagation(); setEncodingOpen(false); return; }
+          if (toolboxKind) { e.preventDefault(); e.stopPropagation(); setToolboxKind(null); return; }
+          if (macroModal) { e.preventDefault(); e.stopPropagation(); setMacroModal(null); return; }
+          if (printOpen) { e.preventDefault(); e.stopPropagation(); setPrintOpen(false); return; }
+          if (sessionModal) { e.preventDefault(); e.stopPropagation(); setSessionModal(null); return; }
+          if (prefsOpen) { e.preventDefault(); e.stopPropagation(); setPrefsOpen(false); return; }
+          if (mapperOpen) { e.preventDefault(); e.stopPropagation(); setMapperOpen(false); return; }
+          if (aboutOpen) { e.preventDefault(); e.stopPropagation(); setAboutOpen(false); return; }
+        }
         const target = e.target as HTMLElement | null;
         if (target?.closest(".np-modal, .np-find-bar") && target.tagName === "INPUT") return;
         const cmd = useNotepadKeymap.getState().findCommandByEvent(e.nativeEvent);
