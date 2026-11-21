@@ -1138,6 +1138,7 @@
   ↳ `:nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 1)` — alias
   ↳ `:nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 2)` — alias
   ↳ `:nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 5)` — alias
+  ↳ `xpath=(//*[@data-testid="explorer-workspace-tab"][@data-tab-type="file-browser"])[2]` — alias
 - `[data-testid="code-workspace-tool-rail-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tool-rail-explorer
 - `[data-testid="code-workspace-tree-open-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer
 - `[data-testid="code-workspace-tree-open-explorer-new"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer-new

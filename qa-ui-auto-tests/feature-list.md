@@ -15218,6 +15218,7 @@ controls:
     - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 1)'
     - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 2)'
     - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 5)'
+    - 'xpath=(//*[@data-testid="explorer-workspace-tab"][@data-tab-type="file-browser"])[2]'
     kind: interactive
   - id: code-workspace-tool-rail-explorer
     selector: '[data-testid="code-workspace-tool-rail-explorer"]'
