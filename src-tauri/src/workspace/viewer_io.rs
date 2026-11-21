@@ -39,3 +39,14 @@ pub(crate) fn atomic_viewer_write(
     let ack = write_workspace_bytes_limited(target, bytes, expected_hash, max_bytes)?;
     Ok((ack.written_hash, ack.written_byte_length))
 }
+
+pub(crate) fn atomic_viewer_write_unconditional(
+    target: &Path,
+    bytes: Vec<u8>,
+    max_bytes: u64,
+) -> Result<(String, u64), WorkspaceWriteError> {
+    reject_protected_loose_write(target)
+        .map_err(|error| WorkspaceWriteError::new(WorkspaceWriteErrorKind::Permission, error))?;
+    let ack = write_workspace_bytes_unconditional(target, bytes, max_bytes)?;
+    Ok((ack.written_hash, ack.written_byte_length))
+}

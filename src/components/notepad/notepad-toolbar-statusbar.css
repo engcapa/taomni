@@ -1,0 +1,182 @@
+/* High-fidelity Notepad toolbar + status bar (prototype v3 parity).
+ *
+ * Every selector is scoped under `.np-workbench` so these rules win over the
+ * baseline `.np-toolbar` / `.np-tool-btn` / `.np-statusbar` declarations in
+ * notepad.css regardless of stylesheet import order.
+ */
+
+.np-workbench {
+  --np-danger: #ef4444;
+  --np-warn-chip-bg: color-mix(in srgb, #f59e0b 22%, transparent);
+  --np-warn-chip-text: #b45309;
+}
+
+html[data-app-theme="dark"] .np-workbench {
+  --np-danger: #f87171;
+  --np-warn-chip-bg: color-mix(in srgb, #f59e0b 26%, transparent);
+  --np-warn-chip-text: #fbbf24;
+}
+
+/* ---------------------------------------------------------------- Toolbar */
+
+.np-workbench .np-toolbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 1px;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--taomni-divider);
+  background: var(--taomni-bg);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.np-workbench .np-toolbar .np-tool-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 27px;
+  min-width: 27px;
+  height: 27px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--taomni-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.np-workbench .np-toolbar .np-tool-btn svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.8;
+}
+
+.np-workbench .np-toolbar .np-tool-btn:hover {
+  background: var(--taomni-hover);
+  color: var(--taomni-text);
+}
+
+.np-workbench .np-toolbar .np-tool-btn.active,
+.np-workbench .np-toolbar .np-tool-btn[aria-pressed="true"],
+.np-workbench .np-toolbar .np-tool-btn[data-active="true"] {
+  border-color: transparent;
+  background: var(--taomni-selected);
+  color: var(--taomni-accent);
+}
+
+/* Recording macro: pressed background plus danger-colored icon. */
+.np-workbench .np-toolbar .np-tool-btn.rec,
+.np-workbench .np-toolbar .np-tool-btn.rec:hover {
+  background: var(--taomni-selected);
+  color: var(--np-danger);
+}
+
+.np-workbench .np-toolbar .np-tool-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.np-workbench .np-toolbar .np-tool-sep {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 5px;
+  background: var(--taomni-divider);
+}
+
+/* -------------------------------------------------------------- Status bar */
+
+.np-workbench .np-statusbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  box-sizing: border-box;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 6px;
+  border-top: 1px solid var(--taomni-chrome-border);
+  background: var(--taomni-status-bg);
+  color: var(--taomni-text-muted);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  user-select: none;
+}
+
+.np-workbench .np-statusbar .np-status-item {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 1px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.np-workbench .np-statusbar .np-status-item:hover {
+  background: var(--taomni-hover);
+  color: var(--taomni-text);
+}
+
+.np-workbench .np-statusbar button.np-status-item {
+  cursor: pointer;
+}
+
+.np-workbench .np-statusbar button.np-status-item:hover {
+  background: color-mix(in srgb, var(--taomni-text) 11%, transparent);
+  color: var(--taomni-text);
+}
+
+.np-workbench .np-statusbar .np-status-backup {
+  font-variant-numeric: tabular-nums;
+}
+
+.np-workbench .np-statusbar .np-status-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+
+.np-workbench .np-statusbar .np-status-sep {
+  flex: none;
+  width: 1px;
+  height: 12px;
+  margin: 0 2px;
+  background: var(--taomni-divider);
+}
+
+.np-workbench .np-statusbar .np-status-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  margin-left: 4px;
+  padding: 0 7px;
+  border-radius: 9px;
+  background: var(--taomni-selected);
+  color: var(--taomni-accent);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.np-workbench .np-statusbar .np-status-chip.warn {
+  background: var(--np-warn-chip-bg);
+  color: var(--np-warn-chip-text);
+}
+
+.np-workbench .np-statusbar .np-status-chip.rec {
+  background: var(--np-danger);
+  color: #ffffff;
+}

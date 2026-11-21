@@ -30,6 +30,7 @@ mod migrate;
 pub mod models;
 mod module_lock;
 mod nettools;
+mod notepad;
 mod notes;
 mod objectstorage;
 pub mod perf;

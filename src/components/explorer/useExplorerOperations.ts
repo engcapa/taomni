@@ -11,16 +11,18 @@ import { effectiveFileType, sftpOpenPath, sftpRemove, type FileEntry } from "../
 import { useSftpStore } from "../../stores/sftpStore";
 import { clipboardMatches, getExplorerClipboard, setExplorerClipboard } from "./explorerClipboard";
 import { useExplorerLabels } from "./explorerLabels";
-import { openFile } from "../../lib/openFile";
+import { openFile, UnavailableFileHandlerError } from "../../lib/openFile";
 import { EXPLORER_TEXT_FILE_TYPES, newFileNameError, uniqueNewFileName, type ExplorerQuickExtension } from "./explorerFileTypes";
 import { setExplorerPreferences } from "./explorerPreferences";
 
 export interface ExplorerToast { message: string; error?: boolean; undo?: () => void }
 export interface DeletePrompt { entries: FileEntry[]; reason?: string }
+export interface UnavailableHandlerPrompt { path: string; handlerLabel: string; message: string }
 export function useExplorerOperations(tabId: string, workspaceId?: string) {
   const label = useExplorerLabels();
   const [toast, setToast] = useState<ExplorerToast | null>(null);
   const [deletePrompt, setDeletePrompt] = useState<DeletePrompt | null>(null);
+  const [unavailablePrompt, setUnavailablePrompt] = useState<UnavailableHandlerPrompt | null>(null);
   const [renamePath, setRenamePath] = useState<string | null>(null);
   const [properties, setProperties] = useState<FileEntry[] | null>(null);
   const [progress, setProgress] = useState<ExplorerProgress | null>(null);
@@ -31,8 +33,13 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
   const lock = useRef(false);
   const cancelled = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const notify = useCallback((message: string, error = false) => {
-    if (mounted.current) setToast({ message, error });
+  const notify = useCallback((message: string, error = false, rawError?: unknown) => {
+    if (!mounted.current) return;
+    if (rawError instanceof UnavailableFileHandlerError) {
+      setUnavailablePrompt({ path: rawError.filePath, handlerLabel: rawError.handlerLabel, message });
+      return;
+    }
+    setToast({ message, error });
   }, []);
   useEffect(() => {
     if (!toast) return;
@@ -61,7 +68,7 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
     const listening = listen<ExplorerProgress>("explorer:progress", ({ payload }) => {
       if (!disposed && mounted.current && payload.operationId === id) setProgress(payload);
     }).catch(() => () => {});
-    try { await task(id); } catch (error) { notify(String(error), true); }
+    try { await task(id); } catch (error) { notify(String(error), true, error); }
     finally {
       disposed = true;
       void listening.then((unlisten) => unlisten());
@@ -73,9 +80,13 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
   const open = useCallback(async (entry: FileEntry, alternate = false) => {
     if (effectiveFileType(entry) === "dir") await useSftpStore.getState().navigate(tabId, "local", entry.path);
     else {
-      try { await openFile({ path: entry.path }, { context: "explorer", workspaceId, alternate }); } catch (error) { notify(String(error), true); }
+      try { await openFile({ path: entry.path }, { context: "explorer", workspaceId, alternate }); } catch (error) { notify(String(error), true, error); }
     }
   }, [notify, tabId, workspaceId]);
+  const openWithSystemFallback = useCallback(async (path: string) => {
+    setUnavailablePrompt(null);
+    try { await sftpOpenPath(path); } catch (error) { notify(String(error), true); }
+  }, [notify]);
   const copy = useCallback(async (entries: FileEntry[], cut: boolean) => {
     if (!entries.length) return;
     const paths = entries.map((entry) => entry.path);
@@ -117,7 +128,6 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
   }), [notify, label, refreshAll, run, summarize, tabId]);
   const drop = useCallback((paths: string[], destination: string, forceCopy: boolean) => run(async (id) => {
     const result: EntryOperationResult = { done: [], failed: [] };
-    // Decide each source independently: cross-device drops copy, explicit cut still moves.
     for (const path of paths) {
       if (cancelled.current) { result.failed.push({ path, code: "cancelled", message: label("操作已取消，已完成的项目保留", "Cancelled; completed items were retained") }); continue; }
       try {
@@ -216,9 +226,9 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
     cancelled.current = true;
     if (operation.current) void explorerCancelOperation(operation.current).catch((error) => notify(String(error), true));
   }, [notify]);
-  return { toast, notify, busy, progress, cancel, open, copy, paste, drop, transfer, remove, permanentDelete,
+  return { toast, notify, busy, progress, cancel, open, openWithSystemFallback, copy, paste, drop, transfer, remove, permanentDelete,
     rename, renamePath, setRenamePath, create, createFile, suggestFileName, newFile, setNewFile, startNewFile,
-    copyPath, reveal, deletePrompt, setDeletePrompt, properties, setProperties };
+    copyPath, reveal, deletePrompt, setDeletePrompt, unavailablePrompt, setUnavailablePrompt, properties, setProperties };
 }
 
 export type ExplorerOperations = ReturnType<typeof useExplorerOperations>;

@@ -951,3 +951,10 @@ cases:
 - TC-SERVERS-003-tab-functional-native
 - TC-SERVERS-004-local-ssh-sftp-native
 - TC-SERVERS-005-local-ssh-credential-browser
+- TC-NP-001
+- TC-NP-002
+- TC-NP-003
+- TC-NP-004
+- TC-NP-005
+- TC-NP-101
+- TC-NP-102

@@ -80,5 +80,16 @@ export function ExplorerDialogs({ operations }: { operations: ExplorerOperations
       </div>
     </ExplorerDialog>}
     {operations.properties && <PropertiesDialog entries={operations.properties} onClose={() => operations.setProperties(null)} />}
+    {operations.unavailablePrompt && <ExplorerDialog testId="explorer-unavailable-handler-dialog" onClose={() => operations.setUnavailablePrompt(null)}>
+      <h3>{label(`无法用 ${operations.unavailablePrompt.handlerLabel} 打开`, `Cannot open with ${operations.unavailablePrompt.handlerLabel}`)}</h3>
+      <p role="alert">{label(
+        `${operations.unavailablePrompt.path} 的关联应用（${operations.unavailablePrompt.handlerLabel}）当前不可用（开发中），不会静默改用其他应用。`,
+        `The saved association for ${operations.unavailablePrompt.path} (${operations.unavailablePrompt.handlerLabel}) is currently unavailable (in development).`,
+      )}</p>
+      <div className="ex-dialog-footer">
+        <button data-testid="open-with-fallback-cancel" onClick={() => operations.setUnavailablePrompt(null)}>{label("取消", "Cancel")}</button>
+        <button data-testid="open-with-fallback-system" className="primary" onClick={() => void operations.openWithSystemFallback(operations.unavailablePrompt!.path)}>{label("用系统默认应用打开", "Open with system default app")}</button>
+      </div>
+    </ExplorerDialog>}
   </>;
 }

@@ -23,6 +23,7 @@ import { CodeViewAppearanceSettings } from "../CodeViewAppearanceSettings";
 import { CodexCodePanel } from "../CodexCodePanel";
 import { EditorAiLanguagePanel } from "../EditorAiLanguagePanel";
 import { FileOpenSettings } from "../FileOpenSettings";
+import { NotepadSettingsPanel } from "../NotepadSettingsPanel";
 import { MobileServiceSettings } from "../MobileServiceSettings";
 import { ModuleStorePanel, type ModuleStoreCatalogEntry, type ModuleStorePanelProps } from "../ModuleStorePanel";
 import { ModuleOfflineInstall } from "../ModuleOfflineInstall";
@@ -382,6 +383,9 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
             </SettingsAnchor>
             <SettingsAnchor id="file-open">
               <FileOpenSettings />
+            </SettingsAnchor>
+            <SettingsAnchor id="notepad">
+              <NotepadSettingsPanel />
             </SettingsAnchor>
             <SettingsAnchor id="screenshot">
               <ScreenshotSettings />

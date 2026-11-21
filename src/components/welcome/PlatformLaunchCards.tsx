@@ -1,11 +1,12 @@
 import { showAgentsComingSoon } from "../agents/comingSoon";
-import { Bot, Boxes, ChevronDown, GitBranch, Monitor, Plus, Upload, Wrench } from "lucide-react";
+import { Bot, Boxes, ChevronDown, FileText, GitBranch, Monitor, Plus, Upload, Wrench } from "lucide-react";
 import { useContextMenu } from "../ContextMenu";
 import { useSessionImportExport } from "../menubar/useSessionImportExport";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { useGitCloneStore } from "../../stores/gitCloneStore";
+import { openUntitledNotepadDocument } from "../../lib/openFile";
 
 /** Launch actions share the existing import, workspace and utility owners. */
 export function PlatformLaunchCards({ onNewSession, onOpenNewWorkspace }: {
@@ -55,6 +56,7 @@ export function PlatformLaunchCards({ onNewSession, onOpenNewWorkspace }: {
         <div className="taomni-home-card-heading"><Wrench /><strong>{t("platform.tools")}</strong></div>
         <p>{t("platform.homeHint")}</p>
         <div className="taomni-home-card-actions">
+          <button type="button" data-testid="home-new-notepad" className="taomni-btn taomni-btn-primary" onClick={() => openUntitledNotepadDocument()}><FileText />{t("notepad.newDocument")}</button>
           <button type="button" data-testid="home-open-mail" className="taomni-btn" onClick={() => command("mail-unified")}>{t("tabs.mailUnified")}</button>
           <button type="button" data-testid="home-open-network-tools" className="taomni-btn" onClick={() => command("tools")}>{t("menu.networkTools")}</button>
         </div>

@@ -14,6 +14,7 @@ import { invokeWorkspace } from "./commands/workspace";
 import { invokeSession } from "./commands/session";
 import { invokeFiles } from "./commands/files";
 import { invokeExplorer } from "./commands/explorer";
+import { invokeNotepad } from "./commands/notepad";
 import { invokeViewer } from "./commands/viewer";
 import { invokeSdk } from "./commands/sdk";
 import { invokeLsp } from "./commands/lsp";
@@ -32,9 +33,20 @@ const stubCommandRegistry = new CommandRegistry();
 
 if (typeof window !== "undefined") installStubMailQaControl(mailStubSeed);
 
+const NOTEPAD_VIEWER_COMMANDS = new Set([
+  "viewer_save_as",
+  "viewer_rename",
+  "viewer_trash",
+  "viewer_set_readonly_attr",
+  "viewer_write_text_elevated",
+]);
+
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
   if (cmd === "backup_inspect" || cmd === "backup_stage_restore") return backupRestoreStub(cmd, args ?? {}) as T;
   if (cmd.startsWith("plugin_")) return await invokePlugin<T>(cmd, args);
+  if (NOTEPAD_VIEWER_COMMANDS.has(cmd) || cmd.startsWith("notepad_")) {
+    return await invokeNotepad(cmd, args) as T;
+  }
   if (cmd.startsWith("viewer_")) return await invokeViewer(cmd, args) as T;
   if (cmd.startsWith("mobile_")) return await mobileStub(cmd, args) as T;
   if (cmd === "backup_get_policy") {

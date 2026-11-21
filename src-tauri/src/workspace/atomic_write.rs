@@ -83,6 +83,14 @@ pub(super) fn write_workspace_bytes_limited(
     )
 }
 
+pub(super) fn write_workspace_bytes_unconditional(
+    target: &Path,
+    bytes: Vec<u8>,
+    max_bytes: u64,
+) -> Result<WrittenBytesAck, WorkspaceWriteError> {
+    write_workspace_bytes_inner(target, bytes, None, WriteBytesFault::None, Some(max_bytes))
+}
+
 fn write_workspace_bytes_inner(
     target: &Path,
     bytes: Vec<u8>,

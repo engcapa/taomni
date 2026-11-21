@@ -1,0 +1,243 @@
+id: TC-NP-002
+title: Notepad untitled document saves exact VFS bytes, Ctrl+S updates them, and Save a Copy keeps the open document path
+description: >-
+  AC-01/02/13/44 browser slice. A new untitled document types deterministic text, File > Save opens the real Save As dialog with a
+  prefilled name, and confirming writes exact bytes into the isolated VFS; the tab retitles and the dirty marker clears. Editing again
+  and pressing the platform save chord performs a direct byte update. Save As is cancelled without changing the open document, then
+  Save a Copy writes a second file while the open document keeps its original path. File > Close closes the clean document. Byte
+  assertions use the independent file-open VFS oracle, not viewer state.
+modes:
+- browser
+covers:
+- F-NOTEPAD-1
+tags:
+- p0
+- notepad
+- persistence
+- editor
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab-new-notepad"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="notepad-workbench"]'
+- click: '[data-testid="viewer-editor"]'
+- type: "alpha beta alpha\nsecond line alpha\n"
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'true'
+- click: '[data-testid="notepad-menu-file"]'
+- wait_for: '[data-testid="notepad-menu-item-file.save"]'
+- click: '[data-testid="notepad-menu-item-file.save"]'
+- wait_for: '[data-testid="notepad-save-as-dialog"]'
+- eval_readonly:
+    expression: document.querySelector('.np-modal .np-input').value
+    contains: .txt
+- fill:
+    selector: '[data-testid="notepad-save-as-input"]'
+    value: ${fixture.file_open_root}/np-case.txt
+- click: '[data-testid="notepad-save-as-confirm"]'
+- wait_for:
+    selector: '[data-testid="notepad-save-as-dialog"]'
+    state: detached
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-path
+    equals: ${fixture.file_open_root}/np-case.txt
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'false'
+- assert_visible: '[data-testid="explorer-workspace-tab"][data-tab-title="np-case.txt"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/np-case.txt
+    equals: "alpha beta alpha\nsecond line alpha\n"
+- assert_count:
+    selector: '[data-testid="viewer-tab-dirty"]'
+    equal: 0
+- click: '[data-testid="viewer-editor"]'
+- press:
+    key: Control+End
+    macos_key: Meta+End
+- type: TAIL
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'true'
+- press: Mod+s
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/np-case.txt
+    equals: "alpha beta alpha\nsecond line alpha\nTAIL"
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'false'
+- click: '[data-testid="notepad-menu-file"]'
+- wait_for: '[data-testid="notepad-menu-item-file.saveAs"]'
+- click: '[data-testid="notepad-menu-item-file.saveAs"]'
+- wait_for: '[data-testid="notepad-save-as-dialog"]'
+- eval_readonly:
+    expression: document.querySelector('.np-modal .np-input').value
+    contains: np-case.txt
+- press: Escape
+- wait_for:
+    selector: '[data-testid="notepad-save-as-dialog"]'
+    state: detached
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-path
+    equals: ${fixture.file_open_root}/np-case.txt
+- click: '[data-testid="notepad-menu-file"]'
+- wait_for: '[data-testid="notepad-menu-item-file.saveCopy"]'
+- click: '[data-testid="notepad-menu-item-file.saveCopy"]'
+- wait_for: '[data-testid="notepad-save-as-dialog"]'
+- assert_pattern:
+    selector: '[data-testid="notepad-save-as-dialog"]'
+    regex: (Save a Copy|保存副本)
+- fill:
+    selector: '[data-testid="notepad-save-as-input"]'
+    value: ${fixture.file_open_root}/np-copy.txt
+- click: '[data-testid="notepad-save-as-confirm"]'
+- wait_for:
+    selector: '[data-testid="notepad-save-as-dialog"]'
+    state: detached
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/np-copy.txt
+    equals: "alpha beta alpha\nsecond line alpha\nTAIL"
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-path
+    equals: ${fixture.file_open_root}/np-case.txt
+- click: '[data-testid="notepad-menu-file"]'
+- wait_for: '[data-testid="notepad-menu-item-file.close"]'
+- click: '[data-testid="notepad-menu-item-file.close"]'
+- wait_for:
+    selector: '[data-testid="notepad-workbench"]'
+    state: detached
+- assert_count:
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
+    equal: 0
+- assert_no_runtime_errors: null
+- screenshot: np-002-save-lifecycle.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: File > Save on an untitled document opens the prefilled Save As dialog and writes exactly the typed bytes to the
+      requested VFS path while retitling the document and clearing dirty state.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 8
+    - 10
+    - 12
+    - 15
+    - 16
+    checkpoints:
+    - step: 6
+      expectation: The untitled Notepad workbench is mounted.
+    - step: 9
+      expectation: Typing marks the document dirty before saving.
+    - step: 13
+      expectation: The real Save As dialog is shown for the untitled document.
+    - step: 14
+      expectation: The path field is prefilled with a default name ending in .txt.
+    - step: 17
+      expectation: Confirming Save closes the dialog.
+    - step: 18
+      expectation: The open document now points at the requested VFS path.
+    - step: 19
+      expectation: Dirty state cleared after the write.
+    - step: 20
+      expectation: The Explorer tab title follows the saved file name.
+    - step: 21
+      expectation: Independent VFS byte read matches the typed text exactly.
+    - step: 22
+      expectation: The shared dirty tab indicator is gone.
+    results:
+    - 14
+    - 18
+    - 21
+    - 22
+  - id: R2
+    requirement: Editing a saved document and pressing the platform save chord writes the updated bytes directly without reopening
+      Save As.
+    actions:
+    - 23
+    - 24
+    - 25
+    - 27
+    checkpoints:
+    - step: 26
+      expectation: The appended text marks the document dirty again.
+    - step: 28
+      expectation: The VFS file contains the appended text after the save chord.
+    - step: 29
+      expectation: Dirty state clears after the direct save.
+    results:
+    - 28
+    - 29
+  - id: R3
+    requirement: Save As can be cancelled while keeping the open document, Save a Copy writes a second file without changing the
+      open document path, and File > Close removes the clean document; no uncaught runtime errors occur.
+    actions:
+    - 30
+    - 32
+    - 35
+    - 38
+    - 40
+    - 43
+    - 44
+    - 48
+    - 50
+    checkpoints:
+    - step: 31
+      expectation: Save As is reachable from the File menu for a saved document.
+    - step: 33
+      expectation: The Save As dialog opens again.
+    - step: 34
+      expectation: The reopened Save As dialog prefills the current document path.
+    - step: 36
+      expectation: Escape closes Save As without replacing the open document.
+    - step: 37
+      expectation: The document path is unchanged after cancelling Save As.
+    - step: 39
+      expectation: Save a Copy is reachable from the File menu.
+    - step: 41
+      expectation: The Save a Copy variant dialog is shown.
+    - step: 42
+      expectation: The dialog identifies the copy workflow.
+    - step: 45
+      expectation: Confirming the copy closes the dialog.
+    - step: 46
+      expectation: Independent VFS byte read proves the copied file was written.
+    - step: 47
+      expectation: The open document still points at its original file.
+    - step: 51
+      expectation: Closing the clean document removes the workbench.
+    - step: 52
+      expectation: No file-viewer tab remains in the Explorer tab strip.
+    - step: 53
+      expectation: The whole lifecycle raises no uncaught runtime errors.
+    results:
+    - 34
+    - 37
+    - 42
+    - 46
+    - 53
+  visual:
+  - check: Save As / Save a Copy dialog layout and dirty marker rendering
+    method: manual
+    reason: The flow asserts DOM state and exact bytes; dialog visual fidelity is not certified here.
+  native:
+  - check: Real disk bytes, overwrite prompts, permission failures and native file dialogs
+    method: external
+    reason: This case writes only the browser IndexedDB VFS; native disk effects require the native Notepad cases.

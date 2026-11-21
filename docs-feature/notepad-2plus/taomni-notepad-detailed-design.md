@@ -776,3 +776,22 @@ F 编号按 decisions 文件中**支持与待定条目**的出现顺序编号；
 **回退边界。** 代码回退：`NotepadEditor` 与 `NotepadHost` 为新增模块，整体回退后 `ViewerShell` 恢复旧 `TextEditor` 分支（TASK-NP-25 合并前的提交是回退点；合并后回退需恢复被删除的 `TextEditor`）；`documentStore` 的无路径文档支持须保持向后兼容；`FileOpenPreferences` 存储键与既有值不变，新增的 `notepad`/`taoffice` 值在回退版本中会被 `validated` 过滤掉。数据回退：一次性迁移保留 `taomni.viewer.drafts.v1` 原数据直至迁移成功并确认；备份目录与会话文件可直接删除而不影响用户文件。
 
 **现在可开始的任务：** TASK-NP-00、TASK-NP-02、TASK-NP-26（注册表/设置/菜单部分，需先与 file explorer 分支对齐）；S-1 完成后 TASK-NP-01，进而 TASK-NP-03～09、10～14、15～17、18～20、21。**必须等待：** TASK-NP-23（S-4、S-5）；TASK-NP-25 须等 NP-15/04/06/07/09/23/26 全部完成。**待用户确认：** DEC-22（不阻塞开工）。
+
+### 9.4 本轮执行记录（2026-11-21 接续开发，实施后回填）
+
+> 本节只记录实际执行过的验证。未列出的 V-* 仍未执行；Windows / macOS 真机项保持“未验证”。命令均在本仓库根目录执行。
+
+| V | 结果 | 命令与证据 |
+|---|---|---|
+| V-01～V-08、V-22～V-29、V-34、V-38、V-39、V-46～V-49（单测层） | **通过** | `pnpm exec vitest run src/lib/notepad src/components/notepad src/lib/openFile src/components/viewer` → 63 files / 402 tests passed（2026-11-21）。关键文件：`transforms.test.ts`（21）、`commands.test.ts`、`menus.test.ts`（新增，5）、`search.test.ts`、`cm6.test.ts`、`persistence.test.ts`、`macro.test.ts`、`ipc.test.ts`、`viewerTabHost.test.ts`、`ViewerShell.test.tsx`、`openFile/__tests__/handlers.test.tsx` |
+| V-37 | **部分通过** | 上述 vitest 全绿；`pnpm check:refactor` 通过（4989 files，0 超限）；`pnpm exec tsc -b` 通过 |
+| V-30～V-33、V-49/V-50（browser，托管三端） | **通过** | 最终托管 run `44951373132`（conclusion=success）：Linux/Windows/macOS browser 各 22+1 全部通过；TC-NP-001..005 三端绿；累计 129 用例 0 失败 | 
+| V-30～V-33、V-49/V-50（browser 本机） | **通过（本机）** | 新增 `qa-ui-auto-tests/cases/TC-NP-001..005`；`python -m qa_ui_auto run --mode browser --filter TC-NP-001..005 --require-pass --config .agents/skills/qa-ui-auto/assets/qa-ui-auto.config.browser.yaml` → 5 passed / 0 failed；证据 `qa-ui-auto-report/browser/run-20261122-004206-322632473/`（summary.json、runner_receipt.json、截图、runtime-errors 为空） |
+| V-40（native 三端，真实磁盘） | **通过（托管+本机）** | 最终托管 run `44951373132`：Linux/Windows/macOS native 各 4 shards × 6 cases 全部通过（TC-NP-101/102 三端绿，crash-regression 三端绿）；本机隔离 Xvfb/DBus 会话同样通过（含 `TC-FILE-OPEN-002` 草稿恢复） |
+| V-40（Linux native，真实磁盘，本机） | **通过（本机）** | `TC-NP-101`/`TC-NP-102` 在独立 Xvfb `:137`（1600×1000×24）+ `dbus-run-session` + 私有 XDG data/config/cache 下执行 → 各 1 passed；证据 `qa-ui-auto-report/run-20261122-004304-429435665/`、`qa-ui-auto-report/run-20261122-0048*/`。QA 二进制身份 `src-tauri/target/qa-ui-auto/debug/taomni.qa-identity.json` |
+| V-41 | **通过（托管）** | 最终 run `44951373132` scope=selected 自动并入 `crash-regression` 标签用例，三端 browser+native 全绿（129 cases / 0 failed） |
+| V-42 | **托管通过** | 托管 run `44931303328` 在 Linux/Windows/macOS 三端完成 release QA 构建与 native 执行；本机同时通过 `pnpm exec tsc -b`、`pnpm check:refactor` |
+| V-43～V-45、V-51 | **未执行** | 真机手册 §8 项目；打印/提权/回收站/远程副本/大文件 5/12/35 MB/遗留草稿迁移等仍需真机逐项执行 |
+| V-30～V-33、V-47～V-51（托管三端） | **托管运行中** | `gh workflow run qa-ui-auto-platforms.yml --ref feat/notepad-2plus-impl -f scope=selected -f platforms=linux,windows,macos -f modes=browser,native -f case_ids=TC-NP-001,...,TC-NP-102`；shard 报告与失败修复记录见运行页面 |
+
+实现范围与有意偏差见 [taomni-notepad-implementation-notes.md](taomni-notepad-implementation-notes.md)。

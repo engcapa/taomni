@@ -17212,3 +17212,414 @@ The retired Tao-specific key/save selectors are retained as optional absence ass
 TC-FILE-OPEN-029/030 覆盖 Markdown Live 的实际拖选与选区对比度、深色源码标记与深色源码选区（聚焦/失焦且不遮盖活动行），以及 Live、源码和分栏的共享查找替换控件。
 TC-FILE-OPEN-031/032 覆盖左侧工具栏的 draw.io 导入、Live 和分栏预览与 draw.io Desktop 原图的像素比较，以及导出后可编辑节点和连线的往返校验。
 TC-FILE-OPEN-045 覆盖深色主题下 Markdown Live 编辑、源码与分栏模式的选区对比度（含局部浅色/深色预览外观覆盖）、格式工具栏（标题/粗体/斜体/引用）、专注模式、大纲切换与 `/` 插入菜单的真实保存往返。
+
+## 16. Notepad 工作台（Notepad++ 对齐）
+
+### 16.1 Notepad 工作台外壳与文件生命周期
+
+<!-- feature
+id: F-NOTEPAD-1
+title: Notepad Workbench Shell and File Lifecycle
+status: implemented
+area: editor/notepad
+components: [NotepadEditor, NotepadToolbar, NotepadMenuBar, NotepadStatusBar, NotepadCodeMirrorPane, FileLifecycleDialogs]
+files:
+  - src/components/notepad/NotepadEditor.tsx
+  - src/components/notepad/NotepadToolbar.tsx
+  - src/components/notepad/NotepadMenuBar.tsx
+  - src/components/notepad/NotepadStatusBar.tsx
+  - src/components/notepad/NotepadCodeMirrorPane.tsx
+  - src/components/notepad/dialogs/FileLifecycleDialogs.tsx
+  - src/components/notepad/useNotepadActions.ts
+  - src/components/notepad/actions/coreCommands.ts
+  - src/components/notepad/actions/extraCommands.ts
+  - src/components/viewer/ViewerShell.tsx
+  - src/components/viewer/ViewerDirtyIndicator.tsx
+  - src/components/explorer/ExplorerTabStrip.tsx
+  - src/lib/notepad/commands/catalog.ts
+  - src/lib/notepad/commands/menus.ts
+  - src/lib/notepad/host/viewerTabHost.ts
+  - src/stores/notepadStore.ts
+  - src/stores/notepadPreferences.ts
+  - src/stores/documentStore.ts
+  - src/stubs/commands/notepad.ts
+controls:
+  - id: notepad-workbench
+    selector: '[data-testid="notepad-workbench"]'
+    kind: display
+  - id: notepad-toolbar
+    selector: '[data-testid="notepad-toolbar"]'
+    kind: display
+  - id: notepad-menubar
+    selector: '[data-testid="notepad-menubar"]'
+    kind: display
+  - id: notepad-status-bar
+    selector: '[data-testid="notepad-status-bar"]'
+    kind: display
+  - id: notepad-status-stats
+    selector: '[data-testid="notepad-status-stats"]'
+    kind: display
+  - id: notepad-status-eol
+    selector: '[data-testid="notepad-status-eol"]'
+    kind: interactive
+  - id: notepad-status-encoding
+    selector: '[data-testid="notepad-status-encoding"]'
+    kind: interactive
+  - id: notepad-status-ovr
+    selector: '[data-testid="notepad-status-ovr"]'
+    kind: interactive
+  - id: notepad-status-zoom
+    selector: '[data-testid="notepad-status-zoom"]'
+    kind: interactive
+  - id: viewer-tab-dirty
+    selector: '[data-testid="viewer-tab-dirty"]'
+    kind: display
+  - id: notepad-status-sel
+    selector: '[data-testid="notepad-status-sel"]'
+    kind: display
+    optional: true
+    note: Selection chip is rendered only while the editor selection is non-empty.
+  - id: explorer-tab-new-notepad
+    selector: '[data-testid="explorer-tab-new-notepad"]'
+    kind: interactive
+  - id: notepad-tool-wrap
+    selector: '[data-testid="notepad-tool-wrap"]'
+    kind: interactive
+  - id: notepad-tool-symbols
+    selector: '[data-testid="notepad-tool-symbols"]'
+    kind: interactive
+  - id: notepad-menu-file
+    selector: '[data-testid="notepad-menu-file"]'
+    kind: interactive
+  - id: notepad-menu-help
+    selector: '[data-testid="notepad-menu-help"]'
+    kind: display
+    optional: true
+    note: Prototype-parity menu has no Help menu; asserted absent on purpose.
+  - id: notepad-menu-item-file-new
+    selector: '[data-testid="notepad-menu-item-file.new"]'
+    kind: display
+    note: Presence only; the New command itself is exercised through the toolbar.
+  - id: notepad-menu-item-file-save
+    selector: '[data-testid="notepad-menu-item-file.save"]'
+    kind: interactive
+  - id: notepad-menu-item-file-save-as
+    selector: '[data-testid="notepad-menu-item-file.saveAs"]'
+    kind: interactive
+  - id: notepad-menu-item-file-save-copy
+    selector: '[data-testid="notepad-menu-item-file.saveCopy"]'
+    kind: interactive
+  - id: notepad-menu-item-file-print
+    selector: '[data-testid="notepad-menu-item-file.print"]'
+    kind: interactive
+  - id: notepad-menu-item-file-close
+    selector: '[data-testid="notepad-menu-item-file.close"]'
+    kind: interactive
+  - id: notepad-save-as-dialog
+    selector: '[data-testid="notepad-save-as-dialog"]'
+    kind: display
+  - id: notepad-save-as-input
+    selector: '[data-testid="notepad-save-as-input"]'
+    kind: interactive
+  - id: notepad-save-as-confirm
+    selector: '[data-testid="notepad-save-as-confirm"]'
+    kind: interactive
+-->
+
+### 16.2 Notepad 查找、替换与搜索结果
+
+<!-- feature
+id: F-NOTEPAD-2
+title: Notepad Find Replace and Search Results
+status: implemented
+area: editor/notepad-search
+components: [FindReplaceBar, SearchResultsPanel, NotepadToolbar]
+files:
+  - src/components/notepad/FindReplaceBar.tsx
+  - src/components/notepad/notepad-findbar.css
+  - src/components/notepad/panels/SearchResultsPanel.tsx
+  - src/components/notepad/actions/coreCommands.ts
+  - src/components/notepad/useNotepadActions.ts
+  - src/lib/notepad/search/engine.ts
+  - src/lib/notepad/search/findInFiles.ts
+  - src/lib/notepad/transforms/escape.ts
+  - src/stores/notepadStore.ts
+controls:
+  - id: notepad-tool-find
+    selector: '[data-testid="notepad-tool-find"]'
+    kind: interactive
+  - id: notepad-find-bar
+    selector: '[data-testid="notepad-find-bar"]'
+    kind: display
+  - id: np-find-input
+    selector: '[data-testid="np-find-input"]'
+    kind: interactive
+  - id: notepad-find-status
+    selector: '[data-testid="notepad-find-status"]'
+    kind: display
+  - id: np-find-next
+    selector: '[data-testid="np-find-next"]'
+    kind: interactive
+  - id: np-find-count
+    selector: '[data-testid="np-find-count"]'
+    kind: interactive
+  - id: np-find-tab-find
+    selector: '[data-testid="np-find-tab-find"]'
+    kind: interactive
+  - id: np-find-tab-replace
+    selector: '[data-testid="np-find-tab-replace"]'
+    kind: interactive
+  - id: np-find-tab-mark
+    selector: '[data-testid="np-find-tab-mark"]'
+    kind: interactive
+  - id: np-find-tab-files
+    selector: '[data-testid="np-find-tab-files"]'
+    kind: interactive
+  - id: np-find-replace-input
+    selector: '[data-testid="np-find-replace-input"]'
+    kind: interactive
+  - id: np-find-replace-all
+    selector: '[data-testid="np-find-replace-all"]'
+    kind: interactive
+  - id: np-find-all-current
+    selector: '[data-testid="np-find-all-current"]'
+    kind: interactive
+  - id: np-find-mark-all
+    selector: '[data-testid="np-find-mark-all"]'
+    kind: interactive
+  - id: np-find-in-files
+    selector: '[data-testid="np-find-in-files"]'
+    kind: interactive
+  - id: np-find-close
+    selector: '[data-testid="np-find-close"]'
+    kind: interactive
+  - id: notepad-files-dir
+    selector: '[data-testid="notepad-files-dir"]'
+    kind: interactive
+  - id: notepad-files-filter
+    selector: '[data-testid="notepad-files-filter"]'
+    kind: interactive
+  - id: notepad-panel-results
+    selector: '[data-testid="notepad-panel-results"]'
+    kind: display
+  - id: notepad-search-results
+    selector: '[data-testid="notepad-search-results"]'
+    kind: display
+  - id: notepad-result-hit
+    selector: '[data-testid^="notepad-result-hit-"]'
+    kind: display
+-->
+
+### 16.3 Notepad 分屏、面板与视图状态
+
+<!-- feature
+id: F-NOTEPAD-3
+title: Notepad Split Panes Panels and View State
+status: implemented
+area: editor/notepad-view
+components: [NotepadSplitPanes, NotepadCodeMirrorPane, PanelHost, DocumentMapPanel, CharPanel, EncodingDialog, NotepadMenuBar]
+files:
+  - src/components/notepad/NotepadSplitPanes.tsx
+  - src/components/notepad/NotepadCodeMirrorPane.tsx
+  - src/components/notepad/panels/PanelHost.tsx
+  - src/components/notepad/panels/DocumentMapPanel.tsx
+  - src/components/notepad/panels/CharPanel.tsx
+  - src/components/notepad/panels/DocumentListPanel.tsx
+  - src/components/notepad/dialogs/EncodingDialog.tsx
+  - src/components/notepad/actions/coreCommands.ts
+  - src/components/notepad/actions/extraCommands.ts
+  - src/lib/notepad/cm6/splitSync.ts
+  - src/lib/notepad/cm6/extensions.ts
+  - src/lib/notepad/commands/menus.ts
+  - src/stores/notepadStore.ts
+  - src/stores/notepadPreferences.ts
+controls:
+  - id: notepad-tool-split
+    selector: '[data-testid="notepad-tool-split"]'
+    kind: interactive
+  - id: notepad-tool-docmap
+    selector: '[data-testid="notepad-tool-docmap"]'
+    kind: interactive
+  - id: notepad-editor-secondary
+    selector: '[data-testid="notepad-editor-secondary"]'
+    kind: display
+  - id: notepad-menu-view
+    selector: '[data-testid="notepad-menu-view"]'
+    kind: interactive
+  - id: notepad-menu-item-view-rotate-split
+    selector: '[data-testid="notepad-menu-item-view.rotateSplit"]'
+    kind: interactive
+  - id: notepad-menu-item-view-toggle-char-panel
+    selector: '[data-testid="notepad-menu-item-view.toggleCharPanel"]'
+    kind: interactive
+  - id: notepad-menu-group-zoom
+    selector: '[data-testid="notepad-menu-group-zoom"]'
+    kind: interactive
+  - id: notepad-menu-item-view-zoom-in
+    selector: '[data-testid="notepad-menu-item-view.zoomIn"]'
+    kind: interactive
+  - id: notepad-panel-minimap
+    selector: '[data-testid="notepad-panel-minimap"]'
+    kind: display
+  - id: notepad-panel-chars
+    selector: '[data-testid="notepad-panel-chars"]'
+    kind: display
+  - id: notepad-char-panel
+    selector: '[data-testid="notepad-char-panel"]'
+    kind: display
+  - id: notepad-dock-right
+    selector: '[data-testid="notepad-dock-right"]'
+    kind: display
+  - id: notepad-dock-bottom
+    selector: '[data-testid="notepad-dock-bottom"]'
+    kind: display
+  - id: notepad-panel-dock-menu-minimap
+    selector: '[data-testid="notepad-panel-dock-menu-minimap"]'
+    kind: interactive
+  - id: notepad-panel-dock-minimap-float
+    selector: '[data-testid="notepad-panel-dock-minimap-float"]'
+    kind: interactive
+  - id: notepad-float-layer
+    selector: '[data-testid="notepad-float-layer"]'
+    kind: display
+  - id: notepad-encoding-dialog
+    selector: '[data-testid="notepad-encoding-dialog"]'
+    kind: display
+  - id: notepad-enc-apply
+    selector: '[data-testid="notepad-enc-apply"]'
+    kind: display
+  - id: notepad-enc-option-gbk
+    selector: '[data-testid="notepad-enc-option-GBK"]'
+    kind: display
+-->
+
+### 16.4 Notepad 工具、对话框与设置
+
+<!-- feature
+id: F-NOTEPAD-4
+title: Notepad Tools Dialogs Macro and Settings
+status: implemented
+area: editor/notepad-tools
+components: [PreferencesDialog, ShortcutMapperDialog, CompareOverlay, ToolboxDialogs, PrintDialog, MacroDialogs, NotepadMenuBar, NotepadSettingsPanel]
+files:
+  - src/components/notepad/dialogs/PreferencesDialog.tsx
+  - src/components/notepad/dialogs/ShortcutMapperDialog.tsx
+  - src/components/notepad/dialogs/CompareOverlay.tsx
+  - src/components/notepad/dialogs/ToolboxDialogs.tsx
+  - src/components/notepad/dialogs/PrintDialog.tsx
+  - src/components/notepad/dialogs/MacroDialogs.tsx
+  - src/components/notepad/dialogs/PickerDialogs.tsx
+  - src/components/settings/NotepadSettingsPanel.tsx
+  - src/lib/notepad/commands/keymap.ts
+  - src/lib/notepad/commands/catalog.ts
+  - src/lib/notepad/commands/menus.ts
+  - src/lib/notepad/macro/macroManager.ts
+  - src/lib/notepad/print/printDocument.ts
+  - src/lib/notepad/ipc.ts
+  - src/stores/notepadStore.ts
+  - src/stores/notepadPreferences.ts
+  - src/stubs/commands/notepad.ts
+controls:
+  - id: notepad-menu-tools
+    selector: '[data-testid="notepad-menu-tools"]'
+    kind: interactive
+  - id: notepad-menu-compare
+    selector: '[data-testid="notepad-menu-compare"]'
+    kind: interactive
+  - id: notepad-menu-item-tools-preferences
+    selector: '[data-testid="notepad-menu-item-tools.preferences"]'
+    kind: interactive
+  - id: notepad-menu-item-tools-shortcut-mapper
+    selector: '[data-testid="notepad-menu-item-tools.shortcutMapper"]'
+    kind: interactive
+  - id: notepad-menu-item-tools-compare-disk
+    selector: '[data-testid="notepad-menu-item-tools.compareDisk"]'
+    kind: interactive
+  - id: notepad-menu-item-tools-hash-dialog
+    selector: '[data-testid="notepad-menu-item-tools.hashDialog"]'
+    kind: interactive
+  - id: notepad-preferences-dialog
+    selector: '[data-testid="notepad-preferences-dialog"]'
+    kind: display
+  - id: notepad-settings
+    selector: '[data-testid="notepad-settings"]'
+    kind: display
+  - id: notepad-pref-eol
+    selector: '[data-testid="notepad-pref-eol"]'
+    kind: display
+  - id: notepad-pref-encoding
+    selector: '[data-testid="notepad-pref-encoding"]'
+    kind: display
+  - id: notepad-pref-backup-mode
+    selector: '[data-testid="notepad-pref-backup-mode"]'
+    kind: display
+  - id: notepad-pref-line-numbers
+    selector: '[data-testid="notepad-pref-line-numbers"]'
+    kind: interactive
+  - id: notepad-shortcut-mapper-dialog
+    selector: '[data-testid="notepad-shortcut-mapper-dialog"]'
+    kind: display
+  - id: notepad-keymap-filter
+    selector: '[data-testid="notepad-keymap-filter"]'
+    kind: display
+  - id: notepad-keymap-bind
+    selector: '[data-testid^="notepad-keymap-bind-"]'
+    kind: display
+  - id: notepad-compare-dialog
+    selector: '[data-testid="notepad-compare-dialog"]'
+    kind: display
+  - id: notepad-hash-dialog
+    selector: '[data-testid="notepad-hash-dialog"]'
+    kind: display
+  - id: notepad-hash-generate
+    selector: '[data-testid="notepad-hash-generate"]'
+    kind: interactive
+  - id: notepad-hash-output
+    selector: '[data-testid="notepad-hash-output"]'
+    kind: display
+  - id: notepad-print-dialog
+    selector: '[data-testid="notepad-print-dialog"]'
+    kind: display
+  - id: notepad-print-confirm
+    selector: '[data-testid="notepad-print-confirm"]'
+    kind: display
+  - id: notepad-tool-macro-record
+    selector: '[data-testid="notepad-tool-macro-record"]'
+    kind: interactive
+  - id: notepad-tool-macro-stop
+    selector: '[data-testid="notepad-tool-macro-stop"]'
+    kind: interactive
+  - id: notepad-menubar-recording
+    selector: '[data-testid="notepad-menubar-recording"]'
+    kind: display
+  - id: notepad-status-rec
+    selector: '[data-testid="notepad-status-rec"]'
+    kind: display
+-->
+
+### 16.2 Notepad 真实磁盘与文件系统边界（native）
+
+<!-- feature
+id: F-NOTEPAD-5
+title: Notepad Native Real-Disk Save Conflict and Copy Semantics
+status: implemented
+area: editor/notepad-native
+components: [NotepadEditor, FileLifecycleDialogs, ViewerShell, ExplorerFileList]
+files:
+  - src/components/notepad/NotepadEditor.tsx
+  - src/components/notepad/dialogs/FileLifecycleDialogs.tsx
+  - src/components/notepad/actions/coreCommands.ts
+  - src/components/notepad/actions/extraCommands.ts
+  - src/components/notepad/useNotepadActions.ts
+  - src/components/viewer/ViewerShell.tsx
+  - src/lib/notepad/ipc.ts
+  - src/stores/notepadStore.ts
+  - src-tauri/src/commands/notepad.rs
+  - src-tauri/src/viewer/text.rs
+controls: []
+-->
+
+TC-NP-101/102 在 Linux/Windows/macOS 的 native 模式下用 `file_open_files` 真实宿主机目录验证：Notepad 打开 `notes.txt` 后
+Ctrl/Cmd+S 通过 `viewer_write_text` 写出真实字节；外部进程改写后保存出现冲突横幅，重新加载应用磁盘内容；另存为把文档重键到
+新路径并更新标签，保存副本写出第二个真实文件而当前文档仍指向另存为目标。浏览器 VFS 无法证明这些主机侧效果，因此这两个用例
+只登记 native；真机平台结果以各次托管运行的 shard 报告为准，未执行平台保持未验证。

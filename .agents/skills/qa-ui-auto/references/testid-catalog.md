@@ -1087,6 +1087,108 @@
 - `[data-testid="db-chat-toggle"]` — interactive [optional] — F-DB-1.chat-toggle
 - `[data-testid="db-detach"]` — interactive [optional] — F-DB-1.detach
 
+## editor/notepad (F-NOTEPAD-1)
+
+- `[data-testid="notepad-workbench"]` — display — F-NOTEPAD-1.notepad-workbench
+- `[data-testid="notepad-toolbar"]` — display — F-NOTEPAD-1.notepad-toolbar
+- `[data-testid="notepad-menubar"]` — display — F-NOTEPAD-1.notepad-menubar
+- `[data-testid="notepad-status-bar"]` — display — F-NOTEPAD-1.notepad-status-bar
+- `[data-testid="notepad-status-stats"]` — display — F-NOTEPAD-1.notepad-status-stats
+- `[data-testid="notepad-status-eol"]` — interactive — F-NOTEPAD-1.notepad-status-eol
+- `[data-testid="notepad-status-encoding"]` — interactive — F-NOTEPAD-1.notepad-status-encoding
+- `[data-testid="notepad-status-ovr"]` — interactive — F-NOTEPAD-1.notepad-status-ovr
+- `[data-testid="notepad-status-zoom"]` — interactive — F-NOTEPAD-1.notepad-status-zoom
+- `[data-testid="viewer-tab-dirty"]` — display — F-NOTEPAD-1.viewer-tab-dirty
+- `[data-testid="notepad-status-sel"]` — display [optional] — F-NOTEPAD-1.notepad-status-sel
+- `[data-testid="explorer-tab-new-notepad"]` — interactive — F-NOTEPAD-1.explorer-tab-new-notepad
+- `[data-testid="notepad-tool-wrap"]` — interactive — F-NOTEPAD-1.notepad-tool-wrap
+- `[data-testid="notepad-tool-symbols"]` — interactive — F-NOTEPAD-1.notepad-tool-symbols
+- `[data-testid="notepad-menu-file"]` — interactive — F-NOTEPAD-1.notepad-menu-file
+- `[data-testid="notepad-menu-help"]` — display [optional] — F-NOTEPAD-1.notepad-menu-help
+- `[data-testid="notepad-menu-item-file.new"]` — display — F-NOTEPAD-1.notepad-menu-item-file-new
+- `[data-testid="notepad-menu-item-file.save"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-save
+- `[data-testid="notepad-menu-item-file.saveAs"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-save-as
+- `[data-testid="notepad-menu-item-file.saveCopy"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-save-copy
+- `[data-testid="notepad-menu-item-file.print"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-print
+- `[data-testid="notepad-menu-item-file.close"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-close
+- `[data-testid="notepad-save-as-dialog"]` — display — F-NOTEPAD-1.notepad-save-as-dialog
+- `[data-testid="notepad-save-as-input"]` — interactive — F-NOTEPAD-1.notepad-save-as-input
+- `[data-testid="notepad-save-as-confirm"]` — interactive — F-NOTEPAD-1.notepad-save-as-confirm
+
+## editor/notepad-search (F-NOTEPAD-2)
+
+- `[data-testid="notepad-tool-find"]` — interactive — F-NOTEPAD-2.notepad-tool-find
+- `[data-testid="notepad-find-bar"]` — display — F-NOTEPAD-2.notepad-find-bar
+- `[data-testid="np-find-input"]` — interactive — F-NOTEPAD-2.np-find-input
+- `[data-testid="notepad-find-status"]` — display — F-NOTEPAD-2.notepad-find-status
+- `[data-testid="np-find-next"]` — interactive — F-NOTEPAD-2.np-find-next
+- `[data-testid="np-find-count"]` — interactive — F-NOTEPAD-2.np-find-count
+- `[data-testid="np-find-tab-find"]` — interactive — F-NOTEPAD-2.np-find-tab-find
+- `[data-testid="np-find-tab-replace"]` — interactive — F-NOTEPAD-2.np-find-tab-replace
+- `[data-testid="np-find-tab-mark"]` — interactive — F-NOTEPAD-2.np-find-tab-mark
+- `[data-testid="np-find-tab-files"]` — interactive — F-NOTEPAD-2.np-find-tab-files
+- `[data-testid="np-find-replace-input"]` — interactive — F-NOTEPAD-2.np-find-replace-input
+- `[data-testid="np-find-replace-all"]` — interactive — F-NOTEPAD-2.np-find-replace-all
+- `[data-testid="np-find-all-current"]` — interactive — F-NOTEPAD-2.np-find-all-current
+- `[data-testid="np-find-mark-all"]` — interactive — F-NOTEPAD-2.np-find-mark-all
+- `[data-testid="np-find-in-files"]` — interactive — F-NOTEPAD-2.np-find-in-files
+- `[data-testid="np-find-close"]` — interactive — F-NOTEPAD-2.np-find-close
+- `[data-testid="notepad-files-dir"]` — interactive — F-NOTEPAD-2.notepad-files-dir
+- `[data-testid="notepad-files-filter"]` — interactive — F-NOTEPAD-2.notepad-files-filter
+- `[data-testid="notepad-panel-results"]` — display — F-NOTEPAD-2.notepad-panel-results
+- `[data-testid="notepad-search-results"]` — display — F-NOTEPAD-2.notepad-search-results
+- `[data-testid^="notepad-result-hit-"]` — display — F-NOTEPAD-2.notepad-result-hit
+
+## editor/notepad-tools (F-NOTEPAD-4)
+
+- `[data-testid="notepad-menu-tools"]` — interactive — F-NOTEPAD-4.notepad-menu-tools
+- `[data-testid="notepad-menu-compare"]` — interactive — F-NOTEPAD-4.notepad-menu-compare
+- `[data-testid="notepad-menu-item-tools.preferences"]` — interactive — F-NOTEPAD-4.notepad-menu-item-tools-preferences
+- `[data-testid="notepad-menu-item-tools.shortcutMapper"]` — interactive — F-NOTEPAD-4.notepad-menu-item-tools-shortcut-mapper
+- `[data-testid="notepad-menu-item-tools.compareDisk"]` — interactive — F-NOTEPAD-4.notepad-menu-item-tools-compare-disk
+- `[data-testid="notepad-menu-item-tools.hashDialog"]` — interactive — F-NOTEPAD-4.notepad-menu-item-tools-hash-dialog
+- `[data-testid="notepad-preferences-dialog"]` — display — F-NOTEPAD-4.notepad-preferences-dialog
+- `[data-testid="notepad-settings"]` — display — F-NOTEPAD-4.notepad-settings
+- `[data-testid="notepad-pref-eol"]` — display — F-NOTEPAD-4.notepad-pref-eol
+- `[data-testid="notepad-pref-encoding"]` — display — F-NOTEPAD-4.notepad-pref-encoding
+- `[data-testid="notepad-pref-backup-mode"]` — display — F-NOTEPAD-4.notepad-pref-backup-mode
+- `[data-testid="notepad-pref-line-numbers"]` — interactive — F-NOTEPAD-4.notepad-pref-line-numbers
+- `[data-testid="notepad-shortcut-mapper-dialog"]` — display — F-NOTEPAD-4.notepad-shortcut-mapper-dialog
+- `[data-testid="notepad-keymap-filter"]` — display — F-NOTEPAD-4.notepad-keymap-filter
+- `[data-testid^="notepad-keymap-bind-"]` — display — F-NOTEPAD-4.notepad-keymap-bind
+- `[data-testid="notepad-compare-dialog"]` — display — F-NOTEPAD-4.notepad-compare-dialog
+- `[data-testid="notepad-hash-dialog"]` — display — F-NOTEPAD-4.notepad-hash-dialog
+- `[data-testid="notepad-hash-generate"]` — interactive — F-NOTEPAD-4.notepad-hash-generate
+- `[data-testid="notepad-hash-output"]` — display — F-NOTEPAD-4.notepad-hash-output
+- `[data-testid="notepad-print-dialog"]` — display — F-NOTEPAD-4.notepad-print-dialog
+- `[data-testid="notepad-print-confirm"]` — display — F-NOTEPAD-4.notepad-print-confirm
+- `[data-testid="notepad-tool-macro-record"]` — interactive — F-NOTEPAD-4.notepad-tool-macro-record
+- `[data-testid="notepad-tool-macro-stop"]` — interactive — F-NOTEPAD-4.notepad-tool-macro-stop
+- `[data-testid="notepad-menubar-recording"]` — display — F-NOTEPAD-4.notepad-menubar-recording
+- `[data-testid="notepad-status-rec"]` — display — F-NOTEPAD-4.notepad-status-rec
+
+## editor/notepad-view (F-NOTEPAD-3)
+
+- `[data-testid="notepad-tool-split"]` — interactive — F-NOTEPAD-3.notepad-tool-split
+- `[data-testid="notepad-tool-docmap"]` — interactive — F-NOTEPAD-3.notepad-tool-docmap
+- `[data-testid="notepad-editor-secondary"]` — display — F-NOTEPAD-3.notepad-editor-secondary
+- `[data-testid="notepad-menu-view"]` — interactive — F-NOTEPAD-3.notepad-menu-view
+- `[data-testid="notepad-menu-item-view.rotateSplit"]` — interactive — F-NOTEPAD-3.notepad-menu-item-view-rotate-split
+- `[data-testid="notepad-menu-item-view.toggleCharPanel"]` — interactive — F-NOTEPAD-3.notepad-menu-item-view-toggle-char-panel
+- `[data-testid="notepad-menu-group-zoom"]` — interactive — F-NOTEPAD-3.notepad-menu-group-zoom
+- `[data-testid="notepad-menu-item-view.zoomIn"]` — interactive — F-NOTEPAD-3.notepad-menu-item-view-zoom-in
+- `[data-testid="notepad-panel-minimap"]` — display — F-NOTEPAD-3.notepad-panel-minimap
+- `[data-testid="notepad-panel-chars"]` — display — F-NOTEPAD-3.notepad-panel-chars
+- `[data-testid="notepad-char-panel"]` — display — F-NOTEPAD-3.notepad-char-panel
+- `[data-testid="notepad-dock-right"]` — display — F-NOTEPAD-3.notepad-dock-right
+- `[data-testid="notepad-dock-bottom"]` — display — F-NOTEPAD-3.notepad-dock-bottom
+- `[data-testid="notepad-panel-dock-menu-minimap"]` — interactive — F-NOTEPAD-3.notepad-panel-dock-menu-minimap
+- `[data-testid="notepad-panel-dock-minimap-float"]` — interactive — F-NOTEPAD-3.notepad-panel-dock-minimap-float
+- `[data-testid="notepad-float-layer"]` — display — F-NOTEPAD-3.notepad-float-layer
+- `[data-testid="notepad-encoding-dialog"]` — display — F-NOTEPAD-3.notepad-encoding-dialog
+- `[data-testid="notepad-enc-apply"]` — display — F-NOTEPAD-3.notepad-enc-apply
+- `[data-testid="notepad-enc-option-GBK"]` — display — F-NOTEPAD-3.notepad-enc-option-gbk
+
 ## editor/structural-search (F25.6)
 
 - `[data-testid="structural-search-templates"]` — display [optional] — F25.6.structural-search-templates
