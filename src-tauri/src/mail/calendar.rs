@@ -9,8 +9,7 @@ use serde::Serialize;
 use tauri::State;
 
 use super::{
-    ImapSessionOpts, MailAccountConfig, build_smtp_transport, now_ts, parse_mailbox,
-    resolve_config, with_imap_session,
+    ImapSessionOpts, MailAccountConfig, now_ts, parse_mailbox, resolve_config, with_imap_session,
 };
 use crate::state::AppState;
 
@@ -119,13 +118,13 @@ pub async fn mail_respond_invite(
                 ),
         )
         .map_err(|e| format!("failed to build invitation reply: {e}"))?;
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        let transport = build_smtp_transport(&account, &handle)?;
-        transport.mailer.send(&message).map(|_| ())
-    })
-    .await
-    .map_err(|e| format!("invite reply task failed: {e}"))??;
+    super::module_host::send_smtp(
+        state.plugins.clone(),
+        &account,
+        message.envelope().clone(),
+        message.formatted(),
+    )
+    .await?;
     Ok(MailInviteResponse {
         partstat: partstat.to_string(),
         sent_to: organizer.email,

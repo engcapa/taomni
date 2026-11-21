@@ -2,10 +2,11 @@
 
 use std::{net::SocketAddr, sync::Arc};
 
+use lettre::address::Envelope;
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, FolderSubscription, IMAP_FOLDER_TREE, ImapFolderTree,
-    IncomingTest, OutgoingTest, SLUG,
+    IncomingTest, SEND_SMTP, SLUG, SMTP_DELIVERY_UNKNOWN, SmtpConnection, SmtpDelivery,
 };
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
 
@@ -38,24 +39,68 @@ pub(super) async fn test_smtp(
             .await
             .map_err(|error| format!("SMTP test task failed: {error}"))?;
     }
+    let (_route, request) = bind_smtp(account).await?;
+    invoke(registry, CHECK_OUTGOING, request).await
+}
+
+pub(super) async fn send_smtp(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    envelope: Envelope,
+    mime: Vec<u8>,
+) -> Result<String, String> {
+    if !supports(&registry, SEND_SMTP) {
+        let account = account.clone();
+        let runtime = tokio::runtime::Handle::current();
+        return tokio::task::spawn_blocking(move || {
+            let transport = super::smtp::build_smtp_transport(&account, &runtime)?;
+            let response = transport.mailer.send_raw(&envelope, &mime)?;
+            Ok(format!("{response:?}"))
+        })
+        .await
+        .map_err(|error| format!("SMTP send task failed: {error}"))?;
+    }
+    let (_route, connection) = bind_smtp(account).await?;
+    let mime_length = mime.len() as u64;
+    let (_offer, mime_source) = Route::offer_bytes(mime)
+        .await
+        .map_err(|error| format!("Prepare outgoing message: {error}"))?;
+    let request = SmtpDelivery {
+        connection,
+        sender: envelope.from().map(ToString::to_string),
+        recipients: envelope.to().iter().map(ToString::to_string).collect(),
+        mime_source,
+        mime_length,
+    };
+    // The host may have received SMTP acceptance before losing the response.
+    invoke_result(registry, SEND_SMTP, request)
+        .await
+        .map_err(|error| {
+            format!("{SMTP_DELIVERY_UNKNOWN}: {error}. Verify delivery before resending.")
+        })?
+}
+
+async fn bind_smtp(account: &ResolvedMailAccount) -> Result<(Route, SmtpConnection), String> {
     let server = &account.config.smtp;
     let server_name = server.host.trim().to_owned();
-    let (_route, endpoint) = bind_route(
+    let (route, endpoint) = bind_route(
         server_name.clone(),
         server.port,
         account.network_settings.clone(),
     )
     .await?;
-    let request = OutgoingTest {
-        route: endpoint,
-        server_name,
-        security: server.security,
-        trusted_certificate: server.trusted_cert.clone(),
-        authentication: account.auth_mode,
-        username: account.smtp_username.clone(),
-        secret: account.smtp_password.clone().into(),
-    };
-    invoke(registry, CHECK_OUTGOING, request).await
+    Ok((
+        route,
+        SmtpConnection {
+            route: endpoint,
+            server_name,
+            security: server.security,
+            trusted_certificate: server.trusted_cert.clone(),
+            authentication: account.auth_mode,
+            username: account.smtp_username.clone(),
+            secret: account.smtp_password.clone().into(),
+        },
+    ))
 }
 
 fn supports(registry: &PluginRegistry, method: &str) -> bool {
@@ -142,6 +187,14 @@ async fn invoke<T: DeserializeOwned, P: Serialize + Send + 'static>(
     method: &'static str,
     request: P,
 ) -> Result<T, String> {
+    invoke_result(registry, method, request).await?
+}
+
+async fn invoke_result<T: DeserializeOwned, P: Serialize + Send + 'static>(
+    registry: Arc<PluginRegistry>,
+    method: &'static str,
+    request: P,
+) -> Result<Result<T, String>, String> {
     let result = tokio::task::spawn_blocking(move || {
         let payload = serde_json::to_value(request).map_err(|error| error.to_string())?;
         registry
@@ -151,5 +204,5 @@ async fn invoke<T: DeserializeOwned, P: Serialize + Send + 'static>(
     .await
     .map_err(|error| format!("Mail module request failed: {error}"))??;
     serde_json::from_value::<Result<T, String>>(result)
-        .map_err(|_| "Invalid Mail module response".to_owned())?
+        .map_err(|_| "Invalid Mail module response".to_owned())
 }

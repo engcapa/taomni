@@ -14,23 +14,6 @@ pub(super) struct MailSmtpTransport {
     _forward: Option<ProxyForward>,
 }
 
-pub(super) fn send_smtp_with(
-    account: &ResolvedMailAccount,
-    request: &MailSendRequest,
-    runtime: &tokio::runtime::Handle,
-    options: &MessageBuildOptions,
-) -> Result<MailSendResult, String> {
-    let message = build_send_message_with(account, request, options)?;
-    let transport = build_smtp_transport(account, runtime)?;
-    let response = transport.mailer.send(&message)?;
-    Ok(MailSendResult {
-        accepted: true,
-        response: format!("{response:?}"),
-        sent_copy_folder: None,
-        sent_copy_error: None,
-    })
-}
-
 pub(super) fn test_smtp(
     account: &ResolvedMailAccount,
     runtime: &tokio::runtime::Handle,

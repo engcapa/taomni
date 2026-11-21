@@ -10,7 +10,9 @@ mod store;
 use std::{collections::BTreeSet, io, sync::Arc, time::Duration};
 
 use serde_json::Value;
-use taomni_mail_api::{CHECK_INCOMING, CHECK_OUTGOING, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE};
+use taomni_mail_api::{
+    CHECK_INCOMING, CHECK_OUTGOING, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, SEND_SMTP,
+};
 use taomni_plugin_api::{
     ErrorCode, RpcError,
     services::{SNAPSHOT_METHOD, SNAPSHOT_PREPARE_METHOD, SNAPSHOT_RELEASE_METHOD},
@@ -31,6 +33,7 @@ fn host_config() -> HostConfig {
                 CHECK_INCOMING,
                 CHECK_OUTGOING,
                 IMAP_FOLDER_TREE,
+                SEND_SMTP,
                 SNAPSHOT_PREPARE_METHOD,
                 SNAPSHOT_METHOD,
                 SNAPSHOT_RELEASE_METHOD,
@@ -84,6 +87,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(outgoing::check(&self.io, operation, input)?)
+            }
+            SEND_SMTP => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(outgoing::send(&self.io, operation, input)?)
             }
             IMAP_FOLDER_TREE => {
                 let input = serde_json::from_value(params.unwrap_or_default())

@@ -91,6 +91,9 @@ steps:
 - mail_server_assert_smtp_contains:
     text: Server draft and sent copy
     timeout_sec: 20
+- mail_server_assert_smtp_contains:
+    text: Stored on the server for other clients
+    timeout_sec: 20
 - assert_no_runtime_errors: null
 - screenshot: mail-send-01-sent-copy.png
 verification:
@@ -141,6 +144,8 @@ verification:
     - step: 27
       expectation: SMTP receives the composed message independently of the Sent folder copy.
     - step: 28
+      expectation: SMTP receives the composed text body as well as the subject.
+    - step: 29
       expectation: Sending and the subsequent refresh leave no runtime errors.
     results:
     - 25
@@ -149,6 +154,7 @@ verification:
     - 22
     - 27
     - 28
+    - 29
   - id: R3
     requirement: Quick Connect 默认目录的完整原件下载必须完成，不能在发送成功时遗漏后台归档发布错误；覆盖 Windows 长存储路径。
     actions:

@@ -51,6 +51,12 @@ describe("mailOutbox", () => {
     expect(isTransientSendError("SMTP auth failed for smtp.example.com:465: 535")).toBe(false);
   });
 
+  it("requires manual review when SMTP may have accepted a message", () => {
+    const lastError = "SMTP delivery status unknown: connection timed out";
+    expect(isTransientSendError(lastError)).toBe(false);
+    expect(outboxNextAttemptAt({ queuedAt: 100, attempts: 1, sendAt: 100, lastError })).toBeNull();
+  });
+
   it("round-trips datetime-local values", () => {
     const at = fromDateTimeLocal("2030-01-02T03:04");
     expect(at).not.toBeNull();

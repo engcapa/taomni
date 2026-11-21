@@ -40,8 +40,13 @@ full sync and updates folder subscriptions. The core grants a route to the
 selected destination and resolves the account credential for each request.
 The host checks TLS against the original hostname and closes the socket on
 cancellation. The desktop applies resulting folder metadata to the current
-account cache. The protocol job checks SMTP authentication rejection and
-success, including the NOOP after successful authentication.
+account cache. Version 0.1.4 also delivers composed messages, queued mail,
+read receipts and invitation replies over SMTP. The core resolves attachment
+paths and passes the authorized MIME bytes through a separate one-use local
+route. SMTP acceptance remains independent of storing a Sent copy. The
+Outbox waits for a manual retry if a lost reply leaves delivery uncertain.
+The protocol job checks authentication, delivery to blind recipients, MIME
+framing, explicit rejection and loss of the final DATA reply.
 
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.

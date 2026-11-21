@@ -6,10 +6,7 @@ use lettre::address::{Address, Envelope};
 use serde::Serialize;
 use tauri::State;
 
-use super::{
-    MailAccountConfig, MailMessageHeader, build_smtp_transport, now_ts, resolve_config,
-    with_mail_db,
-};
+use super::{MailAccountConfig, MailMessageHeader, now_ts, resolve_config, with_mail_db};
 use crate::state::AppState;
 
 /// IMAP keyword marking "receipt handled" (sent or declined).
@@ -120,16 +117,8 @@ pub async fn mail_send_receipt(
         .parse()
         .map_err(|e| format!("invalid receipt address {receipt_to}: {e}"))?;
     let envelope = Envelope::new(Some(from), vec![to]).map_err(|e| e.to_string())?;
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        let transport = build_smtp_transport(&account, &handle)?;
-        transport
-            .mailer
-            .send_raw(&envelope, raw.as_bytes())
-            .map(|_| ())
-    })
-    .await
-    .map_err(|e| format!("read receipt task failed: {e}"))??;
+    super::module_host::send_smtp(state.plugins.clone(), &account, envelope, raw.into_bytes())
+        .await?;
     super::mail_set_flags(
         config,
         folder,

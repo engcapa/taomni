@@ -2,6 +2,9 @@
 
 ## 2026-11-21 当前进展
 
+- GitHub 的三端签名 RDP 各收到 40/40 帧。Linux p95 为 84.00 ms，Windows 为 46.90 ms，macOS 26 为 76.00 ms，均低于 130 ms。独立探针的首帧、动画帧率和带宽也通过既有用例。Linux 绑定 `d3803b336`，另外两端绑定 `cd8756948`。各平台在 `live-shards/` 的 TC-MODULES-056 子目录保存签名包 SHA-256、浏览器输入时间及逐帧配对；正式候选需要重新绑定同一 SHA。 [Linux](https://github.com/engcapa/taomni/actions/runs/44890131445) · [Windows 和 macOS](https://github.com/engcapa/taomni/actions/runs/44888211385)
+- Linux 旧备份恢复 TC-MODULES-058 通过。Linux 同轮两项 Mail 失败发生在修复前的 POP3 标签和正文断言。修复版各端 Browser 已通过 23/23，Native 继续按分片核验。macOS 此前的两项失败停在系统保存对话框与 HTML 原生指针探针，保留各自的截图和报错。 [Linux 原始分片](https://github.com/engcapa/taomni/actions/runs/44890131445) · [修复版分片](https://github.com/engcapa/taomni/actions/runs/44892575348) · [SMTP 0.1.3 与 Explorer](https://github.com/engcapa/taomni/actions/runs/44894455514)
+- Mail 0.1.4 的签名宿主负责普通邮件、发件箱、阅读回执和邀请回复的 SMTP 发送。核心解析已选附件，按请求授权本机 MIME 数据流和目标路由。发送与 Sent 副本分别返回结果。服务器可能已接收时，发件箱保留邮件并等待人工处理。TC-MODULES-059 增加两种账户的正常发送和 Sent 检查，TC-MAIL-SEND-01 增加正文断言。三端真实宿主协议验证覆盖 Bcc、MIME、服务器拒收和 DATA 回复丢失。
 - `cd8756948` 的 Windows 签名 RDP 查看器收到全部 40 帧，p95 为 46.90 ms，低于 130 ms。独立探针同轮首帧为 40 ms，输入延迟 p95 为 54.85 ms，动画观察为 33.24 fps，带宽检查通过。查看器原始回执在 `qa-ui-auto-report/github/44888211385/live-shards/qa-windows-native-shard-3-b68f39e17a734a3fa1d168c72e21dbd7/run-20261121-101057-023510200/TC-MODULES-056/signed-rdp-viewer-latency.json`。 [GitHub 分片](https://github.com/engcapa/taomni/actions/runs/44888211385)
 - `523f8c923` 合入主线 #848，保留 Explorer 独立标签计入退出确认的修复。ControlBar 用例从 Tools 调用实际 Explorer 打开流程，覆盖返回 Tools。相关 43 项单测和重构边界检查通过。 [合并提交](https://github.com/engcapa/taomni/commit/523f8c923)
 - Mail 0.1.3 将工具栏 SMTP 连接测试交给签名宿主。宿主通过核心为当次请求授权的路由执行 TLS、认证和 NOOP。通过真实宿主协议用例检查认证被拒后可重试。TC-MODULES-059 核对 IMAP、POP3 会话的连接结果。发送、同步和前端迁出仍在推进。

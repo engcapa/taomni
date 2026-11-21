@@ -11,7 +11,9 @@ pub const SLUG: &str = "mail";
 pub const CHECK_INCOMING: &str = "mail/check-incoming";
 pub const CHECK_OUTGOING: &str = "mail/check-outgoing";
 pub const IMAP_FOLDER_TREE: &str = "mail/imap-folder-tree";
+pub const SEND_SMTP: &str = "mail/send-smtp";
 pub const HOST_REQUEST_TIMEOUT: Duration = Duration::from_secs(70);
+pub const SMTP_DELIVERY_UNKNOWN: &str = "SMTP delivery status unknown";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MailConnectionSecurity {
@@ -68,7 +70,7 @@ pub struct IncomingTest {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct OutgoingTest {
+pub struct SmtpConnection {
     pub route: Endpoint,
     pub server_name: String,
     pub security: MailConnectionSecurity,
@@ -76,6 +78,16 @@ pub struct OutgoingTest {
     pub authentication: MailAuthMode,
     pub username: String,
     pub secret: Zeroizing<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SmtpDelivery {
+    pub connection: SmtpConnection,
+    pub sender: Option<String>,
+    pub recipients: Vec<String>,
+    pub mime_source: Endpoint,
+    pub mime_length: u64,
 }
 
 #[derive(Serialize, Deserialize)]

@@ -397,13 +397,25 @@ pub(super) async fn send_message(
     let db = state.mail_db(&account_id)?;
     let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
-    let (result, pending, account, handle) = tokio::task::spawn_blocking(move || {
-        let (result, pending) =
-            outgoing::send_with_pending_copy(&account, &request, remote_draft, &handle)?;
-        Ok::<_, String>((result, pending, account, handle))
+    let (envelope, mime, pending, account) = tokio::task::spawn_blocking(move || {
+        let (message, pending) = outgoing::prepare_send(&account, &request, remote_draft)?;
+        Ok::<_, String>((
+            message.envelope().clone(),
+            message.formatted(),
+            pending,
+            account,
+        ))
     })
     .await
     .map_err(|e| format!("mail send task failed: {e}"))??;
+    let response =
+        super::module_host::send_smtp(state.plugins.clone(), &account, envelope, mime).await?;
+    let result = MailSendResult {
+        accepted: true,
+        response,
+        sent_copy_folder: None,
+        sent_copy_error: None,
+    };
     if result.accepted {
         // Owned by the backend, not the composer or tab. SMTP acceptance is
         // returned immediately; neither cache contention nor APPEND can turn

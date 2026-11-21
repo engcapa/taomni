@@ -14,9 +14,9 @@ use tauri::State;
 use super::sync::quote_imap_string;
 use super::{
     ActiveImapSession, ImapSessionOpts, MailAccountConfig, MailDraft, MailFolder, MailImapPool,
-    MailProvider, MailSendAttachment, MailSendRequest, MailSendResult, MessageBuildOptions,
-    ResolvedMailAccount, build_send_message_with, clean_message_id, list_mail_drafts,
-    resolve_config, send_smtp_with, with_imap_session, with_mail_db,
+    MailProvider, MailSendAttachment, MailSendRequest, MessageBuildOptions, ResolvedMailAccount,
+    build_send_message_with, clean_message_id, list_mail_drafts, resolve_config, with_imap_session,
+    with_mail_db,
 };
 use crate::state::AppState;
 
@@ -255,12 +255,11 @@ pub(super) struct PendingSentCopy {
 
 /// Prepare local MIME before SMTP; once SMTP accepts, only the independent
 /// copy task may fail. Such a failure must never cause the caller to resend.
-pub(super) fn send_with_pending_copy(
+pub(super) fn prepare_send(
     account: &ResolvedMailAccount,
     request: &MailSendRequest,
     remote_draft: Option<RemoteDraftLocation>,
-    runtime: &tokio::runtime::Handle,
-) -> Result<(MailSendResult, Option<PendingSentCopy>), String> {
+) -> Result<(lettre::Message, Option<PendingSentCopy>), String> {
     let message_id = new_message_id(&account.config.email_address);
     let save_copy = save_sent_copy_enabled(&account.config);
     let copy = if save_copy {
@@ -279,10 +278,9 @@ pub(super) fn send_with_pending_copy(
     } else {
         None
     };
-    let result = send_smtp_with(
+    let message = build_send_message_with(
         account,
         request,
-        runtime,
         &MessageBuildOptions {
             message_id: Some(message_id),
             ..MessageBuildOptions::default()
@@ -290,7 +288,7 @@ pub(super) fn send_with_pending_copy(
     )?;
     let pending = (copy.is_some() || remote_draft.is_some())
         .then_some(PendingSentCopy { copy, remote_draft });
-    Ok((result, pending))
+    Ok((message, pending))
 }
 
 pub(super) fn store_pending_copy(

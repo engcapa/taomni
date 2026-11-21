@@ -432,10 +432,18 @@ fn smtp_acceptance_does_not_wait_for_or_retry_a_failed_sent_copy() {
         "to": ["qa-recipient@example.test"], "subject": "disposable fixture", "textBody": "test only",
     })).unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let (result, pending) =
-        outgoing::send_with_pending_copy(&account, &request, None, runtime.handle()).unwrap();
-    assert!(result.accepted);
-    assert!(result.sent_copy_folder.is_none());
+    let directory = tempfile::tempdir().unwrap();
+    let registry = Arc::new(crate::plugin::PluginRegistry::new(directory.path()));
+    let (message, pending) = outgoing::prepare_send(&account, &request, None).unwrap();
+    let response = runtime
+        .block_on(super::module_host::send_smtp(
+            registry,
+            &account,
+            message.envelope().clone(),
+            message.formatted(),
+        ))
+        .unwrap();
+    assert!(response.contains("accepted"));
     assert!(
         outgoing::store_pending_copy(
             &MailImapPool::new(),

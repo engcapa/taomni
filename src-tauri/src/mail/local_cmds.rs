@@ -12,8 +12,8 @@ use super::{
     MailMarkReadResult, MailMessageBody, MailMoveResult, MailSendRequest, MailSendResult,
     MailSyncAllResult, MailTestConnectionResult, MessageBuildOptions, build_send_message_with,
     cached_to_body, extract_attachment, get_cached_body, list_cached_folders,
-    mark_cached_messages_read, now_ts, resolve_config, send_smtp_with, unread_cached_uids,
-    update_cached_flags, upsert_sent_contacts, with_mail_db,
+    mark_cached_messages_read, now_ts, resolve_config, unread_cached_uids, update_cached_flags,
+    upsert_sent_contacts, with_mail_db,
 };
 use crate::state::AppState;
 
@@ -337,14 +337,12 @@ pub(super) async fn send(
 ) -> Result<MailSendResult, String> {
     let account = resolve_config(state, config)?;
     let account_id = account.config.session_id.clone();
-    let handle = tokio::runtime::Handle::current();
     let request_for_task = request.clone();
-    let (mut result, copy) = tokio::task::spawn_blocking(move || {
+    let (envelope, mime, copy, account) = tokio::task::spawn_blocking(move || {
         let message_id = super::outgoing::new_message_id(&account.config.email_address);
-        let result = send_smtp_with(
+        let message = build_send_message_with(
             &account,
             &request_for_task,
-            &handle,
             &MessageBuildOptions {
                 message_id: Some(message_id.clone()),
                 ..MessageBuildOptions::default()
@@ -360,10 +358,23 @@ pub(super) async fn send(
             },
         )
         .map(|message| message.formatted());
-        Ok::<_, String>((result, copy))
+        Ok::<_, String>((
+            message.envelope().clone(),
+            message.formatted(),
+            copy,
+            account,
+        ))
     })
     .await
     .map_err(|e| format!("mail send task failed: {e}"))??;
+    let response =
+        super::module_host::send_smtp(state.plugins.clone(), &account, envelope, mime).await?;
+    let mut result = MailSendResult {
+        accepted: true,
+        response,
+        sent_copy_folder: None,
+        sent_copy_error: None,
+    };
     if result.accepted {
         match copy {
             Ok(bytes) => {

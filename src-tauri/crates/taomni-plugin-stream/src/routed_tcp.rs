@@ -52,6 +52,25 @@ impl Route {
         self.closed.clone()
     }
 
+    /// Offer a single authenticated read of bytes already held by the caller.
+    pub async fn offer_bytes(bytes: Vec<u8>) -> io::Result<(Self, Endpoint)> {
+        let mut bytes = Some(bytes);
+        Self::bind(move || {
+            std::future::ready(
+                bytes
+                    .take()
+                    .map(|bytes| {
+                        (
+                            transport::join(io::Cursor::new(bytes), transport::sink()),
+                            SocketAddr::from((Ipv4Addr::LOCALHOST, 0)),
+                        )
+                    })
+                    .ok_or_else(|| "The payload has already been read".to_owned()),
+            )
+        })
+        .await
+    }
+
     pub async fn bind<Stream, Dial, Opening>(mut dial: Dial) -> io::Result<(Self, Endpoint)>
     where
         Stream: AsyncRead + AsyncWrite + Unpin + Send + 'static,

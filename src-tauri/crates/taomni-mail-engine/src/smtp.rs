@@ -3,7 +3,7 @@
 #[cfg(feature = "routed-smtp")]
 mod routed;
 #[cfg(feature = "routed-smtp")]
-pub use routed::check_routed_connection;
+pub use routed::{check_routed_connection, send_routed_message};
 
 use std::time::Duration;
 

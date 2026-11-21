@@ -12,7 +12,8 @@ from .steps import StepError
 def run(ctx, phase):
     owner = ctx.fixture_context
     signed = getattr(owner, "signed_mail", None)
-    if phase not in {"idle", "folder-tree", "running", "disabled"} or not signed or owner.case_id != "TC-MODULES-059":
+    active = {"folder-tree", "running", "imap-delivery", "pop3-delivery"}
+    if phase not in active | {"idle", "disabled"} or not signed or owner.case_id != "TC-MODULES-059":
         raise StepError("The Mail host observation requires the registered signed native case")
     plugins = isolated_data_root(owner) / "plugins"
     receipt = signed["receipt"]
@@ -29,7 +30,7 @@ def run(ctx, phase):
         digest = hashlib.file_digest(binary, "sha256").hexdigest()
     if digest != receipt["hostSha256"]:
         raise StepError("The installed Mail host differs from the verified package")
-    observed = writer_lease(plugins, slug="mail", enabled=phase in {"folder-tree", "running"})
+    observed = writer_lease(plugins, slug="mail", enabled=phase in active)
     report = {"phase": phase, "sourceSha": receipt["sourceSha"], "platform": receipt["platform"],
               "packageSha256": receipt["sha256"], "hostSha256": digest, "writerLease": observed}
     (ctx.case_dir / f"signed-mail-{phase}.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

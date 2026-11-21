@@ -1,15 +1,15 @@
 id: TC-MODULES-059
-title: The signed Mail module lists and subscribes IMAP folders and tests incoming connections
+title: Signed Mail manages IMAP folders and sends from IMAP and POP3 accounts
 description: >-
   Install and enable the matching signed Mail package. Use the regular Mail
-  tab to populate the IMAP folder tree and unsubscribe Archive. Check the host's
-  module data lease before opening the tab, while displaying the folder tree,
-  after the normal IMAP, POP3 and SMTP connection tests, and after disable.
-covers: [F-Modules-1, F-MAIL-3, F-MAIL-11, F-MAIL-17]
+  tab to populate the IMAP folder tree, unsubscribe Archive, test connections
+  and send messages from IMAP and POP3 accounts. Check SMTP delivery, Sent
+  copies, and the signed host's data lease through disable.
+covers: [F-Modules-1, F-MAIL-3, F-MAIL-6, F-MAIL-11, F-MAIL-17]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
 fixtures: [reset_db, mail_server, module_signed_mail_archive]
-timeout_sec: 230
+timeout_sec: 310
 steps:
 - open: ${cfg.app.base_url}
 - seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
@@ -44,12 +44,32 @@ steps:
 - click: '[data-testid="mail-test-connection"]'
 - assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'IMAP ok, SMTP ok', timeout_sec: 45}
 - assert_signed_mail_host: running
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-compose-open"]'
+- fill: {selector: '[data-testid="mail-recipient-to"] input', value: receiver@example.com}
+- press: Enter
+- fill: {selector: '[data-testid="mail-compose-subject"]', value: Signed host IMAP delivery}
+- type: {selector: '[data-testid="mail-compose-editor"]', text: IMAP message from the signed Mail host}
+- click: '[data-testid="mail-compose-send"]'
+- wait_for: {selector: '[data-testid="mail-compose-dialog"]', state: detached}
+- mail_server_assert_smtp_contains: {text: Signed host IMAP delivery, timeout_sec: 20}
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-sent-copy-status"]', contains: copy saved to Sent, timeout_sec: 30}
+- assert_signed_mail_host: imap-delivery
 - fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_pop3_quick_connect}'}
 - click: '[data-testid="qc-submit"]'
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 2}
 - mail_server_assert_list_matches: {timeout_sec: 40}
-- click: '[data-testid="mail-test-connection"]'
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-test-connection"]'
 - assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'POP3 ok, SMTP ok', timeout_sec: 45}
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-compose-open"]'
+- fill: {selector: '[data-testid="mail-recipient-to"] input', value: receiver@example.com}
+- press: Enter
+- fill: {selector: '[data-testid="mail-compose-subject"]', value: Signed host POP3 delivery}
+- type: {selector: '[data-testid="mail-compose-editor"]', text: POP3 message from the signed Mail host}
+- click: '[data-testid="mail-compose-send"]'
+- wait_for: {selector: '[data-testid="mail-compose-dialog"]', state: detached}
+- mail_server_assert_smtp_contains: {text: Signed host POP3 delivery, timeout_sec: 20}
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-sent-copy-status"]', contains: copy saved to Sent, timeout_sec: 30}
+- assert_signed_mail_host: pop3-delivery
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
 - click: '[data-testid="module-action-disable-mail"]'
@@ -74,20 +94,31 @@ verification:
     results: [9, 12, 19, 20, 22, 24, 27, 29]
   - id: R2
     requirement: The normal connection controls test IMAP, POP3 and SMTP using the installed Mail host.
-    actions: [30, 31, 34, 35, 38]
+    actions: [30, 31, 44, 45, 48]
     checkpoints:
     - {step: 32, expectation: The hosted app reports working IMAP and SMTP connections.}
     - {step: 33, expectation: The signed Mail host still holds its data lease.}
-    - {step: 39, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
-    results: [32, 33, 39]
+    - {step: 49, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
+    results: [32, 33, 49]
   - id: R3
-    requirement: Disabling the module releases its data lease without restarting the desktop.
-    actions: [40, 41, 42]
+    requirement: The signature-verified package delivers from both account types and preserves the Sent-copy behavior.
+    actions: [34, 35, 36, 37, 38, 39, 50, 51, 52, 53, 54, 55]
     checkpoints:
-    - {step: 43, expectation: The disabled package can be re-enabled.}
-    - {step: 44, expectation: The verified module is still installed and the host released its writer lease.}
-    - {step: 45, expectation: The same renderer still runs without uncaught errors.}
-    results: [43, 44, 45]
+    - {step: 41, expectation: The SMTP server received the message sent from the IMAP account.}
+    - {step: 42, expectation: The IMAP Sent copy was stored.}
+    - {step: 43, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
+    - {step: 57, expectation: The SMTP server received the message sent from the POP3 account.}
+    - {step: 58, expectation: The POP3 copy was stored in local Sent.}
+    - {step: 59, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
+    results: [41, 42, 43, 57, 58, 59]
+  - id: R4
+    requirement: Disabling the module releases its data lease without restarting the desktop.
+    actions: [60, 61, 62]
+    checkpoints:
+    - {step: 63, expectation: The disabled package can be re-enabled.}
+    - {step: 64, expectation: The verified module is still installed and the host released its writer lease.}
+    - {step: 65, expectation: The same renderer still runs without uncaught errors.}
+    results: [63, 64, 65]
   visual:
   - check: The Mail pane shows the connection results for both accounts.
     method: automated

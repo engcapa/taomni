@@ -8,14 +8,16 @@ use std::{
     time::Duration,
 };
 
+use lettre::address::Envelope;
 use lettre::transport::smtp::{
     authentication::{Credentials, DEFAULT_MECHANISMS, Mechanism},
     client::{AsyncSmtpConnection, AsyncTokioStream},
     extension::ClientId,
+    response::Response,
 };
-use taomni_mail_api::OutgoingTest;
+use taomni_mail_api::{SMTP_DELIVERY_UNKNOWN, SmtpConnection, SmtpDelivery};
 use tokio::{
-    io::{AsyncRead, AsyncWrite, ReadBuf},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, ReadBuf},
     net::TcpStream,
 };
 use tokio_native_tls::{TlsConnector, TlsStream};
@@ -27,8 +29,68 @@ use crate::{
 
 pub async fn check_routed_connection(
     stream: TcpStream,
-    request: &OutgoingTest,
+    request: &SmtpConnection,
 ) -> Result<(), String> {
+    let mut client = connect(stream, request)
+        .await
+        .map_err(|error| format!("SMTP test failed: {error}"))?;
+    let connected = client.test_connected().await;
+    quit(&mut client).await;
+    if connected {
+        Ok(())
+    } else {
+        Err("SMTP test did not establish a connection".into())
+    }
+}
+
+pub async fn send_routed_message(request: SmtpDelivery) -> Result<Response, String> {
+    let envelope = Envelope::new(
+        request
+            .sender
+            .as_deref()
+            .map(str::parse)
+            .transpose()
+            .map_err(|error| format!("Invalid SMTP sender: {error}"))?,
+        request
+            .recipients
+            .iter()
+            .map(|recipient| recipient.parse())
+            .collect::<Result<_, _>>()
+            .map_err(|error| format!("Invalid SMTP recipient: {error}"))?,
+    )
+    .map_err(|error| error.to_string())?;
+    let (source, _) = request.mime_source.connect().await?;
+    let mut mime = Vec::new();
+    source
+        .take(request.mime_length.saturating_add(1))
+        .read_to_end(&mut mime)
+        .await
+        .map_err(|error| format!("Read outgoing mail: {error}"))?;
+    if mime.len() as u64 != request.mime_length {
+        return Err("Outgoing message length did not match the authorized MIME source".into());
+    }
+    let (stream, _) = request.connection.route.connect().await?;
+    let mut client = connect(stream, &request.connection)
+        .await
+        .map_err(|error| super::send_error(&error))?;
+    let result = client.send(&envelope, &mime).await.map_err(|error| {
+        if error.status().is_none() && !error.is_client() {
+            format!("{SMTP_DELIVERY_UNKNOWN}: {error}. Verify delivery before resending.")
+        } else {
+            super::send_error(&error.to_string())
+        }
+    });
+    // Bound the cleanup independently of the final DATA response.
+    if result.is_ok() {
+        quit(&mut client).await;
+    }
+    result
+}
+
+async fn connect(
+    stream: TcpStream,
+    request: &SmtpConnection,
+) -> Result<AsyncSmtpConnection, String> {
     let hello = ClientId::default();
     let trusted = request.trusted_certificate.as_deref();
     let transport: Box<dyn AsyncTokioStream> = match request.security {
@@ -37,17 +99,20 @@ pub async fn check_routed_connection(
             let secured = connector
                 .connect(&request.server_name, stream)
                 .await
-                .map_err(smtp_error)?;
+                .map_err(|error| error.to_string())?;
             Box::new(SmtpTlsStream(secured))
         }
         _ => Box::new(stream),
     };
     let mut client = AsyncSmtpConnection::connect_with_transport(transport, &hello)
         .await
-        .map_err(smtp_error)?;
+        .map_err(|error| error.to_string())?;
     if request.security == MailConnectionSecurity::Starttls {
         let tls = smtp_tls_parameters(&request.server_name, trusted)?;
-        client.starttls(tls, &hello).await.map_err(smtp_error)?;
+        client
+            .starttls(tls, &hello)
+            .await
+            .map_err(|error| error.to_string())?;
     }
     let mechanisms = match request.authentication {
         MailAuthMode::OAuth2 => &[Mechanism::Xoauth2],
@@ -59,18 +124,12 @@ pub async fn check_routed_connection(
             &Credentials::new(request.username.clone(), request.secret.to_string()),
         )
         .await
-        .map_err(smtp_error)?;
-    let connected = client.test_connected().await;
-    let _ = tokio::time::timeout(Duration::from_secs(1), client.quit()).await;
-    if connected {
-        Ok(())
-    } else {
-        Err("SMTP test did not establish a connection".into())
-    }
+        .map_err(|error| error.to_string())?;
+    Ok(client)
 }
 
-fn smtp_error(error: impl std::fmt::Display) -> String {
-    format!("SMTP test failed: {error}")
+async fn quit(client: &mut AsyncSmtpConnection) {
+    let _ = tokio::time::timeout(Duration::from_secs(1), client.quit()).await;
 }
 
 #[derive(Debug)]

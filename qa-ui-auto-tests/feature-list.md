@@ -7746,6 +7746,7 @@ controls:
 - 回复/全部回复发送 `In-Reply-To` 与 `References`（转发开启新会话），Thunderbird/Gmail 可将回复归入原会话；同步时缓存每封邮件的 `In-Reply-To`/`References`（schema v3）。
 - 列表“Threads”切换按邮件头严格线程化（不按主题猜测），会话折叠为最新一封并显示数量与未读数，展开后按回复层级缩进；开关按查看者保存在 localStorage。
 - SMTP 接受后立即反馈，Sent 副本结果通过独立提示显示；事件先于发送响应到达、或随后刷新邮箱，都不会覆盖副本结果。
+- 启用的 Mail 宿主负责 SMTP 发送。TC-MODULES-059 检查 IMAP 和 POP3 账号从正常写信入口发出邮件并保存各自的 Sent 副本。TC-MAIL-SEND-01 检查送达的主题和正文。
 - 发信成功后按账户设置把带 Bcc 的副本 APPEND 到 Sent（SPECIAL-USE 优先，找不到时按名称，缺失时创建）；Gmail/Outlook 默认不重复保存。副本失败不影响“已发送”，状态栏提示原因。
 - 手工保存草稿会把草稿 APPEND 到服务器 Drafts（`\Draft \Seen`，按 Message-ID 找回 UID 并替换旧副本）；发送或删除草稿时移除服务器副本；自动保存仍只写本地。
 
