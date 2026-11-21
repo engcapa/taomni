@@ -129,13 +129,18 @@ pub async fn rdp_connect(
     let reaper_cancel = session.cancel.clone();
     let reaper_sessions = state.legacy.remote_desktop.rdp_sessions.clone();
     let reaper_id = session_id.clone();
+    state
+        .legacy
+        .remote_desktop
+        .rdp_sessions
+        .write()
+        .await
+        .insert(session_id, session);
     tokio::spawn(async move {
         reaper_cancel.cancelled().await;
         reaper_sessions.write().await.remove(&reaper_id);
     });
 
-    let mut sessions = state.legacy.remote_desktop.rdp_sessions.write().await;
-    sessions.insert(session_id, session);
     Ok(result)
 }
 

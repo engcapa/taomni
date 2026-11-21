@@ -15,6 +15,7 @@ use crate::session::RdpSessionHandle;
 use crate::session::SessionOutput;
 use futures::SinkExt;
 use futures::StreamExt;
+use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -219,6 +220,44 @@ async fn late_controls_do_not_replace_the_connection_error_in_the_websocket() {
         .await
         .unwrap()
         .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn dropping_the_relay_owner_closes_an_unattached_rdp_transport() {
+    use crate::transport::{RdpConnector, RdpTransport};
+    use std::sync::Arc;
+
+    let (peer_tx, mut peer_rx) = mpsc::unbounded_channel();
+    let connect: RdpConnector = Arc::new(move || {
+        let (stream, peer) = tokio::io::duplex(2048);
+        peer_tx.send(peer).unwrap();
+        let local_addr = ([127, 0, 0, 1], 12345).into();
+        Box::pin(std::future::ready(Ok(RdpTransport::new(
+            stream, local_addr,
+        ))))
+    });
+    let relay = spawn_rdp_relay(RdpSpawnConfig {
+        host: "127.0.0.1".into(),
+        port: 3389,
+        username: None,
+        password: None,
+        options: RdpOptions::default(),
+        connect,
+    })
+    .await
+    .unwrap();
+    let mut peer = peer_rx.recv().await.unwrap();
+    tokio::time::timeout(Duration::from_secs(2), peer.read_u8())
+        .await
+        .expect("the relay starts RDP negotiation")
+        .unwrap();
+
+    drop(relay);
+    let mut buffered = Vec::new();
+    tokio::time::timeout(Duration::from_secs(2), peer.read_to_end(&mut buffered))
+        .await
+        .expect("dropping the owner closes the transport during negotiation")
         .unwrap();
 }
 

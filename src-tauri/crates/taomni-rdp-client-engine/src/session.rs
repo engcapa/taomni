@@ -124,6 +124,7 @@ enum ActiveOutputFlow {
 pub struct RdpSessionHandle {
     output: Arc<SessionOutputQueue>,
     active_frame: VecDeque<SessionOutput>,
+    worker: Option<tokio::task::JoinHandle<()>>,
     /// Sends control input from the relay into the session worker.
     ctrl_tx: UnboundedSender<RdpControl>,
 }

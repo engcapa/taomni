@@ -64,6 +64,12 @@ pub struct RdpSession {
     pub cancel: CancellationToken,
 }
 
+impl Drop for RdpSession {
+    fn drop(&mut self) {
+        self.cancel.cancel();
+    }
+}
+
 pub struct RdpSpawnConfig {
     pub host: String,
     pub port: u16,

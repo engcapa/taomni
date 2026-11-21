@@ -4,6 +4,7 @@
 
 - 合入 `main` 的 `44a9392d4`。深色 Markdown 选区和嵌套斜体修复沿用 main 的 TC-FILE-OPEN-045。分支的 Draw.io 旧资产用例改为 046，保留检查步骤。12 项 Markdown 单测、QA 审计及三端选集检查通过。 [合并提交](https://github.com/engcapa/taomni/commit/ce51d8820)
 - RDP 会话、图像解码、输入、剪贴板、驱动器和 WebSocket 中继已迁到 `taomni-rdp-client-engine`。桌面适配层提供首次连接和尺寸重连的路由，继续使用现有 Vault、证书确认、代理和 SSH 跳板。独立引擎 157 项单测通过，7 项外部目标测试保留为显式运行。TC-111 检查 Browser 重连后的画布，TC-RDPJ-01 增加原证书确认、NLA 和输入恢复。独立 RDP 宿主、签名前端和 GitHub 运行结果继续按 TASK-016 验收。
+- RDP 中继结束时现在回收握手任务和 WebSocket 读写任务。新增单测在握手进行中丢弃中继句柄，等待对端收到 EOF。独立引擎共 158 项单测通过，核心路由、证书表和现有 RDP 契约的定向单测共 15 项通过。
 - VNC 两轮 Browser 在 Linux、Windows、macOS 26 各通过 28/28。首轮 macOS Native 的 TC-MODULES-053 在签名安装、画面、输入和停用恢复后，因窗口操作菜单尚未展开停在分离步骤。用例现在先打开菜单再点击分离，保留后续独立窗口和回挂断言。首轮 Linux Native 在打包前遇到分离窗口单测缺少 `getLocale` mock，后续 `02362fff2` 已修复该 fixture。 [首轮分片](https://github.com/engcapa/taomni/actions/runs/44852430063) · [含旧会话接管和 Windows 辅助进程的复验](https://github.com/engcapa/taomni/actions/runs/44855178583)
 - RDP 客户端的 RD Gateway 和 TLS 校验迁入 `taomni-rdp-client-engine`。核心继续持有证书确认和指纹数据库。迁移保留配置序列化、错误文本、系统信任和显式 pin 校验。现有 TC-111、TC-RDPJ-01、TC-MODULES-030/031 继续覆盖入口、会话、真实端到端连接及升级保留，RD Gateway 的既有协议单测随新 crate 迁移。生产宿主和签名前端按 TASK-016 继续。
 - 再次拉取的 `origin/main` 为 `349dc9268`，当前分支已包含。`f04017cf0` 把 VNC 查看器、绘制和前端状态迁入模块，签名包携带独立 ESM。会话仍从 Sessions、Workspace 和分离窗口打开。TC-MODULES-053 核对实际签名路径、帧、禁用、恢复和分离回挂，TC-MODULES-054 核对开发预览。Linux、Windows、macOS 26 的六个 Browser 分片已在原生运行期间下载。 [VNC 三端复验](https://github.com/engcapa/taomni/actions/runs/44852430063)
@@ -487,7 +488,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-003 共享采集 | 引擎与私有 still 服务已集成 | 引擎/权限/像素/一次性采集已下沉，核心持有显示器、帧源和窗口生命周期；四目标库 check、真实 X11 与三端 SDK still 场景已有证据。真实 MFA facade 尚未调用新的私有入口；物理屏幕经宿主路径、macOS TCC 与 RDP 性能仍待验证。当前 matching UI/crash 继续收证。 |
 | TASK-004 RDP 公共库 | 已集成，公共库门已有证据 | `taomni-rdp-common` 与零依赖 `taomni-file-uri` 已被原调用方使用。`237e35f5f` 的 #43978893008 已取得四目标 check、三端 full/minimal unit/tree 与 Linux 原调用方单元；整轮其它失败保留，不称全 run 成功。精确保留 UI/剪贴板与发布性能仍按下方场景收口。 |
 | TASK-005 核心状态 | 005-A 已集成验证；005-B 待迁出 | CoreState/LegacyFeatureRuntime、统一 bootstrap、服务准入/Vault 协调、弱观察器与退出清理已有契约和 TC-MODULES-008/009 证据；业务状态和依赖尚在 LegacyFeatureRuntime，005-B 未完成。 |
-| TASK-006 核心依赖闭包 | 待开始 | Cargo 默认 features、bundle/resources、平台依赖与核心前端 chunk 真正移除已迁移业务。 |
+| TASK-006 核心依赖闭包 | VNC 已裁剪，其他模块继续 | 四个目标的默认 Cargo 树及 Vite 产物已排除 VNC 引擎、辅助程序和查看器。其余业务依赖、安装包资源和最终四目标回执待补。 [VNC 清单](https://github.com/engcapa/taomni/actions/runs/44853523906) |
 | TASK-007 前端注册和路由 | 运行时已有 native 证据；业务前端待迁出 | 主窗/分离窗真实动态 ESM、共享 SDK、owner 失效/取消、locator 恢复和篡改拒绝已接入，TC-MODULES-016/018 有 matching native 结果；十个业务前端与各独立入口的完整等价验证尚未完成。 |
 | TASK-008 宿主监督 | 生产 adapter 已接入，三端 37 项门通过 | 主动心跳、重启预算、取消/revoke、确认进程树退出、双向服务、profile 与 snapshot 已接入；最新产品源码 #44020928836 三端各 37/37。完整已安装发行包的强杀/下次清扫与业务资源仍按 G6/G11 验证。 |
 | TASK-009 生命周期 | 已验证签名模块无重启更新与回滚 | Linux、Windows、macOS Intel 的 TC-MODULES-042 通过，含禁用偏好、原数据、切换后真实宿主与握手失败恢复。各正式业务模块仍需核对其资源释放和数据。 [三端 #44287815253](https://github.com/engcapa/taomni/actions/runs/44287815253) |
@@ -497,7 +498,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-013 原型与 G 门 | hello/MFA 真宿主与签名包已有证据；G 门未闭合 | 三端实际进程、四目标签名包及三端正式安装门已有结果；G1/G3 系统实验、Linux noexec 已保留通过项与限制。完整安装包、hardened runtime/签名信任、性能、core-only 与真实升级仍有缺口，不能宣布 G1–G11 全过。 |
 | TASK-014 MFA | 签名安装门通过；已提交 profile 的业务接管待复验 | 独立 store actor、作用域 KeyProvider、snapshot、可信包安装已有三端结果。`76c3f94e9` 接入已提交 profile 的宿主命令和旧归档恢复。新装 profile 的模块入口、实际旧安装的升级触发、capture RPC、动态 UI、相关 G 门与迁出后三态还原待闭合。 |
 | TASK-015 | 已取消 | 历史设计 `7bc498b35` 中为 LanChat 迁移，已由用户明确删除决定取消；主设计已保留编号并清理前置依赖。旧库保持原位，不读取、迁移或删除，不创建替代插件。 |
-| TASK-016 RDP/VNC 客户端 | 待前置闭合 | 两个插件宿主与前端、证书钉扎、剪贴板/输入、保留会话及特定按键辅助入口。 |
+| TASK-016 RDP/VNC 客户端 | VNC 已拆宿主与前端，RDP 已拆引擎 | VNC 的签名宿主、查看器及 Windows 按键辅助程序已接线，三端实装复验进行中。RDP 继续接入独立宿主、证书迁移及签名前端。 |
 | TASK-017 RDP/VNC 服务端 | 待前置闭合 | 两个插件宿主、共享采集/公共库、系统权限和平台边界。 |
 | TASK-018 Servers | 待前置闭合 | 配置迁移、服务生命周期、目录与原有功能等价。 |
 | TASK-019 SocksCap | 待前置闭合 | 提权/驱动/辅助进程、文件与恢复日志、卸载清理迁出。 |

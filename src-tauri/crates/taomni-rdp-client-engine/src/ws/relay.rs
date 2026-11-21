@@ -23,6 +23,7 @@ use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::sync::mpsc::UnboundedSender;
+use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tungstenite::Message;
 use uuid::Uuid;
@@ -113,9 +114,10 @@ pub(super) async fn run_relay(
     let ws_stream = accept_authorized_ws(&listener, &ws_token, &cancel).await?;
     let (mut ws_sink, ws_reader) = ws_stream.split();
     let last_seen = std::sync::Arc::new(AsyncMutex::new(Instant::now()));
+    let mut workers = JoinSet::new();
 
     // Pump outgoing → WS sink.
-    let ws_write = tokio::spawn(async move {
+    workers.spawn(async move {
         let mut ping = tokio::time::interval(WS_PING_INTERVAL);
         ping.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         ping.tick().await;
@@ -148,7 +150,7 @@ pub(super) async fn run_relay(
     let last_seen_read = last_seen.clone();
     let cancel_read = cancel.clone();
     let ctrl = _control_tx.clone();
-    let ws_read = tokio::spawn(async move {
+    workers.spawn(async move {
         let mut reader = ws_reader;
         while let Some(Ok(msg)) = reader.next().await {
             if cancel_read.is_cancelled() {
@@ -209,7 +211,7 @@ pub(super) async fn run_relay(
 
     // Drive the session: forward display/status output to the WebSocket and
     // pass browser controls into IronRDP.
-    let session_drive = tokio::spawn({
+    workers.spawn({
         let cancel = cancel.clone();
         let ws_out_clone = ws_out_tx.clone();
         async move {
@@ -249,7 +251,7 @@ pub(super) async fn run_relay(
     // Idle watchdog.
     let watchdog_cancel = cancel.clone();
     let watchdog_last_seen = last_seen.clone();
-    let idle_watch = tokio::spawn(async move {
+    workers.spawn(async move {
         let mut ticker = tokio::time::interval(WS_IDLE_CHECK_INTERVAL);
         ticker.tick().await;
         loop {
@@ -271,11 +273,16 @@ pub(super) async fn run_relay(
     });
 
     tokio::select! {
-        r = ws_write => { if let Err(e) = r { tracing::error!("ws_write: {}", e); } }
-        r = ws_read => { if let Err(e) = r { tracing::error!("ws_read: {}", e); } }
-        r = session_drive => { if let Err(e) = r { tracing::error!("session_drive: {}", e); } }
-        r = idle_watch => { if let Err(e) = r { tracing::error!("idle_watch: {}", e); } }
+        finished = workers.join_next() => {
+            if let Some(Err(error)) = finished {
+                tracing::error!(%error, "RDP relay worker failed");
+            }
+        }
+        _ = cancel.cancelled() => {}
     }
     cancel.cancel();
+    // Release a producer waiting for space before stopping the socket pumps.
+    ws_out_tx.0.close();
+    workers.shutdown().await;
     Ok(())
 }

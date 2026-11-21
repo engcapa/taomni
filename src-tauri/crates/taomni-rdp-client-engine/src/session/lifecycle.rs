@@ -8,6 +8,7 @@ impl RdpSessionHandle {
             Self {
                 output: output.clone(),
                 active_frame: VecDeque::new(),
+                worker: None,
                 ctrl_tx,
             },
             SessionOutputSender(output),
@@ -48,16 +49,19 @@ impl RdpSessionHandle {
 impl Drop for RdpSessionHandle {
     fn drop(&mut self) {
         self.output.close();
+        if let Some(worker) = &self.worker {
+            worker.abort();
+        }
     }
 }
 
 pub fn start_ironrdp_session(cfg: RdpSessionConfig) -> RdpSessionHandle {
-    let (handle, out_tx, ctrl_rx) = RdpSessionHandle::new();
-    tokio::spawn(async move {
+    let (mut handle, out_tx, ctrl_rx) = RdpSessionHandle::new();
+    handle.worker = Some(tokio::spawn(async move {
         if let Err(e) = drive_ironrdp_session(cfg, out_tx.clone(), ctrl_rx).await {
             send_error(&out_tx, "rdp-session", &e);
         }
-    });
+    }));
     handle
 }
 
