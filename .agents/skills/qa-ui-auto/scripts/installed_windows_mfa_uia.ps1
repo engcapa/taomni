@@ -26,20 +26,28 @@ public static class OwnedDesktopClick {
 
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr window);
+    [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr window, uint flags);
     [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point point);
     [DllImport("user32.dll", SetLastError = true)] static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
 
     public static void Click(IntPtr window, int x, int y) {
-        SetForegroundWindow(window);
-        var point = new Point { X = x, Y = y };
-        if (GetForegroundWindow() != window || GetAncestor(WindowFromPoint(point), 2) != window)
-            throw new InvalidOperationException("The hit point is outside the owned application window");
-        if (!SetCursorPos(x, y)) throw new Win32Exception(Marshal.GetLastWin32Error());
-        mouse_event(2, 0, 0, 0, UIntPtr.Zero);
-        mouse_event(4, 0, 0, 0, UIntPtr.Zero);
+        var dpi = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        try {
+            SetForegroundWindow(window);
+            var point = new Point { X = x, Y = y };
+            if (GetAncestor(WindowFromPoint(point), 2) != window)
+                throw new InvalidOperationException("The hit point is outside the owned application window");
+            if (!SetCursorPos(x, y)) throw new Win32Exception(Marshal.GetLastWin32Error());
+            mouse_event(2, 0, 0, 0, UIntPtr.Zero);
+            mouse_event(4, 0, 0, 0, UIntPtr.Zero);
+        } finally {
+            if (dpi != IntPtr.Zero) SetThreadDpiAwarenessContext(dpi);
+        }
     }
+
+    public static bool IsForeground(IntPtr window) { return GetForegroundWindow() == window; }
 }
 '@
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -75,6 +83,13 @@ function Find-Control($Root, $Type, [string]$Name) {
     }
 }
 
+function Click-Element($Element) {
+    $rect = $Element.Current.BoundingRectangle
+    if ($rect.IsEmpty) { throw 'The owned control has no visible rectangle' }
+    [OwnedDesktopClick]::Click($windowHandle,
+        [int]($rect.X + $rect.Width / 2), [int]($rect.Y + $rect.Height / 2))
+}
+
 function Invoke-Button($Root, [string]$Name) {
     $button = Wait-Element { Find-Control $Root $types::Button $Name } $Name
     [object]$pattern = $null
@@ -82,14 +97,23 @@ function Invoke-Button($Root, [string]$Name) {
         $pattern.Invoke()
         return
     }
-    $rect = $button.Current.BoundingRectangle
-    if ($rect.IsEmpty) { throw 'The owned button has no visible rectangle' }
-    [OwnedDesktopClick]::Click([IntPtr]$Root.Current.NativeWindowHandle,
-        [int]($rect.X + $rect.Width / 2), [int]($rect.Y + $rect.Height / 2))
+    Click-Element $button
 }
 
 function Set-Value($Element, [string]$Value) {
-    $Element.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($Value)
+    [object]$pattern = $null
+    if ($Element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) {
+        $pattern.SetValue($Value)
+        return
+    }
+    Click-Element $Element
+    if (-not [OwnedDesktopClick]::IsForeground($windowHandle)) { throw 'The owned text control did not receive foreground focus' }
+    [System.Windows.Forms.Clipboard]::SetText($Value)
+    try {
+        [System.Windows.Forms.SendKeys]::SendWait('^a^v')
+    } finally {
+        [System.Windows.Forms.Clipboard]::Clear()
+    }
 }
 
 function Find-Passwords([int]$Count) {
@@ -110,13 +134,14 @@ function Read-Code([string]$Expected) {
     } "HOTP clipboard value $Expected"
 }
 
-$window = Wait-Element {
+$windowHandle = Wait-Element {
     $process = Get-Process -Id $OwnerId
     if ($process.MainWindowHandle -ne [IntPtr]::Zero) {
         $element = $automation::FromHandle($process.MainWindowHandle)
-        if ($element.Current.ProcessId -eq $OwnerId) { return $element }
+        if ($element.Current.ProcessId -eq $OwnerId) { return $process.MainWindowHandle }
     }
 } 'the owned top-level window'
+$window = $automation::FromHandle($windowHandle)
 
 if ($Phase -ne 'seed') {
     $fields = Wait-Element { Find-Passwords 1 } 'the vault unlock field'
