@@ -111,16 +111,22 @@ function Find-ToolsMfa {
 }
 
 function Find-ToolsRail {
-    $sessions = Find-Control $window $types::Button 'Sessions'
-    if ($null -eq $sessions) { return }
-    $anchor = $sessions.Current.BoundingRectangle
+    $anchors = @('File Explorer', 'Sessions' | ForEach-Object {
+        $control = Find-Control $window $types::Button $_
+        if ($null -ne $control) { $control.Current.BoundingRectangle }
+    })
     Find-Control $window $types::Button 'Tools' {
         param($candidate)
         $row = $candidate.Current.BoundingRectangle
-        return (-not $row.IsEmpty -and -not $anchor.IsEmpty -and
-            [Math]::Abs($row.Left - $anchor.Left) -lt 2 -and
-            [Math]::Abs($row.Right - $anchor.Right) -lt 2 -and
-            $row.Top -ge $anchor.Bottom -and $row.Top -lt $anchor.Bottom + 12)
+        foreach ($anchor in $anchors) {
+            if (-not $row.IsEmpty -and -not $anchor.IsEmpty -and
+                [Math]::Abs($row.Left - $anchor.Left) -lt 2 -and
+                [Math]::Abs($row.Right - $anchor.Right) -lt 2 -and
+                $row.Top -ge $anchor.Bottom -and $row.Top -lt $anchor.Bottom + 12) {
+                return $true
+            }
+        }
+        return $false
     }
 }
 

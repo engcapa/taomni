@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- 同一 `617bce843` 候选的 Linux deb 通过 MFA 安装、回退、重装、GUI 与 headless 双向互斥及强退回收。deb、RPM 和 AppImage 都通过 `noexec` 恢复并校验 15 份 profile 输入。macOS ARM64 DMG 也通过安装回退、双向互斥和 MFA 强退恢复。Windows MSI 通过安装回退和互斥，强退前的旧版 MFA 造数因 File Explorer 插入导航栏而找不到 Tools 按钮。已修正 UI Automation 定位并保留原持续运行和进程回收断言。 [Linux](https://github.com/engcapa/taomni/actions/runs/44958085653) · [Windows 与 macOS ARM64](https://github.com/engcapa/taomni/actions/runs/44958965056)
 - Local servers 0.1.1 的源码 `66d0b58f9` 已进入三端 Browser、Native 与完整崩溃回归。验证覆盖签名模块的 HTTP、SSH/SFTP、备份与停用，以及旧服务器预检、SSH 凭据界面和终端 PTY。 [三端回归](https://github.com/engcapa/taomni/actions/runs/44957237883)
 - 候选 `0.6.0` Linux deb 完成签名 MFA 的升级、回退和重装。G11 的反向桌面竞争进程只收到测试数据路径，缺少 Xvfb 的显示和认证变量，退出码为 101。已修正测试环境并保留退出码、占用提示、监听端点和原进程存活的断言。 [原始升级回执](https://github.com/engcapa/taomni/actions/runs/44956421239)
 - Local servers 0.1.1 接管原 `server_configs` 中的八类本地服务配置。原 SSH 和 FTP 密码在首次保存时进入专用 Vault 凭据。原库和 SSH 主机身份保留供旧版回滚。正式基座移出 Local servers 引擎，隔离 QA 保留旧路径用于回归。TC-MODULES-066 覆盖真实 HTTP、SSH/SFTP、运行中备份和停用。
