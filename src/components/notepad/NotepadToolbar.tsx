@@ -34,6 +34,7 @@ function NotepadToolButton({
   toggle = false,
   recording = false,
   hasRecordedBuffer,
+  disabled = false,
   onCommand,
   children,
 }: {
@@ -45,6 +46,7 @@ function NotepadToolButton({
   toggle?: boolean;
   recording?: boolean;
   hasRecordedBuffer?: boolean;
+  disabled?: boolean;
   onCommand: (commandId: string) => void;
   children: ReactNode;
 }) {
@@ -57,6 +59,7 @@ function NotepadToolButton({
       data-active={pressed ? "true" : undefined}
       data-has-buffer={hasRecordedBuffer === undefined ? undefined : hasRecordedBuffer ? "true" : "false"}
       aria-pressed={toggle ? pressed : undefined}
+      disabled={disabled}
       title={title}
       onClick={() => onCommand(command)}
     >
@@ -72,6 +75,9 @@ function NotepadToolButton({
 }
 
 export function NotepadToolbar({
+  dirty,
+  readOnly,
+  saving,
   wrap,
   allSymbols,
   split,
@@ -92,6 +98,7 @@ export function NotepadToolbar({
   recordingMacro: boolean;
   syncScroll?: boolean;
   hasRecordedBuffer?: boolean;
+  disabled?: boolean;
   onCommand: (commandId: string) => void;
 }) {
   const label = useViewerLabels();
@@ -105,7 +112,13 @@ export function NotepadToolbar({
       <NotepadToolButton testId="notepad-tool-open" title={label("打开", "Open")} command="file.open" onCommand={onCommand}>
         <FolderOpen size={15} />
       </NotepadToolButton>
-      <NotepadToolButton testId="viewer-save" title={label("保存", "Save")} command="file.save" onCommand={onCommand}>
+      <NotepadToolButton
+        testId="viewer-save"
+        title={label("保存", "Save")}
+        command="file.save"
+        disabled={!dirty || readOnly || saving}
+        onCommand={onCommand}
+      >
         <Save size={15} />
       </NotepadToolButton>
       <NotepadToolButton

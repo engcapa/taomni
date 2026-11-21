@@ -7,7 +7,7 @@ import {
   viewerTextForDisk, viewerWriteText, type ViewerDocument, type ViewerEol, type ViewerTextData, type ViewerWriteAck,
 } from "../lib/viewer";
 import { readViewerDrafts, writeViewerDrafts } from "./viewerDrafts";
-import { notepadBackupList, notepadBackupRead } from "../lib/notepad/ipc";
+import { notepadBackupList, notepadBackupPrune, notepadBackupRead } from "../lib/notepad/ipc";
 import { useNotepadStore } from "./notepadStore";
 
 export interface ViewerCloseRequest { paths: string[]; proceed: () => void; cancel?: () => void }
@@ -354,6 +354,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
       update(path, (document) => ({ ...document, content: document.savedContent, encoding: document.savedEncoding,
         eol: document.savedEol, bom: document.savedBom, dirty: false, error: undefined, revision: document.revision + 1 }));
       get().flushDrafts();
+      // A discarded unsaved buffer must not be resurrected from the Notepad disk
+      // backup on the next open (AC-02 discard semantics).
+      void notepadBackupPrune(documentPathKey(path)).catch(() => {});
     },
     async readChunk(path, offset) {
       const current = get().documents[documentPathKey(path)];
@@ -379,6 +382,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
       checking.delete(key);
       const current = get().documents[key];
       if (current?.readOnlyReason) void viewerReleaseTemp(path).catch(() => {});
+      // Closing a clean document removes its recovery snapshot so a later
+      // external change cannot be shadowed by stale backup content.
+      if (current && !current.dirty) void notepadBackupPrune(key).catch(() => {});
       set((state) => { const documents = { ...state.documents }; delete documents[key]; return { documents }; });
     },
     flushDrafts() {
