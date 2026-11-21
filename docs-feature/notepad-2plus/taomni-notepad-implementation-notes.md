@@ -82,11 +82,39 @@
 
 ### 4.2 浏览器 QA（本机）
 
-用例：`qa-ui-auto-tests/cases/TC-NP-*`（F-NOTEPAD-1～4），执行与结果见 QA 报告与 CI 记录。当前状态：见 §5。
+用例：`qa-ui-auto-tests/cases/TC-NP-001..005`（F-NOTEPAD-1～4），全部在真实渲染器上执行：
 
-### 4.3 GitHub 托管 CI（qa-ui-auto-platforms）
+```bash
+python -m qa_ui_auto run --mode browser --filter TC-NP-001,TC-NP-002,TC-NP-003,TC-NP-004,TC-NP-005   --require-pass --workers 2   --config .agents/skills/qa-ui-auto/assets/qa-ui-auto.config.browser.yaml   --report-dir qa-ui-auto-report/browser
+```
 
-Windows / macOS / Linux 的 browser + native 由 `.github/workflows/qa-ui-auto-platforms.yml` 按选定 case ID 执行；结果与 shard 证据链接记录在 PR/checkpoint 提交说明中。未执行的平台保持“未验证”。
+结果：5 passed / 0 failed / 0 skipped。证据目录 `qa-ui-auto-report/browser/run-20261122-004206-322632473/`（summary.json、runner_receipt.json、每用例截图、空 runtime-errors）。
+
+### 4.3 Linux native QA（隔离会话）
+
+`TC-NP-101`/`TC-NP-102` 使用真实宿主目录（`file_open_files` fixture）验证真实磁盘写入、外部变更冲突、另存为/保存副本路径语义。本机执行方式：
+
+```bash
+# 独立 X11 会话 + 独立 D-Bus + 私有 XDG 目录，与 :0 桌面隔离
+Xvfb :137 -screen 0 1600x1000x24 & DISPLAY=:137 openbox &
+dbus-run-session -- bash -c 'export DISPLAY=:137 \
+  XDG_DATA_HOME=qa-ui-auto-report/_local/native-session/data \
+  XDG_CONFIG_HOME=qa-ui-auto-report/_local/native-session/config \
+  XDG_CACHE_HOME=qa-ui-auto-report/_local/native-session/cache; \
+  python -m qa_ui_auto run --mode native --filter TC-NP-101,TC-NP-102'
+```
+
+结果：两个用例均 1 passed；QA 二进制身份记录 `src-tauri/target/qa-ui-auto/debug/taomni.qa-identity.json`。
+
+### 4.4 GitHub 托管 CI（qa-ui-auto-platforms）
+
+```bash
+gh workflow run qa-ui-auto-platforms.yml --ref feat/notepad-2plus-impl \
+  -f scope=selected -f platforms=linux,windows,macos -f modes=browser,native \
+  -f case_ids=TC-NP-001,TC-NP-002,TC-NP-003,TC-NP-004,TC-NP-005,TC-NP-101,TC-NP-102
+```
+
+selected scope 会自动并入 `crash-regression` 标签用例（AGENTS.md 要求），shard 结果按运行页面与产物归档；与本次改动无关的既有失败单独记录、不混入 Notepad 结论。未执行平台保持“未验证”。
 
 ### 4.4 Linux 真机（Xvfb 隔离会话）
 
