@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import runpy
 import shutil
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -53,11 +54,26 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
         guard = next(step["run"] for step in workflow["jobs"]["sign"]["steps"]
                      if step.get("name", "").startswith("Restrict QA signing"))
         source = guard.split("\n", 1)[1].rsplit("\nPY", 1)[0]
-        with chdir(root), patch.dict(os.environ, {
+        scripts = root / "scripts"
+        scripts.mkdir(exist_ok=True)
+        shutil.copyfile(ROOT / "scripts/local_voice_runtime.py", scripts / "local_voice_runtime.py")
+        with chdir(root), patch.object(sys, "path", list(sys.path)), patch.dict(os.environ, {
             "QA_MODULE": module, "MODULE_PLATFORM": platform, "MODULE_SOURCE_SHA": "a" * 40,
             "MODULE_LEGACY_ROSTER": legacy_roster,
         }):
             exec(compile(source, "trusted-workflow-payload-guard", "exec"), {})
+
+    def test_local_voice_requires_its_windows_runtime_in_the_signed_payload(self):
+        runtime = runpy.run_path(str(ROOT / "scripts/local_voice_runtime.py"))["WINDOWS_RUNTIME"]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = self.seed(root, "ai-voice-local", "windows-x86_64")
+            for name in runtime:
+                (payload / name).write_bytes(b"inert runtime library")
+            self.guard(root, "ai-voice-local", "windows-x86_64")
+            (payload / runtime[0]).unlink()
+            with self.assertRaisesRegex(ValueError, "Missing Local Voice runtime library"):
+                self.guard(root, "ai-voice-local", "windows-x86_64")
 
     def test_hello_and_host_only_mfa_match_trusted_contract_on_four_targets(self):
         for module in ["hello-plugin", "mfa"]:
