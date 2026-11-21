@@ -3,7 +3,6 @@ use anyhow::Context;
 use image::RgbaImage;
 use std::io::BufWriter;
 use std::io::Write;
-use std::path::Path;
 
 // ---------------------------------------------------------------------------
 // GIF
@@ -20,15 +19,14 @@ pub(super) struct GifSink {
 }
 
 impl GifSink {
-    pub(super) fn create(path: &Path) -> anyhow::Result<Self> {
-        let file = std::fs::File::create(path).context("create gif file")?;
-        Ok(Self {
+    pub(super) fn new(file: std::fs::File) -> Self {
+        Self {
             file: Some(BufWriter::new(file)),
             encoder: None,
             dims: (0, 0),
             frames: 0,
             written_cs: 0,
-        })
+        }
     }
 }
 

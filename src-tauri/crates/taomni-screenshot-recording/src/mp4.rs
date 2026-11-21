@@ -1,18 +1,17 @@
 use super::encoding::FrameSink;
 use anyhow::Context;
 use image::RgbaImage;
+use std::fs::File;
 use std::io::BufWriter;
 use std::io::Seek;
 use std::io::Write;
-use std::path::Path;
-use std::path::PathBuf;
 
 // ---------------------------------------------------------------------------
 // MP4 (H.264 via OpenH264, muxed with the `mp4` crate)
 // ---------------------------------------------------------------------------
 
 pub(super) struct Mp4Sink {
-    pub(super) path: PathBuf,
+    pub(super) file: Option<File>,
     pub(super) fps: u32,
     pub(super) encoder: Option<openh264::encoder::Encoder>,
     pub(super) writer: Option<mp4::Mp4Writer<BufWriter<std::fs::File>>>,
@@ -21,7 +20,7 @@ pub(super) struct Mp4Sink {
 }
 
 /// NAL units of an Annex-B bitstream (start codes removed).
-pub(crate) fn annex_b_nals(data: &[u8]) -> Vec<&[u8]> {
+pub fn annex_b_nals(data: &[u8]) -> Vec<&[u8]> {
     let mut starts = Vec::new();
     let mut i = 0;
     while i + 3 <= data.len() {
@@ -47,15 +46,15 @@ pub(crate) fn annex_b_nals(data: &[u8]) -> Vec<&[u8]> {
 }
 
 impl Mp4Sink {
-    pub(super) fn create(path: &Path, fps: u32) -> anyhow::Result<Self> {
-        Ok(Self {
-            path: path.to_path_buf(),
+    pub(super) fn new(file: File, fps: u32) -> Self {
+        Self {
+            file: Some(file),
             fps,
             encoder: None,
             writer: None,
             dims: (0, 0),
             frames: 0,
-        })
+        }
     }
 
     pub(super) fn make_encoder(
@@ -125,7 +124,7 @@ impl FrameSink for Mp4Sink {
             let (Some(sps), Some(pps)) = (sps, pps) else {
                 anyhow::bail!("H.264 encoder did not emit SPS/PPS with the first frame");
             };
-            let file = std::fs::File::create(&self.path).context("create mp4 file")?;
+            let file = self.file.take().context("MP4 output already opened")?;
             let config = mp4::Mp4Config {
                 major_brand: "isom".parse().expect("fourcc"),
                 minor_version: 512,

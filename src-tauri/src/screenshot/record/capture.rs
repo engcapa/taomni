@@ -1,6 +1,4 @@
 use super::frames::FrameQueue;
-use super::frames::TimedFrame;
-use super::model::RecordFormat;
 use crate::screenshot::capture::DisplayInfo;
 use crate::screenshot::capture::FrameSource;
 use anyhow::Context;
@@ -10,6 +8,7 @@ use std::sync::mpsc::SyncSender;
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
+use taomni_screenshot_recording::{RecordFormat, TimedFrame};
 use tauri::AppHandle;
 
 /// Output size for a region: even (H.264 4:2:0) and width-capped.

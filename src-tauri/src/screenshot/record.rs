@@ -12,19 +12,11 @@
 
 mod lifetime;
 
-mod model;
-
 mod frames;
 
 mod capture;
 
-mod encoding;
-
-mod gif;
-
-mod mp4;
-
-mod inspection;
+mod module_encoder;
 
 #[cfg(test)]
 mod tests;
@@ -37,11 +29,8 @@ pub use lifetime::{
 pub(crate) use lifetime::output_path;
 
 pub(super) use lifetime::{Recording, take_for_recovery};
+pub(super) use module_encoder::available as module_recording_available;
 
-pub use model::{RecordFormat, RecordingInfo};
+pub use taomni_screenshot_recording::{ClipInfo, RecordFormat, RecordingInfo, inspect_clip};
 
-pub(crate) use mp4::annex_b_nals;
-
-pub use inspection::{ClipInfo, inspect_clip};
-
-pub(crate) use inspection::inspect_clip_frames;
+pub(crate) use taomni_screenshot_recording::inspect_clip_frames;

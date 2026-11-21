@@ -1,4 +1,4 @@
-//! OCR and redaction in the official screenshot module process.
+//! OCR, redaction and recording in the official screenshot module process.
 
 use std::{io, sync::Arc, time::Duration};
 
@@ -8,10 +8,12 @@ use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_plugin_sdk::{HostConfig, Operation, PluginHandler};
 use taomni_screenshot_api::{
     CLASSIFY_TSV, COMMANDS, MAX_IMAGE_BYTES, OcrAvailability, OcrInput, PROBE_OCR, RECOGNIZE,
-    REDACT, RedactResult,
+    REDACT, RedactResult, START_RECORDING,
 };
 use taomni_screenshot_ocr::{engine_name, find_sensitive, install_hint, ocr_image, redact_tsv};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+mod recording;
 
 pub fn serve_stdio() -> io::Result<()> {
     let config = HostConfig {
@@ -29,11 +31,17 @@ pub fn serve_stdio() -> io::Result<()> {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()?;
-        Ok(Arc::new(Host(runtime)))
+        Ok(Arc::new(Host {
+            runtime,
+            recording: recording::Recorder::default(),
+        }))
     })
 }
 
-struct Host(tokio::runtime::Runtime);
+struct Host {
+    runtime: tokio::runtime::Runtime,
+    recording: recording::Recorder,
+}
 
 impl PluginHandler for Host {
     fn invoke(
@@ -54,6 +62,10 @@ impl PluginHandler for Host {
             CLASSIFY_TSV => {
                 let tsv: String = decode(params)?;
                 result(redact_tsv(&tsv).map_err(failed)?)
+            }
+            START_RECORDING => {
+                self.recording.start(&self.runtime, decode(params)?)?;
+                Ok(Value::Null)
             }
             RECOGNIZE | REDACT => {
                 let input = decode(params)?;
@@ -98,7 +110,7 @@ impl Host {
         let output = file
             .reopen()
             .map_err(|error| failed(format!("Open OCR image: {error}")))?;
-        self.0.block_on(async {
+        self.runtime.block_on(async {
             let mut output = tokio::fs::File::from_std(output);
             let transfer = async {
                 let (stream, _) = input.source.connect().await.map_err(failed)?;

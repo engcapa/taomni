@@ -98,6 +98,7 @@ cases:
 - TC-MODULES-059
 - TC-MODULES-060
 - TC-MODULES-061
+- TC-MODULES-062
 - TC-BACKUP-RESTORE-001
 - TC-WS-GIT-CLONE-01-defaults-proxy-and-clone-browser
 - TC-WS-GIT-CLONE-02-background-close-cancel-retry-browser

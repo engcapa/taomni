@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- Screenshot 0.1.1 的签名宿主接管 GIF 和 MP4 编码。核心通过授权连接传送带时间戳的帧，收齐文件后再发布到预览路径。TC-MODULES-062 在同一宿主连续录制两种格式，核对解码内容、时间戳、预览和停用清理。录制 UI、采集和用户保存路径仍由核心协调。未安装该模块的配置暂用原编码器，正式依赖裁剪仍待完成。
+- `2168325e4` 的 Mail 草稿轮次已在运行期间收齐 18 个分片。三个平台的 Browser 各 28/28，Native 各 32/32，包含完整崩溃回归和 macOS 文件面板复验。源码、选集和回执留在 `qa-ui-auto-report/github/44925531406/live-shards/`。 [三端回执](https://github.com/engcapa/taomni/actions/runs/44925531406)
 - Screenshot OCR 的签名宿主接管文字识别和自动遮挡。核心授予单次图片读取，并持有采集和截图窗口。TC-MODULES-061 核对宿主摘要、实际识别、剪贴板像素和停用后的写租约，TC-SHOT-021 核对 Browser 的裁剪、遮挡与复制。兼容路径仍为未安装过该模块的配置提供原 OCR，录制和核心依赖裁剪继续按 TASK-020 验收。
 - `2168325e4` 的 Mail 0.1.16 草稿协议在 Linux、Windows、macOS ARM64 通过，三端 Browser 各通过 28/28。各平台的源码、宿主摘要和原始日志位于 `qa-ui-auto-report/github/44926627778/live-contracts/modular-protocol-*/`。Native 在执行期间逐片核对。 [真实宿主](https://github.com/engcapa/taomni/actions/runs/44926627778) · [三端应用](https://github.com/engcapa/taomni/actions/runs/44925531406)
 - Mail 0.1.15 的签名宿主协议在 Linux、Windows 和 macOS ARM64 均通过，核对了所选远端 Sent 文件夹、原始 MIME 字节和单次 APPEND。对应三个 Browser 平台各通过 28/28，其中 TC-MAIL-SEND-01 均通过。 [宿主协议](https://github.com/engcapa/taomni/actions/runs/44923460860) · [应用分片](https://github.com/engcapa/taomni/actions/runs/44922422361)

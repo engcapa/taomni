@@ -1,9 +1,5 @@
 use super::capture::output_dims;
-use super::encoding::encode_loop;
 use super::frames::FrameQueue;
-use super::frames::TimedFrame;
-use super::inspection::inspect_clip;
-use super::inspection::inspect_clip_frames;
 use super::lifetime::Recording;
 use super::lifetime::RecordingLease;
 use super::lifetime::Session;
@@ -13,9 +9,6 @@ use super::lifetime::nano_id;
 use super::lifetime::sessions;
 use super::lifetime::stop_recording;
 use super::lifetime::take_for_recovery;
-use super::model::RecordFormat;
-use super::model::RecordingInfo;
-use super::mp4::annex_b_nals;
 use crate::screenshot::capture::temp_artifact_path;
 use image::RgbaImage;
 use std::path::PathBuf;
@@ -24,6 +17,10 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::sync_channel;
 use std::thread;
+use taomni_screenshot_recording::{
+    RecordFormat, RecordingInfo, TimedFrame, annex_b_nals, encode_loop, inspect_clip,
+    inspect_clip_frames,
+};
 
 static RECORDING_TEST_LOCK: Mutex<()> = Mutex::new(());
 

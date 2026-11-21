@@ -1,11 +1,9 @@
-use super::capture::capture_loop;
-use super::encoding::encode_loop;
+use super::capture::{capture_loop, output_dims};
 use super::frames::FRAME_QUEUE;
-use super::frames::TimedFrame;
-use super::model::RecordFormat;
-use super::model::RecordingInfo;
+use super::module_encoder;
 use crate::screenshot::capture::DisplayInfo;
 use crate::screenshot::capture::temp_artifact_path;
+use crate::state::AppState;
 use anyhow::Context;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -18,8 +16,10 @@ use std::sync::mpsc::sync_channel;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use taomni_screenshot_recording::{RecordFormat, RecordingInfo, TimedFrame, encode_loop};
 use tauri::AppHandle;
 use tauri::Emitter;
+use tauri::Manager;
 
 /// Event emitted when a recording ends on its own (time limit or failure).
 pub const RECORDING_ENDED_EVENT: &str = "screenshot://recording-ended";
@@ -144,6 +144,11 @@ pub fn start_recording(
         anyhow::bail!("recording region must be at least 2x2 pixels");
     }
     let lease = RecordingLease::acquire()?;
+    let plugins = app.state::<AppState>().plugins.clone();
+    let size = output_dims(region.2, region.3, format.max_width());
+    let module = module_encoder::selected(&plugins)?
+        .then(|| module_encoder::connect(&plugins, format, fps, size))
+        .transpose()?;
     let id = format!("rec-{}", nano_id());
     let output_path = temp_artifact_path("rec", format.extension())?;
     let stop = Arc::new(AtomicBool::new(false));
@@ -154,7 +159,13 @@ pub fn start_recording(
         let path = output_path.clone();
         thread::Builder::new()
             .name("screenshot-record-encode".into())
-            .spawn(move || encode_loop(rx, format, fps, &path))
+            .spawn(move || {
+                if let Some(module) = module {
+                    module_encoder::encode(module, rx, format, size, &path)
+                } else {
+                    encode_loop(rx, format, fps, &path)
+                }
+            })
             .context("spawn encoder thread")?
     };
     let capture = {

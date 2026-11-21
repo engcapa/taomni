@@ -3,12 +3,16 @@
 use serde::{Deserialize, Serialize};
 use taomni_plugin_stream::routed_tcp::Endpoint;
 
+mod recording;
+pub use recording::{FrameHeader, MAX_CLIP_BYTES, RecordStart};
+
 pub const SLUG: &str = "screenshot";
 pub const PROBE_OCR: &str = "screenshot/probe-ocr";
 pub const RECOGNIZE: &str = "screenshot/recognize";
 pub const REDACT: &str = "screenshot/redact";
 pub const CLASSIFY_TSV: &str = "screenshot/classify-tsv";
-pub const COMMANDS: [&str; 4] = [PROBE_OCR, RECOGNIZE, REDACT, CLASSIFY_TSV];
+pub const START_RECORDING: &str = "screenshot/start-recording";
+pub const COMMANDS: [&str; 5] = [PROBE_OCR, RECOGNIZE, REDACT, CLASSIFY_TSV, START_RECORDING];
 pub const MAX_IMAGE_BYTES: u64 = 256 * 1024 * 1024;
 
 #[derive(Serialize, Deserialize)]

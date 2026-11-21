@@ -33,6 +33,7 @@ members = [
     "crates/taomni-redirector",
     "crates/taomni-screenshot-api",
     "crates/taomni-screenshot-ocr",
+    "crates/taomni-screenshot-recording",
     "crates/taomni-sqlite-snapshot",
     "crates/taomni-vnc-api",
     "crates/taomni-vnc-engine",
@@ -93,6 +94,7 @@ taomni-sqlite-snapshot = { path = "crates/taomni-sqlite-snapshot" }
 taomni-capture = { path = "crates/taomni-capture" }
 taomni-screenshot-api = { path = "crates/taomni-screenshot-api" }
 taomni-screenshot-ocr = { path = "crates/taomni-screenshot-ocr" }
+taomni-screenshot-recording = { path = "crates/taomni-screenshot-recording" }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-rdp-client-api = { path = "crates/taomni-rdp-client-api" }
 taomni-rdp-client-engine = { path = "crates/taomni-rdp-client-engine", optional = true }
@@ -222,9 +224,6 @@ keyring = "4"
 keyring-core = "1"
 cpal = { version = "0.17", optional = true }
 whisper-rs = { version = "0.16", optional = true }
-# Also the screenshot tool's MP4 encoder (always on): built from source,
-# assembly is optional (nasm is used when present).
-openh264 = "0.9"
 ash = { version = "0.38", optional = true }
 llama-cpp-2 = { version = "0.1", optional = true }
 plist = "1.9"
@@ -267,9 +266,8 @@ socket2 = { version = "0.6", features = ["all"] }
 tauri-plugin-notification = "2.4.0"
 xcap = { version = "0.9.6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
-# Screenshot tool recording: GIF encoder and MP4 (ISO BMFF) muxer.
+# Clipboard export can copy the first frame of a GIF.
 gif = "0.13"
-mp4 = "0.14"
 tauri-plugin-dialog = "2.7.3"
 # Keep the existing screenshot hotkey plugin while updating the window runtime.
 tauri-plugin-global-shortcut = "=2.3.2"

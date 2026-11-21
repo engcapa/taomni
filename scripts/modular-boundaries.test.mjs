@@ -8,14 +8,16 @@ import { modularBoundaryViolations } from "./modular-boundaries.mjs";
 function fixture(t, manifest = "") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "taomni-capture-boundary-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const shared = ["taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api",
+    "taomni-rdp-client-engine", "taomni-mail-engine", "taomni-mfa-engine", "taomni-vnc-api",
+    "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector", "taomni-screenshot-api",
+    "taomni-screenshot-ocr", "taomni-screenshot-recording"];
   for (const child of ["src/screenshot", "src/mfa", "src/mobile", "src/servers", "src/config",
-    "crates/taomni-capture/src", "crates/taomni-file-uri/src", "crates/taomni-rdp-common/src", "crates/taomni-rdp-client-engine/src",
-    "crates/taomni-mail-engine/src", "crates/taomni-mfa-engine/src",
-    "crates/taomni-rdp-client-api/src", "crates/taomni-vnc-api/src", "crates/taomni-vnc-engine/src", "crates/taomni-vnc-key-protocol/src", "crates/taomni-redirector/src"]) {
+    "crates/taomni-capture/src", ...shared.map(name => `crates/${name}/src`)]) {
     fs.mkdirSync(path.join(root, "src-tauri", child), { recursive: true });
   }
   fs.writeFileSync(path.join(root, "src-tauri/crates/taomni-capture/Cargo.toml"), manifest);
-  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api", "taomni-rdp-client-engine", "taomni-mail-engine", "taomni-mfa-engine", "taomni-vnc-api", "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector"]) {
+  for (const name of shared) {
     fs.writeFileSync(path.join(root, "src-tauri/crates", name, "Cargo.toml"), "");
   }
   return root;
@@ -121,6 +123,20 @@ test("Mail engine rejects dependencies on the desktop and host runtime", (t) => 
   const errors = modularBoundaryViolations(root).join("\n");
   assert.match(errors, /taomni-mail-engine\/Cargo.toml.*core links application\/plugin state/);
   assert.match(errors, /lib.rs: shared library must not import application\/plugin state/);
+});
+
+test("Screenshot codecs stay independent of the desktop and the signed host", (t) => {
+  const root = fixture(t);
+  const api = "src-tauri/crates/taomni-screenshot-api";
+  const codec = "src-tauri/crates/taomni-screenshot-recording";
+  write(root, `${api}/Cargo.toml`, '[dependencies]\ntaomni-plugin-stream = { path = "../taomni-plugin-stream" }\n');
+  write(root, `${api}/src/lib.rs`, "use taomni_plugin_stream::routed_tcp::Endpoint;\n");
+  assert.deepEqual(modularBoundaryViolations(root), []);
+  write(root, `${codec}/Cargo.toml`, '[dependencies]\napp = { path = "../.." }\n');
+  write(root, `${codec}/src/lib.rs`, "use taomni_plugin_sdk::Operation;\n");
+  const errors = modularBoundaryViolations(root).join("\n");
+  assert.match(errors, /taomni-screenshot-recording\/Cargo.toml.*app links application\/plugin state/);
+  assert.match(errors, /taomni-screenshot-recording.*shared library must not import application\/plugin state/);
 });
 
 test("MFA host requires SDK services and rejects transitive application ownership", (t) => {

@@ -1,26 +1,39 @@
-use super::frames::TimedFrame;
+use super::TimedFrame;
 use super::gif::GifSink;
-use super::model::RecordFormat;
-use super::model::RecordingInfo;
+use super::model::{ClipMetadata, RecordFormat, RecordingInfo};
 use super::mp4::Mp4Sink;
+use anyhow::Context;
 use image::RgbaImage;
+use std::fs::File;
 use std::path::Path;
 use std::sync::mpsc::Receiver;
 
 /// Consume frames until the end marker (a 0x0 frame) or disconnect.
-pub(super) fn encode_loop(
+pub fn encode_loop(
     rx: Receiver<TimedFrame>,
     format: RecordFormat,
     fps: u32,
     path: &Path,
 ) -> anyhow::Result<RecordingInfo> {
+    let file = File::create(path).context("create recording file")?;
+    let clip = encode_file(rx.iter().map(Ok), format, fps, file)?;
+    Ok(RecordingInfo::from_clip(path.to_path_buf(), clip))
+}
+
+pub fn encode_file(
+    input: impl Iterator<Item = anyhow::Result<TimedFrame>>,
+    format: RecordFormat,
+    fps: u32,
+    file: File,
+) -> anyhow::Result<ClipMetadata> {
     let mut sink: Box<dyn FrameSink> = match format {
-        RecordFormat::Gif => Box::new(GifSink::create(path)?),
-        RecordFormat::Mp4 => Box::new(Mp4Sink::create(path, fps)?),
+        RecordFormat::Gif => Box::new(GifSink::new(file)),
+        RecordFormat::Mp4 => Box::new(Mp4Sink::new(file, fps)),
     };
     let mut pending: Option<TimedFrame> = None;
     let mut end_ms = 0u64;
-    for frame in rx.iter() {
+    for frame in input {
+        let frame = frame?;
         let is_end = frame.image.width() == 0;
         if let Some(prev) = pending.take() {
             let duration = frame.at_ms.saturating_sub(prev.at_ms).max(1);
@@ -44,8 +57,7 @@ pub(super) fn encode_loop(
     if frames == 0 {
         anyhow::bail!("no frames were captured");
     }
-    Ok(RecordingInfo {
-        path: path.to_path_buf(),
+    Ok(ClipMetadata {
         width,
         height,
         frames,

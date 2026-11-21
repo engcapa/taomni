@@ -12,7 +12,7 @@ from .steps import StepError
 def run(ctx, phase):
     owner = ctx.fixture_context
     signed = getattr(owner, "signed_screenshot", None)
-    if phase not in {"idle", "running", "disabled"} or not signed or owner.case_id != "TC-MODULES-061":
+    if phase not in {"idle", "running", "disabled"} or not signed or owner.case_id not in {"TC-MODULES-061", "TC-MODULES-062"}:
         raise StepError("The Screenshot host observation requires its signed native case")
 
     plugins = isolated_data_root(owner) / "plugins"

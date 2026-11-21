@@ -30,7 +30,7 @@ pub fn inspect_clip(path: &Path) -> anyhow::Result<ClipInfo> {
     inspect_clip_frames(path, &mut |_, _| Ok(()))
 }
 
-pub(crate) fn inspect_clip_frames(
+pub fn inspect_clip_frames(
     path: &Path,
     observe: &mut dyn FnMut(&RgbaImage, u64) -> anyhow::Result<()>,
 ) -> anyhow::Result<ClipInfo> {

@@ -10884,7 +10884,6 @@ dependencies = [
  "mail-parser",
  "mdns-sd",
  "minisign-verify",
- "mp4",
  "native-tls",
  "notify",
  "objc2",
@@ -10897,7 +10896,6 @@ dependencies = [
  "objc2-foundation",
  "objc2-screen-capture-kit",
  "objc2-video-toolbox",
- "openh264",
  "oracle",
  "pbkdf2 0.13.0",
  "pdf-extract",
@@ -10956,6 +10954,7 @@ dependencies = [
  "taomni-redirector",
  "taomni-screenshot-api",
  "taomni-screenshot-ocr",
+ "taomni-screenshot-recording",
  "taomni-sqlite-snapshot",
  "taomni-vnc-api",
  "taomni-vnc-engine",
@@ -11222,14 +11221,17 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-screenshot"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
+ "anyhow",
+ "image",
  "serde",
  "serde_json",
  "taomni-plugin-api",
  "taomni-plugin-sdk",
  "taomni-screenshot-api",
  "taomni-screenshot-ocr",
+ "taomni-screenshot-recording",
  "tempfile",
  "tokio",
 ]
@@ -11421,6 +11423,19 @@ dependencies = [
  "objc2-vision",
  "taomni-screenshot-api",
  "windows 0.62.2",
+]
+
+[[package]]
+name = "taomni-screenshot-recording"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "gif",
+ "image",
+ "mp4",
+ "openh264",
+ "serde",
 ]
 
 [[package]]

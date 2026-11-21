@@ -143,7 +143,7 @@ def setup_mail(ctx):
 
 
 def setup_screenshot(ctx):
-    if ctx.case_id != "TC-MODULES-061" or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    if ctx.case_id not in {"TC-MODULES-061", "TC-MODULES-062"} or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Signed Screenshot input requires its registered native case")
     setting = "QA_SIGNED_SCREENSHOT_ROOT"
     raw = os.environ.get(setting)

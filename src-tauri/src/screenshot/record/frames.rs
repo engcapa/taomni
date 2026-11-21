@@ -2,15 +2,10 @@ use anyhow::Context;
 use image::RgbaImage;
 use std::sync::mpsc::SyncSender;
 use std::sync::mpsc::TrySendError;
+use taomni_screenshot_recording::TimedFrame;
 
 /// Encoded frames in flight before the capture thread starts dropping.
 pub(super) const FRAME_QUEUE: usize = 4;
-
-pub(super) struct TimedFrame {
-    pub(super) image: RgbaImage,
-    /// Milliseconds since recording start.
-    pub(super) at_ms: u64,
-}
 
 #[derive(Default)]
 pub(super) struct FrameQueue {

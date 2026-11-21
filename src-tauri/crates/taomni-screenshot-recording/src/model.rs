@@ -16,7 +16,7 @@ impl RecordFormat {
         }
     }
 
-    pub(super) fn extension(self) -> &'static str {
+    pub fn extension(self) -> &'static str {
         match self {
             Self::Gif => "gif",
             Self::Mp4 => "mp4",
@@ -24,14 +24,14 @@ impl RecordFormat {
     }
 
     /// Hard stop so a forgotten recording cannot fill the disk.
-    pub(super) fn max_duration(self) -> Duration {
+    pub fn max_duration(self) -> Duration {
         match self {
             Self::Gif => Duration::from_secs(60),
             Self::Mp4 => Duration::from_secs(300),
         }
     }
 
-    pub(super) fn default_fps(self) -> u32 {
+    pub fn default_fps(self) -> u32 {
         match self {
             Self::Gif => 10,
             Self::Mp4 => 15,
@@ -39,7 +39,7 @@ impl RecordFormat {
     }
 
     /// Output width cap (GIFs balloon quickly; H.264 level limits).
-    pub(super) fn max_width(self) -> u32 {
+    pub fn max_width(self) -> u32 {
         match self {
             Self::Gif => 960,
             Self::Mp4 => 1920,
@@ -54,4 +54,25 @@ pub struct RecordingInfo {
     pub height: u32,
     pub frames: u32,
     pub duration_ms: u64,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ClipMetadata {
+    pub width: u32,
+    pub height: u32,
+    pub frames: u32,
+    pub duration_ms: u64,
+}
+
+impl RecordingInfo {
+    pub fn from_clip(path: PathBuf, clip: ClipMetadata) -> Self {
+        Self {
+            path,
+            width: clip.width,
+            height: clip.height,
+            frames: clip.frames,
+            duration_ms: clip.duration_ms,
+        }
+    }
 }

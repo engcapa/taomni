@@ -102,7 +102,7 @@ pub async fn screenshot_probe(state: State<'_, AppState>) -> Result<ScreenshotPr
     Ok(ScreenshotProbe {
         permission: base.permission,
         control_permission: base.control_permission,
-        mp4_available: true,
+        mp4_available: super::record::module_recording_available(&state.plugins),
         ocr_available: availability.engine.is_some(),
         ocr_engine: availability.engine,
         ocr_hint: availability.hint,
