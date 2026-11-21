@@ -12,17 +12,18 @@ use std::{
 use lettre::address::Envelope;
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
-    CHECK_INCOMING, CHECK_OUTGOING, FolderSubscription, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE,
-    ImapFlagUpdate, ImapFolderTree, IncomingTest, LIST_IMAP_UNREAD, SEARCH_IMAP, SEND_SMTP,
-    SET_IMAP_FLAGS, SLUG, SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND,
+    CHECK_INCOMING, CHECK_OUTGOING, FETCH_IMAP_RAW, FolderSubscription, HOST_REQUEST_TIMEOUT,
+    IMAP_FOLDER_TREE, ImapFlagUpdate, ImapFolderTree, IncomingTest, LIST_IMAP_UNREAD, SEARCH_IMAP,
+    SEND_SMTP, SET_IMAP_FLAGS, SLUG, SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND,
     SmtpConnection, SmtpDelivery,
-    imap_exchange::{ImapExchange, read_frame, write_frame},
+    imap_exchange::{ImapExchange, RawMessageRequest, read_frame, write_frame},
 };
 use taomni_mail_engine::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest,
 };
 use taomni_mail_engine::search::ImapSearchRequest;
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
+use tokio::io::AsyncReadExt;
 
 use crate::{
     plugin::{LifecycleState, PluginRegistry},
@@ -60,6 +61,10 @@ pub(super) fn sets_imap_flags(registry: &PluginRegistry) -> bool {
 
 pub(super) fn lists_imap_unread(registry: &PluginRegistry) -> bool {
     supports(registry, LIST_IMAP_UNREAD)
+}
+
+pub(super) fn fetches_imap_raw(registry: &PluginRegistry) -> bool {
+    supports(registry, FETCH_IMAP_RAW)
 }
 
 pub(super) async fn sync_imap_headers(
@@ -135,6 +140,41 @@ pub(super) async fn list_imap_unread(
     folder: &str,
 ) -> Result<Vec<u32>, String> {
     exchange_imap(registry, account, LIST_IMAP_UNREAD, &folder).await
+}
+
+pub(super) async fn fetch_imap_raw(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    folder: &str,
+    uid: u32,
+) -> Result<Vec<u8>, String> {
+    let (_route, exchange, mut peer) = Route::pair().await.map_err(|error| error.to_string())?;
+    let receive = async {
+        let mut bytes = Vec::new();
+        peer.read_to_end(&mut bytes)
+            .await
+            .map_err(|error| error.to_string())?;
+        Ok::<_, String>(bytes)
+    };
+    let invoke =
+        invoke_with_incoming::<usize, _>(registry, account, FETCH_IMAP_RAW, |connection| {
+            RawMessageRequest {
+                connection,
+                exchange,
+                folder: folder.to_owned(),
+                uid,
+            }
+        });
+    let (expected, bytes) =
+        tokio::time::timeout(HOST_REQUEST_TIMEOUT + Duration::from_secs(5), async {
+            tokio::try_join!(invoke, receive)
+        })
+        .await
+        .map_err(|_| "Mail original fetch timed out".to_owned())??;
+    if bytes.len() != expected {
+        return Err("Mail module returned an incomplete original message".into());
+    }
+    Ok(bytes)
 }
 
 async fn exchange_imap<T: DeserializeOwned + Send + 'static>(

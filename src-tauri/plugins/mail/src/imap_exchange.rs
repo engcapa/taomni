@@ -3,13 +3,14 @@
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     ImapFlagUpdate, MailIncomingProtocol,
-    imap_exchange::{ImapExchange, read_frame, write_frame},
+    imap_exchange::{ImapExchange, RawMessageRequest, read_frame, write_frame},
 };
 use taomni_mail_engine::imap_sync::{FolderRoundRequest, HeaderStepRequest};
 use taomni_mail_engine::imap_transport::{ImapSession, imap_catch_result};
 use taomni_mail_engine::search::ImapSearchRequest;
 use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_plugin_sdk::Operation;
+use tokio::io::AsyncWriteExt;
 use tokio::runtime::Runtime;
 
 use super::incoming::{open_imap, while_current, with_socket};
@@ -91,6 +92,36 @@ pub(super) fn list_unread(
         }
         session.unread_uids(&folder)
     })
+}
+
+pub(super) fn fetch_raw(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: RawMessageRequest,
+) -> Result<Result<usize, String>, RpcError> {
+    let RawMessageRequest {
+        connection,
+        exchange,
+        folder,
+        uid,
+    } = request;
+    if connection.protocol != MailIncomingProtocol::Imap || folder.trim().is_empty() || uid == 0 {
+        return Err(RpcError::from_code(ErrorCode::InvalidParams));
+    }
+    let mut output = match runtime.block_on(while_current(operation, exchange.connect()))? {
+        Ok((output, _)) => output,
+        Err(error) => return Ok(Err(error)),
+    };
+    let raw = match with_socket(runtime, operation, connection, move |stream, input| {
+        imap_catch_result(|| open_imap(stream, &input)?.fetch_raw(&folder, uid))
+    })? {
+        Ok(raw) => raw,
+        Err(error) => return Ok(Err(error)),
+    };
+    let written = runtime.block_on(while_current(operation, output.write_all(&raw)))?;
+    Ok(written
+        .map(|()| raw.len())
+        .map_err(|error| format!("Return original message: {error}")))
 }
 
 fn validate_folder(account_id: &str, folder: &str) -> Result<(), String> {

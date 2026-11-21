@@ -1817,6 +1817,9 @@
 
 ## mail/storage (F-MAIL-23)
 
+- `[data-testid="context-menu-item-view-source"]` — interactive — F-MAIL-23.mail-view-source
+- `[data-testid="context-menu-item-save-as-eml"]` — interactive — F-MAIL-23.mail-save-eml
+- `[role="dialog"][aria-label="Message source"]` — display — F-MAIL-23.mail-source-dialog
 - `[data-testid="mail-storage-settings"]` — display — F-MAIL-23.mail-storage-settings
 - `[data-testid="mail-storage-directory"]` — interactive — F-MAIL-23.mail-storage-directory
 - `[data-testid="mail-storage-browse"]` — interactive — F-MAIL-23.mail-storage-browse

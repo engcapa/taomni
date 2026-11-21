@@ -78,6 +78,11 @@ Version 0.1.10 also runs unread UID lookup and read-flag batches in the
 signed host. Each confirmed batch is committed before the next request.
 The unread count is rechecked at the end of a whole-folder operation.
 
+Version 0.1.11 fetches the original IMAP message in the host when it is
+absent from the local archive. The host transfers the original bytes over
+the authorized companion socket. The desktop checks the reported length
+before displaying the source or publishing the user-selected EML file.
+
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.
 It publishes the module data before activating the verified package and

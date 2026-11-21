@@ -2,6 +2,8 @@
 
 ## 2026-11-21 当前进展
 
+- Mail 0.1.11 由签名宿主读取未归档邮件的 IMAP 原文。核心通过授权连接接收 MIME 字节并核对长度，查看时沿用原文对话框，保存时原子替换目标 EML。已归档邮件继续读取已校验的本机原件。TC-MODULES-059 核对实际 IMAP 原文和本机落盘，TC-MODULES-060 核对 Browser 对话框及导出文件字节。
+- `38eb4d116` 的 Browser 分片已在 Native 执行期间收齐，Linux、Windows 和 macOS 26 各通过 37/37。三个平台的 Native 仍在逐片复验订阅和星标。 [Browser 与 Native 回执](https://github.com/engcapa/taomni/actions/runs/44908352214)
 - Mail 0.1.10 将全部已读的未读 UID 查询和标记批次交给签名宿主。核心逐批提交缓存，结束时用服务器剩余未读修正计数。TC-MODULES-059 核对真实服务器和列表均清除未读，TC-MAIL-BULK-01 检查收到确认后按钮变为不可用。
 - `662d66d07` 的 Linux Native 为 36/37，Git Clone 和完整崩溃回归通过。TC-MODULES-059 的失败页面显示 Archive 在首次取消订阅前已丢失订阅标记。修复将 LIST/LSUB 文件夹属性与 EXAMINE/STATUS 同步数据分别写入，TC-MAIL-FOLDER-01 增加选中 Archive 抓取新邮件后的订阅断言。 [失败分片](https://github.com/engcapa/taomni/actions/runs/44904055836)
 - `662d66d07` 的 Linux、Windows 和 macOS 26 Browser 各 37/37。六个 Browser 分片在 Native 构建期间逐片下载，TC-MODULES-060 三端均已通过。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44904055836)

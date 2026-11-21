@@ -380,6 +380,30 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
       return stubMailBody(accountId, folder, uid) as T;
     }
 
+    case "mail_fetch_raw":
+    case "mail_save_raw": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const folder = String(invokeArgs?.folder ?? "INBOX");
+      const uid = Number(invokeArgs?.uid);
+      const header = stubMailFindHeader(accountId, mailStubSeed, folder, uid);
+      if (!header) throw new Error("Message is unavailable");
+      const body = stubMailBody(accountId, folder, uid);
+      const text = [
+        `From: ${header.from?.address ?? "sender@example.com"}`,
+        `Subject: ${header.subject}`,
+        "MIME-Version: 1.0",
+        `Content-Type: ${body.html ? "text/html" : "text/plain"}; charset=UTF-8`,
+        "",
+        (body.html ?? body.text ?? "").replace(/\r?\n/g, "\r\n"),
+      ].join("\r\n");
+      if (cmd === "mail_fetch_raw") return text as T;
+      const targetPath = String(invokeArgs?.targetPath ?? "");
+      if (!targetPath.trim()) throw new Error("target path is required");
+      await vfsWriteText(targetPath, text);
+      return { path: targetPath, contentType: "message/rfc822", size: new TextEncoder().encode(text).length } as T;
+    }
+
     case "mail_download_attachment": {
       const invokeArgs = args as InvokeArgs | undefined;
       const targetPath = (invokeArgs?.targetPath as string | undefined) ?? "attachment";

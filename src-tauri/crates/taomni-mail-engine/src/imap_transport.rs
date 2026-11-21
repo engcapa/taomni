@@ -10,7 +10,7 @@ use native_tls::TlsStream;
 use crate::cache::MailCacheSettings;
 use crate::imap_auth::{MailAuthMode, MailProvider, authenticate};
 use crate::imap_folders::{imap_list_folders, imap_set_subscription};
-use crate::imap_messages::Mailbox;
+use crate::imap_messages::{Mailbox, imap_fetch_raw};
 use crate::imap_mutations::{imap_set_flags, unread_uids};
 use crate::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest, StepParams,
@@ -104,6 +104,13 @@ impl ImapSession {
         match self {
             Self::Plain(session) => unread_uids(session, folder),
             Self::Tls(session) => unread_uids(session, folder),
+        }
+    }
+
+    pub fn fetch_raw(&mut self, folder: &str, uid: u32) -> Result<Vec<u8>, String> {
+        match self {
+            Self::Plain(session) => imap_fetch_raw(session, folder, uid),
+            Self::Tls(session) => imap_fetch_raw(session, folder, uid),
         }
     }
 }

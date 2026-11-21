@@ -1,13 +1,14 @@
 id: TC-MODULES-060
 title: Mail account and unified panes follow the module selector
 description: >-
-  Enable the preview Mail module from an open account tab. Open Unified Mail
-  and refresh an actual stub message. Disable the module and check the two
-  retained tabs both show the disabled state.
-covers: [F-Modules-1, F-MAIL-3, F-MAIL-20]
+  Enable the preview Mail module from an open account tab. View and save the
+  original of a newly received message. Refresh Unified Mail after delivering
+  a separate message. Disable the module and check both retained tabs show the
+  disabled state.
+covers: [F-Modules-1, F-MAIL-3, F-MAIL-20, F-MAIL-23]
 tags: [modules, mail, p1]
 modes: [browser]
-fixtures: [reset_db, module_mail_preview, mail_server]
+fixtures: [reset_db, module_mail_preview, mail_server, file_open_files]
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
@@ -26,12 +27,28 @@ steps:
 - click: '[data-testid="tab-item"][data-tab-type="mail"]'
 - wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]'
 - mail_server_assert_list_matches: {timeout_sec: 30}
+- mail_server_deliver: {count: 1, prefix: Module source}
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- wait_for: '[data-testid="mail-message-row"][data-subject="Module source 0001"]'
+- right_click: '[data-testid="mail-message-row"][data-subject="Module source 0001"]'
+- click: '[data-testid="context-menu-item-view-source"]'
+- assert_text: {selector: '[role="dialog"][aria-label="Message source"] pre', contains: 'Subject: Module source 0001'}
+- assert_text: {selector: '[role="dialog"][aria-label="Message source"] pre', contains: 'Hello from Taomni Mail preview.'}
+- click: '[role="dialog"][aria-label="Message source"] [aria-label="Close dialog"]'
+- wait_for: {selector: '[role="dialog"][aria-label="Message source"]', state: detached}
+- right_click: '[data-testid="mail-message-row"][data-subject="Module source 0001"]'
+- click: '[data-testid="context-menu-item-save-as-eml"]'
+- fill: {selector: '[data-testid="text-input-dialog-input"]', value: '${fixture.file_open_root}/mail-original.eml'}
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/mail-original.eml
+    equals: "From: qa-sender@example.com\r\nSubject: Module source 0001\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nHello from Taomni Mail preview.\r\n\r\nThis body is shaped like a cached IMAP message body. Use Sync in the desktop build to fetch live mailbox data.\r\n\r\nSubject: Module source 0001"
 - mail_server_deliver: {count: 1, prefix: Module frontend}
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-mail-unified"]'
 - wait_for: '[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="mail-unified-tab"]'
 - click: '[data-testid="mail-unified-refresh"]'
-- assert_text: {selector: '[data-testid="mail-unified-row"]', contains: 'Module frontend 0001', timeout_sec: 30}
+- assert_text: {selector: '[data-testid="mail-unified-tab"]', contains: 'Module frontend 0001', timeout_sec: 30}
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
 - click: '[data-testid="module-action-disable-mail"]'
@@ -51,26 +68,36 @@ verification:
   requirements:
   - id: R1
     requirement: Enabling Mail renders the account list in the original tab and the unified list in its own tab.
-    actions: [5, 6, 9, 10, 12, 14, 17, 18, 19, 21]
+    actions: [5, 6, 9, 10, 12, 14, 31, 32, 33, 35]
     checkpoints:
     - {step: 7, expectation: The first open shows the disabled module.}
     - {step: 8, expectation: The disabled module has no account pane.}
     - {step: 15, expectation: The existing tab mounts the account pane from the Mail module.}
     - {step: 16, expectation: The account shows the same inbox as its stub server.}
-    - {step: 20, expectation: The Unified Mail entry mounts the module's unified pane.}
-    - {step: 22, expectation: Refresh populates the unified pane with the new message.}
-    results: [7, 8, 15, 16, 20, 22]
+    - {step: 34, expectation: The Unified Mail entry mounts the module's unified pane.}
+    - {step: 36, expectation: Refresh populates the unified pane with the new message.}
+    results: [7, 8, 15, 16, 34, 36]
   - id: R2
     requirement: Disabling Mail unmounts both panes while preserving both tabs.
-    actions: [23, 24, 25, 28, 30, 33]
+    actions: [37, 38, 39, 42, 44, 47]
     checkpoints:
-    - {step: 27, expectation: Both module panes have unmounted.}
-    - {step: 31, expectation: The original account tab displays the disabled state.}
-    - {step: 32, expectation: Exactly one account tab remains.}
-    - {step: 34, expectation: The original unified tab displays the disabled state.}
-    - {step: 35, expectation: Exactly one unified tab remains.}
-    - {step: 36, expectation: The transitions produce no uncaught errors.}
-    results: [27, 31, 32, 34, 35, 36]
+    - {step: 41, expectation: Both module panes have unmounted.}
+    - {step: 45, expectation: The original account tab displays the disabled state.}
+    - {step: 46, expectation: Exactly one account tab remains.}
+    - {step: 48, expectation: The original unified tab displays the disabled state.}
+    - {step: 49, expectation: Exactly one unified tab remains.}
+    - {step: 50, expectation: The transitions produce no uncaught errors.}
+    results: [41, 45, 46, 48, 49, 50]
+  - id: R3
+    requirement: The Mail account context menu shows the selected message's full source and saves it to the chosen browser path.
+    actions: [17, 18, 20, 21, 24, 26, 27, 28, 29]
+    checkpoints:
+    - {step: 19, expectation: Sync adds the newly delivered message to the account.}
+    - {step: 22, expectation: The source dialog shows the selected subject header.}
+    - {step: 23, expectation: The source dialog also renders the body.}
+    - {step: 25, expectation: Closing the source dialog leaves the account available.}
+    - {step: 30, expectation: The browser saves the full source in the chosen virtual file.}
+    results: [19, 22, 23, 25, 30]
   visual:
   - check: The account and unified panes each show content when enabled and a status when disabled.
     method: automated

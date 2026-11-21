@@ -8695,6 +8695,8 @@ controls:
 
 Mail 宿主从旧库的归档记录返回保存时间。只有 POP3 原件时，读取正文不生成缓存时间。归档和本地原件的内容、时间字段及重开后的结果由 `profile_host` 跨进程用例核对，Browser 和 Native 归档操作由 `TC-MAIL-STORAGE-01/02` 覆盖。
 
+查看原文和保存 EML 优先读取已归档的原件。启用的签名 Mail 宿主从 IMAP 读取未归档的 MIME 原件，由核心保存到用户选定的位置。TC-MODULES-059 检查真实 IMAP 原文与本机保存的 EML 文件，TC-MODULES-060 检查 Browser 的原文对话框和导出内容。
+
 <!-- feature
 id: F-MAIL-23
 status: partial
@@ -8713,10 +8715,21 @@ files:
   - src-tauri/src/mail/archive.rs
   - src-tauri/src/mail/archive_query.rs
   - src-tauri/src/mail/archive_metadata.rs
+  - src-tauri/src/mail/message_source.rs
+  - src-tauri/plugins/mail/renderer/client/MailSourceDialog.tsx
   - src-tauri/src/mail/coordination.rs
   - src-tauri/src/state.rs
   - src-tauri/src/session/mod.rs
 controls:
+  - id: mail-view-source
+    selector: '[data-testid="context-menu-item-view-source"]'
+    kind: interactive
+  - id: mail-save-eml
+    selector: '[data-testid="context-menu-item-save-as-eml"]'
+    kind: interactive
+  - id: mail-source-dialog
+    selector: '[role="dialog"][aria-label="Message source"]'
+    kind: display
   - id: mail-storage-settings
     selector: '[data-testid="mail-storage-settings"]'
     kind: display

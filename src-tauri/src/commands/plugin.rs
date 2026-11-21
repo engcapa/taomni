@@ -197,6 +197,7 @@ pub async fn plugin_invoke(
                     | taomni_mail_api::SEARCH_IMAP
                     | taomni_mail_api::SET_IMAP_FLAGS
                     | taomni_mail_api::LIST_IMAP_UNREAD
+                    | taomni_mail_api::FETCH_IMAP_RAW
             ))
     {
         // The desktop commands resolve these routes and credentials.

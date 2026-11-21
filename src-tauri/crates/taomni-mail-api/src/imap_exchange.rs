@@ -17,6 +17,15 @@ pub struct ImapExchange {
     pub exchange: Endpoint,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RawMessageRequest {
+    pub connection: IncomingTest,
+    pub exchange: Endpoint,
+    pub folder: String,
+    pub uid: u32,
+}
+
 pub async fn read_frame(stream: &mut (impl AsyncRead + Unpin)) -> io::Result<Vec<u8>> {
     let size = stream.read_u32().await? as usize;
     validate_size(size)?;
