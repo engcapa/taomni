@@ -291,7 +291,7 @@ Native 模式不使用 stub，验证真实 Git 与磁盘。
 | ID | 验收结果 |
 | --- | --- |
 | AC-01 | Workspaces 的 `+` 菜单、工作区切换器菜单、Home 卡片都能打开同一个克隆导入对话框。 |
-| AC-02 | 打开对话框后 `user.name`/`user.email` 来自全局 Git 配置（有值时）；分支预填全局 `init.defaultBranch` 或 `main`；代理模式与两个代理字段预填 Taomni Settings 的应用代理；vault 有 token 时 `Use the saved token` 默认勾选。 |
+| AC-02 | 打开对话框后 `user.name`/`user.email` 来自全局 Git 配置（有值时）；分支预填全局 `init.defaultBranch` 或 `main`；父目录默认 `~/taomni-workspaces` 且可编辑/浏览选择；代理模式与两个代理字段预填 Taomni Settings 的应用代理；vault 有 token 时 `Use the saved token` 默认勾选。 |
 | AC-03 | 代理三模式行为正确：Application 不可编辑并使用后端解析值；Custom 可编辑且校验 URL；None 清空、禁用并显式绕过环境代理。 |
 | AC-04 | URL/名称/父目录/分支/代理校验在提交前给出可读错误；非法输入不调用后端。 |
 | AC-05 | `Detect`/URL blur 能探测默认分支与分支列表；失败只提示，不阻止克隆；用户已编辑分支时不被覆盖。 |
