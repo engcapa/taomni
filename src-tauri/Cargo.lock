@@ -10880,6 +10880,7 @@ dependencies = [
  "llama-cpp-2",
  "log",
  "mail-parser",
+ "md-5 0.11.0",
  "mdns-sd",
  "minisign-verify",
  "native-tls",
