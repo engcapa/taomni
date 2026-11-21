@@ -75,9 +75,16 @@ Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS �
 - Windows native 42/46：除 009/006 同上、`TC-EXPLORER-005` 终局暴露**真实迁移缺口**——仅剩独立 Explorer 标签时 `confirmExitWithOpenTabs` 只数 Sessions 标签导致静默退出；已修复为同时计入 explorerStore 可关闭标签（`5093be85c`，含 3 项新单测）。另 `TC-FILE-OPEN-023` 败于 QA 对话框自动化脚本自身 WM_GETTEXT 探测（非产品代码），并入第三轮复验。
 - 该轮三端 browser 与 native crash、SFTP 契约 job 全部 success；receipt 与 build hash 已按 shard 流式下载核对（windows release `a3e7d616…`、macos release `ef8459d3…`）。
 
-## GitHub hosted 第三轮（run44886766477，head `5093be85c`，含 linux）
+## GitHub hosted 第三/四轮（run44886766477 `5093be85c` 三端 + run44890986861 `6193c4446` linux）
 
-- 定向复验集：`TC-EXPLORER-002/003/005/009` 与 `TC-FILE-OPEN-021/023/032/036/042`；平台首次纳入 linux（Xvfb release），自动并入完整 `crash-regression`，同时补齐 linux release 二进制门禁。
+- 第三轮 browser：linux 19/19+1/1、macOS 19/19+1/1（`TC-EXPLORER-002` 复验通过，确认第二轮为 flake）；windows shard 同批 success。
+- 第三轮 native（Windows+macOS 56/60）：`TC-EXPLORER-009` 新 settled 设计双平台通过；003/021/023/032/036/042 全过；`TC-EXPLORER-005` 三端一致败于第二个标签 nth-match 10s 等待，失败收据显示标签实际已建立——高负载 runner 下建标签超过默认等待（第二轮轻负载通过），该步已显式改 30s（`88838697b`）；`TC-FILE-OPEN-006` 仍为既有已记录竞态。
+- 第三轮 linux build 门禁抓到迁移提交遗漏的 `ControlBar.test.tsx` 旧断言（Explorer 从 Tools 打开仍期望 Sessions TabBar）——按独立视图契约改写为断言 Explorer rail 激活时渲染 `explorer-workspace-tab`（`6193c4446`）；随后全量前端单测 7,320 通过、1 skip。
+- 第四轮 linux native release 28/30：build 门禁通过；009/003/021/023/032/036/042 在 hosted linux Xvfb WebKitGTK 全部通过（drawio 四例 hosted linux 正常渲染，证实本机 WebKitGTK 差异为机器特有）；完整 crash 合并集其余用例全过，linux release crash 门禁除 005（见上）与既有 006 外全绿。
+
+## 第五轮收口（run44895878269，head `88838697b`）
+
+- 最终定向复验：`TC-EXPLORER-005` 三端 native 全流程（含 `5093be85c` 退出确认修复的终局步骤）；完成后以该轮 receipt 关闭验证。
 
 ## 迁移前历史证据
 

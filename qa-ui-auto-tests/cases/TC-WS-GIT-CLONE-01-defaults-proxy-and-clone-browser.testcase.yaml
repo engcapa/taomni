@@ -1,0 +1,208 @@
+id: TC-WS-GIT-CLONE-01-defaults-proxy-and-clone-browser
+title: Git clone import prefills Taomni defaults, edits proxy modes and publishes a workspace
+description: >-
+  The Workspaces + menu opens the clone dialog; identity, branch, parent location and the
+  Taomni application proxy arrive as defaults, branch detection and custom/no-proxy modes work, and a
+  controlled clone publishes a real workspace root with its project tree. Browser only: the stub
+  proves renderer routing and request composition, not Git or disk.
+modes:
+- browser
+covers:
+- F-WS-2
+- F25.1
+tags:
+- p1
+- workspace
+- git
+- clone
+fixtures:
+- reset_db
+- git_clone_source
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-git-clone-01
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-switcher-button"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-clone-git"]'
+- wait_for: '[data-testid="workspace-git-clone-modal"]'
+- assert_visible: '[data-testid="workspace-git-clone-url"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-git-clone-user-name"]'
+    name: value
+    equals: QA Stub User
+- assert_attribute:
+    selector: '[data-testid="workspace-git-clone-user-email"]'
+    name: value
+    equals: qa-clone@example.invalid
+- assert_attribute:
+    selector: '[data-testid="workspace-git-clone-branch"]'
+    name: value
+    equals: main
+- assert_attribute:
+    selector: '[data-testid="workspace-git-clone-location"]'
+    name: value
+    equals: ${fixture.git_clone_parent}
+- assert_attribute:
+    selector: '[data-testid="workspace-git-clone-http-proxy"]'
+    name: value
+    equals: http://192.168.0.110:31028
+- assert_attribute:
+    selector: '[data-testid="workspace-git-clone-https-proxy"]'
+    name: value
+    equals: http://192.168.0.110:31028
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-git-clone-use-saved-token"]')?.checked === true
+    expect_truthy: true
+- fill:
+    selector: '[data-testid="workspace-git-clone-url"]'
+    value: ${fixture.git_clone_url}
+- wait_for: '[data-testid="workspace-git-clone-name"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-git-clone-name"]'
+    name: value
+    equals: qa-clone
+- click: '[data-testid="workspace-git-clone-branch-detect"]'
+- wait_for:
+    selector: '[data-testid="workspace-git-clone-branch"]'
+    timeout_sec: 15
+- assert_attribute:
+    selector: '[data-testid="workspace-git-clone-branch"]'
+    name: value
+    equals: trunk
+- fill:
+    selector: '[data-testid="workspace-git-clone-name"]'
+    value: qa-clone
+- fill:
+    selector: '[data-testid="workspace-git-clone-location"]'
+    value: ${fixture.git_clone_parent}
+- click: '[data-testid="workspace-git-clone-proxy-custom"]'
+- assert_enabled: '[data-testid="workspace-git-clone-http-proxy"]'
+- fill:
+    selector: '[data-testid="workspace-git-clone-http-proxy"]'
+    value: http://custom.example.test:8080
+- fill:
+    selector: '[data-testid="workspace-git-clone-https-proxy"]'
+    value: http://custom.example.test:8080
+- click: '[data-testid="workspace-git-clone-proxy-none"]'
+- assert_disabled: '[data-testid="workspace-git-clone-http-proxy"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-git-clone-http-proxy"]')?.value === ""
+    expect_truthy: true
+- click: '[data-testid="workspace-git-clone-proxy-app"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-git-clone-http-proxy"]'
+    name: value
+    equals: http://192.168.0.110:31028
+- assert_text:
+    selector: '[data-testid="workspace-git-clone-destination"]'
+    contains: ${fixture.git_clone_destination}
+- click: '[data-testid="workspace-git-clone-start"]'
+- wait_for:
+    selector: '[data-testid="workspace-git-clone-progress"]'
+    timeout_sec: 20
+- assert_pattern:
+    selector: '[data-testid="workspace-git-clone-phase"]'
+    regex: (Preparing|Connecting|Counting|Receiving|Resolving|Updating|Writing)
+- assert_visible: '[data-testid="workspace-git-clone-percent"]'
+- wait_for:
+    selector: '[data-testid="workspace-git-clone-success"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="workspace-git-clone-success"]'
+    contains: ${fixture.git_clone_destination}
+- click: '[data-testid="workspace-git-clone-close"]'
+- wait_for: '[data-testid="workspace-switcher-button"]'
+- assert_text:
+    selector: '[data-testid="workspace-switcher-button"]'
+    contains: qa-clone
+- wait_for: '[data-testid="code-workspace-tree-root"][data-root-path="${fixture.git_clone_destination}"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="src/cloned.ts"]'
+- assert_localstorage:
+    key: taomni.qa.gitClone.lastRequest
+    contains: '"workspaceName":"qa-clone"'
+- assert_localstorage:
+    key: taomni.qa.gitClone.lastRequest
+    contains: '"proxyMode":"app"'
+- assert_localstorage:
+    key: taomni.qa.gitClone.lastRequest
+    contains: '"tokenProvided":true'
+- assert_localstorage:
+    key: taomni.qa.gitClone.lastRequest
+    contains: '"useSavedToken":true'
+- assert_no_runtime_errors: null
+- assert_visible: '[data-testid="code-workspace-tree-root"][data-root-path="${fixture.git_clone_destination}"]'
+- screenshot: git-clone-defaults-proxy-browser.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The Workspaces + menu opens one clone dialog whose identity, branch, parent location
+      and application proxy fields carry the Taomni/Git defaults, including the saved-token default.
+    actions: [5, 6]
+    checkpoints:
+    - step: 9
+      expectation: The Git global user.name is prefilled.
+    - step: 11
+      expectation: The global init.defaultBranch equivalent is prefilled.
+    - step: 13
+      expectation: Both proxy fields show the resolved Taomni application proxy.
+    - step: 15
+      expectation: The saved vault token default is offered without exposing plaintext.
+    results: [9, 11, 13, 15]
+  - id: R2
+    requirement: URL entry derives the workspace name, Detect replaces the untouched branch with the
+      remote default branch, and the editable parent location produces the expected destination.
+    actions: [16, 19, 22, 23]
+    checkpoints:
+    - step: 21
+      expectation: Detect replaced the untouched branch with the remote default branch.
+    - step: 33
+      expectation: The destination preview joins the editable parent location and workspace name.
+    results: [21, 33]
+  - id: R3
+    requirement: Custom proxy fields become editable, No proxy clears and disables them, and switching
+      back to Application restores the Taomni proxy without changing Settings.
+    actions: [24, 26, 27, 28, 31]
+    checkpoints:
+    - step: 25
+      expectation: Custom mode enables the proxy fields.
+    - step: 29
+      expectation: No proxy disables the proxy fields.
+    - step: 32
+      expectation: Application mode restores the Taomni proxy URL.
+    results: [25, 29, 32]
+  - id: R4
+    requirement: A successful clone shows phase/percent progress, publishes the workspace and its project
+      tree, and sends the expected redacted request without a token.
+    actions: [34]
+    checkpoints:
+    - step: 38
+      expectation: The clone reaches the success summary.
+    - step: 42
+      expectation: The active workspace switcher shows the cloned workspace name.
+    - step: 47
+      expectation: The redacted clone request names the expected workspace.
+    - step: 49
+      expectation: The request records the saved-token default without plaintext.
+    - step: 50
+      expectation: The request records that the saved token was used.
+    results: [38, 42, 47, 49, 50]
+  - id: R5
+    requirement: The successful workflow completes without uncaught runtime errors.
+    actions: [51]
+    checkpoints:
+    - step: 52
+      expectation: The published workspace tree remains visible after the workflow.
+    results: [52]
+  visual:
+  - check: Dialog default fields, proxy-mode states, progress panel, success summary and the cloned project tree.
+    method: manual
+    reason: The retained git-clone-defaults-proxy-browser.png screenshot is reviewed for the dialog layout and state presentation.
+  native:
+  - check: Real Git subprocess, repository configuration and disk bytes.
+    method: not-applicable
+    reason: This browser-only case uses the controlled stub; TC-WS-GIT-CLONE-03 owns real native Git/disk evidence.

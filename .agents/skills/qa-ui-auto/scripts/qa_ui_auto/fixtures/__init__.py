@@ -81,6 +81,7 @@ from . import workspace_ignored_ancestor_root
 from . import parity005_completion
 from . import parity006_replace
 from . import parity008_git
+from . import git_clone_source
 from . import git_change_types
 from . import parity009_ssr
 from . import parity007_extract
@@ -232,6 +233,7 @@ REGISTRY: dict[str, Fixture] = {
     "java_sample_projects": Fixture("java_sample_projects", java_sample_projects.setup),
     "java25_projects": Fixture("java25_projects", java25_projects.setup),
     "git_diff_repo": Fixture("git_diff_repo", git_diff_repo.setup, git_diff_repo.teardown),
+    "git_clone_source": Fixture("git_clone_source", git_clone_source.setup, git_clone_source.teardown),
     "welcome_recents": Fixture("welcome_recents", welcome_recents.setup, welcome_recents.teardown),
     "editor_typing_fixtures": Fixture("editor_typing_fixtures", editor_typing_fixtures.setup, editor_typing_fixtures.teardown),
     "restore_24tab_fixtures": Fixture("restore_24tab_fixtures", restore_24tab_fixtures.setup, restore_24tab_fixtures.teardown),

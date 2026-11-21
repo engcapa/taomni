@@ -373,6 +373,8 @@ controls:
     aliases:
       - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
       - '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
     kind: display
   - id: plugin-tab-error
     selector: '[data-testid="plugin-tab-error"]'
@@ -385,6 +387,7 @@ controls:
     aliases:
       - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-settings"]'
       - '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-settings"]'
+      - '[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]'
     kind: interactive
   - id: plugin-tab-loading
     selector: '[data-testid="plugin-tab-loading"]'
@@ -7399,6 +7402,9 @@ files:
 controls:
   - id: mail-client-tab
     selector: '[data-testid="mail-client-tab"]'
+    aliases:
+      - '[data-plugin-slug="mail"] [data-testid="mail-client-tab"]'
+      - '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]'
     kind: display
   - id: compose-open
     selector: '[data-testid="mail-compose-open"]'
@@ -8439,6 +8445,8 @@ controls:
     optional: true       # app menu (Tools); macOS uses the native menu
   - id: unified-tab
     selector: '[data-testid="mail-unified-tab"]'
+    aliases:
+      - '[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="mail-unified-tab"]'
     kind: display
   - id: unified-refresh
     selector: '[data-testid="mail-unified-refresh"]'
@@ -14114,6 +14122,15 @@ files:
 - src/stores/agentsStore.ts
 - src/stores/workspaceEditorStore.ts
 - src/stores/workspaceUiStore.ts
+- src/stores/gitCloneStore.ts
+- src/lib/gitClone.ts
+- src/components/workspace/WorkspaceGitCloneModal.tsx
+- src/components/workspace/gitClone/gitCloneForm.ts
+- src/components/workspace/gitClone/GitCloneFields.tsx
+- src/components/workspace/gitClone/GitCloneProgressView.tsx
+- src-tauri/src/git/clone.rs
+- src-tauri/src/git/clone/runner.rs
+- src-tauri/src/git/clone/settings.rs
 - src/components/editor/workspace/explorerPreferences.ts
 - src/components/editor/workspace/ExplorerSortControls.tsx
 - src/components/editor/workspace/ProjectTreeFlat.tsx
@@ -14699,11 +14716,89 @@ controls:
 - id: workspace-tab-categories
   selector: '[data-testid="workspace-tab-categories"]'
   kind: display
+- id: workspace-git-clone-modal
+  selector: '[data-testid="workspace-git-clone-modal"]'
+  kind: display
+- id: workspace-plus-clone-git
+  selector: '[data-testid="workspace-plus-clone-git"]'
+  kind: interactive
+- id: workspace-switcher-clone-git
+  selector: '[data-testid="workspace-switcher-clone-git"]'
+  kind: interactive
+  optional: true
+- id: workspace-git-clone-url
+  selector: '[data-testid="workspace-git-clone-url"]'
+  kind: interactive
+- id: workspace-git-clone-name
+  selector: '[data-testid="workspace-git-clone-name"]'
+  kind: interactive
+- id: workspace-git-clone-location
+  selector: '[data-testid="workspace-git-clone-location"]'
+  kind: interactive
+- id: workspace-git-clone-branch
+  selector: '[data-testid="workspace-git-clone-branch"]'
+  kind: interactive
+- id: workspace-git-clone-branch-detect
+  selector: '[data-testid="workspace-git-clone-branch-detect"]'
+  kind: interactive
+- id: workspace-git-clone-user-name
+  selector: '[data-testid="workspace-git-clone-user-name"]'
+  kind: interactive
+- id: workspace-git-clone-user-email
+  selector: '[data-testid="workspace-git-clone-user-email"]'
+  kind: interactive
+- id: workspace-git-clone-proxy-app
+  selector: '[data-testid="workspace-git-clone-proxy-app"]'
+  kind: interactive
+- id: workspace-git-clone-proxy-custom
+  selector: '[data-testid="workspace-git-clone-proxy-custom"]'
+  kind: interactive
+- id: workspace-git-clone-proxy-none
+  selector: '[data-testid="workspace-git-clone-proxy-none"]'
+  kind: interactive
+- id: workspace-git-clone-http-proxy
+  selector: '[data-testid="workspace-git-clone-http-proxy"]'
+  kind: interactive
+- id: workspace-git-clone-https-proxy
+  selector: '[data-testid="workspace-git-clone-https-proxy"]'
+  kind: interactive
+- id: workspace-git-clone-destination
+  selector: '[data-testid="workspace-git-clone-destination"]'
+  kind: display
+- id: workspace-git-clone-start
+  selector: '[data-testid="workspace-git-clone-start"]'
+  kind: interactive
+- id: workspace-git-clone-close
+  selector: '[data-testid="workspace-git-clone-close"]'
+  kind: interactive
+- id: workspace-git-clone-cancel
+  selector: '[data-testid="workspace-git-clone-cancel"]'
+  kind: interactive
+- id: workspace-git-clone-retry
+  selector: '[data-testid="workspace-git-clone-retry"]'
+  kind: interactive
+- id: workspace-git-clone-progress
+  selector: '[data-testid="workspace-git-clone-progress"]'
+  kind: display
+- id: workspace-git-clone-phase
+  selector: '[data-testid="workspace-git-clone-phase"]'
+  kind: display
+- id: workspace-git-clone-percent
+  selector: '[data-testid="workspace-git-clone-percent"]'
+  kind: display
+- id: workspace-git-clone-success
+  selector: '[data-testid="workspace-git-clone-success"]'
+  kind: display
+- id: workspace-git-clone-cancelled
+  selector: '[data-testid="workspace-git-clone-cancelled"]'
+  kind: display
 -->
 
 Workspaces 模式左栏提供工作区切换器（默认工作区不可删除）、多根文件树（新建文件/目录、添加/移除根目录）、工作区标签条与打开任意会话入口；画布内含编辑器、Git 面板与隔离会话。
 
 Issue #792 的生产 Project 树沿用 F25.1 的根/目录/文件行控件（不新增 QA hook/testid）：根由 `data-root-id`/`data-root-path`/`data-tree-kind=root` 标识，目录由 `data-root-id`/`data-path`/`data-tree-kind=dir` 标识，统一悬停 `data-drop-target=true`。TC-WS-087/088 同时 covers F25.1/F-WS-2，拒绝文件行与实际空白命中，并通过隔离 source/root1/root2 全量哈希与目录集断言证明不污染。两个用例都是合成事件入口；native 额外证明真实导入 IPC/磁盘的边界，不能宣称真实文件管理器/OS 拖拽手势已验证。
+
+工作区 Git 克隆入口位于标签条 `+` 菜单、工作区切换器菜单和 Home 的 Clone 卡片；对话框支持仓库地址、工作区名、可编辑上层目录（默认 `~/taomni-workspaces`）、分支检测、user.name/user.email、http/https 代理三模式与 token/vault 提示。TC-WS-GIT-CLONE-01/02 覆盖 browser 默认值、进度、后台关闭、取消和重试；TC-WS-GIT-CLONE-03 在 native 验证真实 Git、分支、仓库本地配置与磁盘字节。
 
 ### 12.3 左侧主导航条底部工具与左下角 MFA 悬浮窗
 

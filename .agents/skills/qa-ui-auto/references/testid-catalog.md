@@ -1616,6 +1616,8 @@
 ## mail/compose (F-MAIL-1)
 
 - `[data-testid="mail-client-tab"]` — display — F-MAIL-1.mail-client-tab
+  ↳ `[data-plugin-slug="mail"] [data-testid="mail-client-tab"]` — alias
+  ↳ `[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]` — alias
 - `[data-testid="mail-compose-open"]` — interactive — F-MAIL-1.compose-open
 - `[data-testid="mail-compose-dialog"]` — display — F-MAIL-1.compose-dialog
 - `[data-testid="mail-recipient-to"]` — interactive — F-MAIL-1.recipient-to
@@ -1897,6 +1899,7 @@
 - `[data-testid="sidebar-tool-mail-unified"]` — interactive — F-MAIL-20.open-unified
 - `[data-testid="context-menu-item-mail-unified"]` — interactive [optional] — F-MAIL-20.open-unified-menu
 - `[data-testid="mail-unified-tab"]` — display — F-MAIL-20.unified-tab
+  ↳ `[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="mail-unified-tab"]` — alias
 - `[data-testid="mail-unified-refresh"]` — interactive — F-MAIL-20.unified-refresh
 - `[data-testid="mail-unified-status"]` — display — F-MAIL-20.unified-status
 - `[data-testid="mail-unified-row"]` — interactive — F-MAIL-20.unified-row
@@ -2330,6 +2333,31 @@
 - `[data-testid="workspace-tab-filter-local"]` — interactive — F-WS-2.workspace-tab-filter-local
 - `[data-testid="workspace-tab-filter-other"]` — interactive — F-WS-2.workspace-tab-filter-other
 - `[data-testid="workspace-tab-categories"]` — display — F-WS-2.workspace-tab-categories
+- `[data-testid="workspace-git-clone-modal"]` — display — F-WS-2.workspace-git-clone-modal
+- `[data-testid="workspace-plus-clone-git"]` — interactive — F-WS-2.workspace-plus-clone-git
+- `[data-testid="workspace-switcher-clone-git"]` — interactive [optional] — F-WS-2.workspace-switcher-clone-git
+- `[data-testid="workspace-git-clone-url"]` — interactive — F-WS-2.workspace-git-clone-url
+- `[data-testid="workspace-git-clone-name"]` — interactive — F-WS-2.workspace-git-clone-name
+- `[data-testid="workspace-git-clone-location"]` — interactive — F-WS-2.workspace-git-clone-location
+- `[data-testid="workspace-git-clone-branch"]` — interactive — F-WS-2.workspace-git-clone-branch
+- `[data-testid="workspace-git-clone-branch-detect"]` — interactive — F-WS-2.workspace-git-clone-branch-detect
+- `[data-testid="workspace-git-clone-user-name"]` — interactive — F-WS-2.workspace-git-clone-user-name
+- `[data-testid="workspace-git-clone-user-email"]` — interactive — F-WS-2.workspace-git-clone-user-email
+- `[data-testid="workspace-git-clone-proxy-app"]` — interactive — F-WS-2.workspace-git-clone-proxy-app
+- `[data-testid="workspace-git-clone-proxy-custom"]` — interactive — F-WS-2.workspace-git-clone-proxy-custom
+- `[data-testid="workspace-git-clone-proxy-none"]` — interactive — F-WS-2.workspace-git-clone-proxy-none
+- `[data-testid="workspace-git-clone-http-proxy"]` — interactive — F-WS-2.workspace-git-clone-http-proxy
+- `[data-testid="workspace-git-clone-https-proxy"]` — interactive — F-WS-2.workspace-git-clone-https-proxy
+- `[data-testid="workspace-git-clone-destination"]` — display — F-WS-2.workspace-git-clone-destination
+- `[data-testid="workspace-git-clone-start"]` — interactive — F-WS-2.workspace-git-clone-start
+- `[data-testid="workspace-git-clone-close"]` — interactive — F-WS-2.workspace-git-clone-close
+- `[data-testid="workspace-git-clone-cancel"]` — interactive — F-WS-2.workspace-git-clone-cancel
+- `[data-testid="workspace-git-clone-retry"]` — interactive — F-WS-2.workspace-git-clone-retry
+- `[data-testid="workspace-git-clone-progress"]` — display — F-WS-2.workspace-git-clone-progress
+- `[data-testid="workspace-git-clone-phase"]` — display — F-WS-2.workspace-git-clone-phase
+- `[data-testid="workspace-git-clone-percent"]` — display — F-WS-2.workspace-git-clone-percent
+- `[data-testid="workspace-git-clone-success"]` — display — F-WS-2.workspace-git-clone-success
+- `[data-testid="workspace-git-clone-cancelled"]` — display — F-WS-2.workspace-git-clone-cancelled
 
 ## main/workspace-platform (F-WS-3)
 
@@ -2734,11 +2762,14 @@
 - `[data-testid="plugin-tab-unavailable"]` — display — F-Modules-1.plugin-tab-unavailable
   ↳ `[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
   ↳ `[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
+  ↳ `[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
+  ↳ `[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
 - `[data-testid="plugin-tab-error"]` — display — F-Modules-1.plugin-tab-error
 - `[data-testid="plugin-tab-retry"]` — interactive — F-Modules-1.plugin-tab-retry
 - `[data-testid="plugin-tab-settings"]` — interactive — F-Modules-1.plugin-tab-settings
   ↳ `[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-settings"]` — alias
   ↳ `[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-settings"]` — alias
+  ↳ `[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]` — alias
 - `[data-testid="plugin-tab-loading"]` — display [optional] — F-Modules-1.plugin-tab-loading
 - `[data-testid="hello-plugin-view"]` — display — F-Modules-1.hello-plugin-view
 - `[data-testid="hello-plugin-value"]` — interactive — F-Modules-1.hello-plugin-value

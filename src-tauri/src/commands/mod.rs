@@ -191,7 +191,11 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "git_set_remote"
         | "git_delete_remote"
         | "git_save_settings"
-        | "git_save_remote_auth" => git::handle(invoke),
+        | "git_save_remote_auth"
+        | "git_clone_defaults"
+        | "git_clone_probe"
+        | "git_clone_repository"
+        | "git_clone_cancel" => git::handle(invoke),
         "sdk_get_registry"
         | "sdk_probe_installation"
         | "sdk_discover_installations"

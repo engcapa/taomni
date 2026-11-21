@@ -3,6 +3,7 @@ import { voiceStub } from "./voiceStub";
 import { installStubMailQaControl } from "./mailServerStub";
 import { stubMfaInvoke } from "./mfaStub";
 import { parity008Handles, parity008Invoke } from "./parity008Git";
+import { invokeGitClone } from "./commands/gitClone";
 import { CommandRegistry } from "./commands/registry";
 import { mailStubSeed, invokeMail } from "./commands/mail";
 import { type InvokeOptions } from "./commands/runtime";
@@ -53,6 +54,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
   }
   // ED-PARITY-008 isolated two-repository Git fixture (opt-in via localStorage).
   if (parity008Handles(cmd, args)) return await parity008Invoke(cmd, args) as T;
+  if (cmd.startsWith("git_clone_")) return await invokeGitClone(cmd, args) as T;
   // MFA authenticator: localStorage mirror of mfa.db gated by the stub vault.
   if (cmd.startsWith("mfa_")) {
     const vault = loadStubVault();
