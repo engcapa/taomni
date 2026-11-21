@@ -122,7 +122,9 @@ selected scope 会自动并入 `crash-regression` 标签用例（AGENTS.md 要�
 |---|---|---|
 | `44936461619` / `3fab61357` | Linux/Windows/macOS 各 23 passed（22+1 单用例 shard），0 failed；含 TC-NP-001..005 | macOS 4 shards：TC-NP-101/102 通过；Linux/Windows `TC-FILE-OPEN-002`（后续定位为 CM 缺 `defaultKeymap`）与 `TC-FILE-OPEN-006`（`has-text` 选择器不支持 native）失败，其余 crash 套件通过 |
 | `44945018379` / `5327b1af9` | 同上，三端 69/69 通过（含 5 个 Notepad 用例） | 三端各 24 cases：TC-NP-101/102 **全部通过**；仅剩 `TC-FILE-OPEN-006` 的 Playwright-only `:has-text` 等待（分支已修） |
-| `44951373132` / `a6158201a` | 最终证据运行 | 最终证据运行 |
+| `44951373132` / `a6158201a` | **最终证据：全绿**（Linux/Windows/macOS 各 22+1，0 failed） | **最终证据：全绿**（三端 native 各 4 shards × 6 cases，0 failed；TC-NP-101/102 三端通过，crash-regression 套件三端通过） |
+
+**最终运行 `44951373132`（head `a6158201a`）conclusion=success：**浏览器 69/69、native 60/60，合计 129 个用例执行、0 失败；Notepad 7 个用例在 Linux/Windows/macOS 的 browser+native（共 21 次执行）全部通过，崩溃回归套件三端全绿。shard 报告产物在 `qa-ui-auto-report/hosted/run6/`。
 
 本地同时用同一 head 的 debug QA 二进制在隔离 Xvfb/DBus 会话验证 TC-NP-101/102 与 `TC-FILE-OPEN-002`。与本次改动无关的既有 flake（如 DB-GRID 指针稳定性、Markdown 导出质量用例）在各轮单独出现且与本分支无因果关系，未混入 Notepad 结论；未执行平台/项目保持“未验证”。
 
