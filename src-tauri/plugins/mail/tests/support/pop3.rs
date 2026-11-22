@@ -106,6 +106,7 @@ async fn serve(listener: TcpListener, commit: bool) {
     for (command, response) in [
         ("USER qa", &b"+OK\r\n"[..]),
         ("PASS fixture-password", &b"+OK\r\n"[..]),
+        ("STAT", &b"+OK 1 42\r\n"[..]),
         ("UIDL", &b"+OK\r\n7 routed-uidl\r\n.\r\n"[..]),
         (
             "RETR 7",

@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- 合入远程 `main` 的 `ab6c4831a`（#860）。标签概览与工具栏相关 44 项单测、TypeScript、重构边界和 QA 静态审计通过。`5a6e98c61` 三端 Browser 各通过 34/34。POP3 进程测试的三端原始回执均显示测试服务器漏答登录后的 `STAT`，夹具已补齐并通过编译检查。 [Browser 与 Native](https://github.com/engcapa/taomni/actions/runs/44983227602) · [POP3 进程回执](https://github.com/engcapa/taomni/actions/runs/44983222465)
 - Mail 0.1.20 由签名宿主执行 POP3 的 UIDL、原件读取和删除标记。核心过渡层持有原账户库，先提交原件再允许宿主发送 QUIT。新增 TC-MODULES-076 验证签名安装、真实收信、读信、去重和停用。宿主进程用例核对二进制 MIME、主动提交和中断时关闭连接。83 项 Rust 单测、核心和宿主测试编译通过。
 - GitHub 原生分片发现 SocksCap 从空 Vault 导入链接时打开了解锁窗口。上游凭据改用统一 Vault 流程，首次设置完成后继续当前导入。TC-MODULES-075 验证 Browser 的取消、续办和 UUID 引用，TC-MODULES-072 核对签名宿主及实际端点。首轮用于预置 macOS 引导的字符串被测试工具拒绝，配置用例改为通过关闭按钮退出实际引导。Local Voice 复跑在设置页选预置模型，回到打开的聊天窗口验证实际录音。 [原生失败分片](https://github.com/engcapa/taomni/actions/runs/44975396751) · [合并版分片](https://github.com/engcapa/taomni/actions/runs/44981741088)
 - Mail 0.1.19 将归档暂停状态、待归档索引和原件发布检查迁入邮件引擎。发布与清理使用同一 SQLite 写锁。两个连接的单测核对暂停、跳过旧 UIDVALIDITY 和删除时序。69 项引擎单测、10 项宿主单测及核心编译通过。TC-MODULES-070 核对续传后的持久化状态，TC-MAIL-STORAGE-06 核对主动清理后暂停。签名宿主接管归档索引和缓存写入仍待完成。
