@@ -8,6 +8,9 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::IncomingTest;
 
+#[path = "imap_sync_stream.rs"]
+pub mod sync;
+
 const MAX_FRAME_BYTES: usize = taomni_plugin_stream::MAX_PAYLOAD_BYTES;
 pub const MAX_PREFETCH_BODIES: usize = 4;
 

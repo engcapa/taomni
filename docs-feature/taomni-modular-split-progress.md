@@ -1,5 +1,13 @@
 # 模块化实施与验收台账
 
+## 2026-11-23 当前进展
+
+- Mail 0.1.28 的签名宿主支持按偏移量读取 IMAP 邮件头。关闭缓存时，邮件列表使用服务器分页并保留文件夹树。TC-MODULES-086 和 087 覆盖首页、继续加载、无重复和最后一页。三个 GitHub Runner 已通过宿主协议验证。首轮 Browser 用例缺少连接夹具变量，已补齐并派发复跑。 [宿主回执](https://github.com/engcapa/taomni/actions/runs/45059596326) · [Browser 复跑](https://github.com/engcapa/taomni/actions/runs/45061276996)
+- Mail 0.1.29 将含正文的分页、单文件夹和账号同步交给签名宿主。宿主逐封传回用户允许保存的原件，基座在用户选定的目录完成文件写入并返回结果。已装旧模块仍使用原有接口。104 项 Rust 单测、核心编译和模块边界检查通过。新宿主跨进程验证和缓存、归档索引的迁移继续进行。
+- 原生归档附件的保存选择器已修正，Linux 与 macOS 的 TC-MODULES-070 都实际保存并核对了导出的 SHA-256。Linux 和 Windows 的三态自动还原修正了 QA 隔离目录环境与桥接输入。Windows SocksCap 用例现在按旧格式日志的 `Active` 默认值检查实际监听，等待验证停用和驱动文件删除。 [归档回执](https://github.com/engcapa/taomni/actions/runs/45041946604) · [三端原生复验](https://github.com/engcapa/taomni/actions/runs/45059590681)
+- 已单独保存 Windows 原始分片 `45036209138/live-recovered`。PowerShell 错误包含 XML 禁止的字符，导致旧采集器反复拒收该分片。现有采集器保留原件并在 JUnit 语法错误时读取 JSON 用例结果。该分片的 runner receipt 与摘要文件的 SHA-256 已校验，包含归档保存与 WinDivert 旧版卸载的原始失败。 [原始执行](https://github.com/engcapa/taomni/actions/runs/45036209138)
+- 已派发适用主线签名方式的独立 MFA 宿主验证，包含运行、禁用和卸载保留三态的 Vault 与 HOTP 还原。最终候选仍需收齐四目标实装、核心依赖裁剪、发行目录和同源码 G1–G11 回执。 [签名 MFA](https://github.com/engcapa/taomni/actions/runs/45060444782)
+
 ## 2026-11-22 当前进展
 
 - 合入 `main` 的 #866。Browser 和 Native 工作流使用同分支的 Cargo 依赖与原生运行时工件，Linux 构建使用 lld。Windows 运行时缓存按 runner 镜像区分，SocksCap 辅助程序继续由模块工具包构建，签名包与即时分片采集保留。

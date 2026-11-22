@@ -100,7 +100,7 @@ pub struct FolderStepOutcome {
     pub new_unseen: usize,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HeaderStepRequest {
     pub account_id: String,
@@ -110,7 +110,7 @@ pub struct HeaderStepRequest {
     pub limit: usize,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HeaderPageRequest {
     pub account_id: String,

@@ -13,7 +13,7 @@ use super::{
     advance_state, imap_has_capability, imap_sync_folder_step,
 };
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FolderRoundRequest {
     pub folder: MailFolder,

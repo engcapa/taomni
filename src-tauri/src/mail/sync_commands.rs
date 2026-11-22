@@ -32,7 +32,8 @@ pub async fn mail_sync_headers(
         .unwrap_or(account.config.sync.max_fetch_per_sync)
         .max(1)
         .min(2000);
-    let include_bodies = include_bodies.unwrap_or(false);
+    let include_bodies =
+        include_bodies.unwrap_or(false) && cache_enabled && cache_settings.body_recent_limit > 0;
     let refresh_folders = refresh_folders.unwrap_or(true);
 
     let cached_folders = if cache_enabled {
@@ -51,14 +52,15 @@ pub async fn mail_sync_headers(
         limit,
         list_folders: do_list,
     };
-    let outcome = if !include_bodies && module_host::syncs_imap_page(&state.plugins) {
+    let outcome = if module_host::syncs_imap_page(&state.plugins, include_bodies) {
         let registry = &state.plugins;
-        let first = module_host::sync_imap_page(registry.clone(), &account, &page).await;
+        let first =
+            module_host::sync_imap_page(registry.clone(), &account, &page, include_bodies).await;
         if first
             .as_ref()
             .is_err_and(|error| is_imap_transport_error(error))
         {
-            module_host::sync_imap_page(registry.clone(), &account, &page).await?
+            module_host::sync_imap_page(registry.clone(), &account, &page, include_bodies).await?
         } else {
             first?
         }
@@ -187,7 +189,9 @@ pub async fn mail_sync_folder(
         limit: limit
             .unwrap_or(account.config.sync.max_fetch_per_sync)
             .clamp(1, 2000) as usize,
-        include_bodies: include_bodies.unwrap_or(false),
+        include_bodies: include_bodies.unwrap_or(false)
+            && cache_enabled
+            && cache_settings.body_recent_limit > 0,
         condstore: false,
     };
     // Without a cache there is nothing to resume from: every call is a fresh
@@ -203,7 +207,7 @@ pub async fn mail_sync_folder(
     };
 
     let started_ms = sync::now_ms();
-    let result = if !params.include_bodies && module_host::syncs_imap_headers(&state.plugins) {
+    let result = if module_host::syncs_imap_headers(&state.plugins, params.include_bodies) {
         let step = taomni_mail_engine::imap_sync::HeaderStepRequest {
             account_id: account_id.clone(),
             folder: folder.clone(),
@@ -211,12 +215,24 @@ pub async fn mail_sync_folder(
             mode: params.request,
             limit: params.limit,
         };
-        let first = module_host::sync_imap_headers(state.plugins.clone(), &account, &step).await;
+        let first = module_host::sync_imap_headers(
+            state.plugins.clone(),
+            &account,
+            &step,
+            params.include_bodies,
+        )
+        .await;
         if first
             .as_ref()
             .is_err_and(|error| is_imap_transport_error(error))
         {
-            module_host::sync_imap_headers(state.plugins.clone(), &account, &step).await
+            module_host::sync_imap_headers(
+                state.plugins.clone(),
+                &account,
+                &step,
+                params.include_bodies,
+            )
+            .await
         } else {
             first
         }
@@ -290,7 +306,8 @@ pub async fn mail_sync_all_folders(
     let limit = limit
         .unwrap_or(account.config.sync.max_fetch_per_sync)
         .clamp(1, 2000) as usize;
-    let include_bodies = include_bodies.unwrap_or(false);
+    let include_bodies =
+        include_bodies.unwrap_or(false) && cache_enabled && cache_settings.body_recent_limit > 0;
     let reconcile_mode = if full_reconcile.unwrap_or(false) {
         MailSyncRequestMode::ReconcileFull
     } else {
@@ -430,13 +447,21 @@ async fn sync_account_folder(
     request: FolderRoundRequest,
     include_bodies: bool,
 ) -> Result<FolderRoundOutcome, String> {
-    if !include_bodies && module_host::syncs_imap_round(&state.plugins) {
-        let first = module_host::sync_imap_round(state.plugins.clone(), account, &request).await;
+    if module_host::syncs_imap_round(&state.plugins, include_bodies) {
+        let first =
+            module_host::sync_imap_round(state.plugins.clone(), account, &request, include_bodies)
+                .await;
         if first
             .as_ref()
             .is_err_and(|error| is_imap_transport_error(error))
         {
-            return module_host::sync_imap_round(state.plugins.clone(), account, &request).await;
+            return module_host::sync_imap_round(
+                state.plugins.clone(),
+                account,
+                &request,
+                include_bodies,
+            )
+            .await;
         }
         return first;
     }

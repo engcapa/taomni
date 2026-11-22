@@ -14,9 +14,9 @@ use crate::imap_messages::{Mailbox, imap_fetch_attachment, imap_fetch_raw};
 use crate::imap_mutations::{imap_delete_messages, imap_set_flags, unread_uids};
 use crate::imap_outgoing::{store_remote_draft, store_sent_copy};
 use crate::imap_sync::{
-    FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderPageOutcome,
-    HeaderPageRequest, HeaderStepRequest, StepParams, imap_has_capability, imap_sync_folder_step,
-    sync_folder_round,
+    BodySyncOutcome, BodySyncRequest, BodySyncTask, FolderRoundOutcome, FolderRoundRequest,
+    FolderStepOutcome, HeaderPageOutcome, HeaderPageRequest, HeaderStepRequest, StepParams,
+    imap_has_capability, imap_sync_folder_step, sync_folder_round,
 };
 use crate::search::{ImapSearchRequest, search_imap_messages};
 use crate::tls::{MailConnectionSecurity, certificate_error_hint, tls_connector};
@@ -147,9 +147,20 @@ impl ImapSession {
         &mut self,
         request: &HeaderStepRequest,
     ) -> Result<FolderStepOutcome, String> {
+        let cache = MailCacheSettings::default();
+        let mut mailbox = header_mailbox(&request.account_id, &request.folder, &cache);
+        self.sync_step(&mut mailbox, request, false)
+    }
+
+    fn sync_step(
+        &mut self,
+        mailbox: &mut Mailbox<'_, impl FnMut(u32, &[u8]) -> Result<(), String>>,
+        request: &HeaderStepRequest,
+        include_bodies: bool,
+    ) -> Result<FolderStepOutcome, String> {
         match self {
-            Self::Plain(session) => sync_headers(session, request),
-            Self::Tls(session) => sync_headers(session, request),
+            Self::Plain(session) => sync_step(session, mailbox, request, include_bodies),
+            Self::Tls(session) => sync_step(session, mailbox, request, include_bodies),
         }
     }
 
@@ -157,15 +168,28 @@ impl ImapSession {
         &mut self,
         page: &HeaderPageRequest,
     ) -> Result<HeaderPageOutcome, String> {
+        let cache = MailCacheSettings::default();
+        let mut mailbox = header_mailbox(&page.account_id, &page.folder, &cache);
+        self.sync_page(&mut mailbox, page, false)
+    }
+
+    fn sync_page(
+        &mut self,
+        mailbox: &mut Mailbox<'_, impl FnMut(u32, &[u8]) -> Result<(), String>>,
+        page: &HeaderPageRequest,
+        include_bodies: bool,
+    ) -> Result<HeaderPageOutcome, String> {
         let folders = page
             .list_folders
             .then(|| self.list_folders(&page.account_id))
             .transpose()?;
-        let cache = MailCacheSettings::default();
-        let mut mailbox = header_mailbox(&page.account_id, &page.folder, &cache);
         let (selected, messages, has_more) = match self {
-            Self::Plain(session) => mailbox.fetch_page(session, page.offset, page.limit, false),
-            Self::Tls(session) => mailbox.fetch_page(session, page.offset, page.limit, false),
+            Self::Plain(session) => {
+                mailbox.fetch_page(session, page.offset, page.limit, include_bodies)
+            }
+            Self::Tls(session) => {
+                mailbox.fetch_page(session, page.offset, page.limit, include_bodies)
+            }
         }?;
         Ok(HeaderPageOutcome {
             folders,
@@ -178,9 +202,50 @@ impl ImapSession {
     pub fn sync_header_round(&mut self, request: &FolderRoundRequest) -> FolderRoundOutcome {
         let cache = MailCacheSettings::default();
         let mut mailbox = header_mailbox(&request.folder.account_id, &request.folder.name, &cache);
+        self.sync_round(&mut mailbox, request, false)
+    }
+
+    fn sync_round(
+        &mut self,
+        mailbox: &mut Mailbox<'_, impl FnMut(u32, &[u8]) -> Result<(), String>>,
+        request: &FolderRoundRequest,
+        include_bodies: bool,
+    ) -> FolderRoundOutcome {
         match self {
-            Self::Plain(session) => sync_folder_round(session, &mut mailbox, request, false),
-            Self::Tls(session) => sync_folder_round(session, &mut mailbox, request, false),
+            Self::Plain(session) => sync_folder_round(session, mailbox, request, include_bodies),
+            Self::Tls(session) => sync_folder_round(session, mailbox, request, include_bodies),
+        }
+    }
+
+    pub fn sync_with_bodies(
+        &mut self,
+        request: &BodySyncRequest,
+        save_original: impl FnMut(u32, &[u8]) -> Result<(), String>,
+    ) -> Result<BodySyncOutcome, String> {
+        let (account_id, name) = request.task.mailbox();
+        let cache = MailCacheSettings {
+            body_recent_limit: request.recent_limit,
+            body_max_bytes: request.max_bytes,
+            ..MailCacheSettings::default()
+        };
+        let mut mailbox = Mailbox {
+            account_id,
+            name,
+            cache: &cache,
+            save_original,
+        };
+        match &request.task {
+            BodySyncTask::Page(page) => self
+                .sync_page(&mut mailbox, page, true)
+                .map(BodySyncOutcome::Page),
+            BodySyncTask::Step(step) => self
+                .sync_step(&mut mailbox, step, true)
+                .map(BodySyncOutcome::Step),
+            BodySyncTask::Round(round) => Ok(BodySyncOutcome::Round(self.sync_round(
+                &mut mailbox,
+                round,
+                true,
+            ))),
         }
     }
 
@@ -275,19 +340,19 @@ impl ImapSession {
     }
 }
 
-fn sync_headers<T: Read + Write>(
+fn sync_step<T: Read + Write>(
     session: &mut Session<T>,
+    mailbox: &mut Mailbox<'_, impl FnMut(u32, &[u8]) -> Result<(), String>>,
     step: &HeaderStepRequest,
+    include_bodies: bool,
 ) -> Result<FolderStepOutcome, String> {
     let params = StepParams {
         request: step.mode,
         limit: step.limit,
-        include_bodies: false,
+        include_bodies,
         condstore: imap_has_capability(session, "CONDSTORE"),
     };
-    let cache = MailCacheSettings::default();
-    let mut mailbox = header_mailbox(&step.account_id, &step.folder, &cache);
-    imap_sync_folder_step(session, &mut mailbox, &step.state, &params)
+    imap_sync_folder_step(session, mailbox, &step.state, &params)
 }
 
 fn header_mailbox<'a>(

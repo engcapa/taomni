@@ -22,6 +22,7 @@ pub const CHECK_OUTGOING: &str = "mail/check-outgoing";
 pub const IMAP_FOLDER_TREE: &str = "mail/imap-folder-tree";
 pub const MUTATE_IMAP_FOLDER: &str = "mail/mutate-imap-folder";
 pub const SYNC_IMAP_HEADERS: &str = "mail/sync-imap-headers";
+pub const SYNC_IMAP_BODIES: &str = "mail/sync-imap-bodies";
 pub const SYNC_IMAP_PAGE: &str = "mail/sync-imap-page";
 pub const SYNC_IMAP_ROUND: &str = "mail/sync-imap-round";
 pub const SEARCH_IMAP: &str = "mail/search-imap";

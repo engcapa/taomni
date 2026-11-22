@@ -50,6 +50,16 @@ pub(super) fn with_socket<T: Send + 'static>(
     input: IncomingTest,
     work: impl FnOnce(TcpStream, IncomingTest) -> Result<T, String> + Send + 'static,
 ) -> Result<Result<T, String>, RpcError> {
+    with_socket_and_reply(runtime, operation, input, None, work)
+}
+
+pub(super) fn with_socket_and_reply<T: Send + 'static>(
+    runtime: &Runtime,
+    operation: &Operation,
+    input: IncomingTest,
+    reply: Option<TcpStream>,
+    work: impl FnOnce(TcpStream, IncomingTest) -> Result<T, String> + Send + 'static,
+) -> Result<Result<T, String>, RpcError> {
     if input.server_name.trim().is_empty() || input.username.trim().is_empty() {
         return Err(RpcError::from_code(ErrorCode::InvalidParams));
     }
@@ -66,6 +76,9 @@ pub(super) fn with_socket<T: Send + 'static>(
         if result.is_err() {
             // Closing both halves wakes native TLS and any blocked protocol read.
             let _ = interrupt.shutdown(Shutdown::Both);
+            if let Some(reply) = reply {
+                let _ = reply.shutdown(Shutdown::Both);
+            }
             let _ = worker.await;
         }
         result

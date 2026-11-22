@@ -4,6 +4,7 @@ mod archive;
 mod archive_decoding;
 mod archive_encoding;
 pub(super) mod attachment_cache;
+mod body_sync;
 pub(super) use archive_decoding::{decode_archive_attachment, decode_archive_original};
 pub(super) use archive_encoding::ArchiveEncoder;
 mod downloads;
@@ -38,14 +39,14 @@ use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, FETCH_IMAP_RAW,
     FolderSubscription, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, ImapFlagUpdate, ImapFolderChange,
     ImapFolderMutation, ImapFolderTree, IncomingTest, LIST_IMAP_UNREAD, MUTATE_IMAP_FOLDER,
-    SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, SLUG, SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS,
-    SYNC_IMAP_PAGE, SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
+    SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, SLUG, SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_BODIES,
+    SYNC_IMAP_HEADERS, SYNC_IMAP_PAGE, SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
     imap_exchange::{ImapExchange, read_frame, write_frame},
 };
 use taomni_mail_engine::delivery::PreparedMail;
 use taomni_mail_engine::imap_sync::{
-    FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderPageOutcome,
-    HeaderPageRequest, HeaderStepRequest,
+    BodySyncOutcome, BodySyncTask, FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome,
+    HeaderPageOutcome, HeaderPageRequest, HeaderStepRequest,
 };
 use taomni_mail_engine::search::ImapSearchRequest;
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
@@ -72,16 +73,27 @@ pub(super) fn changes_imap_folders(registry: &PluginRegistry) -> bool {
     supports(registry, MUTATE_IMAP_FOLDER)
 }
 
-pub(super) fn syncs_imap_headers(registry: &PluginRegistry) -> bool {
-    supports(registry, SYNC_IMAP_HEADERS)
+pub(super) fn syncs_imap_headers(registry: &PluginRegistry, include_bodies: bool) -> bool {
+    supports_imap_sync(registry, SYNC_IMAP_HEADERS, include_bodies)
 }
 
-pub(super) fn syncs_imap_page(registry: &PluginRegistry) -> bool {
-    supports(registry, SYNC_IMAP_PAGE)
+pub(super) fn syncs_imap_page(registry: &PluginRegistry, include_bodies: bool) -> bool {
+    supports_imap_sync(registry, SYNC_IMAP_PAGE, include_bodies)
 }
 
-pub(super) fn syncs_imap_round(registry: &PluginRegistry) -> bool {
-    supports(registry, SYNC_IMAP_ROUND)
+pub(super) fn syncs_imap_round(registry: &PluginRegistry, include_bodies: bool) -> bool {
+    supports_imap_sync(registry, SYNC_IMAP_ROUND, include_bodies)
+}
+
+fn supports_imap_sync(registry: &PluginRegistry, headers: &str, include_bodies: bool) -> bool {
+    supports(
+        registry,
+        if include_bodies {
+            SYNC_IMAP_BODIES
+        } else {
+            headers
+        },
+    )
 }
 
 pub(super) fn searches_imap(registry: &PluginRegistry) -> bool {
@@ -112,9 +124,16 @@ pub(super) async fn sync_imap_headers(
     registry: Arc<PluginRegistry>,
     account: &ResolvedMailAccount,
     step: &HeaderStepRequest,
+    include_bodies: bool,
 ) -> Result<FolderStepOutcome, String> {
-    let outcome: FolderStepOutcome =
-        exchange_imap(registry, account, SYNC_IMAP_HEADERS, step).await?;
+    let outcome: FolderStepOutcome = if include_bodies {
+        match body_sync::exchange(registry, account, BodySyncTask::Step(step.clone())).await? {
+            BodySyncOutcome::Step(outcome) => outcome,
+            _ => return Err("Mail module returned the wrong sync result".into()),
+        }
+    } else {
+        exchange_imap(registry, account, SYNC_IMAP_HEADERS, step).await?
+    };
     if outcome.folder.account_id != step.account_id || outcome.folder.name != step.folder {
         return Err("Mail module returned another folder's result".into());
     }
@@ -125,9 +144,16 @@ pub(super) async fn sync_imap_page(
     registry: Arc<PluginRegistry>,
     account: &ResolvedMailAccount,
     request: &HeaderPageRequest,
+    include_bodies: bool,
 ) -> Result<HeaderPageOutcome, String> {
-    let outcome: HeaderPageOutcome =
-        exchange_imap(registry, account, SYNC_IMAP_PAGE, request).await?;
+    let outcome: HeaderPageOutcome = if include_bodies {
+        match body_sync::exchange(registry, account, BodySyncTask::Page(request.clone())).await? {
+            BodySyncOutcome::Page(outcome) => outcome,
+            _ => return Err("Mail module returned the wrong sync result".into()),
+        }
+    } else {
+        exchange_imap(registry, account, SYNC_IMAP_PAGE, request).await?
+    };
     let valid_folders = match &outcome.folders {
         Some(folders) => {
             request.list_folders && folders.iter().all(|f| f.account_id == request.account_id)
@@ -153,9 +179,16 @@ pub(super) async fn sync_imap_round(
     registry: Arc<PluginRegistry>,
     account: &ResolvedMailAccount,
     request: &FolderRoundRequest,
+    include_bodies: bool,
 ) -> Result<FolderRoundOutcome, String> {
-    let outcome: FolderRoundOutcome =
-        exchange_imap(registry, account, SYNC_IMAP_ROUND, request).await?;
+    let outcome: FolderRoundOutcome = if include_bodies {
+        match body_sync::exchange(registry, account, BodySyncTask::Round(request.clone())).await? {
+            BodySyncOutcome::Round(outcome) => outcome,
+            _ => return Err("Mail module returned the wrong sync result".into()),
+        }
+    } else {
+        exchange_imap(registry, account, SYNC_IMAP_ROUND, request).await?
+    };
     if outcome
         .steps
         .iter()

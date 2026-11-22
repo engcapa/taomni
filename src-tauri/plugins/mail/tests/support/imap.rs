@@ -24,9 +24,9 @@ use tokio::{
 
 use super::{MailHost, WAIT};
 
-const HEADER: &str =
+pub(super) const HEADER: &str =
     "From: sender@example.test\r\nSubject: Routed body\r\nContent-Type: text/plain\r\n\r\n";
-const TEXT: &str = "Body from the routed IMAP connection\r\n";
+pub(super) const TEXT: &str = "Body from the routed IMAP connection\r\n";
 
 pub(super) fn check_routed_header_pages(host: &mut MailHost) {
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -76,7 +76,10 @@ pub(super) fn check_routed_header_pages(host: &mut MailHost) {
                         assert!(reply.folders.is_none());
                     }
                 };
-                let fixture = FixtureFetch::Page { uid, list_folders };
+                let fixture = FixtureFetch::Page {
+                    uids: vec![uid],
+                    list_folders,
+                };
                 let (response, (), ()) = tokio::time::timeout(WAIT, async {
                     tokio::join!(response, read, serve(listener, fixture))
                 })
@@ -536,7 +539,7 @@ async fn serve_outgoing(listener: TcpListener, fixture: Outgoing<'_>) {
     assert_eq!(changes, expected);
 }
 
-async fn routed_mailbox() -> (TcpListener, Route, IncomingTest) {
+pub(super) async fn routed_mailbox() -> (TcpListener, Route, IncomingTest) {
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
     let address = listener.local_addr().unwrap();
     let (route, endpoint): (Route, Endpoint) = Route::bind(move || async move {
@@ -561,8 +564,8 @@ async fn routed_mailbox() -> (TcpListener, Route, IncomingTest) {
     (listener, route, connection)
 }
 
-enum FixtureFetch {
-    Page { uid: u32, list_folders: bool },
+pub(super) enum FixtureFetch {
+    Page { uids: Vec<u32>, list_folders: bool },
     Body,
     Prefetch,
     Archive,
@@ -573,7 +576,7 @@ enum FixtureFetch {
 impl FixtureFetch {
     fn uids(&self) -> &[u32] {
         match self {
-            Self::Page { uid, .. } => std::slice::from_ref(uid),
+            Self::Page { uids, .. } => uids,
             Self::Prefetch => &[23, 24],
             Self::Archive => &[23, 23],
             _ => &[23],
@@ -589,6 +592,15 @@ impl FixtureFetch {
         const BINARY: &str = "JVFB/wA=\r\n";
         match self {
             Self::Page { .. } => {
+                if request.ends_with("(UID FLAGS)") {
+                    return format!("* 1 FETCH (UID {uid} FLAGS ())\r\n");
+                }
+                if request.ends_with("(UID RFC822.SIZE BODY.PEEK[]<0.1024>)") {
+                    let size = HEADER.len() + TEXT.len();
+                    return format!(
+                        "* 1 FETCH (UID {uid} RFC822.SIZE {size} BODY[]<0> {{{size}}}\r\n{HEADER}{TEXT})\r\n"
+                    );
+                }
                 assert!(
                     request.ends_with("(UID FLAGS RFC822.SIZE INTERNALDATE BODY.PEEK[HEADER])")
                 );
@@ -641,7 +653,7 @@ impl FixtureFetch {
     }
 }
 
-async fn serve(listener: TcpListener, fixture: FixtureFetch) {
+pub(super) async fn serve(listener: TcpListener, fixture: FixtureFetch) {
     let (stream, _) = listener.accept().await.unwrap();
     let mut stream = BufReader::new(stream);
     stream
@@ -681,7 +693,11 @@ async fn serve(listener: TcpListener, fixture: FixtureFetch) {
                 if matches!(fixture, FixtureFetch::Page { .. })
                     && input.starts_with("UID SEARCH ") =>
             {
-                "* SEARCH 23 24\r\n".to_owned()
+                if input.contains("24:24") {
+                    "* SEARCH 24\r\n".into()
+                } else {
+                    "* SEARCH 23 24\r\n".into()
+                }
             }
             "UID" => {
                 let uid = fixture.uids()[fetches];

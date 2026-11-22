@@ -7,6 +7,7 @@ mod archive_decoding;
 mod archive_encoding;
 mod attachment_cache;
 mod commands;
+mod imap_body_sync;
 mod imap_exchange;
 mod incoming;
 mod local_drafts;
@@ -57,6 +58,7 @@ fn host_config() -> HostConfig {
                 STORE_IMAP_DRAFT,
                 DISCARD_IMAP_DRAFT,
                 SYNC_IMAP_HEADERS,
+                taomni_mail_api::SYNC_IMAP_BODIES,
                 SYNC_IMAP_PAGE,
                 SYNC_IMAP_ROUND,
                 SEARCH_IMAP,
@@ -217,6 +219,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(imap_exchange::sync_headers(&self.io, operation, input)?)
+            }
+            taomni_mail_api::SYNC_IMAP_BODIES => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(imap_body_sync::serve(&self.io, operation, input)?)
             }
             SYNC_IMAP_PAGE => {
                 let input = serde_json::from_value(params.unwrap_or_default())
