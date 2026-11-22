@@ -45,7 +45,7 @@ jobs:
       - uses: ./.github/actions/qa-runtime
         with:
           mode: ${{ matrix.mode }}
-          install_node_deps: ${{ inputs.operation != 'run' || matrix.mode != 'native' || contains(matrix.capabilities, 'updater') || contains(matrix.capabilities, 'mobile') }}
+          install_node_deps: ${{ (inputs.operation != 'run' && !(runner.os == 'Windows' && inputs.operation == 'contracts')) || matrix.mode != 'native' || contains(matrix.capabilities, 'updater') || contains(matrix.capabilities, 'mobile') }}
       - name: Native QA reusable runtime key
         id: reusable-key
         if: matrix.mode == 'native' && inputs.operation == 'build'
@@ -122,26 +122,26 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         if: matrix.mode == 'native' && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
       - name: Install verified fixed protoc
-        if: (matrix.mode == 'native') && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        if: (matrix.mode == 'native') && inputs.operation != 'run' && !(runner.os == 'Windows' && inputs.operation == 'contracts') && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
         run: python .agents/skills/qa-ui-auto/scripts/ci_setup_protoc.py
       - uses: swatinem/rust-cache@v2
         if: (matrix.mode == 'native') && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
         with:
           workspaces: src-tauri -> target/qa-ui-auto
-          shared-key: qa-platforms-${{ matrix.cache_key }}-${{ matrix.profile }}
+          shared-key: qa-platforms-${{ matrix.cache_key }}-${{ matrix.profile }}${{ runner.os == 'Windows' && inputs.operation == 'contracts' && '-sockscap' || '' }}
           # Keep the shared dependency/tool cache pruned within the 10 GB repo
           # quota; full runtime reuse is handled by the lightweight tarball above.
           cache-targets: true
           cache-on-failure: true
       - name: Sherpa-ONNX prebuilt cache
         id: sherpa-cache
-        if: (matrix.mode == 'native') && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        if: (matrix.mode == 'native') && inputs.operation != 'run' && !(runner.os == 'Windows' && inputs.operation == 'contracts') && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
         uses: actions/cache@v4
         with:
           path: src-tauri/target/qa-ui-auto/sherpa-onnx-prebuilt
           key: qa-sherpa-onnx-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src-tauri/Cargo.lock') }}
       - name: Ensure Sherpa-ONNX build state and runtime DLLs
-        if: (matrix.mode == 'native') && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        if: (matrix.mode == 'native') && inputs.operation != 'run' && !(runner.os == 'Windows' && inputs.operation == 'contracts') && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
         env:
           CARGO_TARGET_DIR: src-tauri/target/qa-ui-auto
           SHERPA_CACHE_HIT: ${{ steps.sherpa-cache.outputs.cache-hit }}
@@ -164,7 +164,7 @@ jobs:
         if: (runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'secret-service')) && inputs.operation == 'run'
         run: sudo apt-get update && sudo apt-get install -y gnome-keyring libsecret-tools libglib2.0-bin
       - name: Windows build tools (Perl)
-        if: runner.os == 'Windows' && matrix.mode == 'native' && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        if: runner.os == 'Windows' && matrix.mode == 'native' && inputs.operation == 'build' && steps.reusable-runtime-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -380,13 +380,12 @@ jobs:
           QA_RELEASE: ${{ matrix.profile == 'release' }}
         run: |
           mkdir -p qa-contract-output
-          pnpm build:mobile
           python - <<'PYTHON' 2>&1 | tee qa-contract-output/capture-contracts.log
           import os, subprocess
           from native_build import ROOT, configured_environment
           env = configured_environment()
           env['CARGO_TARGET_DIR'] = str(ROOT / 'src-tauri' / 'target' / 'qa-ui-auto')
-          command = ['cargo', 'test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml', '--bin', 'sockscap-helper']
+          command = ['cargo', 'test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml', '-p', 'sockscap-helper', '--bin', 'sockscap-helper']
           if os.environ['QA_RELEASE'] == 'true':
               env['CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS'] = 'true'
               command.append('--release')

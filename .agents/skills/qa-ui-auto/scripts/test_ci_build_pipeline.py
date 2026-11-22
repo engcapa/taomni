@@ -103,6 +103,9 @@ class BuildPipelineTests(unittest.TestCase):
         sherpa_refresh = next(s for s in steps if s.get('name') == 'Ensure Sherpa-ONNX build state and runtime DLLs')
         self.assertIn('scripts/refresh-sherpa-onnx-cache.mjs', sherpa_refresh['run'])
         self.assertIn('cargo clean --manifest-path src-tauri/Cargo.toml --package sherpa-onnx-sys', sherpa_refresh['run'])
+        helper_contracts = next(s for s in steps if s.get('name') == 'Windows capture helper contracts')
+        self.assertIn("'-p', 'sockscap-helper'", helper_contracts['run'])
+        self.assertNotIn('pnpm build:mobile', helper_contracts['run'])
 
     @unittest.skipUnless(os.name == 'posix' and shutil.which('bash'), 'POSIX shell contract')
     def test_rust_contracts_use_one_root_binary_with_all_selected_filters(self):
