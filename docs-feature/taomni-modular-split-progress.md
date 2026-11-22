@@ -2,6 +2,9 @@
 
 ## 2026-11-22 当前进展
 
+- Mail 0.1.24 的签名宿主接管桌面地址簿、vCard 导入导出和 CardDAV 的本地写入。首次实装从旧邮箱库保留联系人、未同步编辑、待删除记录和远端 ETag。单独升级核心时按当前 Mail 版本确定归属，从备份恢复的模块邮箱优先使用自己的数据。写信时仍可同时搜索地址簿和历史收件人。TC-MODULES-081 逐步核对真实写锁、联系人 UID、旧库、停用后保留及重开后删除。TC-MAIL-CONTACTS-01 增加编辑后重新搜索。邮件正文缓存与归档索引仍在迁出，三端签名宿主和桌面验收待 GitHub 回执。
+- 候选 `647fec73c` 的三端 Browser 九个分片均已在运行期间下载，每端 24/24。四目标核心的 `latest.json` 和验签回执已从构建作业下载。Mail 上一批 `bc19f8dc3` 的 macOS Native 已收到 Live 表格、Explorer 新建文件、Outbox 和邮件服务器用例。TC-FILE-OPEN-007 的三个系统保存面板通过，接着在导出目录选择面板超时。 [升级分片](https://github.com/engcapa/taomni/actions/runs/45005586816) · [构建](https://github.com/engcapa/taomni/actions/runs/45005581790) · [Mail 分片](https://github.com/engcapa/taomni/actions/runs/45003592759)
+
 - SocksCap 0.1.4 让基座在模块生命周期锁内验签并启动已安装的 macOS 宿主，由其桥接 Redirector。桥接进程分别核验核心数据对端和模块宿主的 PID 与启动时间。宿主在等待批准时退出会清理启动器和私有套接字，在已应用规则后退出会先恢复空匹配规则。旧模块和遗留恢复仍使用独立 helper。TC-MODULES-080 在 macOS 从面板启动后停用，检查真实进程、两处套接字、写锁及恢复记录。TC-MODULES-074 增加重新启用后的 Browser 断言。Linux 协议、设置和宿主 57 项单测通过，macOS ARM64 和 Intel 的桥接库及其测试代码通过类型检查。系统批准、实际流量与正式系统签名仍须对应 runner 回执。
 - 合入远程 main 的 #863。保留标签栏两侧的断言和新记事本用例，新建文件编辑、保存与重开的崩溃回归现用 TC-EXPLORER-013，主线的标签栏用例保留 TC-EXPLORER-011。53 项受影响前端单测、34 项选择与 crash-regression 单测通过。上一批 Mail 的 Linux 和 Windows Native 均已收齐 34/34，三端 Browser 各 25/25。 [main 合并](https://github.com/engcapa/taomni/commit/7c16faaa3) · [已下载分片](https://github.com/engcapa/taomni/actions/runs/45003592759)
 
@@ -654,7 +657,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-023 发布验收 | 目录签名、首装名单和独立模块发布准备已验证 | 发布工具覆盖已暂存模块的签名、声明平台、描述和摘要。核心发布继承签名目录，独立发布保留原模块的资产地址。正式模块构建矩阵、系统签名、首批目录及最终两种安装集合的回归和性能仍待交付。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
 | TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
-| TASK-026 Mail | 签名前端、主要 IMAP 读写、POP3 收信和归档连接已接入独立宿主 | POP3 真实进程收信和中断处理已在三端通过。归档索引与过渡缓存的数据写入仍需迁移，接着验证正式安装升级、数据接管及回滚。 |
+| TASK-026 Mail | 签名前端、主要 IMAP 读写、POP3 收信和归档连接已接入独立宿主 | POP3 真实进程收信和中断处理已在三端通过。签名宿主已接管草稿、发件箱，现已接入地址簿。归档索引与过渡缓存的数据写入仍需迁移，接着验证正式安装升级、数据接管及回滚。 |
 | TASK-027 G1–G11 全门禁收口 | 新增任务，未闭合 | G1–G11 的当前证据仍存在正式发行包、业务模块、核心依赖闭包、系统信任和完整入口矩阵缺口；必须用匹配源码的 GitHub runner receipt 逐项闭合后才能进入生产发布。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。

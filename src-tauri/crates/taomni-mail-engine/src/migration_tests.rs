@@ -69,8 +69,13 @@ fn captures_wal_and_originals_from_custom_storage_without_changing_the_source() 
         account_id: "unused".into(),
         database: default_root.join(format!("{}.db", mail_db_file_stem("unused"))),
     };
-    let staged =
-        StagedMailData::prepare(staging.path(), &[mailbox, unused], true, &control()).unwrap();
+    let staged = StagedMailData::prepare(
+        staging.path(),
+        &[mailbox, unused],
+        super::HostedMailboxData::ALL,
+        &control(),
+    )
+    .unwrap();
     assert_eq!(staged.mailbox_count(), 1);
     let target = staged.data();
     let dest = Connection::open_with_flags(
@@ -116,15 +121,26 @@ fn follows_a_relocated_mailbox_and_rejects_a_missing_relocation_target() {
         init_mail_tables(&db).unwrap();
     }
     crate::database::write_redirect(&from.database, &to.database).unwrap();
-    let staged = StagedMailData::prepare(staging.path(), &[from], true, &control()).unwrap();
+    let staged = StagedMailData::prepare(
+        staging.path(),
+        &[from],
+        super::HostedMailboxData::ALL,
+        &control(),
+    )
+    .unwrap();
     assert_eq!(staged.mailbox_count(), 1);
     drop(staged);
 
     fs::remove_file(&to.database).unwrap();
     let from = mailbox(legacy.path(), ACCOUNT);
-    let error = StagedMailData::prepare(staging.path(), &[from], true, &control())
-        .err()
-        .unwrap();
+    let error = StagedMailData::prepare(
+        staging.path(),
+        &[from],
+        super::HostedMailboxData::ALL,
+        &control(),
+    )
+    .err()
+    .unwrap();
     assert!(error.contains("relocation target is missing"), "{error}");
     assert_eq!(staging.path().read_dir().unwrap().count(), 0);
 }
@@ -141,14 +157,22 @@ fn bad_second_account_discards_the_first_snapshot_and_can_be_retried() {
     }
     fs::write(&broken.database, b"not sqlite").unwrap();
     let mailboxes = [valid, broken];
-    assert!(StagedMailData::prepare(staging.path(), &mailboxes, true, &control()).is_err());
+    assert!(
+        StagedMailData::prepare(
+            staging.path(),
+            &mailboxes,
+            super::HostedMailboxData::ALL,
+            &control()
+        )
+        .is_err()
+    );
     assert_eq!(staging.path().read_dir().unwrap().count(), 0);
     assert_eq!(fs::read(&mailboxes[1].database).unwrap(), b"not sqlite");
     assert!(
         StagedMailData::prepare(
             staging.path(),
             &mailboxes,
-            true,
+            super::HostedMailboxData::ALL,
             &SnapshotControl::with_timeout(Duration::ZERO)
         )
         .is_err()
@@ -156,9 +180,14 @@ fn bad_second_account_discards_the_first_snapshot_and_can_be_retried() {
     assert_eq!(staging.path().read_dir().unwrap().count(), 0);
     fs::remove_file(&mailboxes[1].database).unwrap();
     assert_eq!(
-        StagedMailData::prepare(staging.path(), &mailboxes, true, &control())
-            .unwrap()
-            .mailbox_count(),
+        StagedMailData::prepare(
+            staging.path(),
+            &mailboxes,
+            super::HostedMailboxData::ALL,
+            &control()
+        )
+        .unwrap()
+        .mailbox_count(),
         1
     );
 }
@@ -178,9 +207,14 @@ fn rejects_a_linked_wal_before_opening_sqlite() {
     let mut wal = mailbox.database.as_os_str().to_owned();
     wal.push("-wal");
     std::os::unix::fs::symlink(&other, wal).unwrap();
-    let error = StagedMailData::prepare(staging.path(), &[mailbox], true, &control())
-        .err()
-        .unwrap();
+    let error = StagedMailData::prepare(
+        staging.path(),
+        &[mailbox],
+        super::HostedMailboxData::ALL,
+        &control(),
+    )
+    .err()
+    .unwrap();
     assert!(error.contains("symbolic link"), "{error}");
     assert_eq!(fs::read(other).unwrap(), b"outside");
     assert_eq!(staging.path().read_dir().unwrap().count(), 0);
@@ -192,12 +226,16 @@ fn detects_preexisting_drafts_in_the_last_relocated_cache_without_initializing_s
     let root = temp.path().canonicalize().unwrap();
     let filename = format!("{}.db", crate::database::mail_db_file_stem("qa"));
     let old = root.join("missing").join(&filename);
-    assert!(super::legacy_drafts(&old, "qa").unwrap().is_none());
+    assert!(
+        super::read_legacy_mailbox(&old, "qa", crate::draft_import::read_account)
+            .unwrap()
+            .is_none()
+    );
     assert!(!root.join("missing").exists());
     std::fs::create_dir(root.join("missing")).unwrap();
     let current = root.join(&filename);
     crate::database::write_redirect(&old, &current).unwrap();
-    assert!(super::legacy_drafts(&old, "qa").is_err());
+    assert!(super::read_legacy_mailbox(&old, "qa", crate::draft_import::read_account).is_err());
     let db = rusqlite::Connection::open(&current).unwrap();
     crate::cache::init_mail_tables(&db).unwrap();
     let queued = |id| {
@@ -206,7 +244,7 @@ fn detects_preexisting_drafts_in_the_last_relocated_cache_without_initializing_s
     };
     crate::drafts::save_mail_draft(&db, "other", queued("other-draft")).unwrap();
     assert!(
-        super::legacy_drafts(&old, "qa")
+        super::read_legacy_mailbox(&old, "qa", crate::draft_import::read_account)
             .unwrap()
             .unwrap()
             .is_empty()
@@ -214,9 +252,15 @@ fn detects_preexisting_drafts_in_the_last_relocated_cache_without_initializing_s
     crate::drafts::save_mail_draft(&db, "qa", queued("waiting")).unwrap();
     drop(db);
     let before = std::fs::read(&current).unwrap();
-    assert_eq!(super::legacy_drafts(&old, "qa").unwrap().unwrap().len(), 1);
+    assert_eq!(
+        super::read_legacy_mailbox(&old, "qa", crate::draft_import::read_account)
+            .unwrap()
+            .unwrap()
+            .len(),
+        1
+    );
     assert!(
-        super::legacy_drafts(&old, "other")
+        super::read_legacy_mailbox(&old, "other", crate::draft_import::read_account)
             .unwrap_err()
             .contains("relocation target")
     );
@@ -240,7 +284,14 @@ fn only_staging_for_a_host_that_takes_draft_ownership_marks_the_mailbox() {
         crate::drafts::save_mail_draft(&db, ACCOUNT, draft).unwrap();
     }
     let original = fs::read(&source.database).unwrap();
-    for hosted in [false, true] {
+    for hosted in [
+        super::HostedMailboxData::default(),
+        super::HostedMailboxData {
+            drafts: true,
+            address_book: false,
+        },
+        super::HostedMailboxData::ALL,
+    ] {
         let copy = StagedMailData::prepare(
             staging.path(),
             std::slice::from_ref(&source),
@@ -249,7 +300,14 @@ fn only_staging_for_a_host_that_takes_draft_ownership_marks_the_mailbox() {
         )
         .unwrap();
         let db = Connection::open(copy.data().join(source.database.file_name().unwrap())).unwrap();
-        assert_eq!(crate::draft_import::is_owned(&db, ACCOUNT).unwrap(), hosted);
+        assert_eq!(
+            crate::draft_import::is_owned(&db, ACCOUNT).unwrap(),
+            hosted.drafts
+        );
+        assert_eq!(
+            crate::contacts::handoff::is_owned(&db, ACCOUNT).unwrap(),
+            hosted.address_book
+        );
         let draft = crate::drafts::get_mail_draft(&db, ACCOUNT, "scheduled")
             .unwrap()
             .unwrap();

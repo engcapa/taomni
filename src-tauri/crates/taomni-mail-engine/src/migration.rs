@@ -22,6 +22,21 @@ pub struct LegacyMailbox {
     pub database: PathBuf,
 }
 
+/// A core-only upgrade can retain an older signed Mail host. Only hand it
+/// ownership of mailbox tables its installed manifest can actually write.
+#[derive(Clone, Copy, Default)]
+pub struct HostedMailboxData {
+    pub drafts: bool,
+    pub address_book: bool,
+}
+
+impl HostedMailboxData {
+    pub const ALL: Self = Self {
+        drafts: true,
+        address_book: true,
+    };
+}
+
 /// Staging is scoped to one attempt. Dropping it discards every partial copy.
 pub struct StagedMailData {
     directory: tempfile::TempDir,
@@ -32,7 +47,7 @@ impl StagedMailData {
     pub fn prepare(
         staging_root: &Path,
         mailboxes: &[LegacyMailbox],
-        hosted_drafts: bool,
+        hosted: HostedMailboxData,
         control: &SnapshotControl,
     ) -> Result<Self, String> {
         check(control)?;
@@ -55,7 +70,7 @@ impl StagedMailData {
         let mut mailbox_count = 0;
         for mailbox in mailboxes {
             check(control)?;
-            if stage_account(mailbox, &target, hosted_drafts, control)? {
+            if stage_account(mailbox, &target, hosted, control)? {
                 mailbox_count += 1;
             }
         }
@@ -78,7 +93,7 @@ impl StagedMailData {
 fn stage_account(
     mailbox: &LegacyMailbox,
     target: &Path,
-    hosted_drafts: bool,
+    hosted: HostedMailboxData,
     control: &SnapshotControl,
 ) -> Result<bool, String> {
     let stem = mail_db_file_stem(&mailbox.account_id);
@@ -118,8 +133,11 @@ fn stage_account(
     // Upgrade the snapshot's schema so the read-only host can open it. Some
     // old schema migrations read the original message objects during backfill.
     crate::cache::init_mail_tables(&db).map_err(string_error)?;
-    if hosted_drafts {
+    if hosted.drafts {
         crate::draft_import::mark_owned(&db, &mailbox.account_id).map_err(string_error)?;
+    }
+    if hosted.address_book {
+        crate::contacts::handoff::mark_owned(&db, &mailbox.account_id).map_err(string_error)?;
     }
     db.close().map_err(|(_, error)| string_error(error))?;
     OpenOptions::new()
@@ -189,10 +207,11 @@ fn resolve_database(
 /// An explicitly installed module on an older modular profile may encounter
 /// drafts in the desktop cache. Inspect the existing database and relocation
 /// chain without initializing the account or changing its journal mode.
-pub fn legacy_drafts(
+pub fn read_legacy_mailbox<T>(
     database: &Path,
     account: &str,
-) -> Result<Option<Vec<crate::draft_import::StoredDraft>>, String> {
+    read: impl FnOnce(&Connection, &str) -> rusqlite::Result<T>,
+) -> Result<Option<T>, String> {
     let filename = format!("{}.db", mail_db_file_stem(account));
     let control = SnapshotControl::with_timeout(std::time::Duration::from_secs(5));
     let Some(path) = resolve_database(database, &filename, &control)? else {
@@ -203,9 +222,10 @@ pub fn legacy_drafts(
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(string_error)?;
-    crate::draft_import::read_account(&db, account)
-        .map(Some)
-        .map_err(string_error)
+    let snapshot = db.unchecked_transaction().map_err(string_error)?;
+    let result = read(&snapshot, account).map_err(string_error)?;
+    snapshot.commit().map_err(string_error)?;
+    Ok(Some(result))
 }
 
 fn copy_originals(

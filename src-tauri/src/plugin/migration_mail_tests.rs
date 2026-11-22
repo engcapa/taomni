@@ -221,7 +221,7 @@ fn refreshes_unactivated_data_after_the_legacy_app_has_reopened() {
         &data,
         &transaction,
         false,
-        true,
+        HostedMailboxData::ALL,
         &control(),
     )
     .unwrap();

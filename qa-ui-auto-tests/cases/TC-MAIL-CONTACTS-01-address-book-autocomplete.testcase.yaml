@@ -108,6 +108,15 @@ steps:
     selector: '[data-testid="mail-contact-row"][data-contact-name="Zed Contact"]'
     contains: zed.contact@example.org
 - assert_no_runtime_errors: null
+- click: '[data-testid="mail-contact-row"][data-contact-name="Zed Contact"] [data-testid="mail-contact-edit"]'
+- fill: {selector: '[data-testid="mail-contact-name"]', value: Zed Updated}
+- click: '[data-testid="mail-contact-save"]'
+- wait_for: '[data-testid="mail-contact-row"][data-contact-name="Zed Updated"]'
+- click: '[data-testid="mail-address-book-close"]'
+- click: '[data-testid="mail-compose-open"]'
+- fill: {selector: '[data-testid="mail-recipient-to"] input', value: zed.con}
+- assert_text: {selector: '[data-testid="mail-recipient-suggestions"]', contains: Zed Updated, timeout_sec: 20}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -215,6 +224,14 @@ verification:
     - 36
     - 37
     - 38
+  - id: edited-address
+    requirement: A saved name change is returned by the next composer search for the same email.
+    actions: [39, 40, 41, 43, 44, 45]
+    checkpoints:
+    - {step: 42, expectation: The address book displays the changed name.}
+    - {step: 46, expectation: Searching the same email returns the updated contact name.}
+    - {step: 47, expectation: Editing and searching complete without renderer errors.}
+    results: [42, 46, 47]
   visual:
   - check: 截图中收件人下拉列出 “Zed Contact <zed.contact@example.org>”。
     method: manual

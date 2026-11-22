@@ -40,7 +40,7 @@ impl MailAddressBookEntry {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StoredCard {
     pub card: MailContactCard,
     pub book: String,
@@ -50,9 +50,19 @@ pub struct StoredCard {
     pub deleted: bool,
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum CardChange {
     Store(StoredCard),
     Remove(String),
+}
+
+impl CardChange {
+    pub(super) fn uid(&self) -> &str {
+        match self {
+            Self::Store(card) => &card.card.uid,
+            Self::Remove(uid) => uid,
+        }
+    }
 }
 
 #[derive(Debug)]

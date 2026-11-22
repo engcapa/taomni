@@ -23,9 +23,9 @@ def run(ctx, args):
     phase = args.get("phase") if isinstance(args, dict) else args
     active = {
         "folder-tree", "folder-changes", "running", "imap-delivery", "pop3-delivery",
-        "responses", "imap-search", "imap-flags", "imap-source", "imap-prefetch", "outbox-queued", "outbox-sent",
+        "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source", "imap-prefetch", "outbox-queued", "outbox-sent",
     }
-    if phase not in active | {"idle", "disabled", "outbox-retained"} or not signed or owner.case_id not in SIGNED_MAIL_CASES:
+    if phase not in active | {"idle", "disabled", "outbox-retained", "contact-retained"} or not signed or owner.case_id not in SIGNED_MAIL_CASES:
         raise StepError("The Mail host observation requires the registered signed native case")
     plugins = isolated_data_root(owner) / "plugins"
     receipt = signed["receipt"]
@@ -53,6 +53,13 @@ def run(ctx, args):
     report = {"phase": phase, "sourceSha": receipt["sourceSha"], "platform": receipt["platform"],
               "packageSha256": receipt["sha256"], "hostSha256": digest,
               "frontendSha256": frontend_digest, "writerLease": observed}
+    if phase.startswith("contact-"):
+        from .module_mail_contacts import observe
+        if owner.case_id != "TC-MODULES-081":
+            raise StepError("Address-book storage requires the signed contact lifecycle case")
+        report["contact"] = observe(module / "data", plugins.parent / "mail-cache", phase, signed.get("contact"))
+        if phase == "contact-saved":
+            signed["contact"] = report["contact"]
     if phase == "responses":
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
         if "mail/send-response" not in manifest["commands"]:

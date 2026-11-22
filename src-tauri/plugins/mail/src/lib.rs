@@ -1,12 +1,14 @@
 //! The official Mail host. The profile lease belongs to the SDK, and the
 //! mailbox store uses only paths derived from that profile and account IDs.
 
+mod address_book;
 mod archive;
 mod archive_encoding;
 mod commands;
 mod imap_exchange;
 mod incoming;
 mod local_drafts;
+mod mailbox;
 mod outgoing;
 mod pop3_sync;
 mod prefetch;
@@ -40,6 +42,7 @@ fn host_config() -> HostConfig {
             .into_iter()
             .chain([
                 taomni_mail_api::LOCAL_DRAFTS,
+                taomni_mail_api::ADDRESS_BOOK,
                 CHECK_INCOMING,
                 CHECK_OUTGOING,
                 IMAP_FOLDER_TREE,
@@ -110,15 +113,33 @@ impl PluginHandler for Handler {
     ) -> Result<Value, RpcError> {
         operation.check_current()?;
         let result = match method {
-            taomni_mail_api::LOCAL_DRAFTS => {
+            taomni_mail_api::LOCAL_DRAFTS | taomni_mail_api::ADDRESS_BOOK => {
                 let endpoint = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
-                serde_json::to_value(local_drafts::serve(
-                    &self.io,
-                    &self.store,
-                    operation,
-                    endpoint,
-                )?)
+                let result = if method == taomni_mail_api::LOCAL_DRAFTS {
+                    use taomni_mail_engine::draft_import;
+                    mailbox::serve(
+                        &self.io,
+                        &self.store,
+                        operation,
+                        endpoint,
+                        draft_import::is_owned,
+                        draft_import::adopt,
+                        local_drafts::execute,
+                    )
+                } else {
+                    use taomni_mail_engine::contacts::handoff;
+                    mailbox::serve(
+                        &self.io,
+                        &self.store,
+                        operation,
+                        endpoint,
+                        handoff::is_owned,
+                        handoff::adopt,
+                        address_book::execute,
+                    )
+                };
+                serde_json::to_value(result?)
             }
             CHECK_INCOMING => {
                 let input = serde_json::from_value(params.unwrap_or_default())

@@ -8,7 +8,9 @@
 //! `addressbook-home-set` (RFC 6352 / RFC 6764). The composer's address
 //! autocomplete merges address book entries with collected contacts.
 
+mod book_store;
 mod model;
+pub(super) use book_store::suggestions;
 
 mod dav_protocol;
 

@@ -1,7 +1,7 @@
 use crate::{MailAddress, compose::parse_mailbox, now_ts};
 use lettre::message::Mailbox;
 use rusqlite::{Connection, Result as SqlResult, params};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 pub fn contact_email(address: &MailAddress) -> Option<String> {
@@ -239,7 +239,7 @@ pub fn search_contacts(
     rows.collect()
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MailContactSuggestion {
     pub name: Option<String>,

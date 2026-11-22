@@ -5,12 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::now_ts;
 
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct DraftRequest {
-    pub account_id: String,
-    pub action: DraftAction,
-}
+pub type DraftRequest = crate::database::MailboxRequest<DraftAction>;
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "camelCase", deny_unknown_fields)]

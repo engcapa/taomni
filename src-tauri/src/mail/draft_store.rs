@@ -1,96 +1,18 @@
 //! Resolve the data owner before accessing drafts, server-copy metadata or the Outbox.
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::Connection;
 use serde::de::DeserializeOwned;
-use std::path::Path;
 use taomni_mail_api::{LOCAL_DRAFTS, RemoteDraftLocation};
 use taomni_mail_engine::draft_import::DraftImport;
-use taomni_mail_engine::{
-    database::{configured_directory, mail_db_file_stem},
-    drafts::{
-        DraftAction, DraftRequest, MailDraft, MailDraftSaveRequest, delete_mail_draft,
-        get_mail_draft, list_mail_drafts, replace_remote_location, save_mail_draft,
-    },
+use taomni_mail_engine::drafts::{
+    DraftAction, DraftRequest, MailDraft, MailDraftSaveRequest, delete_mail_draft, get_mail_draft,
+    list_mail_drafts, replace_remote_location, save_mail_draft,
 };
 
 use super::module_host;
-use crate::{
-    plugin::{
-        LifecycleState, PluginRegistry,
-        data_contract::PluginDataRoot,
-        retained_data::{self, DataFileKind},
-    },
-    state::{AppState, CoreState},
-};
-
-fn restored_mailbox(registry: &PluginRegistry, filename: &str) -> Result<bool, String> {
-    Ok(retained_data::load(&registry.root(), "mail")
-        .map_err(|e| e.to_string())?
-        .is_some_and(|locator| {
-            locator
-                .files
-                .iter()
-                .any(|file| file.kind == DataFileKind::Sqlite && file.path == filename)
-        }))
-}
-
-fn import_source(
-    core: &CoreState,
-    registry: &PluginRegistry,
-    migrated: Result<bool, String>,
-    legacy_root: &Path,
-    account: &str,
-) -> Result<DraftImport, String> {
-    let migrated = migrated?;
-    let filename = format!("{}.db", mail_db_file_stem(account));
-    if restored_mailbox(registry, &filename)? {
-        return Ok(DraftImport::default());
-    }
-    let db = core.db.lock().map_err(|e| e.to_string())?;
-    let options: Option<String> = db
-        .query_row(
-            "SELECT options_json FROM sessions WHERE id=?1",
-            [account],
-            |r| r.get(0),
-        )
-        .optional()
-        .map_err(|e| e.to_string())?;
-    drop(db);
-    let directory = configured_directory(options.as_deref().unwrap_or("{}"), legacy_root)?;
-    let rows = taomni_mail_engine::migration::legacy_drafts(&directory.join(filename), account)?;
-    Ok(DraftImport {
-        replace_staged: migrated && rows.is_some(),
-        rows: rows.unwrap_or_default(),
-    })
-}
+use crate::state::AppState;
 
 pub(crate) async fn is_hosted(state: &AppState, account: &str) -> Result<bool, String> {
-    // Keeping an older Mail package during a core-only update preserves the
-    // same desktop cache it used before streaming draft operations existed.
-    if let Some(record) = state.plugins.get("mail") {
-        return Ok(record.state != LifecycleState::Enabled
-            || record.manifest.commands.contains(LOCAL_DRAFTS));
-    }
-    if state.legacy.mail.migrated.clone()? {
-        return Ok(true);
-    }
-    let registry = state.plugins.clone();
-    let filename = format!("{}.db", mail_db_file_stem(account));
-    tokio::task::spawn_blocking(move || {
-        let plugins = registry.root();
-        if !plugins.try_exists().map_err(|e| e.to_string())? {
-            return Ok(false);
-        }
-        let data = PluginDataRoot::open(plugins, "mail").map_err(|e| e.to_string())?;
-        if restored_mailbox(&registry, &filename)? {
-            return Ok(true);
-        }
-        data.data
-            .join(filename)
-            .try_exists()
-            .map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    super::local_storage::is_hosted(state, account, LOCAL_DRAFTS).await
 }
 
 async fn hosted<T: DeserializeOwned + Send + 'static>(
@@ -107,8 +29,19 @@ async fn hosted<T: DeserializeOwned + Send + 'static>(
         account_id: account.clone(),
         action,
     };
-    module_host::local_drafts(state.plugins.clone(), request, move || {
-        import_source(&core, &registry, migrated, &root, &account)
+    module_host::local_mailbox(state.plugins.clone(), LOCAL_DRAFTS, request, move || {
+        let (replace_staged, rows) = super::local_storage::import_source(
+            &core,
+            &registry,
+            migrated,
+            &root,
+            &account,
+            taomni_mail_engine::draft_import::read_account,
+        )?;
+        Ok(DraftImport {
+            replace_staged,
+            rows: rows.unwrap_or_default(),
+        })
     })
     .await
 }

@@ -13,6 +13,7 @@ pub mod pop3_exchange;
 
 pub const SLUG: &str = "mail";
 pub const LOCAL_DRAFTS: &str = "mail/local-drafts";
+pub const ADDRESS_BOOK: &str = "mail/address-book";
 pub const CHECK_INCOMING: &str = "mail/check-incoming";
 pub const CHECK_OUTGOING: &str = "mail/check-outgoing";
 pub const IMAP_FOLDER_TREE: &str = "mail/imap-folder-tree";

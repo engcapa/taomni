@@ -9,7 +9,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use taomni_mail_engine::{
     database::{configured_directory, mail_db_file_stem},
-    migration::{LegacyMailbox, StagedMailData},
+    migration::{HostedMailboxData, LegacyMailbox, StagedMailData},
 };
 use taomni_profile_locks::{
     LegacyUpgradeLease, PluginDataLease, PluginSlug, ProfileRestoreLease, ProfileRoot,
@@ -181,7 +181,10 @@ pub(super) fn execute_under_maintenance(
             &data,
             &transaction,
             receipt.is_some(),
-            manifest.commands.contains(taomni_mail_api::LOCAL_DRAFTS),
+            HostedMailboxData {
+                drafts: manifest.commands.contains(taomni_mail_api::LOCAL_DRAFTS),
+                address_book: manifest.commands.contains(taomni_mail_api::ADDRESS_BOOK),
+            },
             control,
         )?
     };
@@ -302,7 +305,7 @@ fn publish_data(
     target: &Path,
     transaction_id: &str,
     replace_unactivated: bool,
-    hosted_drafts: bool,
+    hosted: HostedMailboxData,
     control: &SnapshotControl,
 ) -> Result<DataReceipt, String> {
     let database = profile.join(LEGACY_DATABASE);
@@ -318,7 +321,7 @@ fn publish_data(
     if mailboxes.is_empty() {
         return Err("The profile has no legacy Mail accounts".into());
     }
-    let stage = StagedMailData::prepare(module, &mailboxes, hosted_drafts, control)?;
+    let stage = StagedMailData::prepare(module, &mailboxes, hosted, control)?;
     let receipt = DataReceipt {
         format_version: 1,
         transaction_id: transaction_id.to_owned(),

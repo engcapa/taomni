@@ -33,8 +33,8 @@ use taomni_sqlite_snapshot::SnapshotControl;
 mod archive_encoding;
 #[path = "support/imap.rs"]
 mod imap;
-#[path = "support/local_drafts.rs"]
-mod local_drafts;
+#[path = "support/local_mailbox.rs"]
+mod local_mailbox;
 #[path = "support/pop3.rs"]
 mod pop3;
 #[path = "support/smtp.rs"]
@@ -194,6 +194,11 @@ fn snapshot_cache(
         list_mail_drafts(&db, ACCOUNT).unwrap()[0].subject,
         "Draft saved by the monolith"
     );
+    assert!(taomni_mail_engine::contacts::handoff::is_owned(&db, ACCOUNT).unwrap());
+    let cards = taomni_mail_engine::contacts::entries(&db, ACCOUNT).unwrap();
+    assert_eq!(cards.len(), 1);
+    assert_eq!(cards[0].display_name, "Migrated Card");
+    assert!(cards[0].pending_sync);
     let original = fs::read(profile.join("plugins/mail/data").join(attachment)).unwrap();
     assert!(original.starts_with(b"SQLite format 3\0"));
     assert_eq!(fs::read(export.join(attachment)).unwrap(), original);
@@ -311,7 +316,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
             account_id: ACCOUNT.into(),
             database: source.clone(),
         }],
-        true,
+        taomni_mail_engine::migration::HostedMailboxData::ALL,
         &SnapshotControl::with_timeout(WAIT),
     )
     .unwrap();
@@ -347,7 +352,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
         4102444800_i64
     );
 
-    assert_eq!(local_drafts::list(&mut host, ACCOUNT, None), drafts);
+    assert_eq!(local_mailbox::list(&mut host, ACCOUNT, None), drafts);
 
     let mut competing = MailHost::spawn(&profile, &context);
     assert_eq!(competing.exit_code(), Some(1));
@@ -370,6 +375,10 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     let listed = host.call(
         "mail_list_address_book",
         json!({"accountId":ACCOUNT,"limit":1}),
+    );
+    assert_eq!(
+        local_mailbox::book(&mut host, ACCOUNT, json!({"operation":"list"}), None),
+        listed
     );
     let contact = &listed[0];
     assert_eq!(contact["book"], "carddav");
@@ -442,10 +451,10 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     assert_eq!(fresh.as_array().unwrap().len(), 1);
     assert_eq!(fresh[0]["id"], "template");
     assert_eq!(
-        local_drafts::list(&mut reopened, ACCOUNT, None),
+        local_mailbox::list(&mut reopened, ACCOUNT, None),
         reopened_drafts
     );
-    let imported = local_drafts::list(
+    let imported = local_mailbox::list(
         &mut reopened,
         FRESH_ACCOUNT,
         Some(json!({
@@ -454,9 +463,33 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     );
     assert_eq!(imported, fresh);
     assert_eq!(
-        local_drafts::list(&mut reopened, FRESH_ACCOUNT, None),
+        local_mailbox::list(&mut reopened, FRESH_ACCOUNT, None),
         imported
     );
+    let reopened_book = local_mailbox::book(
+        &mut reopened,
+        ACCOUNT,
+        json!({"operation":"suggest", "query":"migrated","limit":8}),
+        None,
+    );
+    assert_eq!(reopened_book[0]["name"], "Migrated Card Edited");
+    let late_account = "mail-added-after-upgrade";
+    let vcard = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:restored\r\nFN:Restored\r\nEMAIL:late@example.org\r\nX-CUSTOM:keep\r\nEND:VCARD\r\n";
+    let row = local_mailbox::book(
+        &mut reopened,
+        late_account,
+        json!({"operation":"import","carddav":false,"text":vcard}),
+        Some(json!({"replace_staged":false,"snapshot":{"cards":[],"state":null}})),
+    );
+    assert_eq!(row, 1);
+    let export = local_mailbox::book(
+        &mut reopened,
+        late_account,
+        json!({"operation":"export"}),
+        None,
+    );
+    assert_eq!(export[1], 1);
+    assert!(export[0].as_str().unwrap().contains("X-CUSTOM:keep"));
     let suggestions = reopened.call("mail_search_contacts", search);
     assert_eq!(suggestions[0]["name"], "Migrated Card Edited");
     assert_eq!(suggestions[0]["email"], "migrated@example.com");

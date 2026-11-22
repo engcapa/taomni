@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 use taomni_mail_api::{
-    LOCAL_DRAFTS,
+    ADDRESS_BOOK, LOCAL_DRAFTS,
     imap_exchange::{read_body_frame, write_body_frame},
 };
 use taomni_plugin_stream::routed_tcp::Route;
@@ -11,6 +11,34 @@ use super::{MailHost, WAIT};
 /// Run the same one-use transfer as the desktop and prove an already owned
 /// mailbox can be read even when its original cache is no longer available.
 pub(super) fn list(host: &mut MailHost, account: &str, import: Option<Value>) -> Value {
+    transfer(
+        host,
+        LOCAL_DRAFTS,
+        account,
+        json!({"operation":"list"}),
+        import,
+    )
+}
+
+pub(super) fn book(
+    host: &mut MailHost,
+    account: &str,
+    action: Value,
+    import: Option<Value>,
+) -> Value {
+    let reply = transfer(host, ADDRESS_BOOK, account, action, import);
+    serde_json::from_value::<Result<Value, String>>(reply)
+        .unwrap()
+        .unwrap()
+}
+
+fn transfer(
+    host: &mut MailHost,
+    method: &str,
+    account: &str,
+    action: Value,
+    import: Option<Value>,
+) -> Value {
     let io = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -18,10 +46,10 @@ pub(super) fn list(host: &mut MailHost, account: &str, import: Option<Value>) ->
     std::thread::scope(|scope| {
         io.block_on(async {
             let (_route, endpoint, mut peer) = Route::pair().await.unwrap();
-            let call = scope
-                .spawn(move || host.call(LOCAL_DRAFTS, serde_json::to_value(endpoint).unwrap()));
+            let call =
+                scope.spawn(move || host.call(method, serde_json::to_value(endpoint).unwrap()));
             let output = tokio::time::timeout(WAIT, async {
-                let request = json!({"accountId":account,"action":{"operation":"list"}});
+                let request = json!({"accountId":account,"action":action});
                 write_body_frame(&mut peer, &serde_json::to_vec(&request).unwrap())
                     .await
                     .unwrap();

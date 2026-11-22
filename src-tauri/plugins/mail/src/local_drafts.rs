@@ -1,64 +1,9 @@
-//! Transfer complete draft lists, bodies and scheduled Outbox data on a one-use
-//! connection. The SDK operation owns both the SQLite transaction and the transfer.
-
-use taomni_mail_api::imap_exchange::{read_body_frame, write_body_frame};
-use taomni_mail_engine::draft_import::{self, DraftImport};
+use super::store::{Store, unavailable};
 use taomni_mail_engine::drafts::{
     DraftAction, DraftRequest, delete_mail_draft, draft_search_index, get_mail_draft,
     list_mail_drafts, replace_remote_location, save_mail_draft,
 };
-use taomni_plugin_api::{ErrorCode, RpcError};
-use taomni_plugin_sdk::Operation;
-use taomni_plugin_stream::routed_tcp::Endpoint;
-use tokio::io::AsyncWriteExt;
-use tokio::runtime::Runtime;
-
-use super::{
-    incoming::while_current,
-    store::{Store, unavailable},
-};
-
-pub(super) fn serve(
-    io: &Runtime,
-    store: &Store,
-    operation: &Operation,
-    endpoint: Endpoint,
-) -> Result<Result<(), String>, RpcError> {
-    let (mut peer, _) = match io.block_on(while_current(operation, endpoint.connect()))? {
-        Ok(pair) => pair,
-        Err(error) => return Ok(Err(error)),
-    };
-    let bytes = io
-        .block_on(while_current(operation, read_body_frame(&mut peer)))?
-        .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
-    let input: DraftRequest = serde_json::from_slice(&bytes)
-        .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
-    operation.check_current()?;
-    let account = &input.account_id;
-    let needs_import = !store.query(account, |db| draft_import::is_owned(db, account))?;
-    io.block_on(while_current(
-        operation,
-        peer.write_u8(u8::from(needs_import)),
-    ))?
-    .map_err(|_| unavailable())?;
-    if needs_import {
-        let import = io
-            .block_on(while_current(operation, read_body_frame(&mut peer)))?
-            .map_err(|_| unavailable())?;
-        let source: DraftImport = serde_json::from_slice(&import)
-            .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
-        store.mutate(account, true, &|| operation.check_current(), |db| {
-            draft_import::adopt(db, account, source).map_err(|_| unavailable())
-        })?;
-    }
-    let bytes = execute(store, input, &|| operation.check_current())?;
-    io.block_on(while_current(
-        operation,
-        write_body_frame(&mut peer, &bytes),
-    ))?
-    .map_err(|_| unavailable())?;
-    Ok(Ok(()))
-}
+use taomni_plugin_api::RpcError;
 
 #[cfg(test)]
 mod tests {

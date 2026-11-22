@@ -65,8 +65,5 @@ pub async fn mail_search_contacts(
     state: State<'_, AppState>,
 ) -> Result<Vec<MailContactSuggestion>, String> {
     let limit = limit.unwrap_or(8).clamp(1, 20);
-    with_mail_db_async(&state, &account_id, move |db, account_id| {
-        taomni_mail_engine::contacts::search_recipient_suggestions(db, &account_id, &query, limit)
-    })
-    .await
+    super::contacts::suggestions(&state, &account_id, query, limit).await
 }

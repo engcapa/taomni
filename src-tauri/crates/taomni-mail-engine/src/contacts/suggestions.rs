@@ -5,7 +5,7 @@ use rusqlite::Result as SqlResult;
 use std::collections::HashSet;
 
 /// Address book matches for the composer's autocomplete, best first.
-pub(super) fn address_book_suggestions(
+pub fn address_book_suggestions(
     conn: &Connection,
     account_id: &str,
     query: &str,
@@ -52,7 +52,7 @@ pub(super) fn address_book_suggestions(
 }
 
 /// Address book entries first (with their names), then collected contacts.
-pub(super) fn merge_suggestions(
+pub fn merge_suggestions(
     book: Vec<MailContactSuggestion>,
     collected: Vec<MailContactSuggestion>,
     limit: u32,

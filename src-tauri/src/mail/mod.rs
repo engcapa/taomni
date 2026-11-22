@@ -22,6 +22,7 @@ pub use smtp::*;
 mod imap_transport;
 
 mod cache_access;
+mod local_storage;
 
 pub use cache_access::*;
 
