@@ -319,6 +319,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     host.handshake(&context);
     smtp::check_routed_smtp(&mut host);
     imap::check_routed_body(&mut host);
+    imap::check_routed_prefetch(&mut host);
     imap::check_routed_attachment(&mut host);
     imap::check_routed_sent_copy(&mut host);
     imap::check_routed_draft(&mut host);

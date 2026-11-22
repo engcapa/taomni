@@ -120,8 +120,11 @@ def setup_rdp(ctx):
     setup_desktop_client(ctx, "rdp")
 
 
+SIGNED_MAIL_CASES = {"TC-MODULES-059", "TC-MODULES-068"}
+
+
 def setup_mail(ctx):
-    if ctx.case_id != "TC-MODULES-059" or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    if ctx.case_id not in SIGNED_MAIL_CASES or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Signed Mail input requires the native package verifier")
     raw = os.environ.get("QA_SIGNED_MAIL_ROOT")
     if not raw:

@@ -249,6 +249,15 @@ def mail_performance_probe(ctx: StepContext, args: Any) -> None:
     run(ctx, args)
 
 
+@verb("mail_server_prefetch_paused")
+def mail_server_prefetch_paused(ctx: StepContext, paused: Any) -> None:
+    if not isinstance(paused, bool):
+        raise StepError("mail_server_prefetch_paused expects true or false")
+    if not ctx.dry_run:
+        _require_control(ctx)
+        ctx.page.evaluate(f"(paused) => {_CONTROL}.setPrefetchPaused(paused)", paused)
+
+
 @verb("mail_server_delay_next_read")
 def mail_server_delay_next_read(ctx: StepContext, args: Any) -> None:
     """Hold one folder-read response to exercise other actions while it is pending."""

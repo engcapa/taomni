@@ -2,12 +2,14 @@
 
 mod downloads;
 mod imap_outgoing;
+mod prefetch;
 
 pub(super) use downloads::{fetch_imap_attachment, fetch_imap_body, fetch_imap_raw};
 pub(super) use imap_outgoing::{
     discard_remote_draft, discards_remote_drafts, store_remote_draft, store_sent_copy,
     stores_remote_drafts,
 };
+pub(super) use prefetch::{prefetch_imap_bodies, prefetches_imap_bodies};
 
 use std::{
     net::SocketAddr,
@@ -325,9 +327,14 @@ async fn invoke_with_incoming<T: DeserializeOwned, P: Serialize + Send + 'static
     method: &'static str,
     build_request: impl FnOnce(IncomingTest) -> P,
 ) -> Result<T, String> {
+    let (_route, connection) = bind_incoming(account).await?;
+    invoke(registry, method, build_request(connection)).await
+}
+
+async fn bind_incoming(account: &ResolvedMailAccount) -> Result<(Route, IncomingTest), String> {
     let server = &account.config.imap;
     let server_name = server.host.trim().to_owned();
-    let (_route, endpoint) = bind_route(
+    let (route, endpoint) = bind_route(
         server_name.clone(),
         server.port,
         account.network_settings.clone(),
@@ -344,7 +351,7 @@ async fn invoke_with_incoming<T: DeserializeOwned, P: Serialize + Send + 'static
         username: account.imap_username.clone(),
         secret: account.imap_password.clone().into(),
     };
-    invoke(registry, method, build_request(connection)).await
+    Ok((route, connection))
 }
 
 async fn bind_route(

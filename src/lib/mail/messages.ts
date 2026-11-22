@@ -68,9 +68,22 @@ export function mailGetMessageBody(
   );
 }
 
-/** Populate the native disk cache without returning a body to the renderer. */
-export function mailPrefetchMessageBody(config: MailTabInfo, folder: string, uid: number): Promise<void> {
-  return invoke<void>("mail_prefetch_message_body", { config, folder, uid });
+/** Populate the native disk cache without returning bodies to the renderer. */
+export async function mailPrefetchMessageBody(
+  config: MailTabInfo,
+  folder: string,
+  uid: number,
+  additionalUids: number[] = [],
+): Promise<void> {
+  const accepted = await invoke<boolean | null>("mail_prefetch_message_body", {
+    config, folder, uid, uids: additionalUids.length ? [uid, ...additionalUids] : undefined,
+  });
+  if (accepted === true) return;
+
+  // Previous cores can still warm each UID individually.
+  for (const nextUid of additionalUids) {
+    await invoke<void>("mail_prefetch_message_body", { config, folder, uid: nextUid });
+  }
 }
 
 export function mailMarkRead(

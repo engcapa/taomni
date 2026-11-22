@@ -89,7 +89,10 @@ pub(super) async fn while_current<T>(
     }
 }
 
-fn configure(stream: &TcpStream, protocol: MailIncomingProtocol) -> Result<(), RpcError> {
+pub(super) fn configure(
+    stream: &TcpStream,
+    protocol: MailIncomingProtocol,
+) -> Result<(), RpcError> {
     let timeout = Duration::from_secs(match protocol {
         MailIncomingProtocol::Imap => 30,
         MailIncomingProtocol::Pop3 => 60,

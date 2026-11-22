@@ -5,6 +5,7 @@ mod commands;
 mod imap_exchange;
 mod incoming;
 mod outgoing;
+mod prefetch;
 mod snapshot;
 mod store;
 
@@ -14,8 +15,8 @@ use serde_json::Value;
 use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, DISCARD_IMAP_DRAFT, FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY,
     FETCH_IMAP_RAW, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, LIST_IMAP_UNREAD, MUTATE_IMAP_FOLDER,
-    SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, STORE_IMAP_DRAFT, STORE_IMAP_SENT, SYNC_IMAP_HEADERS,
-    SYNC_IMAP_ROUND,
+    PREFETCH_IMAP_BODIES, SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, STORE_IMAP_DRAFT,
+    STORE_IMAP_SENT, SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND,
 };
 use taomni_plugin_api::{
     ErrorCode, RpcError,
@@ -49,6 +50,7 @@ fn host_config() -> HostConfig {
                 LIST_IMAP_UNREAD,
                 FETCH_IMAP_RAW,
                 FETCH_IMAP_BODY,
+                PREFETCH_IMAP_BODIES,
                 FETCH_IMAP_ATTACHMENT,
                 SNAPSHOT_PREPARE_METHOD,
                 SNAPSHOT_METHOD,
@@ -69,9 +71,11 @@ pub fn serve_stdio() -> io::Result<()> {
         let storage = storage.ok_or_else(|| io::Error::other("Mail profile ownership required"))?;
         Ok(Arc::new(Handler {
             store: Arc::new(store::Store::new(storage.root().path())),
-            io: tokio::runtime::Builder::new_current_thread()
+            io: tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
                 .enable_all()
                 .build()?,
+            prefetch: Arc::new(tokio::sync::Semaphore::new(2)),
         }))
     })
 }
@@ -79,6 +83,7 @@ pub fn serve_stdio() -> io::Result<()> {
 struct Handler {
     store: Arc<store::Store>,
     io: tokio::runtime::Runtime,
+    prefetch: Arc<tokio::sync::Semaphore>,
 }
 
 impl PluginHandler for Handler {
@@ -168,6 +173,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(imap_exchange::fetch_body(&self.io, operation, input)?)
+            }
+            PREFETCH_IMAP_BODIES => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(prefetch::start(&self.io, operation, input, &self.prefetch)?)
             }
             FETCH_IMAP_ATTACHMENT => {
                 let input = serde_json::from_value(params.unwrap_or_default())

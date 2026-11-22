@@ -78,6 +78,8 @@ interface StubAccountState {
 
 const accounts = new Map<string, StubAccountState>();
 let nextFolderReadDelayMs = 0;
+let prefetchGate: Promise<void> | undefined;
+let releasePrefetch: (() => void) | undefined;
 type MutationFault = { supports_move?: boolean; uidplus?: boolean; max_count?: number | null; fail_after?: number | null; reject_store_once?: boolean; drop_copy_response_once?: boolean };
 let mutationFault: MutationFault = {};
 let mutationTransferred = 0;
@@ -167,6 +169,21 @@ export function stubMailFindHeader(accountId: string, seed: Seed, folder: string
   const state = account(accountId, seed);
   const entry = folderState(state, folder);
   return entry.cache.get(uid) ?? entry.server.get(uid) ?? null;
+}
+
+export async function stubMailPrefetchBodies(
+  accountId: string,
+  seed: Seed,
+  folderName: string,
+  uids: number[],
+): Promise<boolean> {
+  await prefetchGate;
+  const { cache } = folderState(account(accountId, seed), folderName);
+  for (const uid of uids) {
+    const entry = cache.get(uid);
+    if (entry) cache.set(uid, { ...entry, bodyCached: true });
+  }
+  return true;
 }
 
 export function stubMailSyncFolder(
@@ -548,6 +565,7 @@ function idleChanged(accountId: string, folder: string) {
 export interface StubMailQaControl {
   mutationFault: (fault: MutationFault) => void;
   delayNextFolderRead: (milliseconds: number) => void;
+  setPrefetchPaused: (paused: boolean) => void;
   deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean, listUnsubscribe?: string | null, invite?: string | null, readReceipt?: boolean) => number[];
   expunge: (accountId: string, folder: string, uids: number[]) => void;
   setFlags: (accountId: string, folder: string, uid: number, flags: string[]) => void;
@@ -587,6 +605,11 @@ export function installStubMailQaControl(seed: Seed): void {
   const control: StubMailQaControl = {
     mutationFault(fault) { mutationFault = { ...mutationFault, ...fault }; },
     delayNextFolderRead(milliseconds) { nextFolderReadDelayMs = milliseconds; },
+    setPrefetchPaused(paused) {
+      releasePrefetch?.();
+      prefetchGate = paused ? new Promise<void>((resolve) => { releasePrefetch = resolve; }) : undefined;
+      if (!paused) releasePrefetch = undefined;
+    },
     deliver(accountId, folderName, count, prefix = "QA", thread = false, listUnsubscribe = null, invite = null, readReceipt = false) {
       const state = account(accountId, seed);
       const folder = folderState(state, folderName);

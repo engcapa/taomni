@@ -986,7 +986,19 @@
           "description": "Native signed Local servers case. Check the installed host, listener, settings, Vault, writer lease and running backup."
         },
         "assert_signed_mail_host": {
-          "enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "disabled"],
+          "oneOf": [
+            {"enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "disabled"]},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["phase", "subject_prefix", "count"],
+              "properties": {
+                "phase": {"const": "imap-prefetch"},
+                "subject_prefix": {"type": "string", "minLength": 1},
+                "count": {"type": "integer", "minimum": 2, "maximum": 4}
+              }
+            }
+          ],
           "description": "Native signed Mail case only. Match installed host bytes to the signed input and observe the module writer lease before, during and after using the Mail host."
         },
         "assert_signed_rdp_latency": {
@@ -1772,6 +1784,10 @@
           "type": "object", "additionalProperties": false,
           "required": ["milliseconds"],
           "properties": {"milliseconds": {"type": "integer", "minimum": 1, "maximum": 25000}}
+        },
+        "mail_server_prefetch_paused": {
+          "type": "boolean",
+          "description": "Hold or release background body prefetch in the browser Mail fixture."
         },
         "mail_server_deliver": {
           "type": "object",

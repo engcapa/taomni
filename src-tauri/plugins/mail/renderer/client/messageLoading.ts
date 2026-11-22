@@ -281,16 +281,24 @@ export function createWarmRecentBodies(controllerContext: WarmRecentBodiesContex
       controllerContext.setBodyWarming({ active: true, done: 0, total: candidates.length, folder: candidates[0]?.folder ?? null });
       let done = 0;
       let lastProgressAt = Date.now();
-      for (const message of candidates) {
+      // Match the bound in the Mail host contract.
+      const maxBatch = 4;
+      while (done < candidates.length) {
         if (controllerContext.bodyWarmSeqRef.current !== seq || !controllerContext.visibleRef.current) return;
+        const message = candidates[done];
+        const additionalUids = [];
+        for (const next of candidates.slice(done + 1, done + maxBatch)) {
+          if (next.folder !== message.folder) break;
+          additionalUids.push(next.uid);
+        }
         try {
           // Warm only the native disk cache. Manual opens use the interactive
           // connection and must not join a request queued behind history sync.
-          await mailPrefetchMessageBody(controllerContext.info, message.folder, message.uid);
+          await mailPrefetchMessageBody(controllerContext.info, message.folder, message.uid, additionalUids);
         } catch {
           // Body warming is opportunistic; direct message open still reports errors.
         }
-        done += 1;
+        done += 1 + additionalUids.length;
         if (controllerContext.bodyWarmSeqRef.current !== seq || !controllerContext.visibleRef.current) return;
         const now = Date.now();
         if (done === candidates.length || now - lastProgressAt >= 250) {
@@ -304,7 +312,7 @@ export function createWarmRecentBodies(controllerContext: WarmRecentBodiesContex
         }
         // Cached IPC can settle synchronously. Give input/paint a task turn
         // without rebuilding every visible row once per warmed body.
-        if (done % 8 === 0) await delay(0);
+        if (done < candidates.length) await delay(0);
       }
     } finally {
       if (controllerContext.bodyWarmSeqRef.current === seq) {

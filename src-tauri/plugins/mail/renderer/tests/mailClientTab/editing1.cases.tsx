@@ -154,6 +154,7 @@ export function registerMailClientTabEditing1Cases() {
   });
 
   it("syncs headers first and shows body warming as separate progress", async () => {
+    const second = { ...uncachedMessage, uid: uncachedMessage.uid + 1, subject: "Another uncached message" };
     let resolveWarmBody!: () => void;
     const warmBodyPromise = new Promise<void>((resolve) => {
       resolveWarmBody = resolve;
@@ -161,8 +162,8 @@ export function registerMailClientTabEditing1Cases() {
     mailMocks.mailListCachedMessages.mockReset();
     mailMocks.mailListCachedMessages
       .mockResolvedValueOnce([message])
-      .mockResolvedValueOnce([uncachedMessage])
-      .mockResolvedValueOnce([uncachedMessage]);
+      .mockResolvedValueOnce([uncachedMessage, second])
+      .mockResolvedValueOnce([uncachedMessage, second]);
     mailMocks.mailPrefetchMessageBody.mockReturnValue(warmBodyPromise);
     mailMocks.mailGetMessageBody.mockImplementation((_config: MailTabInfo, _folder: string, uid: number) =>
       Promise.resolve(uid === uncachedMessage.uid ? {
@@ -179,15 +180,17 @@ export function registerMailClientTabEditing1Cases() {
       { ...info, sync: { ...info.sync, subscribedOnly: false } },
       { limit: 50, includeBodies: false, fullReconcile: true },
     ));
-    expect(await screen.findByText(/Header arrived before the body cache is warm/)).toBeInTheDocument();
-    expect(await screen.findByTestId("mail-body-warming-progress")).toHaveTextContent("Bodies 0/1");
+    const row = (await screen.findAllByTestId("mail-message-row"))
+      .find((candidate) => candidate.dataset.subject === uncachedMessage.subject)!;
+    expect(within(row).getByText(/Header arrived before the body cache is warm/)).toBeInTheDocument();
+    expect(await screen.findByTestId("mail-body-warming-progress")).toHaveTextContent("Bodies 0/2");
 
-    expect(mailMocks.mailPrefetchMessageBody).toHaveBeenCalledWith(info, "INBOX", uncachedMessage.uid);
+    expect(mailMocks.mailPrefetchMessageBody).toHaveBeenCalledWith(info, "INBOX", uncachedMessage.uid, [second.uid]);
     // Warming is still pending; opening that message must use the interactive
     // path instead of waiting on the background promise or changing the reader.
-    fireEvent.click(screen.getByTestId("mail-message-row"));
+    fireEvent.click(row);
     expect(await screen.findByText("Interactive body while warming is pending")).toBeInTheDocument();
-    expect(screen.getByTestId("mail-body-warming-progress")).toHaveTextContent("Bodies 0/1");
+    expect(screen.getByTestId("mail-body-warming-progress")).toHaveTextContent("Bodies 0/2");
     resolveWarmBody();
 
     await waitFor(() => expect(screen.queryByTestId("mail-body-warming-progress")).not.toBeInTheDocument());

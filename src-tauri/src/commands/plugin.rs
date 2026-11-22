@@ -213,6 +213,7 @@ pub async fn plugin_invoke(
                     | taomni_mail_api::LIST_IMAP_UNREAD
                     | taomni_mail_api::FETCH_IMAP_RAW
                     | taomni_mail_api::FETCH_IMAP_BODY
+                    | taomni_mail_api::PREFETCH_IMAP_BODIES
                     | taomni_mail_api::FETCH_IMAP_ATTACHMENT
             ))
     {

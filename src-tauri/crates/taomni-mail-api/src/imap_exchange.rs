@@ -9,6 +9,32 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use crate::IncomingTest;
 
 const MAX_FRAME_BYTES: usize = taomni_plugin_stream::MAX_PAYLOAD_BYTES;
+pub const MAX_PREFETCH_BODIES: usize = 4;
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PrefetchBodies {
+    pub account_id: String,
+    pub folder: String,
+    pub uids: Vec<u32>,
+    pub body_max_bytes: u32,
+    pub save_original: bool,
+}
+
+impl PrefetchBodies {
+    pub fn is_valid(&self) -> bool {
+        !self.account_id.trim().is_empty()
+            && self.account_id.len() <= 1024
+            && !self.folder.trim().is_empty()
+            && !self.uids.is_empty()
+            && self.uids.len() <= MAX_PREFETCH_BODIES
+            && self
+                .uids
+                .iter()
+                .enumerate()
+                .all(|(index, uid)| *uid != 0 && !self.uids[..index].contains(uid))
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

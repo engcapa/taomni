@@ -1,5 +1,5 @@
 import { mailArchiveStub } from "../mailArchiveStub";
-import { stubMailAppend, stubMailChangeFolder, stubMailClearCache, stubMailExpunge, stubMailFindHeader, stubMailListCached, stubMailListFolders, stubMailSearch, stubMailSyncAll, stubMailSyncFolder, stubMailIdleStart, stubMailSetSubscription, stubMailIdleStop, stubMailRecordSent, stubMailMutation, stubMailUpdateCachedFlags, stubMailMarkRead, type Seed as MailStubSeed, type StubMailSearchQuery } from "../mailServerStub";
+import { stubMailAppend, stubMailChangeFolder, stubMailClearCache, stubMailExpunge, stubMailFindHeader, stubMailListCached, stubMailListFolders, stubMailSearch, stubMailSyncAll, stubMailSyncFolder, stubMailIdleStart, stubMailSetSubscription, stubMailIdleStop, stubMailRecordSent, stubMailMutation, stubMailUpdateCachedFlags, stubMailMarkRead, stubMailPrefetchBodies, type Seed as MailStubSeed, type StubMailSearchQuery } from "../mailServerStub";
 import { stubApplyFilters, stubListFilters, stubSaveFilters } from "../mailFiltersStub";
 import { stubAddressBookSuggestions, stubDeleteAddressBookEntry, stubListAddressBook, stubSaveAddressBookEntry } from "../mailContactsStub";
 import type { MailAddressBookEntry } from "../../lib/mailContacts";
@@ -387,8 +387,12 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
       ) as T;
     }
 
-    case "mail_prefetch_message_body":
-      return undefined as T;
+    case "mail_prefetch_message_body": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = String(invokeArgs?.folder ?? "INBOX");
+      const uids = Array.isArray(invokeArgs?.uids) ? invokeArgs.uids.map(Number) : [Number(invokeArgs?.uid)];
+      return await stubMailPrefetchBodies(stubMailAccountId(invokeArgs), mailStubSeed, folder, uids) as T;
+    }
 
     case "mail_get_message_body": {
       const invokeArgs = args as InvokeArgs | undefined;

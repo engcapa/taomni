@@ -3,10 +3,11 @@ use std::net::Ipv4Addr;
 use taomni_mail_api::{
     DISCARD_IMAP_DRAFT, FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, ImapDraftDiscard, ImapDraftStore,
     ImapSentCopy, IncomingTest, MailAuthMode, MailConnectionSecurity, MailIncomingProtocol,
-    MailProvider, MimeUpload, RemoteDraftLocation, STORE_IMAP_DRAFT, STORE_IMAP_SENT,
+    MailProvider, MimeUpload, PREFETCH_IMAP_BODIES, RemoteDraftLocation, STORE_IMAP_DRAFT,
+    STORE_IMAP_SENT,
     imap_exchange::{
-        AttachmentReceipt, AttachmentRequest, ImapExchange, read_body_frame, read_frame,
-        write_frame,
+        AttachmentReceipt, AttachmentRequest, ImapExchange, PrefetchBodies, read_body_frame,
+        read_frame, write_frame,
     },
 };
 use taomni_mail_engine::imap_transport::{ImapBodyReply, ImapBodyRequest};
@@ -143,6 +144,72 @@ pub(super) fn check_routed_attachment(host: &mut MailHost) {
             });
         });
     }
+}
+
+pub(super) fn check_routed_prefetch(host: &mut MailHost) {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    std::thread::scope(|scope| {
+        runtime.block_on(async {
+            tokio::time::timeout(WAIT, async {
+                let (listener, _route, connection) = routed_mailbox().await;
+                let (_exchange, exchange, mut peer) = Route::pair().await.unwrap();
+                let request = ImapExchange {
+                    connection,
+                    exchange,
+                };
+                let (publish, acknowledged) = oneshot::channel();
+                scope.spawn(move || {
+                    let result =
+                        host.call(PREFETCH_IMAP_BODIES, serde_json::to_value(request).unwrap());
+                    serde_json::from_value::<Result<(), String>>(result)
+                        .unwrap()
+                        .unwrap();
+                    // A prefetch awaiting its data must leave the RPC worker available.
+                    let folders = host.call(
+                        "mail_list_cached_folders",
+                        serde_json::json!({"accountId": "existing-mail"}),
+                    );
+                    assert_eq!(folders[0]["name"], "INBOX");
+                    publish.send(()).unwrap();
+                });
+                let receive = async {
+                    acknowledged.await.unwrap();
+                    let batch = PrefetchBodies {
+                        account_id: "existing-mail".into(),
+                        folder: "INBOX".into(),
+                        uids: vec![23, 24],
+                        body_max_bytes: 1024,
+                        save_original: true,
+                    };
+                    write_frame(&mut peer, &serde_json::to_vec(&batch).unwrap())
+                        .await
+                        .unwrap();
+                    for uid in batch.uids {
+                        let reply: Result<ImapBodyReply, String> =
+                            serde_json::from_slice(&read_body_frame(&mut peer).await.unwrap())
+                                .unwrap();
+                        let original = read_frame(&mut peer).await.unwrap();
+                        let reply = reply.unwrap();
+                        assert_eq!(reply.message.header.account_id, batch.account_id);
+                        assert_eq!(reply.message.header.folder, batch.folder);
+                        assert_eq!(reply.message.header.uid, uid);
+                        assert!(reply.message.body_text.unwrap().contains(TEXT.trim()));
+                        assert_eq!(reply.original_size, Some(original.len()));
+                        assert_eq!(original, format!("{HEADER}{TEXT}").as_bytes());
+                    }
+                    let mut tail = Vec::new();
+                    peer.read_to_end(&mut tail).await.unwrap();
+                    assert!(tail.is_empty());
+                };
+                tokio::join!(receive, serve(listener, FixtureFetch::Prefetch));
+            })
+            .await
+            .expect("The background connection and its exchange must end");
+        });
+    });
 }
 
 pub(super) fn check_routed_sent_copy(host: &mut MailHost) {
@@ -366,12 +433,20 @@ async fn routed_mailbox() -> (TcpListener, Route, IncomingTest) {
 
 enum FixtureFetch {
     Body,
+    Prefetch,
     Attachment,
     Section,
 }
 
 impl FixtureFetch {
-    fn reply(&self, request: &str) -> String {
+    fn uids(&self) -> &[u32] {
+        match self {
+            Self::Prefetch => &[23, 24],
+            _ => &[23],
+        }
+    }
+
+    fn reply(&self, request: &str, uid: u32) -> String {
         const MIME: &str = concat!(
             "Content-Type: application/octet-stream\r\n",
             "Content-Disposition: attachment; filename=fixture.bin\r\n",
@@ -379,10 +454,10 @@ impl FixtureFetch {
         );
         const BINARY: &str = "JVFB/wA=\r\n";
         match self {
-            Self::Body => {
+            Self::Body | Self::Prefetch => {
                 assert!(request.contains("BODY.PEEK[]<0.1024>"));
                 format!(
-                    "* 1 FETCH (UID 23 FLAGS () RFC822.SIZE {} BODY[HEADER] {{{}}}\r\n{HEADER} BODY[]<0> {{{}}}\r\n{HEADER}{TEXT})\r\n",
+                    "* 1 FETCH (UID {uid} FLAGS () RFC822.SIZE {} BODY[HEADER] {{{}}}\r\n{HEADER} BODY[]<0> {{{}}}\r\n{HEADER}{TEXT})\r\n",
                     HEADER.len() + TEXT.len(),
                     HEADER.len(),
                     HEADER.len() + TEXT.len()
@@ -431,9 +506,10 @@ async fn serve(listener: TcpListener, fixture: FixtureFetch) {
                 "* 1 EXISTS\r\n* OK [UIDVALIDITY 2] UIDs valid\r\n".to_owned()
             }
             "UID" => {
-                assert!(input.starts_with("UID FETCH 23 "));
+                let uid = fixture.uids()[fetches];
+                assert!(input.starts_with(&format!("UID FETCH {uid} ")));
                 fetches += 1;
-                fixture.reply(&input)
+                fixture.reply(&input, uid)
             }
             "LOGOUT" => "* BYE goodbye\r\n".to_owned(),
             _ => panic!("unexpected IMAP command {command}"),
@@ -447,5 +523,5 @@ async fn serve(listener: TcpListener, fixture: FixtureFetch) {
         }
         line.clear();
     }
-    assert_eq!(fetches, 1);
+    assert_eq!(fetches, fixture.uids().len());
 }

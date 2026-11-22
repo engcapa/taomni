@@ -18,10 +18,29 @@ pub async fn mail_get_message_body(
 pub async fn mail_prefetch_message_body(
     config: MailAccountConfig,
     folder: String,
-    uid: u32,
+    uid: Option<u32>,
+    uids: Option<Vec<u32>>,
     state: State<'_, AppState>,
-) -> Result<(), String> {
-    if config.cache.enabled {
+) -> Result<bool, String> {
+    use taomni_mail_api::imap_exchange::MAX_PREFETCH_BODIES;
+
+    let mut uids = uids.unwrap_or_else(|| uid.into_iter().collect());
+    if uids.is_empty() || uids.len() > MAX_PREFETCH_BODIES || uids.contains(&0) {
+        return Err("Invalid Mail body prefetch UIDs".into());
+    }
+    if !config.cache.enabled {
+        return Ok(true);
+    }
+    let mut seen = HashSet::new();
+    uids.retain(|uid| seen.insert(*uid));
+
+    if !pop3::is_pop3(&config) && module_host::prefetches_imap_bodies(&state.plugins) {
+        module_host::prefetch_imap_bodies(&state, config, folder, uids).await?;
+        return Ok(true);
+    }
+
+    let mut result = Ok(());
+    for uid in uids {
         let saved_folder = folder.clone();
         let saved = with_mail_db_async(&state, &config.session_id, move |db, account| {
             storage::lookup(db, account, &saved_folder, uid)
@@ -32,11 +51,15 @@ pub async fn mail_prefetch_message_body(
         // A complete original already supplies offline reading. Background
         // warming must not repeatedly decompress and parse its attachments.
         if saved {
-            return Ok(());
+            continue;
         }
-        get_message_body(config, folder, uid, true, state).await?;
+        if let Err(error) =
+            get_message_body(config.clone(), folder.clone(), uid, true, state.clone()).await
+        {
+            result = Err(error);
+        }
     }
-    Ok(())
+    result.map(|()| true)
 }
 
 async fn get_message_body(
@@ -87,7 +110,7 @@ async fn get_message_body(
     let account = resolve_config(&state, config)?;
     let cache_enabled = account.config.cache.enabled;
     let observed_at = sync::now_ms();
-    // Keep the pooled background lane until body prefetch can batch requests.
+    // Older Mail packages keep their pooled background connection.
     let mut message = if !background && module_host::fetches_imap_body(&state.plugins) {
         fetch_host_body(state.plugins.clone(), account, folder, uid).await?
     } else {
