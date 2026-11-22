@@ -451,6 +451,8 @@ jobs:
           node scripts/compose-modules-manifest.mjs changed-modules changed-catalog --delta
           scripts/plugin-package/target/release/taomni-plugin-package \
             --prepare-catalog-update current-catalog changed-catalog next-catalog > new-assets.json
+          cp changed-catalog/SHA256SUMS next-catalog/SHA256SUMS
+          (cd next-catalog && sha256sum --check --strict SHA256SUMS)
       - name: Sign the complete module catalog
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -480,7 +482,7 @@ jobs:
           tag = os.environ['TAG']
           release = json.loads(subprocess.check_output(['gh', 'release', 'view', tag, '--json', 'assets'], text=True))
           existing = {asset['name'] for asset in release['assets']}
-          for name in json.loads(pathlib.Path('new-assets.json').read_text(encoding='utf-8')):
+          for name in [*json.loads(pathlib.Path('new-assets.json').read_text(encoding='utf-8')), 'SHA256SUMS']:
               candidate = f'next-catalog/{name}'
               if name not in existing:
                   subprocess.run(['gh', 'release', 'upload', tag, candidate], check=True)

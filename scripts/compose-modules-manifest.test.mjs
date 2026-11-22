@@ -53,14 +53,17 @@ test("composes platform entries with exact bytes, SHA-256 and detached signature
   assert.equal(result.manifest.coreApiVersion, "1");
   assert.equal(result.manifest.sequence, 42);
   assert.equal(plugin.version, "1.2.3");
+  const checksums = [];
   for (const [platform, bytes] of [["linux-x86_64", "linux package"], ["windows-x86_64", "windows package"]]) {
     const entry = plugin.platforms[platform];
     assert.match(entry.url, new RegExp(`taomni-plugin-hello-1\\.2\\.3-${platform}\\.taomni-plugin$`));
     assert.equal(entry.sha256, createHash("sha256").update(bytes).digest("hex"));
+    checksums.push(`${entry.sha256}  taomni-plugin-hello-1.2.3-${platform}.taomni-plugin\n`);
     assert.equal(entry.size, Buffer.byteLength(bytes));
     assert.equal(readFileSync(join(f.output, `taomni-plugin-hello-1.2.3-${platform}.taomni-plugin`), "utf8"), bytes);
     assert.equal(readFileSync(join(f.output, `taomni-plugin-hello-1.2.3-${platform}.taomni-plugin.minisig`), "utf8"), `signature for ${platform}\n`);
   }
+  assert.equal(readFileSync(join(f.output, "SHA256SUMS"), "utf8"), checksums.join(""));
   assert.deepEqual(JSON.parse(readFileSync(join(f.output, "modules.json"), "utf8")), result.manifest);
 });
 

@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- 联合发布和独立模块发布都会随包上传外部 `SHA256SUMS`，列出该 Release 实际上传的模块包。发布前对暂存包逐项复核摘要。仅核心发布继续引用已发布模块所在的 Release。模块独立版本的其他平台和其他模块仍由签名目录定位。
 - 四目标打包演练在 macOS 作业的静态 Kerberos 参数检查处提前退出。ARM64 和 Intel 改用各自的 runner、签名配置和依赖，ARM64 可单独启用静态链接与 hardened runtime。旧轮已收到 Mail、MFA 和本地语音的 Linux ELF 回执，三个宿主均符合 glibc 2.35 上限。新版双架构 DMG 和安装复验仍待 runner。 [原打包作业](https://github.com/engcapa/taomni/actions/runs/44989355250/job/137107289852)
 - `0555ee9dd` 的九个 Browser 分片在执行期间收齐，Linux、Windows 和 macOS 各通过 27/27，包含 SocksCap、Markdown Live、Explorer 新建文件及崩溃回归。`3f9a2610e` 的六个升级相关用例与完整崩溃回归已提交三端 Browser/Native。 [Browser 分片](https://github.com/engcapa/taomni/actions/runs/44988634877) · [升级复验](https://github.com/engcapa/taomni/actions/runs/44991520399)
 - 旧会话预检按已验签并启用的客户端分别确认 RDP 和 VNC，会话记录保留在核心数据库。RDP 的证书导入仍有独立回执。Mobile 桌面策略继续由核心读写，升级页已移除对 Mobile 模块的推荐。TC-MODULES-005、025、056 覆盖设置回读、旧策略文件摘要和混合客户端的迁移记录。

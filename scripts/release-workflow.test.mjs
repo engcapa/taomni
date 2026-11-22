@@ -151,11 +151,17 @@ test("verifies the detached module catalog and all its packages before any relea
   f.put(join(f.root, "module-assets/modules.json"), "{}");
   f.put(join(f.root, "module-assets/example.taomni-plugin"), "fixture only");
   f.put(join(f.root, "module-assets/example.taomni-plugin.minisig"), "fixture only");
+  const checksumFile = join(f.root, "module-assets/SHA256SUMS");
+  f.put(checksumFile, `${"0".repeat(64)}  example.taomni-plugin\n`);
+  assert.notEqual(f.run().status, 0);
+  assert.deepEqual(f.calls(), []);
+  rmSync(join(f.root, "updater-assets"), { recursive: true });
+  f.put(checksumFile, `${createHash("sha256").update("fixture only").digest("hex")}  example.taomni-plugin\n`);
   const result = f.run({ TEST_GH_EXISTING_DRAFT: "1" });
   assert.equal(result.status, 0, result.stderr + result.stdout);
-  const published = f.calls().filter((args) => args[1] === "upload").slice(-5).map((args) => args[3]);
+  const published = f.calls().filter((args) => args[1] === "upload").slice(-6).map((args) => args[3]);
   assert.deepEqual(published, ["module-assets/example.taomni-plugin", "module-assets/example.taomni-plugin.minisig",
-    "module-assets/modules.json.minisig", "module-assets/modules.json", "updater-assets/latest.json"]);
+    "module-assets/SHA256SUMS", "module-assets/modules.json.minisig", "module-assets/modules.json", "updater-assets/latest.json"]);
 });
 
 test("a joint release publishes only changed module assets from the verified catalog", (t) => {
@@ -173,6 +179,7 @@ test("a joint release publishes only changed module assets from the verified cat
     releaseExceptions: { "taomni-plugin-mobile": { placement: "core", notes: "Mobile remains in the core application." } },
   }));
   f.put(join(f.root, "module-uploads.json"), JSON.stringify(["changed.taomni-plugin", "changed.taomni-plugin.minisig"]));
+  f.put(join(f.root, "module-assets/SHA256SUMS"), `${createHash("sha256").update("changed.taomni-plugin").digest("hex")}  changed.taomni-plugin\n`);
   assert.notEqual(f.run({ TEST_GH_EXISTING_RELEASE: "1" }).status, 0);
   assert(f.calls().every((args) => args[1] === "view"));
   rmSync(join(f.root, "updater-assets"), { recursive: true });
@@ -180,9 +187,10 @@ test("a joint release publishes only changed module assets from the verified cat
   assert.equal(result.status, 0, result.stderr + result.stdout);
   const uploads = f.calls().filter((args) => args[1] === "upload").map((args) => args[3]);
   assert(!uploads.some((path) => path.includes("unchanged.taomni-plugin")));
-  assert.deepEqual(uploads.slice(-5), [
+  assert.deepEqual(uploads.slice(-6), [
     "module-assets/changed.taomni-plugin",
     "module-assets/changed.taomni-plugin.minisig",
+    "module-assets/SHA256SUMS",
     "module-assets/modules.json.minisig",
     "module-assets/modules.json",
     "updater-assets/latest.json",

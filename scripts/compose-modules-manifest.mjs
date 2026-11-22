@@ -211,7 +211,7 @@ export function composeModulesManifest({
       size: statSync(packagePath).size,
     };
     plugins.set(manifest.id, plugin);
-    assets.push({ packagePath, signaturePath: signature.path, assetName });
+    assets.push({ packagePath, signaturePath: signature.path, assetName, digest });
   }
 
   if (legacyUpgrade !== undefined) {
@@ -248,6 +248,9 @@ export function composeModulesManifest({
     copyFileSync(asset.packagePath, join(outputDir, asset.assetName));
     copyFileSync(asset.signaturePath, join(outputDir, `${asset.assetName}.minisig`));
   }
+  writeFileSync(join(outputDir, "SHA256SUMS"), assets.map(
+    ({ digest, assetName }) => `${digest}  ${assetName}\n`,
+  ).join(""));
   writeFileSync(join(outputDir, "modules.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   const signatureSource = manifestSignaturePath ?? join(artifactsDir, "modules.json.minisig");
   if (existsSync(signatureSource)) copyFileSync(signatureSource, join(outputDir, "modules.json.minisig"));

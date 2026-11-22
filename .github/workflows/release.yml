@@ -563,6 +563,7 @@ jobs:
           node scripts/fetch-published-module-assets.mjs carried-module-catalog carried-module-catalog
           scripts/plugin-package/target/release/taomni-plugin-package \
             --prepare-catalog-update carried-module-catalog changed-module-catalog module-assets > module-uploads.json
+          cp changed-module-catalog/SHA256SUMS module-assets/SHA256SUMS
       - name: Verify the first-upgrade roster before signing
         if: steps.module-catalog.outputs.present == 'true'
         shell: bash
@@ -594,6 +595,7 @@ jobs:
 
           if [ -d module-assets ]; then
             scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog module-assets
+            (cd module-assets && sha256sum --check --strict SHA256SUMS)
           elif [ -d carried-module-catalog ]; then
             scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog-signature carried-module-catalog
           fi
@@ -647,11 +649,12 @@ jobs:
             if [[ -f module-uploads.json ]]; then
               module_uploads="$(node -e 'for (const name of require("./module-uploads.json")) console.log("module-assets/" + name)')"
             else
-              module_uploads="$(find module-assets -maxdepth 1 -type f ! -name modules.json ! -name modules.json.minisig | sort)"
+              module_uploads="$(find module-assets -maxdepth 1 -type f \( -name '*.taomni-plugin' -o -name '*.taomni-plugin.minisig' \) | sort)"
             fi
             while IFS= read -r asset; do
               gh release upload "$TAG" "$asset" --clobber
             done <<< "$module_uploads"
+            gh release upload "$TAG" module-assets/SHA256SUMS --clobber
             gh release upload "$TAG" module-assets/modules.json.minisig --clobber
             gh release upload "$TAG" module-assets/modules.json --clobber
           elif [[ -d carried-module-catalog && "$MODULE_CATALOG_SOURCE_TAG" != "$TAG" ]]; then
