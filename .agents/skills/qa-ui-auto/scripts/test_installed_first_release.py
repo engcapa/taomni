@@ -4,9 +4,11 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
+from contextlib import nullcontext
 from unittest.mock import Mock, patch
 
 from installed_first_release import enrollment
+import installed_windows_store as windows_store
 from installed_windows_webview import owned_listener
 from native_driver_lifecycle import windows_webview_options
 from native_webdriver_transport import WebDriverError
@@ -86,3 +88,38 @@ class InstalledFirstReleaseTests(unittest.TestCase):
         self.assertIsNone(owned_listener(connections, {48}, 9222))
         for addr in ("127.0.0.1", "::1"):
             self.assertEqual(owned_listener([*connections, connection(addr, 9222)], {48}, 9222), 48)
+
+    def test_windows_reopens_same_store_after_removal_without_another_catalog_selection(self):
+        catalog = {i: {"name": r["slug"]} for i, r in self.roster.items()}
+        self.origin.start_catalog = "signed.json"
+        self.origin.current_catalog = json.dumps({"plugins": catalog}).encode()
+        owner = Mock(pid=401)
+        for label, removed in [("first", None), ("reopen", "mail")]:
+            expected = sorted(i for i, row in self.roster.items() if row["slug"] != removed)
+            stage = {}
+            with self.subTest(label=label), \
+                 patch.object(windows_store, "installed_windows_desktop", return_value=nullcontext(owner)) as start, \
+                 patch.object(windows_store, "controls", return_value={"currentModules": expected}) as ui, \
+                 patch.object(windows_store, "observe_legacy_roster") as disk, \
+                 patch.object(windows_store, "close_window"):
+                windows_store.exercise_stage("Taomni.exe", self.profile, self.profile, self.profile,
+                                             self.origin, label, removed, stage, Mock())
+                self.assertEqual(start.call_args.kwargs["webview"], self.profile / "webview")
+                disk.assert_called_once_with(self.profile / "plugins", self.origin, removed)
+                phases = [call.args[1] for call in ui.call_args_list]
+                self.assertEqual(phases, ["open-store", "roster"] + ([] if removed else ["remove-mail"]))
+                source = ui.call_args_list[0].kwargs["catalogSource"]
+                self.assertEqual(source, None if removed else windows_store.ORIGIN + "/signed.json")
+                self.assertEqual(stage["currentModules"], expected)
+
+    def test_windows_store_rejects_another_owner_and_an_abnormal_exit(self):
+        owner = Mock(pid=17)
+        wrong = SimpleNamespace(stdout='{"ownerPid":18,"phase":"roster"}', returncode=0)
+        with patch.object(windows_store.subprocess, "run", return_value=wrong), \
+             self.assertRaisesRegex(RuntimeError, "Unexpected Windows UI Automation"):
+            windows_store.controls(owner, "roster", self.profile)
+        owner.wait.return_value = 1
+        confirmed = {"confirmation": "There is 1 open tab. Exit Taomni and close it?"}
+        with patch.object(windows_store, "controls", return_value=confirmed), \
+             self.assertRaisesRegex(RuntimeError, "exited with 1"):
+            windows_store.close_window(owner, self.profile)

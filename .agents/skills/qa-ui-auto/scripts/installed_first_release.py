@@ -1,6 +1,7 @@
 """Check first enrollment in a replacement desktop installation using its production desktop and signed business packages."""
 import json
 import os
+import platform
 import time
 
 from modular_bundle_inventory import digest, write_json
@@ -47,6 +48,10 @@ def exercise(ctx, executable, work, profile, evidence, origin, *, environment=No
     try:
         for label, removed in [("first-business-install", None), ("reopen-without-mail", "mail")]:
             stage = observation["stages"][label] = {}
+            if platform.system() == "Windows":
+                from installed_windows_store import exercise_stage
+                exercise_stage(executable, work, profile, evidence, origin, label, removed, stage, enrollment)
+                continue
             with installed_desktop(ctx, executable, work / "desktop", evidence, label,
                                    environment=environment, timeout=300) as (driver, session):
                 steps = unlock_vault(ctx, session, evidence)

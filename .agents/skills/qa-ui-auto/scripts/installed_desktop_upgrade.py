@@ -136,14 +136,14 @@ def execute(args):
     try:
         if args.first_release:
             origin = installed_first_release.open_release(args.first_release.resolve(strict=True), identity, report)
-            if system == "Windows":
-                webview = str(work / "webview")
-                environment = {"WEBVIEW2_USER_DATA_FOLDER": webview}
         old_binary, stages["original"] = install(old_package, slot, report / "original", old_version)
         initialize_profile(old_binary, profile, work, report, "original-start")
         insert_business_rows(profile, input_sessions(True))
         expected_rows = session_rows(profile)
-        if origin:
+        if origin and system == "Windows":
+            from installed_windows_store import seed
+            seed(old_binary, work, report, profile)
+        elif origin:
             seed_legacy_desktop(ctx, old_binary, work / "desktop", report, profile,
                                 catalog_source=f"{installed_first_release.ORIGIN}/{origin.start_catalog}",
                                 environment=environment)

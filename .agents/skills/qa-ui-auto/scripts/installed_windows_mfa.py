@@ -20,9 +20,12 @@ UIA_STAGES = {
 
 
 @contextmanager
-def installed_windows_desktop(executable, work, evidence, label):
-    webview = work / f"{label}-webview"
-    webview.mkdir()
+def installed_windows_desktop(executable, work, evidence, label, *, webview=None):
+    if webview is None:
+        webview = work / f"{label}-webview"
+        webview.mkdir()
+    else:
+        webview.mkdir(exist_ok=True)
     environment = {
         **os.environ,
         "WEBVIEW2_USER_DATA_FOLDER": str(webview),
