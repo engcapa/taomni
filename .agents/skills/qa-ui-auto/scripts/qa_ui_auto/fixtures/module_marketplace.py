@@ -3,10 +3,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
+import shutil
 import threading
 
 from .module_download import plugin_root
 from .module_signed_archive import load_artifact
+from . import module_first_release
 
 ORIGIN = "http://127.0.0.1:50301"
 BASELINE_CATALOG = "modules-baseline.json"
@@ -41,10 +43,15 @@ class Origin:
                     self.send_error(404)
                     return
                 self.send_response(200)
-                self.send_header("Content-Length", str(len(data)))
+                size = data.stat().st_size if isinstance(data, Path) else len(data)
+                self.send_header("Content-Length", str(size))
                 self.send_header("Connection", "close")
                 self.end_headers()
-                self.wfile.write(data)
+                if isinstance(data, Path):
+                    with data.open("rb") as package:
+                        shutil.copyfileobj(package, self.wfile)
+                else:
+                    self.wfile.write(data)
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 50301), Handler)
         self.server.daemon_threads = True
@@ -114,6 +121,12 @@ def setup_roster(ctx):
         raise RuntimeError("module_legacy_roster requires the native pinned verifier")
     plugin_root(ctx)
     receipt = json.loads((Path(ctx.case_dir) / "official-module-fixture.json").read_text(encoding="utf-8"))
+    release_run = os.environ.get("QA_FIRST_RELEASE_RUN")
+    if ctx.case_id == "TC-MODULES-040" and release_run:
+        files, roster, producer = module_first_release.release_inputs(
+            Path(os.environ["QA_FIRST_RELEASE_ROOT"]).resolve(), receipt["sourceSha"], release_run, receipt["platform"], ORIGIN,
+        )
+        return start_first_upgrade(ctx, files, roster, module_first_release.CATALOG, "mail", producer)
     root = Path(os.environ["QA_SIGNED_MODULE_ROOT"])
     hello, hello_archive, _, _ = load_artifact(root, receipt["sourceSha"], receipt["platform"])
     mfa, mfa_archive, _, _ = load_artifact(root / "legacy-roster-mfa", receipt["sourceSha"], receipt["platform"], "mfa")
@@ -144,8 +157,22 @@ def setup_roster(ctx):
     }
     (Path(ctx.case_dir) / "module-legacy-roster.json").write_text(json.dumps(roster, indent=2), encoding="utf-8")
     enrollment = {id: entry for id, entry in roster.items() if id in expected_ids}
+    if ctx.case_id == "TC-MODULES-040":
+        return start_first_upgrade(ctx, files, enrollment, catalog.name, "hello-plugin")
     ctx.module_marketplace = Origin(files, Path(ctx.case_dir) / "module-marketplace-requests.json",
                                     roster=enrollment, start_catalog=catalog.name)
+
+
+def start_first_upgrade(ctx, files, roster, catalog, remove, producer=None):
+    case = Path(ctx.case_dir)
+    primary = roster["taomni-plugin-" + remove]
+    evidence = {"catalog": catalog, "sourceSha": primary["sourceSha"], "platform": primary["platform"],
+                "removed": primary["slug"], "roster": roster}
+    if producer:
+        evidence.update(releaseRun=producer["runId"], catalogSha256=producer["catalogSha256"])
+    (case / "first-upgrade-input.json").write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+    ctx.values["module_roster_remove"] = remove
+    ctx.module_marketplace = Origin(files, case / "module-marketplace-requests.json", roster=roster, start_catalog=catalog)
 
 
 def teardown(ctx):

@@ -2905,8 +2905,12 @@
   ↳ `[data-testid="module-action-disable-ai-voice-local"]` — alias
   ↳ `[data-testid="module-action-disable-sockscap"]` — alias
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
+  ↳ `[data-testid="module-action-uninstall-mail"]` — alias
+  ↳ `[data-testid="module-action-uninstall-${fixture.module_roster_remove}"]` — alias
 - `[data-testid="module-action-install-hello-plugin"]` — interactive — F-Modules-1.module-action-install-hello-plugin
   ↳ `[data-testid="module-action-install-mfa"]` — alias
+  ↳ `[data-testid="module-action-install-mail"]` — alias
+  ↳ `[data-testid="module-action-install-${fixture.module_roster_remove}"]` — alias
 - `[data-testid="module-delete-data-hello-plugin"]` — interactive — F-Modules-1.module-delete-data-hello-plugin
 - `[data-testid="module-data-retained-hello-plugin"]` — display — F-Modules-1.module-data-retained-hello-plugin
   ↳ `[data-testid="module-data-retained-mfa"]` — alias

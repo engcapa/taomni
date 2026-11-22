@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- 首发升级演练从同一次联合构建中取得十个业务模块的签名包，按源码、平台、摘要和包内清单逐件校验，再签署 runner 使用的目录。`TC-MODULES-040` 从正式 0.5.12 安装件创建并重开的 profile 启动候选应用。指定 `first_release_run` 后，用例自动安装该平台的冻结名单，卸载 Mail，再正常重启并核对商店、其余签名包、原会话和历史文件。0.5.10 的回归继续由 027 等用例覆盖。正式首发仍要求全部模块达到 `stable`。十模块的完整 GitHub Native 回执待收取。 [0.5.12 安装件](https://github.com/engcapa/taomni/releases/tag/v0.5.12)
+- `0555ee9dd` 的 18 个 Browser/Native 分片已在执行期间全部收齐。SocksCap、Markdown Live、Explorer 及完整崩溃回归在三端 Browser 各通过 27/27，Linux、Windows、macOS Native 分别通过 29/29、30/30、30/30。 [原始运行](https://github.com/engcapa/taomni/actions/runs/44988634877)
 - 联合发布按工件名称分别下载四目标核心安装件和本次签名模块。此前模块包和 ABI 回执也会进入核心清单生成器，导致首发中断。四目标无标签演练使用与发布相同的更新清单生成和验签步骤，将 `latest.json`、安装件摘要、源码和 runner 身份保存为 `modular-candidate-updater-<run-id>`。50 项发布单测通过，候选仍待 GitHub 实包验证。
 - `3f9a2610e` 的九个 Browser 分片已在执行期间收齐，Linux、Windows 和 macOS 各通过 23/23。Linux 签名 RDP Server 在 `8a729b6f8` 的 ELF 回执中最高依赖 glibc 2.34，核心上限为 2.35。 [升级分片](https://github.com/engcapa/taomni/actions/runs/44991520399) · [打包工件](https://github.com/engcapa/taomni/actions/runs/44989355250)
 - Mail 的独立引擎已接管预取邮件的筛选和 SQLite 缓存提交。提交时在同一写事务内核对 UIDVALIDITY、Message-ID、已缓存正文、归档原件和读信标记。双连接回归与邮件引擎的其余单测共 71 项通过。TC-MODULES-068/069 增加了已读与未读的区分。应用仍通过核心过渡层提供账户数据库连接，签名宿主的数据写入归属继续迁移。

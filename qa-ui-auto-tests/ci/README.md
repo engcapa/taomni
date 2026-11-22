@@ -14,6 +14,17 @@ The audio playback case verifies the real loopback with the same installed devic
 
 ## Trigger and select
 
+For the first modular upgrade, run Release Bundle without a tag, with all
+platforms and the modules in `src-tauri/plugins/legacy-upgrade.json`. It uploads
+the verified packages and `modular-candidate-roster-<run-id>`. Run QA UI Auto
+Platforms at the same commit with `scope=selected`, `case_ids=TC-MODULES-040`,
+`native_release=true` and `first_release_run=<run-id>`. The native shard
+starts the pinned monolith, opens its profile with the candidate, installs all
+compatible business packages and checks the installed versions after removing
+Mail and restarting. The shard saves the catalog digest, package provenance,
+HTTP requests, active pointers and retained sessions. The regular focused run
+uses the signed Hello/MFA fixture.
+
 The modular refactor also uses `qa-modular-upgrade.yml` with an exact `head`.
 It runs the shared capture library checks for the four release targets, real
 X11 capture source tests, and the production host adapter against a real hello

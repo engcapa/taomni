@@ -131,7 +131,7 @@ def capabilities(cases, mode: str) -> list[str]:
             if "module_signed_rdp_archive" in fixtures:
                 result.add("signed-rdp")
             if fixtures & {"module_legacy_install", "module_legacy_mfa"}:
-                result.add("legacy-installer")
+                result.add("first-upgrade-installer" if case.id == "TC-MODULES-040" else "legacy-installer")
             if fixtures & {"backup_cloud", "credential_store"}:
                 result.add("secret-service")
             if "dual_display_required" in fixtures:
@@ -526,6 +526,8 @@ def main(argv=None):
             write_json(args.output, result)
             matrix = {"include": [{k: e[k] for k in ("id", "runner", "arch", "mode", "platform_key", "capabilities",
                                                      "linux_profile", "linux_wrapper", "cache_key", "rdp_unit_contracts", "build_id", "workers")} for e in result["entries"]]}
+            if os.environ.get("QA_FIRST_RELEASE_RUN") and not any("first-upgrade-installer" in job["capabilities"] for job in matrix["include"]):
+                raise ValueError("first_release_run requires the native first-upgrade case TC-MODULES-040")
             github_output("matrix", json.dumps(matrix, separators=(",", ":")))
             for mode in ("browser", "native"):
                 items = [e for e in matrix["include"] if e["mode"] == mode]

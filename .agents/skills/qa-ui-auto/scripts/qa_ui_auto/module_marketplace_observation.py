@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 import time
 
+from modular_bundle_inventory import digest
 from .fixtures.module_download import plugin_root
+from .fixtures.module_legacy_install import retained_manifest, session_rows
 from .fixtures.module_marketplace import BASELINE_CATALOG, LATER_ROSTER_CATALOG, NEW_MODULE_CATALOG, NEW_MODULE_SEQUENCE, ORIGIN
 from .module_retained_observation import assert_code_removed
 from .module_update_observation import VERSION_STATES, observe as observe_update
@@ -38,7 +40,7 @@ def observe_legacy_roster(root, origin, removed):
     for entry in origin.roster.values():
         slug, version = entry["slug"], entry["version"]
         archive = root / ".downloads" / (entry["sha256"] + ".taomni-plugin")
-        if origin.requests.count("/" + entry["archive"]) != 1 or not archive.is_file() or hashlib.sha256(archive.read_bytes()).hexdigest() != entry["sha256"]:
+        if origin.requests.count("/" + entry["archive"]) != 1 or not archive.is_file() or digest(archive) != entry["sha256"]:
             raise StepError(f"First upgrade did not transfer exactly one signed package for {slug}")
         owner = root / slug
         pointer = json.loads((owner / "active.json").read_text(encoding="utf-8"))
@@ -50,7 +52,7 @@ def observe_legacy_roster(root, origin, removed):
             if pointer["activeVersion"] != version:
                 raise StepError(f"First upgrade did not activate the roster's signed version for {slug}")
             proof = owner / "versions" / version / ".taomni-trust/package.taomni-plugin"
-            if hashlib.sha256(proof.read_bytes()).hexdigest() != entry["sha256"]:
+            if digest(proof) != entry["sha256"]:
                 raise StepError(f"Installed signed package does not match the roster for {slug}")
         pointers[slug] = pointer
     return pointers
@@ -75,14 +77,21 @@ def run(ctx, args):
         elif phase in VERSION_STATES:
             record.update(observe_update(ctx, root, phase, origin))
         else:
+            first_input = Path(ctx.case_dir) / "first-upgrade-input.json"
+            first_upgrade = json.loads(first_input.read_text(encoding="utf-8")) if first_input.exists() else None
             if phase in {"legacy-installed", "legacy-new-available"}:
                 enrollment_path = root.parent / ".module-release.json"
-                deadline = time.monotonic() + 45
+                deadline = time.monotonic() + (180 if first_upgrade and first_upgrade.get("releaseRun") else 45)
                 while time.monotonic() < deadline:
                     if enrollment_path.is_file() and json.loads(enrollment_path.read_text()).get("legacyPending") == []:
                         break
                     time.sleep(0.1)
-            receipt = json.loads((Path(ctx.case_dir) / "official-module-fixture.json").read_text())
+            if first_upgrade:
+                receipt = origin.roster["taomni-plugin-" + first_upgrade["removed"]]
+                record.update(sourceSha=first_upgrade["sourceSha"], platform=first_upgrade["platform"],
+                              catalog=first_upgrade["catalog"], releaseRun=first_upgrade.get("releaseRun"))
+            else:
+                receipt = json.loads((Path(ctx.case_dir) / "official-module-fixture.json").read_text())
             archive_url = "/" + receipt["archive"]
             requests = list(origin.requests)
             record["requests"] = requests
@@ -125,6 +134,21 @@ def run(ctx, args):
                     if enrollment.get("origin") != "legacy" or enrollment.get("legacyPending") != []:
                         raise StepError("First installation was not recorded as complete for the legacy profile")
                     record["enrollment"] = enrollment
+                    if first_upgrade and (set(enrollment["seen"]) != set(origin.roster) or enrollment["newModules"]):
+                        raise StepError("First installation did not acknowledge exactly the compatible roster")
+                    if first_upgrade and phase == "legacy-uninstalled":
+                        current = ctx.session.execute("""
+                          return Array.from(document.querySelectorAll('[data-testid="module-marketplace-current"]'),
+                            node => node.closest('[data-module-id]').getAttribute('data-module-id')).sort();
+                        """)
+                        if current != sorted(set(origin.roster) - {receipt["id"]}):
+                            raise StepError("Restart did not restore exactly the remaining modules in the store")
+                        legacy = owner.module_upgrade
+                        if (session_rows(legacy["root"]) != legacy["full_sessions"]
+                                or retained_manifest(legacy["root"]) != legacy["retained"]):
+                            raise StepError("First upgrade changed the original sessions or historical chat files")
+                        record["remainingModules"] = current
+                        record["legacySessionIds"] = [row["id"] for row in legacy["full_sessions"]]
                     if getattr(origin, "roster", None):
                         removed = receipt["slug"] if phase == "legacy-uninstalled" else None
                         record["rosterPointers"] = observe_legacy_roster(root, origin, removed)

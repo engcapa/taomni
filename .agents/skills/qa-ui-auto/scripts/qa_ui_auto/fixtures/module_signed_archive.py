@@ -48,7 +48,9 @@ def load_artifact(root: Path, source_sha: str, expected_platform: str, slug: str
     archive, signature = root / archive_name, root / (archive_name + ".minisig")
     if any(p.is_symlink() or not p.is_file() for p in (archive, signature)):
         raise RuntimeError("Official module archive/signature must be ordinary files")
-    if hashlib.sha256(archive.read_bytes()).hexdigest() != receipt.get("sha256") or archive.stat().st_size != receipt.get("size"):
+    with archive.open("rb") as stream:
+        archive_digest = hashlib.file_digest(stream, "sha256").hexdigest()
+    if archive_digest != receipt.get("sha256") or archive.stat().st_size != receipt.get("size"):
         raise RuntimeError("Official module artifact digest/size differs from provenance")
     detached = signature.read_text(encoding="utf-8")
     trusted = f"trusted comment: id={receipt['id']} version={version} platform={expected_platform} coreApiVersion=1 sha256={receipt['sha256']}"

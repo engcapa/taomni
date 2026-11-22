@@ -1,8 +1,9 @@
 id: TC-MODULES-040
-title: First upgrade installs both signed roster modules and keeps MFA after Hello is removed
-description: An isolated legacy-style profile contains only an SSH session. The signed loopback release roster supplies
-  the platform's Hello and MFA packages. The main window installs both. Removing Hello deletes its code,
-  and a normal restart preserves the removal and the installed MFA module.
+title: First upgrade installs the signed release roster and remembers a module removal
+description: The pinned 0.5.12 monolithic app creates and reopens an isolated profile containing one SSH session.
+  The main window automatically installs the signed roster for this platform. A selected joint release supplies
+  the frozen business roster and the user removes Mail. The focused fixture supplies Hello and MFA and removes Hello.
+  Restarting preserves the removal and each remaining module's original signed version.
 covers:
 - F-Modules-1
 tags:
@@ -14,10 +15,10 @@ modes:
 - native
 fixtures:
 - reset_db
-- module_upgrade
+- module_legacy_install
 - module_signed_archive
 - module_legacy_roster
-timeout_sec: 300
+timeout_sec: 900
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
@@ -36,11 +37,11 @@ steps:
 - module_marketplace_probe:
     phase: legacy-installed
 - press:
-    selector: '[data-testid="module-action-uninstall-hello-plugin"]:not([disabled])'
+    selector: '[data-testid="module-action-uninstall-${fixture.module_roster_remove}"]:not([disabled])'
     key: Enter
 - wait_for: '[data-testid="confirm-dialog"]'
 - click: '[data-testid="confirm-dialog-confirm"]'
-- wait_for: '[data-testid="module-action-install-hello-plugin"]'
+- wait_for: '[data-testid="module-action-install-${fixture.module_roster_remove}"]'
 - native_restart_app:
     expect_exit_confirmation:
       title: Exit
@@ -52,12 +53,12 @@ steps:
     selector: '[data-testid="settings-search-input"]'
     value: module store
 - wait_for: '[data-testid="module-marketplace-checked"]'
-- wait_for: '[data-testid="module-action-install-hello-plugin"]'
+- wait_for: '[data-testid="module-action-install-${fixture.module_roster_remove}"]'
 - assert_count:
     selector: '[data-testid="module-marketplace-update"]'
     equal: 0
 - assert_count:
-    selector: '[data-testid="module-marketplace-current"]'
+    selector: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
     equal: 1
 - assert_count:
     selector: '[data-testid="module-release-notice"]'
@@ -74,13 +75,13 @@ verification:
     actions: [3, 4, 7, 8]
     checkpoints:
     - step: 6
-      expectation: The main window installs the Hello and MFA packages before opening Settings.
+      expectation: The main window installs every compatible package in the selected signed roster before opening Settings.
     - step: 9
       expectation: MFA appears as installed without a download or install confirmation.
     - step: 10
       expectation: Old data discovery has no candidate, although the release module was installed.
     - step: 11
-      expectation: Each official archive is transferred once. Both signed versions are present on disk and enrollment is complete.
+      expectation: Each official archive is transferred once. Its signed version is active on disk and enrollment is complete.
     results: [6, 9, 10, 11]
   - id: R2
     requirement: Keep the module uninstalled after the user removes it and checks the same catalog on a normal restart.
@@ -91,11 +92,11 @@ verification:
     - step: 22
       expectation: The removed module has no upgrade offer.
     - step: 23
-      expectation: The module store shows exactly one current installed module.
+      expectation: The retained MFA module is current in the store.
     - step: 24
       expectation: The application does not resume first installation.
     - step: 25
-      expectation: Hello remains uninstalled with version history and no new transfer. MFA stays installed with the same signed package.
+      expectation: Every retained module is current in the store and has its original signed package on disk. The removed module retains its history without a new transfer. The old sessions and historical files survive restart.
     - step: 26
       expectation: The renderer records no unhandled errors.
     results: [21, 22, 23, 24, 25, 26]

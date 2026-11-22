@@ -1,10 +1,10 @@
 """Immutable, public installer inputs for hosted upgrade verification."""
 from dataclasses import dataclass
+import argparse
 import hashlib
 import os
 from pathlib import Path
 import platform
-import sys
 import time
 import urllib.request
 
@@ -36,14 +36,35 @@ ASSETS = {
 }
 
 
-def selected_asset(system=None, machine=None):
+FIRST_UPGRADE_VERSION = "0.5.12"
+FIRST_UPGRADE_ASSETS = {
+    ("Linux", "x64"): ReleaseAsset(
+        778140971, "Taomni_0.5.12_amd64.deb", 111121068,
+        "f832e8a8c4831fba93f7ccce3142b9fd897fccd078a652147cba2fa2a216528a"),
+    ("Windows", "x64"): ReleaseAsset(
+        778141256, "Taomni_0.5.12_x64_en-US.msi", 97583104,
+        "5b02169cb3cd4d4700fd98c397b3dbad1ef81604a18d617e9573dfd4cba2fd2c"),
+    ("Darwin", "arm64"): ReleaseAsset(
+        778140588, "Taomni_0.5.12_aarch64.dmg", 101059589,
+        "e2f3305d5f7b8a8c40fbc874af920cc9e1df6a1608e0f75d9a923b2a26d2f902"),
+    ("Darwin", "x64"): ReleaseAsset(
+        778141173, "Taomni_0.5.12_x64.dmg", 107199989,
+        "5c1912e553fe9246ddaf81e250b1a6b50eff229081e13e463c33ad4b1a68d297"),
+}
+RELEASES = {
+    RELEASE_VERSION: (RELEASE_ID, ASSETS),
+    FIRST_UPGRADE_VERSION: (454210401, FIRST_UPGRADE_ASSETS),
+}
+
+
+def selected_asset(system=None, machine=None, *, version=RELEASE_VERSION):
     system = system or platform.system()
     machine = (machine or platform.machine()).lower()
     arch = {"amd64": "x64", "x86_64": "x64", "arm64": "arm64", "aarch64": "arm64"}.get(machine)
     try:
-        return ASSETS[(system, arch)]
+        return RELEASES[version][1][(system, arch)]
     except KeyError:
-        raise RuntimeError(f"No pinned {RELEASE_VERSION} installer for {system}/{machine}") from None
+        raise RuntimeError(f"No pinned {version} installer for {system}/{machine}") from None
 
 
 def verify_asset(path, asset):
@@ -100,11 +121,15 @@ def download_asset(directory, asset, *, token=None):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("directory", type=Path)
+    parser.add_argument("--version", choices=RELEASES, default=RELEASE_VERSION)
+    args = parser.parse_args()
     token = os.environ.get("GH_TOKEN")
-    if len(sys.argv) != 2 or not token:
+    if not token:
         raise SystemExit("Provide the hosted installer staging directory and a read-only GH_TOKEN")
-    asset = selected_asset()
-    download_asset(Path(sys.argv[1]), asset, token=token)
+    asset = selected_asset(version=args.version)
+    download_asset(args.directory, asset, token=token)
     print(f"Verified {asset.name} (asset {asset.asset_id}, SHA-256 {asset.sha256})")
 
 

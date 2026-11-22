@@ -361,11 +361,16 @@ controls:
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
+    aliases:
+    - '[data-testid="module-action-uninstall-mail"]'
+    - '[data-testid="module-action-uninstall-${fixture.module_roster_remove}"]'
   - id: module-action-install-hello-plugin
     selector: '[data-testid="module-action-install-hello-plugin"]'
     kind: interactive
     aliases:
     - '[data-testid="module-action-install-mfa"]'
+    - '[data-testid="module-action-install-mail"]'
+    - '[data-testid="module-action-install-${fixture.module_roster_remove}"]'
   - id: module-delete-data-hello-plugin
     selector: '[data-testid="module-delete-data-hello-plugin"]'
     kind: interactive
@@ -435,7 +440,7 @@ controls:
 
 动态前端基础接入主窗和独立 WebView：共享 React SDK、owner-scoped IPC、仅 locator 的保存恢复、启禁撤销、缺失占位和重试。`TC-MODULES-016` 验证官方签名 ESM/相对资源、真实 host 写入、非活动草稿、reload、分离窗启禁同步和回挂；`TC-MODULES-017` 以明确 browser-only model 覆盖同类 renderer 流程，不代表验签或原生存储；`TC-MODULES-018` 独立篡改已安装前端，验证原生协议拒绝、错误隔离及恢复原字节后重试。它们尚待 matching runner，不将 MFA 产品入口迁出或 TASK-007 全部验收记为完成。
 
-`TC-MODULES-027/040` 使用同一签名目录自动安装 Hello 和 MFA。027 在真实旧版 profile 上复核待迁移的 VNC journal 和旧文件。040 确认卸载 Hello 并重启后，MFA 仍使用原签名包。`TC-MODULES-041/045` 分别在 browser 和 native 检查新模块提示、名称和说明、稍后处理与之后主动安装。045 使用两份正式公钥可验证的 QA 目录，独立核对提示记录、实际请求、包摘要和 active 版本。
+`TC-MODULES-027/040` 从真实安装的单体版打开旧 profile。027 自动安装 Hello 和 MFA，同时复核待迁移的 VNC journal 和旧文件。040 的日常回归使用 Hello 和 MFA。指定同源码的 `first_release_run` 后，040 自动安装该平台的全部首发业务模块，在商店卸载 Mail，重启后逐件核对剩余模块、下载次数、原有会话和历史文件。`TC-MODULES-041/045` 分别在 browser 和 native 检查新模块提示、名称和说明、稍后处理与之后主动安装。045 使用两份正式公钥可验证的 QA 目录，独立核对提示记录、实际请求、包摘要和 active 版本。
 
 `TC-MODULES-046` 从旧配置直接打开后续签名目录，核对 MFA 自动安装，以及新增的 Hello 在用户确认前只展示名称和说明。随后确认安装 Hello，核对两份包与版本指针。
 

@@ -7,7 +7,7 @@ import platform
 import plistlib
 import subprocess
 
-from .legacy_release import RELEASE_ID, RELEASE_TAG, RELEASE_VERSION, selected_asset, verify_asset
+from .legacy_release import RELEASES, RELEASE_VERSION, selected_asset, verify_asset
 
 
 def command(args, evidence, label, *, accepted=(0,), timeout=180, env=None):
@@ -103,7 +103,7 @@ def macos_install(package, destination, evidence, *, version=RELEASE_VERSION):
                         "scope": "No quarantine bypass; direct CLI launch is not Gatekeeper acceptance evidence"}
 
 
-def install(case_dir, work):
+def install(case_dir, work, *, version=RELEASE_VERSION, shared_msi_directory=None):
     if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("GITHUB_REPOSITORY") != "engcapa/taomni":
         raise RuntimeError("Real legacy installation is allowed only on engcapa/taomni GitHub runners")
     case_dir = Path(case_dir).resolve()
@@ -111,22 +111,28 @@ def install(case_dir, work):
     work.mkdir(parents=True)
     evidence = case_dir / "legacy-install"
     evidence.mkdir()
-    asset = selected_asset()
+    asset = selected_asset(version=version)
     staged = os.environ.get("QA_LEGACY_INSTALLER_DIR")
     if not staged:
         raise RuntimeError("The hosted job did not stage the pinned legacy installer")
     package = Path(staged) / asset.name
     verify_asset(package, asset)
-    destination = work / "Applications"
-    destination.mkdir()
+    # Windows Installer registers one destination per product. Two cases can
+    # reopen separate profiles from the same installed monolith in this shard.
+    shared = platform.system() == "Windows" and shared_msi_directory is not None
+    destination = shared_msi_directory if shared else work / "Applications"
+    if destination.resolve() != destination:
+        raise RuntimeError("Legacy installation refuses a linked application directory")
+    destination.mkdir(exist_ok=shared)
     adapter = {"Linux": linux_install, "Windows": windows_install, "Darwin": macos_install}[platform.system()]
-    executable, details = adapter(package, destination, evidence)
+    options = {"allow_downgrade": True} if platform.system() == "Linux" else {}
+    executable, details = adapter(package, destination, evidence, version=version, **options)
     if executable.is_symlink() or not executable.is_file():
         raise RuntimeError("Installed legacy executable is missing or linked")
     if platform.system() != "Linux" and not executable.resolve().is_relative_to(destination):
         raise RuntimeError("Legacy executable is outside its run-owned installation")
     receipt = {"schema": "taomni.qa.legacy-install.v1", "repository": "engcapa/taomni",
-               "releaseId": RELEASE_ID, "tag": RELEASE_TAG, "assetId": asset.asset_id,
+               "releaseId": RELEASES[version][0], "tag": f"v{version}", "assetId": asset.asset_id,
                "assetName": asset.name, "assetBytes": asset.size, "assetSha256": asset.sha256,
                "executable": str(executable), "executableSha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
                "installation": details, "system": platform.system(), "machine": platform.machine()}

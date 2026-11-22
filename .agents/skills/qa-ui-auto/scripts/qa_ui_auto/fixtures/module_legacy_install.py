@@ -9,7 +9,7 @@ from .backup_policy import isolated_data_root
 from .module_upgrade import input_sessions
 from ..legacy_install import install
 from ..legacy_process import initialize_profile
-from ..legacy_release import RELEASE_VERSION
+from ..legacy_release import FIRST_UPGRADE_VERSION, RELEASE_VERSION
 
 
 def retained_manifest(data):
@@ -51,17 +51,18 @@ def insert_business_rows(data, rows):
 
 
 def setup(ctx):
-    if ctx.case_id != "TC-MODULES-027":
+    if ctx.case_id not in {"TC-MODULES-027", "TC-MODULES-040"}:
         raise RuntimeError("Real legacy installation requires its fixed registered native case")
     data = isolated_data_root(ctx)
     if any(data.iterdir()):
         raise RuntimeError("Real legacy upgrade requires an empty run-owned profile")
-    work = Path(ctx.report_root).resolve() / "_workdirs" / "legacy-install"
+    work = Path(ctx.report_root).resolve() / "_workdirs" / ctx.case_id / "legacy-install"
     if work.resolve() != work:
         raise RuntimeError("Legacy installation refuses a linked work directory")
-    executable, evidence = install(ctx.case_dir, work)
+    version = FIRST_UPGRADE_VERSION if ctx.case_id == "TC-MODULES-040" else RELEASE_VERSION
+    executable, evidence = install(ctx.case_dir, work, version=version, shared_msi_directory=work.parents[1] / "legacy-msi")
     initialize_profile(executable, data, work, evidence, "old-first-start")
-    rows = input_sessions(True)
+    rows = input_sessions(ctx.case_id == "TC-MODULES-027")
     insert_business_rows(data, rows)
     before = session_rows(data)
     initialize_profile(executable, data, work, evidence, "old-reopen")
@@ -75,7 +76,7 @@ def setup(ctx):
     ctx.module_upgrade = {"root": data, "sessions": rows, "journal": None,
                           "retained": retained, "full_sessions": before}
     (evidence / "profile-input.json").write_text(json.dumps({
-        "scope": f"Installed {RELEASE_VERSION} initialization and reopen with synthetic SSH/VNC rows and candidate QA preflight",
+        "scope": f"Installed {version} initialization and reopen with synthetic saved sessions",
         "dataRoot": str(data), "sessionRows": before, "sessionIds": [row["id"] for row in before],
         "sessionTypes": [row["session_type"] for row in before], "retained": retained,
         "notEstablished": ["installer replacement by candidate", "MFA secret export", "trusted staging/activation", "rollback"],

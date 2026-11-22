@@ -19,6 +19,20 @@ from qa_ui_auto.fixtures.module_upgrade import input_sessions
 
 
 class PinnedReleaseTests(unittest.TestCase):
+    def test_first_upgrade_pins_the_last_monolith_for_all_release_platforms(self):
+        for system, arch in [("Linux", "x64"), ("Windows", "x64"), ("Darwin", "arm64"), ("Darwin", "x64")]:
+            machine = "x86_64" if arch == "x64" else "aarch64"
+            with self.subTest(system=system, machine=machine):
+                first = selected_asset(system, machine, version="0.5.12")
+                old = selected_asset(system, machine)
+                self.assertIn("_0.5.12_", first.name)
+                self.assertGreater(first.size, 0)
+                self.assertNotEqual(first.asset_id, old.asset_id)
+                self.assertNotEqual(first.sha256, old.sha256)
+                self.assertRegex(first.sha256, "^[0-9a-f]{64}$")
+        with self.assertRaisesRegex(RuntimeError, "No pinned"):
+            selected_asset("Linux", "x86_64", version="latest")
+
     def test_only_explicit_supported_release_architectures_are_accepted(self):
         self.assertIs(selected_asset("Windows", "AMD64"), ASSETS[("Windows", "x64")])
         self.assertIs(selected_asset("Darwin", "aarch64"), ASSETS[("Darwin", "arm64")])
