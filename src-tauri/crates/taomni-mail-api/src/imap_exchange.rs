@@ -13,6 +13,24 @@ pub mod sync;
 
 const MAX_FRAME_BYTES: usize = taomni_plugin_stream::MAX_PAYLOAD_BYTES;
 pub const MAX_PREFETCH_BODIES: usize = 4;
+pub const MAX_IMPORT_FILE_BYTES: u64 = 1024 * 1024 * 1024;
+// A source consisting of bare line feeds can double after CRLF normalization.
+pub const MAX_IMPORT_MESSAGE_BYTES: u64 = 2 * MAX_IMPORT_FILE_BYTES;
+pub const MBOX_EXPORT_FRAME_BYTES: usize = 64 * 1024;
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImportMessage {
+    pub folder: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExportMailbox {
+    pub connection: IncomingTest,
+    pub exchange: Endpoint,
+    pub folder: String,
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -101,7 +119,21 @@ pub async fn read_frame(stream: &mut (impl AsyncRead + Unpin)) -> io::Result<Vec
 /// A decoded body can exceed the control frame limit when the server returns
 /// a complete text or HTML section for an oversized message.
 pub async fn read_body_frame(stream: &mut (impl AsyncRead + Unpin)) -> io::Result<Vec<u8>> {
-    let size = usize::try_from(stream.read_u64().await?)
+    read_bounded_body_frame(stream, u64::MAX).await
+}
+
+pub async fn read_bounded_body_frame(
+    stream: &mut (impl AsyncRead + Unpin),
+    limit: u64,
+) -> io::Result<Vec<u8>> {
+    let declared = stream.read_u64().await?;
+    if declared > limit {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Mail body exceeds its limit",
+        ));
+    }
+    let size = usize::try_from(declared)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Mail body size is invalid"))?;
     read_payload(stream, size).await
 }
@@ -145,6 +177,19 @@ fn validate_size(size: usize) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn bounded_body_rejects_oversized_declaration_before_reading_bytes() {
+        let (mut writer, mut reader) = tokio::io::duplex(8);
+        writer
+            .write_u64(MAX_IMPORT_MESSAGE_BYTES + 1)
+            .await
+            .unwrap();
+        let error = read_bounded_body_frame(&mut reader, MAX_IMPORT_MESSAGE_BYTES)
+            .await
+            .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    }
 
     #[tokio::test]
     async fn transfers_a_frame_larger_than_the_control_channel() {

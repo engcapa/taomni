@@ -8280,13 +8280,21 @@ files:
   - src-tauri/src/mail/lists.rs
   - src-tauri/src/mail/mbox.rs
   - src-tauri/crates/taomni-mail-engine/src/mbox.rs
+  - src-tauri/plugins/mail/src/archive.rs
+  - src-tauri/plugins/mail/src/mbox_export.rs
 controls:
   - id: unsubscribe
     selector: '[data-testid="mail-unsubscribe"]'
     kind: interactive
+  - id: import-messages
+    selector: '[data-testid="context-menu-item-import-messages-mbox-eml"]'
+    kind: interactive
+  - id: export-mbox
+    selector: '[data-testid="context-menu-item-export-as-mbox"]'
+    kind: interactive
 -->
 
-- 文件夹右键 “Export as mbox…” 导出 mboxrd（Thunderbird 可导入，`From - ` 分隔、`>From ` 转义，每批 50 封流式写入）；“Import messages (mbox/.eml)…” 拆分 mbox 或读取单封 .eml，经 IMAP APPEND 写入该文件夹并同步到列表。文件对话框无法由 WebDriver 驱动，导入导出由 Rust 往返测试覆盖。
+- 文件夹右键 “Export as mbox…” 由签名宿主每批读取 50 封，生成带 `From - ` 分隔和 `>From ` 转义的 mboxrd。基座收到完成回执后发布用户选定的文件。“Import messages (mbox/.eml)…” 由签名宿主执行 IMAP APPEND 并同步到列表。TC-MAIL-IMPORT-01 核对取消，TC-MODULES-095 经系统对话框核对导入内容、已读标记和导出的 mbox 文件。
 - 带 `List-Unsubscribe` 的邮件在阅读区显示 “Unsubscribe”：支持 RFC 8058 一键退订时先确认再 POST；否则优先 mailto（打开写信窗口），再退回浏览器打开 https 链接。表头在拉取时解析并缓存。
 - 阅读区（HTML 与纯文本）中的 `mailto:` 链接在应用内打开写信窗口并填好收件人、抄送、主题与正文。
 - 未完成：注册为系统 `mailto:` 默认处理程序需要引入 Tauri deep-link 插件并修改三端安装注册，尚未实施。

@@ -1,0 +1,96 @@
+id: TC-MODULES-095
+title: Signed Mail imports EML and round-trips the Archive mailbox
+description: Install verified Mail. Import an mbox and an EML into Archive and export the result through actual OS choosers. Verify the on-disk mbox and the IMAP server receipts.
+covers: [F-Modules-1, F-MAIL-14]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, mail_server, module_signed_mail_archive]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-mail"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"] [data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- click: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- mail_server_assert_list_matches: {folder: Archive, timeout_sec: 30}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- native_file_dialog:
+    kind: open
+    action: choose
+    title: Select files to send
+    trigger: '[data-testid="context-menu-item-import-messages-mbox-eml"]'
+    path: ${fixture.mail_import_mbox}
+- mail_server_assert_folder_count: {folder: Archive, equals: 2, has_subject: Mbox one, timeout_sec: 40}
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Imported 2 messages into Archive}
+- mail_server_assert_list_matches: {folder: Archive, timeout_sec: 30}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- native_file_dialog:
+    kind: open
+    action: choose
+    title: Select files to send
+    trigger: '[data-testid="context-menu-item-import-messages-mbox-eml"]'
+    path: ${fixture.mail_import_eml}
+- mail_server_assert_folder_count: {folder: Archive, equals: 3, has_subject: EML import, timeout_sec: 40}
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Imported 1 message into Archive}
+- mail_server_assert_list_matches: {folder: Archive, timeout_sec: 30}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    title: Export Archive as mbox
+    trigger: '[data-testid="context-menu-item-export-as-mbox"]'
+    path: ${fixture.mail_export_mbox}
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Exported 3 messages}
+- assert_file_contains: {path: '${fixture.mail_export_mbox}', contains: 'From - '}
+- assert_file_contains: {path: '${fixture.mail_export_mbox}', contains: '>From the first message'}
+- assert_file_contains: {path: '${fixture.mail_export_mbox}', contains: 'Subject: Mbox two'}
+- assert_file_contains: {path: '${fixture.mail_export_mbox}', contains: 'Subject: EML import'}
+- assert_signed_mail_host: imap-mbox
+- assert_no_runtime_errors: null
+- screenshot: signed-mail-import.png
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-import
+    requirement: The installed Mail module imports both file formats and syncs the destination folder.
+    actions: [8, 10, 15, 17, 19, 20, 24, 25]
+    checkpoints:
+    - {step: 12, expectation: The verified Mail package is installed and its host is initially idle.}
+    - {step: 16, expectation: The signed frontend opens its folder list.}
+    - {step: 21, expectation: The mbox adds exactly two messages on the server.}
+    - {step: 22, expectation: The import reports two messages in Archive.}
+    - {step: 23, expectation: The desktop list matches Archive after the mbox import.}
+    - {step: 26, expectation: The standalone EML adds one message to the same folder.}
+    - {step: 27, expectation: The import reports one message in Archive.}
+    - {step: 28, expectation: All three APPENDed messages appear in the list.}
+    - {step: 36, expectation: The signed host report binds the original bodies and Seen flags to three distinct IMAP APPENDs.}
+    results: [12, 16, 21, 22, 23, 26, 27, 28, 36]
+  - id: signed-export
+    requirement: The signed host exports all three messages as a readable mboxrd file at the chosen path.
+    actions: [29, 30]
+    checkpoints:
+    - {step: 31, expectation: The desktop reports the exact message count.}
+    - {step: 32, expectation: The saved mbox contains mail separators.}
+    - {step: 33, expectation: A body line beginning with From is escaped in the export.}
+    - {step: 34, expectation: The other imported mbox message is present.}
+    - {step: 35, expectation: The EML subject is present.}
+    - {step: 36, expectation: The export receipt records the file digest and the batched IMAP FETCH.}
+    - {step: 37, expectation: The renderer reports no runtime errors.}
+    results: [31, 32, 33, 34, 35, 36, 37]
+  visual:
+  - {check: Both imports keep the selected Archive view visible, method: automated, reason: The list is reconciled with the server after each import.}
+  native:
+  - {check: The OS chooser returns real fixture files and the verified host transfers normalized message bytes to IMAP, method: automated, reason: The report retains the native dialog result and signed host and server receipts.}

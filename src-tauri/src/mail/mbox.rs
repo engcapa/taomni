@@ -7,23 +7,27 @@
 
 use std::fs::File;
 use std::io::{BufWriter, Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use serde::Serialize;
+use taomni_mail_api::{
+    HOST_REQUEST_TIMEOUT, OPEN_IMAP_IMPORT,
+    imap_exchange::{ImportMessage, MAX_IMPORT_FILE_BYTES},
+};
 use taomni_mail_engine::mbox::{
-    is_mbox, mbox_separator, mboxrd_escape, normalize_crlf, split_mbox,
+    imap_export_folder, is_mbox, mbox_separator, mboxrd_escape, normalize_crlf, split_mbox,
 };
 use tauri::State;
 
 use super::{
-    ActiveImapSession, ImapSessionOpts, MailAccountConfig, resolve_config, with_imap_session,
+    ActiveImapSession, ImapSessionOpts, MailAccountConfig, ResolvedMailAccount,
+    module_host::{HostedImap, export_imap_mbox, exports_imap_mbox, imports_imap},
+    resolve_config, with_imap_session,
 };
+use crate::plugin::PluginRegistry;
 use crate::state::AppState;
-
-const EXPORT_CHUNK: usize = 50;
-/// Refuse imports above this size (the file is read into memory).
-const IMPORT_MAX_BYTES: u64 = 1024 * 1024 * 1024;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +36,7 @@ pub struct MailExportResult {
     pub count: usize,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MailImportResult {
     pub imported: usize,
@@ -41,49 +45,16 @@ pub struct MailImportResult {
     pub first_error: Option<String>,
 }
 
-pub(super) fn imap_export_folder<T: Read + Write, W: Write>(
-    session: &mut imap::Session<T>,
-    folder: &str,
-    out: &mut W,
-) -> Result<usize, String> {
-    session
-        .examine(folder)
-        .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
-    let mut uids: Vec<u32> = session
-        .uid_search("ALL")
-        .map_err(|e| format!("IMAP UID SEARCH failed: {e}"))?
-        .into_iter()
-        .collect();
-    uids.sort_unstable();
-    let mut count = 0usize;
-    for chunk in uids.chunks(EXPORT_CHUNK) {
-        let set = chunk
-            .iter()
-            .map(u32::to_string)
-            .collect::<Vec<_>>()
-            .join(",");
-        let fetches = session
-            .uid_fetch(&set, "(UID INTERNALDATE BODY.PEEK[])")
-            .map_err(|e| format!("IMAP FETCH failed: {e}"))?;
-        let mut ordered: Vec<_> = fetches.iter().filter(|f| f.body().is_some()).collect();
-        ordered.sort_by_key(|f| f.uid.unwrap_or(0));
-        for fetch in ordered {
-            let body = fetch.body().unwrap_or_default();
-            let ts = fetch.internal_date().map(|d| d.timestamp());
-            out.write_all(mbox_separator(ts).as_bytes())
-                .and_then(|_| out.write_all(&mboxrd_escape(body)))
-                .and_then(|_| {
-                    if body.ends_with(b"\n") {
-                        out.write_all(b"\n")
-                    } else {
-                        out.write_all(b"\n\n")
-                    }
-                })
-                .map_err(|e| format!("writing mbox failed: {e}"))?;
-            count += 1;
+impl MailImportResult {
+    fn record(&mut self, appended: Result<(), String>) {
+        match appended {
+            Ok(()) => self.imported += 1,
+            Err(error) => {
+                self.failed += 1;
+                self.first_error.get_or_insert(error);
+            }
         }
     }
-    Ok(count)
 }
 
 impl ActiveImapSession {
@@ -127,6 +98,13 @@ pub async fn mail_export_mbox(
     if target.as_os_str().is_empty() {
         return Err("export path is required".into());
     }
+    if exports_imap_mbox(&state.plugins) {
+        let count = export_imap_mbox(state.plugins.clone(), &account, folder, &target).await?;
+        return Ok(MailExportResult {
+            path: target.display().to_string(),
+            count,
+        });
+    }
     let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let target_for_task = target.clone();
@@ -165,25 +143,11 @@ pub async fn mail_import_messages(
     state: State<'_, AppState>,
 ) -> Result<MailImportResult, String> {
     let source = PathBuf::from(path.trim());
-    let size = std::fs::metadata(&source)
-        .map_err(|e| format!("cannot read {}: {e}", source.display()))?
-        .len();
-    if size > IMPORT_MAX_BYTES {
-        return Err("import file is larger than 1 GiB".into());
-    }
-    let data =
-        std::fs::read(&source).map_err(|e| format!("cannot read {}: {e}", source.display()))?;
-    let messages = if is_mbox(&data) {
-        split_mbox(&data)
-    } else {
-        vec![normalize_crlf(&data)]
-    };
+    let messages = tokio::task::spawn_blocking(move || read_import_file(&source))
+        .await
+        .map_err(|error| format!("mail import file task failed: {error}"))??;
     if messages.is_empty() {
-        return Ok(MailImportResult {
-            imported: 0,
-            failed: 0,
-            first_error: None,
-        });
+        return Ok(MailImportResult::default());
     }
     if super::pop3::is_pop3(&config) {
         let imported =
@@ -195,12 +159,13 @@ pub async fn mail_import_messages(
         });
     }
     let account = resolve_config(&state, config)?;
+    if imports_imap(&state.plugins) {
+        return Ok(import_hosted(state.plugins.clone(), &account, folder, messages).await);
+    }
     let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let mut imported = 0usize;
-        let mut failed = 0usize;
-        let mut first_error = None;
+        let mut result = MailImportResult::default();
         for message in &messages {
             let appended = with_imap_session(
                 &pool,
@@ -209,22 +174,68 @@ pub async fn mail_import_messages(
                 ImapSessionOpts::default(),
                 |imap| imap.append(&folder, message, &["\\Seen"]),
             );
-            match appended {
-                Ok(()) => imported += 1,
-                Err(e) => {
-                    failed += 1;
-                    first_error.get_or_insert(e);
-                }
-            }
+            result.record(appended);
         }
-        MailImportResult {
-            imported,
-            failed,
-            first_error,
-        }
+        result
     })
     .await
     .map_err(|e| format!("mail import task failed: {e}"))
+}
+
+fn read_import_file(source: &Path) -> Result<Vec<Vec<u8>>, String> {
+    let read_error = |error| format!("cannot read {}: {error}", source.display());
+    let file = File::open(source).map_err(read_error)?;
+    if file.metadata().map_err(read_error)?.len() > MAX_IMPORT_FILE_BYTES {
+        return Err("import file is larger than 1 GiB".into());
+    }
+    let mut data = Vec::new();
+    file.take(MAX_IMPORT_FILE_BYTES + 1)
+        .read_to_end(&mut data)
+        .map_err(read_error)?;
+    if data.len() as u64 > MAX_IMPORT_FILE_BYTES {
+        return Err("import file is larger than 1 GiB".into());
+    }
+    Ok(if is_mbox(&data) {
+        split_mbox(&data)
+    } else {
+        vec![normalize_crlf(&data)]
+    })
+}
+
+async fn import_hosted(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    folder: String,
+    messages: Vec<Vec<u8>>,
+) -> MailImportResult {
+    let mut connection = None::<HostedImap>;
+    let mut result = MailImportResult::default();
+    for message in messages {
+        let request = ImportMessage {
+            folder: folder.clone(),
+        };
+        let append = async {
+            if connection.is_none() {
+                connection =
+                    Some(HostedImap::open(registry.clone(), account, OPEN_IMAP_IMPORT).await?);
+            }
+            connection
+                .as_mut()
+                .expect("open Mail import session")
+                .exchange(request, Some(message))
+                .await
+        };
+        let appended = tokio::time::timeout(HOST_REQUEST_TIMEOUT + Duration::from_secs(5), append)
+            .await
+            .unwrap_or_else(|_| Err("Mail import APPEND timed out".into()));
+        if appended.is_err() {
+            // A lost APPEND receipt is ambiguous. Open a fresh session only
+            // for the next message so the current one is never copied twice.
+            connection = None;
+        }
+        result.record(appended);
+    }
+    result
 }
 
 #[cfg(test)]

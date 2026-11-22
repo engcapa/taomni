@@ -580,6 +580,10 @@ Always rejects duplicate source copies or mailbox-wide EXPUNGE.
 installed package identity, writer lease, COPY attempts, STORE commands and
 targeted expunges in the signed Mail report.
 
+`TC-MODULES-095` uses `assert_signed_mail_host: imap-mbox` to record the
+verified package, imported contents and Seen flags, batched IMAP FETCH and
+the exported file digest.
+
 ### `mail_server_deliver`
 
 Deliver `{count, folder?: INBOX, prefix?: QA, body?: string}` to the disposable

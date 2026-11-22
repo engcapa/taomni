@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
-    OPEN_IMAP_ARCHIVE,
-    imap_exchange::{ImapExchange, read_frame, write_frame},
+    OPEN_IMAP_ARCHIVE, OPEN_IMAP_IMPORT,
+    imap_exchange::{ImapExchange, read_frame, write_body_frame, write_frame},
 };
 use taomni_mail_engine::archive::{ArchiveChunk, ArchiveQuery, CHUNK};
 use taomni_plugin_stream::routed_tcp::Route;
@@ -17,6 +17,10 @@ use super::{
 
 pub(in crate::mail) fn archives_imap(registry: &PluginRegistry) -> bool {
     supports(registry, OPEN_IMAP_ARCHIVE)
+}
+
+pub(in crate::mail) fn imports_imap(registry: &PluginRegistry) -> bool {
+    supports(registry, OPEN_IMAP_IMPORT)
 }
 
 pub(in crate::mail) struct HostedImap {
@@ -58,10 +62,23 @@ impl HostedImap {
         &mut self,
         query: impl Serialize,
     ) -> Result<T, String> {
+        self.exchange(query, None).await
+    }
+
+    pub(in crate::mail) async fn exchange<T: DeserializeOwned + Send + 'static>(
+        &mut self,
+        query: impl Serialize,
+        body: Option<Vec<u8>>,
+    ) -> Result<T, String> {
         let bytes = serde_json::to_vec(&query).map_err(|error| error.to_string())?;
         write_frame(&mut self.peer, &bytes)
             .await
             .map_err(|error| error.to_string())?;
+        if let Some(body) = body {
+            write_body_frame(&mut self.peer, &body)
+                .await
+                .map_err(|error| error.to_string())?;
+        }
         let frame = read_frame(&mut self.peer)
             .await
             .map_err(|error| error.to_string())?;

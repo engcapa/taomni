@@ -131,6 +131,7 @@ cases:
 - TC-MODULES-092
 - TC-MODULES-093
 - TC-MODULES-094
+- TC-MODULES-095
 - TC-BACKUP-RESTORE-001
 - TC-WS-GIT-CLONE-01-defaults-proxy-and-clone-browser
 - TC-WS-GIT-CLONE-02-background-close-cancel-retry-browser
@@ -405,6 +406,7 @@ cases:
 - TC-MAIL-BULK-01
 - TC-MAIL-BULK-02
 - TC-MAIL-BULK-03
+- TC-MAIL-IMPORT-01
 - TC-AI-012
 - TC-AI-013
 - TC-AI-014

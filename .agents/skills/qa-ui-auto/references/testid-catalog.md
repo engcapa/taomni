@@ -1962,6 +1962,8 @@
 ## mail/lists (F-MAIL-14)
 
 - `[data-testid="mail-unsubscribe"]` — interactive — F-MAIL-14.unsubscribe
+- `[data-testid="context-menu-item-import-messages-mbox-eml"]` — interactive — F-MAIL-14.import-messages
+- `[data-testid="context-menu-item-export-as-mbox"]` — interactive — F-MAIL-14.export-mbox
 
 ## mail/organize (F-MAIL-8)
 

@@ -12,7 +12,7 @@ use crate::imap_auth::{MailAuthMode, MailProvider, authenticate};
 use crate::imap_folders::{imap_change_folder, imap_list_folders, imap_set_subscription};
 use crate::imap_messages::{Mailbox, imap_fetch_attachment, imap_fetch_raw};
 use crate::imap_mutations::{imap_delete_messages, imap_set_flags, unread_uids};
-use crate::imap_outgoing::{store_remote_draft, store_sent_copy};
+use crate::imap_outgoing::{imap_append, store_remote_draft, store_sent_copy};
 use crate::imap_sync::{
     BodySyncOutcome, BodySyncRequest, BodySyncTask, FolderRoundOutcome, FolderRoundRequest,
     FolderStepOutcome, HeaderPageOutcome, HeaderPageRequest, HeaderStepRequest, StepParams,
@@ -65,6 +65,14 @@ pub fn imap_catch_result<T>(work: impl FnOnce() -> Result<T, String>) -> Result<
 }
 
 impl ImapSession {
+    pub fn append_imported(&mut self, folder: &str, bytes: &[u8]) -> Result<(), String> {
+        let flags = &["\\Seen"];
+        match self {
+            Self::Plain(session) => imap_append(session, folder, bytes, flags),
+            Self::Tls(session) => imap_append(session, folder, bytes, flags),
+        }
+    }
+
     pub fn store_remote_draft(
         &mut self,
         account_id: &str,

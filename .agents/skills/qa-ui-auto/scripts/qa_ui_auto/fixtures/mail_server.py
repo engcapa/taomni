@@ -13,6 +13,7 @@ renderer orchestration only, never real IMAP.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from .. import mail_fake_server
@@ -54,6 +55,24 @@ def setup(ctx: Any) -> None:
     values["mail_caldav_quick_connect"] = (
         f"{values['mail_quick_connect']}&caldav=http://127.0.0.1:{server.caldav_port}/"
     )
+    if getattr(ctx, "case_id", None) == "TC-MODULES-095":
+        root = Path(ctx.case_dir).resolve()
+        root.mkdir(parents=True, exist_ok=True)
+        separator = b"From - Wed Nov 04 12:00:00 2026\n"
+        mbox = root / "signed-mail.mbox"
+        mbox.write_bytes(separator + _raw("Mbox one", ">From the first message") + b"\n"
+                         + separator + _raw("Mbox two", "The second message"))
+        eml = root / "signed-mail.eml"
+        eml.write_bytes(_raw("EML import", "The standalone message"))
+        values.update(mail_import_mbox=mbox.as_posix(), mail_import_eml=eml.as_posix(),
+                      mail_export_mbox=(root / "signed-mail-export.mbox").as_posix())
+
+
+def _raw(subject: str, body: str) -> bytes:
+    identifier = subject.lower().replace(" ", "-")
+    return (f"From: sender@example.com\nTo: qa@example.com\nSubject: {subject}\n"
+            f"Date: Wed, 4 Nov 2026 12:00:00 +0000\nMessage-ID: <{identifier}@example.com>\n"
+            f"Content-Type: text/plain; charset=UTF-8\n\n{body}\n").encode()
 
 
 def teardown(ctx: Any) -> None:

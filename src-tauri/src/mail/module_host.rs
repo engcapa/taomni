@@ -6,6 +6,7 @@ mod archive_encoding;
 pub(super) mod attachment_cache;
 mod body_sync;
 pub(super) mod imap_idle;
+mod mbox;
 pub(super) use archive_decoding::{decode_archive_attachment, decode_archive_original};
 pub(super) use archive_encoding::ArchiveEncoder;
 mod downloads;
@@ -18,12 +19,13 @@ mod prefetch;
 mod responses;
 pub(super) use responses::send_response;
 
-pub(super) use archive::{HostedImap, archives_imap};
+pub(super) use archive::{HostedImap, archives_imap, imports_imap};
 pub(super) use downloads::{fetch_imap_attachment, fetch_imap_body, fetch_imap_raw};
 pub(super) use imap_outgoing::{
     discard_remote_draft, discards_remote_drafts, store_remote_draft, store_sent_copy,
     stores_remote_drafts,
 };
+pub(super) use mbox::{export_imap_mbox, exports_imap_mbox};
 pub(super) use mutations::HostedMutations;
 pub(super) use pop3::{HostedPop3, syncs_pop3};
 pub(super) use prefetch::{prefetch_imap_bodies, prefetches_imap_bodies};

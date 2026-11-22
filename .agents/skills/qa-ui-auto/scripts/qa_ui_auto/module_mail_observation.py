@@ -25,7 +25,7 @@ def run(ctx, args):
         "folder-tree", "folder-changes", "running", "imap-delivery", "pop3-delivery",
         "attachment-saved", "attachment-reopened", "agenda-written", "filter-saved",
         "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source",
-        "imap-prefetch", "imap-mutations", "outbox-queued", "outbox-sent",
+        "imap-prefetch", "imap-mutations", "imap-mbox", "outbox-queued", "outbox-sent",
     }
     retained = {"outbox-retained", "contact-retained", "agenda-retained", "filter-retained"}
     if phase not in active | retained | {"idle", "disabled"} or not signed or owner.case_id not in SIGNED_MAIL_CASES:
@@ -104,6 +104,13 @@ def run(ctx, args):
         if owner.case_id != "TC-MAIL-BULK-03" or "mail/open-imap-mutations" not in manifest["commands"]:
             raise StepError("The installed Mail version does not provide the signed mutation connection")
         report["mutations"] = observe_mutations()
+    if phase == "imap-mbox":
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        commands = {"mail/open-imap-import", "mail/export-imap-mbox"}
+        if owner.case_id != "TC-MODULES-095" or not commands.issubset(manifest["commands"]):
+            raise StepError("The installed Mail version does not provide signed mbox transfer")
+        report["imports"] = observe_imports()
+        report["export"] = observe_export(owner.values["mail_export_mbox"])
     if phase in {"outbox-queued", "outbox-retained", "outbox-sent"}:
         if owner.case_id != "TC-MODULES-077":
             raise StepError("Outbox storage requires the signed draft lifecycle case")
@@ -125,6 +132,37 @@ def observe_mutations():
     if len(deleted) != 3 or len(expunged) != 2:
         raise StepError(f"Expected three STORE attempts and two targeted EXPUNGE commands, got {deleted} and {expunged}")
     return {"transfers": copies, "stores": deleted, "uidExpunges": expunged}
+
+
+def observe_imports():
+    state = mail_fake_server.ACTIVE.state
+    parser = BytesParser(policy=policy.default)
+    with state.lock:
+        imports = [(parser.parsebytes(message.raw), list(message.flags))
+                   for message in state.folders["Archive"].messages.values()]
+        appends = [command for command in state.log if command.startswith("APPEND ")]
+    expected = {"Mbox one": "From the first message", "Mbox two": "The second message",
+                "EML import": "The standalone message"}
+    contents = {message["Subject"]: message.get_content().rstrip("\r\n") for message, _ in imports}
+    if contents != expected or len(imports) != len(expected) or len(appends) != len(expected):
+        raise StepError(f"IMAP APPEND content/count mismatch: {contents} with {len(appends)} commands")
+    if any(r"\Seen" not in flags for _, flags in imports):
+        raise StepError("An imported message is missing the IMAP seen flag")
+    return {"appends": appends, "contents": contents, "seen": len(imports)}
+
+
+def observe_export(path):
+    from pathlib import Path
+
+    file = Path(path)
+    ordinary(file)
+    data = file.read_bytes()
+    state = mail_fake_server.ACTIVE.state
+    with state.lock:
+        fetches = [command for command in state.log if command.endswith("(UID INTERNALDATE BODY.PEEK[])")]
+    if sum(line.startswith(b"From - ") for line in data.splitlines()) != 3 or len(fetches) != 1:
+        raise StepError("The exported mailbox must contain three separators and one batched IMAP FETCH")
+    return {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), "fetches": fetches}
 
 
 def observe_responses():
