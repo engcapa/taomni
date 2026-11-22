@@ -6,6 +6,7 @@ import { useExplorerStore } from "../../stores/explorerStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useTabOverviewStore } from "../../stores/tabOverviewStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { OVERVIEW_PREVIEW_DELAY_MS } from "./overview/useOverviewPreview";
 import type { Tab } from "../../types";
 
 const explorerFolder = (id: string, title: string, path: string): Tab => ({
@@ -199,6 +200,12 @@ it("moves focus with arrows and enlarges a hovered card only after the dwell tim
     tabs: [...state.tabs, { id: "session-2", type: "terminal", title: "Review", closable: true }],
   }));
   render(<TabOverview />);
+  // The configured dwell time must stay inside the agreed 0.5-1 s range and be
+  // observable by browser cases without reading React internals.
+  const dialog = screen.getByTestId("tab-overview");
+  expect(OVERVIEW_PREVIEW_DELAY_MS).toBeGreaterThanOrEqual(500);
+  expect(OVERVIEW_PREVIEW_DELAY_MS).toBeLessThanOrEqual(1_000);
+  expect(dialog).toHaveAttribute("data-preview-delay-ms", String(OVERVIEW_PREVIEW_DELAY_MS));
   const [first, second] = screen.getAllByTestId("tab-overview-card");
   fireEvent.keyDown(screen.getByTestId("tab-overview-search"), { key: "ArrowDown" });
   expect(first).toHaveFocus();
@@ -207,14 +214,20 @@ it("moves focus with arrows and enlarges a hovered card only after the dwell tim
   expect(useAppStore.getState().activeTabId).toBe("session-1");
 
   fireEvent.mouseEnter(second);
-  act(() => vi.advanceTimersByTime(1_999));
+  expect(screen.queryByTestId("tab-overview-enlarged")).toBeNull();
+  act(() => vi.advanceTimersByTime(OVERVIEW_PREVIEW_DELAY_MS - 1));
   expect(screen.queryByTestId("tab-overview-enlarged")).toBeNull();
   fireEvent.mouseLeave(second);
   act(() => vi.advanceTimersByTime(1));
   expect(screen.queryByTestId("tab-overview-enlarged")).toBeNull();
 
+  fireEvent.mouseEnter(first);
+  act(() => vi.advanceTimersByTime(OVERVIEW_PREVIEW_DELAY_MS / 2));
+  fireEvent.mouseLeave(first);
   fireEvent.mouseEnter(second);
-  act(() => vi.advanceTimersByTime(2_000));
+  act(() => vi.advanceTimersByTime(OVERVIEW_PREVIEW_DELAY_MS - 1));
+  expect(screen.queryByTestId("tab-overview-enlarged")).toBeNull();
+  act(() => vi.advanceTimersByTime(1));
   const enlarged = screen.getByTestId("tab-overview-enlarged");
   expect(enlarged).toHaveAttribute("data-tab-id", "session-2");
   expect(useAppStore.getState().activeTabId).toBe("session-1");

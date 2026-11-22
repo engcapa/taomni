@@ -79,7 +79,7 @@
 - **执行命令**：`pnpm exec vitest run src/components/tabbar/__tests__/ControlBarSharedToolbar.test.tsx`
 - **必测用例清单（6 项）**：
   1. **`UT-WS-03-01`（单行 33px 共享工具栏与零额外顶栏）**：渲染主窗口壳层，断言仅存在一个 `[data-testid="control-bar"]`，不存在第二个顶栏或 3 色装饰圆点。
-  2. **`UT-WS-03-02`（左右栏收缩按钮与 `Ctrl+B` 联动）**：点击 `[data-testid="toggle-left-sidebar"]`（`◧`）切换左栏折叠状态；点击 `[data-testid="toggle-right-sidebar"]`（`◨`）切换右栏折叠状态。
+  2. **`UT-WS-03-02`（左栏收缩按钮与 `Ctrl+B` 联动，右栏已移除）**：点击 `[data-testid="toggle-left-sidebar"]`（`◧`）切换左栏折叠状态；断言 `toggle-right-sidebar`/`right-sidebar`/`right-sidebar-resize-handle` 均不存在。
   3. **`UT-WS-03-03`（按模式切换共享工具栏中间的 Tab 条）**：在 `Workspaces` 模式下展示当前工作区的 `openTabs`；在 `Sessions` 模式下展示全局会话 `TabBar`。
   4. **`UT-WS-03-04`（100% 保留 `app-main-menu` 所有主菜单项）**：点击 `[data-testid="app-main-menu"]`，断言 `New local terminal`、`New remote session`、`New SFTP`、`Sessions`（含导入导出子菜单）、`View`、`Tools`、`Settings`、`Help`、`Exit` 全部存在。
   5. **`UT-WS-03-05`（大预览与统一过滤）**：断言原小预览 `tab-details-hover` 已移除，`tab-overview-trigger` 打开大预览；`tab-more`（漏斗）打开 `open-tabs-menu`，保留分类、目录分组与搜索过滤已打开标签。
@@ -117,8 +117,10 @@
 
 | 用例 ID | 用例文件 | 模式 (`modes`) | 覆盖特性 (`covers`) | 测试目标与核心步骤 |
 | :--- | :--- | :--- | :--- | :--- |
-| **`TC-WS-001`** | `TC-WS-001-single-shared-toolbar-and-sidebar-collapse.testcase.yaml` | `browser`, `native` | `F1.2`, `F1.3`, `F-WS-1` | **单行 33px 共享主工具栏与左右栏收缩**：验证顶栏高度 `<= 33px`、无多余顶栏行、无右上角 3 色圆点；验证左侧 `◧`（`toggle-left-sidebar` / `Ctrl+B`）与右侧 `◨`（`toggle-right-sidebar`）折叠/展开侧栏。 |
+| **`TC-WS-001`** | `TC-WS-001-single-shared-toolbar-and-sidebar-collapse.testcase.yaml` | `browser`, `native` | `F1.2`, `F1.3`, `F-WS-1` | **单行 33px 共享主工具栏与左右栏收缩**：验证顶栏高度 `<= 33px`、无多余顶栏行、无右上角 3 色圆点；验证左侧 `◧`（`toggle-left-sidebar` / `Ctrl+B`）折叠/展开侧栏，并断言右侧栏收缩按钮、右侧上下文面板及其子控件在所有主视图均不存在。 |
 | **`TC-WS-002`** | `TC-WS-002-primary-rail-modes-home-first.testcase.yaml` | `browser`, `native` | `F1.2`, `F1.6`, `F-WS-1` | **左侧主导航条顶部 5 大模式（Home 并列第 1）**：验证顶部模式按钮顺序为 `Home -> Workspaces -> Sessions -> Agents -> Tools`；点击 `Home` 渲染 `welcome-panel` 全部功能。 |
+| **`TC-WS-100`** | `TC-WS-100-overview-dwell-boundary-browser.testcase.yaml` | `browser` | `F1.5`, `F-WS-1`, `F-WS-2` | **大预览悬停放大时序边界**：验证配置值在 500–1000ms、悬停不立即放大、700ms 后放大且展示悬停文档、指针离开清除、重新进入重新计时、点击放大卡片激活文档。WebDriver 悬停时延使 native 不适合断言“不立即放大”，native 的放大/激活由 TC-WS-098/099 覆盖。 |
+| **`TC-WS-099`** | `TC-WS-099-topbar-overview-dwell.testcase.yaml` | `browser`, `native` | `F1.5`, `F-WS-1`, `F-WS-2`, `F-EXPLORER-1` | **右上角按钮契约与大预览悬停放大**：验证 Home 按钮不变、Sessions/Tools/Workspaces/File Explorer 仅保留模式操作/全局搜索/大预览且无右栏按钮或面板；大预览在 0.5–1s（700ms）悬停后放大、不会立即放大、放大仅跟随悬停卡片并可点击激活文档。 |
 | **`TC-WS-003`** | `TC-WS-003-workspace-merged-idea-rail-and-overflow-menu.testcase.yaml` | `browser`, `native` | `F25.5`, `F-WS-2` | **Workspaces 模式下 IDEA 工具窗口条单轨融合与 `⋯` 菜单**：验证切换到 `Workspaces` 时，`Project / Sessions / Git / Structure / ⋯` 直接融合在窗口主左侧栏中，工作区内绝无第二条竖向工具条；验证 `⋯` 菜单包含全部 IDEA 工具窗口与 `Show Tool Window Names`。 |
 | **`TC-WS-004`** | `TC-WS-004-rail-bottom-tools-and-bottom-left-floating-mfa.testcase.yaml` | `browser`, `native` | `F5.5`, `F27.1`, `F-MFA-1`, `F-I18n-1`, `F-WS-3` | **主左侧栏底部 6 工具顺序与左下角 MFA 悬浮窗口**：验证底部依次为 `MFA -> 截图 -> 聊天 -> 主题 -> 语言 -> 设置`；点击 `MFA` 在左下角（`left: 50px, bottom: 30px`）弹出可拖拽悬浮验证器，验证搜索、复制 6 位 TOTP 验证码及展开全屏 MFA 页。 |
 | **`TC-WS-005`** | `TC-WS-005-left-sidebar-resize-workspace-switcher-and-default-workspace.testcase.yaml` | `browser`, `native` | `F1.2`, `F-WS-2` | **左栏拖拽调宽、左栏工作区切换器与默认工作区保底**：验证拖拽 `main-sidebar-resize-handle` 改变左栏宽度并在 reload 后保持；验证工作区切换器位于工作区左栏顶部，初始自带不可删除的 `Default Workspace`，支持新建与切换工作区。 |

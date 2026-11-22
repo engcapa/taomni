@@ -10,9 +10,9 @@
 
 用户确认 Agents / Crew 暂时仅保留入口按钮，点击显示“开发中”，保留当前视图；本文后续完整 Worktree 编排方案属于后续设计，不作为本次交付的已实现能力。原型对齐以全高 42px 图标栏、260px 初始侧栏、6px 分隔条、独立圆角框架、画布内 33px 工具栏、默认全宽 Home 为准，保留主分支已有菜单、导入导出、启动、会话与工具能力。
 
-本轮补充确认：全局及 Sessions 均提供覆盖画布的实时大预览（Ctrl/Cmd+Shift+E），可切换当前视图/全部范围并点击卡片激活已有标签；文件读取当前缓冲区，终端读取已有运行实例的输出，不因预览启动新连接。Sessions 移除 Welcome 标签及画布欢迎页，右上角小预览按钮移除；逐标签悬停详情和 Ctrl/Cmd+Shift+H 保留。Tao 贴边悬浮条移除，聊天/便签/通知通过主导航入口访问。各模式的右侧操作按原型排列：Home 导航、Sessions 广播与布局预设、Workspaces 布局预设与底栏、Tools 返回工作区，再接搜索/大预览/右栏；语音从更多菜单访问。
+本轮补充确认：全局及 Sessions 均提供覆盖画布的实时大预览（Ctrl/Cmd+Shift+E），可切换当前视图/全部范围并点击卡片激活已有标签；文件读取当前缓冲区，终端读取已有运行实例的输出，不因预览启动新连接。Sessions 移除 Welcome 标签及画布欢迎页，右上角小预览按钮移除；逐标签悬停详情和 Ctrl/Cmd+Shift+H 保留。Tao 贴边悬浮条移除，聊天/便签/通知通过主导航入口访问。各模式的右侧操作按原型排列：Home 导航、Sessions 广播与布局预设、Workspaces 布局预设与底栏、Tools 返回工作区，再接搜索/大预览（2026-11-22 起右侧上下文栏及右栏收缩按钮已移除，Home 按钮保持不变）；语音从更多菜单访问。
 
-模式与工作区切换仅隐藏运行实例，继续保留 PTY、文档文本及撤销历史。关闭标签才释放对应实例；全局 Sessions 与工作区实例彼此隔离。右侧上下文栏支持键盘/指针调宽及持久化，MFA 浮窗宽度为 280px。
+模式与工作区切换仅隐藏运行实例，继续保留 PTY、文档文本及撤销历史。关闭标签才释放对应实例；全局 Sessions 与工作区实例彼此隔离。MFA 浮窗宽度为 280px。（2026-11-22：右侧上下文栏已整体移除，`TC-WS-099` 验证各视图右上角不再出现右栏按钮或面板。）
 
 新增验收：`TC-WS-016` 验证紧凑 Home、导入入口、右栏调整、窄窗口与启动导航；`TC-WS-017` 验证工作区/模式切换后未保存文档、撤销重做及保存重载。`TC-WS-011` 改为多入口开发中提示和真实全局搜索。`TC-WS-012/015` 验证离开工作区时隐藏 PTY、返回后保留输出并继续执行命令。单元回归 `WorkspaceEditorLifecycle.test.tsx` 覆盖 StrictMode 异步加载、编辑器实例保持及保存期间继续编辑的 dirty 状态。
 
@@ -103,7 +103,7 @@
 
 ### 3.1 目标变更验收标准
 
-- **`AC-01`（零额外顶栏 & 33px 单行共享主工具栏）**：主窗口顶部仅保留单行 `33px`（`h-8`）的 `ControlBar`（`[data-testid="control-bar"]`），无额外顶栏行、无右上角 3 色装饰圆点；主工具栏最左侧提供左栏收缩/展开按钮（`[data-testid="toggle-left-sidebar"]`，`Ctrl+B`），中间为当前模式的标签栏（`[data-testid="tab-bar"]`），右侧依次为标签动作槽位、`[data-testid="tab-details-hover"]`（`ℹ️`）、`[data-testid="tab-more"]`（`⋯`）、`[data-testid="global-search-trigger"]`（`🔍 Ctrl+K`）、`[data-testid="toggle-right-sidebar"]`（`◨`）、`[data-testid="titlebar-tray"]`（保留分屏/群发/语音按钮）及窗口控制按钮。
+- **`AC-01`（零额外顶栏 & 33px 单行共享主工具栏）**：主窗口顶部仅保留单行 `33px`（`h-8`）的 `ControlBar`（`[data-testid="control-bar"]`），无额外顶栏行、无右上角 3 色装饰圆点；主工具栏最左侧提供左栏收缩/展开按钮（`[data-testid="toggle-left-sidebar"]`，`Ctrl+B`），中间为当前模式的标签栏（`[data-testid="tab-bar"]`），右侧依次为标签动作槽位、`[data-testid="tab-more"]`（`⋯`）、`[data-testid="global-search-trigger"]`（`🔍 Ctrl+K`）、`[data-testid="tab-overview-trigger"]`（大预览）、`[data-testid="titlebar-tray"]`（保留分屏/群发/语音按钮）及窗口控制按钮；原 `[data-testid="toggle-right-sidebar"]` 与右侧上下文面板已于 2026-11-22 移除。
 - **`AC-02`（左侧主导航条顶部 5 大一级模式 & Home 并列第一）**：左侧主导航条（`[data-testid="sidebar-rail"]`）顶部为 `[data-testid="app-main-menu"]`（非 macOS），其下依次为 5 个一级模式按钮：`[data-testid="nav-mode-home"]`（`🏠 Home`，第 1 位）、`[data-testid="nav-mode-workspaces"]`（`🟣 Workspaces`，同时兼容别名 `side-tab-workspaces`）、`[data-testid="side-tab-sessions"]`（`🖥️ Sessions`）、`[data-testid="nav-mode-agents"]`（`🤖 Agents`）、`[data-testid="side-tab-tools"]`（`🛠️ Tools`）。点击 `Home` 展示原 `WelcomePanel` 全部能力与平台概览卡片，且不占用 `Sessions` 终端标签栏宽度。
 - **`AC-03`（Workspaces 模式下 IDEA 工具窗口融合至主左侧导航条）**：当且仅当处于 `Workspaces` 模式时，左侧主导航条在 `side-tab-tools` 下方渲染分割线与上下文工具窗口区（`[data-testid="workspace-merged-tool-rail"]`，兼容 `[data-testid="code-workspace-tool-rail-left"]`），包含：`📁 Project`（`[data-testid="code-workspace-tool-rail-project"]`）、`🖥️ Sessions`（`[data-testid="code-workspace-tool-rail-sessions"]`）、`🌿 Git`（`[data-testid="code-workspace-tool-rail-git"]`，带变更数徽标）、`🧭 Structure`（`[data-testid="code-workspace-tool-rail-structure"]`）以及 `⋯` 溢出菜单按钮（`[data-testid="code-workspace-bottom-tab-overflow"]`）。点击 `⋯` 弹出包含 `Terminal (Alt+F12)`、`Problems (Alt+6)`、`Run / Debug (Alt+4)`、`Find`、`Bookmarks`、`TODO`、`Services`、`Database`、`Show Tool Window Names`、`Move to...` 的完整菜单。工作区左栏与主编辑区之间**绝不出现第二条竖向工具按钮条**。
 - **`AC-04`（左侧主导航条底部 6 工具排列 & 左下角 MFA 悬浮窗）**：左侧主导航条底部自上而下依次渲染：
@@ -161,7 +161,7 @@ flowchart TD
 
 #### `DEC-01`：单行 33px 共享主工具栏与零额外顶栏设计
 - **状态**：`用户已定`
-- **裁决**：彻底取消独立顶栏行，复用并扩展 `src/components/tabbar/ControlBar.tsx`（高度 `32px/33px`），在其左侧增加左栏折叠/展开按钮 `[data-testid="toggle-left-sidebar"]`（快捷键 `Ctrl+B`），中间根据当前激活的一级模式渲染对应的标签栏（`Workspaces` 模式下渲染当前工作区的打开标签；`Sessions` / `Home` / `Tools` 模式下渲染会话工作台标签），右侧增加全局搜索按钮 `[data-testid="global-search-trigger"]`（`Ctrl+K`）与右栏折叠按钮 `[data-testid="toggle-right-sidebar"]`，同时完整保留 `tab-details-hover`（`ℹ️`）与 `tab-more`（`⋯` `OpenTabsMenu`）。删除右上角无意义的 3 色圆点。
+- **裁决**：彻底取消独立顶栏行，复用并扩展 `src/components/tabbar/ControlBar.tsx`（高度 `32px/33px`），在其左侧增加左栏折叠/展开按钮 `[data-testid="toggle-left-sidebar"]`（快捷键 `Ctrl+B`），中间根据当前激活的一级模式渲染对应的标签栏（`Workspaces` 模式下渲染当前工作区的打开标签；`Sessions` / `Home` / `Tools` 模式下渲染会话工作台标签），右侧增加全局搜索按钮 `[data-testid="global-search-trigger"]`（`Ctrl+K`）与大预览按钮 `[data-testid="tab-overview-trigger"]`，同时完整保留 `tab-more`（`⋯` `OpenTabsMenu`）。删除右上角无意义的 3 色圆点；原右栏折叠按钮与右侧上下文面板已于 2026-11-22 移除。
 
 #### `DEC-02`：左侧主导航条顶部一级模式（Home 第 1）与 IDEA 式工具窗口条单轨融合
 - **状态**：`用户已定`
@@ -287,7 +287,6 @@ export interface PlatformWorkspace {
 | | `tab-details-hover` | `ℹ️` 标签详情预览按钮（`Ctrl+Shift+H`） |
 | | `tab-more` / `open-tabs-menu` | `⋯` 已打开标签目录分组过滤与模糊搜索菜单 |
 | | `global-search-trigger` | `🔍` 全局搜索触发按钮（`Ctrl+K`） |
-| | `toggle-right-sidebar` | 主工具栏右侧 `◨` 右栏收缩/展开按钮 |
 | | `titlebar-tray` | 顶栏托盘容器（保留 `tab-split-view`、`tab-multiexec-toggle`、`PttButton`） |
 | **左侧主导航条 (`SidebarRail`)** | `sidebar-rail` | 窗口最左侧常驻主导航条 |
 | | `nav-mode-home` | `🏠 Home` 模式按钮（第 1 位） |
@@ -336,7 +335,7 @@ export interface PlatformWorkspace {
 | `src/components/sidebar/Sidebar.tsx` | 修改 | ~310 行 | 重构左侧栏容器：组合 `PrimaryNavigationRail` 与各模式左栏内容（`HomeSidebar` / `WorkspaceSidebar` / `SessionTree` / `AgentsSidebar` / `ToolsPanel`） |
 | `src/components/sidebar/PrimaryNavigationRail.tsx` | 新增 | ~280 行 | 独立封装左侧主导航条：顶部 5 模式（Home 第 1）、中部 `Workspaces` 融合 IDEA 工具窗口按钮（含 `⋯` 菜单）、底部 6 工具（`MFA -> 截图 -> 聊天 -> 主题 -> 语言 -> 设置`） |
 | `src/components/mfa/MfaFloatingWindow.tsx` | 新增 | ~260 行 | 左下角（`left: 50px; bottom: 30px;`）可拖拽 MFA 悬浮验证器窗口，复用 Vault 门禁与 TOTP 列表、搜索、倒计时复制 |
-| `src/components/tabbar/ControlBar.tsx` | 修改 | ~340 行 | 整合单行 33px 共享主工具栏：新增左侧 `◧`（`toggle-left-sidebar`）、按模式路由中间 Tab 条、右侧 `🔍`（`global-search-trigger`）与 `◨`（`toggle-right-sidebar`），保留全部主菜单与 `OpenTabsMenu` |
+| `src/components/tabbar/ControlBar.tsx` | 修改 | ~340 行 | 整合单行 33px 共享主工具栏：新增左侧 `◧`（`toggle-left-sidebar`）、按模式路由中间 Tab 条、右侧 `🔍`（`global-search-trigger`）与大预览（`tab-overview-trigger`），保留全部主菜单与 `OpenTabsMenu` |
 | `src/components/window/TitleBarTrayControls.tsx` | 修改 | ~240 行 | 将 `LanguageSwitcher` 与 `theme-cycle` 移交 `PrimaryNavigationRail` 底部渲染，保留顶栏托盘容器 `[data-testid="titlebar-tray"]` 内的分屏、多端群发与语音按钮 |
 | `src/components/workspace/WorkspaceSidebar.tsx` | 新增 | ~320 行 | 工作区左栏：顶部 `WorkspaceSwitcher`、工具栏（新建文件/新建目录/添加文件夹）、多根文件管理树/`Sessions` 面板/`Structure` 面板切换、底部常驻 Git 状态条 |
 | `src/components/workspace/WorkspaceMainPanel.tsx` | 新增 | ~350 行 | 工作区主画布：路由工作区内的文件编辑器（`CodeWorkspaceTab` 核心）、内置专用 Git Panel（复用 `WorkspaceGitManagerView` / `GitPanelView`）、以及工作区独立打开的任意会话实例，配合底部可折叠 IDEA 停靠窗（Terminal/Problems/Run） |
@@ -356,7 +355,7 @@ export interface PlatformWorkspace {
 ```mermaid
 flowchart LR
   T01["TASK-01\n状态层与默认工作区/实例隔离 Store"] --> T02["TASK-02\n主左侧导航条 (5模式+融合IDEA条+底部6工具)"]
-  T01 --> T03["TASK-03\n单行33px共享ControlBar与左右栏收缩"]
+  T01 --> T03["TASK-03\n单行33px共享ControlBar与左栏收缩"]
   T02 --> T04["TASK-04\n左下角可拖拽 MFA 悬浮窗口"]
   T01 --> T05["TASK-05\n工作区左栏 (切换器+多根文件树+新建文件/目录)"]
   T05 --> T06["TASK-06\n工作区内置专用 Git Panel 集成与跳转"]
@@ -437,10 +436,10 @@ flowchart LR
   1. 确保整个窗口顶部只有这一行 `32px/33px` 的 `ControlBar`，无任何额外顶栏行，无右上角 3 色圆点。
   2. 在 `ControlBar` 左侧（`app-main-menu` 右侧）渲染左栏收缩/展开按钮 `[data-testid="toggle-left-sidebar"]`（`◧`，快捷键 `Ctrl+B`）。
   3. 在 `ControlBar` 中间区域：当 `activeSideTab === "workspaces"` 时渲染当前激活工作区的独立标签条（包含文件 Tab、`GIT` Tab、工作区内打开的会话 Tab 以及 `+` 打开任意会话/新建文件按钮）；在其他模式下渲染原有的 `TabBar`。
-  4. 在 `ControlBar` 右侧（`tab-more` 右侧）渲染 `[data-testid="global-search-trigger"]`（`🔍 Ctrl+K`）与 `[data-testid="toggle-right-sidebar"]`（`◨`）。
+  4. 在 `ControlBar` 右侧（`tab-more` 右侧）渲染 `[data-testid="global-search-trigger"]`（`🔍 Ctrl+K`）与 `[data-testid="tab-overview-trigger"]`（大预览）。
   5. 在 `MainLayoutView.tsx` 中确保左栏 `Panel` 支持拖拽 `[data-testid="main-sidebar-resize-handle"]` 无级调整宽度并持久化。
 - **单元测试要求（Vitest）**：
-  - 验证 `ControlBar` 单行高度契约、左右栏收缩按钮点击触发 store 更新；
+  - 验证 `ControlBar` 单行高度契约、左栏收缩按钮点击触发 store 更新；
   - 验证 `Workspaces` 模式与 `Sessions` 模式下中间 Tab 条自动切换且互不污染；
   - 验证 `app-main-menu` 与 `OpenTabsMenu` 的所有原有功能正常。
 
@@ -602,7 +601,7 @@ PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto.lint --cases 
 
 | 验证 ID | 关联 AC | 关联任务 | 验证层级 | 自动化用例 ID / 测试文件 | 验证目标摘要 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`V-01`** | `AC-01` | `TASK-03` | Unit + Browser + Native | `TC-WS-001` / `ControlBarSharedToolbar.test.tsx` | 验证单行 33px 共享主工具栏无额外顶栏行、无右上角 3 色圆点，左右栏收缩按钮（`◧`/`◨`）与 `Ctrl+B` 正常工作 |
+| **`V-01`** | `AC-01` | `TASK-03` | Unit + Browser + Native | `TC-WS-001` / `ControlBarSharedToolbar.test.tsx` | 验证单行 33px 共享主工具栏无额外顶栏行、无右上角 3 色圆点，左栏收缩按钮（`◧`）与 `Ctrl+B` 正常工作，右侧上下文面板与右栏按钮不再存在 |
 | **`V-02`** | `AC-02` | `TASK-02` | Unit + Browser + Native | `TC-WS-002` / `PrimaryNavigationRail.test.tsx` | 验证左侧主导航条顶部 5 大模式按钮（`Home` 第 1、`Workspaces` 第 2、`Sessions` 第 3、`Agents` 第 4、`Tools` 第 5）顺序与切换 |
 | **`V-03`** | `AC-03` | `TASK-02` | Unit + Browser + Native | `TC-WS-003` / `PrimaryNavigationRail.test.tsx` | 验证切换到 `Workspaces` 时 IDEA 工具窗口按钮（`Project / Sessions / Git / Structure / ⋯`）融合进主左侧栏，无第二条并列竖栏，`⋯` 菜单完整保留 |
 | **`V-04`** | `AC-04` | `TASK-02`, `TASK-04` | Unit + Browser + Native | `TC-WS-004` / `MfaFloatingWindow.test.tsx` | 验证主左侧栏底部 6 工具顺序（`MFA -> 截图 -> 聊天 -> 主题 -> 语言 -> 设置`），点击 MFA 在左下角（`left:50px, bottom:30px`）弹出可拖拽悬浮验证器并支持复制与 Vault 门禁 |

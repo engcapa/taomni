@@ -15,7 +15,7 @@ import { useTerminalPreviews } from "./overview/useTerminalPreviews";
 import { OverviewSummary } from "./overview/OverviewSummary";
 import { OverviewTitle } from "./overview/OverviewTitle";
 import { focusOverviewCard, moveOverviewFocus } from "./overview/overviewNavigation";
-import { useOverviewPreview } from "./overview/useOverviewPreview";
+import { OVERVIEW_PREVIEW_DELAY_MS, useOverviewPreview } from "./overview/useOverviewPreview";
 
 /** Mode-scoped, live text overview. Reading a preview never starts a session. */
 export function TabOverview() {
@@ -129,7 +129,7 @@ function OpenTabOverview() {
     close();
   };
   return createPortal(
-    <div ref={dialogRef} data-testid="tab-overview" data-scope={all ? "all" : mode} role="dialog" aria-modal="true" aria-labelledby="tab-overview-title" className="taomni-tab-overview" onScroll={clearPreview}>
+    <div ref={dialogRef} data-testid="tab-overview" data-scope={all ? "all" : mode} data-preview-delay-ms={OVERVIEW_PREVIEW_DELAY_MS} role="dialog" aria-modal="true" aria-labelledby="tab-overview-title" className="taomni-tab-overview" onScroll={clearPreview}>
       <div className="taomni-overview-header">
         <div><h2 id="tab-overview-title" className="flex items-center gap-2 text-[16px] font-bold"><LayoutGrid className="h-4 w-4" />{t("platform.tabOverview")}<kbd className="text-[11px] font-normal">Ctrl/Cmd+Shift+E</kbd></h2><p className="mt-1 text-[12px] text-[var(--taomni-text-muted)]">{t("platform.overviewHint")}</p></div>
         <button data-testid="tab-overview-close" className="taomni-btn" onClick={close}><X className="mr-1 h-3 w-3" />{t("common.close")} (Esc)</button>

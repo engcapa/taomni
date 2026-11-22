@@ -46,13 +46,12 @@ function rememberSidebarChange(s: AppState, collapsed: boolean): Partial<AppStat
   return rememberSidebarForActiveGroup(s, collapsed);
 }
 
-export const createLayoutSlice: StateCreator<AppState, [], [], Pick<AppState, "sidebarCollapsed" | "workspaceSidebarCollapsed" | "mergeToolWindowRail" | "sidebarCollapsedByGroup" | "activeSideTab" | "rightSidebarCollapsed" | "floatingMfa" | "statusMessage" | "toggleSidebar" | "setSidebarCollapsed" | "setActiveSideTab" | "toggleRightSidebar" | "setRightSidebarCollapsed" | "toggleFloatingMfa" | "openFloatingMfa" | "closeFloatingMfa" | "setFloatingMfaPosition" | "setFloatingMfaPinned" | "setFloatingMfaSearch" | "setMergeToolWindowRail" | "applySidebarForActiveTab" | "setStatusMessage">> = (set, get) => ({
+export const createLayoutSlice: StateCreator<AppState, [], [], Pick<AppState, "sidebarCollapsed" | "workspaceSidebarCollapsed" | "mergeToolWindowRail" | "sidebarCollapsedByGroup" | "activeSideTab" | "floatingMfa" | "statusMessage" | "toggleSidebar" | "setSidebarCollapsed" | "setActiveSideTab" | "toggleFloatingMfa" | "openFloatingMfa" | "closeFloatingMfa" | "setFloatingMfaPosition" | "setFloatingMfaPinned" | "setFloatingMfaSearch" | "setMergeToolWindowRail" | "applySidebarForActiveTab" | "setStatusMessage">> = (set, get) => ({
   sidebarCollapsed: readSidebarCollapsed(),
   workspaceSidebarCollapsed: readWorkspaceSidebarCollapsed(),
   mergeToolWindowRail: readMergeToolWindowRail(),
   sidebarCollapsedByGroup: readSidebarCollapsedByGroup(readSidebarCollapsed()),
   activeSideTab: "home",
-  rightSidebarCollapsed: true,
   floatingMfa: createInitialFloatingMfaState(),
   statusMessage: tr("status.ready"),
 
@@ -75,8 +74,6 @@ export const createLayoutSlice: StateCreator<AppState, [], [], Pick<AppState, "s
         ? {} : rememberSidebarForActiveGroup(s, false)),
     }));
   },
-  toggleRightSidebar: () => set((s) => ({ rightSidebarCollapsed: !s.rightSidebarCollapsed })),
-  setRightSidebarCollapsed: (collapsed) => set({ rightSidebarCollapsed: collapsed }),
   toggleFloatingMfa: () => set((s) => ({ floatingMfa: { ...s.floatingMfa, open: !s.floatingMfa.open } })),
   openFloatingMfa: () => set((s) => ({ floatingMfa: { ...s.floatingMfa, open: true } })),
   closeFloatingMfa: () => set((s) => ({ floatingMfa: { ...s.floatingMfa, open: false } })),
