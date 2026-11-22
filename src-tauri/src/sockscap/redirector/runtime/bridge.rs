@@ -21,6 +21,7 @@ use tokio::process::Child;
 use tokio::process::ChildStdin;
 use tokio::process::ChildStdout;
 use tokio::process::Command;
+use tokio_util::sync::CancellationToken;
 
 pub(super) struct SocketCleanup(pub(super) PathBuf);
 
@@ -166,6 +167,7 @@ pub(super) async fn launch_bridge(
     flow_socket: &std::path::Path,
     actions: &[String],
     session_id: &str,
+    cancel: &CancellationToken,
 ) -> Result<BridgeSession, RedirectorStartError> {
     if actions.is_empty() {
         return Err(RedirectorStartError::before_scope(
@@ -175,6 +177,11 @@ pub(super) async fn launch_bridge(
     if session_id.trim().is_empty() {
         return Err(RedirectorStartError::before_scope(
             "Redirector bridge session id must not be empty",
+        ));
+    }
+    if cancel.is_cancelled() {
+        return Err(RedirectorStartError::before_scope(
+            "SocksCap activation cancelled",
         ));
     }
     let mut child =
@@ -194,8 +201,13 @@ pub(super) async fn launch_bridge(
     let mut input = BufWriter::new(stdin);
     let mut output = BufReader::new(stdout);
 
-    let ready =
-        match tokio::time::timeout(CONTROL_CONNECT_TIMEOUT, read_bridge_event(&mut output)).await {
+    let ready = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => {
+            terminate_bridge_child(&mut child).await;
+            return Err(RedirectorStartError::before_scope("SocksCap activation cancelled"));
+        }
+        ready = tokio::time::timeout(CONTROL_CONNECT_TIMEOUT, read_bridge_event(&mut output)) => match ready {
             Ok(Ok(event)) => event,
             Ok(Err(error)) => {
                 terminate_bridge_child(&mut child).await;
@@ -207,7 +219,8 @@ pub(super) async fn launch_bridge(
                     "timed out waiting for Redirector bridge control readiness",
                 ));
             }
-        };
+        },
+    };
     let provider_pid = match ready {
         BridgeEvent::ControlReady {
             version,
@@ -225,6 +238,14 @@ pub(super) async fn launch_bridge(
         }
     };
 
+    if cancel.is_cancelled() {
+        terminate_bridge_child(&mut child).await;
+        return Err(RedirectorStartError::before_scope(
+            "SocksCap activation cancelled",
+        ));
+    }
+    // After writing Apply, finish the handshake so the caller can stop any
+    // active scope using the confirmed session or keep its recovery journal.
     let session_id = session_id.to_string();
     if let Err(error) = write_bridge_command(
         &mut input,

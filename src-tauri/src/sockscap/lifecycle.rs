@@ -77,6 +77,8 @@ pub async fn sockscap_start(
         .sockscap
         .begin_activation(&state.plugins)
         .await?;
+    #[cfg(target_os = "macos")]
+    let startup = state.legacy.sockscap.macos_start.start()?;
     #[cfg(not(target_os = "linux"))]
     let _ = sudo_password;
 
@@ -191,7 +193,7 @@ pub async fn sockscap_start(
 
     #[cfg(target_os = "macos")]
     let status: Result<SocksCapStatus, String> =
-        start_macos_capture(&app, &state, &cfg, &caps, journal_path).await;
+        start_macos_capture(&app, &state, &cfg, &caps, journal_path, &startup.token).await;
 
     #[cfg(all(not(windows), not(target_os = "linux"), not(target_os = "macos")))]
     let status: Result<SocksCapStatus, String> = {

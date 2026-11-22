@@ -49,8 +49,16 @@ pub async fn plugin_set_enabled(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<PluginRecord, String> {
+    #[cfg(target_os = "macos")]
+    let _sockscap_disable = if !enabled && slug == taomni_sockscap_api::SLUG {
+        Some(state.legacy.sockscap.prepare_module_disable().await?)
+    } else {
+        None
+    };
     let registry = state.plugins.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(target_os = "macos")]
+        let _sockscap_disable = _sockscap_disable;
         registry
             .set_enabled(&slug, enabled)
             .map_err(|error| error.to_string())

@@ -7,7 +7,11 @@ pub(super) async fn start_macos_capture(
     cfg: &SocksCapConfig,
     caps: &capture::SocksCapCapabilities,
     journal_path: &std::path::Path,
+    cancel: &tokio_util::sync::CancellationToken,
 ) -> Result<SocksCapStatus, String> {
+    if cancel.is_cancelled() {
+        return Err("SocksCap capture was cancelled before activation".into());
+    }
     capture::macos::preflight(cfg)?;
     redirector::cleanup_stale_sockets()?;
     redirector::cleanup_stale_launchers().await?;
@@ -39,7 +43,8 @@ pub(super) async fn start_macos_capture(
     recovery::write_journal_durable(journal_path, &journal)
         .map_err(|error| format!("persist macOS SocksCap write-ahead journal: {error}"))?;
 
-    let capture = match capture::macos::start(app, cfg, Arc::clone(&ctx), &session_id).await {
+    let capture = match capture::macos::start(app, cfg, Arc::clone(&ctx), &session_id, cancel).await
+    {
         Ok(capture) => capture,
         Err(start_error) => {
             if let Some(manager) = state.legacy.sockscap.xray() {

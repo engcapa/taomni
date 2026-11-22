@@ -41,6 +41,7 @@ pub async fn recover(
         &flow_socket_path,
         &inert_actions(),
         &uuid::Uuid::new_v4().to_string(),
+        &tokio_util::sync::CancellationToken::new(),
     )
     .await
     .map_err(|error| error.to_string())?;

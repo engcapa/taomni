@@ -107,6 +107,7 @@ pub async fn start(
     config: &SocksCapConfig,
     ctx: Arc<RwLock<RelayContext>>,
     session_id: &str,
+    cancel: &tokio_util::sync::CancellationToken,
 ) -> Result<RedirectorCaptureHandle, RedirectorStartError> {
     preflight(config)?;
     let file_descriptor_limit = prepare_file_descriptor_budget()?;
@@ -130,6 +131,7 @@ pub async fn start(
     let provider_socket_path = random_socket_path("provider");
     let listener = bind_private_listener(&flow_socket_path)?;
     let cleanup = SocketCleanup(flow_socket_path.clone());
+    let provider_cleanup = SocketCleanup(provider_socket_path.clone());
     let bridge = launch_bridge(
         &state.plugins,
         false,
@@ -138,6 +140,7 @@ pub async fn start(
         &flow_socket_path,
         scope.actions(),
         session_id,
+        cancel,
     )
     .await?;
     let telemetry = Arc::new(RuntimeTelemetry {
@@ -168,6 +171,7 @@ pub async fn start(
     let block_quic = config.block_quic;
     let task_telemetry = Arc::clone(&telemetry);
     let task = tokio::spawn(async move {
+        let _provider_cleanup = provider_cleanup;
         let result = run_capture(
             listener,
             bridge,
