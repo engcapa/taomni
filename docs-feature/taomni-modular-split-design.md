@@ -789,7 +789,7 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 | Vault | `vault.db` | 核心（插件只拿引用） |
 | Servers | `taomni.db` 里的 `server_configs` 表（`servers/db.rs`）；其中 RDP / VNC Server 的配置行按 `server_type` 区分 | `plugin-servers`；RDP / VNC Server 行随 `plugin-rdp-server / plugin-vnc-server` 走（§4） |
 | RDP 客户端 | `taomni.db` 里的 `rdp_certificate_pins`（`rdp/tls.rs`）；会话记录是 `sessions` 表 | 证书钉扎表迁入 `plugin-rdp-client` 自有库；会话记录留核心 |
-| SocksCap | `<应用数据目录>/sockscap/{config.json, rules/, recovery.json}` | 0.1.3 起，签名宿主首次读取时将旧配置导入 `plugins/sockscap/data/config.json`。保存、重开和备份使用该文件，旧配置保留供回退。规则缓存和崩溃恢复日志仍由原路径持有，见 §8.2。 |
+| SocksCap | `<应用数据目录>/sockscap/{config.json, rules/, recovery.json}` | 0.1.3 起，签名宿主首次读取时将旧配置导入 `plugins/sockscap/data/config.json`，保存、重开和备份使用该文件。旧配置保留供回退。签名模块的本机恢复日志与模块指针同目录，兼容旧日志见 §8.2。 |
 | 移动端 | `mobile_feishu_events` 等表（`mobile/`）、`mobile-desktop-remote.json`（桌面远控策略文件），其余配置在核心设置 | 插件自有库，逐表核查后迁移 |
 | VNC 客户端 / 截图 | 实测未发现独立表（偏好存核心设置） | 无需新库；M0 逐模块再核一遍 |
 
@@ -798,7 +798,7 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 - 每个插件自己写一次性迁移：旧数据在 `taomni.db` 时，**插件宿主不直接打开 `taomni.db`**（多进程写同一 SQLite 有锁冲突，也违反“不读对方库”）；`module.json` 声明 `legacyTables`，核心提供只读 RPC `legacy.read(table)`，插件读出属于自己的行、写入自己的库，写完打标；不删旧表（旧表留一个版本周期再清，给回滚留路）。
 - 迁移失败时插件不启用、核心不崩，商店显示“迁移失败，数据未动”，用户可重试或卸载插件。
 - 卸载插件不删数据；重装同一插件时数据还在；显式“删除数据”才清。
-- **SocksCap 恢复日志的特例**：`sockscap/recovery.json` 记录“系统网络状态被改动、需要在崩溃后恢复”。若启动时该日志处于未清理状态而 SocksCap 插件未安装 / 已禁用，核心不得忽略：显示明确提示，引导安装插件完成恢复或手动清理，不静默留脏系统状态（现有恢复服务见 `sockscap/recovery_service`）。
+- **SocksCap 恢复日志的特例**：签名模块的本机网络恢复日志位于 `plugins/sockscap/recovery.json`，随模块指针同目录保存。便携备份只保存用户配置。启动、恢复和更新前检查该路径及旧版 `sockscap/recovery.json`。若有未清理状态而模块未安装或已禁用，核心继续处理该机器的恢复记录，恢复失败时给出明确提示和可用的手动清理步骤。完成恢复后清理相应记录。
 - 备份（核心）备份全部数据文件（核心库 + 各插件库），恢复时按 §3.7 处理。运行中的宿主用 `backup.snapshot` 取一致快照，已禁用 / 未安装的插件按 `backupPaths` 拷贝；还原前核心先停全部宿主并持有独占 `ProfileLease`（S13）。Vault 与插件库必须同批恢复，否则加密库无法解密（AC-016）。
 - 将 v2 MFA 备份恢复到新配置后，启动时按还原事务生成的定位记录使用 `plugins/mfa/data/mfa.db`。用户安装并启用签名模块后，用原 Vault 密码访问已恢复的账号。后续恢复 v1 MFA 备份也写入该配置当前使用的模块库。仍使用旧库且已含账号的配置会拒绝缺少配对旧 MFA 数据的 Vault 还原。
 - 首次升级遇到旧 Mail 账号时，模块商店自动准备验签包并显示下次启动时导入。应用下次启动先处理未完成的备份还原，再在打开业务库前用独占租约导入邮件。SQLite 快照包含已提交的 WAL 内容，原件和已缓存附件随账号一起复制。核心先发布数据，再激活验签代码，最后提交 journal。首次激活前中断时，重试使用最新的原缓存。会话记录和原缓存保留，供旧版回滚读取。

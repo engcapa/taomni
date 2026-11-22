@@ -58,7 +58,9 @@ pub async fn sockscap_diagnostics(
         status: orch.status(),
         capabilities: capture::capabilities_for(&app),
         stats: orch.stats_snapshot(),
-        recovery_journal: recovery::read_journal(&recovery::journal_path(&data_dir(&app)?)),
+        recovery_journal: recovery::read_journal(
+            recovery::JournalLocations::load(&state.core.paths.data)?.active(),
+        ),
         redirector,
         manual_recovery_steps,
     })
@@ -115,6 +117,14 @@ pub async fn sockscap_start(
     }
 
     let activation_lock = ModuleLock::try_acquire_for_app(&app, "sockscap", "global", "SocksCap")?;
+    let journals = recovery::JournalLocations::load(&state.core.paths.data)?;
+    let hosted = state
+        .plugins
+        .get(taomni_sockscap_api::SLUG)
+        .is_some_and(|record| {
+            record.state == crate::plugin::LifecycleState::Enabled && record.reason.is_none()
+        });
+    let journal_path = journals.for_start(hosted);
 
     let dir = rules_dir(&app)?;
     {
@@ -165,7 +175,6 @@ pub async fn sockscap_start(
     }
 
     let caps = capture::capabilities();
-    let journal_path = data_dir(&app)?.join("recovery.json");
 
     #[cfg(windows)]
     let status: Result<SocksCapStatus, String> =
@@ -177,7 +186,7 @@ pub async fn sockscap_start(
 
     #[cfg(target_os = "macos")]
     let status: Result<SocksCapStatus, String> =
-        start_macos_capture(&app, &state, &cfg, &caps, &journal_path).await;
+        start_macos_capture(&app, &state, &cfg, &caps, journal_path).await;
 
     #[cfg(all(not(windows), not(target_os = "linux"), not(target_os = "macos")))]
     let status: Result<SocksCapStatus, String> = {
@@ -200,7 +209,7 @@ pub async fn sockscap_start(
                 .and_then(|g| g.as_ref().map(|s| s.port));
             let relay_port = state.legacy.sockscap.orch.read().await.relay_port();
             recovery::write_journal(
-                &journal_path,
+                journal_path,
                 &recovery::RecoveryJournal {
                     platform: caps.platform.clone(),
                     capture_backend: st.capture_backend.clone(),

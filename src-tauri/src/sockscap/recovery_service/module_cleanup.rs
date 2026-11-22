@@ -10,14 +10,14 @@ use std::{
 #[derive(Debug)]
 pub(crate) struct ModuleCleanup {
     runtime: Weak<SocksCapRuntime>,
-    journal: PathBuf,
+    profile: PathBuf,
 }
 
 impl ModuleCleanup {
     pub(crate) fn new(runtime: &Arc<SocksCapRuntime>, profile: &Path) -> Self {
         Self {
             runtime: Arc::downgrade(runtime),
-            journal: recovery::journal_path(&profile.join("sockscap")),
+            profile: profile.to_path_buf(),
         }
     }
 }
@@ -49,8 +49,10 @@ impl crate::plugin::ModuleCleanup for ModuleCleanup {
             if runtime.orch.read().await.status().phase == EnginePhase::RecoveryRequired {
                 return Err("Recover the SocksCap network before changing the module".into());
             }
-            stop_capture(&runtime, &self.journal, false, true).await?;
-            clear_capture_journal(&runtime, &self.journal).await?;
+            let journals = recovery::JournalLocations::load(&self.profile);
+            let journal = journals.as_ref().map(|paths| paths.active());
+            stop_capture(&runtime, journal.as_ref().ok().copied(), true).await?;
+            clear_capture_journal(&runtime, journal.map_err(Clone::clone)).await?;
             runtime.release_activation_lock();
             Ok(())
         })

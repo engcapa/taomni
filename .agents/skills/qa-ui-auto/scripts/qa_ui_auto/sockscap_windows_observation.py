@@ -53,8 +53,10 @@ def run(ctx, phase):
     host = (installed / "taomni-plugin-sockscap.exe").resolve()
     receipt = owner.signed_sockscap
     ready_dir = root / "sockscap"
-    journal_path = ready_dir / "recovery.json"
+    journal_path = root / "plugins/sockscap/recovery.json"
+    legacy_journal = ready_dir / "recovery.json"
     result = {"sourceSha": receipt["sourceSha"], "platform": receipt["platform"], "packageSha256": receipt["sha256"],
+              "journalPath": journal_path.relative_to(root).as_posix(),
               "phase": phase, "passed": False}
     status_path = Path(ctx.case_dir) / f"sockscap-windows-capture-{phase}.json"
     if phase == "uninstalled":
@@ -92,7 +94,8 @@ def run(ctx, phase):
                 except FileNotFoundError:
                     continue
             if phase == "disabled":
-                result.update(relayListening=listening(result["relayPort"]), journalExists=journal_path.exists())
+                result.update(relayListening=listening(result["relayPort"]),
+                              journalExists=journal_path.exists() or legacy_journal.exists())
                 if not result["hosts"] and not result["helpers"] and not ready and not result["relayListening"] and not result["journalExists"]:
                     config = root / "plugins/sockscap/data/config.json"
                     result["configSha256"] = hashlib.sha256(config.read_bytes()).hexdigest()
@@ -103,6 +106,11 @@ def run(ctx, phase):
                 matching = [row for row in ready if row.get("pid") == helper_pid]
                 if (len(matching) == 1 and matching[0].get("elevated") is True
                         and matching[0].get("parentPid") == host_pid):
+                    if legacy_journal.exists():
+                        raise StepError("Signed SocksCap wrote a capture journal to the legacy directory")
+                    if not journal_path.is_file():
+                        time.sleep(0.15)
+                        continue
                     journal = json.loads(journal_path.read_text(encoding="utf-8"))
                     port = journal.get("relayPort")
                     # Windows journals omit phase. RecoveryPhase defaults to Active.

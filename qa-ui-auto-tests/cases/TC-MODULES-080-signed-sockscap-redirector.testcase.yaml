@@ -64,4 +64,4 @@ verification:
   native:
   - check: OS process and file ownership across module disable.
     method: automated
-    reason: The kernel reports executable paths and process parentage. The case checks live file locks, socket modes and the durable journal.
+    reason: The kernel reports executable paths and process parentage. The case checks live file locks, socket modes and the durable journal beside the module pointer.

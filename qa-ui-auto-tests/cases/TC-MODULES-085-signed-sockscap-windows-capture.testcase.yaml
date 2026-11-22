@@ -67,7 +67,7 @@ verification:
     - {step: 22, expectation: Capture is inactive after the integrity error.}
     - {step: 23, expectation: "After restoring the case fixture, the user can retry capture."}
     - {step: 28, expectation: The elevated helper runs from the verified payload under the active signed host.}
-    - {step: 33, expectation: "The host and helper have exited, the relay port is closed and the recovery journal is gone."}
+    - {step: 33, expectation: "The host and helper have exited, the relay port is closed and the module's recovery journal is gone."}
     - {step: 37, expectation: The existing desktop shows the disabled module state.}
     - {step: 43, expectation: The store offers installation again after uninstall completes.}
     - {step: 44, expectation: The version and staged runtime are gone and the retained configuration digest matches.}
@@ -81,6 +81,6 @@ verification:
   - check: The unsigned test edit is rejected before Windows elevation staging.
     method: automated
     reason: The runner records the actual installed and signed asset hashes and checks that the helper has not been copied out.
-  - check: Disabling the module closes the actual core listener and clears its recovery journal.
+  - check: The active relay writes its recovery journal under the module. Disabling closes the listener and clears the journal.
     method: automated
     reason: The runner probes the captured relay port before and after disabling and retains the filesystem observation.

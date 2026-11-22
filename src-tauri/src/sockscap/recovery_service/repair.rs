@@ -143,15 +143,31 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
         }
     }
 
-    let journal_path = recovery::journal_path(&dir);
-    let dirty = recovery::needs_repair(&journal_path);
+    let journals = match recovery::JournalLocations::load(&state.core.paths.data) {
+        Ok(journals) => journals,
+        Err(error) => {
+            state
+                .legacy
+                .sockscap
+                .orch
+                .write()
+                .await
+                .set_recovery_required(
+                    &capture::capabilities().capture_backend,
+                    format!("Cannot inspect SocksCap recovery data: {error}"),
+                );
+            return;
+        }
+    };
+    let journal_path = journals.active();
+    let dirty = recovery::needs_repair(journal_path);
     if !dirty && orphans.is_empty() {
         return;
     }
 
     if dirty {
         tracing::warn!("sockscap: dirty recovery journal — repairing network state");
-        if let Some(j) = recovery::read_journal(&journal_path) {
+        if let Some(j) = recovery::read_journal(journal_path) {
             tracing::warn!(
                 "sockscap: dirty journal pid={} backend={} relay={:?} helper={:?}",
                 j.pid,
@@ -176,11 +192,12 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
             redirector::installer::system_extension_state(),
             redirector::installer::RedirectorSystemExtensionState::WaitingForUser
         )
-        && recovery::read_journal(&journal_path)
+        && journals.only_dirty() == Some(journal_path)
+        && recovery::read_journal(journal_path)
             .as_ref()
             .is_some_and(pending_approval_never_recorded_scope)
     {
-        match recovery::mark_clean_and_clear(&journal_path) {
+        match recovery::mark_clean_and_clear(journal_path) {
             Ok(()) => {
                 tracing::info!(
                     "sockscap: cleared aborted first-use approval journal; waiting for System Settings approval"
@@ -231,12 +248,10 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
 
     queue_reap(state, &orphans);
     if orphans.is_empty() {
-        #[cfg(target_os = "macos")]
-        match recovery::mark_clean_and_clear(&journal_path) {
+        match journals.clear_after_repair() {
             Ok(()) => tracing::info!("sockscap: recovery complete"),
             Err(error) => {
                 tracing::warn!("sockscap: recovery journal cleanup failed: {error}");
-                #[cfg(target_os = "macos")]
                 state
                     .legacy
                     .sockscap
@@ -244,17 +259,10 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
                     .write()
                     .await
                     .set_recovery_required(
-                        "mitmproxy-redirector",
-                        format!(
-                            "macOS network recovery succeeded, but journal cleanup failed: {error}"
-                        ),
+                        &capture::capabilities().capture_backend,
+                        format!("Network recovery succeeded, but journal cleanup failed: {error}"),
                     );
             }
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            let _ = recovery::mark_clean_and_clear(&journal_path);
-            tracing::info!("sockscap: recovery complete");
         }
     } else {
         // Do not declare success while an elevated orphan is still diverting

@@ -9064,6 +9064,7 @@ files:
   - src-tauri/crates/taomni-module-settings/
   - src-tauri/plugins/sockscap/
   - src-tauri/src/sockscap/
+  # The signed module's capture journal is observed by TC-MODULES-080 and TC-MODULES-085.
   - src/lib/sockscap.ts
   - src/stubs/tauri-core.ts
 controls:

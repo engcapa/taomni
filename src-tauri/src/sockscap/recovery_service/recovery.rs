@@ -2,7 +2,6 @@ use super::repair::queue_reap;
 use super::teardown::full_teardown;
 use crate::module_lock::ModuleLock;
 use crate::sockscap::capture;
-use crate::sockscap::data_dir;
 use crate::sockscap::recovery;
 use crate::sockscap::redirector;
 use crate::state::AppState;
@@ -28,6 +27,7 @@ pub async fn sockscap_recover(
     // Even if stopping the active session was incomplete, recovery gets one
     // more independent chance to remove the platform-owned state.
     let teardown_error = full_teardown(&app, &state, false).await.err();
+    let journals = recovery::JournalLocations::load(&state.core.paths.data);
     #[cfg(target_os = "macos")]
     let stale_runtime_clean = {
         let sockets_clean = match redirector::cleanup_stale_sockets() {
@@ -50,9 +50,10 @@ pub async fn sockscap_recover(
     };
 
     #[cfg(target_os = "macos")]
-    let pending_approval_journal = data_dir(&app)
+    let pending_approval_journal = journals
+        .as_ref()
         .ok()
-        .map(|dir| recovery::journal_path(&dir))
+        .and_then(recovery::JournalLocations::only_dirty)
         .filter(|journal| {
             recovery::read_journal(journal)
                 .as_ref()
@@ -69,7 +70,7 @@ pub async fn sockscap_recover(
         && pending_approval_journal.is_some()
     {
         let journal = pending_approval_journal.expect("checked above");
-        if let Err(error) = recovery::mark_clean_and_clear(&journal) {
+        if let Err(error) = recovery::mark_clean_and_clear(journal) {
             let message = format!(
                 "Redirector never applied capture while System Extension approval was pending, but its journal could not be cleared: {error}"
             );
@@ -97,31 +98,24 @@ pub async fn sockscap_recover(
             // Queue anything only an elevated process can kill; the next Start
             // hands the list to the helper it launches under UAC.
             queue_reap(&state, &needs_elevation);
-            #[cfg(target_os = "macos")]
-            if let Ok(dir) = data_dir(&app) {
-                if let Err(error) = recovery::mark_clean_and_clear(&recovery::journal_path(&dir)) {
-                    let message = format!(
-                        "network recovery succeeded, but the durable recovery journal could not be cleared: {error}"
+            if let Err(error) = journals.and_then(|paths| paths.clear_after_repair()) {
+                let message = format!(
+                    "network recovery succeeded, but the recovery journal could not be cleared: {error}"
+                );
+                state
+                    .legacy
+                    .sockscap
+                    .orch
+                    .write()
+                    .await
+                    .set_recovery_required(
+                        &capture::capabilities().capture_backend,
+                        message.clone(),
                     );
-                    state
-                        .legacy
-                        .sockscap
-                        .orch
-                        .write()
-                        .await
-                        .set_recovery_required(
-                            &capture::capabilities().capture_backend,
-                            message.clone(),
-                        );
-                    if acquired_recovery_lock {
-                        state.legacy.sockscap.release_activation_lock();
-                    }
-                    return Err(message);
+                if acquired_recovery_lock {
+                    state.legacy.sockscap.release_activation_lock();
                 }
-            }
-            #[cfg(not(target_os = "macos"))]
-            if let Ok(dir) = data_dir(&app) {
-                let _ = recovery::mark_clean_and_clear(&recovery::journal_path(&dir));
+                return Err(message);
             }
             state.legacy.sockscap.orch.write().await.force_idle();
             if let Some(error) = teardown_error {

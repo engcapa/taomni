@@ -2,6 +2,7 @@
 
 ## 2026-11-23 当前进展
 
+- SocksCap 启动捕获时将本机恢复日志写在 `plugins/sockscap/recovery.json`。启动和手动恢复仍检查旧路径，确认网络状态恢复后才清除日志。TC-MODULES-080/085 验证签名模块写入路径、停用后的回收及 Windows 卸载后配置保留。
 - 正式基座只保留 MFA 的 IPC 类型、旧数据库快照和只读 Vault 密钥核对。默认 Cargo 树不包含 OTP 引擎、MFA 宿主或二维码解码器。MFA 0.1.2 的签名页面会提示已有账户先在模块商店迁移，运行时读取、修改和导出由宿主持有。TC-MODULES-044 补充迁移前提示和无验证码断言，TC-MODULES-089 核对新账户无需迁移，TC-MODULES-090 补充正常关闭桌面的确认操作。
 - Mail 0.1.31 的 CalDAV 历史议程导入和事务写入已在 Linux、Windows 和 macOS ARM64 的宿主进程验证通过。Linux Native 的 TC-MODULES-091 检查实际 CalDAV 事件、模块数据库与停用后的保留。 [三端宿主](https://github.com/engcapa/taomni/actions/runs/45070703837) · [Linux Native](https://github.com/engcapa/taomni/actions/runs/45070155812)
 - `4c5b6e429` 的 Linux Native 已通过 Mail 分页及 IDLE、MFA 双入口和已有的密码及验证码场景。TC-MODULES-048 的原生 HTML 显示新模块页面正确提示缺少 MFA，旧用例仍查找内置页面的错误组件。已改为检查模块页、关闭该页并验证签名入口读回升级前的 HOTP。 [原始分片](https://github.com/engcapa/taomni/actions/runs/45067527972)

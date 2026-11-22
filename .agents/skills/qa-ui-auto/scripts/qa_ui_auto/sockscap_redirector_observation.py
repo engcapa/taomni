@@ -65,7 +65,8 @@ def run(ctx, phase):
             or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted" or type(core) is not int):
         raise StepError("Redirector observation requires its owned macOS desktop and signed native case")
     profile = isolated_data_root(fixture)
-    journal = profile / "sockscap/recovery.json"
+    journal = profile / "plugins/sockscap/recovery.json"
+    legacy_journal = profile / "sockscap/recovery.json"
     host_path = Path(fixture.values["sockscap_signed_host"])
     signed = fixture.signed_sockscap
     with host_path.open("rb") as binary:
@@ -73,12 +74,15 @@ def run(ctx, phase):
             raise StepError("Installed SocksCap host differs from its signed archive")
     result = {"sourceSha": signed["sourceSha"], "packageSha256": signed["sha256"],
               "hostSha256": signed["hostSha256"], "runnerImage": os.environ.get("ImageVersion"),
+              "journalPath": journal.relative_to(profile).as_posix(),
               "phase": phase, "passed": False}
     before_path = ctx.case_dir / "redirector-pending.json"
     before = json.loads(before_path.read_text()) if phase == "disabled" else None
     deadline = time.monotonic() + remaining_timeout(35)
     try:
         while time.monotonic() < deadline:
+            if legacy_journal.exists():
+                raise StepError("The signed capture wrote a journal in the legacy directory")
             processes = rows()
             if executable(core) != ctx.session.application.resolve():
                 raise StepError("The original QA desktop exited or changed executable")

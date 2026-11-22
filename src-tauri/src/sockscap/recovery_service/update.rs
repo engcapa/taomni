@@ -3,7 +3,6 @@ use super::privileged_files::wait_for_privileged_files_unlocked;
 use super::teardown::full_teardown;
 use crate::module_lock::ModuleLock;
 use crate::sockscap::capture;
-use crate::sockscap::data_dir;
 use crate::sockscap::helper;
 use crate::sockscap::orchestrator;
 use crate::sockscap::recovery;
@@ -46,6 +45,7 @@ pub async fn sockscap_prepare_for_update(
                 .into(),
         );
     }
+    let journals = recovery::JournalLocations::load(&state.core.paths.data)?;
     if !state.legacy.sockscap.has_activation_lock() {
         let lock = ModuleLock::try_acquire_for_app(
             &app,
@@ -56,8 +56,7 @@ pub async fn sockscap_prepare_for_update(
         state.legacy.sockscap.install_activation_lock(lock);
     }
 
-    let journal_path = data_dir(&app).ok().map(|dir| recovery::journal_path(&dir));
-    let dirty_journal = journal_path.as_deref().is_some_and(recovery::needs_repair);
+    let dirty_journal = recovery::needs_repair(journals.active());
 
     // A previous Linux process may have exited after installing nftables and
     // cgroups but before clearing its journal. The updater already has the old
@@ -83,24 +82,19 @@ pub async fn sockscap_prepare_for_update(
             }
             return Err(message);
         }
-        if let Some(journal) = journal_path.as_deref() {
-            if let Err(error) = recovery::mark_clean_and_clear(journal) {
-                let message = format!(
-                    "SocksCap network recovery succeeded, but its journal could not be cleared before updating: {error}"
-                );
-                state
-                    .legacy
-                    .sockscap
-                    .orch
-                    .write()
-                    .await
-                    .set_recovery_required(
-                        &capture::capabilities().capture_backend,
-                        message.clone(),
-                    );
-                state.legacy.sockscap.release_activation_lock();
-                return Err(message);
-            }
+        if let Err(error) = journals.clear_after_repair() {
+            let message = format!(
+                "SocksCap network recovery succeeded, but its journal could not be cleared before updating: {error}"
+            );
+            state
+                .legacy
+                .sockscap
+                .orch
+                .write()
+                .await
+                .set_recovery_required(&capture::capabilities().capture_backend, message.clone());
+            state.legacy.sockscap.release_activation_lock();
+            return Err(message);
         }
         state.legacy.sockscap.orch.write().await.force_idle();
         tracing::info!("sockscap: automatically recovered stale Linux state before update");

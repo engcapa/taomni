@@ -1,6 +1,5 @@
 use crate::sockscap::SocksCapRuntime;
 use crate::sockscap::capture;
-use crate::sockscap::data_dir;
 use crate::sockscap::helper;
 use crate::sockscap::linux_capture;
 use crate::sockscap::macos_capture;
@@ -23,14 +22,19 @@ pub(in crate::sockscap) async fn full_teardown(
     state: &State<'_, AppState>,
     clear_journal: bool,
 ) -> Result<(), String> {
-    let journal = recovery::journal_path(&state.core.paths.data.join("sockscap"));
-    stop_capture(&state.legacy.sockscap, &journal, clear_journal, false).await
+    let journals = recovery::JournalLocations::load(&state.core.paths.data);
+    let journal = journals.as_ref().map(|paths| paths.active());
+    let runtime = &state.legacy.sockscap;
+    stop_capture(runtime, journal.as_ref().ok().copied(), false).await?;
+    if clear_journal {
+        clear_capture_journal(runtime, journal.map_err(Clone::clone)).await?;
+    }
+    Ok(())
 }
 
 pub(super) async fn stop_capture(
     runtime: &SocksCapRuntime,
-    journal: &Path,
-    clear_journal: bool,
+    _journal: Option<&Path>,
     replacing_host: bool,
 ) -> Result<(), String> {
     use std::time::Duration;
@@ -95,7 +99,8 @@ pub(super) async fn stop_capture(
     // --- 2b) macOS first sends Redirector's inert scope, then closes IPC ------
     #[cfg(target_os = "macos")]
     {
-        if recovery::needs_repair(journal)
+        if let Some(journal) = _journal
+            && recovery::needs_repair(journal)
             && let Err(error) =
                 recovery::update_phase_durable(journal, recovery::RecoveryPhase::Stopping)
         {
@@ -141,12 +146,6 @@ pub(super) async fn stop_capture(
         }
     }
     if errors.is_empty() {
-        if clear_journal {
-            #[cfg(target_os = "macos")]
-            clear_capture_journal(runtime, journal).await?;
-            #[cfg(not(target_os = "macos"))]
-            let _ = recovery::mark_clean_and_clear(journal);
-        }
         tracing::info!("sockscap: teardown complete");
         Ok(())
     } else {
@@ -170,9 +169,15 @@ async fn stop_upstreams(runtime: &SocksCapRuntime, replacing_host: bool) {
 
 pub(super) async fn clear_capture_journal(
     runtime: &SocksCapRuntime,
-    journal: &Path,
+    journal: Result<&Path, String>,
 ) -> Result<(), String> {
-    if let Err(error) = recovery::mark_clean_and_clear(journal) {
+    let cleared = journal.and_then(|path| {
+        if path.try_exists().map_err(|error| error.to_string())? {
+            recovery::mark_clean_and_clear(path)?;
+        }
+        Ok(())
+    });
+    if let Err(error) = cleared {
         let message =
             format!("capture stopped, but the recovery journal could not be cleared: {error}");
         runtime
@@ -195,7 +200,7 @@ pub(super) async fn clear_capture_journal(
 /// best-effort: any RPC error is logged, and the journal is only cleared when
 /// the helper confirmed capture stopped (so a failure still triggers
 /// `boot_repair` on the next launch).
-pub fn shutdown_on_exit(app: &AppHandle, state: &AppState) {
+pub fn shutdown_on_exit(_app: &AppHandle, state: &AppState) {
     // Kill any xray-core sidecars first (all platforms). Best-effort, sync:
     // start_kill without reaping, since no async runtime is guaranteed at exit.
     // kill_on_drop is the further backstop for a hard crash.
@@ -237,8 +242,8 @@ pub fn shutdown_on_exit(app: &AppHandle, state: &AppState) {
     sess.remove_ready_file();
 
     if stopped {
-        if let Ok(dir) = data_dir(app) {
-            let _ = recovery::mark_clean_and_clear(&recovery::journal_path(&dir));
+        if let Ok(journals) = recovery::JournalLocations::load(&state.core.paths.data) {
+            let _ = recovery::mark_clean_and_clear(journals.active());
         }
     }
 }

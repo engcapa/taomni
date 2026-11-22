@@ -118,4 +118,4 @@ verification:
   native:
   - check: Native target decisions and signed host execution are covered by TC-MODULES-073.
     method: not-applicable
-    reason: This fixture exercises the preview response.
+    reason: This fixture exercises preview behavior. TC-MODULES-080 and TC-MODULES-085 observe the real module recovery journal and process cleanup.
