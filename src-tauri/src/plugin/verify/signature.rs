@@ -8,7 +8,7 @@ use minisign_verify::{PublicKey, Signature};
 
 use super::TrustError;
 
-const MAX_SIGNATURE_BYTES: usize = 16 * 1024;
+pub(super) const MAX_SIGNATURE_BYTES: usize = 16 * 1024;
 const MAX_LEGACY_BYTES: u64 = 32 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
@@ -108,6 +108,13 @@ impl SignatureVerifier {
 }
 
 fn parse_signature(input: &str) -> Result<Signature, TrustError> {
+    Signature::decode(&signature_envelope(input)?)
+        .map_err(|error| TrustError::Signature(error.to_string()))
+}
+
+/// Catalogs and sidecars can carry the same four signed-envelope lines with
+/// different line endings or with the Tauri base64 transport wrapper.
+pub(super) fn signature_envelope(input: &str) -> Result<String, TrustError> {
     if input.len() > MAX_SIGNATURE_BYTES {
         return Err(TrustError::Signature("signature is too large".into()));
     }
@@ -125,5 +132,5 @@ fn parse_signature(input: &str) -> Result<Signature, TrustError> {
     if text.lines().count() != 4 || !text.starts_with("untrusted comment: ") {
         return Err(TrustError::Signature("invalid Minisign envelope".into()));
     }
-    Signature::decode(text).map_err(|error| TrustError::Signature(error.to_string()))
+    Ok(text.replace("\r\n", "\n"))
 }

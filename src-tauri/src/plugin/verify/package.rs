@@ -9,7 +9,7 @@ use tempfile::{NamedTempFile, TempDir};
 
 use super::archive::{self, TreeDigests};
 use super::catalog::{PLATFORMS, reject_symlink, valid_slug};
-use super::signature::SignatureVerifier;
+use super::signature::{MAX_SIGNATURE_BYTES, SignatureVerifier, signature_envelope};
 use super::{TrustError, TrustedComment, VerifiedCatalog, trusted_fields, verify_trusted_comment};
 use crate::plugin::ModuleManifest;
 
@@ -141,10 +141,9 @@ impl VerifiedPackage {
         reject_symlink(&proof.join("signature.minisig"))?;
         let proof_digest =
             archive::hash_file(&mut File::open(proof.join("package.taomni-plugin"))?)?;
-        let mut original = self.archive.reopen()?;
-        let expected = archive::hash_file(&mut original)?;
-        if proof_digest != expected
-            || fs::read_to_string(proof.join("signature.minisig"))? != self.signature
+        let stored = read_signature_proof(&proof.join("signature.minisig"))?;
+        if proof_digest != self.archive_sha256
+            || signature_envelope(&stored)? != signature_envelope(&self.signature)?
         {
             return Err(invalid(
                 "stored signature proof does not match the verified package",
@@ -328,16 +327,21 @@ pub(super) fn inspect_installed_with(
     reject_symlink(&proof)?;
     let (archive_path, signature_path) = installed_proof_paths(path);
     reject_symlink(&signature_path)?;
-    if !fs::symlink_metadata(&signature_path)?.is_file() {
-        return Err(invalid("signature proof must be a regular file"));
-    }
-    let mut signature = String::new();
-    File::open(signature_path)?
-        .take(16 * 1024 + 1)
-        .read_to_string(&mut signature)?;
+    let signature = read_signature_proof(&signature_path)?;
     let verified = VerifiedPackage::prepare(&archive_path, &signature, platform, verifier, None)?;
     archive::check_installed_tree(path, &verified.checksums)?;
     Ok(verified)
+}
+
+fn read_signature_proof(path: &Path) -> Result<String, TrustError> {
+    if !fs::symlink_metadata(path)?.is_file() {
+        return Err(invalid("signature proof must be a regular file"));
+    }
+    let mut signature = String::new();
+    File::open(path)?
+        .take(MAX_SIGNATURE_BYTES as u64 + 1)
+        .read_to_string(&mut signature)?;
+    Ok(signature)
 }
 
 pub fn host_platform() -> &'static str {

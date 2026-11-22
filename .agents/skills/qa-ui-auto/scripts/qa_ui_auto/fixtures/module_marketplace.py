@@ -1,5 +1,6 @@
 """Serve exact officially signed CI inputs; never seed registry or trust state."""
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import base64
 import json
 import os
 from pathlib import Path
@@ -153,7 +154,7 @@ def setup_roster(ctx):
         "/" + catalog.name: raw,
         "/" + signature.name: detached,
         "/" + hello_archive.name: hello_archive.read_bytes(),
-        "/" + mfa_archive.name: mfa_archive.read_bytes(),
+        "/" + mfa_archive.name: mfa_archive,
     }
     (Path(ctx.case_dir) / "module-legacy-roster.json").write_text(json.dumps(roster, indent=2), encoding="utf-8")
     enrollment = {id: entry for id, entry in roster.items() if id in expected_ids}
@@ -171,6 +172,11 @@ def start_first_upgrade(ctx, files, roster, catalog, remove, producer=None):
     if producer:
         evidence.update(releaseRun=producer["runId"], catalogSha256=producer["catalogSha256"])
     (case / "first-upgrade-input.json").write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+    mfa = roster["taomni-plugin-mfa"]
+    archive = files["/" + mfa["archive"]]
+    signature = archive.with_name(mfa["signature"]).read_bytes()
+    ctx.values["module_roster_mfa_archive"] = archive.as_posix()
+    ctx.values["module_roster_mfa_signature"] = base64.b64encode(signature).decode("ascii")
     ctx.values["module_roster_remove"] = remove
     ctx.module_marketplace = Origin(files, case / "module-marketplace-requests.json", roster=roster, start_catalog=catalog)
 

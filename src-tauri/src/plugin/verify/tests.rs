@@ -337,6 +337,46 @@ fn stage_retains_authentic_proof_and_rejects_installed_tampering_or_fake_receipt
 }
 
 #[test]
+fn catalog_install_can_be_reused_with_the_original_offline_sidecar() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+
+    let root = tempdir().unwrap();
+    let manifest = manifest();
+    let bytes = archive(files(&manifest));
+    let sidecar = package_signature(&bytes, &manifest, host_platform());
+    let raw = catalog_bytes(42, &bytes, sidecar.trim_end());
+    let catalog =
+        VerifiedCatalog::verify(&raw, &sign(&raw, "file=modules.json"), root.path()).unwrap();
+    let path = root.path().join("module.taomni-plugin");
+    fs::write(&path, &bytes).unwrap();
+    let catalog_package =
+        VerifiedPackage::from_catalog(&path, &catalog, &manifest.id, host_platform()).unwrap();
+    let installer = ModuleInstaller::new(root.path());
+    let installed = installer.stage_verified(&catalog_package).unwrap();
+    let proof = installed_proof_paths(&installed).1;
+
+    for previous in [
+        sidecar.trim_end().to_owned(),
+        sidecar.replace('\n', "\r\n"),
+        STANDARD.encode(&sidecar),
+    ] {
+        fs::write(&proof, previous).unwrap();
+        let offline_package = raw_package(&bytes, &sidecar).unwrap();
+        assert_eq!(
+            installer.stage_verified(&offline_package).unwrap(),
+            installed
+        );
+        assert_eq!(
+            verify_installed(&installed, host_platform()).unwrap(),
+            manifest
+        );
+    }
+    fs::write(&proof, sidecar.replace("version=1.0.0", "version=1.1.0")).unwrap();
+    assert!(installer.stage_verified(&catalog_package).is_err());
+    assert!(verify_installed(&installed, host_platform()).is_err());
+}
+
+#[test]
 fn mutation_of_verified_tree_before_stage_never_publishes_a_version() {
     let root = tempdir().unwrap();
     let package = support::verified_package(&manifest());
