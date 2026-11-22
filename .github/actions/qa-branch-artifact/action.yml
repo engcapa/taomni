@@ -6,7 +6,7 @@ inputs:
     required: true
 outputs:
   run-id:
-    description: Completed producer run with a matching artifact
+    description: Earlier producer run containing a finalized artifact
     value: ${{ steps.find.outputs.run-id }}
 runs:
   using: composite
@@ -32,7 +32,7 @@ runs:
                   producer.head_branch !== branch || producer.id === context.runId) continue;
               const { data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: producer.id });
               if (run.path !== '.github/workflows/qa-ui-auto-platforms.yml' ||
-                  run.event !== 'workflow_dispatch' || run.status !== 'completed' ||
+                  run.event !== 'workflow_dispatch' ||
                   run.head_branch !== branch || run.head_repository?.id !== repoId) continue;
               core.setOutput('run-id', String(run.id));
               core.info(`Found ${name} in workflow run ${run.id}`);
