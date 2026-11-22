@@ -36,7 +36,9 @@ pub(super) fn check(host: &mut MailHost, module: &Path, legacy: &Path, relative:
 }
 
 fn transfer(host: &mut MailHost, part: &str, write: Option<(&[u8], usize)>) -> (Value, Vec<u8>) {
-    let io = tokio::runtime::Builder::new_current_thread()
+    // The route must deliver the writer's EOF while this thread waits for the stdio reply.
+    let io = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
         .enable_all()
         .build()
         .unwrap();
