@@ -59,8 +59,7 @@ jobs:
       test_version: ${{ steps.plan.outputs.test_version }}
       build_desktop: ${{ steps.plan.outputs.build_desktop }}
       desktop_platforms: ${{ steps.plan.outputs.desktop_platforms }}
-      macos_aarch64: ${{ steps.plan.outputs.macos_aarch64 }}
-      macos_x86_64: ${{ steps.plan.outputs.macos_x86_64 }}
+      macos_architectures: ${{ steps.plan.outputs.macos_architectures }}
       macos_runner: ${{ steps.plan.outputs.macos_runner }}
       modules: ${{ steps.plan.outputs.modules }}
     steps:
@@ -80,6 +79,7 @@ jobs:
           INPUT_RELEASE_TAG: ${{ inputs.tag }}
           INPUT_PLATFORMS: ${{ inputs.platforms }}
           INPUT_MACOS_ARCH: ${{ inputs.macos_arch }}
+          INPUT_MACOS_STATIC_KRB5: ${{ inputs.macos_static_krb5 }}
           INPUT_MACOS_RUNNER: ${{ inputs.macos_runner }}
           RELEASE_TEST_VERSION: ${{ inputs.test_version }}
           INPUT_RELEASE_MODULES: ${{ inputs.modules }}
@@ -278,14 +278,18 @@ jobs:
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
-  # macOS – single arm64 runner, cross-compiles both architectures
+  # macOS – each target gets its own ARM64 runner, keychain and Kerberos build.
   # tauri.conf.json sets minimumSystemVersion to 10.15 for Whisper's C++17
   # std::filesystem. Tauri forwards it as MACOSX_DEPLOYMENT_TARGET to both builds.
   # ---------------------------------------------------------------------------
   build-macos:
     needs: plan
-    if: needs.plan.outputs.macos_aarch64 == 'true' || needs.plan.outputs.macos_x86_64 == 'true'
-    name: Bundle (macOS)
+    if: needs.plan.outputs.macos_architectures != '[]'
+    name: Bundle (macOS ${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(needs.plan.outputs.macos_architectures) }}
     runs-on: ${{ needs.plan.outputs.macos_runner }}
     env:
       # Direct cargo tests run before Tauri exports minimumSystemVersion.
@@ -316,13 +320,14 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: ${{ matrix.arch }}-apple-darwin
 
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
           cache-on-failure: true
+          key: macos-${{ matrix.arch }}-${{ matrix.arch == 'aarch64' && inputs.macos_static_krb5 && 'static' || 'shared' }}
 
       # -----------------------------------------------------------------------
       # Install MIT Kerberos for both architectures.
@@ -339,7 +344,7 @@ jobs:
         run: brew install krb5
 
       - name: Install MIT Kerberos (x86_64 – Rosetta 2)
-        if: needs.plan.outputs.macos_x86_64 == 'true'
+        if: matrix.arch == 'x86_64'
         run: bash scripts/install-krb5-macos-x86_64.sh
 
       - name: Install frontend dependencies
@@ -365,21 +370,14 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-sockscap-api --locked --lib recovery::tests -- --test-threads=1
 
       - name: Build static MIT Kerberos for the ARM64 signing comparison
-        if: inputs.macos_static_krb5
-        env:
-          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
-          BUILD_DESKTOP: ${{ needs.plan.outputs.build_desktop }}
-          BUILD_ARM64: ${{ needs.plan.outputs.macos_aarch64 }}
-          BUILD_INTEL: ${{ needs.plan.outputs.macos_x86_64 }}
+        if: matrix.arch == 'aarch64' && inputs.macos_static_krb5
+        id: static-krb5
         run: |
           set -euo pipefail
-          if [ -n "$RELEASE_TAG" ] || [ "$BUILD_DESKTOP" != false ] || [ "$BUILD_ARM64" != true ] || [ "$BUILD_INTEL" != false ]; then
-            echo 'Select an artifact-only macOS ARM64 build for the static Kerberos comparison.' >&2
-            exit 1
-          fi
           brew list --versions openssl@3 >/dev/null || brew install openssl@3
           bash scripts/build-macos-static-krb5.sh "$RUNNER_TEMP/taomni-static-krb5"
           echo 'MIT_KRB5_GSSAPI_STATIC=1' >> "$GITHUB_ENV"
+          echo "prefix=$RUNNER_TEMP/taomni-static-krb5" >> "$GITHUB_OUTPUT"
 
       - name: Release signing unit contracts
         run: node --test scripts/configure-release-signing.test.mjs scripts/verify-macos-release-bundle.test.mjs scripts/macos-runtime-paths.test.mjs
@@ -393,7 +391,7 @@ jobs:
         shell: bash
         env:
           RELEASE_PLATFORM: macOS
-          MACOS_STATIC_KRB5: ${{ inputs.macos_static_krb5 }}
+          MACOS_STATIC_KRB5: ${{ matrix.arch == 'aarch64' && inputs.macos_static_krb5 }}
           RELEASE_TAG: ${{ needs.plan.outputs.tag }}
           RELEASE_TEST_VERSION: ${{ needs.plan.outputs.test_version }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -407,101 +405,61 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: node scripts/configure-release-signing.mjs
 
-      # ---------- aarch64-apple-darwin (native) ----------
-      - name: Stage and verify xray-core (aarch64)
-        if: needs.plan.outputs.macos_aarch64 == 'true'
-        shell: bash
+      - name: Stage and verify xray-core for the target architecture
+        env:
+          XRAY_PLATFORM: ${{ matrix.arch == 'aarch64' && 'macos-arm64' || 'macos' }}
+          EXPECTED_ARCH: ${{ matrix.arch == 'aarch64' && 'arm64' || 'x86_64' }}
         run: |
           set -euo pipefail
-          pwsh scripts/fetch-xray.ps1 -Platform macos-arm64 -Force
-          test "$(lipo -archs src-tauri/resources/sockscap/macos/xray)" = "arm64"
+          pwsh scripts/fetch-xray.ps1 -Platform "$XRAY_PLATFORM" -Force
+          test "$(lipo -archs src-tauri/resources/sockscap/macos/xray)" = "$EXPECTED_ARCH"
 
-      - name: Build macOS bundle (aarch64)
-        if: needs.plan.outputs.macos_aarch64 == 'true'
-        id: tauri_macos_aarch64
+      - name: Select target Kerberos libraries
+        env:
+          STATIC_PREFIX: ${{ steps.static-krb5.outputs.prefix }}
+          SHARED_PREFIX: ${{ matrix.arch == 'aarch64' && '/opt/homebrew/opt/krb5' || '/usr/local/opt/krb5' }}
+        run: |
+          prefix="${STATIC_PREFIX:-$SHARED_PREFIX}"
+          echo "LIBGSSAPI_PREFIX=$prefix" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$prefix/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - name: Build macOS bundle
+        id: tauri_macos
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LIBGSSAPI_IMPL: mit
-          LIBGSSAPI_PREFIX: ${{ inputs.macos_static_krb5 && format('{0}/taomni-static-krb5', runner.temp) || '/opt/homebrew/opt/krb5' }}
-          PKG_CONFIG_PATH: ${{ inputs.macos_static_krb5 && format('{0}/taomni-static-krb5/lib/pkgconfig', runner.temp) || '/opt/homebrew/opt/krb5/lib/pkgconfig' }}
+          PKG_CONFIG_ALLOW_CROSS: ${{ matrix.arch == 'x86_64' && '1' || '0' }}
         with:
-          args: --target aarch64-apple-darwin --config '${{ env.TAURI_RELEASE_CONFIG }}'
+          args: --target ${{ matrix.arch }}-apple-darwin --config '${{ env.TAURI_RELEASE_CONFIG }}'
 
-      - name: Verify fixed signature and updater app (aarch64)
-        if: needs.plan.outputs.macos_aarch64 == 'true'
+      - name: Verify fixed signature and updater app
         env:
           RELEASE_TAG: ${{ needs.plan.outputs.tag }}
-        run: bash scripts/verify-macos-release-bundle.sh aarch64-apple-darwin arm64
+          TARGET: ${{ matrix.arch }}-apple-darwin
+          EXPECTED_ARCH: ${{ matrix.arch == 'aarch64' && 'arm64' || 'x86_64' }}
+        run: bash scripts/verify-macos-release-bundle.sh "$TARGET" "$EXPECTED_ARCH"
 
-      - name: Collect workflow artifacts (aarch64)
-        if: needs.plan.outputs.macos_aarch64 == 'true'
-        shell: bash
+      - name: Collect workflow artifacts
         env:
-          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_aarch64.outputs.artifactPaths }}
-          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-aarch64
+          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos.outputs.artifactPaths }}
+          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-${{ matrix.arch }}
         run: node scripts/collect-tauri-action-artifacts.mjs
 
-      - name: Upload workflow artifacts (aarch64)
-        if: needs.plan.outputs.macos_aarch64 == 'true'
+      - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: taomni-${{ needs.plan.outputs.version }}-macos-aarch64
-          path: tauri-artifacts/macos-aarch64
-          if-no-files-found: error
-
-      # ---------- x86_64-apple-darwin (cross-compile) ----------
-      - name: Stage and verify xray-core (x86_64)
-        if: needs.plan.outputs.macos_x86_64 == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          pwsh scripts/fetch-xray.ps1 -Platform macos -Force
-          test "$(lipo -archs src-tauri/resources/sockscap/macos/xray)" = "x86_64"
-
-      - name: Build macOS bundle (x86_64)
-        if: needs.plan.outputs.macos_x86_64 == 'true'
-        id: tauri_macos_x86_64
-        uses: tauri-apps/tauri-action@action-v0.6.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Point libgssapi-sys at x86_64 MIT Kerberos under /usr/local
-          LIBGSSAPI_IMPL: mit
-          LIBGSSAPI_PREFIX: /usr/local/opt/krb5
-          PKG_CONFIG_PATH: /usr/local/opt/krb5/lib/pkgconfig
-          PKG_CONFIG_ALLOW_CROSS: "1"
-        with:
-          args: --target x86_64-apple-darwin --config '${{ env.TAURI_RELEASE_CONFIG }}'
-
-      - name: Verify fixed signature and updater app (x86_64)
-        if: needs.plan.outputs.macos_x86_64 == 'true'
-        env:
-          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
-        run: bash scripts/verify-macos-release-bundle.sh x86_64-apple-darwin x86_64
-
-      - name: Collect workflow artifacts (x86_64)
-        if: needs.plan.outputs.macos_x86_64 == 'true'
-        shell: bash
-        env:
-          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_x86_64.outputs.artifactPaths }}
-          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-x86_64
-        run: node scripts/collect-tauri-action-artifacts.mjs
-
-      - name: Upload workflow artifacts (x86_64)
-        if: needs.plan.outputs.macos_x86_64 == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: taomni-${{ needs.plan.outputs.version }}-macos-x86_64
-          path: tauri-artifacts/macos-x86_64
+          name: taomni-${{ needs.plan.outputs.version }}-macos-${{ matrix.arch }}
+          path: tauri-artifacts/macos-${{ matrix.arch }}
           if-no-files-found: error
 
       # Preserve the signed output for diagnosis when the gate fails. These are
       # Actions artifacts only; a failed builder cannot enter release publishing.
       - name: Preserve macOS bundle verification evidence
-        if: failure() && (steps.tauri_macos_aarch64.outcome == 'success' || steps.tauri_macos_x86_64.outcome == 'success')
+        if: failure() && steps.tauri_macos.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: macos-bundle-diagnostics-${{ github.run_id }}
+          name: macos-bundle-diagnostics-${{ matrix.arch }}-${{ github.run_id }}
           path: |
             src-tauri/target/*-apple-darwin/release/bundle/dmg/*.dmg
             src-tauri/target/*-apple-darwin/release/bundle/macos/*.app.tar.gz*

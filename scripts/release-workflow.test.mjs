@@ -30,17 +30,18 @@ test("macOS native tests and bundles share a deployment target supporting Whispe
 test("artifact-only selection controls builders and cannot enter the publishing job", () => {
   assert(workflow.includes("    if: needs.plan.outputs.build_desktop == 'true'"));
   assert(workflow.includes("        platform: ${{ fromJSON(needs.plan.outputs.desktop_platforms) }}"));
-  assert(workflow.includes("    if: needs.plan.outputs.macos_aarch64 == 'true' || needs.plan.outputs.macos_x86_64 == 'true'"));
+  assert(workflow.includes("    if: needs.plan.outputs.macos_architectures != '[]'"));
   const finalizer = workflow.split("  finalize-updater-manifest:\n")[1];
   assert(finalizer.includes("    needs: [plan, build, build-macos, package-modules]"));
   assert.match(finalizer, /needs\.plan\.outputs\.tag != ''/);
   assert.equal((workflow.match(/RELEASE_TEST_VERSION: \$\{\{ needs.plan.outputs.test_version \}\}/g) ?? []).length, 2);
-  for (const arch of ["aarch64", "x86_64"]) {
-    for (const name of ["Stage and verify xray-core", "Build macOS bundle", "Verify fixed signature and updater app", "Collect workflow artifacts", "Upload workflow artifacts"]) {
-      const step = workflow.split(`      - name: ${name} (${arch})\n`)[1]?.split("      - name:")[0];
-      assert(step?.includes(`        if: needs.plan.outputs.macos_${arch} == 'true'`), `${name} (${arch}) must follow the validated build selection`);
-    }
-  }
+  const mac = workflow.split("  build-macos:\n")[1].split("  package-modules:\n")[0];
+  assert(mac.includes("arch: ${{ fromJSON(needs.plan.outputs.macos_architectures) }}"));
+  assert(mac.includes("if: matrix.arch == 'aarch64' && inputs.macos_static_krb5"));
+  assert(mac.includes("MACOS_STATIC_KRB5: ${{ matrix.arch == 'aarch64' && inputs.macos_static_krb5 }}"));
+  assert(mac.includes("args: --target ${{ matrix.arch }}-apple-darwin"));
+  assert(mac.includes("name: taomni-${{ needs.plan.outputs.version }}-macos-${{ matrix.arch }}"));
+  assert(mac.includes("bash scripts/verify-macos-release-bundle.sh \"$TARGET\" \"$EXPECTED_ARCH\""));
 });
 
 test("joint releases use the same source for core and selected modules and require all package jobs", () => {

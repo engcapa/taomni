@@ -9,7 +9,7 @@ const manual = { GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF_TYPE: "branc
 test("the default manual build collects all platforms without publishing", () => {
   assert.deepEqual(releaseBuildPlan(manual, version), {
     version, tag: "", test_version: "", build_desktop: "true", desktop_platforms: '["ubuntu-22.04","windows-latest"]',
-    macos_aarch64: "true", macos_x86_64: "true", macos_runner: "macos-15", modules: "[]",
+    macos_architectures: '["aarch64","x86_64"]', macos_runner: "macos-15", modules: "[]",
   });
 });
 
@@ -18,12 +18,11 @@ test("Intel-only upgrade tests resolve distinct versions without enabling releas
     const plan = releaseBuildPlan({ ...manual, INPUT_PLATFORMS: "macos", INPUT_MACOS_ARCH: "x86_64", RELEASE_TEST_VERSION: testVersion }, version);
     assert.deepEqual(plan, {
       version: testVersion, tag: "", test_version: testVersion, build_desktop: "false", desktop_platforms: "[]",
-      macos_aarch64: "false", macos_x86_64: "true", macos_runner: "macos-15", modules: "[]",
+      macos_architectures: '["x86_64"]', macos_runner: "macos-15", modules: "[]",
     });
   }
   const arm = releaseBuildPlan({ ...manual, INPUT_MACOS_ARCH: "aarch64" }, version);
-  assert.equal(arm.macos_aarch64, "true");
-  assert.equal(arm.macos_x86_64, "false");
+  assert.deepEqual(JSON.parse(arm.macos_architectures), ["aarch64"]);
 });
 
 test("Windows-only upgrade tests build one MSI target and never enter release publication", () => {
@@ -31,9 +30,22 @@ test("Windows-only upgrade tests build one MSI target and never enter release pu
   assert.equal(plan.tag, "");
   assert.equal(plan.build_desktop, "true");
   assert.deepEqual(JSON.parse(plan.desktop_platforms), ["windows-latest"]);
-  assert.equal(plan.macos_aarch64, "false");
-  assert.equal(plan.macos_x86_64, "false");
+  assert.deepEqual(JSON.parse(plan.macos_architectures), []);
   assert.throws(() => releaseBuildPlan({ ...manual, INPUT_PLATFORMS: "windows", INPUT_RELEASE_TAG: `v${version}` }, version), /every platform/);
+});
+
+test("the static ARM64 rehearsal can share a run with other targets", () => {
+  const rehearsal = { ...manual, INPUT_MACOS_STATIC_KRB5: "true" };
+  for (const platforms of ["all", "macos"]) {
+    for (const arch of ["both", "aarch64"]) {
+      const plan = releaseBuildPlan({ ...rehearsal, INPUT_PLATFORMS: platforms, INPUT_MACOS_ARCH: arch }, version);
+      assert.deepEqual(JSON.parse(plan.macos_architectures), arch === "both" ? ["aarch64", "x86_64"] : ["aarch64"]);
+      assert.equal(plan.build_desktop, String(platforms === "all"));
+    }
+  }
+  for (const overrides of [{ INPUT_PLATFORMS: "windows" }, { INPUT_MACOS_ARCH: "x86_64" }, { INPUT_RELEASE_TAG: `v${version}` }]) {
+    assert.throws(() => releaseBuildPlan({ ...rehearsal, ...overrides }, version), /artifact-only build that includes macOS ARM64/);
+  }
 });
 
 test("macOS 26 is available for test artifacts", () => {
@@ -52,7 +64,8 @@ test("tag pushes and published releases keep the full build, ignoring manual inp
     assert.equal(plan.tag, "v0.4.30");
     assert.equal(plan.version, version);
     assert.equal(plan.macos_runner, "macos-15");
-    for (const key of ["build_desktop", "macos_aarch64", "macos_x86_64"]) assert.equal(plan[key], "true");
+    assert.equal(plan.build_desktop, "true");
+    assert.deepEqual(JSON.parse(plan.macos_architectures), ["aarch64", "x86_64"]);
   }
 });
 

@@ -71,8 +71,9 @@ the default is `all`. Each target selection has its own concurrency group.
 Set `package_macos_arm_runner=macos-26` to use macOS 26 for an ARM64 DMG
 inspection or installed upgrade. Both runner choices consume the pinned Darwin
 ARM64 artifact and record the actual host OS and architecture.
-For the hardened ARM64 DMG check, build a Release Bundle workflow artifact with
-`platforms=macos`, `macos_arch=aarch64` and `macos_static_krb5=true`. Select the
+For the hardened ARM64 DMG check, set `macos_static_krb5=true` on an artifact-only
+Release Bundle build that includes ARM64. A four-target build uses static Kerberos
+on ARM64 and the bundled Intel libraries on x86_64. Select the
 resulting package with `package_upgrade_desktop=true` and
 `package_macos_hardened_mfa=true`. The run binds the core and module leaf
 certificates, records Gatekeeper, observes the signed host after install and

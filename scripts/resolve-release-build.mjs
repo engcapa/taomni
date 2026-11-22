@@ -42,6 +42,12 @@ export function releaseBuildPlan(env, packageVersion) {
   if (tag && (platforms !== "all" || arch !== "both")) {
     throw new Error("Tagged releases require every platform and both macOS architectures.");
   }
+  const macosArchitectures = ["aarch64", "x86_64"].filter(
+    (target) => platforms !== "windows" && (arch === "both" || arch === target),
+  );
+  if (manual && env.INPUT_MACOS_STATIC_KRB5 === "true" && (tag || !macosArchitectures.includes("aarch64"))) {
+    throw new Error("Static Kerberos requires an artifact-only build that includes macOS ARM64.");
+  }
   const desktopPlatforms = [];
   // Keep the Linux bundle on the glibc 2.35 baseline.
   if (platforms === "all") desktopPlatforms.push("ubuntu-22.04");
@@ -52,8 +58,7 @@ export function releaseBuildPlan(env, packageVersion) {
     test_version: testVersion,
     build_desktop: String(desktopPlatforms.length > 0),
     desktop_platforms: JSON.stringify(desktopPlatforms),
-    macos_aarch64: String(platforms !== "windows" && arch !== "x86_64"),
-    macos_x86_64: String(platforms !== "windows" && arch !== "aarch64"),
+    macos_architectures: JSON.stringify(macosArchitectures),
     macos_runner: macosRunner,
     modules: JSON.stringify(modules),
   };

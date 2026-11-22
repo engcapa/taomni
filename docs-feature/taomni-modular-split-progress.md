@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- 四目标打包演练在 macOS 作业的静态 Kerberos 参数检查处提前退出。ARM64 和 Intel 改用各自的 runner、签名配置和依赖，ARM64 可单独启用静态链接与 hardened runtime。旧轮已收到 Mail、MFA 和本地语音的 Linux ELF 回执，三个宿主均符合 glibc 2.35 上限。新版双架构 DMG 和安装复验仍待 runner。 [原打包作业](https://github.com/engcapa/taomni/actions/runs/44989355250/job/137107289852)
+- `0555ee9dd` 的九个 Browser 分片在执行期间收齐，Linux、Windows 和 macOS 各通过 27/27，包含 SocksCap、Markdown Live、Explorer 新建文件及崩溃回归。`3f9a2610e` 的六个升级相关用例与完整崩溃回归已提交三端 Browser/Native。 [Browser 分片](https://github.com/engcapa/taomni/actions/runs/44988634877) · [升级复验](https://github.com/engcapa/taomni/actions/runs/44991520399)
 - 旧会话预检按已验签并启用的客户端分别确认 RDP 和 VNC，会话记录保留在核心数据库。RDP 的证书导入仍有独立回执。Mobile 桌面策略继续由核心读写，升级页已移除对 Mobile 模块的推荐。TC-MODULES-005、025、056 覆盖设置回读、旧策略文件摘要和混合客户端的迁移记录。
 - 首发十模块名单已写入源码。正式首发会自动选择完整名单，后续核心发布从 GitHub Latest 核心 Release 继承目录。独立发布会下载原包和原始分离签名，并与目录核对。十个业务模块的稳定状态、首发签名和用户升级仍待候选验收。
 - 回查 `617bce843` 的 Linux RDP Server 签名包，包 SHA-256 为 `a26a46cebbb2197e7afb9aebf9987243c1fe53af91d1ab9815e6c38f4f9c05dc`。宿主的 ELF 版本需求含 `GLIBC_2.38` 与 `GLIBC_2.39`，高于核心支持的 Ubuntu 22.04 / glibc 2.35。模块 QA 和发布改在 Ubuntu 22.04 编译 Linux 宿主，RDP Server 与基座共用 PipeWire 构建步骤。签名前检查每个 ELF 文件的架构和 glibc 需求并保存二进制摘要。 [原始签名包](https://github.com/engcapa/taomni/actions/runs/44951621527)
