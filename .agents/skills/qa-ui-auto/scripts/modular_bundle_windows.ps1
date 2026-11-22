@@ -78,24 +78,20 @@ public static class TaomniPackageRuntimeLoader {
     }
     [void][TaomniPackageRuntimeLoader]::FreeLibrary($handle)
   }
-  $files = @(Get-ChildItem -LiteralPath $app.DirectoryName -Recurse -File | ForEach-Object {
-    [pscustomobject][ordered]@{ path = [IO.Path]::GetRelativePath($app.DirectoryName, $_.FullName); bytes = $_.Length }
-  })
-  $payloadBytes = ($files | Measure-Object -Property bytes -Sum).Sum
-  if ($null -eq $payloadBytes -or $payloadBytes -le 0) { throw 'MSI payload byte total is unavailable' }
+  $treeJson = & python (Join-Path $PSScriptRoot 'modular_bundle_inventory.py') sample-tree --root $app.DirectoryName
+  if ($LASTEXITCODE -ne 0) { throw 'Could not inventory the extracted MSI payload' }
+  $tree = $treeJson | ConvertFrom-Json -AsHashtable
   $result = [ordered]@{
     scope = 'msi-administrative-payload'
     executableSha256 = (Get-FileHash -LiteralPath $app.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     productVersion = $app.VersionInfo.ProductVersion
     architecture = 'x86_64'
     isolatedRuntimeLoads = $present
-    regularFiles = $files.Count
-    regularFileBytes = [long]$payloadBytes
-    largestFiles = @($files | Sort-Object -Property bytes -Descending | Select-Object -First 25)
     applicationLaunched = $false
     installedUpgradeEstablished = $false
     systemTrustEstablished = $false
   }
+  foreach ($key in $tree.Keys) { $result[$key] = $tree[$key] }
   $result | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'windows-payload.json') -Encoding utf8
 } finally {
   Remove-Item -LiteralPath $work -Recurse -Force

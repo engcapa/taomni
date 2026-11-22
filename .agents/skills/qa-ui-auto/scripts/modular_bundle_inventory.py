@@ -128,7 +128,7 @@ def inventory(directory: Path, identity: dict) -> dict:
 
 
 def tree_sample(root: Path) -> dict:
-    """Count file bytes without following links or mistaking them for full files."""
+    """Record the extracted files and their digests without following links."""
     rows = []
     links = []
     for path in sorted(root.rglob('*')):
@@ -136,8 +136,9 @@ def tree_sample(root: Path) -> dict:
         if path.is_symlink():
             links.append({'path': name, 'target': str(path.readlink())})
         elif path.is_file():
-            rows.append({'path': name, 'bytes': path.stat().st_size})
+            rows.append({'path': name, 'bytes': path.stat().st_size, 'sha256': digest(path)})
     return {'regularFiles': len(rows), 'regularFileBytes': sum(row['bytes'] for row in rows),
+            'files': rows,
             'largestFiles': sorted(rows, key=lambda row: (-row['bytes'], row['path']))[:25],
             'symlinks': links}
 
@@ -159,6 +160,38 @@ def validate_payload(target: str, evidence: dict) -> None:
     selected_bytes = sum(row['bytes'] for row in rows)
     if selected_bytes > size or (count <= 25 and selected_bytes != size):
         raise ValueError('payload byte total differs from its file samples')
+
+
+def record_payload_receipt(target: str, directory: Path) -> None:
+    name = ('macos' if target.startswith('darwin') else target.split('-')[0]) + '-payload.json'
+    raw = directory / name
+    evidence = json.loads(raw.read_text(encoding='utf-8-sig'))
+    validate_payload(target, evidence)
+    sample = evidence if target == 'windows-x86_64' else evidence['payload']
+    files = sample.get('files', [])
+    if len(files) != sample['regularFiles'] or len({row['path'] for row in files}) != len(files):
+        raise ValueError('core payload inventory is incomplete or contains duplicate paths')
+    if any(type(row['bytes']) is not int or row['bytes'] < 0 or
+           not re.fullmatch('[0-9a-f]{64}', row.get('sha256', '')) for row in files):
+        raise ValueError('core payload inventory has an invalid size or digest')
+    if sum(row['bytes'] for row in files) != sample['regularFileBytes']:
+        raise ValueError('core payload file bytes do not match the observed total')
+    if sorted(files, key=lambda row: (-row['bytes'], row['path']))[:25] != sample['largestFiles']:
+        raise ValueError('core payload file inventory differs from its largest-file sample')
+
+    baseline = json.loads((directory / 'bundle-baseline.json').read_text(encoding='utf-8'))
+    if baseline['target'] != target:
+        raise ValueError('core payload source target differs from the inspected package')
+    suffix = TARGETS[target][1][0]  # The deb, MSI or DMG inspected by the platform adapter.
+    package, = (asset for asset in baseline['files'] if asset['name'].endswith(suffix))
+    runner = json.loads((directory / 'runner.json').read_text(encoding='utf-8'))
+    write_json(directory / 'core-payload-receipt.json', {
+        'schema': 'taomni.core-payload-inventory.v1', 'target': target, 'package': package,
+        'producerSource': baseline['producerSource'], 'producerRun': baseline['producerRun'],
+        'toolingSource': baseline['toolingSource'], 'runner': runner,
+        'rawArtifact': f'modular-bundle-{target}-{baseline["producerRun"]}/{name}',
+        'rawSha256': digest(raw), 'regularFiles': len(files),
+    })
 
 
 def linux_metadata(directory: Path, output: Path, version: str) -> dict:
@@ -203,6 +236,8 @@ def main() -> None:
     payload = commands.add_parser('validate-payload')
     payload.add_argument('--target', required=True)
     payload.add_argument('--directory', type=Path, required=True)
+    tree = commands.add_parser('sample-tree')
+    tree.add_argument('--root', type=Path, required=True)
     validate = commands.add_parser('validate-source')
     for key in ('run', 'artifacts', 'out', 'github-output'):
         validate.add_argument(f'--{key}', type=Path, required=True)
@@ -227,9 +262,11 @@ def main() -> None:
                 ]}
                 stream.write('mfa_builds=' + json.dumps(builds, separators=(',', ':')) + '\n')
         return
+    if args.command == 'sample-tree':
+        print(json.dumps(tree_sample(args.root)))
+        return
     if args.command == 'validate-payload':
-        name = ('macos' if args.target.startswith('darwin') else args.target.split('-')[0]) + '-payload.json'
-        validate_payload(args.target, json.loads((args.directory / name).read_text(encoding='utf-8-sig')))
+        record_payload_receipt(args.target, args.directory)
         return
     if args.command == 'validate-source':
         record = validate_source(

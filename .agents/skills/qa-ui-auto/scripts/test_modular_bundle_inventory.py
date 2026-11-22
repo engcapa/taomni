@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from copy import deepcopy
 import io
+import json
 from pathlib import Path
 import plistlib
 import tarfile
 import tempfile
 import unittest
 
-from modular_bundle_inventory import inventory, plan_targets, tree_sample, validate_payload, validate_source
+from modular_bundle_inventory import digest, inventory, plan_targets, record_payload_receipt, tree_sample, validate_payload, validate_source
 from modular_bundle_macos import app_identity, extract_updater
 
 
@@ -140,6 +141,30 @@ class BundleFileTests(unittest.TestCase):
         self.assertEqual(result['regularFiles'], 3)
         self.assertEqual(result['regularFileBytes'], 6)
         self.assertEqual(result['largestFiles'][0]['bytes'], 3)
+
+    def test_core_receipt_binds_files_outside_largest_sample_to_the_installer_and_runner(self):
+        baseline = {**inventory(self.root, self.identity), 'toolingSource': 'c' * 40}
+        payload = self.root / 'extracted'
+        payload.mkdir()
+        for i in range(30):
+            (payload / f'file-{i}').write_bytes(b'x' * (i + 1))
+        sample = tree_sample(payload)
+        self.assertEqual(len(sample['largestFiles']), 25)
+        self.assertEqual(sample['files'][0]['sha256'], digest(payload / 'file-0'))
+        (self.root / 'bundle-baseline.json').write_text(json.dumps(baseline))
+        runner = {'runId': '999', 'imageVersion': 'image-test'}
+        (self.root / 'runner.json').write_text(json.dumps(runner))
+        raw = self.root / 'linux-payload.json'
+        raw.write_text(json.dumps({'payload': sample}))
+        record_payload_receipt('linux-x86_64', self.root)
+        receipt = json.loads((self.root / 'core-payload-receipt.json').read_text())
+        self.assertEqual(receipt['producerSource'], SOURCE)
+        self.assertEqual(receipt['runner'], runner)
+        self.assertEqual(receipt['rawSha256'], digest(raw))
+        self.assertEqual(receipt['package'], next(f for f in baseline['files'] if f['name'].endswith('.deb')))
+        raw.write_text(json.dumps({'payload': {**sample, 'files': sample['files'][1:]}}))
+        with self.assertRaisesRegex(ValueError, 'incomplete'):
+            record_payload_receipt('linux-x86_64', self.root)
 
     def test_macos_and_windows_use_their_actual_package_families(self):
         targets = {
