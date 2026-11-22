@@ -56,8 +56,8 @@ async fn invoke<T: DeserializeOwned + Send + 'static>(
         let response = registry
             .invoke(SLUG, command, payload)
             .map_err(|error| error.to_string())?;
-        serde_json::from_value(response)
-            .map_err(|_| "Invalid SocksCap module response".to_owned())?
+        serde_json::from_value::<T>(response)
+            .map_err(|_| "Invalid SocksCap module response".to_owned())
     })
     .await
     .map_err(|error| format!("SocksCap module task failed: {error}"))?
