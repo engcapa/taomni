@@ -29,6 +29,7 @@ pub struct HostedMailboxData {
     pub drafts: bool,
     pub address_book: bool,
     pub agenda: bool,
+    pub filter_rules: bool,
 }
 
 impl HostedMailboxData {
@@ -36,6 +37,7 @@ impl HostedMailboxData {
         drafts: true,
         address_book: true,
         agenda: true,
+        filter_rules: true,
     };
 }
 
@@ -143,6 +145,9 @@ fn stage_account(
     }
     if hosted.agenda {
         crate::agenda::handoff::mark_owned(&db, &mailbox.account_id).map_err(string_error)?;
+    }
+    if hosted.filter_rules {
+        crate::filters::rules::mark_owned(&db, &mailbox.account_id).map_err(string_error)?;
     }
     db.close().map_err(|(_, error)| string_error(error))?;
     OpenOptions::new()

@@ -43,24 +43,34 @@ pub fn load_filters(conn: &Connection, account_id: &str) -> SqlResult<Vec<MailFi
 
 pub fn store_filters(conn: &Connection, account_id: &str, filters: &[MailFilter]) -> SqlResult<()> {
     let tx = conn.unchecked_transaction()?;
-    tx.execute(
+    replace_filters(&tx, account_id, filters)?;
+    tx.commit()
+}
+
+pub(super) fn replace_filters(
+    conn: &Connection,
+    account_id: &str,
+    filters: &[MailFilter],
+) -> SqlResult<()> {
+    conn.execute(
         "DELETE FROM mail_filters WHERE account_id = ?1",
         params![account_id],
     )?;
     for (position, filter) in filters.iter().enumerate() {
-        tx.execute(
+        conn.execute(
             "INSERT INTO mail_filters (account_id, id, position, filter_json, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
                 account_id,
                 filter.id,
                 position as i64,
-                serde_json::to_string(filter).unwrap_or_default(),
+                serde_json::to_string(filter)
+                    .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
                 now_ts()
             ],
         )?;
     }
-    tx.commit()
+    Ok(())
 }
 
 fn folder_uid_validity(

@@ -15,6 +15,7 @@ mod actions;
 mod execution;
 
 mod commands;
+mod store;
 
 #[cfg(test)]
 mod tests;

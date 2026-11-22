@@ -1,6 +1,6 @@
 id: TC-MODULES-092
 title: Signed Mail moves new IMAP messages by body content
-description: Install the signed Mail module and save an incoming body rule. Deliver a body match and a subject-only match without opening either message. Verify that the live IMAP mailbox moves just the body match.
+description: Install signed Mail and save an incoming body rule. Verify the actual IMAP mailbox moves only the body match. Disable the module and verify the saved rule is retained in the module database.
 covers: [F-Modules-1, F-MAIL-19]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
@@ -42,7 +42,12 @@ steps:
 - mail_server_assert_folder_count: {folder: INBOX, has_subject: invoice marker 0001, lacks_subject: Receivable 0001}
 - mail_server_assert_list_matches: {timeout_sec: 20}
 - assert_count: {selector: '[data-testid="mail-message-row"][data-subject="invoice marker 0001"]', equal: 1}
-- assert_signed_mail_host: running
+- assert_signed_mail_host: filter-saved
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-disable-mail"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-enable-mail"]'
+- assert_signed_mail_host: filter-retained
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -58,10 +63,16 @@ verification:
     - {step: 32, expectation: The subject-only match remains in the server inbox.}
     - {step: 33, expectation: The visible inbox matches the server after filtering.}
     - {step: 34, expectation: The remaining new message appears once in the inbox.}
-    - {step: 35, expectation: The signed native host owns the profile writer lease.}
-    - {step: 36, expectation: The renderer reports no runtime errors.}
-    results: [12, 17, 26, 31, 32, 33, 34, 35, 36]
+    - {step: 35, expectation: The signed host holds the writer lease and has saved the complete rule under module data.}
+    results: [12, 17, 26, 31, 32, 33, 34, 35]
+  - id: retained-rule
+    requirement: Disabling Mail releases the writer and preserves the saved rule.
+    actions: [36, 37, 38]
+    checkpoints:
+    - {step: 40, expectation: The module database still contains the identical rule and the host has released its writer lease.}
+    - {step: 41, expectation: The renderer reports no runtime errors.}
+    results: [40, 41]
   visual:
   - {check: The visible mailbox keeps the subject-only match, method: automated, reason: The runner checks the exact subject and reconciles the list with the server.}
   native:
-  - {check: A verified Mail host and actual IMAP server are active, method: automated, reason: The signed package and profile lease are inspected and the server independently verifies the message locations.}
+  - {check: The verified host owns and retains the rule while the IMAP server supplies independent message locations, method: automated, reason: The runner checks the module database and writer lease in both lifecycle states.}

@@ -1,5 +1,6 @@
 use super::actions::execute_plans;
 use super::imap_search::body_needles;
+use super::store;
 use crate::mail::ImapSessionOpts;
 use crate::mail::MailAccountConfig;
 use crate::mail::MailMessageHeader;
@@ -12,9 +13,10 @@ use crate::state::AppState;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use taomni_mail_engine::filters::imap::FilterBodyQuery;
+use taomni_mail_engine::filters::rules::FilterRulesAction;
 use taomni_mail_engine::filters::{
     CandidateSelection, FilterMessage, MailFilter, MailFilterRunResult, MessagePlan,
-    ensure_filter_mark, filter_mark, load_candidates, load_filters, plan_message, set_filter_mark,
+    ensure_filter_mark, filter_mark, load_candidates, plan_message, set_filter_mark,
 };
 use tauri::State;
 
@@ -42,19 +44,20 @@ pub async fn mail_apply_filters(
         folder: folder.clone(),
         ..MailFilterRunResult::default()
     };
-    let (filters, candidates, new_high) = with_mail_db(&state, &account_id, |db| {
-        let wanted: Option<HashSet<&String>> = filter_ids.as_ref().map(|ids| ids.iter().collect());
-        let filters: Vec<MailFilter> = load_filters(db, &account_id)?
-            .into_iter()
-            .filter(|f| f.enabled && (!incoming || f.on_incoming))
-            .filter(|f| wanted.as_ref().is_none_or(|ids| ids.contains(&f.id)))
-            .collect();
+    let wanted: Option<HashSet<&String>> = filter_ids.as_ref().map(|ids| ids.iter().collect());
+    let filters: Vec<MailFilter> = store::run(&state, &account_id, FilterRulesAction::List)
+        .await?
+        .into_iter()
+        .filter(|f| f.enabled && (!incoming || f.on_incoming))
+        .filter(|f| wanted.as_ref().is_none_or(|ids| ids.contains(&f.id)))
+        .collect();
+    let (candidates, new_high) = with_mail_db(&state, &account_id, |db| {
         let selection = if incoming {
             match filter_mark(db, &account_id, &folder)? {
                 Some(mark) => CandidateSelection::Above(mark),
                 None => {
                     ensure_filter_mark(db, &account_id, &folder)?;
-                    return Ok((Vec::new(), Vec::new(), None));
+                    return Ok((Vec::new(), None));
                 }
             }
         } else {
@@ -65,7 +68,7 @@ pub async fn mail_apply_filters(
         };
         let candidates = load_candidates(db, &account_id, &folder, &selection)?;
         let new_high = candidates.iter().map(|(h, _)| h.uid).max();
-        Ok((filters, candidates, new_high))
+        Ok((candidates, new_high))
     })?;
     result.examined = candidates.len();
     let finish_mark = |state: &State<'_, AppState>| -> Result<(), String> {

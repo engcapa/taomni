@@ -185,6 +185,7 @@ pub(super) fn execute_under_maintenance(
                 drafts: manifest.commands.contains(taomni_mail_api::LOCAL_DRAFTS),
                 address_book: manifest.commands.contains(taomni_mail_api::ADDRESS_BOOK),
                 agenda: manifest.commands.contains(taomni_mail_api::CALDAV_AGENDA),
+                filter_rules: manifest.commands.contains(taomni_mail_api::FILTER_RULES),
             },
             control,
         )?

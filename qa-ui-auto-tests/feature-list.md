@@ -8457,6 +8457,7 @@ files:
   - src/lib/mailFilters.ts
   - src-tauri/src/mail/filters.rs
   - src-tauri/src/mail/filters/execution.rs
+  - src-tauri/src/mail/filters/store.rs
   - src-tauri/crates/taomni-mail-engine/src/filters/imap.rs
   - src-tauri/plugins/mail/src/imap_exchange.rs
 controls:
@@ -8557,6 +8558,7 @@ controls:
 - 编辑器支持多条件（From/To/Cc/To 或 Cc/主题/正文/大小 KB/天数/标签/有附件；包含、不包含、是、不是、开头、结尾、正则、大于、小于；全部或任一匹配）与多动作（移动、复制、标记已读/未读、加星、加标签、删除到废纸篓、转发、停止执行后续过滤器）。邮件右键 “Create filter from message…” 预填发件人。
 - 收信过滤：标签打开期间，INBOX 同步取到新邮件后执行（DEC-01，不在后台运行）；每个文件夹记录已过滤的最高 UID，只处理之后到达的邮件，保存规则时不回溯旧邮件；UIDVALIDITY 变化后重新建立基线。POP3 账户同样适用。
 - Mail 0.1.32 由签名宿主查询未缓存的 IMAP 正文。TC-MAIL-FILTER-01 覆盖主题和正文的过滤区别，TC-MODULES-092 核对启用签名包后服务器的实际邮件位置。
+- Mail 0.1.33 将规则定义保存在模块邮箱。TC-MODULES-092 同时验证模块库写入和停用后的保留。过滤进度与消息缓存使用同一 UIDVALIDITY。
 - 正文条件：正文已缓存时本地匹配，未缓存时用服务器 `UID SEARCH BODY` 判断（因此正文只支持包含/不包含）。
 - 动作失败（例如目标文件夹不存在）时邮件留在原处，错误显示在状态栏，漏斗按钮出现警示，打开对话框可看到失败明细（AC-42）。
 

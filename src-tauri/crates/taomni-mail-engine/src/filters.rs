@@ -5,6 +5,7 @@ pub mod imap;
 mod matching;
 mod model;
 mod planning;
+pub mod rules;
 
 pub use cache::{
     CandidateSelection, ensure_filter_mark, filter_mark, load_candidates, load_filters,

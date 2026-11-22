@@ -23,10 +23,11 @@ def run(ctx, args):
     phase = args.get("phase") if isinstance(args, dict) else args
     active = {
         "folder-tree", "folder-changes", "running", "imap-delivery", "pop3-delivery",
-        "attachment-saved", "attachment-reopened", "agenda-written",
+        "attachment-saved", "attachment-reopened", "agenda-written", "filter-saved",
         "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source", "imap-prefetch", "outbox-queued", "outbox-sent",
     }
-    if phase not in active | {"idle", "disabled", "outbox-retained", "contact-retained", "agenda-retained"} or not signed or owner.case_id not in SIGNED_MAIL_CASES:
+    retained = {"outbox-retained", "contact-retained", "agenda-retained", "filter-retained"}
+    if phase not in active | retained | {"idle", "disabled"} or not signed or owner.case_id not in SIGNED_MAIL_CASES:
         raise StepError("The Mail host observation requires the registered signed native case")
     plugins = isolated_data_root(owner) / "plugins"
     receipt = signed["receipt"]
@@ -85,6 +86,16 @@ def run(ctx, args):
         if "mail/send-response" not in manifest["commands"]:
             raise StepError("The installed Mail version does not implement reply delivery")
         report["responses"] = observe_responses()
+    if phase in {"filter-saved", "filter-retained"}:
+        if owner.case_id != "TC-MODULES-092":
+            raise StepError("Filter storage requires the signed filter case")
+        from .module_mail_filters import observe
+
+        report["filter"] = observe(module / "data", plugins.parent / "mail-cache")
+        if phase == "filter-saved":
+            signed["filter"] = report["filter"]
+        elif report["filter"] != signed.get("filter"):
+            raise StepError("Disabling Mail changed the saved filter")
     if phase == "imap-prefetch":
         report["prefetch"] = observe_prefetch(args)
     if phase in {"outbox-queued", "outbox-retained", "outbox-sent"}:

@@ -8,6 +8,7 @@ mod archive_decoding;
 mod archive_encoding;
 mod attachment_cache;
 mod commands;
+mod filter_rules;
 mod imap_body_sync;
 mod imap_exchange;
 mod imap_idle;
@@ -50,6 +51,7 @@ fn host_config() -> HostConfig {
                 taomni_mail_api::LOCAL_DRAFTS,
                 taomni_mail_api::ADDRESS_BOOK,
                 taomni_mail_api::CALDAV_AGENDA,
+                taomni_mail_api::FILTER_RULES,
                 taomni_mail_api::ATTACHMENT_CACHE,
                 CHECK_INCOMING,
                 CHECK_OUTGOING,
@@ -159,6 +161,20 @@ impl PluginHandler for Handler {
                     handoff::is_owned,
                     handoff::adopt,
                     agenda::execute,
+                )?)
+            }
+            taomni_mail_api::FILTER_RULES => {
+                use taomni_mail_engine::filters::rules;
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(mailbox::serve(
+                    &self.io,
+                    &self.store,
+                    operation,
+                    endpoint,
+                    rules::is_owned,
+                    rules::adopt,
+                    filter_rules::execute,
                 )?)
             }
             taomni_mail_api::LOCAL_DRAFTS | taomni_mail_api::ADDRESS_BOOK => {

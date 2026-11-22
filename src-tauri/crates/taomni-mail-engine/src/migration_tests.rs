@@ -288,8 +288,7 @@ fn only_staging_for_a_host_that_takes_draft_ownership_marks_the_mailbox() {
         super::HostedMailboxData::default(),
         super::HostedMailboxData {
             drafts: true,
-            address_book: false,
-            agenda: false,
+            ..Default::default()
         },
         super::HostedMailboxData::ALL,
     ] {
@@ -308,6 +307,10 @@ fn only_staging_for_a_host_that_takes_draft_ownership_marks_the_mailbox() {
         assert_eq!(
             crate::contacts::handoff::is_owned(&db, ACCOUNT).unwrap(),
             hosted.address_book
+        );
+        assert_eq!(
+            crate::filters::rules::is_owned(&db, ACCOUNT).unwrap(),
+            hosted.filter_rules
         );
         let draft = crate::drafts::get_mail_draft(&db, ACCOUNT, "scheduled")
             .unwrap()
