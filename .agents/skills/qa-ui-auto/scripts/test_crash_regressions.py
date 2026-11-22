@@ -92,17 +92,16 @@ class CrashRegressionTests(unittest.TestCase):
         self.assertIn("format('{0},crash-regression', inputs.tags)", env["QA_TAGS"])
         triggers = workflow.get("on", workflow.get(True))
         dispatch_inputs = triggers["workflow_dispatch"]["inputs"]
-        self.assertEqual(dispatch_inputs["quick"]["default"], False)
-        self.assertEqual(dispatch_inputs["platforms"]["default"], "")
-        self.assertEqual(dispatch_inputs["modes"]["default"], "")
-        self.assertIn("inputs.quick", env["QA_TAGS"])
-        self.assertIn("QA_QUICK", env)
-        self.assertEqual(workflow["jobs"]["summarize"]["name"], "qa-ui-auto-platforms-result${{ inputs.quick && '-quick' || '' }}")
-        self.assertIn("!inputs.quick", workflow["jobs"]["publish-issues"]["if"])
-        self.assertEqual(workflow["concurrency"]["cancel-in-progress"], "${{ github.event_name == 'workflow_dispatch' && inputs.quick }}")
-        self.assertIn("github.run_id", workflow["concurrency"]["group"])
+        self.assertNotIn("quick", dispatch_inputs)
+        self.assertNotIn("QA_QUICK", env)
+        self.assertNotIn("concurrency", workflow)
+        self.assertEqual(dispatch_inputs["platforms"]["default"], "linux,windows,macos")
+        self.assertEqual(dispatch_inputs["modes"]["default"], "browser,native")
+        self.assertNotIn("inputs.quick", env["QA_TAGS"])
+        self.assertEqual(workflow["jobs"]["summarize"]["name"], "qa-ui-auto-platforms-result")
+        self.assertNotIn("!inputs.quick", workflow["jobs"]["publish-issues"]["if"])
         paths = triggers["pull_request"]["paths"]
-        for path in ["src/**", "src-tauri/src/**", "pnpm-lock.yaml", "pnpm-workspace.yaml", "patches/**", "src-tauri/Cargo.lock"]:
+        for path in ["src/**", "src-tauri/src/**", "src-tauri/crates/**", "pnpm-lock.yaml", "pnpm-workspace.yaml", "patches/**", "src-tauri/Cargo.lock"]:
             self.assertIn(path, paths)
 
     def test_failed_or_missing_case_summary_fails_all_scopes(self):

@@ -158,9 +158,8 @@ def make_plan(args, *, cases=None, features=None) -> dict:
         raise ValueError(f"CI policy catalog differs: new={sorted(known-registered)}, removed={sorted(registered-known)}")
     # Validate the entire DAG, including currently unselected cases.
     dependency_order(set(dependencies), dependencies, known)
-    quick = bool(getattr(args, "quick", False))
-    platforms = csv(args.platforms or ("linux" if quick else "linux,windows,macos"))
-    modes = csv(args.modes or ("native" if quick else "browser,native"))
+    platforms = csv(args.platforms or "linux,windows,macos")
+    modes = csv(args.modes or "browser,native")
     if not platforms or set(platforms) - PLATFORMS.keys():
         raise ValueError("platforms must contain linux, windows and/or macos")
     if not modes or set(modes) - {"browser", "native"}:
@@ -177,9 +176,6 @@ def make_plan(args, *, cases=None, features=None) -> dict:
         if supplied - available:
             raise ValueError(f"unknown {label}: {sorted(supplied-available)}")
     scope = args.scope
-    if quick and scope in {"smoke", "selected"} and (requested or wanted_features or wanted_tags):
-        scope = "selected"
-        wanted_tags.add("crash-regression")
     explicit = requested | {c.id for c in cases if wanted_features.intersection(c.covers)
                             or wanted_tags.intersection(c.tags)}
     if scope in {"all", "smoke"} and explicit:
@@ -318,7 +314,6 @@ def make_plan(args, *, cases=None, features=None) -> dict:
         shards=getattr(args, "shards", "auto"), browser_workers=getattr(args, "browser_workers", 2))
     return {"schema": "qa-ui-auto.ci-selection.v1", "groups": groups, "builds": builds, "head": head, "base": base,
             "linux_profiles": linux_profiles, "native_release": bool(getattr(args, "native_release", False)),
-            "quick": quick, "merge_eligible": not quick,
             "merge_base": ancestor, "scope": scope, "changed_paths": changed,
             "identity": execution_identity(Path.cwd()), "reasons": reasons, "impact": impact,
             "entries": entries, "gaps": gaps, "no_relevant_changes": not entries,
@@ -460,10 +455,7 @@ def aggregate(manifest: dict, root: Path) -> dict:
         for entry in entries
         for error in entry["errors"]
     ]
-    quick = bool(manifest.get("quick", False))
-    merge_eligible = bool(manifest.get("merge_eligible", not quick))
     return {"head": manifest["head"], "run_id": manifest.get("run_id"), "attempt": manifest.get("attempt"),
-            "quick": quick, "merge_eligible": merge_eligible,
             "entries": entries, "groups": list(groups.values()), "build_hashes": build_hashes, "failures": failures, "gaps": manifest["gaps"],
             "not_applicable": manifest.get("not_applicable", []),
             "unreviewed": manifest["unreviewed"],
@@ -487,8 +479,6 @@ def main(argv=None):
     plan.add_argument("--browser-workers", type=int, default=int(os.environ.get("QA_BROWSER_WORKERS") or 2))
     plan.add_argument("--native-release", action="store_true",
                       default=os.environ.get("QA_NATIVE_RELEASE", "").lower() in {"true", "1"})
-    plan.add_argument("--quick", action="store_true",
-                      default=os.environ.get("QA_QUICK", "").lower() in {"true", "1"})
     plan.add_argument("--output", type=Path, default=Path("qa-ui-auto-report/selection.json"))
     report = subs.add_parser("report")
     report.add_argument("--selection", type=Path, required=True)
@@ -545,11 +535,6 @@ def main(argv=None):
         result = aggregate(manifest, args.reports)
         write_json(args.reports / "ci-summary.json", result)
         lines = ["# QA platform results", "", f"Commit: `{result['head']}`", ""]
-        if result.get("quick"):
-            lines.extend([
-                "> **Quick run (`merge_eligible: false`):** single-platform/focused dispatch retaining `crash-regression` on the selected target(s); does not replace full cross-platform PR gates.",
-                "",
-            ])
         lines.extend([
                  "| Combination | Selected | Passed | Failed | Skipped | Infrastructure errors |",
                  "|---|---:|---:|---:|---:|---:|"])
