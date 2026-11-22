@@ -44,6 +44,8 @@ pub const PARSE_SHARE_LINK: &str = "sockscap/parse-share-link";
 pub const TEST_TARGET: &str = "sockscap/test-target";
 pub const SETTINGS: &str = "sockscap/settings";
 pub const CONFIG_PATH: &str = "plugins/sockscap/data/config.json";
+pub const RULES: &str = "sockscap/rules";
+pub const RULES_PATH: &str = "plugins/sockscap/data/rules.json";
 pub const RUNTIME_INFO: &str = "sockscap/runtime-info";
 pub const XRAY: &str = "sockscap/xray";
 pub const XRAY_FILE: &str = if cfg!(windows) { "xray.exe" } else { "xray" };
@@ -56,7 +58,14 @@ pub struct XrayProcesses {
     pub children: Vec<u32>,
 }
 pub const REDIRECTOR_BRIDGE_ARG: &str = "--sockscap-redirector-bridge";
-pub const COMMANDS: [&str; 5] = [PARSE_SHARE_LINK, TEST_TARGET, SETTINGS, RUNTIME_INFO, XRAY];
+pub const COMMANDS: [&str; 6] = [
+    PARSE_SHARE_LINK,
+    TEST_TARGET,
+    SETTINGS,
+    RULES,
+    RUNTIME_INFO,
+    XRAY,
+];
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(tag = "operation", rename_all = "camelCase", deny_unknown_fields)]
@@ -91,4 +100,17 @@ pub enum SettingsRequest {
     Read,
     Adopt(Box<SocksCapConfig>),
     Save(Box<SocksCapConfig>),
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(
+    tag = "operation",
+    content = "cache",
+    rename_all = "camelCase",
+    deny_unknown_fields
+)]
+pub enum RulesRequest {
+    Read,
+    Adopt(gfwlist_rules::RuleCache),
+    Replace(gfwlist_rules::RuleCache),
 }

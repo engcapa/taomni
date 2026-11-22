@@ -17,6 +17,24 @@ pub struct GfwListMeta {
     pub etag: Option<String>,
 }
 
+/// Serialize the original rules and their origin together so a refresh can
+/// publish one consistent record and backups can retain local imports.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuleCache {
+    pub raw: String,
+    pub meta: GfwListMeta,
+}
+
+impl RuleCache {
+    pub fn compile(&self) -> Result<CompiledRules, String> {
+        let mut rules = CompiledRules::compile(&self.raw, &self.meta.source)?;
+        rules.meta.last_refresh.clone_from(&self.meta.last_refresh);
+        rules.meta.etag.clone_from(&self.meta.etag);
+        Ok(rules)
+    }
+}
+
 impl GfwListMeta {
     pub fn load(path: &std::path::Path) -> Option<Self> {
         let s = std::fs::read_to_string(path).ok()?;

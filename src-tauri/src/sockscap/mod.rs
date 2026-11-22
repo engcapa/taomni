@@ -11,6 +11,7 @@ mod lifecycle;
 pub use lifecycle::*;
 mod configuration_commands;
 mod module_host;
+mod module_rules;
 mod module_settings;
 pub use configuration_commands::*;
 mod upstream;
@@ -189,9 +190,7 @@ fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn rules_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = data_dir(app)?.join("rules");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("create rules dir: {e}"))?;
-    Ok(dir)
+    Ok(crate::resolved_app_data_dir(app)?.join("sockscap/rules"))
 }
 
 /* ---------------------------- capabilities ------------------------------ */

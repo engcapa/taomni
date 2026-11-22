@@ -2,21 +2,27 @@
 //! its SDK operation, including the first import from the legacy desktop.
 use std::{io, path::Path};
 
+use serde::{Serialize, de::DeserializeOwned};
 use taomni_module_settings::SettingsFile;
 use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_plugin_sdk::{Operation, SnapshotExport, SnapshotProvider};
 use taomni_plugin_stream::{length_prefixed, routed_tcp::Endpoint};
-use taomni_sockscap_api::{CONFIG_PATH, SettingsRequest, SocksCapConfig};
+use taomni_sockscap_api::{
+    CONFIG_PATH, RULES_PATH, RulesRequest, SettingsRequest, SocksCapConfig,
+    gfwlist_rules::RuleCache,
+};
 use tokio::runtime::Runtime;
 
 pub(super) struct Settings {
     file: SettingsFile,
+    rules: SettingsFile,
 }
 
 impl Settings {
     pub(super) fn new(profile: &Path) -> Self {
         Self {
             file: SettingsFile::with_limit(profile, CONFIG_PATH, u64::MAX),
+            rules: SettingsFile::with_limit(profile, RULES_PATH, u64::MAX),
         }
     }
 
@@ -51,27 +57,71 @@ impl Settings {
         operation: &Operation,
         endpoint: Endpoint,
     ) -> Result<serde_json::Value, RpcError> {
-        let (mut peer, _) = io
-            .block_on(operation.while_current(endpoint.connect()))?
-            .map_err(failed)?;
-        let bytes = io
-            .block_on(operation.while_current(length_prefixed::read(&mut peer)))?
-            .map_err(failed)?;
-        let request = serde_json::from_slice(&bytes)
-            .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
-        operation.check_current()?;
-        let config = self
-            .apply(request, || {
-                operation
-                    .check_current()
-                    .map_err(|e| io::Error::other(e.message))
-            })
-            .map_err(failed)?;
-        let result = serde_json::to_vec(&config).map_err(failed)?;
-        io.block_on(operation.while_current(length_prefixed::write(&mut peer, &result)))?
-            .map_err(failed)?;
-        Ok(serde_json::Value::Null)
+        transfer(io, operation, endpoint, |request| {
+            self.apply(request, || check_publish(operation))
+        })
     }
+
+    fn apply_rules(
+        &self,
+        request: RulesRequest,
+        before_publish: impl FnOnce() -> io::Result<()>,
+    ) -> Result<Option<RuleCache>, String> {
+        let (mut cache, adopted) = match request {
+            RulesRequest::Read => return self.rules.load().map_err(|error| error.to_string()),
+            RulesRequest::Adopt(seed) => {
+                if let Some(current) = self.rules.load().map_err(|error| error.to_string())? {
+                    return Ok(Some(current));
+                }
+                (seed, true)
+            }
+            RulesRequest::Replace(cache) => (cache, false),
+        };
+        cache.meta = cache.compile()?.meta;
+        self.rules
+            .save_checked(&cache, before_publish)
+            .map_err(|error| error.to_string())?;
+        Ok(adopted.then_some(cache))
+    }
+
+    pub(super) fn exchange_rules(
+        &self,
+        io: &Runtime,
+        operation: &Operation,
+        endpoint: Endpoint,
+    ) -> Result<serde_json::Value, RpcError> {
+        transfer(io, operation, endpoint, |request| {
+            self.apply_rules(request, || check_publish(operation))
+        })
+    }
+}
+
+fn check_publish(operation: &Operation) -> io::Result<()> {
+    operation
+        .check_current()
+        .map_err(|error| io::Error::other(error.message))
+}
+
+fn transfer<Request: DeserializeOwned, Reply: Serialize>(
+    io: &Runtime,
+    operation: &Operation,
+    endpoint: Endpoint,
+    apply: impl FnOnce(Request) -> Result<Reply, String>,
+) -> Result<serde_json::Value, RpcError> {
+    let (mut peer, _) = io
+        .block_on(operation.while_current(endpoint.connect()))?
+        .map_err(failed)?;
+    let bytes = io
+        .block_on(operation.while_current(length_prefixed::read(&mut peer)))?
+        .map_err(failed)?;
+    let request = serde_json::from_slice(&bytes)
+        .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+    operation.check_current()?;
+    let reply = apply(request).map_err(failed)?;
+    let bytes = serde_json::to_vec(&reply).map_err(failed)?;
+    io.block_on(operation.while_current(length_prefixed::write(&mut peer, &bytes)))?
+        .map_err(failed)?;
+    Ok(serde_json::Value::Null)
 }
 
 fn failed(error: impl std::fmt::Display) -> RpcError {
@@ -87,6 +137,9 @@ impl SnapshotProvider for Settings {
         operation.check_current()?;
         if let Some(file) = self.file.open().map_err(failed)? {
             output.file("config.json", file)?;
+        }
+        if let Some(file) = self.rules.open().map_err(failed)? {
+            output.file("rules.json", file)?;
         }
         Ok(())
     }
@@ -174,5 +227,51 @@ mod tests {
                 .is_err()
         );
         assert_eq!(fs::read(file).unwrap(), b"invalid JSON");
+    }
+
+    #[test]
+    fn adopted_rules_keep_their_metadata_and_cancelled_updates_keep_the_original() {
+        let profile = tempfile::tempdir().unwrap();
+        let settings = Settings::new(profile.path());
+        let cache = |raw: &str| RuleCache {
+            raw: raw.into(),
+            meta: taomni_sockscap_api::gfwlist_rules::GfwListMeta {
+                source: "legacy fixture".into(),
+                rule_count: 0,
+                skipped: 0,
+                last_refresh: Some("fixture date".into()),
+                etag: Some("fixture etag".into()),
+            },
+        };
+        let raw = "[AutoProxy 0.2.9]\n||proxied.example.test\n";
+        let adopted = settings
+            .apply_rules(RulesRequest::Adopt(cache(raw)), || Ok(()))
+            .unwrap()
+            .unwrap();
+        assert_eq!(adopted.meta.rule_count, 1);
+        assert_eq!(adopted.meta.last_refresh.as_deref(), Some("fixture date"));
+        assert_eq!(adopted.meta.etag.as_deref(), Some("fixture etag"));
+        let replacement = "[AutoProxy 0.2.9]\n||replacement.example.test\n";
+        assert!(
+            settings
+                .apply_rules(RulesRequest::Replace(cache(replacement)), || Err(
+                    io::Error::other("cancelled")
+                ))
+                .is_err()
+        );
+        let retained = Settings::new(profile.path())
+            .apply_rules(RulesRequest::Adopt(cache(replacement)), || {
+                panic!("already adopted")
+            })
+            .unwrap()
+            .unwrap();
+        assert_eq!(retained.raw, raw);
+        assert!(matches!(
+            retained
+                .compile()
+                .unwrap()
+                .match_host("proxied.example.test"),
+            taomni_sockscap_api::gfwlist_rules::RuleMatch::Proxy { .. }
+        ));
     }
 }

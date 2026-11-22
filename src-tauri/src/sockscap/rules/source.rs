@@ -1,7 +1,8 @@
 //! Fetch / import / cache GFWList rule sources.
 
-use super::{CompiledRules, GfwListMeta};
+use super::GfwListMeta;
 use std::path::{Path, PathBuf};
+use taomni_sockscap_api::gfwlist_rules::RuleCache;
 
 fn raw_path(dir: &Path) -> PathBuf {
     dir.join("gfwlist.raw")
@@ -10,33 +11,26 @@ fn meta_path(dir: &Path) -> PathBuf {
     dir.join("gfwlist.meta.json")
 }
 
-/// Load previously cached raw payload and recompile.
-pub fn load_cached(dir: &Path) -> Option<CompiledRules> {
+pub(in crate::sockscap) fn load_legacy(dir: &Path) -> Option<RuleCache> {
     let raw = std::fs::read_to_string(raw_path(dir)).ok()?;
-    let meta = GfwListMeta::load(&meta_path(dir));
-    let source = meta
-        .as_ref()
-        .map(|m| m.source.clone())
-        .unwrap_or_else(|| "cache".into());
-    let mut compiled = CompiledRules::compile(&raw, &source).ok()?;
-    if let Some(m) = meta {
-        // Preserve last_refresh/etag from disk meta when recompiling.
-        compiled.meta.last_refresh = m.last_refresh;
-        compiled.meta.etag = m.etag;
-        compiled.meta.source = m.source;
-    }
-    Some(compiled)
+    let meta = GfwListMeta::load(&meta_path(dir)).unwrap_or_else(|| GfwListMeta {
+        source: "cache".into(),
+        rule_count: 0,
+        skipped: 0,
+        last_refresh: None,
+        etag: None,
+    });
+    Some(RuleCache { raw, meta })
 }
 
-fn persist(dir: &Path, raw: &str, compiled: &CompiledRules) -> Result<(), String> {
+pub(in crate::sockscap) fn save_legacy(dir: &Path, cache: &RuleCache) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    std::fs::write(raw_path(dir), raw).map_err(|e| format!("write gfwlist.raw: {e}"))?;
-    compiled.meta.save(&meta_path(dir))?;
-    Ok(())
+    std::fs::write(raw_path(dir), &cache.raw).map_err(|e| format!("write gfwlist.raw: {e}"))?;
+    cache.meta.save(&meta_path(dir))
 }
 
-/// Download from URL, compile, and write cache.
-pub async fn refresh_from_url(url: &str, dir: &Path) -> Result<CompiledRules, String> {
+/// Download using the existing desktop network path.
+pub(in crate::sockscap) async fn fetch(url: &str) -> Result<(String, Option<String>), String> {
     let url = url.trim();
     if url.is_empty() {
         return Err("gfwlist url is empty".into());
@@ -62,17 +56,5 @@ pub async fn refresh_from_url(url: &str, dir: &Path) -> Result<CompiledRules, St
         .text()
         .await
         .map_err(|e| format!("read gfwlist body: {e}"))?;
-    let mut compiled = CompiledRules::compile(&body, url)?;
-    compiled.meta.etag = etag;
-    persist(dir, &body, &compiled)?;
-    Ok(compiled)
-}
-
-/// Import from a local file (base64 gfwlist or plain AutoProxy).
-pub fn import_from_path(path: &Path, dir: &Path) -> Result<CompiledRules, String> {
-    let body = std::fs::read_to_string(path).map_err(|e| format!("read rules file: {e}"))?;
-    let source = format!("file:{}", path.display());
-    let compiled = CompiledRules::compile(&body, &source)?;
-    persist(dir, &body, &compiled)?;
-    Ok(compiled)
+    Ok((body, etag))
 }

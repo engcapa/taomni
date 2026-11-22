@@ -41,6 +41,7 @@ impl crate::plugin::ModuleCleanup for ModuleCleanup {
             if let Some(manager) = runtime.xray() {
                 manager.shutdown_all_blocking();
             }
+            tauri::async_runtime::block_on(async { runtime.orch.write().await.clear_rules() });
             return Ok(());
         }
         // Registry mutations run on a blocking worker. The capture teardown
@@ -54,6 +55,7 @@ impl crate::plugin::ModuleCleanup for ModuleCleanup {
             stop_capture(&runtime, journal.as_ref().ok().copied(), true).await?;
             clear_capture_journal(&runtime, journal.map_err(Clone::clone)).await?;
             runtime.release_activation_lock();
+            runtime.orch.write().await.clear_rules();
             Ok(())
         })
     }

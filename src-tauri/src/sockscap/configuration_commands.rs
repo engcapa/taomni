@@ -79,6 +79,11 @@ pub async fn sockscap_set_config(
     config: SocksCapConfig,
 ) -> Result<(), String> {
     config.validate()?;
+    let _operation = state
+        .legacy
+        .sockscap
+        .begin_activation(&state.plugins)
+        .await?;
     let mut orch = state.legacy.sockscap.orch.write().await;
     ensure_configuration_unlocked(&orch)?;
     module_settings::save(&app, &state.plugins, &config).await?;
@@ -99,20 +104,21 @@ pub async fn sockscap_gfwlist_status(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<GfwListStatus, String> {
-    let orch = state.legacy.sockscap.orch.read().await;
-    if let Some(meta) = orch.gfwlist_meta() {
-        return Ok(GfwListStatus {
-            loaded: true,
-            rule_count: meta.rule_count,
-            skipped: meta.skipped,
-            last_refresh: meta.last_refresh.clone(),
-            source: meta.source.clone(),
-            error: None,
-        });
-    }
-    // Fall back to disk meta if engine has not loaded yet.
-    let meta_path = rules_dir(&app)?.join("gfwlist.meta.json");
-    match GfwListMeta::load(&meta_path) {
+    let live = state
+        .legacy
+        .sockscap
+        .orch
+        .read()
+        .await
+        .gfwlist_meta()
+        .cloned();
+    let meta = match live {
+        Some(meta) => Some(meta),
+        None => module_rules::load(&app, &state.plugins)
+            .await?
+            .map(|rules| rules.meta),
+    };
+    match meta {
         Some(m) => Ok(GfwListStatus {
             loaded: true,
             rule_count: m.rule_count,
@@ -138,6 +144,11 @@ pub async fn sockscap_refresh_gfwlist(
     state: State<'_, AppState>,
     url: Option<String>,
 ) -> Result<GfwListStatus, String> {
+    let _operation = state
+        .legacy
+        .sockscap
+        .begin_activation(&state.plugins)
+        .await?;
     // Hold the write lock for the complete mutation so Start cannot snapshot
     // the old rules while a refresh is being committed.
     let mut orch = state.legacy.sockscap.orch.write().await;
@@ -150,8 +161,7 @@ pub async fn sockscap_refresh_gfwlist(
         cfg.gfwlist.url = fetch_url.clone();
     }
 
-    let dir = rules_dir(&app)?;
-    let result = rules::source::refresh_from_url(&fetch_url, &dir).await;
+    let result = module_rules::refresh(&app, &state.plugins, &fetch_url).await;
     match result {
         Ok(compiled) => {
             let meta = compiled.meta.clone();
@@ -198,10 +208,14 @@ pub async fn sockscap_import_rules(
     state: State<'_, AppState>,
     path: String,
 ) -> Result<GfwListStatus, String> {
+    let _operation = state
+        .legacy
+        .sockscap
+        .begin_activation(&state.plugins)
+        .await?;
     let mut orch = state.legacy.sockscap.orch.write().await;
     ensure_configuration_unlocked(&orch)?;
-    let dir = rules_dir(&app)?;
-    let compiled = rules::source::import_from_path(std::path::Path::new(&path), &dir)?;
+    let compiled = module_rules::import(&app, &state.plugins, PathBuf::from(path)).await?;
     let meta = compiled.meta.clone();
     orch.set_rules(compiled);
     Ok(GfwListStatus {
@@ -227,12 +241,16 @@ pub async fn sockscap_test_target(
         return Err("host is empty".into());
     }
 
+    let _operation = state
+        .legacy
+        .sockscap
+        .begin_activation(&state.plugins)
+        .await?;
     // Ensure rules are loaded into the orchestrator for dry-run.
     {
         let mut orch = state.legacy.sockscap.orch.write().await;
         if orch.rules().is_none() {
-            let dir = rules_dir(&app)?;
-            if let Some(c) = rules::source::load_cached(&dir) {
+            if let Some(c) = module_rules::load(&app, &state.plugins).await? {
                 orch.set_rules(c);
             }
         }

@@ -2,6 +2,7 @@
 
 ## 2026-11-23 当前进展
 
+- SocksCap 0.1.11 的签名宿主接管 GFWList 缓存。首次读取把旧规则和刷新记录原子保存至 `plugins/sockscap/data/rules.json`，保留旧文件供回退。备份声明涵盖规则缓存。停用或换版会释放内存中的规则，重新启用时从模块库读取。TC-MODULES-073 核对磁盘、规则结果和启停，TC-MODULES-074 补充重新启用后试算。
 - Mail 过滤 TC-MODULES-092 和 TC-MAIL-FILTER-01 通过三端 Browser/Native 的适用选集。Linux Native 的 TC-MODULES-048 已能从签名页面读回还原的 HOTP。TC-MODULES-090 的退出回执显示 MFA 和设置共两个打开的标签页，用例已调整为核对实际确认文案，再验证新进程的 HOTP。 [Mail](https://github.com/engcapa/taomni/actions/runs/45072599646) · [MFA](https://github.com/engcapa/taomni/actions/runs/45075409694)
 - 正式基座为 SMTP 提供邮件组装与代理，启用的签名 Mail 0.1.34 宿主执行发送及连通性检查。旧 SMTP 传输仅用于隔离 QA 中已有的单体用例。G9 增加四目标 Cargo 特性清单和 SMTP 传输排除断言。
 - Mail 模块停用、换版、回退或卸载前会停止基座过渡期的后台归档扫描并等待文件锁释放。停止保留续传片段和用户原先的暂停设置。TC-MODULES-070 增加实际文件锁观测和重新启用后自动续传，TC-MODULES-060 检查原标签中的归档入口。

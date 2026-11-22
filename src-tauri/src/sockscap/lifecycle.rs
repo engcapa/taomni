@@ -126,7 +126,6 @@ pub async fn sockscap_start(
         });
     let journal_path = journals.for_start(hosted);
 
-    let dir = rules_dir(&app)?;
     {
         let mut orch = state.legacy.sockscap.orch.write().await;
         orch.apply_config(cfg.clone());
@@ -138,13 +137,19 @@ pub async fn sockscap_start(
     if cfg.requires_gfwlist() {
         let mut orch = state.legacy.sockscap.orch.write().await;
         if orch.rules().is_none() {
-            if let Some(c) = rules::source::load_cached(&dir) {
+            let cached = module_rules::load(&app, &state.plugins)
+                .await
+                .map_err(|error| {
+                    orch.set_start_failed(format!("Cannot load saved GFWList: {error}"));
+                    error
+                })?;
+            if let Some(c) = cached {
                 gfw_start_note = format!("using cached GFWList ({} rules)", c.meta.rule_count);
                 orch.set_rules(c);
             } else if !cfg.gfwlist.url.trim().is_empty() {
                 let url = cfg.gfwlist.url.clone();
                 drop(orch);
-                match rules::source::refresh_from_url(&url, &dir).await {
+                match module_rules::refresh(&app, &state.plugins, &url).await {
                     Ok(compiled) => {
                         gfw_start_note =
                             format!("downloaded GFWList ({} rules)", compiled.meta.rule_count);

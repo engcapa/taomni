@@ -45,6 +45,8 @@ def setup(ctx):
             apps=[{"path": str(Path(os.environ["SystemRoot"]) / "System32/where.exe"), "name": "where.exe"}],
             ruleMode="off",
         )
+    if ctx.case_id == "TC-MODULES-073":
+        config["gfwlist"]["enabled"] = True
     serialized = json.dumps(config)
     ctx.values["sockscap_legacy_config"] = serialized
     if (ctx.cfg.get("app") or {}).get("mode") == "native":
@@ -54,6 +56,17 @@ def setup(ctx):
         ctx.values.update(sockscap_original_file=path.as_posix(),
                           sockscap_original_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
                           sockscap_module_config=(isolated_data_root(ctx) / "plugins/sockscap/data/config.json").as_posix())
+        if ctx.case_id == "TC-MODULES-073":
+            raw_rules = path.parent / "rules/gfwlist.raw"
+            raw_rules.parent.mkdir()
+            raw_rules.write_bytes(b"[AutoProxy 0.2.9]\n||proxied.example.test\n")
+            raw_rules.with_name("gfwlist.meta.json").write_text(json.dumps({
+                "source": "file:qa-legacy-rules", "ruleCount": 1, "skipped": 1,
+                "lastRefresh": "2026-01-01T00:00:00Z",
+            }), encoding="utf-8")
+            ctx.values.update(sockscap_legacy_rules=raw_rules.as_posix(),
+                              sockscap_legacy_rules_sha256=hashlib.sha256(raw_rules.read_bytes()).hexdigest(),
+                              sockscap_module_rules=(isolated_data_root(ctx) / "plugins/sockscap/data/rules.json").as_posix())
 
 
 def setup_signed(ctx):

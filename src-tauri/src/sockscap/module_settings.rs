@@ -2,6 +2,7 @@
 //! package can keep using its legacy file until the new host adopts it.
 use std::{fs, io, path::Path, sync::Arc, time::Duration};
 
+use serde::{Serialize, de::DeserializeOwned};
 use taomni_plugin_stream::{length_prefixed, routed_tcp::Route};
 use taomni_sockscap_api::{SETTINGS, SLUG, SettingsRequest, SocksCapConfig};
 use tauri::AppHandle;
@@ -42,16 +43,20 @@ pub(super) async fn load(
     if !hosted(registry)? {
         return Ok(SocksCapConfig::load(&super::config_path(app)?));
     }
-    if let Some(owned) = exchange(registry, SettingsRequest::Read).await? {
+    if let Some(owned) = exchange(registry, SETTINGS, SettingsRequest::Read).await? {
         return Ok(owned);
     }
     let path = super::config_path(app)?;
     let seed = tokio::task::spawn_blocking(move || legacy_seed(&path))
         .await
         .map_err(|e| e.to_string())??;
-    exchange(registry, SettingsRequest::Adopt(Box::new(seed)))
-        .await?
-        .ok_or_else(|| "SocksCap did not return the adopted settings".into())
+    exchange::<_, Option<SocksCapConfig>>(
+        registry,
+        SETTINGS,
+        SettingsRequest::Adopt(Box::new(seed)),
+    )
+    .await?
+    .ok_or_else(|| "SocksCap did not return the adopted settings".into())
 }
 
 pub(super) async fn save(
@@ -62,18 +67,24 @@ pub(super) async fn save(
     if !hosted(registry)? {
         return config.save(&super::config_path(app)?);
     }
-    exchange(registry, SettingsRequest::Save(Box::new(config.clone()))).await?;
+    exchange::<_, Option<SocksCapConfig>>(
+        registry,
+        SETTINGS,
+        SettingsRequest::Save(Box::new(config.clone())),
+    )
+    .await?;
     Ok(())
 }
 
-async fn exchange(
+pub(super) async fn exchange<Request: Serialize, Reply: DeserializeOwned>(
     registry: &Arc<PluginRegistry>,
-    request: SettingsRequest,
-) -> Result<Option<SocksCapConfig>, String> {
+    method: &'static str,
+    request: Request,
+) -> Result<Reply, String> {
     let (_route, endpoint, mut peer) = Route::pair().await.map_err(|e| e.to_string())?;
     let call = super::module_host::invoke::<()>(
         registry,
-        SETTINGS,
+        method,
         serde_json::to_value(endpoint).map_err(|e| e.to_string())?,
     );
     let transfer = async {
