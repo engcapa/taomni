@@ -11,6 +11,7 @@ import unittest
 import yaml
 
 from qa_ui_auto.ci import make_plan
+from qa_ui_auto.feature_catalog import load_features
 from qa_ui_auto.testcase import discover
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -29,8 +30,13 @@ NATIVE_ONLY = {"TC-WS-051", "TC-WS-054", "TC-WS-056", "TC-MOBILE-013", "TC-FILE-
 
 
 class CrashRegressionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.cases = discover(ROOT / "qa-ui-auto-tests/cases")
+        cls.features = load_features(ROOT / "qa-ui-auto-tests/feature-list.md")
+
     def test_tag_and_smoke_keep_every_reported_crash_and_boundary_case(self):
-        cases = [c for c in discover(ROOT / "qa-ui-auto-tests/cases") if "crash-regression" in c.tags]
+        cases = [c for c in self.cases if "crash-regression" in c.tags]
         self.assertEqual({c.id for c in cases}, EXPECTED)
         policy = yaml.safe_load((ROOT / "qa-ui-auto-tests/ci/policy.yaml").read_text())
         self.assertTrue(EXPECTED.issubset(policy["smoke"]))
@@ -44,7 +50,7 @@ class CrashRegressionTests(unittest.TestCase):
         args = argparse.Namespace(scope="selected", head="", base="", platforms="linux,windows,macos",
                                   modes="browser,native", case_ids="", features="", tags="crash-regression",
                                   shards="1", browser_workers=2)
-        plan = make_plan(args)
+        plan = make_plan(args, cases=self.cases, features=self.features)
         self.assertFalse(plan["gaps"])
         self.assertEqual(len(plan["entries"]), 6)
         for entry in plan["entries"]:
@@ -58,7 +64,7 @@ class CrashRegressionTests(unittest.TestCase):
                 args = argparse.Namespace(scope="selected", head="", base="", platforms="linux,windows,macos",
                                           modes=mode, case_ids="", features="", tags="crash-regression",
                                           shards="1", browser_workers=2)
-                plan = make_plan(args)
+                plan = make_plan(args, cases=self.cases, features=self.features)
                 self.assertFalse(plan["gaps"])
                 self.assertEqual(len(plan["entries"]), 3)
                 for entry in plan["entries"]:
@@ -73,7 +79,7 @@ class CrashRegressionTests(unittest.TestCase):
                                           modes=mode, case_ids=case_id, features="", tags="crash-regression",
                                           shards="1", browser_workers=2)
                 with self.assertRaisesRegex(ValueError, "explicit cases unavailable"):
-                    make_plan(args)
+                    make_plan(args, cases=self.cases, features=self.features)
 
     def test_pr_and_focused_workflow_entries_keep_crash_suite(self):
         workflow = yaml.safe_load((ROOT / ".github/workflows/qa-ui-auto-platforms.yml").read_text())

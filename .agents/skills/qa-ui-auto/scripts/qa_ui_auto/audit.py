@@ -57,6 +57,7 @@ from qa_ui_auto.control_coverage import (  # noqa: E402
 from qa_ui_auto.diff_impact import analyze as diff_analyze, _git_diff_names, _normalize  # noqa: E402
 from qa_ui_auto.gen_testid_catalog import render as render_catalog  # noqa: E402
 from qa_ui_auto.console import configure_console_encoding  # noqa: E402
+from qa_ui_auto.testcase import discover  # noqa: E402
 
 DEFAULT_FEATURES = Path("qa-ui-auto-tests/feature-list.md")
 DEFAULT_CASES = Path("qa-ui-auto-tests/cases")
@@ -114,17 +115,31 @@ class AuditReport:
 # ---------------------------------------------------------------------------
 
 def _check_health(
-    *, features_path: Path, cases_dir: Path, catalog_path: Path,
+    *,
+    features_path: Path,
+    cases_dir: Path,
+    catalog_path: Path,
+    lint_result: tuple[int, int, list[str], list[str], dict[str, int]] | None = None,
+    features: list[Any] | None = None,
+    control_coverage: tuple[list[Any], list[str]] | None = None,
 ) -> dict[str, Any]:
     """Aggregate lint + catalog freshness into one structured report."""
-    case_n, case_ids, case_errors = lint_cases(cases_dir)
-    feat_errors, feat_stats = lint_features(features_path)
-    orphans = [] if case_errors or feat_errors else warn_selector_orphans(features_path, cases_dir)
+    if lint_result is None:
+        case_n, case_ids, case_errors = lint_cases(cases_dir)
+        feat_errors, feat_stats = lint_features(features_path)
+    else:
+        case_n, case_ids, case_errors, feat_errors, feat_stats = lint_result
+    if case_errors or feat_errors:
+        orphans = []
+    elif control_coverage is not None:
+        orphans = control_coverage[1]
+    else:
+        orphans = warn_selector_orphans(features_path, cases_dir)
     # Catalog freshness: render expected output, compare to disk.
     catalog_stale = False
     catalog_reason: str | None = None
     try:
-        feats = load_features(features_path)
+        feats = load_features(features_path) if features is None else features
         expected = render_catalog(feats)
         if not catalog_path.exists():
             catalog_stale = True
@@ -157,12 +172,29 @@ def _check_health(
 # ---------------------------------------------------------------------------
 
 def _collect_gaps(
-    *, features_path: Path, cases_dir: Path, focus_feature: str | None,
+    *,
+    features_path: Path,
+    cases_dir: Path,
+    focus_feature: str | None,
+    features: list[Any] | None = None,
+    cases: list[Any] | None = None,
+    control_coverage: tuple[list[Any], list[str]] | None = None,
 ) -> list[Gap]:
-    rows = build_matrix(features_path, cases_dir)
-    ctrl_results, _orphans = build_coverage(features_path, cases_dir)
+    feats = load_features(features_path) if features is None else features
+    if control_coverage is None:
+        control_coverage = build_coverage(
+            features_path, cases_dir, features=feats, cases=cases,
+        )
+    rows = build_matrix(
+        features_path,
+        cases_dir,
+        features=feats,
+        cases=cases,
+        control_coverage=control_coverage,
+    )
+    ctrl_results, _orphans = control_coverage
     ctrl_by_fid = {r.feature.id: r for r in ctrl_results}
-    feats_by_fid = {f.id: f for f in load_features(features_path)}
+    feats_by_fid = {f.id: f for f in feats}
 
     gaps: list[Gap] = []
     for row in rows:
@@ -222,7 +254,11 @@ def _collect_gaps(
 
 
 def _collect_orphan_gaps(
-    *, features_path: Path, cases_dir: Path, focus_feature: str | None,
+    *,
+    features_path: Path,
+    cases_dir: Path,
+    focus_feature: str | None,
+    control_coverage: tuple[list[Any], list[str]] | None = None,
 ) -> list[Gap]:
     """Orphan selectors live alongside other gaps but at lower priority.
 
@@ -231,7 +267,11 @@ def _collect_orphan_gaps(
     is almost always declaring the selector on its owning feature."""
     if focus_feature:
         return []
-    orphans = warn_selector_orphans(features_path, cases_dir)
+    orphans = (
+        control_coverage[1]
+        if control_coverage is not None
+        else warn_selector_orphans(features_path, cases_dir)
+    )
     return [
         Gap(
             priority=40,
@@ -311,7 +351,12 @@ def _diff_section(
 # ---------------------------------------------------------------------------
 
 def _gate(
-    *, features_path: Path, cases_dir: Path, baseline_path: Path, release_evidence: bool = False,
+    *,
+    features_path: Path,
+    cases_dir: Path,
+    baseline_path: Path,
+    release_evidence: bool = False,
+    control_coverage: tuple[list[Any], list[str]] | None = None,
 ) -> dict[str, Any]:
     """Compare current snapshot against baseline. Returns dict with regs/imps."""
     if not baseline_path.exists():
@@ -327,7 +372,11 @@ def _gate(
         baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "error": f"baseline parse: {e}"}
-    results, orphans = build_coverage(features_path, cases_dir)
+    results, orphans = (
+        control_coverage
+        if control_coverage is not None
+        else build_coverage(features_path, cases_dir)
+    )
     snap = _build_snapshot(results, orphans)
     regressions, improvements = _render_gate_diff(baseline, snap)
     control_ok = not regressions
@@ -477,24 +526,45 @@ def build_audit(
     release_evidence: bool = False,
 ) -> AuditReport:
     rep = AuditReport()
-    rep.health = _check_health(
-        features_path=features_path,
-        cases_dir=cases_dir,
-        catalog_path=catalog_path,
-    )
-    if rep.health["lint_cases"]["errors"] or rep.health["lint_features"]["errors"]:
+    case_n, case_ids, case_errors = lint_cases(cases_dir)
+    feat_errors, feat_stats = lint_features(features_path)
+    lint_result = (case_n, case_ids, case_errors, feat_errors, feat_stats)
+    if case_errors or feat_errors:
+        rep.health = _check_health(
+            features_path=features_path,
+            cases_dir=cases_dir,
+            catalog_path=catalog_path,
+            lint_result=lint_result,
+        )
         # Do not parse an invalid testcase again through coverage/diff. Preserve
         # the actionable lint error instead of hiding it behind a traceback.
         rep.health["coverage_skipped"] = "Fix lint errors before coverage, diff or gate evaluation."
         return rep
+    feats = load_features(features_path)
+    cases = discover(cases_dir)
+    cov = build_coverage(
+        features_path, cases_dir, features=feats, cases=cases,
+    )
+    rep.health = _check_health(
+        features_path=features_path,
+        cases_dir=cases_dir,
+        catalog_path=catalog_path,
+        lint_result=lint_result,
+        features=feats,
+        control_coverage=cov,
+    )
     rep.gaps = _collect_gaps(
         features_path=features_path,
         cases_dir=cases_dir,
         focus_feature=focus_feature,
+        features=feats,
+        cases=cases,
+        control_coverage=cov,
     ) + _collect_orphan_gaps(
         features_path=features_path,
         cases_dir=cases_dir,
         focus_feature=focus_feature,
+        control_coverage=cov,
     )
     if diff_base is not None and diff_base is not False:
         base_arg = diff_base if isinstance(diff_base, str) else None
@@ -507,6 +577,7 @@ def build_audit(
             cases_dir=cases_dir,
             baseline_path=baseline_path,
             release_evidence=release_evidence,
+            control_coverage=cov,
         )
     return rep
 

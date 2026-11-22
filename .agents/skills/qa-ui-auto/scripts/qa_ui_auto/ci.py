@@ -145,8 +145,8 @@ def capabilities(cases, mode: str) -> list[str]:
     return sorted(result)
 
 
-def make_plan(args) -> dict:
-    cases = discover(Path("qa-ui-auto-tests/cases"))
+def make_plan(args, *, cases=None, features=None) -> dict:
+    cases = discover(Path("qa-ui-auto-tests/cases")) if cases is None else cases
     by_id = {case.id: case for case in cases}
     if len(by_id) != len(cases):
         raise ValueError("duplicate case IDs")
@@ -166,7 +166,7 @@ def make_plan(args) -> dict:
     linux_profiles = csv(getattr(args, "linux_profiles", "") or DEFAULT_LINUX_PROFILE)
     if not linux_profiles or set(linux_profiles) - LINUX_PROFILES.keys():
         raise ValueError("linux_profiles must contain: " + ", ".join(LINUX_PROFILES))
-    features = load_features()
+    features = load_features() if features is None else list(features)
     feature_ids = {f.id for f in features}
     tags = {tag for case in cases for tag in case.tags}
     requested, wanted_features, wanted_tags = set(csv(args.case_ids)), set(csv(args.features)), set(csv(args.tags))
