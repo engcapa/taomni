@@ -586,7 +586,17 @@ export interface StubMailQaControl {
   mutationFault: (fault: MutationFault) => void;
   delayNextFolderRead: (milliseconds: number) => void;
   setPrefetchPaused: (paused: boolean) => void;
-  deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean, listUnsubscribe?: string | null, invite?: string | null, readReceipt?: boolean) => number[];
+  deliver: (
+    accountId: string,
+    folder: string,
+    count: number,
+    prefix?: string,
+    thread?: boolean,
+    listUnsubscribe?: string | null,
+    invite?: string | null,
+    readReceipt?: boolean,
+    body?: string | null,
+  ) => number[];
   expunge: (accountId: string, folder: string, uids: number[]) => void;
   setFlags: (accountId: string, folder: string, uid: number, flags: string[]) => void;
   observe: (accountId: string, folder: string) => { server: number[]; cache: number[]; flagged: number[] };
@@ -630,7 +640,7 @@ export function installStubMailQaControl(seed: Seed): void {
       prefetchGate = paused ? new Promise<void>((resolve) => { releasePrefetch = resolve; }) : undefined;
       if (!paused) releasePrefetch = undefined;
     },
-    deliver(accountId, folderName, count, prefix = "QA", thread = false, listUnsubscribe = null, invite = null, readReceipt = false) {
+    deliver(accountId, folderName, count, prefix = "QA", thread = false, listUnsubscribe = null, invite = null, readReceipt = false, body = null) {
       const state = account(accountId, seed);
       const folder = folderState(state, folderName);
       const uids: number[] = [];
@@ -639,6 +649,7 @@ export function installStubMailQaControl(seed: Seed): void {
         const uid = folder.uidNext;
         folder.uidNext += 1;
         const message = templateMessage(accountId, folderName, uid, `${prefix} ${String(index + 1).padStart(4, "0")}`);
+        if (body !== null) message.snippet = body;
         if (thread && ancestry.length > 0) {
           message.inReplyTo = ancestry[ancestry.length - 1];
           message.references = [...ancestry];

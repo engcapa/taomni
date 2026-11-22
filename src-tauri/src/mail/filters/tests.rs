@@ -1,4 +1,4 @@
-use super::imap_search::imap_body_hits;
+use taomni_mail_engine::filters::imap::imap_body_hits;
 
 #[test]
 fn server_body_search_is_limited_to_the_candidates() {

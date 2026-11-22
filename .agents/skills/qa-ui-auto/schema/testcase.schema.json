@@ -1842,6 +1842,9 @@
               "type": "string",
               "minLength": 1
             },
+            "body": {
+              "type": "string"
+            },
             "thread": {
               "type": "boolean"
             },

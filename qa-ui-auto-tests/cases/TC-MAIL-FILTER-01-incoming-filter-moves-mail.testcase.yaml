@@ -1,5 +1,5 @@
 id: TC-MAIL-FILTER-01
-title: Mail filter created in the filter dialog moves matching new mail out of the Inbox
+title: Saved subject and body filters move matching new mail out of the Inbox
 description: 'TASK-13 (docs-feature/mail-thunderbird-parity-design.md AC-40, DEC-11).
 
   Creates a filter "Subject contains Filtered -> Move to Archive" in the
@@ -8,7 +8,9 @@ description: 'TASK-13 (docs-feature/mail-thunderbird-parity-design.md AC-40, DEC
 
   syncs, and requires the server to hold the matching message in Archive and
 
-  only the other one in INBOX. Manual runs, failures (AC-41/AC-42), body
+  only the other one in INBOX. Adds a second rule whose keyword must appear in
+  the body and delivers mail with the keyword in either its subject or body.
+  Manual runs, failures (AC-41/AC-42), other condition operators
 
   conditions and the rule semantics are covered by Rust and Vitest tests.
 
@@ -30,7 +32,7 @@ modes:
 fixtures:
 - reset_db
 - mail_server
-timeout_sec: 150
+timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - seed_storage:
@@ -86,6 +88,21 @@ steps:
     lacks_subject: Filtered 0001
     timeout_sec: 20
 - assert_no_runtime_errors: null
+- click: '[data-testid="mail-filters-open"]'
+- click: '[data-testid="mail-filter-new"]'
+- fill: {selector: '[data-testid="mail-filter-name"]', value: QA body archive}
+- select_option: {selector: '[data-testid="mail-filter-condition-field"]', value: body}
+- fill: {selector: '[data-testid="mail-filter-condition-value"]', value: invoice marker}
+- select_option: {selector: '[data-testid="mail-filter-action-folder"]', value: Archive}
+- click: '[data-testid="mail-filter-save"]'
+- wait_for: '[data-testid="mail-filter-row"][data-filter-name="QA body archive"]'
+- click: '[data-testid="mail-filters-close"]'
+- mail_server_deliver: {count: 1, prefix: Receivable, body: 'Contains the INVOICE MARKER from accounting.'}
+- mail_server_deliver: {count: 1, prefix: invoice marker, body: 'This note is unrelated.'}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_folder_count: {folder: Archive, has_subject: Receivable 0001, lacks_subject: invoice marker 0001, timeout_sec: 45}
+- mail_server_assert_folder_count: {folder: INBOX, has_subject: invoice marker 0001, lacks_subject: Receivable 0001}
+- assert_no_runtime_errors: null
 - screenshot: mail-filter-01-after-sync.png
 verification:
   review: reviewed
@@ -135,8 +152,17 @@ verification:
     - 24
     - 25
     - 26
+  - id: R3
+    requirement: 正文规则忽略大小写，并且不会移动只在主题中含有该关键词的邮件。
+    actions: [27, 28, 29, 30, 31, 32, 33, 35, 36, 37, 38]
+    checkpoints:
+    - {step: 34, expectation: 消息过滤器显示已保存的正文规则。}
+    - {step: 39, expectation: 正文包含关键词的邮件移到 Archive。}
+    - {step: 40, expectation: 仅主题包含关键词的邮件留在 INBOX。}
+    - {step: 41, expectation: 完成过滤时无运行时错误。}
+    results: [34, 39, 40, 41]
   visual:
-  - check: 截图中 INBOX 列表不含 Filtered 0001，含 Keep 0001。
+  - check: 截图中 INBOX 列表保留只匹配主题的邮件和 Keep 0001。
     method: manual
     reason: 像素与布局需人工评审。
   native:

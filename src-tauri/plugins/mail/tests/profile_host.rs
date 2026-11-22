@@ -37,6 +37,8 @@ mod attachment_cache;
 mod imap;
 #[path = "support/imap_body_sync.rs"]
 mod imap_body_sync;
+#[path = "support/imap_filter.rs"]
+mod imap_filter;
 #[path = "support/imap_idle.rs"]
 mod imap_idle;
 #[path = "support/local_mailbox.rs"]
@@ -340,6 +342,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     imap::check_routed_prefetch(&mut host);
     imap::check_routed_header_pages(&mut host);
     imap_body_sync::check_routed_body_sync(&mut host);
+    imap_filter::check_routed_body_filter(&mut host);
     imap_idle::check_routed_idle(&mut host);
     local_mailbox::check_agenda(&mut host);
     imap::check_routed_archive(&mut host);

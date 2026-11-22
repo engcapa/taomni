@@ -3,6 +3,7 @@ use super::imap_search::body_needles;
 use crate::mail::ImapSessionOpts;
 use crate::mail::MailAccountConfig;
 use crate::mail::MailMessageHeader;
+use crate::mail::module_host;
 use crate::mail::now_ts;
 use crate::mail::resolve_config;
 use crate::mail::with_imap_session;
@@ -10,6 +11,7 @@ use crate::mail::with_mail_db;
 use crate::state::AppState;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use taomni_mail_engine::filters::imap::FilterBodyQuery;
 use taomni_mail_engine::filters::{
     CandidateSelection, FilterMessage, MailFilter, MailFilterRunResult, MessagePlan,
     ensure_filter_mark, filter_mark, load_candidates, load_filters, plan_message, set_filter_mark,
@@ -101,20 +103,33 @@ pub async fn mail_apply_filters(
             }
         } else {
             let account = resolve_config(&state, config.clone())?;
-            let pool = std::sync::Arc::clone(&state.legacy.mail.mail_imap_pool);
-            let handle = tokio::runtime::Handle::current();
-            let folder_for_task = folder.clone();
-            let lookup = tokio::task::spawn_blocking(move || {
-                with_imap_session(
-                    &pool,
+            let lookup = if module_host::filters_imap_bodies(&state.plugins) {
+                module_host::filter_imap_bodies(
+                    state.plugins.clone(),
                     &account,
-                    &handle,
-                    ImapSessionOpts::default(),
-                    |imap| imap.filter_body_hits(&folder_for_task, &uncached, &needles),
+                    &FilterBodyQuery {
+                        folder: folder.clone(),
+                        uids: uncached,
+                        needles,
+                    },
                 )
-            })
-            .await
-            .map_err(|e| format!("filter body search failed: {e}"))?;
+                .await
+            } else {
+                let pool = std::sync::Arc::clone(&state.legacy.mail.mail_imap_pool);
+                let handle = tokio::runtime::Handle::current();
+                let folder_for_task = folder.clone();
+                tokio::task::spawn_blocking(move || {
+                    with_imap_session(
+                        &pool,
+                        &account,
+                        &handle,
+                        ImapSessionOpts::default(),
+                        |imap| imap.filter_body_hits(&folder_for_task, &uncached, &needles),
+                    )
+                })
+                .await
+                .map_err(|e| format!("filter body search failed: {e}"))?
+            };
             match lookup {
                 Ok(hits) => server_hits = hits,
                 Err(e) => result.errors.push(format!("body search: {e}")),

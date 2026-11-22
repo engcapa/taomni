@@ -1,0 +1,67 @@
+id: TC-MODULES-092
+title: Signed Mail moves new IMAP messages by body content
+description: Install the signed Mail module and save an incoming body rule. Deliver a body match and a subject-only match without opening either message. Verify that the live IMAP mailbox moves just the body match.
+covers: [F-Modules-1, F-MAIL-19]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, mail_server, module_signed_mail_archive]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-mail"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"] [data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches: {timeout_sec: 45}
+- click: '[data-testid="mail-filters-open"]'
+- click: '[data-testid="mail-filter-new"]'
+- fill: {selector: '[data-testid="mail-filter-name"]', value: QA body archive}
+- select_option: {selector: '[data-testid="mail-filter-condition-field"]', value: body}
+- fill: {selector: '[data-testid="mail-filter-condition-value"]', value: invoice marker}
+- select_option: {selector: '[data-testid="mail-filter-action-folder"]', value: Archive}
+- click: '[data-testid="mail-filter-save"]'
+- wait_for: '[data-testid="mail-filter-row"][data-filter-name="QA body archive"]'
+- click: '[data-testid="mail-filters-close"]'
+- mail_server_deliver: {count: 1, prefix: Receivable, body: 'Contains the INVOICE MARKER from accounting.'}
+- mail_server_deliver: {count: 1, prefix: invoice marker, body: 'This note is unrelated.'}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_folder_count: {folder: Archive, has_subject: Receivable 0001, lacks_subject: invoice marker 0001, timeout_sec: 45}
+- mail_server_assert_folder_count: {folder: INBOX, has_subject: invoice marker 0001, lacks_subject: Receivable 0001}
+- mail_server_assert_list_matches: {timeout_sec: 20}
+- assert_count: {selector: '[data-testid="mail-message-row"][data-subject="invoice marker 0001"]', equal: 1}
+- assert_signed_mail_host: running
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-body-rule
+    requirement: The installed Mail module applies the saved body condition while syncing live mail.
+    actions: [8, 10, 16, 20, 22, 23, 24, 25, 28, 29, 30]
+    checkpoints:
+    - {step: 12, expectation: The signed package is installed and the Mail host is still idle.}
+    - {step: 17, expectation: The signed frontend opens the mail tab.}
+    - {step: 26, expectation: The filter dialog shows the saved body rule.}
+    - {step: 31, expectation: Only the message with a body match is in the server archive.}
+    - {step: 32, expectation: The subject-only match remains in the server inbox.}
+    - {step: 33, expectation: The visible inbox matches the server after filtering.}
+    - {step: 34, expectation: The remaining new message appears once in the inbox.}
+    - {step: 35, expectation: The signed native host owns the profile writer lease.}
+    - {step: 36, expectation: The renderer reports no runtime errors.}
+    results: [12, 17, 26, 31, 32, 33, 34, 35, 36]
+  visual:
+  - {check: The visible mailbox keeps the subject-only match, method: automated, reason: The runner checks the exact subject and reconciles the list with the server.}
+  native:
+  - {check: A verified Mail host and actual IMAP server are active, method: automated, reason: The signed package and profile lease are inspected and the server independently verifies the message locations.}

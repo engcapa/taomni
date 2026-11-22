@@ -1,6 +1,7 @@
 //! Persisted mail filters and their rule evaluation.
 
 mod cache;
+pub mod imap;
 mod matching;
 mod model;
 mod planning;

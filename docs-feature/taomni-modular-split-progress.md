@@ -2,6 +2,8 @@
 
 ## 2026-11-23 当前进展
 
+- 重新拉取的远程 `main` 为 `a6cf8ecfa`，QA 加速 PR #866 已在本分支祖先 `1b572a1b3` 中。后续验证按三个工作流并行上限派发，分片上传后即时保存。 [主线工作流加速](https://github.com/engcapa/taomni/pull/866)
+- Mail 0.1.32 由签名宿主查询未缓存的 IMAP 正文。跨进程用例核对查询只涉及传入 UID，并覆盖 UTF-8 搜索。TC-MAIL-FILTER-01 和 TC-MODULES-092 检查正文匹配移入归档、仅主题匹配留在收件箱，待 GitHub 多端验证。
 - 新配置在签名 MFA 启用后使用模块宿主。已有账户继续走显式迁移。新增原生断言检查 `plugins/mfa/data/mfa.db`，并在独立新进程解锁后读回同一 HOTP。新配置的三端原生验证待复跑。
 - `4c5b6e429` 的三端 Browser 均通过 MFA 管理页和浮窗的启停用例及 Mail 分页。四目标 Cargo 树和基座 Vite 清单已归档，412 个入口均未包含 MFA 模块前端。基座兼容引擎及最终安装载荷继续核对。 [三端分片](https://github.com/engcapa/taomni/actions/runs/45067527972) · [基座清单](https://github.com/engcapa/taomni/actions/runs/45068537504)
 - `91df69f28` 的 Linux Native 已通过运行、禁用、卸载保留三态的备份自动还原，以及 Mail IDLE 的推送、关标签和停用释放连接。分页用例在鼠标自动滚动后找不到按钮，键盘复验随 MFA 回归执行。 [Linux Native 分片](https://github.com/engcapa/taomni/actions/runs/45064193835)

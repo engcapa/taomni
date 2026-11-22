@@ -9,6 +9,7 @@ use taomni_mail_api::{
         write_body_frame, write_frame,
     },
 };
+use taomni_mail_engine::filters::imap::FilterBodyQuery;
 use taomni_mail_engine::imap_sync::{FolderRoundRequest, HeaderPageRequest, HeaderStepRequest};
 use taomni_mail_engine::imap_transport::{
     ImapBodyReply, ImapBodyRequest, ImapSession, imap_catch_result,
@@ -82,6 +83,24 @@ pub(super) fn search(
         |session, query: ImapSearchRequest| {
             validate_folder(&query.account_id, &query.folder)?;
             session.search_imap(&query)
+        },
+    )
+}
+
+pub(super) fn filter_bodies(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: ImapExchange,
+) -> Result<Result<(), String>, RpcError> {
+    transfer(
+        runtime,
+        operation,
+        request,
+        |session, query: FilterBodyQuery| {
+            if query.folder.trim().is_empty() || query.uids.contains(&0) {
+                return Err("IMAP body filtering requires a folder and valid UIDs".into());
+            }
+            session.filter_body_hits(&query)
         },
     )
 }

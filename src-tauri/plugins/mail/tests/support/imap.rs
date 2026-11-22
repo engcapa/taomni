@@ -566,6 +566,7 @@ pub(super) async fn routed_mailbox() -> (TcpListener, Route, IncomingTest) {
 
 pub(super) enum FixtureFetch {
     Page { uids: Vec<u32>, list_folders: bool },
+    BodyFilter,
     Body,
     Prefetch,
     Archive,
@@ -577,6 +578,7 @@ impl FixtureFetch {
     fn uids(&self) -> &[u32] {
         match self {
             Self::Page { uids, .. } => uids,
+            Self::BodyFilter => &[],
             Self::Prefetch => &[23, 24],
             Self::Archive => &[23, 23],
             _ => &[23],
@@ -591,6 +593,7 @@ impl FixtureFetch {
         );
         const BINARY: &str = "JVFB/wA=\r\n";
         match self {
+            Self::BodyFilter => unreachable!("body filters must use SEARCH without FETCH"),
             Self::Page { .. } => {
                 if request.ends_with("(UID FLAGS)") {
                     return format!("* 1 FETCH (UID {uid} FLAGS ())\r\n");
@@ -661,6 +664,7 @@ pub(super) async fn serve(listener: TcpListener, fixture: FixtureFetch) {
         .await
         .unwrap();
     let mut fetches = 0;
+    let mut body_searches = 0;
     let mut line = String::new();
     while stream.read_line(&mut line).await.unwrap() != 0 {
         let (tag, input) = line.trim_end().split_once(' ').unwrap();
@@ -682,7 +686,10 @@ pub(super) async fn serve(listener: TcpListener, fixture: FixtureFetch) {
             }
             "EXAMINE" => {
                 assert!(input.ends_with("\"INBOX\"") || input.ends_with(" INBOX"));
-                let count = if matches!(fixture, FixtureFetch::Page { .. }) {
+                let count = if matches!(
+                    fixture,
+                    FixtureFetch::Page { .. } | FixtureFetch::BodyFilter
+                ) {
                     2
                 } else {
                     1
@@ -698,6 +705,18 @@ pub(super) async fn serve(listener: TcpListener, fixture: FixtureFetch) {
                 } else {
                     "* SEARCH 23 24\r\n".into()
                 }
+            }
+            "UID" if matches!(fixture, FixtureFetch::BodyFilter) => {
+                let (expected, reply) = [
+                    ("UID SEARCH UID 23,24 BODY \"INVOICE\"", "* SEARCH 23\r\n"),
+                    (
+                        "UID SEARCH CHARSET UTF-8 UID 23,24 BODY \"发票\"",
+                        "* SEARCH\r\n",
+                    ),
+                ][body_searches];
+                assert_eq!(input, expected);
+                body_searches += 1;
+                reply.into()
             }
             "UID" => {
                 let uid = fixture.uids()[fetches];
@@ -718,4 +737,7 @@ pub(super) async fn serve(listener: TcpListener, fixture: FixtureFetch) {
         line.clear();
     }
     assert_eq!(fetches, fixture.uids().len());
+    if matches!(fixture, FixtureFetch::BodyFilter) {
+        assert_eq!(body_searches, 2);
+    }
 }

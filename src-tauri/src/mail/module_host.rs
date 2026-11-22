@@ -45,6 +45,7 @@ use taomni_mail_api::{
     imap_exchange::{ImapExchange, read_frame, write_frame},
 };
 use taomni_mail_engine::delivery::PreparedMail;
+use taomni_mail_engine::filters::imap::{BodyHits, FilterBodyQuery};
 use taomni_mail_engine::imap_sync::{
     BodySyncOutcome, BodySyncTask, FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome,
     HeaderPageOutcome, HeaderPageRequest, HeaderStepRequest,
@@ -223,6 +224,35 @@ pub(super) async fn search_imap(
         return Err("Mail module returned another folder's search results".into());
     }
     Ok(results)
+}
+
+pub(super) fn filters_imap_bodies(registry: &PluginRegistry) -> bool {
+    supports(registry, taomni_mail_api::FILTER_IMAP_BODIES)
+}
+
+pub(super) async fn filter_imap_bodies(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    query: &FilterBodyQuery,
+) -> Result<BodyHits, String> {
+    let hits: BodyHits = exchange_imap(
+        registry,
+        account,
+        taomni_mail_api::FILTER_IMAP_BODIES,
+        query,
+    )
+    .await?;
+    let uids: std::collections::HashSet<_> = query.uids.iter().copied().collect();
+    let needles: std::collections::HashSet<_> = query.needles.iter().map(String::as_str).collect();
+    if hits.iter().any(|(uid, found)| {
+        !uids.contains(uid)
+            || found
+                .iter()
+                .any(|needle| !needles.contains(needle.as_str()))
+    }) {
+        return Err("Mail module returned body matches outside the filter request".into());
+    }
+    Ok(hits)
 }
 
 pub(super) async fn set_imap_flags(

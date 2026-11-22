@@ -3007,7 +3007,7 @@ def _do_mail_server_deliver(ctx: NativeStepContext, args: Any) -> str:
                                         thread=bool(args.get("thread")),
                                         list_unsubscribe=args.get("list_unsubscribe") or None,
                                         invite=args.get("invite") or None,
-                                        read_receipt=bool(args.get("read_receipt")))
+                                        read_receipt=bool(args.get("read_receipt")), body=args.get("body"))
     return f"delivered {len(uids)} to {folder} (uids {uids[0]}..{uids[-1]})"
 
 

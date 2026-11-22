@@ -576,6 +576,13 @@ Native-only protocol oracle. Optional `no_move`, `count_rejected`, and `copied`
 assert capability routing, a real provider count rejection, and unique COPY count.
 Always rejects duplicate source copies or mailbox-wide EXPUNGE.
 
+### `mail_server_deliver`
+
+Deliver `{count, folder?: INBOX, prefix?: QA, body?: string}` to the disposable
+fixture. Set `body` to separate the content from the generated subject when
+testing body filters. Browser uses the stub's body preview and native delivers
+the text in the IMAP message.
+
 ### `mail_server_delay_next_read`
 
 `{milliseconds: 1..25000}` delays one read-flag response on the disposable mail fixture. Browser delays the next explicit folder read; native delays the next `UID STORE +FLAGS` containing `\Seen`, after applying flags and outside the server lock. Use checkboxes/modifier selection to avoid consuming it with auto-read. Assert the read action remains busy when testing concurrent availability; the finite delay is fault injection, not a relaxed latency budget. Supports browser and native on Linux, Windows and macOS.
