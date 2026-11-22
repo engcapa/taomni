@@ -33,9 +33,12 @@ def platform_key(system=None, machine=None):
 
 
 def load_artifact(root: Path, source_sha: str, expected_platform: str, slug: str = "hello-plugin", *, version="0.1.0"):
+    frontend_path = "frontend/index.js" if slug in {"hello-plugin", "vnc-client", "rdp-client"} else None
     if version is None:
         manifest = Path(__file__).resolve().parents[6] / "src-tauri/plugins" / slug / "module.json"
-        version = json.loads(manifest.read_text(encoding="utf-8"))["version"]
+        declared = json.loads(manifest.read_text(encoding="utf-8"))
+        version = declared["version"]
+        frontend_path = declared["entry"].get("frontend")
     root = root.absolute()
     if root.resolve() != root or not root.is_dir():
         raise RuntimeError("Signed module artifact must be a real directory")
@@ -60,9 +63,9 @@ def load_artifact(root: Path, source_sha: str, expected_platform: str, slug: str
     if len(detached.splitlines()) != 4 or detached.splitlines()[2] != trusted:
         raise RuntimeError("Official module signature does not bind the expected metadata")
     frontend = None
-    if slug in {"hello-plugin", "vnc-client", "rdp-client", "mfa"}:
+    if frontend_path is not None:
         with zipfile.ZipFile(archive) as zipped:
-            frontend = zipped.read("frontend/index.js")
+            frontend = zipped.read(frontend_path)
     return receipt, archive, detached, frontend
 
 
