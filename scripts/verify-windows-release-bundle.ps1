@@ -35,6 +35,9 @@ try {
     $executables = @(Get-ChildItem -LiteralPath $directory -Recurse -File -Filter taomni.exe)
     if ($executables.Count -ne 1) { throw "Expected one taomni.exe in $directory" }
     $appDir = $executables[0].DirectoryName
+    if (Get-ChildItem -LiteralPath $directory -Recurse -File -Filter acp-fake-agent.exe) {
+      throw "The Windows installer contains the ACP integration test fixture"
+    }
     if (Get-ChildItem -LiteralPath $directory -Recurse -File -Filter taomni-vnc-key-helper.exe) {
       throw "The Windows installer contains the independently shipped VNC key helper"
     }

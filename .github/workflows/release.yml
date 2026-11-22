@@ -253,6 +253,10 @@ jobs:
         with:
           args: --config '${{ env.TAURI_RELEASE_CONFIG }}'
 
+      - name: Verify Linux core installer contents
+        if: matrix.platform == 'ubuntu-22.04'
+        run: bash scripts/verify-linux-release-bundle.sh
+
       - name: Verify Windows installer runtimes
         if: matrix.platform == 'windows-latest'
         shell: pwsh

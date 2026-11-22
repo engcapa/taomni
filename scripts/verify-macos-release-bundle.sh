@@ -165,8 +165,18 @@ verify_separate_installer() {
     return 1
   fi
 }
+verify_test_fixture_absent() {
+  local fixture
+  fixture="$(find "$1" -iname 'acp-fake-agent' -print -quit)"
+  if [ -n "$fixture" ]; then
+    echo "The macOS app contains the ACP integration test fixture: $fixture" >&2
+    return 1
+  fi
+}
+verify_test_fixture_absent "$app"
 verify_separate_installer "$resource_root"
 if [ -n "${updater_app:-}" ]; then
+  verify_test_fixture_absent "$updater_app"
   verify_separate_installer "$updater_app/Contents/Resources"
 fi
 

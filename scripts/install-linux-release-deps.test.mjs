@@ -82,7 +82,7 @@ test("release dependency installation uses fresh official Jammy indexes for both
   const install = calls[1].args;
   assert.deepEqual(install.slice(install.indexOf("install")), [
     "install", "-y", "libwebkit2gtk-4.1-dev", "libappindicator3-dev", "librsvg2-dev",
-    "patchelf", "libkrb5-dev", "nasm", "libasound2-dev", "libpipewire-0.3-dev",
+    "patchelf", "rpm", "libkrb5-dev", "nasm", "libasound2-dev", "libpipewire-0.3-dev",
     "libclang-dev", "libdbus-1-dev", "libudev-dev", "meson", "ninja-build", "pkg-config",
   ]);
   f.assertCleaned();

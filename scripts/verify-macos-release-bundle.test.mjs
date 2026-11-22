@@ -99,6 +99,16 @@ test("core and archived updater each exclude the module-owned Redirector install
   assert.match(f.run().stderr, /SocksCap module installer was included/);
 });
 
+test("both the macOS application and updater archive exclude the ACP test fixture", (t) => {
+  const f = fixture(t);
+  const helper = join(f.app, "Contents/MacOS/acp-fake-agent");
+  writeFileSync(helper, "test-only executable");
+  assert.match(f.run().stderr, /ACP integration test fixture/);
+  f.pack();
+  rmSync(helper);
+  assert.match(f.run().stderr, /ACP integration test fixture/);
+});
+
 for (const failure of ["TEST_INVALID_SIGNATURE", "TEST_DIFFERENT_CERTIFICATE", "TEST_CDHASH", "TEST_DIFFERENT_REQUIREMENT", "TEST_WRONG_ARCH", "TEST_HARDENED_RUNTIME", "TEST_BOTTLE_PATH"]) {
   test(`release gate rejects ${failure}`, (t) => {
     const f = fixture(t);

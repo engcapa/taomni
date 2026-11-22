@@ -69,6 +69,13 @@ platform-specific receipt do not close a gate. The final release record must
 bind every gate to the source SHA, runner image, package identity, and raw
 artifact path.
 
+Match the OS signing policy on `main` for G1 and G3. On macOS, verify the
+fixed signing identity of the core and host, retain the Gatekeeper assessment,
+and exercise the installed host and system permissions. On Windows, record
+Authenticode status and exercise downloaded hosts with Defender enabled.
+An unsigned Windows installer and an unnotarized macOS app are accepted under
+this policy. Module, catalog and updater signature verification is required.
+
 For G5, accept input-to-frame p95 up to twice the existing 65 ms reference.
 Record the 130 ms limit and the observed p95 in the modular QA evidence. Apply
 the reviewed RDP case checks for first graphics, frame rate, bandwidth, and

@@ -556,7 +556,7 @@ v1.2 的方案是：每个插件是 `crate-type = ["cdylib", "rlib"]` 的 Cargo 
 |---|---|---|
 | G1 | macOS ad-hoc / 自签名发布包能否拉起下载来的、同一签名身份签名的宿主可执行文件 | 在 hardened runtime 开启的包上拉起成功；写明 `codesign` 身份与 `spctl` 结果 |
 | G2 | macOS 屏幕录制 / 辅助功能（TCC）授权的归属：由核心拉起的宿主进程做屏幕采集、输入注入，授权算谁的（对象含截图引擎、`plugin-rdp-server`、`plugin-mobile` 的桌面窗口输入与屏幕采集、`plugin-mfa` 的屏幕扫描） | 若算宿主自己的 TCC 主体，截图引擎与 `plugin-rdp-server` 的采集需要二次授权，且升级后 cdhash 变化会再次失效（见 `docs-issue/macos-screenshot-permission-and-signing.md`）；此时这两类能力改走核心内 `capture/`（§4.2 S1）或由 DEC-2 例外处理 |
-| G3 | Windows：下载到应用数据目录的 exe 被 SmartScreen / Defender 拦截的概率与处置 | 记录；至少 Authenticode 签名是否必需（现有发布流程是否已签名要先核实） |
+| G3 | Windows 下载到应用数据目录的宿主在系统防护下启动 | 沿用 main 的发布方式，接受未签名安装件。记录 Authenticode 状态、下载区域标记、Defender 和可观察的 SmartScreen 结果，实际启动候选宿主。 |
 | G4 | Linux：deb / rpm / AppImage 下应用数据目录是否可执行（`noexec` 挂载） | 不可执行时的明确报错与替代目录 |
 | G5 | 数据通道吞吐：RDP 帧经宿主进程 + loopback WS，与现有进程内路径对比 | 输入到画面的 p95 可比原验收上限增加最多 100%，以 65 ms 为基准，模块化验收上限为 130 ms。首帧 ≤ 500 ms，动画 ≥ 25.6 fps，带宽 ≤ 4905 kbps，沿用原用例的采样和画面验证。 |
 | G6 | 应用崩溃 / 强杀后宿主进程是否残留 | 三端都不残留，或有下一次启动的清扫 |
@@ -1018,9 +1018,9 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 
 | 验证门 | 已取得的结果 | 剩余验证 |
 |---|---|---|
-| G1 macOS 宿主启动 | macOS 26 ARM64 的候选 DMG 与签名 MFA 宿主均使用固定证书及 hardened runtime。实际安装后带隔离属性的宿主成功启动，两个主体的 Gatekeeper 评估均返回 3。 [实装回执](https://github.com/engcapa/taomni/actions/runs/44816840208) | 在最终候选上复验宿主启动及分发信任。 |
+| G1 macOS 宿主启动 | macOS 26 ARM64 的候选 DMG 与签名 MFA 宿主均使用固定证书及 hardened runtime。实际安装后带隔离属性的宿主成功启动，两个主体的 Gatekeeper 评估均返回 3。 [实装回执](https://github.com/engcapa/taomni/actions/runs/44816840208) | 最终候选与 main 使用同一固定签名身份，实测宿主启动并保留 Gatekeeper 原始评估。按 2026-11-22 的发布决定，接受主线的未公证配置。 |
 | G2 macOS 系统权限 | 同一签名身份的核心升级后保留屏幕录制和辅助功能授权。macOS 26 ARM64 的已安装签名 MFA 通过核心 `capture.still` 读取窗口并识别账号。 [授权保持](https://github.com/engcapa/taomni/actions/runs/44816840208) · [实装采集](https://github.com/engcapa/taomni/actions/runs/44824402835) | 补齐正式候选的原生输入及各模块权限归属。 |
-| G3 Windows 系统保护 | GitHub Windows Runner 在 Defender 实时保护开启时从 `LOCALAPPDATA` 成功启动带 Internet 区域标记的 Hello 和 MFA。启动前后均确认实时保护开启。 [Defender 工件](https://github.com/engcapa/taomni/actions/runs/44628961420) | 正式 Authenticode 资产和实际 SmartScreen 分发信誉。 |
+| G3 Windows 系统保护 | GitHub Windows Runner 在 Defender 实时保护开启时从 `LOCALAPPDATA` 成功启动带 Internet 区域标记的 Hello 和 MFA。启动前后均确认实时保护开启。 [Defender 工件](https://github.com/engcapa/taomni/actions/runs/44628961420) | 在最终候选上复验下载宿主、Defender 与执行结果，附安装件 Authenticode 状态。接受主线的未签名配置。 |
 | G4 Linux `noexec` | deb、RPM 和 AppImage 均验证宿主拒绝、用户按指引迁移 profile、原 Vault 与 MFA 连续读写。 [安装验证](taomni-modular-installed-upgrade-verification.md#linux-安装格式的-noexec-恢复) | 正式首发产物按同场景复验。 |
 | G5 帧吞吐 | 签名 RDP 查看器的 Linux、Windows 和 macOS 26 分别测得 p95 84.00、46.90、76.00 ms，每端均收到 40/40 个样本，均在 130 ms 上限内。独立探针通过首帧、动画帧率和带宽检查。 [Linux](https://github.com/engcapa/taomni/actions/runs/44890131445) · [Windows 与 macOS](https://github.com/engcapa/taomni/actions/runs/44888211385) | 在同一正式候选 SHA 上复测并绑定各平台签名包与原始样本。 |
 | G6 强制退出 | Linux deb、Windows MSI 和 macOS 26 ARM64 DMG 各有实装强退回执。签名 MFA 宿主在驱动清理前退出，重开后原账号继续计数。 [Linux 安装验证](taomni-modular-installed-upgrade-verification.md#linux-已安装应用的强制退出) · [Windows 实装](https://github.com/engcapa/taomni/actions/runs/44886832952) · [macOS 实装](https://github.com/engcapa/taomni/actions/runs/44816840208) | 用同一正式候选验证三端及各业务宿主的资源回收。 |

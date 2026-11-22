@@ -36,7 +36,7 @@ cargo test
 | `tests/integration/main.rs` | Single integration-test crate root (modules only) |
 | `tests/integration/*.rs` | Integration cases (former top-level `tests/*.rs`) |
 | `tests/integration/support/` | Shared mocks for the integration crate |
-| `tests/support/acp_fake_agent.rs` | `[[bin]] acp-fake-agent` fixture (not a test target) |
+| `tests/support/acp_fake_agent.rs` | ACP subprocess fixture. The dev dependency enables its Cargo feature for the integration suite. |
 
 ## Network / proxy / SSH jump-host tests
 

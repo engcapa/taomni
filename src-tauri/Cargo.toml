@@ -75,6 +75,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [[bin]]
 name = "acp-fake-agent"
 path = "tests/support/acp_fake_agent.rs"
+required-features = ["acp-test-fixture"]
 test = false
 bench = false
 
@@ -317,6 +318,7 @@ winscard = { path = "vendor/winscard" }
 
 [features]
 default = ["hbase-kerberos", "voice-capture"]
+acp-test-fixture = []
 # Isolated QA exercises both the pre-module relay and the signed host.
 legacy-vnc-client = ["dep:taomni-vnc-engine", "dep:taomni-vnc-key-protocol"]
 legacy-rdp-client = ["dep:taomni-rdp-client-engine"]
@@ -436,6 +438,9 @@ webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 gtk = "0.18.2"
 
 [dev-dependencies]
+# Cargo enables the helper when building integration tests. Tauri enumerates
+# only enabled binary targets when it assembles a desktop installer.
+taomni = { path = ".", default-features = false, features = ["acp-test-fixture"] }
 taomni-screenshot-ocr = { path = "crates/taomni-screenshot-ocr" }
 taomni-screenshot-recording = { path = "crates/taomni-screenshot-recording" }
 mail-parser = { version = "0.11.4", features = ["full_encoding"] }

@@ -38,6 +38,7 @@ sudo apt-get "${apt_options[@]}" install -y \
   libappindicator3-dev \
   librsvg2-dev \
   patchelf \
+  rpm \
   libkrb5-dev \
   nasm \
   libasound2-dev \

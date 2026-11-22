@@ -10935,6 +10935,7 @@ dependencies = [
  "sqlx-mysql",
  "sqlx-postgres",
  "subtle",
+ "taomni",
  "taomni-asr-models",
  "taomni-capture",
  "taomni-file-uri",
