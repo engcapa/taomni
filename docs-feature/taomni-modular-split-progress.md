@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- Mail 0.1.17（`a192bde02`）将后台正文预取迁入签名宿主，每批读取同一文件夹最多四封。手动打开邮件使用单独的请求。缓存提交校验 UIDVALIDITY，保留已读标记和先完成的正文。77 项前端单测、15 项 Rust 单测、核心编译与用例审计通过。GitHub 正在执行签名 Native、Browser 和完整崩溃回归。 [Mail 三端回归](https://github.com/engcapa/taomni/actions/runs/44967113628)
+- `469de51f4` 的三端 Browser 分片已收齐，各 39/39，覆盖 Local Voice、Local servers、Notepad、Explorer 和 Markdown Live 表格。Linux Native 的流程断言漏列 Local Voice 签名任务，`3a5f37ff3` 修正后已开始复跑。Windows Native 为 29/32，TC-MODULES-066 切换面板时读到了 SSH 端口 28491，失败快照随后显示迁移后的 HTTP 端口 28489。用例现等待该值后核对连接、备份和清理。TC-MODULES-067 从设置打开新终端后显式打开该终端的聊天面板。TC-SERVERS-004 已收到退出码 0，输出标记仍需验证，复跑分片会保留原始输出并在去除终端控制序列后检查完整标记行。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44963910380) · [Linux 复验](https://github.com/engcapa/taomni/actions/runs/44965415995)
 - Local servers 0.1.1 收齐 18/18 分片。三端 Browser 各 24/24，Linux 与 macOS Native 各 31/31，Windows Native 27/30。Windows 已通过签名安装、真实鉴权和文件读取，两个 SSH 用例卡在 PTY 输出结束。0.1.2 在进程退出时释放 ConPTY，并继续转发剩余输出和退出码。第三个失败是 HTTP 停止后 TCP 连接超时，复验将同时核对 Windows 实际监听表。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44957237883)
 - 合入远程 `main` 的 `3dd574044`（#854）。合并提交 `6eed8689b` 保留新版记事本、不可用关联处理器的回退和模块设置，原生 Mail 附件崩溃回归沿用主线等待只读文本就绪的断言。
 - Windows MSI 修正 Tools 导航定位后完成同一候选的强退复验。MFA 宿主在验证工具清理前已退出，重开后使用旧账号并继续 HOTP。联合构建已收齐 Linux、Windows、macOS ARM64 和 Intel 安装件，以及四个目标的 RDP Server 签名包。 [Windows 复跑](https://github.com/engcapa/taomni/actions/runs/44960070675) · [联合构建](https://github.com/engcapa/taomni/actions/runs/44951621527)
@@ -598,13 +600,13 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-017 RDP/VNC 服务端 | 已接入签名宿主与配置迁移，原生验收进行中 | 完成签名包的真实连接、停用和备份验收，并补 macOS 系统权限、Windows 和 macOS 的 VNC 系统服务以及正式安装件升级结果。 |
 | TASK-018 Servers | 签名宿主、配置迁移和默认依赖裁剪已接入 | 多端签名包、原配置与身份恢复、全部服务等价和运行中清理回执待验收。 |
 | TASK-019 SocksCap | 待前置闭合 | 提权/驱动/辅助进程、文件与恢复日志、卸载清理迁出。 |
-| TASK-020 截图 OCR/录制 | 待前置闭合 | OCR/录制插件；截图入口、滚动截图与采集保持核心归属。 |
+| TASK-020 截图 OCR/录制 | OCR 与录制已接入签名宿主和前端，待候选验收 | 原生离线 OCR、遮挡坐标、视频内容与时间轴继续核对。截图、滚动截图与采集归核心。 |
 | TASK-021 本地语音 | ASR 签名宿主已接入，待三端复验 | Whisper、SenseVoice、Zipformer 推理迁出。继续验收真实语音、模型目录、FIM、云 ASR 和麦克风保留路径。 [三端回归](https://github.com/engcapa/taomni/actions/runs/44963910380) |
 | TASK-022 Mobile | 首发按 DEC-2 留在核心 | 已将决定写入设计、签名目录生成器和 Release 说明。核心回归保留 Mobile，待正式候选回执。 |
 | TASK-023 发布验收 | 目录签名、首装名单和独立模块发布准备已验证 | 发布工具覆盖已暂存模块的签名、声明平台、描述和摘要。核心发布继承签名目录，独立发布保留原模块的资产地址。正式模块构建矩阵、系统签名、首批目录及最终两种安装集合的回归和性能仍待交付。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
 | TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
-| TASK-026 Mail | 签名前端及部分原生业务已迁入独立宿主 | 签名宿主负责连接测试、SMTP 发送、IMAP 文件夹、邮件头、搜索、标记，以及原文、按需正文和附件读取。后台预热、归档和过渡缓存仍待迁出，需完成正式安装升级、数据接管和回滚验收。 |
+| TASK-026 Mail | 签名前端与主要 IMAP 读写已接入独立宿主 | 签名宿主负责连接测试、SMTP 发送、IMAP 文件夹、邮件头、搜索、标记、原文、正文预取和附件读取。归档、过渡缓存归属和正式安装升级、数据接管及回滚继续验收。 |
 | TASK-027 G1–G11 全门禁收口 | 新增任务，未闭合 | G1–G11 的当前证据仍存在正式发行包、业务模块、核心依赖闭包、系统信任和完整入口矩阵缺口；必须用匹配源码的 GitHub runner receipt 逐项闭合后才能进入生产发布。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。

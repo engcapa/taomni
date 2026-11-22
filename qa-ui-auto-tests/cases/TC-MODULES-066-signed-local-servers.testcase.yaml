@@ -23,7 +23,7 @@ steps:
 - fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
 - click: '[data-testid="global-search-result"][data-result-id="servers"]'
 - click: '[data-testid="server-row-http"]'
-- assert_attribute: {selector: '[data-testid="server-field-port"]', name: value, equals: '28489'}
+- wait_for: {selector: '[data-testid="server-field-port"][value="28489"]', timeout_sec: 10}
 - assert_attribute: {selector: '[data-testid="server-field-bind-address"]', name: value, equals: '127.0.0.1'}
 - assert_attribute: {selector: '[data-testid="server-field-http-root-dir"]', name: value, equals: '${fixture.local_servers_http_root}'}
 - click: '[data-testid="server-row-http-start"]'
@@ -68,6 +68,7 @@ verification:
     actions: [7, 9, 14, 19, 21, 25, 29, 38, 43, 50]
     checkpoints:
     - {step: 8, expectation: The normal offline form accepts the verified package.}
+    - {step: 16, expectation: The loaded HTTP form shows the exact migrated listening port.}
     - {step: 18, expectation: The form shows the original HTTP document root.}
     - {step: 24, expectation: The form hides the legacy password.}
     - {step: 31, expectation: An independent SSH client uses the legacy password to read the original document and run a PTY command.}
@@ -77,7 +78,7 @@ verification:
     - {step: 46, expectation: A new SSH connection is also refused.}
     - {step: 51, expectation: Local servers shows HTTP stopped.}
     - {step: 52, expectation: The same application session remains usable.}
-    results: [8, 18, 24, 31, 32, 40, 45, 46, 51, 52]
+    results: [8, 16, 18, 24, 31, 32, 40, 45, 46, 51, 52]
   visual:
   - check: The HTTP row reports the actual lifecycle.
     method: automated

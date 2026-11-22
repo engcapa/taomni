@@ -17,6 +17,7 @@ PASSWORD = "taomni-local-ssh-fixture"
 FILE = "local-ssh.txt"
 CONTENT = b"Taomni Local servers SSH fixture\n"
 MARKER = b"TAOMNI_LOCAL_SSH"
+TERMINAL_ESCAPE = re.compile(rb"\x1b(?:\][^\x07\x1b]*(?:\x07|\x1b\\)|\[[0-?]*[ -/]*[@-~]|[()][0-2A-Z0-9])")
 
 
 def setup(ctx):
@@ -33,7 +34,7 @@ def run(ctx, phase):
     if fixture.case_id not in {CASE_ID, SIGNED_CASE_ID} or not fixture.values.get("local_servers_ssh_root"):
         raise StepError("The SSH observation requires its native Local servers fixture")
     if phase == "serving":
-        receipt = observe()
+        receipt = observe(ctx.case_dir)
     elif phase == "stopped":
         proof = verify_listener_closed(HOST, PORT)
         receipt = {"listener": False, "proof": proof}
@@ -45,7 +46,7 @@ def run(ctx, phase):
     return f"Verified local SSH/SFTP {phase} at {HOST}:{PORT}"
 
 
-def observe():
+def observe(case_dir):
     import paramiko
 
     with paramiko.SSHClient() as client:
@@ -62,7 +63,8 @@ def observe():
         if body != CONTENT:
             raise StepError("The local SSH server returned different SFTP file bytes")
         output, exit_code = run_pty_command(client, "echo TAOMNI_LOCAL_SSH")
-        visible = re.sub(rb"\x1b\[[0-?]*[ -/]*[@-~]", b"", output)
+        (case_dir / "local-ssh-command.stdout").write_bytes(output)
+        visible = TERMINAL_ESCAPE.sub(b"", output)
         if exit_code != 0 or MARKER not in visible.splitlines():
             raise StepError(f"The local SSH PTY did not return the expected marker (exit {exit_code})")
         _, nonzero = run_pty_command(client, "exit 23")
@@ -81,7 +83,7 @@ def run_pty_command(client, command):
     stdin, stdout, stderr = client.exec_command(command, get_pty=True, timeout=10)
     try:
         with stdin, stdout, stderr:
-            output = stdout.read(4096)
+            output = stdout.read()
             return output, stdout.channel.recv_exit_status()
     except TimeoutError as error:
         raise StepError("The SSH PTY did not finish producing output and an exit status") from error

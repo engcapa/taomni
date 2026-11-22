@@ -25,6 +25,7 @@ steps:
 - wait_for: '[data-testid="module-action-disable-ai-voice-local"]'
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="tao-home-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="chat-voice-button"]'
 - click: '[data-testid="chat-voice-button"]'
 - wait_for: {selector: '[data-testid="chat-voice-button"][data-state="recording"]', timeout_sec: 40}
@@ -37,6 +38,7 @@ steps:
 - wait_for: '[data-testid="module-action-enable-ai-voice-local"]'
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="tao-home-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="chat-voice-button"]'
 - click: '[data-testid="chat-voice-button"]'
 - wait_for: '[data-testid="voice-open-module-store"]'
@@ -48,16 +50,16 @@ verification:
   requirements:
   - id: installed-decode
     requirement: A signed host and preserved model cache let the user decode speech into the editable draft after enable.
-    actions: [6, 9, 12, 15, 20, 22, 27, 32]
+    actions: [6, 9, 12, 15, 19, 21, 23, 28, 32, 34]
     checkpoints:
     - {step: 8, expectation: The local module is unavailable before installation.}
     - {step: 14, expectation: The installed native host matches the package fixture.}
-    - {step: 23, expectation: Local inference recognizes the expected phrase in the draft.}
-    - {step: 24, expectation: The transcript also includes the distinct reference word.}
-    - {step: 34, expectation: The alert names the now-disabled module.}
-    - {step: 35, expectation: Disabling the module disables inference in the same app process.}
-    - {step: 36, expectation: The renderer reports no runtime errors.}
-    results: [8, 14, 23, 24, 34, 35, 36]
+    - {step: 24, expectation: Local inference recognizes the expected phrase in the draft.}
+    - {step: 25, expectation: The transcript also includes the distinct reference word.}
+    - {step: 36, expectation: The alert names the now-disabled module.}
+    - {step: 37, expectation: Disabling the module disables inference in the same app process.}
+    - {step: 38, expectation: The renderer reports no runtime errors.}
+    results: [8, 14, 24, 25, 36, 37, 38]
   visual:
   - check: The required or disabled module is visible in the recording status.
     method: automated
