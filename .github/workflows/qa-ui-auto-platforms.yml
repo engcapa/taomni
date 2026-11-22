@@ -15,13 +15,17 @@ on:
         description: Explicit base commit/ref for impacted scope
         type: string
       platforms:
-        description: Comma-separated linux,windows,macos
+        description: Comma-separated linux,windows,macos (empty = default; linux when quick)
         type: string
-        default: linux,windows,macos
+        default: ''
       modes:
-        description: Comma-separated browser,native
+        description: Comma-separated browser,native (empty = default; native when quick)
         type: string
-        default: browser,native
+        default: ''
+      quick:
+        description: Single-platform fast dispatch (defaults to linux/native, retains crash-regression, non-merge-eligible)
+        type: boolean
+        default: false
       linux_profiles:
         description: 'Linux native profiles (CSV): ubuntu-24.04-xvfb,ubuntu-22.04-x11,ubuntu-22.04-vnc,ubuntu-26.04-wayland'
         type: string
@@ -64,8 +68,9 @@ on:
       scope: {type: string, default: smoke}
       head: {type: string, default: ''}
       base: {type: string, default: ''}
-      platforms: {type: string, default: 'linux,windows,macos'}
-      modes: {type: string, default: 'browser,native'}
+      platforms: {type: string, default: ''}
+      modes: {type: string, default: ''}
+      quick: {type: boolean, default: false}
       linux_profiles: {type: string, default: 'ubuntu-24.04-xvfb'}
       shards: {type: string, default: auto}
       browser_workers: {type: number, default: 2}
@@ -107,6 +112,13 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: >-
+    ${{ github.event_name == 'workflow_dispatch' && inputs.quick &&
+    format('qa-quick-{0}-{1}-{2}-{3}-{4}', github.ref_name, inputs.head, inputs.platforms, inputs.modes, inputs.case_ids) ||
+    format('qa-ui-auto-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' && inputs.quick }}
 
 env:
   PYTHONPATH: .agents/skills/qa-ui-auto/scripts
@@ -170,7 +182,7 @@ jobs:
         run: python .agents/skills/qa-ui-auto/scripts/qa_ui_auto/dev_contract.py --base "$QA_BASE" --head "$QA_HEAD"
 
   tool-contracts:
-    if: (github.event_name != 'pull_request' || inputs.scope != '') && inputs.scope != 'selected'
+    if: (github.event_name != 'pull_request' || inputs.scope != '') && inputs.scope != 'selected' && !inputs.quick
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -257,7 +269,8 @@ jobs:
       - name: Plan exact cases and dependencies
         id: plan
         env:
-          QA_SCOPE: ${{ inputs.scope || github.event_name == 'pull_request' && 'selected' || github.event_name == 'schedule' && 'all' || 'smoke' }}
+          QA_QUICK: ${{ inputs.quick && 'true' || 'false' }}
+          QA_SCOPE: ${{ inputs.quick && (inputs.scope == '' || inputs.scope == 'smoke') && (inputs.case_ids != '' || inputs.features != '' || inputs.tags != '') && 'selected' || inputs.scope || github.event_name == 'pull_request' && 'selected' || github.event_name == 'schedule' && 'all' || 'smoke' }}
           QA_BASE: ${{ inputs.base }}
           QA_PLATFORMS: ${{ inputs.platforms }}
           QA_MODES: ${{ inputs.modes }}
@@ -268,8 +281,8 @@ jobs:
           QA_CASE_IDS: ${{ inputs.case_ids }}
           QA_FEATURES: ${{ inputs.features }}
           # New feature PRs always run the packaged crash suite. Focused manual
-          # selections also retain it, even when their feature selectors differ.
-          QA_TAGS: ${{ inputs.scope == '' && github.event_name == 'pull_request' && 'crash-regression' || (inputs.scope == 'selected' || inputs.scope == 'impacted') && format('{0},crash-regression', inputs.tags) || inputs.tags }}
+          # selections and quick runs also retain it, even when their feature selectors differ.
+          QA_TAGS: ${{ inputs.scope == '' && github.event_name == 'pull_request' && 'crash-regression' || (inputs.scope == 'selected' || inputs.scope == 'impacted' || (inputs.quick && (inputs.case_ids != '' || inputs.features != '' || inputs.tags != ''))) && format('{0},crash-regression', inputs.tags) || inputs.tags }}
         run: python -m qa_ui_auto.ci plan
       - uses: actions/upload-artifact@v4
         with:
@@ -367,7 +380,7 @@ jobs:
   frontend-contracts:
     name: Frontend contracts (shard ${{ matrix.shard }}/4)
     needs: plan
-    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || inputs.scope != 'selected'
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || (inputs.scope != 'selected' && !inputs.quick)
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -408,7 +421,7 @@ jobs:
           retention-days: 14
 
   summarize:
-    name: qa-ui-auto-platforms-result
+    name: qa-ui-auto-platforms-result${{ inputs.quick && '-quick' || '' }}
     if: always() && needs.plan.result != 'skipped'
     needs: [plan, tool-contracts, sftp-contracts, frontend-contracts, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
     runs-on: ubuntu-24.04
@@ -467,7 +480,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: qa-summary-${{ needs.plan.outputs.artifact_key }}
+          name: qa-summary${{ inputs.quick && '-quick' || '' }}-${{ needs.plan.outputs.artifact_key }}
           path: |
             qa-ui-auto-report/ci-summary.json
             qa-ui-auto-report/summary.md
@@ -476,7 +489,7 @@ jobs:
 
   publish-issues:
     if: >-
-      always() && needs.plan.result == 'success' && (inputs.publish_issues ||
+      always() && needs.plan.result == 'success' && !inputs.quick && (inputs.publish_issues ||
       (github.event_name == 'schedule' && vars.QA_UI_AUTO_PUBLISH_ISSUES == 'true')) &&
       github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
     needs: [plan, summarize]
