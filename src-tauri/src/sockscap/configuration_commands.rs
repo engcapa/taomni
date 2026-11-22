@@ -239,25 +239,10 @@ pub async fn sockscap_test_target(
         }
     }
 
-    let orch = state.legacy.sockscap.orch.read().await;
-    let cfg = orch
-        .config()
-        .cloned()
-        .unwrap_or_else(SocksCapConfig::default);
-    let engine = PolicyEngine::from_config(&cfg, orch.rules());
-    let input = PolicyInput {
-        host: Some(host.clone()),
-        ip: host.parse().ok(),
-        port,
-        process_path: None,
-        pid: None,
+    let probe = {
+        let orch = state.legacy.sockscap.orch.read().await;
+        let cfg = orch.config().cloned().unwrap_or_default();
+        policy::TargetRuleProbe::for_config(&cfg, orch.rules(), host, port)
     };
-    let trace = engine.decide(&input);
-    Ok(TargetTestResult {
-        host,
-        port,
-        decision: trace.decision,
-        reason: trace.reason,
-        matched_rule: trace.matched_rule,
-    })
+    module_host::test_target(&state.plugins, probe).await
 }

@@ -13,8 +13,13 @@ import zipfile
 from .backup_policy import isolated_data_root
 from .module_signed_archive import load_artifact, platform_key
 
+SIGNED_CASES = {"TC-MODULES-072", "TC-MODULES-073"}
+
 
 def setup(ctx):
+    user_rules = []
+    if ctx.case_id == "TC-MODULES-073":
+        user_rules.append({"pattern": "route.example.test", "action": "block"})
     serialized = json.dumps({
         "enabled": False,
         "mode": "global",
@@ -22,7 +27,7 @@ def setup(ctx):
         "upstream": {"kind": "socks5", "host": "127.0.0.1", "port": 19391},
         "ruleMode": "gfwList",
         "gfwlist": {"enabled": False, "autoRefreshHours": 24, "url": ""},
-        "userRules": [],
+        "userRules": user_rules,
         "bypassCidrs": ["127.0.0.0/8"],
         "defaultAction": "direct",
     })
@@ -34,7 +39,7 @@ def setup(ctx):
 
 
 def setup_signed(ctx):
-    if ctx.case_id != "TC-MODULES-072" or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    if ctx.case_id not in SIGNED_CASES or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Signed SocksCap input requires its native case")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     manifest = Path(__file__).resolve().parents[6] / "src-tauri/plugins/sockscap/module.json"

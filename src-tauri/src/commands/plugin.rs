@@ -195,7 +195,8 @@ pub async fn plugin_invoke(
             && taomni_screenshot_api::COMMANDS.contains(&command.as_str()))
         || (slug == taomni_local_voice_api::SLUG
             && taomni_local_voice_api::COMMANDS.contains(&command.as_str()))
-        || (slug == taomni_sockscap_api::SLUG && command == taomni_sockscap_api::PARSE_SHARE_LINK)
+        || (slug == taomni_sockscap_api::SLUG
+            && taomni_sockscap_api::COMMANDS.contains(&command.as_str()))
         || (slug == taomni_mail_api::SLUG
             && matches!(
                 command.as_str(),

@@ -272,7 +272,7 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           pwsh scripts/stage-sockscap-windows.ps1 -Configuration release
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-sockscap-api --locked --lib
-          cargo test --manifest-path src-tauri/Cargo.toml --lib -- sockscap::policy sockscap::core
+          cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::core
           pwsh scripts/stage-sockscap-windows.ps1 --check
 
       - name: Check updater signing configuration

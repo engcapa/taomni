@@ -79,3 +79,25 @@ pub struct AppSelector {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub macos_identity: Option<MacosAppIdentity>,
 }
+
+/// Normalize an executable path for app-list matching (lowercase, backslashes, no trailing slash).
+pub fn normalize_exe_path(p: &str) -> String {
+    let mut s = p.trim().replace('/', "\\").to_ascii_lowercase();
+    while s.ends_with('\\') {
+        s.pop();
+    }
+    // Collapse \\?\ prefix
+    if let Some(rest) = s.strip_prefix(r"\\?\") {
+        s = rest.to_string();
+    }
+    s
+}
+
+pub fn paths_match_exe(process_path: &str, selector: &str) -> bool {
+    let p = normalize_exe_path(process_path);
+    let s = normalize_exe_path(selector);
+    if p.is_empty() || s.is_empty() {
+        return false;
+    }
+    p == s || p.ends_with(&s) || std::path::Path::new(&p).ends_with(std::path::Path::new(&s))
+}

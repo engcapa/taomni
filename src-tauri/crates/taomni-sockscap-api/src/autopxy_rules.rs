@@ -149,6 +149,7 @@ fn normalize_host_pattern(s: &str) -> Option<String> {
 }
 
 /// Does `host` match a domain-suffix rule `suffix`?
+#[cfg(test)]
 pub fn host_matches_suffix(host: &str, suffix: &str) -> bool {
     let h = host.trim_end_matches('.').to_ascii_lowercase();
     let s = suffix.trim_end_matches('.').to_ascii_lowercase();

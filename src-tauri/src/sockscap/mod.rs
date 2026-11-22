@@ -53,7 +53,7 @@ pub mod tun_detect;
 
 pub use config::{Decision, RuleMode, SocksCapConfig};
 pub use orchestrator::{Orchestrator, SocksCapStatus};
-pub use policy::{PolicyEngine, PolicyInput};
+pub use policy::{PolicyEngine, PolicyInput, TargetTestResult};
 pub use rules::GfwListMeta;
 pub use stats::DomainRecord;
 
@@ -212,16 +212,6 @@ pub struct GfwListStatus {
     pub last_refresh: Option<String>,
     pub source: String,
     pub error: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TargetTestResult {
-    pub host: String,
-    pub port: u16,
-    pub decision: Decision,
-    pub reason: String,
-    pub matched_rule: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,0 +1,43 @@
+id: TC-MODULES-074
+title: SocksCap target preview shows the simulated routing result
+description: Open the target test from Tools and verify the preview shows the target, result and matching rule.
+covers: [F-Sockscap-1]
+tags: [modules, sockscap, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-testid="sockscap-panel"]'
+- click: '[data-testid="sockscap-section-test-toggle"]'
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: github.example.test}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'github.example.test:443'}
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Decision: proxy'}
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Matched rule: ||stub'}
+- click: '[data-testid="sockscap-test-detail-close"]'
+- wait_for: {selector: '[data-testid="sockscap-test-detail"]', state: detached}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: target-preview
+    requirement: The target test passes the entered host to the preview and displays its complete result.
+    actions: [2, 3, 5, 6, 7, 11]
+    checkpoints:
+    - {step: 8, expectation: The detail contains the requested host and default port.}
+    - {step: 9, expectation: The rendered decision matches the preview response.}
+    - {step: 10, expectation: The matching preview rule is displayed.}
+    - {step: 12, expectation: The user can close the result and return to the panel.}
+    - {step: 13, expectation: The target test runs without runtime errors.}
+    results: [8, 9, 10, 12, 13]
+  visual:
+  - check: The detail displays the requested host alongside the decision and rule.
+    method: automated
+    reason: The case checks the detail opened by the normal control.
+  native:
+  - check: Native target decisions and signed host execution are covered by TC-MODULES-073.
+    method: not-applicable
+    reason: This fixture exercises the preview response.

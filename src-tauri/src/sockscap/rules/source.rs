@@ -1,6 +1,6 @@
 //! Fetch / import / cache GFWList rule sources.
 
-use super::gfwlist::{CompiledRules, GfwListMeta};
+use super::{CompiledRules, GfwListMeta};
 use std::path::{Path, PathBuf};
 
 fn raw_path(dir: &Path) -> PathBuf {

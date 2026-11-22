@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- SocksCap 0.1.1 的签名宿主接管目标规则试算。中转请求只传该目标需要的路由规则，用户凭据留在原有 Vault 路径。原生流量路由复用拆出的策略和规则编译器。48 项 Rust 单测、核心和宿主编译通过。TC-MODULES-073 验证 Windows 和 macOS 的旧规则决策及签名宿主，TC-MODULES-074 验证 Browser 展示。Linux 启动模式原本没有目标试算面板，该平台仍验签名解析和旧配置。
+- `f0b9490ea` 的三端 Browser 分片每端通过 23/23，覆盖 SocksCap 旧配置、Mail 前台阅读、Notepad 和崩溃回归。签名模块的 Native 分片仍按完成顺序核对。`46bda579a` 的归档复验三端 Browser 各 21/21。 [模块回归](https://github.com/engcapa/taomni/actions/runs/44975396751) · [Mail 归档复验](https://github.com/engcapa/taomni/actions/runs/44976337125)
 - Mail 的归档续传、分段写入和发布后清理迁入 `taomni-mail-engine`。保留旧版部分文件与续传元数据格式。新增单测核对传输取消和发布失败后的实际续传偏移，TC-MODULES-070 增加归档后无临时文件的断言。67 项引擎单测、核心与宿主编译以及用例审计通过。归档索引的写入仍由核心过渡层持有。
 - 合入远程 `main` 的 `4e19707e4`（#855），合并提交为 `5a911b255`。记事本相关 36 项单测和 TypeScript 检查通过。
 - Windows 的本地 SSH/SFTP 分片复验通过，包含精确命令输出和端口释放。Local Voice 分片确认签名包已安装且应用检测到预置 Whisper 模型，原测试配置缺少必填字段，录音按钮打开了模型设置。TC-MODULES-067 现通过界面选用 Whisper Base 和英语，继续验证原录音路径、转写和停用。29 项相关前端单测及用例审计通过。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44969347390)

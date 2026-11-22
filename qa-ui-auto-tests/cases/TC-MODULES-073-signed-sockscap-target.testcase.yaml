@@ -1,0 +1,55 @@
+id: TC-MODULES-073
+title: Signed SocksCap evaluates an existing routing rule in Test Target
+description: Install the signed module and verify the rule decision from the old routing profile through the normal dry-run panel.
+covers: [F-Sockscap-1, F-Modules-1]
+tags: [modules, sockscap, native-boundary, p1]
+modes: [native]
+native_platforms: [Windows, macOS]
+fixtures: [reset_db, sockscap_legacy_config, module_signed_sockscap_archive]
+timeout_sec: 140
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.sockscap_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.sockscap_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- assert_file_sha256: {path: '${fixture.sockscap_signed_host}', equals: '${fixture.sockscap_signed_host_sha256}'}
+- click: '[data-testid="module-action-enable-sockscap"]'
+- wait_for: '[data-testid="module-action-disable-sockscap"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-testid="sockscap-panel"]'
+- assert_signed_sockscap_host: idle
+- click: '[data-testid="sockscap-section-test-toggle"]'
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: route.example.test}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Decision: block'}
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Matched rule: route.example.test'}
+- assert_signed_sockscap_host: running
+- click: '[data-testid="sockscap-test-detail-close"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-policy-probe
+    requirement: Testing the target uses the installed host and shows the matching rule from the legacy profile.
+    actions: [6, 9, 13, 16, 17, 18, 22]
+    checkpoints:
+    - {step: 8, expectation: The executable identity matches the signed package.}
+    - {step: 15, expectation: Opening the panel leaves the enabled host idle.}
+    - {step: 19, expectation: The result reports that the target is blocked.}
+    - {step: 20, expectation: The result identifies the exact retained rule.}
+    - {step: 21, expectation: Test Target started the signed module host.}
+    - {step: 23, expectation: The dry-run completes without runtime errors.}
+    results: [8, 15, 19, 20, 21, 23]
+  visual:
+  - check: The dry-run dialog displays the decision and matched rule.
+    method: automated
+    reason: The visible dialog is checked after clicking the normal action.
+  native:
+  - check: The verified host holds the writer lease after the targeted request.
+    method: automated
+    reason: The test checks the lease before and after the action. Linux launch-only mode lacks this panel control.

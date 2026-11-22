@@ -4,7 +4,10 @@ mod scope;
 
 mod upstream;
 
-mod applications;
+pub mod applications;
+mod autopxy_rules;
+pub mod gfwlist_rules;
+pub mod policy;
 
 mod launch;
 
@@ -31,9 +34,12 @@ pub use launch::{AppLaunchMode, AppLaunchPreparation, AppLaunchShell};
 
 pub use rules::{SocksCapProfile, UserRule, UserRuleAction};
 
+pub use autopxy_rules::parse_autopxy_line;
 pub use gfwlist::GfwListSource;
 
 pub use settings::SocksCapConfig;
 
 pub const SLUG: &str = "sockscap";
 pub const PARSE_SHARE_LINK: &str = "sockscap/parse-share-link";
+pub const TEST_TARGET: &str = "sockscap/test-target";
+pub const COMMANDS: [&str; 2] = [PARSE_SHARE_LINK, TEST_TARGET];

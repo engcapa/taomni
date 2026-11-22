@@ -9028,6 +9028,8 @@ files:
   - src/components/sockscap/SocksCapPanel.tsx
   - src/components/sockscap/SocksCapRootPrompt.tsx
   - src-tauri/crates/taomni-sockscap-api/
+  - src-tauri/plugins/sockscap/
+  - src-tauri/src/sockscap/
   - src/lib/sockscap.ts
   - src/stubs/tauri-core.ts
 controls:
@@ -9230,6 +9232,7 @@ controls:
 -->
 
 - 提供全局/按应用 TCP 路由、上游代理、GFWList、规则 dry-run、状态与流量统计的控制面板。
+- 启用签名 SocksCap 后，测试目标会在独立宿主计算实际决策并显示命中的规则。TC-MODULES-073 从旧配置验证签名宿主，TC-MODULES-074 验证 Browser 结果面板。
 - Linux 有权限时继续通过 nftables + cgroup v2 做透明 TCP 重定向；无 sudo、受限桌面容器等环境自动切换为“从 SocksCap 启动应用”的 loopback 捕获，不注入 HTTP_PROXY/ALL_PROXY 等代理变量。该模式只覆盖由面板启动的动态链接应用及其继承进程。
 - 浏览器预览覆盖控制面板状态流转；内核捕获和原始目标恢复由 Rust 单元/集成验证覆盖。
 

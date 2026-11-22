@@ -1,6 +1,6 @@
 //! Compile and match GFWList / AutoProxy rule sets.
 
-use super::autopxy::{ParsedRule, host_matches_suffix, parse_autopxy_line};
+use super::autopxy_rules::{ParsedRule, parse_autopxy_line};
 use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ impl GfwListMeta {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum RuleMatch {
     /// Host matched a proxy rule in GFWList.
     Proxy { rule: String },
@@ -235,6 +235,7 @@ fn chrono_like_now() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::autopxy_rules::host_matches_suffix;
 
     const SAMPLE: &str = r#"[AutoProxy 0.2.9]
 ! Comment

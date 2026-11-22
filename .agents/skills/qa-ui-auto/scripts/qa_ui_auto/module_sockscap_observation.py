@@ -3,6 +3,7 @@
 import json
 
 from .fixtures.backup_policy import isolated_data_root
+from .fixtures.sockscap_legacy import SIGNED_CASES
 from .module_profile_observation import writer_lease
 from .steps import StepError
 
@@ -32,7 +33,7 @@ def show_upstream(ctx, args, *, mode):
 def run(ctx, phase):
     owner = ctx.fixture_context
     receipt = getattr(owner, "signed_sockscap", None)
-    if owner.case_id != "TC-MODULES-072" or not receipt or phase not in {"idle", "running", "disabled"}:
+    if owner.case_id not in SIGNED_CASES or not receipt or phase not in {"idle", "running", "disabled"}:
         raise StepError("The SocksCap host observation requires its signed native case")
     observed = writer_lease(isolated_data_root(owner) / "plugins", slug="sockscap", enabled=phase == "running")
     result = {

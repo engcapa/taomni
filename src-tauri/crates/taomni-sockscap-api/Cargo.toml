@@ -9,6 +9,7 @@ description = "Persisted SocksCap configuration shared by the core and module"
 [dependencies]
 base64 = "0.22"
 hex = "0.4"
+regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"
