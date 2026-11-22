@@ -94,7 +94,9 @@ describe("PrimaryNavigationRail (TASK-02)", () => {
     vi.mocked(openExplorer).mockClear();
     fireEvent.click(screen.getByTestId("side-tab-explorer"));
     expect(openExplorer).not.toHaveBeenCalled();
-    expect(useAppStore.getState()).toMatchObject({ activeSideTab: "explorer", sidebarCollapsed: false });
+    // U6: the rail only switches modes; MainLayoutView keeps the rail-only
+    // Explorer surface collapsed (asserted in the MainLayout integration case).
+    expect(useAppStore.getState().activeSideTab).toBe("explorer");
     expect(useExplorerStore.getState().activeTabId).toBe("explorer-current");
   });
 

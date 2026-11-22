@@ -15,6 +15,7 @@ import { setNotepadPreferences, useNotepadPreferences } from "../../../stores/no
 import { useNotepadStore, type NotepadPanelId } from "../../../stores/notepadStore";
 import type { NotepadCommandHandler } from "../../../lib/notepad/commands/types";
 import type { NotepadActionContext } from "./context";
+import { resolveNotepadSaveAsDefaults } from "./saveDefaults";
 
 /**
  * Core Notepad command handlers (file lifecycle, editing, transforms, search,
@@ -31,13 +32,11 @@ export function createCoreCommandMap(ctx: NotepadActionContext): Record<string, 
       if (picked) await viewerTabHost.openFile(picked, ctx.hostCtx);
     },
     "file.save": () => ctx.performSave(),
-    "file.saveAs": () => {
-      const fallbackName = ctx.docState.titleHint || ctx.document.path.split(/[\\/]/).pop() || "untitled.txt";
-      ctx.setLifecycleModal({
-        kind: "saveAs",
-        defaultPath: fallbackName,
-        initialPath: isUntitledKey(ctx.document.path) ? "" : ctx.document.path,
-      });
+    "file.saveAs": async () => {
+      // U2: untitled documents default to the absolute last-save-dir/$HOME path;
+      // saved documents keep their current path prefilled for in-place editing.
+      const defaults = await resolveNotepadSaveAsDefaults(ctx.document.path, ctx.docState.titleHint || "");
+      ctx.setLifecycleModal({ kind: "saveAs", ...defaults });
     },
     "file.saveAll": async () => {
       const allDocs = Object.values(useDocumentStore.getState().documents);

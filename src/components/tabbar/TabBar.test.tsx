@@ -462,4 +462,31 @@ describe("TabBar overflow navigation", () => {
 
     expect(screen.getByTestId("tab-context-duplicate")).toBeDisabled();
   });
+
+  it("keeps the Sessions tab context menu order, labels and QA anchors after the shared builder refactor", () => {
+    useAppStore.setState({ tabs: [makeTab(0), makeTab(1)], activeTabId: "tab-0" });
+    renderTabBar();
+
+    fireEvent.contextMenu(screen.getAllByTestId("tab-item")[0]);
+    const menu = screen.getByTestId("context-menu");
+    const testIds = Array.from(menu.querySelectorAll<HTMLElement>("button"))
+      .map((button) => button.getAttribute("data-testid"));
+    expect(testIds).toEqual([
+      "context-menu-item-close",
+      "context-menu-item-close-others",
+      "context-menu-item-close-all",
+      "context-menu-item-rename-tab",
+      "tab-context-duplicate",
+      "tab-context-copy-session-info",
+      "context-menu-item-move-to-first",
+      "context-menu-item-move-left",
+      "context-menu-item-move-right",
+      "context-menu-item-move-to-last",
+    ]);
+    expect(screen.queryByText("Pin tab")).not.toBeInTheDocument();
+    expect(screen.queryByText("Close unpinned tabs")).not.toBeInTheDocument();
+    for (const icon of menu.querySelectorAll("button svg")) {
+      expect(icon).toHaveClass("w-3", "h-3");
+    }
+  });
 });

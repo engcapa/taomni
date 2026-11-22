@@ -92,10 +92,11 @@ export function MainLayoutView(props: MainLayoutViewProps) {
     return () => setForceRailMerge(false);
   }, [activeSideTab, setForceRailMerge]);
 
-  // Home opens as the wide launch surface from the prototype. The toolbar
-  // toggles can still reveal either companion panel on demand.
+  // Home opens as the wide launch surface from the prototype, and Explorer is
+  // rail-only after U6. Both modes have no expanded sidebar content, so entering
+  // them collapses the navigator instead of revealing an empty panel.
   useEffect(() => {
-    if (activeSideTab !== "home") return;
+    if (activeSideTab !== "home" && activeSideTab !== "explorer") return;
     useAppStore.getState().setSidebarCollapsed(true);
   }, [activeSideTab]);
 

@@ -65,4 +65,8 @@ describe("browser invoke domain dispatch", () => {
     await invoke("vault_unlock", { masterPassword: "fixture-password" });
     expect(await invoke("vault_status")).toMatchObject({ state: "unlocked" });
   });
+
+  it("reports the browser VFS root as the home directory for Notepad Save As defaults", async () => {
+    await expect(invoke<string | null>("get_home_dir", {})).resolves.toBe("/preview");
+  });
 });

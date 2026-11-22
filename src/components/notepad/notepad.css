@@ -24,7 +24,7 @@
   gap: 2px;
   padding: 2px 6px;
   border-bottom: 1px solid var(--taomni-divider);
-  background: var(--taomni-surface, var(--taomni-bg));
+  background: var(--taomni-menubar-bg, var(--taomni-bg));
   font-size: 12px;
   user-select: none;
   flex-shrink: 0;
@@ -53,7 +53,7 @@
   gap: 2px;
   padding: 3px 6px;
   border-bottom: 1px solid var(--taomni-divider);
-  background: var(--taomni-panel, var(--taomni-surface));
+  background: var(--taomni-panel-bg, var(--taomni-bg));
   flex-shrink: 0;
 }
 
@@ -169,7 +169,7 @@
   padding: 2px 8px;
   height: 24px;
   border-top: 1px solid var(--taomni-divider);
-  background: var(--taomni-surface, var(--taomni-panel));
+  background: var(--taomni-panel-bg, var(--taomni-bg));
   font-size: 11px;
   color: var(--taomni-text-muted);
   user-select: none;
@@ -209,7 +209,7 @@
 /* Find & Replace Dock / Modal Bar */
 .np-find-bar {
   border-bottom: 1px solid var(--taomni-divider);
-  background: var(--taomni-surface, var(--taomni-bg));
+  background: var(--taomni-panel-bg, var(--taomni-bg));
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
@@ -250,7 +250,7 @@
   min-width: 180px;
   max-width: 360px;
   border-left: 1px solid var(--taomni-divider);
-  background: var(--taomni-surface, var(--taomni-bg));
+  background: var(--taomni-panel-bg, var(--taomni-bg));
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -261,7 +261,7 @@
   min-height: 100px;
   max-height: 360px;
   border-top: 1px solid var(--taomni-divider);
-  background: var(--taomni-surface, var(--taomni-bg));
+  background: var(--taomni-panel-bg, var(--taomni-bg));
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -275,7 +275,7 @@
   font-size: 11px;
   font-weight: 600;
   border-bottom: 1px solid var(--taomni-divider);
-  background: var(--taomni-panel, var(--taomni-surface));
+  background: var(--taomni-button-from, var(--taomni-panel-bg));
 }
 
 /* CM6 Pseudo-element Symbols (zero .cm-line textContent pollution) */
@@ -422,7 +422,7 @@
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100vh - 48px);
   overflow: auto;
-  background: var(--taomni-surface, #ffffff);
+  background: var(--taomni-panel-bg, #ffffff);
   color: var(--taomni-text, #111827);
   border: 1px solid var(--taomni-divider);
   border-radius: 8px;
@@ -460,7 +460,7 @@
   padding: 0 10px;
   border-radius: 4px;
   border: 1px solid var(--taomni-divider);
-  background: var(--taomni-panel, var(--taomni-surface));
+  background: var(--taomni-button-from, var(--taomni-panel-bg));
   color: var(--taomni-text);
   font-size: 12px;
   cursor: pointer;
@@ -486,7 +486,7 @@
   height: 100%;
   min-height: 0;
   border-left: 1px solid var(--taomni-chrome-border, var(--taomni-divider));
-  background: var(--taomni-panel-bg, var(--taomni-surface, var(--taomni-bg)));
+  background: var(--taomni-panel-bg, var(--taomni-bg));
 }
 
 .np-right-dock .np-side-dock {
@@ -507,7 +507,7 @@
   min-height: 120px;
   max-height: 50%;
   border-top: 1px solid var(--taomni-chrome-border, var(--taomni-divider));
-  background: var(--taomni-panel-bg, var(--taomni-surface, var(--taomni-bg)));
+  background: var(--taomni-panel-bg, var(--taomni-bg));
 }
 
 .np-bottom-dock .np-bottom-panel {
@@ -535,7 +535,7 @@
   flex-direction: column;
   pointer-events: auto;
   overflow: hidden;
-  background: var(--taomni-card-bg, var(--taomni-surface, var(--taomni-bg)));
+  background: var(--taomni-card-bg, var(--taomni-bg));
   border: 1px solid var(--taomni-card-border, var(--taomni-divider));
   border-radius: 9px;
   box-shadow: 0 14px 38px rgba(15, 23, 42, 0.22);
@@ -594,7 +594,7 @@
   padding: 0 10px;
   border-radius: 999px;
   border: 1px solid var(--taomni-divider);
-  background: var(--taomni-surface, #ffffff);
+  background: var(--taomni-panel-bg, #ffffff);
   color: var(--taomni-text);
   font-size: 12px;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.22);

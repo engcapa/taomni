@@ -1,20 +1,14 @@
 import {
   ChevronDown,
-  ChevronFirst,
-  ChevronLast,
   ChevronLeft,
   ChevronRight,
-  ClipboardCopy,
-  Copy,
   FilePlus,
   Folder,
   History,
-  Pencil,
   Plus,
   Search,
   Server,
   Terminal as TerminalIcon,
-  Trash2,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -33,6 +27,7 @@ import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { TabDetailsOverlay } from "./TabDetailsOverlay";
 import { type DropIndicator, type TabBarProps, type TabScrollState } from "./tabs/model";
 import { maxScrollLeft, setTabScrollLeft, TAB_DRAG_MIME, TAB_SCROLL_EDGE_TOLERANCE, TAB_SCROLL_PADDING, TAB_SCROLL_STEP_MIN } from "./tabs/scroll";
+import { buildTabContextMenu } from "./tabs/tabContextMenu";
 import { IconBtn, TabItem } from "./tabs/TabItem";
 
 export function TabBar({
@@ -373,33 +368,48 @@ export function TabBar({
       const target = sessionTabs[index];
       if (target) moveTabToIndex(tab.id, tabs.findIndex((item) => item.id === target.id));
     };
-    ctx.show(e, [
-      { label: t("tabs.close"), icon: <X className="w-3 h-3" />, onClick: () => removeTab(tab.id), disabled: !tab.closable },
-      { label: t("tabs.closeOthersShort"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.id !== tab.id && t.closable).map((t) => t.id)) },
-      { label: t("tabs.closeAll"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.closable).map((t) => t.id)) },
-      { label: "", separator: true, onClick: () => { } },
-      { label: t("tabs.rename"), icon: <Pencil className="w-3 h-3" />, onClick: () => startRename(tab), disabled: !tab.closable },
-      {
-        label: t("tabs.duplicate"),
-        testId: "tab-context-duplicate",
-        icon: <Copy className="w-3 h-3" />,
-        onClick: () => {
-          (onDuplicateTab ?? duplicateTab)(tab.id);
-        },
-        disabled: tab.type === "welcome" || tab.type === "servers",
+    ctx.show(e, buildTabContextMenu({
+      labels: {
+        close: t("tabs.close"),
+        closeOthers: t("tabs.closeOthersShort"),
+        closeAll: t("tabs.closeAll"),
+        rename: t("tabs.rename"),
+        duplicate: t("tabs.duplicate"),
+        copyPath: t("tabs.copySessionInfo"),
+        moveToFirst: t("tabs.moveToFirst"),
+        moveLeft: t("tabs.moveLeft"),
+        moveRight: t("tabs.moveRight"),
+        moveToLast: t("tabs.moveToLast"),
       },
-      {
-        label: t("tabs.copySessionInfo"),
-        testId: "tab-context-copy-session-info",
-        icon: <ClipboardCopy className="w-3 h-3" />,
-        onClick: () => copyTabSessionInfo(tab),
+      state: {
+        closable: tab.closable,
+        canRename: tab.closable,
+        canDuplicate: tab.type !== "welcome" && tab.type !== "servers",
+        pinned: false,
+        first: isFirst,
+        last: isLast,
       },
-      { label: "", separator: true, onClick: () => { } },
-      { label: t("tabs.moveToFirst"), icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveToSessionIndex(0), disabled: isFirst },
-      { label: t("tabs.moveLeft"), icon: <ChevronLeft className="w-3 h-3" />, onClick: () => moveToSessionIndex(idx - 1), disabled: isFirst },
-      { label: t("tabs.moveRight"), icon: <ChevronRight className="w-3 h-3" />, onClick: () => moveToSessionIndex(idx + 1), disabled: isLast },
-      { label: t("tabs.moveToLast"), icon: <ChevronLast className="w-3 h-3" />, onClick: () => moveToSessionIndex(sessionTabs.length - 1), disabled: isLast },
-    ]);
+      // Sessions keeps its historical explicit anchors; the other rows keep the
+      // label-derived `context-menu-item-<label>` ids QA already targets.
+      testIdFor: (key) =>
+        key === "duplicate"
+          ? "tab-context-duplicate"
+          : key === "copy-path"
+            ? "tab-context-copy-session-info"
+            : undefined,
+      actions: {
+        close: () => removeTab(tab.id),
+        closeOthers: () => removeTabs(tabs.filter((item) => item.id !== tab.id && item.closable).map((item) => item.id)),
+        closeAll: () => removeTabs(tabs.filter((item) => item.closable).map((item) => item.id)),
+        rename: () => startRename(tab),
+        duplicate: () => (onDuplicateTab ?? duplicateTab)(tab.id),
+        copyPath: () => copyTabSessionInfo(tab),
+        moveToFirst: () => moveToSessionIndex(0),
+        moveLeft: () => moveToSessionIndex(idx - 1),
+        moveRight: () => moveToSessionIndex(idx + 1),
+        moveToLast: () => moveToSessionIndex(sessionTabs.length - 1),
+      },
+    }));
   };
 
   const computeDropSide = (rect: DOMRect, clientX: number): "before" | "after" => {

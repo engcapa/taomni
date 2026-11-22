@@ -63,7 +63,6 @@ export function ExplorerNavTree({ id, hidden = false, home, path, dropPath, onNa
     { label: label("打开", "Open"), onClick: () => onNavigate(directory) },
     { label: label("在新的 Explorer 标签中打开", "Open in new Explorer tab"), testId: "explorer-nav-newtab", onClick: () => onOpenExplorer(directory, true) },
     { label: label("在终端中打开", "Open in terminal"), onClick: () => onOpenTerminal(directory) },
-    ...(preferences.pinnedPaths.includes(directory) ? [{ label: label("取消固定到快速访问", "Unpin from Quick access"), onClick: () => setExplorerPreferences({ pinnedPaths: preferences.pinnedPaths.filter((value) => value !== directory) }) }] : []),
   ]);
   const quickRow = (directory: string, name: string, isHome = false) => <div key={directory} role="treeitem" aria-selected={sameExplorerPath(directory, path)}
     className={`ex-nav-row ${sameExplorerPath(directory, path) ? "on" : ""} ${dropPath === directory ? "ex-drop" : ""}`}
@@ -109,7 +108,6 @@ export function ExplorerNavTree({ id, hidden = false, home, path, dropPath, onNa
     <div className="ex-nav-sec">{label("快速访问", "Quick access")}</div>
     {home && quickRow(home, label("主目录", "Home"), true)}
     {home && [["Desktop", label("桌面", "Desktop")], ["Documents", label("文档", "Documents")], ["Downloads", label("下载", "Downloads")], ["Pictures", label("图片", "Pictures")]].map(([folder, name]) => quickRow(joinPath(home, folder), name))}
-    {preferences.pinnedPaths.filter((value) => value !== home).map((directory) => quickRow(directory, explorerCrumbs(directory).at(-1)?.name ?? directory))}
     <div className="ex-nav-sec">{label("工作区", "Workspaces")}</div>
     {workspaceRoots.map((root) => quickRow(root.path, root.name))}
     <div className="ex-nav-sec">{label("此电脑", "This PC")}</div>

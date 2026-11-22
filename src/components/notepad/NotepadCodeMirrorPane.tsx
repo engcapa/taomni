@@ -60,6 +60,7 @@ export function NotepadCodeMirrorPane({
   onToggleInsertMode,
   onViewReady,
   onFocusPane,
+  onContextMenuRequest,
 }: {
   paneIndex: 0 | 1;
   testId: string;
@@ -88,6 +89,8 @@ export function NotepadCodeMirrorPane({
   onToggleInsertMode: (insertMode: boolean) => void;
   onViewReady: (paneIndex: 0 | 1, view: EditorView | null) => void;
   onFocusPane: (paneIndex: 0 | 1) => void;
+  /** U3: open the app-style Notepad context menu instead of the WebView menu. */
+  onContextMenuRequest?: (request: { x: number; y: number; paneIndex: 0 | 1 }) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -295,6 +298,15 @@ export function NotepadCodeMirrorPane({
       data-testid={testId}
       className="np-pane-host"
       onMouseDown={() => onFocusPane(paneIndex)}
+      onContextMenu={(event) => {
+        if (!onContextMenuRequest) return;
+        // U3: suppress the WebView/browser default menu and let the workbench
+        // render its Notepad command menu (read-only still opens it; write rows
+        // are disabled there).
+        event.preventDefault();
+        event.stopPropagation();
+        onContextMenuRequest({ x: event.clientX, y: event.clientY, paneIndex });
+      }}
     />
   );
 }

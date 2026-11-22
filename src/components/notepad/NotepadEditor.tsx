@@ -22,6 +22,7 @@ import type { NotepadSessionModalKind } from "./dialogs/SessionBackupDialogs";
 import type { NotepadToolboxKind } from "./dialogs/ToolboxDialogs";
 import { FindReplaceBar } from "./FindReplaceBar";
 import { type CursorMetrics } from "./NotepadCodeMirrorPane";
+import { NotepadContextMenu, type NotepadContextMenuRequest } from "./NotepadContextMenu";
 import { NotepadDialogsHost } from "./NotepadDialogsHost";
 import { NotepadMenuBar } from "./NotepadMenuBar";
 import { NotepadSplitPanes } from "./NotepadSplitPanes";
@@ -79,6 +80,7 @@ export function NotepadEditor({
   const [searchingFiles, setSearchingFiles] = useState(false);
   const [tamperInfo, setTamperInfo] = useState<{ expectedHash: string; actualHash: string } | null>(null);
   const [pickerModal, setPickerModal] = useState<NotepadPickerDialog>(null);
+  const [contextMenuRequest, setContextMenuRequest] = useState<NotepadContextMenuRequest | null>(null);
 
   const backupMgr = useMemo(
     () =>
@@ -647,6 +649,12 @@ export function NotepadEditor({
             onToggleInsertMode={(ins) => store.setInsertMode(ins)}
             onFocusPane={(pane) => store.patchDoc(docKey, { activePane: pane })}
             onViewsChanged={(views) => { viewsRef.current = views; }}
+            onContextMenuRequest={(request) => {
+              if (request.paneIndex !== docState.activePane) {
+                store.patchDoc(docKey, { activePane: request.paneIndex });
+              }
+              setContextMenuRequest(request);
+            }}
           />
           <PanelDockView
             side="bottom"
@@ -768,6 +776,14 @@ export function NotepadEditor({
         }}
         onInsertText={actions.sessionAndMacroHelpers.insertChar}
         onReturnFocus={focusActiveEditor}
+      />
+
+      <NotepadContextMenu
+        request={contextMenuRequest}
+        readOnly={effectiveReadOnly}
+        hasSelection={metrics.to > metrics.from}
+        onCommand={(commandId) => void actions.registry.execute(commandId)}
+        onClose={() => setContextMenuRequest(null)}
       />
     </div>
   );
