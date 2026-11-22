@@ -1,9 +1,61 @@
 //! Cached drafts, templates and scheduled Outbox state.
 
-use rusqlite::{Connection, Result as SqlResult, params};
+use rusqlite::{Connection, OptionalExtension, Result as SqlResult, params};
 use serde::{Deserialize, Serialize};
 
 use crate::now_ts;
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DraftRequest {
+    pub account_id: String,
+    pub action: DraftAction,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "operation", rename_all = "camelCase", deny_unknown_fields)]
+pub enum DraftAction {
+    List,
+    SearchIndex,
+    Get {
+        id: String,
+    },
+    Save {
+        draft: MailDraftSaveRequest,
+    },
+    Delete {
+        id: String,
+    },
+    SetLocation {
+        id: String,
+        previous: Option<taomni_mail_api::RemoteDraftLocation>,
+        next: Option<taomni_mail_api::RemoteDraftLocation>,
+    },
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DraftSearchEntry {
+    pub id: String,
+    pub subject: String,
+    pub text: String,
+    pub updated_at: i64,
+}
+
+pub fn draft_search_index(conn: &Connection, account: &str) -> SqlResult<Vec<DraftSearchEntry>> {
+    let mut query = conn.prepare(
+        "SELECT id, subject, text_body, updated_at FROM mail_drafts WHERE account_id=?1",
+    )?;
+    query
+        .query_map([account], |row| {
+            Ok(DraftSearchEntry {
+                id: row.get(0)?,
+                subject: row.get(1)?,
+                text: row.get(2)?,
+                updated_at: row.get(3)?,
+            })
+        })?
+        .collect()
+}
 
 /// Queue state of a draft waiting in the local Outbox (TASK-17).
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -86,7 +138,7 @@ pub struct MailDraft {
     pub updated_at: i64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MailDraftSaveRequest {
     #[serde(default)]
@@ -115,6 +167,53 @@ pub struct MailDraftSaveRequest {
 
 pub fn list_mail_drafts(conn: &Connection, account_id: &str) -> SqlResult<Vec<MailDraft>> {
     list_mail_drafts_page(conn, account_id, u32::MAX, 0)
+}
+
+pub fn get_mail_draft(conn: &Connection, account: &str, id: &str) -> SqlResult<Option<MailDraft>> {
+    conn.query_row(
+        "SELECT account_id, id, to_json, cc_json, bcc_json, subject, text_body, html_body,
+                attachments_json, reply_context_json, remote_draft_folder, remote_draft_uid,
+                created_at, updated_at
+         FROM mail_drafts WHERE account_id = ?1 AND id = ?2",
+        params![account, id],
+        mail_draft_from_row,
+    )
+    .optional()
+}
+
+impl MailDraft {
+    pub fn remote_location(&self) -> Option<taomni_mail_api::RemoteDraftLocation> {
+        Some(taomni_mail_api::RemoteDraftLocation {
+            folder: self.remote_draft_folder.clone()?,
+            uid: self.remote_draft_uid.filter(|uid| *uid > 0)?,
+        })
+    }
+}
+
+pub fn replace_remote_location(
+    conn: &Connection,
+    account: &str,
+    id: &str,
+    previous: Option<&taomni_mail_api::RemoteDraftLocation>,
+    next: Option<&taomni_mail_api::RemoteDraftLocation>,
+) -> SqlResult<Option<MailDraft>> {
+    // Do not resurrect a deleted row or overwrite another completed APPEND.
+    let updated = conn.execute(
+        "UPDATE mail_drafts SET remote_draft_folder = :folder, remote_draft_uid = :uid
+         WHERE account_id = :account AND id = :id AND
+           ((:previous_folder IS NULL AND (remote_draft_folder IS NULL OR COALESCE(remote_draft_uid, 0) <= 0))
+             OR (remote_draft_folder = :previous_folder AND remote_draft_uid = :previous_uid))",
+        rusqlite::named_params! {
+            ":account": account, ":id": id,
+            ":folder": next.map(|location| &location.folder), ":uid": next.map(|location| location.uid),
+            ":previous_folder": previous.map(|location| &location.folder),
+            ":previous_uid": previous.map(|location| location.uid),
+        },
+    )?;
+    if updated == 0 {
+        return Ok(None);
+    }
+    get_mail_draft(conn, account, id)
 }
 
 pub fn list_mail_drafts_page(
@@ -297,14 +396,40 @@ mod tests {
         assert_eq!(listed[0].subject, "Edited");
         assert_eq!(listed[0].remote_draft_uid, Some(42));
 
-        db.execute(
-            "UPDATE mail_drafts SET remote_draft_folder=NULL, remote_draft_uid=NULL
-             WHERE account_id='account' AND id='draft'",
-            [],
-        )
-        .unwrap();
+        let previous = first.remote_location().unwrap();
+        let next = taomni_mail_api::RemoteDraftLocation {
+            folder: "Drafts".into(),
+            uid: 70,
+        };
+        let updated =
+            replace_remote_location(&db, "account", "draft", Some(&previous), Some(&next))
+                .unwrap()
+                .unwrap();
+        assert_eq!(updated.subject, "Edited");
+        assert_eq!(updated.remote_location().as_ref(), Some(&next));
+        assert!(
+            replace_remote_location(&db, "account", "draft", Some(&previous), None)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            replace_remote_location(&db, "other", "draft", Some(&next), None)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            replace_remote_location(&db, "account", "draft", Some(&next), None)
+                .unwrap()
+                .is_some()
+        );
         let saved = save_mail_draft(&db, "account", edit()).unwrap();
         assert!(saved.remote_draft_folder.is_none());
         assert!(saved.remote_draft_uid.is_none());
+        delete_mail_draft(&db, "account", "draft").unwrap();
+        assert!(
+            replace_remote_location(&db, "account", "draft", None, Some(&next))
+                .unwrap()
+                .is_none()
+        );
     }
 }

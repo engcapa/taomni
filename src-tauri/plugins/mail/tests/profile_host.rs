@@ -31,6 +31,8 @@ use taomni_sqlite_snapshot::SnapshotControl;
 
 #[path = "support/imap.rs"]
 mod imap;
+#[path = "support/local_drafts.rs"]
+mod local_drafts;
 #[path = "support/pop3.rs"]
 mod pop3;
 #[path = "support/smtp.rs"]
@@ -307,6 +309,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
             account_id: ACCOUNT.into(),
             database: source.clone(),
         }],
+        true,
         &SnapshotControl::with_timeout(WAIT),
     )
     .unwrap();
@@ -340,6 +343,8 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
         drafts[0]["replyContext"]["outbox"]["sendAt"],
         4102444800_i64
     );
+
+    assert_eq!(local_drafts::list(&mut host, ACCOUNT, None), drafts);
 
     let mut competing = MailHost::spawn(&profile, &context);
     assert_eq!(competing.exit_code(), Some(1));
@@ -433,6 +438,22 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     let fresh = reopened.call("mail_list_drafts", json!({"accountId":FRESH_ACCOUNT}));
     assert_eq!(fresh.as_array().unwrap().len(), 1);
     assert_eq!(fresh[0]["id"], "template");
+    assert_eq!(
+        local_drafts::list(&mut reopened, ACCOUNT, None),
+        reopened_drafts
+    );
+    let imported = local_drafts::list(
+        &mut reopened,
+        FRESH_ACCOUNT,
+        Some(json!({
+            "replace_staged": false, "rows": []
+        })),
+    );
+    assert_eq!(imported, fresh);
+    assert_eq!(
+        local_drafts::list(&mut reopened, FRESH_ACCOUNT, None),
+        imported
+    );
     let suggestions = reopened.call("mail_search_contacts", search);
     assert_eq!(suggestions[0]["name"], "Migrated Card Edited");
     assert_eq!(suggestions[0]["email"], "migrated@example.com");

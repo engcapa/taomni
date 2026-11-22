@@ -3,7 +3,7 @@
   "slug": "mail",
   "name": "Mail",
   "description": "Read migrated mail and local POP3 messages, search IMAP mail, send mail over SMTP and manage account folders, drafts and contacts.",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "coreApiVersion": "1",
   "kind": "collaboration",
   "status": "provisional",
@@ -11,6 +11,7 @@
   "entry": { "host": "taomni-plugin-mail", "frontend": "frontend/index.js", "protocol": 1 },
   "tabs": [],
   "commands": [
+    "mail/local-drafts",
     "mail/check-incoming",
     "mail/check-outgoing",
     "mail/imap-folder-tree",

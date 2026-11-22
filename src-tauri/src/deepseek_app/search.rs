@@ -101,14 +101,14 @@ pub fn deepseek_app_set_search_sources(
 }
 
 #[tauri::command]
-pub fn deepseek_app_search(
+pub async fn deepseek_app_search(
     query: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<Value>, String> {
-    retrieve(state.inner(), &query)
+    retrieve(state.inner(), &query).await
 }
 
-pub fn retrieve(state: &AppState, query: &str) -> Result<Vec<Value>, String> {
+pub async fn retrieve(state: &AppState, query: &str) -> Result<Vec<Value>, String> {
     if matches!(
         state.core.vault.status()?.state,
         crate::vault::VaultStateKind::Locked
@@ -133,7 +133,7 @@ pub fn retrieve(state: &AppState, query: &str) -> Result<Vec<Value>, String> {
         )?);
         extras.extend(connectors::collect(&notes, "notes", "SELECT s.id,n.title,s.title||' completed:'||CASE WHEN s.completed_at IS NULL THEN 'no' ELSE 'yes' END,'',s.updated_at,1 FROM note_steps s JOIN notes n ON n.id=s.note_id WHERE n.archived_at IS NULL")?);
     }
-    extras.extend(stored_sources::collect(state, &enabled)?);
+    extras.extend(stored_sources::collect(state, &enabled).await?);
     let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     synchronize(&db, extras)?;
     query::search(&db, query)

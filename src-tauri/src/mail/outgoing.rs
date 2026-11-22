@@ -7,7 +7,6 @@
 
 use std::sync::Arc;
 
-use rusqlite::{Connection, OptionalExtension, Result as SqlResult, params};
 use taomni_mail_api::RemoteDraftLocation;
 use taomni_mail_engine::imap_outgoing::{store_remote_draft, store_sent_copy};
 use tauri::State;
@@ -17,8 +16,7 @@ pub(super) use taomni_mail_engine::imap_outgoing::imap_append;
 use super::{
     ActiveImapSession, ImapSessionOpts, MailAccountConfig, MailDraft, MailImapPool, MailProvider,
     MailSendAttachment, MailSendRequest, MessageBuildOptions, ResolvedMailAccount,
-    build_send_message_with, list_mail_drafts, module_host, resolve_config, with_imap_session,
-    with_mail_db,
+    build_send_message_with, draft_store, module_host, resolve_config, with_imap_session,
 };
 use crate::state::AppState;
 
@@ -51,47 +49,6 @@ impl ActiveImapSession {
             Self::Plain { session, .. } => imap_append(session, folder, bytes, flags),
         }
     }
-}
-
-pub(super) fn remote_draft_location(
-    conn: &Connection,
-    account_id: &str,
-    draft_id: &str,
-) -> SqlResult<Option<RemoteDraftLocation>> {
-    let row: Option<(Option<String>, Option<i64>)> = conn
-        .query_row(
-            "SELECT remote_draft_folder, remote_draft_uid FROM mail_drafts
-             WHERE account_id = ?1 AND id = ?2",
-            params![account_id, draft_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()?;
-    Ok(match row {
-        Some((Some(folder), Some(uid))) if uid > 0 => Some(RemoteDraftLocation {
-            folder,
-            uid: uid as u32,
-        }),
-        _ => None,
-    })
-}
-
-fn set_remote_draft_location(
-    conn: &Connection,
-    account_id: &str,
-    draft_id: &str,
-    location: Option<&RemoteDraftLocation>,
-) -> SqlResult<()> {
-    conn.execute(
-        "UPDATE mail_drafts SET remote_draft_folder = ?3, remote_draft_uid = ?4
-         WHERE account_id = ?1 AND id = ?2",
-        params![
-            account_id,
-            draft_id,
-            location.map(|l| l.folder.clone()),
-            location.map(|l| l.uid as i64),
-        ],
-    )?;
-    Ok(())
 }
 
 pub(super) struct PendingSentCopy {
@@ -216,26 +173,15 @@ pub async fn mail_store_remote_draft(
     draft_id: String,
     state: State<'_, AppState>,
 ) -> Result<MailDraft, String> {
+    let account_id = config.session_id.clone();
+    let draft = draft_store::get(&state, &account_id, &draft_id)
+        .await?
+        .ok_or_else(|| format!("draft {draft_id} not found"))?;
     if super::pop3::is_pop3(&config) {
-        // POP3 has no server Drafts folder; the local draft is the only copy.
-        return with_mail_db(&state, &config.session_id, |db| {
-            Ok(list_mail_drafts(db, &config.session_id)?
-                .into_iter()
-                .find(|draft| draft.id == draft_id))
-        })?
-        .ok_or_else(|| format!("draft {draft_id} not found"));
+        return Ok(draft);
     }
     let account = resolve_config(&state, config)?;
-    let account_id = account.config.session_id.clone();
-    let draft = with_mail_db(&state, &account_id, |db| {
-        Ok(list_mail_drafts(db, &account_id)?
-            .into_iter()
-            .find(|draft| draft.id == draft_id))
-    })?
-    .ok_or_else(|| format!("draft {draft_id} not found"))?;
-    let previous = with_mail_db(&state, &account_id, |db| {
-        remote_draft_location(db, &account_id, &draft.id)
-    })?;
+    let previous = draft.remote_location();
     let message_id = new_message_id(&account.config.email_address);
     let bytes = build_send_message_with(
         &account,
@@ -253,7 +199,7 @@ pub async fn mail_store_remote_draft(
             &account,
             bytes,
             message_id,
-            previous,
+            previous.clone(),
         )
         .await?
     } else {
@@ -292,13 +238,10 @@ pub async fn mail_store_remote_draft(
         .await
         .map_err(|error| format!("Mail draft task failed: {error}"))??
     };
-    with_mail_db(&state, &account_id, |db| {
-        set_remote_draft_location(db, &account_id, &draft.id, location.as_ref())?;
-        Ok(list_mail_drafts(db, &account_id)?
-            .into_iter()
-            .find(|candidate| candidate.id == draft.id))
-    })?
-    .ok_or_else(|| "draft disappeared while storing it".to_string())
+    let previous = draft.remote_location();
+    draft_store::set_location(&state, &account_id, draft.id, previous, location)
+        .await?
+        .ok_or_else(|| "Draft was removed or its server copy changed while storing it".to_owned())
 }
 
 /// Delete the server copy of a draft (local row is kept; `mail_delete_draft`
@@ -315,12 +258,13 @@ pub async fn mail_discard_remote_draft(
     }
     let account = resolve_config(&state, config)?;
     let account_id = account.config.session_id.clone();
-    let Some(location) = with_mail_db(&state, &account_id, |db| {
-        remote_draft_location(db, &account_id, &draft_id)
-    })?
+    let Some(location) = draft_store::get(&state, &account_id, &draft_id)
+        .await?
+        .and_then(|draft| draft.remote_location())
     else {
         return Ok(false);
     };
+    let previous = location.clone();
     if module_host::discards_remote_drafts(&state.plugins) {
         module_host::discard_remote_draft(state.plugins.clone(), &account, location).await?;
     } else {
@@ -338,9 +282,7 @@ pub async fn mail_discard_remote_draft(
         .await
         .map_err(|error| format!("Mail draft task failed: {error}"))??;
     }
-    with_mail_db(&state, &account_id, |db| {
-        set_remote_draft_location(db, &account_id, &draft_id, None)
-    })?;
+    draft_store::set_location(&state, &account_id, draft_id, Some(previous), None).await?;
     Ok(true)
 }
 

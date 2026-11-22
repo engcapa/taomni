@@ -2,6 +2,8 @@
 
 mod archive;
 mod downloads;
+mod local_drafts;
+pub(super) use local_drafts::local_drafts;
 mod imap_outgoing;
 mod pop3;
 mod prefetch;

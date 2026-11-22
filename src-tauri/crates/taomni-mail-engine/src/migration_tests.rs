@@ -69,7 +69,8 @@ fn captures_wal_and_originals_from_custom_storage_without_changing_the_source() 
         account_id: "unused".into(),
         database: default_root.join(format!("{}.db", mail_db_file_stem("unused"))),
     };
-    let staged = StagedMailData::prepare(staging.path(), &[mailbox, unused], &control()).unwrap();
+    let staged =
+        StagedMailData::prepare(staging.path(), &[mailbox, unused], true, &control()).unwrap();
     assert_eq!(staged.mailbox_count(), 1);
     let target = staged.data();
     let dest = Connection::open_with_flags(
@@ -115,13 +116,13 @@ fn follows_a_relocated_mailbox_and_rejects_a_missing_relocation_target() {
         init_mail_tables(&db).unwrap();
     }
     crate::database::write_redirect(&from.database, &to.database).unwrap();
-    let staged = StagedMailData::prepare(staging.path(), &[from], &control()).unwrap();
+    let staged = StagedMailData::prepare(staging.path(), &[from], true, &control()).unwrap();
     assert_eq!(staged.mailbox_count(), 1);
     drop(staged);
 
     fs::remove_file(&to.database).unwrap();
     let from = mailbox(legacy.path(), ACCOUNT);
-    let error = StagedMailData::prepare(staging.path(), &[from], &control())
+    let error = StagedMailData::prepare(staging.path(), &[from], true, &control())
         .err()
         .unwrap();
     assert!(error.contains("relocation target is missing"), "{error}");
@@ -140,13 +141,14 @@ fn bad_second_account_discards_the_first_snapshot_and_can_be_retried() {
     }
     fs::write(&broken.database, b"not sqlite").unwrap();
     let mailboxes = [valid, broken];
-    assert!(StagedMailData::prepare(staging.path(), &mailboxes, &control()).is_err());
+    assert!(StagedMailData::prepare(staging.path(), &mailboxes, true, &control()).is_err());
     assert_eq!(staging.path().read_dir().unwrap().count(), 0);
     assert_eq!(fs::read(&mailboxes[1].database).unwrap(), b"not sqlite");
     assert!(
         StagedMailData::prepare(
             staging.path(),
             &mailboxes,
+            true,
             &SnapshotControl::with_timeout(Duration::ZERO)
         )
         .is_err()
@@ -154,7 +156,7 @@ fn bad_second_account_discards_the_first_snapshot_and_can_be_retried() {
     assert_eq!(staging.path().read_dir().unwrap().count(), 0);
     fs::remove_file(&mailboxes[1].database).unwrap();
     assert_eq!(
-        StagedMailData::prepare(staging.path(), &mailboxes, &control())
+        StagedMailData::prepare(staging.path(), &mailboxes, true, &control())
             .unwrap()
             .mailbox_count(),
         1
@@ -176,10 +178,85 @@ fn rejects_a_linked_wal_before_opening_sqlite() {
     let mut wal = mailbox.database.as_os_str().to_owned();
     wal.push("-wal");
     std::os::unix::fs::symlink(&other, wal).unwrap();
-    let error = StagedMailData::prepare(staging.path(), &[mailbox], &control())
+    let error = StagedMailData::prepare(staging.path(), &[mailbox], true, &control())
         .err()
         .unwrap();
     assert!(error.contains("symbolic link"), "{error}");
     assert_eq!(fs::read(other).unwrap(), b"outside");
     assert_eq!(staging.path().read_dir().unwrap().count(), 0);
+}
+
+#[test]
+fn detects_preexisting_drafts_in_the_last_relocated_cache_without_initializing_storage() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    let filename = format!("{}.db", crate::database::mail_db_file_stem("qa"));
+    let old = root.join("missing").join(&filename);
+    assert!(super::legacy_drafts(&old, "qa").unwrap().is_none());
+    assert!(!root.join("missing").exists());
+    std::fs::create_dir(root.join("missing")).unwrap();
+    let current = root.join(&filename);
+    crate::database::write_redirect(&old, &current).unwrap();
+    assert!(super::legacy_drafts(&old, "qa").is_err());
+    let db = rusqlite::Connection::open(&current).unwrap();
+    crate::cache::init_mail_tables(&db).unwrap();
+    let queued = |id| {
+        serde_json::from_value(serde_json::json!({"id":id, "subject":"Queued before upgrade"}))
+            .unwrap()
+    };
+    crate::drafts::save_mail_draft(&db, "other", queued("other-draft")).unwrap();
+    assert!(
+        super::legacy_drafts(&old, "qa")
+            .unwrap()
+            .unwrap()
+            .is_empty()
+    );
+    crate::drafts::save_mail_draft(&db, "qa", queued("waiting")).unwrap();
+    drop(db);
+    let before = std::fs::read(&current).unwrap();
+    assert_eq!(super::legacy_drafts(&old, "qa").unwrap().unwrap().len(), 1);
+    assert!(
+        super::legacy_drafts(&old, "other")
+            .unwrap_err()
+            .contains("relocation target")
+    );
+    assert_eq!(before, std::fs::read(&current).unwrap());
+    assert!(!old.exists());
+}
+
+#[test]
+fn only_staging_for_a_host_that_takes_draft_ownership_marks_the_mailbox() {
+    let legacy = tempfile::tempdir().unwrap();
+    let staging = tempfile::tempdir().unwrap();
+    let source = mailbox(legacy.path(), ACCOUNT);
+    {
+        let db = Connection::open(&source.database).unwrap();
+        init_mail_tables(&db).unwrap();
+        let draft = serde_json::from_value(serde_json::json!({
+            "id": "scheduled", "subject": "Before the split",
+            "replyContext": {"outbox": {"sendAt": 4102444800_i64}}
+        }))
+        .unwrap();
+        crate::drafts::save_mail_draft(&db, ACCOUNT, draft).unwrap();
+    }
+    let original = fs::read(&source.database).unwrap();
+    for hosted in [false, true] {
+        let copy = StagedMailData::prepare(
+            staging.path(),
+            std::slice::from_ref(&source),
+            hosted,
+            &control(),
+        )
+        .unwrap();
+        let db = Connection::open(copy.data().join(source.database.file_name().unwrap())).unwrap();
+        assert_eq!(crate::draft_import::is_owned(&db, ACCOUNT).unwrap(), hosted);
+        let draft = crate::drafts::get_mail_draft(&db, ACCOUNT, "scheduled")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            draft.reply_context.unwrap().outbox.unwrap().send_at,
+            Some(4102444800)
+        );
+    }
+    assert_eq!(fs::read(&source.database).unwrap(), original);
 }

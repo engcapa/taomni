@@ -44,6 +44,7 @@ mod sync_commands;
 
 pub use sync_commands::*;
 
+pub(crate) mod draft_store;
 mod drafts;
 
 pub use drafts::*;

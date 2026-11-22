@@ -6,6 +6,7 @@ pub mod calendar;
 pub mod compose;
 pub mod contacts;
 pub mod database;
+pub mod draft_import;
 pub mod drafts;
 pub mod filters;
 pub mod imap_auth;

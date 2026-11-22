@@ -48,6 +48,13 @@ fn cached_mail(root: &Path, account: &str, text: &str) -> PathBuf {
     let message =
         taomni_mail_engine::parse_body_message(account, "INBOX", 9, None, raw.as_bytes(), 256);
     upsert_message(&db, &message).unwrap();
+    let draft = serde_json::from_value(json!({
+        "id": "scheduled", "subject": format!("Legacy {account} draft"),
+        "replyContext": {"outbox": {"sendAt": 4102444800_i64, "attempts": 1}},
+        "remoteDraftFolder":"Drafts","remoteDraftUid":9,
+    }))
+    .unwrap();
+    taomni_mail_engine::drafts::save_mail_draft(&db, account, draft).unwrap();
     save_entry(
         &db,
         account,
@@ -169,6 +176,15 @@ fn installs_and_records_default_and_custom_mail_data_for_a_verified_package() {
         let db = Connection::open(path).unwrap();
         let value = get_cached_body(&db, account, "INBOX", 9).unwrap().unwrap();
         assert!(value.text.unwrap().contains(text));
+        assert!(taomni_mail_engine::draft_import::is_owned(&db, account).unwrap());
+        let queued = taomni_mail_engine::drafts::get_mail_draft(&db, account, "scheduled")
+            .unwrap()
+            .unwrap();
+        assert_eq!(queued.remote_draft_uid, Some(9));
+        assert_eq!(
+            queued.reply_context.unwrap().outbox.unwrap().send_at,
+            Some(4102444800)
+        );
     }
     let retained = [
         fs::read(default_path).unwrap(),
@@ -199,7 +215,16 @@ fn refreshes_unactivated_data_after_the_legacy_app_has_reopened() {
     let migration = paths::create_directory(&profile, "migration").unwrap();
     let transaction = uuid::Uuid::new_v4().to_string();
     paths::write_json_durable(&migration.join(TRANSACTION), &transaction).unwrap();
-    publish_data(&profile, &module, &data, &transaction, false, &control()).unwrap();
+    publish_data(
+        &profile,
+        &module,
+        &data,
+        &transaction,
+        false,
+        true,
+        &control(),
+    )
+    .unwrap();
     assert!(active_version(&profile).is_none());
     let source = Connection::open(&db).unwrap();
     source

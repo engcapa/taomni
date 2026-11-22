@@ -109,6 +109,16 @@ fn signed_mail_upgrade_starts_the_installed_host_with_retained_migrated_data() {
             )
             .unwrap();
         assert!(value["text"].as_str().unwrap().contains(expected));
+        let drafts = state
+            .registry
+            .invoke(OWNER, "mail_list_drafts", json!({"accountId": account}))
+            .unwrap();
+        assert_eq!(drafts[0]["subject"], format!("Legacy {account} draft"));
+        assert_eq!(drafts[0]["remoteDraftUid"], 9);
+        assert_eq!(
+            drafts[0]["replyContext"]["outbox"]["sendAt"],
+            4102444800_i64
+        );
         let contacts = state
             .registry
             .invoke(

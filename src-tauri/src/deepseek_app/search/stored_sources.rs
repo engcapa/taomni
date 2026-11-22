@@ -4,7 +4,10 @@ use crate::state::AppState;
 use rusqlite::{Connection, OpenFlags};
 use std::{collections::BTreeMap, path::Path};
 
-pub fn collect(state: &AppState, enabled: &BTreeMap<String, bool>) -> Result<Vec<Entry>, String> {
+pub async fn collect(
+    state: &AppState,
+    enabled: &BTreeMap<String, bool>,
+) -> Result<Vec<Entry>, String> {
     let mut result = Vec::new();
     let on = |source: &str| enabled.get(source) == Some(&true);
     if on("snapshots") || on("file_contents") {
@@ -24,6 +27,22 @@ pub fn collect(state: &AppState, enabled: &BTreeMap<String, bool>) -> Result<Vec
             )?
         };
         for account in accounts {
+            let hosted = on("mail_bodies")
+                && crate::mail::draft_store::is_hosted(state, &account.reference).await?;
+            if hosted {
+                let drafts =
+                    crate::mail::draft_store::hosted_search_index(state, &account.reference)
+                        .await?;
+                result.extend(drafts.into_iter().map(|draft| Entry {
+                    source: "mail_bodies".into(),
+                    reference: format!("{}:draft:{}", account.reference, draft.id),
+                    title: draft.subject,
+                    body: draft.text,
+                    host: String::new(),
+                    ts: draft.updated_at,
+                    uses: 1,
+                }));
+            }
             let handle = state.mail_db(&account.reference)?;
             let db = handle.lock_for_snapshot(&tokio_util::sync::CancellationToken::new())?;
             if on("mail") {
@@ -31,7 +50,9 @@ pub fn collect(state: &AppState, enabled: &BTreeMap<String, bool>) -> Result<Vec
             }
             if on("mail_bodies") {
                 result.extend(rows(&db, "mail_bodies", "SELECT account_id||':'||folder||':'||uid,subject,COALESCE(body_text,''),'',COALESCE(date_ts,updated_at),1 FROM mail_messages WHERE body_text IS NOT NULL ORDER BY COALESCE(date_ts,updated_at) DESC LIMIT 5000")?);
-                result.extend(rows(&db, "mail_bodies", "SELECT account_id||':draft:'||id,subject,text_body,'',updated_at,1 FROM mail_drafts")?);
+                if !hosted {
+                    result.extend(rows(&db, "mail_bodies", "SELECT account_id||':draft:'||id,subject,text_body,'',updated_at,1 FROM mail_drafts")?);
+                }
             }
         }
     }

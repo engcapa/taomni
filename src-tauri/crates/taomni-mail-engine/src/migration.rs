@@ -32,6 +32,7 @@ impl StagedMailData {
     pub fn prepare(
         staging_root: &Path,
         mailboxes: &[LegacyMailbox],
+        hosted_drafts: bool,
         control: &SnapshotControl,
     ) -> Result<Self, String> {
         check(control)?;
@@ -54,7 +55,7 @@ impl StagedMailData {
         let mut mailbox_count = 0;
         for mailbox in mailboxes {
             check(control)?;
-            if stage_account(mailbox, &target, control)? {
+            if stage_account(mailbox, &target, hosted_drafts, control)? {
                 mailbox_count += 1;
             }
         }
@@ -77,6 +78,7 @@ impl StagedMailData {
 fn stage_account(
     mailbox: &LegacyMailbox,
     target: &Path,
+    hosted_drafts: bool,
     control: &SnapshotControl,
 ) -> Result<bool, String> {
     let stem = mail_db_file_stem(&mailbox.account_id);
@@ -116,6 +118,9 @@ fn stage_account(
     // Upgrade the snapshot's schema so the read-only host can open it. Some
     // old schema migrations read the original message objects during backfill.
     crate::cache::init_mail_tables(&db).map_err(string_error)?;
+    if hosted_drafts {
+        crate::draft_import::mark_owned(&db, &mailbox.account_id).map_err(string_error)?;
+    }
     db.close().map_err(|(_, error)| string_error(error))?;
     OpenOptions::new()
         .write(true)
@@ -179,6 +184,28 @@ fn resolve_database(
         return Ok(exists.then_some(canonical_path));
     }
     Err("Legacy Mail relocation chain is too long or contains a cycle".into())
+}
+
+/// An explicitly installed module on an older modular profile may encounter
+/// drafts in the desktop cache. Inspect the existing database and relocation
+/// chain without initializing the account or changing its journal mode.
+pub fn legacy_drafts(
+    database: &Path,
+    account: &str,
+) -> Result<Option<Vec<crate::draft_import::StoredDraft>>, String> {
+    let filename = format!("{}.db", mail_db_file_stem(account));
+    let control = SnapshotControl::with_timeout(std::time::Duration::from_secs(5));
+    let Some(path) = resolve_database(database, &filename, &control)? else {
+        return Ok(None);
+    };
+    let db = Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(string_error)?;
+    crate::draft_import::read_account(&db, account)
+        .map(Some)
+        .map_err(string_error)
 }
 
 fn copy_originals(

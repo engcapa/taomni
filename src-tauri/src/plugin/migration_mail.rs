@@ -181,6 +181,7 @@ pub(super) fn execute_under_maintenance(
             &data,
             &transaction,
             receipt.is_some(),
+            manifest.commands.contains(taomni_mail_api::LOCAL_DRAFTS),
             control,
         )?
     };
@@ -225,6 +226,16 @@ pub(super) fn validate_manifest(manifest: &ModuleManifest) -> Result<(), String>
         return Err("The verified package does not support this legacy Mail data".into());
     }
     Ok(())
+}
+
+pub(crate) fn profile_committed(profile: &Path) -> Result<bool, String> {
+    let directory = profile.join("migration");
+    match fs::symlink_metadata(&directory) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.to_string()),
+        Ok(_) => paths::directory(&directory)?,
+    }
+    mail_already_committed(&MigrationJournal::load(&directory.join("journal.json"))?)
 }
 
 fn mail_already_committed(journal: &MigrationJournal) -> Result<bool, String> {
@@ -291,6 +302,7 @@ fn publish_data(
     target: &Path,
     transaction_id: &str,
     replace_unactivated: bool,
+    hosted_drafts: bool,
     control: &SnapshotControl,
 ) -> Result<DataReceipt, String> {
     let database = profile.join(LEGACY_DATABASE);
@@ -306,7 +318,7 @@ fn publish_data(
     if mailboxes.is_empty() {
         return Err("The profile has no legacy Mail accounts".into());
     }
-    let stage = StagedMailData::prepare(module, &mailboxes, control)?;
+    let stage = StagedMailData::prepare(module, &mailboxes, hosted_drafts, control)?;
     let receipt = DataReceipt {
         format_version: 1,
         transaction_id: transaction_id.to_owned(),

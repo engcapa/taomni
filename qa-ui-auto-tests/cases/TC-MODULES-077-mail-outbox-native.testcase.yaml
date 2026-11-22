@@ -1,0 +1,90 @@
+id: TC-MODULES-077
+title: The signed Mail host owns an Outbox draft through disable and send
+description: Schedule an email and re-enable Mail. Reopen the account and send the same draft from its Outbox.
+covers: [F-Modules-1, F-MAIL-13]
+tags: [modules, mail, outbox, p1]
+modes: [native]
+fixtures: [reset_db, mail_server, module_signed_mail_archive]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]'
+- mail_server_assert_list_matches: {timeout_sec: 60}
+- click: '[data-testid="mail-compose-open"]'
+- wait_for: '[data-testid="mail-compose-dialog"]'
+- fill: {selector: '[data-testid="mail-recipient-to"] input', value: receiver@example.com}
+- press: Enter
+- fill: {selector: '[data-testid="mail-compose-subject"]', value: Signed Outbox ownership}
+- type: {selector: '[data-testid="mail-compose-editor"]', text: Keep this scheduled draft}
+- click: '[data-testid="mail-compose-send-later"]'
+- click: '[data-testid="mail-send-later-confirm"]'
+- wait_for: {selector: '[data-testid="mail-outbox-count"][data-count="1"]', timeout_sec: 25}
+- assert_signed_mail_host: outbox-queued
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-mail"]'
+- wait_for: '[data-testid="module-action-enable-mail"]'
+- assert_signed_mail_host: outbox-retained
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-toolbar-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
+- wait_for: {selector: '[data-testid="mail-outbox-count"][data-count="1"]', timeout_sec: 30}
+- click: '[data-testid="mail-drafts-open"]'
+- click: '[data-testid="mail-drafts-tab-outbox"]'
+- assert_count: {selector: '[data-testid="mail-outbox-row"]', equal: 1}
+- assert_text: {selector: '[data-testid="mail-outbox-row"]', contains: Signed Outbox ownership}
+- assert_text: {selector: '[data-testid="mail-outbox-row"]', contains: receiver@example.com}
+- assert_text: {selector: '[data-testid="mail-outbox-state"]', contains: Sends}
+- click: '[data-testid="mail-outbox-send-all"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Sent 1 queued message, timeout_sec: 40}
+- mail_server_assert_folder_count: {folder: Sent, min: 1, timeout_sec: 30}
+- wait_for: {selector: '[data-testid="mail-outbox-count"]', state: detached, timeout_sec: 30}
+- assert_text: {selector: '[data-testid="mail-drafts-dialog"]', contains: The Outbox is empty}
+- assert_signed_mail_host: outbox-sent
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: module-outbox
+    requirement: A scheduled draft retains its recipient and schedule across module lifecycle changes and leaves the Outbox after delivery.
+    actions: [4, 5, 6, 7, 8, 10, 13, 15, 16, 19, 21, 22, 23, 24, 25, 26, 29, 30, 31, 34, 36, 37, 38, 41, 42, 47]
+    checkpoints:
+    - {step: 27, expectation: Scheduling the message sets the account Outbox count to one.}
+    - {step: 28, expectation: The signed host stores its draft with the recipient and schedule in the module mailbox.}
+    - {step: 33, expectation: While the host is stopped the module retains the same ID and schedule and the old cache has no duplicate.}
+    - {step: 43, expectation: The remounted account shows one queued row.}
+    - {step: 44, expectation: The queued subject survives disabling and enabling the module.}
+    - {step: 45, expectation: The reopened queue preserves the recipient.}
+    - {step: 46, expectation: The message still displays its scheduled send time.}
+    - {step: 48, expectation: Exactly one queued message completes the send action.}
+    - {step: 49, expectation: The mail server receives its Sent copy.}
+    - {step: 51, expectation: The queue is empty after acknowledged delivery.}
+    - {step: 52, expectation: The original database remains and sending removes the exact queued draft.}
+    - {step: 53, expectation: The reload and send complete without renderer errors.}
+    results: [27, 28, 33, 43, 44, 45, 46, 48, 49, 51, 52, 53]
+  visual:
+  - check: The Outbox shows the retained message and clears after sending.
+    method: automated
+    reason: The case checks the visible message, recipient, send state and final empty view.
+  native:
+  - check: Draft persistence and SMTP delivery cross the signed Mail module boundary.
+    method: automated
+    reason: The runner reads the isolated module SQLite database, compares the legacy cache and inspects the native writer lease.

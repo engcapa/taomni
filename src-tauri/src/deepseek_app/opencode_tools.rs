@@ -65,7 +65,8 @@ pub async fn execute(
             if query.len() > 1000 {
                 return Err("search: query too long".into());
             }
-            let rows = super::search::retrieve(state, query)?
+            let rows = super::search::retrieve(state, query)
+                .await?
                 .into_iter()
                 .take(5)
                 .collect::<Vec<_>>();

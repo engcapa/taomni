@@ -270,7 +270,7 @@ jobs:
       - name: Source paste and restore observation contracts
         run: python -m unittest test_fill_paste test_keyboard_steps test_native_contenteditable test_native_webdriver_transport test_native_restore_relaunch test_module_restore_observation test_module_restore_retained_observation
       - name: Official module artifact, trust boundary and lifecycle case contracts
-        run: python -m unittest test_module_signed_archive test_module_package_signing test_module_package_runner test_module_first_release test_module_signed_observation test_module_execution test_module_download_observation test_module_marketplace_observation test_module_upgrade_observation test_legacy_release test_module_network_gate test_module_offline_archive test_module_backup_observation qa_ui_auto.test_core_profile_state
+        run: python -m unittest test_module_signed_archive test_module_mail_observation test_module_package_signing test_module_package_runner test_module_first_release test_module_signed_observation test_module_execution test_module_download_observation test_module_marketplace_observation test_module_upgrade_observation test_legacy_release test_module_network_gate test_module_offline_archive test_module_backup_observation qa_ui_auto.test_core_profile_state
       - name: Cold-start fixture filesystem contracts
         run: python -m unittest test_workspace_ignored_ancestor test_workspace_home_documents
       - name: Catalog contract gate

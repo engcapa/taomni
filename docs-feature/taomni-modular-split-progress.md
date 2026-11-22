@@ -2,6 +2,9 @@
 
 ## 2026-11-22 当前进展
 
+- Mail 0.1.21 将桌面草稿、模板、定时发件箱与 IMAP 草稿位置交给签名宿主。单体迁移在暂存的邮箱库中写入账户归属。只升级核心、仍启用旧版 Mail 时，桌面继续使用现有草稿库。后来安装新版模块时，宿主在同一事务接收旧库数据并登记归属，重启或恢复后已发送的草稿不会再次入队。TC-MODULES-077/078 覆盖禁用、重新启用、找回原草稿和发送。原生观察核对真实数据库、写租约、签名包和发送结果。收件缓存与归档索引仍有核心过渡代码。
+- 升级回归已收齐 18 个执行分片。Linux、Windows、macOS 的 Browser 各通过 23/23，Native 各通过 28/28，均包含完整崩溃回归，源码为 `3f9a2610e`。 [GitHub 原始回执](https://github.com/engcapa/taomni/actions/runs/44991520399)
+
 - 联合构建 `8a729b6f8` 的 40 个签名模块包、10 份 Linux ABI 回执及 Linux/Windows 核心安装件已收齐。该轮 macOS 核心打包失败。候选 `645b7291e` 正在复验双架构 DMG、核心更新清单与首发全模块目录。Linux 实装演练已接入同批模块、固定版本 0.5.12 deb、真实旧桌面建立的 MFA 账户和降级回退，待 GitHub 执行。 [前次打包](https://github.com/engcapa/taomni/actions/runs/44989355250) · [候选打包](https://github.com/engcapa/taomni/actions/runs/44995722930)
 - 首发升级演练从同一次联合构建中取得十个业务模块的签名包，按源码、平台、摘要和包内清单逐件校验，再签署 runner 使用的目录。`TC-MODULES-040` 从正式 0.5.12 安装件创建并重开的 profile 启动候选应用。指定 `first_release_run` 后，用例自动安装该平台的冻结名单，卸载 Mail，再正常重启并核对商店、其余签名包、原会话和历史文件。0.5.10 的回归继续由 027 等用例覆盖。正式首发仍要求全部模块达到 `stable`。十模块的完整 GitHub Native 回执待收取。 [0.5.12 安装件](https://github.com/engcapa/taomni/releases/tag/v0.5.12)
 - `0555ee9dd` 的 18 个 Browser/Native 分片已在执行期间全部收齐。SocksCap、Markdown Live、Explorer 及完整崩溃回归在三端 Browser 各通过 27/27，Linux、Windows、macOS Native 分别通过 29/29、30/30、30/30。 [原始运行](https://github.com/engcapa/taomni/actions/runs/44988634877)

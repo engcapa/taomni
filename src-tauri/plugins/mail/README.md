@@ -120,3 +120,13 @@ profile and verifies contact queries for both default and custom caches.
 Production activation still requires the host to own the full sync and cache
 lifecycle and use the module-scoped core services. TASK-026 covers the installed
 upgrade and rollback. The production catalog follows the TASK-027 gates.
+
+Version 0.1.21 owns local drafts, templates and the scheduled Outbox in the
+signed host after migration. Remote draft replacements check the previous
+folder and UID before committing the server response. The desktop and Tao
+search use the same owner. A one-use connection carries complete lists and
+large bodies. A core-only update paired with an older Mail package continues to use the
+desktop drafts API. When the newer package first takes ownership, the host
+imports that account's desktop drafts in a single transaction. The ownership
+record travels with the mailbox backup. Retries and restarts preserve sent
+and deleted state. A freshly migrated mailbox already includes this record.

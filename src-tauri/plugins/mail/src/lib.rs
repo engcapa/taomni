@@ -5,6 +5,7 @@ mod archive;
 mod commands;
 mod imap_exchange;
 mod incoming;
+mod local_drafts;
 mod outgoing;
 mod pop3_sync;
 mod prefetch;
@@ -37,6 +38,7 @@ fn host_config() -> HostConfig {
         commands: commands::METHODS
             .into_iter()
             .chain([
+                taomni_mail_api::LOCAL_DRAFTS,
                 CHECK_INCOMING,
                 CHECK_OUTGOING,
                 IMAP_FOLDER_TREE,
@@ -103,6 +105,16 @@ impl PluginHandler for Handler {
     ) -> Result<Value, RpcError> {
         operation.check_current()?;
         let result = match method {
+            taomni_mail_api::LOCAL_DRAFTS => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(local_drafts::serve(
+                    &self.io,
+                    &self.store,
+                    operation,
+                    endpoint,
+                )?)
+            }
             CHECK_INCOMING => {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;

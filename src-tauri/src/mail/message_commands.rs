@@ -96,12 +96,9 @@ pub(super) async fn send_message(
     let account_id = account.config.session_id.clone();
     let sent_request = request.clone();
     let remote_draft = match request.draft_id.clone() {
-        Some(draft_id) => {
-            with_mail_db_async(&state, &account_id, move |db, account_id| {
-                outgoing::remote_draft_location(db, account_id, &draft_id)
-            })
+        Some(draft_id) => draft_store::get(&state, &account_id, &draft_id)
             .await?
-        }
+            .and_then(|draft| draft.remote_location()),
         None => None,
     };
     let db = state.mail_db(&account_id)?;

@@ -11,12 +11,14 @@ use taomni_plugin_api::{ErrorCode, RpcError, services::SafeRelativePath};
 
 pub(super) struct Store {
     profile: PathBuf,
+    creation: std::sync::Mutex<()>,
 }
 
 impl Store {
     pub(super) fn new(profile: &Path) -> Self {
         Self {
             profile: profile.to_owned(),
+            creation: std::sync::Mutex::new(()),
         }
     }
 
@@ -48,7 +50,15 @@ impl Store {
             };
         };
         let path = database_for(&root, account_id);
+        // Host requests can observe the same missing mailbox concurrently.
+        // Only creation needs serialization. SQLite serializes later writers.
+        let creation = if !regular(&path)? && create {
+            Some(self.creation.lock().map_err(|_| unavailable())?)
+        } else {
+            None
+        };
         if regular(&path)? {
+            drop(creation);
             let mut db = connect(&path, OpenFlags::SQLITE_OPEN_READ_WRITE)?;
             return apply_change(&mut db, check, change);
         }

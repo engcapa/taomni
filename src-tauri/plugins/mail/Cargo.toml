@@ -1,6 +1,6 @@
 [package]
 name = "taomni-plugin-mail"
-version = "0.1.20"
+version = "0.1.21"
 edition = "2024"
 rust-version = "1.94"
 publish = false

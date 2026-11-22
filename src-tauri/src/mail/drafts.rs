@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(test)]
 pub(super) use taomni_mail_engine::drafts::{delete_mail_draft, list_mail_drafts, save_mail_draft};
 
 #[tauri::command]
@@ -7,10 +8,7 @@ pub async fn mail_list_drafts(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailDraft>, String> {
-    with_mail_db_async(&state, &account_id, |db, account_id| {
-        list_mail_drafts(db, account_id)
-    })
-    .await
+    draft_store::list(&state, &account_id).await
 }
 
 #[tauri::command]
@@ -23,10 +21,7 @@ pub async fn mail_save_draft(
     if account_id.is_empty() {
         return Err("mail account id is required".into());
     }
-    with_mail_db_async(&state, account_id, move |db, account_id| {
-        save_mail_draft(db, account_id, draft)
-    })
-    .await
+    draft_store::save(&state, account_id, draft).await
 }
 
 #[tauri::command]
@@ -43,10 +38,7 @@ pub async fn mail_delete_draft(
     if draft_id.is_empty() {
         return Err("mail draft id is required".into());
     }
-    with_mail_db_async(&state, account_id, move |db, account_id| {
-        delete_mail_draft(db, account_id, &draft_id)
-    })
-    .await
+    draft_store::delete(&state, account_id, draft_id).await
 }
 
 #[tauri::command]
