@@ -7,11 +7,17 @@ import type { NotepadSearchResultHit } from "../../../stores/notepadStore";
 import { getLineStarts, lineIndexAt, type TextRange } from "../transforms/lines";
 import {
   buildSearchRegExp,
+  hasCatastrophicBacktrackingRisk,
   resolveReplacementText,
   type NotepadSearchMode,
 } from "../transforms/escape";
 
-export { readSearchHistory, recordSearchHistory, resetSearchHistoryForTests };
+export {
+  hasCatastrophicBacktrackingRisk,
+  readSearchHistory,
+  recordSearchHistory,
+  resetSearchHistoryForTests,
+};
 
 export interface NotepadSearchQuery {
   query: string;
@@ -41,24 +47,6 @@ export interface SearchAllResult {
 
 const DEFAULT_MAX_MATCHES = 20000;
 const DEFAULT_TIME_BUDGET_MS = 250;
-
-/**
- * Detect nested quantifiers / classic ReDoS constructs before executing user regexes
- * so the renderer UI cannot be locked up by catastrophic backtracking (`V-23`).
- */
-export function hasCatastrophicBacktrackingRisk(pattern: string): boolean {
-  // Strip escaped sequences first so literal `\+` inside `\(+` does not trigger false positives
-  const stripped = pattern.replace(/\\./g, "x");
-  // Pattern: group containing a quantifier (+, *, {n,m}, ?) followed directly by an outer quantifier
-  const nestedGroupQuantifier = /\([^)]*[+*][^)]*\)[+*{]/;
-  if (nestedGroupQuantifier.test(stripped)) return true;
-  // Overlapping alternation inside quantified group: (a|a)+ or (.*|a)+
-  const quantifiedAlt = /\([^)]*\|[^)]*\)[+*{]/;
-  if (quantifiedAlt.test(stripped) && /[*+]/.test(stripped.split(")")[0] ?? "")) {
-    return true;
-  }
-  return false;
-}
 
 export function findAllMatches(
   text: string,

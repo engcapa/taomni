@@ -66,9 +66,28 @@ export function buildSearchRegExp(options: SearchPatternOptions, global = true):
   return new RegExp(source, flags);
 }
 
+/**
+ * Detect nested quantifiers / classic ReDoS constructs before executing user regexes
+ * so the renderer UI cannot be locked up by catastrophic backtracking (`V-23`).
+ */
+export function hasCatastrophicBacktrackingRisk(pattern: string): boolean {
+  // Strip escaped sequences first so literal `\+` inside `\(+` does not trigger false positives
+  const stripped = pattern.replace(/\\./g, "x");
+  const nestedGroupQuantifier = /\([^)]*[+*][^)]*\)[+*{]/;
+  if (nestedGroupQuantifier.test(stripped)) return true;
+  const quantifiedAlt = /\([^)]*\|[^)]*\)[+*{]/;
+  if (quantifiedAlt.test(stripped) && /[*+]/.test(stripped.split(")")[0] ?? "")) {
+    return true;
+  }
+  return false;
+}
+
 /** Validate regex syntax without throwing; returns null if valid or error message otherwise. */
 export function validateSearchPattern(options: SearchPatternOptions): string | null {
   if (!options.query) return null;
+  if (options.mode === "re" && hasCatastrophicBacktrackingRisk(options.query)) {
+    return "Regular expression rejected: nested quantifiers may cause catastrophic backtracking.";
+  }
   try {
     buildSearchRegExp(options, true);
     return null;

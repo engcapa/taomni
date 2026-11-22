@@ -1,3 +1,4 @@
+import { consumeDirtyCloseBypass, guardViewerClose } from "../../openFile/closeGuard";
 import { documentPathKey, isUntitledKey } from "../../openFile/pathIdentity";
 import { openFile, openUntitledNotepadDocument } from "../../openFile";
 import { useAppStore } from "../../../stores/appStore";
@@ -26,11 +27,16 @@ export const viewerTabHost: NotepadHostAdapter = {
     );
   },
 
-  openUntitled(ctx, initialContent) {
+  openUntitled(ctx, initialContent, options) {
     return openUntitledNotepadDocument({
       host: ctx.host === "explorer" ? "explorer" : "main",
       workspaceId: ctx.workspaceId,
       content: initialContent,
+      title: options?.title,
+      encoding: options?.encoding,
+      bom: options?.bom,
+      eol: options?.eol,
+      dirty: options?.dirty,
     });
   },
 
@@ -112,6 +118,25 @@ export const viewerTabHost: NotepadHostAdapter = {
         .filter((t) => t.type === "file-viewer" && t.fileViewer && keySet.has(documentPathKey(t.fileViewer.path)) && !(keepPinned && t.pinned))
         .map((t) => t.id);
       if (ids.length > 0) app.removeTabs(ids);
+    }
+    if (!options?.host || options.host === "workspace") {
+      const ws = useWorkspacePlatformStore.getState();
+      const targetWsId = options?.workspaceId ?? ws.activeWorkspaceId;
+      const space = ws.getWorkspace(targetWsId);
+      if (space) {
+        const matched = space.openTabs.filter(
+          (t) => t.kind === "viewer" && t.fileViewer && keySet.has(documentPathKey(t.fileViewer.path)),
+        );
+        const docs = useDocumentStore.getState().documents;
+        const dirtyPaths = matched
+          .map((t) => t.fileViewer!.path)
+          .filter((p) => docs[documentPathKey(p)]?.dirty && !consumeDirtyCloseBypass(p));
+        if (dirtyPaths.length > 0) {
+          guardViewerClose(dirtyPaths, () => this.closeMany(docKeys, options));
+          return;
+        }
+        for (const tab of matched) ws.closeWorkspaceTab(space.id, tab.id);
+      }
     }
   },
 

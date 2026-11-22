@@ -68,8 +68,10 @@ export interface NotepadSearchResultHit {
 }
 
 export interface NotepadMacroStep {
-  commandId: string;
+  type: "command" | "insertText";
+  commandId?: string;
   args?: Record<string, unknown>;
+  text?: string;
 }
 
 export interface NotepadSavedMacro {
@@ -104,6 +106,8 @@ export interface NotepadDocState {
   split: boolean;
   orient: NotepadSplitOrient;
   syncScroll: boolean;
+  syncScrollV: boolean;
+  syncScrollH: boolean;
   activePane: 0 | 1;
   bookmarks: number[];
   marks: NotepadMarkRule[];
@@ -111,6 +115,8 @@ export interface NotepadDocState {
   paneScrolls: [{ top: number; left: number }, { top: number; left: number }];
   beginSelectAnchor: { pos: number; columnMode: boolean } | null;
   activeMatch: { from: number; to: number } | null;
+  changeHistoryBaseline: string[] | null;
+  changeHistoryResetNonce: number;
   largeEditConfirmed: boolean;
   detectedEncoding?: string;
   lastBackupAt?: number;
@@ -189,6 +195,8 @@ export function createDefaultDocState(docId: string, titleHint?: string): Notepa
     split: false,
     orient: "v",
     syncScroll: false,
+    syncScrollV: false,
+    syncScrollH: false,
     activePane: 0,
     bookmarks: [],
     marks: [],
@@ -196,6 +204,8 @@ export function createDefaultDocState(docId: string, titleHint?: string): Notepa
     paneScrolls: [{ top: 0, left: 0 }, { top: 0, left: 0 }],
     beginSelectAnchor: null,
     activeMatch: null,
+    changeHistoryBaseline: null,
+    changeHistoryResetNonce: 0,
     largeEditConfirmed: false,
     backupState: "idle",
     find: defaultFindState(),
@@ -300,7 +310,14 @@ export const useNotepadStore = create<NotepadStoreState>((set, get) => ({
     const key = documentPathKey(docId);
     set((state) => {
       const current = state.docs[key] ?? createDefaultDocState(key);
-      return { docs: { ...state.docs, [key]: { ...current, ...patch } } };
+      const merged = { ...current, ...patch };
+      if (patch.syncScrollV !== undefined || patch.syncScrollH !== undefined) {
+        merged.syncScroll = Boolean(merged.syncScrollV || merged.syncScrollH);
+      } else if (patch.syncScroll !== undefined) {
+        merged.syncScrollV = patch.syncScroll;
+        merged.syncScrollH = patch.syncScroll;
+      }
+      return { docs: { ...state.docs, [key]: merged } };
     });
   },
 

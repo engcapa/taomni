@@ -375,9 +375,36 @@
 .np-mark-style-5 {
   background: rgba(34, 197, 94, 0.26);
 }
+.np-search-all-match {
+  background: rgba(250, 204, 21, 0.28);
+  border-radius: 2px;
+}
 .np-search-active-match {
   outline: 1.5px solid var(--taomni-accent, #2563eb);
   background: rgba(59, 130, 246, 0.24);
+}
+
+/* Column ruler & indent guides (pure CSS overlay without DOM text mutation) */
+.cm-editor.np-show-ruler .cm-content {
+  background-image: linear-gradient(
+    to right,
+    transparent calc(var(--np-ruler-col, 80ch) + 6px),
+    color-mix(in srgb, var(--taomni-divider, #cbd5e1) 70%, transparent) calc(var(--np-ruler-col, 80ch) + 6px),
+    color-mix(in srgb, var(--taomni-divider, #cbd5e1) 70%, transparent) calc(var(--np-ruler-col, 80ch) + 7px),
+    transparent calc(var(--np-ruler-col, 80ch) + 7px)
+  );
+  background-repeat: no-repeat;
+}
+
+.cm-editor.np-show-indent .cm-line {
+  background-image: repeating-linear-gradient(
+    to right,
+    color-mix(in srgb, var(--taomni-divider, #cbd5e1) 48%, transparent) 0,
+    color-mix(in srgb, var(--taomni-divider, #cbd5e1) 48%, transparent) 1px,
+    transparent 1px,
+    transparent var(--np-tab-ch, 4ch)
+  );
+  background-position: 6px 0;
 }
 
 /* Modal Backdrop */
@@ -544,12 +571,39 @@
   overflow: hidden;
 }
 
+.np-workbench.np-mode-postit .np-menubar,
+.np-workbench.np-mode-postit .np-toolbar,
+.np-workbench.np-mode-postit .np-statusbar,
 .np-workbench.np-mode-focus .np-menubar,
 .np-workbench.np-mode-focus .np-toolbar,
 .np-workbench.np-mode-focus .np-statusbar,
 .np-workbench.np-mode-focus .np-right-dock,
 .np-workbench.np-mode-focus .np-bottom-dock {
   display: none;
+}
+
+.np-exit-view-mode {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 80;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--taomni-divider);
+  background: var(--taomni-surface, #ffffff);
+  color: var(--taomni-text);
+  font-size: 12px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.22);
+  cursor: pointer;
+}
+
+.np-exit-view-mode:hover {
+  border-color: var(--taomni-accent, #2563eb);
+  color: var(--taomni-accent, #2563eb);
 }
 
 .np-workbench.np-mode-focus .np-main-area {

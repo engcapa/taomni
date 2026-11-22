@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Play, ShieldAlert, Trash2, X } from "lucide-react";
 import type { SavedMacroEntry } from "../../../lib/notepad/macro/macroManager";
 import { useViewerLabels } from "../../viewer/viewerLabels";
@@ -36,6 +36,12 @@ export function MacroDialogs({
   const [runMode, setRunMode] = useState<"times" | "eof">("times");
   const [runCount, setRunCount] = useState(5);
   const [renaming, setRenaming] = useState<{ old: string; next: string } | null>(null);
+
+  useEffect(() => {
+    setMacroName("");
+    setMacroKey("");
+    setRenaming(null);
+  }, [kind]);
 
   if (!kind) return null;
 

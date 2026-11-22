@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { previewColumnCells, type ColumnInsertSpec, type ColumnNumberRadix } from "../../../lib/notepad/transforms/column";
 import { useViewerLabels } from "../../viewer/viewerLabels";
@@ -36,6 +36,12 @@ export function EditToolDialogs({
   const [radix, setRadix] = useState<ColumnNumberRadix>(10);
   const [leadingZeros, setLeadingZeros] = useState(false);
 
+  useEffect(() => {
+    if (kind === "goto") {
+      setGoVal(String(goMode === "line" ? currentLine : currentOffset));
+    }
+  }, [kind, goMode, currentLine, currentOffset]);
+
   if (!kind) return null;
 
   if (kind === "goto") {
@@ -70,7 +76,9 @@ export function EditToolDialogs({
               className="np-btn primary"
               data-testid="notepad-goto-confirm"
               onClick={() => {
-                onGoTo(goMode, Math.max(0, Number.parseInt(goVal, 10) || 1));
+                const parsed = Number.parseInt(goVal, 10);
+                const minVal = goMode === "line" ? 1 : 0;
+                onGoTo(goMode, Number.isNaN(parsed) ? minVal : Math.max(minVal, parsed));
                 onClose();
               }}
             >

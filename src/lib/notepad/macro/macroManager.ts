@@ -21,8 +21,31 @@ export interface MacroPlaybackHost {
 
 export const MAX_EOF_MACRO_ITERATIONS = 10000;
 
-export function filterRecordableSteps(steps: RecordedMacroStep[]): RecordedMacroStep[] {
-  return steps.filter((step) => {
+export function normalizeMacroSteps(
+  steps: Array<
+    | RecordedMacroStep
+    | { type?: "command" | "insertText"; commandId?: string; args?: Record<string, unknown>; text?: string }
+  >,
+): RecordedMacroStep[] {
+  const out: RecordedMacroStep[] = [];
+  for (const step of steps) {
+    const kind = step.type ?? (typeof step.text === "string" && step.text.length > 0 ? "insertText" : "command");
+    if (kind === "insertText" && typeof step.text === "string" && step.text.length > 0) {
+      out.push({ type: "insertText", text: step.text });
+    } else if (kind === "command" && step.commandId) {
+      out.push({ type: "command", commandId: step.commandId, args: step.args });
+    }
+  }
+  return out;
+}
+
+export function filterRecordableSteps(
+  steps: Array<
+    | RecordedMacroStep
+    | { type?: "command" | "insertText"; commandId?: string; args?: Record<string, unknown>; text?: string }
+  >,
+): RecordedMacroStep[] {
+  return normalizeMacroSteps(steps).filter((step) => {
     if (step.type === "insertText") return typeof step.text === "string" && step.text.length > 0;
     if (step.type === "command" && step.commandId) {
       return NOTEPAD_COMMAND_BY_ID.get(step.commandId)?.recordable === true;

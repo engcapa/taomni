@@ -17339,6 +17339,54 @@ controls:
   - id: notepad-save-as-confirm
     selector: '[data-testid="notepad-save-as-confirm"]'
     kind: interactive
+  - id: notepad-menu-edit
+    selector: '[data-testid="notepad-menu-edit"]'
+    kind: interactive
+  - id: notepad-menu-item-file-toggle-readonly
+    selector: '[data-testid="notepad-menu-item-file.toggleReadonly"]'
+    kind: interactive
+  - id: notepad-status-readonly
+    selector: '[data-testid="notepad-status-readonly"]'
+    kind: interactive
+  - id: notepad-menu-item-file-open-with
+    selector: '[data-testid="notepad-menu-item-file.openWith"]'
+    kind: interactive
+  - id: notepad-open-with-dialog
+    selector: '[data-testid="notepad-open-with-dialog"]'
+    kind: display
+  - id: notepad-open-with-notepad
+    selector: '[data-testid="notepad-open-with-notepad"]'
+    kind: display
+  - id: notepad-open-with-taoffice
+    selector: '[data-testid="notepad-open-with-taoffice"]'
+    kind: display
+  - id: notepad-open-with-close
+    selector: '[data-testid="notepad-open-with-close"]'
+    kind: interactive
+  - id: notepad-menu-item-edit-select-all
+    selector: '[data-testid="notepad-menu-item-edit.selectAll"]'
+    kind: interactive
+  - id: notepad-menu-group-case
+    selector: '[data-testid="notepad-menu-group-case"]'
+    kind: interactive
+  - id: notepad-menu-item-edit-to-upper-case
+    selector: '[data-testid="notepad-menu-item-edit.toUpperCase"]'
+    kind: interactive
+  - id: notepad-menu-group-line-ops
+    selector: '[data-testid="notepad-menu-group-line-ops"]'
+    kind: interactive
+  - id: notepad-menu-group-sort
+    selector: '[data-testid="notepad-menu-group-sort"]'
+    kind: interactive
+  - id: notepad-menu-item-edit-sort-asc
+    selector: '[data-testid="notepad-menu-item-edit.sortAsc"]'
+    kind: interactive
+  - id: notepad-whole-doc-dialog
+    selector: '[data-testid="notepad-whole-doc-dialog"]'
+    kind: display
+  - id: notepad-whole-doc-confirm
+    selector: '[data-testid="notepad-whole-doc-confirm"]'
+    kind: interactive
 -->
 
 ### 16.2 Notepad 查找、替换与搜索结果
@@ -17423,6 +17471,9 @@ controls:
   - id: notepad-result-hit
     selector: '[data-testid^="notepad-result-hit-"]'
     kind: display
+  - id: notepad-mode-re
+    selector: '[data-testid="notepad-mode-re"]'
+    kind: interactive
 -->
 
 ### 16.3 Notepad 分屏、面板与视图状态
@@ -17506,6 +17557,15 @@ controls:
   - id: notepad-enc-option-gbk
     selector: '[data-testid="notepad-enc-option-GBK"]'
     kind: display
+  - id: notepad-menu-item-view-distraction-free
+    selector: '[data-testid="notepad-menu-item-view.distractionFree"]'
+    kind: interactive
+  - id: notepad-exit-view-mode
+    selector: '[data-testid="notepad-exit-view-mode"]'
+    kind: interactive
+  - id: notepad-char-row-65
+    selector: '[data-testid="notepad-char-row-65"]'
+    kind: interactive
 -->
 
 ### 16.4 Notepad 工具、对话框与设置
@@ -17610,6 +17670,24 @@ controls:
   - id: notepad-status-rec
     selector: '[data-testid="notepad-status-rec"]'
     kind: display
+  - id: notepad-menu-macro
+    selector: '[data-testid="notepad-menu-macro"]'
+    kind: interactive
+  - id: notepad-menu-item-macro-save-current
+    selector: '[data-testid="notepad-menu-item-macro.saveCurrent"]'
+    kind: interactive
+  - id: notepad-macro-save-dialog
+    selector: '[data-testid="notepad-macro-save-dialog"]'
+    kind: display
+  - id: notepad-macro-name-input
+    selector: '[data-testid="notepad-macro-name-input"]'
+    kind: interactive
+  - id: notepad-macro-save-confirm
+    selector: '[data-testid="notepad-macro-save-confirm"]'
+    kind: interactive
+  - id: notepad-menu-macro-echo-upper
+    selector: '[data-testid="notepad-menu-macro-EchoUpper"]'
+    kind: interactive
 -->
 
 ### 16.2 Notepad 真实磁盘与文件系统边界（native）

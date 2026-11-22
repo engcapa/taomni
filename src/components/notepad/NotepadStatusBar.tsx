@@ -26,7 +26,9 @@ export function NotepadStatusBar({
   onCycleEol,
   onOpenEncoding,
   onToggleInsertMode,
+  onToggleReadonly,
   onResetZoom,
+  readOnlyLocked = false,
   remote = false,
   recording = false,
   backupIntervalSec = 30,
@@ -43,6 +45,7 @@ export function NotepadStatusBar({
   bom: boolean;
   insertMode: boolean;
   readOnly: boolean;
+  readOnlyLocked?: boolean;
   zoomPct: number;
   backupState: "idle" | "saving" | "saved" | "error";
   onCycleEol: () => void;
@@ -93,9 +96,16 @@ export function NotepadStatusBar({
         </span>
       )}
       {readOnly && !remote && (
-        <span className="np-status-chip warn" data-testid="notepad-status-readonly">
+        <button
+          type="button"
+          className="np-status-chip warn"
+          data-testid="notepad-status-readonly"
+          disabled={readOnlyLocked}
+          onClick={onToggleReadonly}
+          title={readOnlyLocked ? undefined : label("点击退出只读模式", "Click to exit read-only mode")}
+        >
           {label("只读", "Read-only")}
-        </span>
+        </button>
       )}
       {recording && (
         <span className="np-status-chip rec" data-testid="notepad-status-rec">

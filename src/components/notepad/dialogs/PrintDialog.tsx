@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Printer, X } from "lucide-react";
 import { printNotepadDocument } from "../../../lib/notepad/print/printDocument";
 import { setNotepadPreferences, useNotepadPreferences, type NotepadPrintColorMode } from "../../../stores/notepadPreferences";
@@ -20,6 +20,14 @@ export function PrintDialog({
   const label = useViewerLabels();
   const prefs = useNotepadPreferences();
   const [opts, setOpts] = useState(prefs.printDefaults);
+
+  useEffect(() => {
+    if (!open) return;
+    setOpts({
+      ...prefs.printDefaults,
+      range: prefs.printDefaults.range === "selection" && selection ? "selection" : "all",
+    });
+  }, [open, selection, prefs.printDefaults]);
 
   if (!open) return null;
 
