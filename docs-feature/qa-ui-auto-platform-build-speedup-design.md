@@ -108,6 +108,7 @@
 - 桌面 Rust 库生成 `rlib`。QA 保留 release 优化和诊断断言。QA 的前端构建仍生成桌面资源和内嵌 mobile bundle，macOS 仍 stage krb5。完整类型检查在并行任务执行。
 - Linux 区分编译库和桌面运行包，22.04 构建维持 glibc 基线与 PipeWire 1.0.9。Windows 使用 MSVC 链接器嵌入 ComCtl32 v6 manifest。依赖安装允许 `ssh2` 使用 JavaScript 后备实现。
 - Rust 依赖缓存按平台、profile、编译环境和依赖输入区分。Linux 合约与生产 runtime 的 job 使用同一组依赖，`save-if` 让合约只恢复，由成功构建的生产者写入。失败或取消的冷编无法占用不可覆盖的缓存键。Windows helper 的小依赖树使用单独的键。
+- 在同分支 HEAD 手工派发时，优先使用已上传的 Actions Artifact。依赖归档仅包含第三方 Cargo 构建产物、所需 registry 文件和 Sherpa 预编译库，保留 1 天。完整程序归档保留 3 天。归档一旦发布，其他运行就可以恢复并校验，前一轮的用例分片可继续执行。
 - Sherpa 缓存保存 `src-tauri/target/qa-ui-auto/sherpa-onnx-prebuilt`。命中后清理该 crate 的 dev/release 指纹，让 Cargo 离线重跑其构建脚本并恢复链接库和运行时 DLL。未命中时移除残留的空目录再正常提取。移动端 native 分片单独缓存匹配 Playwright 版本的 Chromium。
 - runtime 归档使用 gzip 级别 1。共享归档绑定平台、架构、runner 基线、profile、完整 source/recipe SHA-256、QA 标识、二进制和每个文件的 SHA-256。命中后先验证，再按当前 head、run/attempt 和 selection 重建当次归档。各执行分片照常验证当次身份并运行用例。
 
@@ -137,13 +138,34 @@
 | A2 `45009569101`，attempt 2，Rust 冷编 | 通过 | 58:45 | 0:41 | 25:25 / 34:17 / 35:30 | 25:34 / 2:25 | 5:44 / 7:39 |
 | B `45015104902`，一行 Rust 注释，实际冷编 | 通过 | 56:31 | 0:40 | 25:22 / 40:09 / 32:28 | 23:53 / 3:04 | 8:57 / 7:00 |
 | C 首次 `45021757976`，仅文档改动 | 取消 | 31:23 | 0:38 | 25:35 / 27:50 / 取消 | 20:19 / 2:57 | 9:32 / 7:11 |
+| 归档生成 `45028831881` | 通过 | 62:35 | 0:41 | 25:05 / 38:54 / 35:00 | 22:44 / 3:03 | 6:54 / 7:00 |
+| B 复测 `45033419257`，恢复依赖后暖编 | 通过 | 40:12 | 0:38 | 9:05 / 17:29 / 18:45 | 10:46 / 3:46 | 9:18 / 6:59 |
+| C 复测 `45036127255`，仅文档改动，复用完整程序 | 通过 | 25:10 | 0:44 | 1:04 / 1:30 / 0:54 | 10:57 / 2:18 | 7:00 / 5:50 |
 
 - **A2**。第一次运行在 7:19 时取消。删除本分支由取消任务写入的 739,943,652 字节半成品缓存后，在同一提交 `25713d41f` 重跑所有 job。三端 Rust 生产者均冷编；Linux 和 macOS 恢复了 Sherpa，Windows 重新下载并成功写入。Linux 构建保存 1,254,467,486 字节 Rust 依赖，Linux contracts 日志为 `save-if: false`。Windows helper 的 26 项 Rust 测试通过，Windows native 四片均成功，第 4 片成功发布 Chromium 缓存。18 个执行分片及汇总全部通过。仓库缓存用量接口在 A2 结束后报告 12,317,326,792 字节。[A2 第 2 次运行](https://github.com/engcapa/taomni/actions/runs/45009569101/attempts/2)
 - **关键路径**。相对 PR #862，A2 的 Linux 和 Windows 冷构建各慢 7:56、7:06，macOS 快 1:27，Windows 合约快 30:36。macOS 构建结束后，四个分片从 10:42:06 到 10:58:17 UTC 陆续执行，每片实际用时 4:09–4:34。配置允许并发 4 片，当次 runner 分配未形成单波次。总墙钟较 PR #862 长 6:52。[PR #862 基线](https://github.com/engcapa/taomni/actions/runs/44998975532)
-- **B**。临时提交 `528cc9cdc` 相对 `b979ed0a2` 仅在 `src-tauri/src/lib.rs` 增加一行注释。源码摘要由 `6261fa3cb03a8406` 变为 `64e99b0ffa4eca09`，配方摘要仍以 `0de7ea9e8a1dcd24` 开头。三个生产者和 Linux 合约均打印 `No cache found.`，Sherpa 也全部未命中。Windows 第 4 片重新安装并保存 Chromium，耗时 9:47。并行前端检查 1:27 通过，120/120 次执行通过，零跳过、零基础设施错误。该样本验证了缓存被驱逐时的重建和执行，暖编耗时仍缺样本。同期缓存清单显示多个 worktree 分支合计超过 10 GB。[B](https://github.com/engcapa/taomni/actions/runs/45015104902)
+- **B**。临时提交 `528cc9cdc` 相对 `b979ed0a2` 仅在 `src-tauri/src/lib.rs` 增加一行注释。源码摘要由 `6261fa3cb03a8406` 变为 `64e99b0ffa4eca09`，配方摘要仍以 `0de7ea9e8a1dcd24` 开头。三个生产者和 Linux 合约均打印 `No cache found.`，Sherpa 也全部未命中。Windows 第 4 片重新安装并保存 Chromium，耗时 9:47。并行前端检查 1:27 通过，120/120 次执行通过，零跳过、零基础设施错误。该样本记录了缓存被驱逐后重建和执行的耗时。同期缓存清单显示多个 worktree 分支合计超过 10 GB。[B](https://github.com/engcapa/taomni/actions/runs/45015104902)
 - **C 首次**。源码和构建配方摘要与 A2 完全相同。Linux、Windows 查找的程序归档键均已在 A2 成功写入，这次查找未命中并重新编译。确认冷编后取消当次运行。缓存用量接口随后报告 11,467,212,071 字节。[C 首次](https://github.com/engcapa/taomni/actions/runs/45021757976)
 - **同分支缓存修复**。直接在分支 HEAD 手工派发时，编译成功后保留 1 天的 Cargo 依赖归档和 3 天的完整程序归档。按同仓库、同一派发分支及同一 workflow 查找，独立于 Actions cache 配额。Cargo 键包含 runner、工具链、profile、Cargo manifests、锁文件和编译环境。完整程序沿用源码、配方和逐文件校验。普通运行出现 miss 时继续构建，暖编验证可在 miss 步骤出现时取消。
+- **归档生成**。首轮构建上传了完整程序，Cargo 依赖打包在 hosted Cargo 1.100 的新版目录下失败。打包和恢复现已覆盖旧版分拆目录与新版逐构建单元目录。修正后 Linux、Windows、macOS 分别上传了 1.563、1.534、1.398 GB 的依赖归档。三端完整程序合计 0.291 GB。[首次归档日志](https://github.com/engcapa/taomni/actions/runs/45025799305/job/137218618225) · [修正后的归档](https://github.com/engcapa/taomni/actions/runs/45028831881)
+- **暖编复测**。三个生产者及 Linux 原生合约从 `45028831881` 恢复依赖归档。三端 Cargo 编译阶段耗时 5:49 / 13:03 / 15:56，日志分别记录 38 / 33 / 33 个 crate 重编，Sherpa 预编译库全部命中。Windows native 第 4 片恢复了 Chromium，执行耗时 4:19。汇总验证 120/120 次通过，零失败、跳过及基础设施错误。macOS 构建等待 runner 约 10 分钟，最终汇总另等约 5 分钟。[B 复测](https://github.com/engcapa/taomni/actions/runs/45033419257)
+- **完整程序复测**。`9d0bece41` 相对暖编提交 `5f06c3558` 只有本文发生变化，源码与构建配方摘要一致。三个生产者均从 `45033419257` 的 Artifact 恢复程序，校验原始 QA 标识和各文件摘要，再绑定当次选择。三个构建日志均记录 `Reused verified native build ...; skipped compilation`。汇总验证 120/120 次通过，零失败、跳过及基础设施错误。macOS 构建结束后，最晚的执行分片等待了 13:40。[C 复测](https://github.com/engcapa/taomni/actions/runs/45036127255)
 - **全量范围**。本分支默认 `scope=all` 本地规划出 847 个不同用例、25 个执行分片、2,864 次执行及零能力缺口。最近可比的历史夜间全量墙钟为 128:28，汇总失败，Linux / Windows / macOS 的 build 分别为 52:21 / 64:47 / 28:15。A2/B/C 的墙钟只代表聚焦回归。本轮未测量新分支全量墙钟。[历史三端全量](https://github.com/engcapa/taomni/actions/runs/44963652702)
+
+### 执行分片与前端检查耗时
+
+每个平台按分片编号排列。单位为分钟和秒。
+
+| Job | A2 | B 复测 | C 复测 |
+| --- | --- | --- | --- |
+| Linux browser | 4:27 / 2:09 | 3:30 / 1:35 | 3:19 / 1:37 |
+| Windows browser | 5:44 / 7:39 | 9:18 / 6:59 | 7:00 / 5:50 |
+| macOS browser | 4:54 / 2:10 | 4:59 / 1:52 | 5:10 / 2:24 |
+| Linux native | 6:12 / 6:09 / 5:23 / 6:06 | 6:16 / 5:05 / 6:08 / 6:49 | 6:09 / 5:40 / 5:55 / 5:48 |
+| Windows native | 5:47 / 7:23 / 5:47 / 8:29 | 4:50 / 6:05 / 4:50 / 4:19 | 5:19 / 6:22 / 4:46 / 5:12 |
+| macOS native | 4:34 / 4:09 / 4:18 / 4:19 | 4:38 / 5:03 / 4:24 / 4:57 | 5:00 / 4:47 / 4:55 / 5:30 |
+| 聚焦前端构建检查 | — | 1:12 | 1:18 |
+| 最终汇总 | 0:19 | 0:22 | 0:21 |
 
 ## 6. 缓存容量
 
@@ -160,6 +182,8 @@
 | 其他 | 2 | 0.003 |
 
 Rust 合计 10.341 GB，占约 86%。`refactor/modules-arch` 的独立分支缓存占 9.656 GB，同一 Windows runner 下两份依赖缓存分别为 1.418 GB 和 1.417 GB。两者依赖指纹不同。每个平台、编译环境和 GitHub ref 都能产生独立缓存，多个并行分支和临时验证 ref 会累加体积。
+
+C 收尾时，Actions cache 用量为 11,513,623,913 字节，42 个条目。同分支三端 Cargo 归档合计 4.495 GB，采用独立 Artifact 存储。恢复暖编与完整程序时均已实际命中。
 
 - **优先减 Rust 重复写入**。在各工作流内统一同一依赖图的缓存键，让成功构建负责写入。同一分支保留仍在使用的依赖版本。Windows helper 的独立缓存约 275 MB，可以对比只保留 registry 或关闭此缓存后的实际合约耗时。pnpm 和 pip 合计 1.449 GB，可在确认重复后再细化。
 - **Actions Artifact**。与 Actions cache 配额分开。适合短期保留同分支的编译依赖和 QA 程序，可通过保留天数约束占用。归档上传、提取和存储仍有开销。[GitHub Actions 存储计费](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
