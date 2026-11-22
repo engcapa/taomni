@@ -130,6 +130,7 @@ export function UpstreamSection(viewProps: UpstreamSectionProps) {
 
       <Field label={viewProps.t("sockscap.host")}>
         <input
+          data-testid="sockscap-upstream-host"
           className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
           value={viewProps.selectedProf.upstream.host}
           disabled={viewProps.locked}
@@ -143,6 +144,7 @@ export function UpstreamSection(viewProps: UpstreamSectionProps) {
       </Field>
       <Field label={viewProps.t("sockscap.port")}>
         <input
+          data-testid="sockscap-upstream-port"
           type="number"
           className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
           value={viewProps.selectedProf.upstream.port}

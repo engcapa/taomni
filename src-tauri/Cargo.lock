@@ -11369,6 +11369,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-plugin-sockscap"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "taomni-plugin-api",
+ "taomni-plugin-sdk",
+ "taomni-sockscap-api",
+]
+
+[[package]]
 name = "taomni-plugin-stream"
 version = "0.1.0"
 dependencies = [

@@ -422,8 +422,9 @@ pub async fn sockscap_test_upstream(
 #[tauri::command]
 pub async fn sockscap_parse_share_link(
     link: String,
+    state: State<'_, AppState>,
 ) -> Result<core::share_link::ParsedShareLink, String> {
-    core::share_link::parse(&link)
+    module_host::parse_share_link(&state.plugins, link).await
 }
 
 /// Parse a subscription blob (base64 or plain newline-separated links) into a

@@ -415,7 +415,7 @@ jobs:
           # first so tauri-build can resolve bundle.macOS.frameworks.
           bash scripts/bundle-krb5-macos.sh stage
           cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::redirector -- --test-threads=1
-          cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::recovery -- --test-threads=1
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-sockscap-api --locked --lib recovery::tests -- --test-threads=1
 
       - name: Build static MIT Kerberos for the ARM64 signing comparison
         if: inputs.macos_static_krb5

@@ -2886,6 +2886,7 @@
   ↳ `[data-testid="module-action-enable-mail"]` — alias
   ↳ `[data-testid="module-action-enable-screenshot"]` — alias
   ↳ `[data-testid="module-action-enable-ai-voice-local"]` — alias
+  ↳ `[data-testid="module-action-enable-sockscap"]` — alias
 - `[data-testid="module-status-mfa"]` — display — F-Modules-1.module-status-mfa
 - `[data-testid="module-action-disable-hello-plugin"]` — interactive — F-Modules-1.module-action-disable-hello-plugin
   ↳ `[data-testid="module-action-disable-mfa"]` — alias
@@ -2897,6 +2898,7 @@
   ↳ `[data-testid="module-action-disable-mail"]` — alias
   ↳ `[data-testid="module-action-disable-screenshot"]` — alias
   ↳ `[data-testid="module-action-disable-ai-voice-local"]` — alias
+  ↳ `[data-testid="module-action-disable-sockscap"]` — alias
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
 - `[data-testid="module-action-install-hello-plugin"]` — interactive — F-Modules-1.module-action-install-hello-plugin
   ↳ `[data-testid="module-action-install-mfa"]` — alias
@@ -2940,6 +2942,11 @@
 - `[data-testid="sockscap-section-profile-toggle"]` — interactive — F-Sockscap-1.profile-section-toggle
 - `[data-testid="sockscap-section-scope-toggle"]` — interactive — F-Sockscap-1.scope-section-toggle
 - `[data-testid="sockscap-section-upstream-toggle"]` — interactive — F-Sockscap-1.upstream-section-toggle
+- `[data-testid="sockscap-upstream-kind"]` — interactive — F-Sockscap-1.upstream-kind
+- `[data-testid="sockscap-upstream-host"]` — interactive — F-Sockscap-1.upstream-host
+- `[data-testid="sockscap-upstream-port"]` — interactive — F-Sockscap-1.upstream-port
+- `[data-testid="sockscap-sharelink-input"]` — interactive [optional] — F-Sockscap-1.share-link
+- `[data-testid="sockscap-sharelink-import"]` — interactive [optional] — F-Sockscap-1.import-share-link
 - `[data-testid="sockscap-section-rules-toggle"]` — interactive — F-Sockscap-1.rules-section-toggle
 - `[data-testid="sockscap-section-test-toggle"]` — interactive — F-Sockscap-1.test-section-toggle
 - `[data-testid="sockscap-section-gfwlist-toggle"]` — interactive — F-Sockscap-1.gfwlist-section-toggle

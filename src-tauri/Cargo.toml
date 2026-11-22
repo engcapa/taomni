@@ -53,6 +53,7 @@ members = [
     "plugins/rdp-client",
     "plugins/rdp-server",
     "plugins/screenshot",
+    "plugins/sockscap",
     "plugins/sockscap/tools",
     "plugins/vnc-client",
     "plugins/vnc-server",

@@ -124,6 +124,8 @@ def capabilities(cases, mode: str) -> list[str]:
                 result.add("signed-local-servers")
             if "module_signed_voice_archive" in fixtures:
                 result.add("signed-local-voice")
+            if "module_signed_sockscap_archive" in fixtures:
+                result.add("signed-sockscap")
             if "module_signed_vnc_archive" in fixtures:
                 result.add("signed-vnc")
             if "module_signed_rdp_archive" in fixtures:

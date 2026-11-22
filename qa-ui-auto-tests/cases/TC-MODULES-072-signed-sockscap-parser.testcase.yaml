@@ -1,0 +1,65 @@
+id: TC-MODULES-072
+title: Signed SocksCap imports a proxy link into an existing routing profile
+description: Install the signed SocksCap host. Import a loopback fixture link and verify the endpoint and the host writer lease through disable.
+covers: [F-Sockscap-1, F-Modules-1]
+tags: [modules, sockscap, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, sockscap_legacy_config, module_signed_sockscap_archive]
+timeout_sec: 175
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.sockscap_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.sockscap_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- assert_file_sha256: {path: '${fixture.sockscap_signed_host}', equals: '${fixture.sockscap_signed_host_sha256}'}
+- assert_signed_sockscap_host: idle
+- click: '[data-testid="module-action-enable-sockscap"]'
+- wait_for: '[data-testid="module-action-disable-sockscap"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-testid="sockscap-panel"]'
+- show_sockscap_upstream: null
+- wait_for: '[data-testid="sockscap-upstream-kind"]'
+- select_option: {selector: '[data-testid="sockscap-upstream-kind"]', value: trojan}
+- wait_for: '[data-testid="sockscap-sharelink-input"]'
+- fill: {selector: '[data-testid="sockscap-sharelink-input"]', value: 'trojan://qa-sockscap-fixture@127.0.0.2:19392#Hosted%20fixture'}
+- click: '[data-testid="sockscap-sharelink-import"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-sockscap-parser-vault
+- click: '[data-testid="sockscap-sharelink-import"]:not([disabled])'
+- wait_for: '[data-testid="sockscap-upstream-host"][value="127.0.0.2"]'
+- assert_attribute: {selector: '[data-testid="sockscap-upstream-port"]', name: value, equals: '19392'}
+- assert_signed_sockscap_host: running
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-sockscap"]'
+- wait_for: '[data-testid="module-action-enable-sockscap"]'
+- assert_signed_sockscap_host: disabled
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-parser
+    requirement: A signed parser supplies the upstream endpoint and releases its host when disabled.
+    actions: [6, 10, 16, 18, 21, 23, 24, 30]
+    checkpoints:
+    - {step: 8, expectation: The installed executable matches the verified package.}
+    - {step: 9, expectation: The installed host is idle before its first request.}
+    - {step: 25, expectation: The original profile shows the exact host parsed from the link.}
+    - {step: 26, expectation: The profile also shows the parsed port.}
+    - {step: 27, expectation: The signed parser owns a live writer lease during use.}
+    - {step: 32, expectation: Module disable releases the lease.}
+    - {step: 33, expectation: Import and disable complete without runtime errors.}
+    results: [8, 9, 25, 26, 27, 32, 33]
+  visual:
+  - check: The upstream settings reflect the imported proxy link.
+    method: automated
+    reason: The UI shows the distinct host and port from the fixture link.
+  native:
+  - check: The signed host is used through the normal SocksCap entry point.
+    method: automated
+    reason: The native receipt records the installed artifact and real writer lease.

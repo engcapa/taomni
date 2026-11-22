@@ -1,0 +1,21 @@
+{
+  "id": "taomni-plugin-sockscap",
+  "slug": "sockscap",
+  "name": "SocksCap",
+  "description": "Manage application traffic routing and its proxy profiles.",
+  "version": "0.1.0",
+  "coreApiVersion": "1",
+  "kind": "remote-client",
+  "status": "provisional",
+  "platforms": ["linux-x86_64", "windows-x86_64", "darwin-aarch64", "darwin-x86_64"],
+  "entry": { "host": "taomni-plugin-sockscap", "protocol": 1 },
+  "tabs": [],
+  "commands": ["sockscap/parse-share-link"],
+  "permissions": [],
+  "dataDir": "plugins/sockscap",
+  "dataSchemaVersion": 1,
+  "backupPaths": [],
+  "legacyTables": [],
+  "vaultFixedKeys": [],
+  "snapshot": "file"
+}

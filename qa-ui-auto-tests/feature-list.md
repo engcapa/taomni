@@ -340,6 +340,7 @@ controls:
     - '[data-testid="module-action-enable-mail"]'
     - '[data-testid="module-action-enable-screenshot"]'
     - '[data-testid="module-action-enable-ai-voice-local"]'
+    - '[data-testid="module-action-enable-sockscap"]'
   - id: module-status-mfa
     selector: '[data-testid="module-status-mfa"]'
     kind: display
@@ -356,6 +357,7 @@ controls:
     - '[data-testid="module-action-disable-mail"]'
     - '[data-testid="module-action-disable-screenshot"]'
     - '[data-testid="module-action-disable-ai-voice-local"]'
+    - '[data-testid="module-action-disable-sockscap"]'
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
@@ -9070,6 +9072,23 @@ controls:
   - id: upstream-section-toggle
     selector: '[data-testid="sockscap-section-upstream-toggle"]'
     kind: interactive
+  - id: upstream-kind
+    selector: '[data-testid="sockscap-upstream-kind"]'
+    kind: interactive
+  - id: upstream-host
+    selector: '[data-testid="sockscap-upstream-host"]'
+    kind: interactive
+  - id: upstream-port
+    selector: '[data-testid="sockscap-upstream-port"]'
+    kind: interactive
+  - id: share-link
+    selector: '[data-testid="sockscap-sharelink-input"]'
+    kind: interactive
+    optional: true
+  - id: import-share-link
+    selector: '[data-testid="sockscap-sharelink-import"]'
+    kind: interactive
+    optional: true
   - id: rules-section-toggle
     selector: '[data-testid="sockscap-section-rules-toggle"]'
     kind: interactive

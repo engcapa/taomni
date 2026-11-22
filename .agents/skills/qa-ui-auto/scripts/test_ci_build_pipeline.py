@@ -95,7 +95,7 @@ class BuildPipelineTests(unittest.TestCase):
                 jobs[f'execute-{platform}-native']['needs'],
                 dependencies + [
                     'signed-mail', 'signed-screenshot', 'signed-vnc-server', 'signed-servers',
-                    'signed-voice', rdp_server_signer,
+                    'signed-voice', 'signed-sockscap', rdp_server_signer,
                 ],
             )
             self.assertIn(f'execute-{platform}-native', jobs['summarize']['needs'])
@@ -118,6 +118,9 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertIn('signed-voice', jobs['summarize']['needs'])
         self.assertEqual(jobs['signed-voice']['with']['module'], 'ai-voice-local')
         self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-local-voice')", jobs['signed-voice']['if'])
+        self.assertIn('signed-sockscap', jobs['summarize']['needs'])
+        self.assertEqual(jobs['signed-sockscap']['with']['module'], 'sockscap')
+        self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-sockscap')", jobs['signed-sockscap']['if'])
         self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-local-vnc')", jobs['signed-vnc-server']['if'])
         self.assertIs(jobs['signed-rdp-server-macos']['with']['native_macos_signing'], True)
         self.assertIn('APPLE_CERTIFICATE', jobs['signed-rdp-server-macos']['secrets'])

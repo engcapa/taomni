@@ -92,6 +92,7 @@
           "module_rdp_preview",
           "module_mail_preview",
           "sockscap_legacy_config",
+          "module_signed_sockscap_archive",
           "module_upgrade",
           "module_legacy_install",
           "module_legacy_mfa",
@@ -1001,6 +1002,14 @@
             }
           ],
           "description": "Native signed Mail case only. Match installed host bytes to the signed input and observe the module writer lease before, during and after using the Mail host."
+        },
+        "assert_signed_sockscap_host": {
+          "enum": ["idle", "running", "disabled"],
+          "description": "Observe the signed SocksCap host's writer lease as the case imports a link and disables the host."
+        },
+        "show_sockscap_upstream": {
+          "type": "null",
+          "description": "Open the real upstream settings section if its platform default leaves it collapsed."
         },
         "assert_signed_rdp_latency": {
           "type": "null",

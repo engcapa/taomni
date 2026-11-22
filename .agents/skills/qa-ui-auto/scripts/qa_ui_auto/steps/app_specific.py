@@ -367,3 +367,10 @@ def step_servers_multi_instance_probe(ctx: StepContext, args: Any) -> None:
     from ..servers_multi_instance import browser_run
 
     browser_run(ctx, args)
+
+
+@verb("show_sockscap_upstream")
+def step_show_sockscap_upstream(ctx: StepContext, args: Any) -> None:
+    from ..module_sockscap_observation import show_upstream
+
+    show_upstream(ctx, args, mode="browser")

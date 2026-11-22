@@ -14,6 +14,7 @@ mod gfwlist;
 
 mod settings;
 
+pub mod recovery;
 pub mod share_link;
 pub mod xray_config;
 
@@ -33,3 +34,6 @@ pub use rules::{SocksCapProfile, UserRule, UserRuleAction};
 pub use gfwlist::GfwListSource;
 
 pub use settings::SocksCapConfig;
+
+pub const SLUG: &str = "sockscap";
+pub const PARSE_SHARE_LINK: &str = "sockscap/parse-share-link";

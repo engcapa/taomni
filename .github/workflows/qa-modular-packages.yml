@@ -10,7 +10,7 @@ on:
       module:
         description: Official QA module
         type: choice
-        options: [hello-plugin, mfa, mail, vnc-client, vnc-server, rdp-client, rdp-server, screenshot, servers, ai-voice-local]
+        options: [hello-plugin, mfa, mail, vnc-client, vnc-server, rdp-client, rdp-server, screenshot, servers, ai-voice-local, sockscap]
         default: hello-plugin
       macos_runner:
         description: Hosted macOS package builder (both Darwin targets remain explicit)
@@ -75,7 +75,7 @@ jobs:
             hello-plugin) echo 'host_package=taomni-hello-plugin' >> "$GITHUB_OUTPUT" ;;
             mfa) echo 'host_package=taomni-plugin-mfa' >> "$GITHUB_OUTPUT" ;;
             mail) echo 'host_package=taomni-plugin-mail' >> "$GITHUB_OUTPUT" ;;
-            vnc-client|vnc-server|rdp-client|rdp-server|screenshot|servers|ai-voice-local) echo "host_package=taomni-plugin-$QA_MODULE" >> "$GITHUB_OUTPUT" ;;
+            vnc-client|vnc-server|rdp-client|rdp-server|screenshot|servers|ai-voice-local|sockscap) echo "host_package=taomni-plugin-$QA_MODULE" >> "$GITHUB_OUTPUT" ;;
             *) echo 'Unknown official QA module.' >&2; exit 1 ;;
           esac
           test -n "$(git for-each-ref --format='%(refname)' --contains HEAD refs/remotes/origin/)" || {
@@ -107,7 +107,7 @@ jobs:
                         'vnc-client': 'signed-vnc', 'vnc-server': 'signed-local-vnc',
                         'rdp-client': 'signed-rdp', 'rdp-server': 'signed-local-rdp',
                         'servers': 'signed-local-servers',
-                        'ai-voice-local': 'signed-local-voice',
+                        'ai-voice-local': 'signed-local-voice', 'sockscap': 'signed-sockscap',
                         'screenshot': 'signed-screenshot'}[os.environ['QA_MODULE']]
           roster = set()
           if raw := os.environ.get('PACKAGE_NATIVE_BUILDS'):
@@ -310,7 +310,7 @@ jobs:
           from local_voice_runtime import runtime_files, verify_runtime
           root = pathlib.Path('candidate')
           module = os.environ['QA_MODULE']
-          assert module in {'hello-plugin', 'mfa', 'mail', 'vnc-client', 'vnc-server', 'rdp-client', 'rdp-server', 'screenshot', 'servers', 'ai-voice-local'}, 'Unknown official QA module'
+          assert module in {'hello-plugin', 'mfa', 'mail', 'vnc-client', 'vnc-server', 'rdp-client', 'rdp-server', 'screenshot', 'servers', 'ai-voice-local', 'sockscap'}, 'Unknown official QA module'
           observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
           assert observed == {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': module}
           assert not any(p.is_symlink() for p in root.rglob('*'))

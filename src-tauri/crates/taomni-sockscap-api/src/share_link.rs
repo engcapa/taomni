@@ -12,7 +12,7 @@ use crate::{UpstreamKind, UpstreamParams};
 
 /// A share link decoded into upstream fields. `secret` / `uuid` are plaintext
 /// (the frontend vaults them into `password_ref` / `params.uuid_ref`).
-#[derive(Debug, Clone, Default, serde::Serialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ParsedShareLink {
     pub kind_tag: String,
