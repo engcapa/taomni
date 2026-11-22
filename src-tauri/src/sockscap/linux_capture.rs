@@ -15,12 +15,27 @@ pub(super) async fn start_linux_capture(
         .linux
         .as_ref()
         .is_some_and(|linux| linux.transparent_available);
+    let processes = if sudo_password.is_some() || transparent_available {
+        match state.legacy.sockscap.xray() {
+            Some(manager) => manager.processes().await?,
+            None => None,
+        }
+    } else {
+        None
+    };
     let capture = if sudo_password.is_some() {
         let backend = LinuxCaptureImpl;
-        LinuxCaptureHandle::Transparent(backend.start(cfg, Arc::clone(&ctx), sudo_password).await?)
+        LinuxCaptureHandle::Transparent(
+            backend
+                .start(cfg, Arc::clone(&ctx), processes.as_ref(), sudo_password)
+                .await?,
+        )
     } else if transparent_available {
         let backend = LinuxCaptureImpl;
-        match backend.start(cfg, Arc::clone(&ctx), None).await {
+        match backend
+            .start(cfg, Arc::clone(&ctx), processes.as_ref(), None)
+            .await
+        {
             Ok(capture) => LinuxCaptureHandle::Transparent(capture),
             Err(error) if caps.privileged_required => return Err(error),
             Err(error) => {

@@ -141,27 +141,11 @@ if [ -n "${updater_app:-}" ]; then
   cmp "$bridge" "$updater_app/${bridge#"$app"/}"
 fi
 
-xray_count="$(find "$resource_root" -type f -path '*/sockscap/macos/xray' | wc -l | tr -d ' ')"
-test "$xray_count" = "1" || {
-  echo "Expected one bundled macOS xray executable, found $xray_count" >&2
-  exit 1
-}
-xray="$(find "$resource_root" -type f -path '*/sockscap/macos/xray' -print -quit)"
-test -x "$xray" || {
-  echo "Bundled xray is not executable: $xray" >&2
-  exit 1
-}
-xray_architectures="$(lipo -archs "$xray")"
-test "$xray_architectures" = "$expected_arch" || {
-  echo "Expected bundled xray architecture $expected_arch, found: $xray_architectures" >&2
-  exit 1
-}
-
 verify_separate_installer() {
   local misplaced
-  misplaced="$(find "$1" \( -name 'Mitmproxy Redirector.app.tar' -o -path '*/macos/redirector' \) -print -quit)"
+  misplaced="$(find "$1" \( -name 'Mitmproxy Redirector.app.tar' -o -path '*/macos/redirector' -o -iname xray \) -print -quit)"
   if [ -n "$misplaced" ]; then
-    echo "The SocksCap module installer was included in the core bundle: $misplaced" >&2
+    echo "The SocksCap module installer or runtime was included in the core bundle: $misplaced" >&2
     return 1
   fi
 }

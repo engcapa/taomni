@@ -502,9 +502,6 @@ pub async fn sockscap_test_core_upstream(
         .sockscap
         .xray()
         .ok_or_else(|| "xray manager not initialized".to_string())?;
-    if !mgr.has_exe() {
-        return Err("xray-core binary not provisioned; run scripts/fetch-xray.ps1".into());
-    }
 
     let spec = build_core_spec(
         &state.core.vault,

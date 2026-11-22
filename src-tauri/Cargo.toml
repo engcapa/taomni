@@ -56,6 +56,7 @@ members = [
     "plugins/screenshot",
     "plugins/sockscap",
     "plugins/sockscap/tools",
+    "plugins/sockscap/xray",
     "plugins/vnc-client",
     "plugins/vnc-server",
     "plugins/servers",
@@ -441,6 +442,7 @@ gtk = "0.18.2"
 # Cargo enables the helper when building integration tests. Tauri enumerates
 # only enabled binary targets when it assembles a desktop installer.
 taomni = { path = ".", default-features = false, features = ["acp-test-fixture"] }
+taomni-sockscap-xray = { path = "plugins/sockscap/xray" }
 taomni-screenshot-ocr = { path = "crates/taomni-screenshot-ocr" }
 taomni-screenshot-recording = { path = "crates/taomni-screenshot-recording" }
 mail-parser = { version = "0.11.4", features = ["full_encoding"] }

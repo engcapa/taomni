@@ -19,7 +19,8 @@ use crate::{UpstreamKind, UpstreamParams};
 /// An upstream with all `vault:<id>` references already resolved to plaintext by
 /// the caller (orchestrator). Never persisted; lives only for the duration of a
 /// core spawn.
-#[derive(Debug, Clone)]
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResolvedCoreUpstream {
     pub kind: UpstreamKind,
     pub host: String,

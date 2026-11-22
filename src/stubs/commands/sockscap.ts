@@ -241,6 +241,7 @@ export async function invokeSockscap<T>(cmd: string, args?: any): Promise<T> {
     case "sockscap_detect_tun_conflicts":
       return [] as T;
 
+    case "sockscap_test_core_upstream":
     case "sockscap_test_upstream":
       throw new Error("Upstream test is only available in the desktop build.");
 

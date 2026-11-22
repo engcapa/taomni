@@ -14,7 +14,8 @@ from . import sockscap_redirector
 from .backup_policy import isolated_data_root
 from .module_signed_archive import load_artifact, platform_key
 
-SIGNED_CASES = {"TC-MODULES-072", "TC-MODULES-073", sockscap_redirector.CASE_ID, sockscap_redirector.INSTALLER_CASE}
+XRAY_CASE_ID = "TC-MODULES-084"
+SIGNED_CASES = {XRAY_CASE_ID, "TC-MODULES-072", "TC-MODULES-073", sockscap_redirector.CASE_ID, sockscap_redirector.INSTALLER_CASE}
 
 
 def setup(ctx):
@@ -34,6 +35,9 @@ def setup(ctx):
     }
     if ctx.case_id == sockscap_redirector.CASE_ID:
         config.update(mode="apps", apps=[{"path": "/usr/bin/true", "name": "true"}], ruleMode="off")
+    if ctx.case_id == XRAY_CASE_ID:
+        config["upstream"].update(kind="shadowsocks", passwordRef="fixture-password",
+                                  params={"method": "invalid-fixture-cipher"})
     serialized = json.dumps(config)
     ctx.values["sockscap_legacy_config"] = serialized
     if (ctx.cfg.get("app") or {}).get("mode") == "native":
@@ -66,7 +70,6 @@ def setup_signed(ctx):
     owned.mkdir()
     destination = owned / archive.name
     shutil.copyfile(archive, destination)
-    (owned / "provenance.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     installed = isolated_data_root(ctx) / "plugins" / "sockscap" / "versions" / version
     ctx.signed_sockscap = receipt
     ctx.values.update(
@@ -77,6 +80,20 @@ def setup_signed(ctx):
         sockscap_signed_frontend=(installed / frontend).as_posix(),
         sockscap_signed_frontend_sha256=receipt["frontendSha256"],
     )
+
+    if ctx.case_id == XRAY_CASE_ID:
+        name = "xray.exe" if platform.startswith("windows-") else "xray"
+        resource = f"resources/xray/{name}"
+        with zipfile.ZipFile(archive) as package, package.open(resource) as packed:
+            receipt["xraySha256"] = hashlib.file_digest(packed, "sha256").hexdigest()
+        ctx.sockscap_xray_restore = (destination, resource)
+        ctx.sockscap_xray_resource = installed / resource
+        ctx.values.update(
+            sockscap_xray_sha256=receipt["xraySha256"],
+            sockscap_xray_staged=(isolated_data_root(ctx) / f"plugins/sockscap/data/xray/{name}").as_posix(),
+        )
+
+    (owned / "provenance.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
 
     if ctx.case_id in (sockscap_redirector.CASE_ID, sockscap_redirector.INSTALLER_CASE):
         sockscap_redirector.prepare(ctx, destination, installed)

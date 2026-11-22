@@ -28,5 +28,9 @@ for format in deb rpm appimage; do
     echo "The $format package contains the ACP integration test fixture" >&2
     exit 1
   fi
+  if grep -E '(^|/)xray$' "$files"; then
+    echo "The $format core package contains SocksCap's Xray executable" >&2
+    exit 1
+  fi
   echo "Verified $format core installer contents"
 done

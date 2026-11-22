@@ -45,8 +45,32 @@ pub const TEST_TARGET: &str = "sockscap/test-target";
 pub const SETTINGS: &str = "sockscap/settings";
 pub const CONFIG_PATH: &str = "plugins/sockscap/data/config.json";
 pub const RUNTIME_INFO: &str = "sockscap/runtime-info";
+pub const XRAY: &str = "sockscap/xray";
+pub const XRAY_FILE: &str = if cfg!(windows) { "xray.exe" } else { "xray" };
+pub const XRAY_RUN_DIR: &str = "plugins/sockscap/data/xray";
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct XrayProcesses {
+    pub host: u32,
+    pub children: Vec<u32>,
+}
 pub const REDIRECTOR_BRIDGE_ARG: &str = "--sockscap-redirector-bridge";
-pub const COMMANDS: [&str; 4] = [PARSE_SHARE_LINK, TEST_TARGET, SETTINGS, RUNTIME_INFO];
+pub const COMMANDS: [&str; 5] = [PARSE_SHARE_LINK, TEST_TARGET, SETTINGS, RUNTIME_INFO, XRAY];
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(tag = "operation", rename_all = "camelCase", deny_unknown_fields)]
+pub enum XrayRequest {
+    Ensure {
+        profile: String,
+        spec: Box<xray_config::ResolvedCoreUpstream>,
+    },
+    Remove {
+        profile: String,
+    },
+    State,
+    Stop,
+}
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

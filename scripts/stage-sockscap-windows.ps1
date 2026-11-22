@@ -36,14 +36,7 @@ if ($args -contains "--check") {
   if (-not (Test-Path -LiteralPath (Join-Path $resWin "sockscap-helper.exe") -PathType Leaf)) {
     throw "SocksCap helper missing from Windows bundle resources. Run this script without --check to build it."
   }
-  # xray-core is optional: its absence only disables core-backed upstreams
-  # (shadowsocks/trojan/vmess/vless/wireguard), not capture. Warn, don't fail.
-  $xray = Join-Path $resWin "xray.exe"
-  if (-not (Test-Path $xray)) {
-    Write-Host "note: xray.exe not staged (core-backed upstreams disabled; run scripts/fetch-xray.ps1)"
-  } else {
-    Write-Host "  xray-core present."
-  }
+
   Write-Host "Windows SocksCap bundle preflight passed (WinDivert present)."
   exit 0
 }
@@ -181,20 +174,6 @@ if (-not (Test-Path $dll)) {
   } else {
     Write-Warning "WinDivert staging incomplete; if capture already worked before, existing files may still be fine."
   }
-}
-
-# xray-core: fetch (pinned SHA256) + stage into target for dev runtime discovery.
-# Non-fatal — a missing xray only disables core-backed upstreams, not capture.
-$fetchXray = Join-Path $root "scripts\fetch-xray.ps1"
-try {
-  & $fetchXray -Platform windows
-  $xraySrc = Join-Path $resWin "xray.exe"
-  if (Test-Path $xraySrc) {
-    $okXray = Copy-Safe -Source $xraySrc -DestinationDir $target
-    if ($okXray) { Write-Host "xray-core ready under $target" }
-  }
-} catch {
-  Write-Warning "fetch-xray failed ($_); core-backed upstreams (ss/trojan/vmess/vless/wireguard) will be unavailable."
 }
 
 Write-Host "Helper ready: $helperSrc"

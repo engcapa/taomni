@@ -33,19 +33,11 @@ when its ownership marker is present, and only deletes empty generated cgroups;
 it never moves an unrelated live process. Desktop sessions request sudo
 authorization when that recovery needs `CAP_NET_ADMIN` or cgroup permissions.
 
-## xray-core (core-backed upstreams)
+## Xray upstreams
 
-Shadowsocks / Trojan / VMess / VLESS / WireGuard upstreams are served by a
-bundled `xray` process (xray-core, MPL-2.0), spawned with a loopback SOCKS
-inbound the relay dials through. The binary is a third-party redistributable and
-is **not committed** — stage it before packaging:
-
-```bash
-pwsh scripts/fetch-xray.ps1 -Platform linux
-```
-
-The script pins the release tag and verifies a SHA256 before extracting `xray`
-here. The runtime resolves it via `sockscap::paths::resolve_xray_exe` (override
-with `SOCKSCAP_XRAY_DIR` / `SOCKSCAP_XRAY_EXE`). A missing xray only disables
-core-backed upstreams; native HTTP / SOCKS5 / SSH upstreams and capture are
-unaffected.
+The signed SocksCap module ships the pinned Xray executable and its MPL-2.0
+license. The module host verifies and starts Xray for Shadowsocks, Trojan,
+VMess, VLESS and WireGuard. The packaged executable and its digests are
+defined in `src-tauri/plugins/sockscap/resources/xray/release.json`.
+The standalone `scripts/fetch-xray.ps1` stages a fixture for the Rust integration
+suite.

@@ -9136,6 +9136,9 @@ controls:
   - id: upstream-port
     selector: '[data-testid="sockscap-upstream-port"]'
     kind: interactive
+  - id: test-upstream
+    selector: '[data-testid="sockscap-test-upstream"]'
+    kind: interactive
   - id: share-link
     selector: '[data-testid="sockscap-sharelink-input"]'
     kind: interactive

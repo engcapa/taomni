@@ -240,6 +240,34 @@ impl CgroupSession {
         Ok(true)
     }
 
+    /// Keep the signed host and already-running children together. Future Xray
+    /// children then inherit the same group before they open outbound sockets.
+    pub(super) fn enroll_upstreams(
+        &mut self,
+        upstreams: &taomni_sockscap_api::XrayProcesses,
+        sudo_password: Option<&str>,
+    ) -> Result<(), String> {
+        let Some(_) = self.bypass_match else {
+            return Ok(());
+        };
+        let host_dir = self.root.join("bypass").join("sockscap-module");
+        self.move_pid(upstreams.host, host_dir, sudo_password)?;
+        for pid in &upstreams.children {
+            let Ok(status) = fs::read_to_string(format!("/proc/{pid}/status")) else {
+                continue;
+            };
+            let parent = status
+                .lines()
+                .find_map(|line| line.strip_prefix("PPid:"))
+                .and_then(|value| value.trim().parse::<u32>().ok());
+            if parent == Some(upstreams.host) {
+                let child_dir = self.root.join("bypass").join(format!("xray-{pid}"));
+                self.move_pid(*pid, child_dir, sudo_password)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Restore moved processes and remove the session's empty cgroup tree.
     pub fn cleanup(&mut self, sudo_password: Option<&str>) -> Result<(), String> {
         let mut errors = Vec::new();

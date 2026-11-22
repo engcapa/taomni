@@ -25,7 +25,7 @@ config="$repo_root/src-tauri/tauri.conf.json"
 runtime_doc="$repo_root/src-tauri/resources/sockscap/linux/README.md"
 
 test -f "$runtime_doc"
-grep -Fq 'resources/sockscap/linux/**/*' "$platform_config"
+grep -Fq 'resources/sockscap/linux/README.md' "$platform_config"
 grep -Fq '"nftables"' "$config"
 
 echo "Linux SocksCap bundle preflight passed: nftables dependency and runtime documentation are staged by Tauri resources."

@@ -1,6 +1,7 @@
 //! Native entry for the signed SocksCap module.
 
 mod settings;
+mod xray;
 
 use std::{io, sync::Arc, time::Duration};
 
@@ -49,7 +50,9 @@ fn main() -> io::Result<()> {
                 storage.ok_or_else(|| io::Error::other("SocksCap profile is unavailable"))?;
             Ok(Arc::new(Host {
                 settings: Arc::new(settings::Settings::new(storage.root().path())),
-                runtime: tokio::runtime::Builder::new_current_thread()
+                xray: xray::open(storage.root().path())?,
+                runtime: tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(1)
                     .enable_all()
                     .build()?,
             }))
@@ -59,6 +62,7 @@ fn main() -> io::Result<()> {
 
 struct Host {
     settings: Arc<settings::Settings>,
+    xray: Arc<taomni_sockscap_xray::XrayManager>,
     runtime: tokio::runtime::Runtime,
 }
 
@@ -76,6 +80,9 @@ impl PluginHandler for Host {
         operation.check_current()?;
         let params = params.ok_or_else(|| RpcError::from_code(ErrorCode::InvalidParams))?;
         let reply = match method {
+            taomni_sockscap_api::XRAY => {
+                return xray::invoke(&self.runtime, &self.xray, operation, params);
+            }
             taomni_sockscap_api::RUNTIME_INFO => {
                 if params != serde_json::json!({}) {
                     return Err(RpcError::from_code(ErrorCode::InvalidParams));

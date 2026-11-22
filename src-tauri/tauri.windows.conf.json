@@ -2,7 +2,7 @@
   "bundle": {
     "resources": [
       "resources/licenses/*",
-      "resources/sockscap/windows/**/*"
+      "resources/sockscap/windows/[RWs]*"
     ]
   }
 }

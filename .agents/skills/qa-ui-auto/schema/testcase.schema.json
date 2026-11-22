@@ -1019,6 +1019,10 @@
           "enum": ["change", "restore"],
           "description": "Change or restore one byte in the isolated installed macOS module resource and record both digests."
         },
+        "sockscap_xray_fixture": {
+          "enum": ["alter", "restore"],
+          "description": "Alter or restore the isolated signed SocksCap Xray resource and record both digests."
+        },
         "assert_signed_sockscap_host": {
           "enum": ["idle", "running", "disabled"],
           "description": "Observe the signed SocksCap host's writer lease as the case imports a link and disables the host."

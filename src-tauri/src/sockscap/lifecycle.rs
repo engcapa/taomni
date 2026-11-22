@@ -1,22 +1,9 @@
 use super::*;
 
-/// Resolve the xray binary + work dir and install the [`core::XrayManager`] on
-/// the runtime. Idempotent (later calls are ignored by the `OnceLock`). Called
-/// from `setup()`; logs whether the binary was found so a missing provisioning
-/// step is visible without blocking startup.
-pub fn init_xray_manager(app: &AppHandle, state: &AppState) {
-    let exe = paths::resolve_xray_exe(app);
-    match &exe {
-        Some(p) => tracing::info!("sockscap: xray-core found at {}", p.display()),
-        None => tracing::info!(
-            "sockscap: xray-core binary not provisioned (core-backed upstreams unavailable; run scripts/fetch-xray.ps1)"
-        ),
-    }
-    let work_dir = data_dir(app)
-        .unwrap_or_else(|_| std::env::temp_dir())
-        .join("xray");
-    let mgr = Arc::new(core::XrayManager::new(exe, work_dir));
-    let _ = state.legacy.sockscap.xray.set(mgr);
+/// Route upstream requests through the active SocksCap module whenever it is installed.
+pub fn init_xray_manager(_app: &AppHandle, state: &AppState) {
+    let manager = Arc::new(core::XrayManager::new(state.plugins.clone()));
+    let _ = state.legacy.sockscap.xray.set(manager);
 }
 
 /* ---------------------------- lifecycle --------------------------------- */
@@ -289,9 +276,8 @@ pub async fn sockscap_start(
             .install_activation_lock(activation_lock);
     }
 
-    // Start the xray health monitor once capture is up, so a core that crashes
-    // mid-session is respawned on its same local port (keeps the relay working).
-    // Idempotent; stopped by full_teardown / shutdown_on_exit.
+    // Refresh Windows capture exclusions when the signed host respawns Xray.
+    #[cfg(windows)]
     if status.is_ok() {
         if let Some(mgr) = state.legacy.sockscap.xray() {
             if mgr.running_count().await > 0 {

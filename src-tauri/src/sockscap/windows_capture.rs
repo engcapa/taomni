@@ -297,12 +297,13 @@ pub(super) async fn start_windows_capture(
     // a snapshot; the path survives a core crashing and being respawned with a
     // new pid, which would otherwise have its node connection captured and
     // looped back into the relay.
-    if let Some(xray) = paths::resolve_xray_exe(app) {
-        let norm = paths::normalize_exe_path(&xray.display().to_string());
-        if !norm.is_empty() && !bypass_paths.contains(&norm) {
-            bypass_paths.push(norm);
-        }
-    }
+    let xray = state
+        .core
+        .paths
+        .data
+        .join(taomni_sockscap_api::XRAY_RUN_DIR)
+        .join(taomni_sockscap_api::XRAY_FILE);
+    bypass_paths.push(paths::normalize_exe_path(&xray.display().to_string()));
     if !loopback_proxy_ports.is_empty() {
         let procs = process::list_processes().unwrap_or_default();
         for port in &loopback_proxy_ports {

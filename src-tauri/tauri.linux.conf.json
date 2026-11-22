@@ -2,7 +2,7 @@
   "bundle": {
     "resources": [
       "resources/licenses/*",
-      "resources/sockscap/linux/**/*"
+      "resources/sockscap/linux/README.md"
     ]
   }
 }

@@ -162,10 +162,6 @@ jobs:
         run: |
           cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::capture::linux
           bash scripts/stage-sockscap-linux.sh --check
-          # Stage xray-core (MPL-2.0) into resources so the Linux bundle can serve
-          # core-backed upstreams (ss/trojan/vmess/vless/wireguard).
-          pwsh scripts/fetch-xray.ps1 -Platform linux
-          cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::core
 
       - name: Fetch WinDivert redistributable (Windows)
         if: matrix.platform == 'windows-latest'
@@ -220,7 +216,6 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           pwsh scripts/stage-sockscap-windows.ps1 -Configuration release
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-sockscap-api --locked --lib
-          cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::core
           pwsh scripts/stage-sockscap-windows.ps1 --check
 
       - name: Check updater signing configuration
@@ -404,15 +399,6 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: node scripts/configure-release-signing.mjs
-
-      - name: Stage and verify xray-core for the target architecture
-        env:
-          XRAY_PLATFORM: ${{ matrix.arch == 'aarch64' && 'macos-arm64' || 'macos' }}
-          EXPECTED_ARCH: ${{ matrix.arch == 'aarch64' && 'arm64' || 'x86_64' }}
-        run: |
-          set -euo pipefail
-          pwsh scripts/fetch-xray.ps1 -Platform "$XRAY_PLATFORM" -Force
-          test "$(lipo -archs src-tauri/resources/sockscap/macos/xray)" = "$EXPECTED_ARCH"
 
       - name: Select target Kerberos libraries
         env:

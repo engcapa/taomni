@@ -245,6 +245,13 @@ jobs:
               'module': slug,
           }, sort_keys=True) + '\n', encoding='utf-8')
           PY
+      - name: Stage pinned SocksCap Xray payload
+        if: needs.source.outputs.slug == 'sockscap'
+        env:
+          MODULE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          python -m unittest discover -s scripts -p test_sockscap_xray_resource.py
+          python scripts/sockscap_xray_resource.py stage src-tauri/plugins/sockscap "$MODULE_PLATFORM" unsigned-module
       - uses: actions/upload-artifact@v4
         with:
           name: module-unsigned-${{ needs.source.outputs.slug }}-${{ matrix.platform }}-${{ github.run_id }}
@@ -335,6 +342,11 @@ jobs:
           FRONTEND_TOOLING: ${{ github.workflow_sha }}
           MODULE_SLUG: ${{ needs.source.outputs.slug }}
         run: python scripts/stage-vnc-frontend.py trusted-desktop-frontend candidate/unsigned-module "$MODULE_SOURCE" "$FRONTEND_TOOLING" "$MODULE_SLUG"
+      - name: Verify the module Xray files against trusted pinned digests
+        if: needs.source.outputs.slug == 'sockscap'
+        env:
+          MODULE_PLATFORM: ${{ matrix.platform }}
+        run: python scripts/sockscap_xray_resource.py verify src-tauri/plugins/sockscap "$MODULE_PLATFORM" candidate/unsigned-module
       - name: Check Linux module ABI against the core baseline
         if: matrix.platform == 'linux-x86_64'
         env:

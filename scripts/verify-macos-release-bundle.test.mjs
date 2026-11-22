@@ -23,7 +23,6 @@ function fixture(t) {
   };
   put(join(app, "Contents/MacOS/taomni"), "#!/bin/sh\n# app executable\n", true);
   put(join(app, "Contents/Frameworks/libgssapi_krb5.2.2.dylib"), "bundled krb5");
-  put(join(app, "Contents/Resources/sockscap/macos/xray"), "#!/bin/sh\n# xray executable\n", true);
   const bridge = "sockscap/macos/sockscap-redirector-bridge";
   put(join(root, "src-tauri/resources", bridge), "bridge executable", true);
   put(join(app, "Contents/Resources", bridge), "bridge executable", true);
@@ -93,10 +92,10 @@ test("core and archived updater each exclude the module-owned Redirector install
   const f = fixture(t);
   const archive = join(f.app, "Contents/Resources/Mitmproxy Redirector.app.tar");
   writeFileSync(archive, "installer fixture");
-  assert.match(f.run().stderr, /SocksCap module installer was included/);
+  assert.match(f.run().stderr, /SocksCap module installer or runtime was included/);
   f.pack();
   rmSync(archive);
-  assert.match(f.run().stderr, /SocksCap module installer was included/);
+  assert.match(f.run().stderr, /SocksCap module installer or runtime was included/);
 });
 
 test("both the macOS application and updater archive exclude the ACP test fixture", (t) => {

@@ -21,9 +21,6 @@ pub(in crate::sockscap) async fn wait_for_privileged_files_unlocked(app: &AppHan
     if let Ok(helper_exe) = paths::resolve_helper_exe(app) {
         files.push(helper_exe);
     }
-    if let Some(xray_exe) = paths::resolve_xray_exe(app) {
-        files.push(xray_exe);
-    }
     files.retain(|p| p.is_file());
     if files.is_empty() {
         return;

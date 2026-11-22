@@ -1,23 +1,13 @@
 # SocksCap binaries (macOS)
 
-## xray-core
+## Xray upstreams
 
-Core-backed upstreams (Shadowsocks / Trojan / VMess / VLESS / WireGuard) are
-served by a bundled `xray` process. It is a third-party redistributable
-(xray-core, MPL-2.0) and is **not committed** — stage it before packaging:
-
-```bash
-# Intel
-pwsh scripts/fetch-xray.ps1 -Platform macos
-# Apple silicon
-pwsh scripts/fetch-xray.ps1 -Platform macos-arm64
-```
-
-The script pins the release tag and verifies a SHA256 before extracting `xray`
-into this directory. `tauri.conf.json` bundles `resources/sockscap/**/*` into
-the app resource dir; the runtime resolves it via
-`sockscap::paths::resolve_xray_exe` (override with `SOCKSCAP_XRAY_DIR` /
-`SOCKSCAP_XRAY_EXE`).
+The signed SocksCap module ships the pinned Xray executable and its MPL-2.0
+license. The module host verifies and starts Xray for Shadowsocks, Trojan,
+VMess, VLESS and WireGuard. The packaged executable and its digests are
+defined in `src-tauri/plugins/sockscap/resources/xray/release.json`.
+The standalone `scripts/fetch-xray.ps1` stages a fixture for the Rust integration
+suite.
 
 ## Mitmproxy Redirector
 

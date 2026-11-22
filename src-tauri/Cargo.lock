@@ -10960,6 +10960,7 @@ dependencies = [
  "taomni-screenshot-recording",
  "taomni-server-process",
  "taomni-sockscap-api",
+ "taomni-sockscap-xray",
  "taomni-sqlite-snapshot",
  "taomni-vnc-api",
  "taomni-vnc-engine",
@@ -11380,7 +11381,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-sockscap"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "serde_json",
  "taomni-module-settings",
@@ -11390,6 +11391,7 @@ dependencies = [
  "taomni-redirector",
  "taomni-sockscap-api",
  "taomni-sockscap-tools",
+ "taomni-sockscap-xray",
  "tempfile",
  "tokio",
 ]
@@ -11677,6 +11679,19 @@ dependencies = [
  "tokio",
  "tracing",
  "winapi",
+]
+
+[[package]]
+name = "taomni-sockscap-xray"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde_json",
+ "sha2 0.10.9",
+ "taomni-sockscap-api",
+ "tempfile",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

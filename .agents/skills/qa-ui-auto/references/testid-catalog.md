@@ -3005,6 +3005,7 @@
 - `[data-testid="sockscap-upstream-uuid-store"]` — interactive — F-Sockscap-1.upstream-uuid-store
 - `[data-testid="sockscap-upstream-host"]` — interactive — F-Sockscap-1.upstream-host
 - `[data-testid="sockscap-upstream-port"]` — interactive — F-Sockscap-1.upstream-port
+- `[data-testid="sockscap-test-upstream"]` — interactive — F-Sockscap-1.test-upstream
 - `[data-testid="sockscap-sharelink-input"]` — interactive [optional] — F-Sockscap-1.share-link
 - `[data-testid="sockscap-sharelink-import"]` — interactive [optional] — F-Sockscap-1.import-share-link
 - `[data-testid="sockscap-section-rules-toggle"]` — interactive — F-Sockscap-1.rules-section-toggle

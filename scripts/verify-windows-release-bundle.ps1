@@ -9,9 +9,6 @@ $ReleaseDir = (Resolve-Path -LiteralPath $ReleaseDir).Path
 $dlls = @("sherpa-onnx-c-api.dll", "sherpa-onnx-cxx-api.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll")
 $sockscapStaging = Join-Path $PSScriptRoot "../src-tauri/resources/sockscap/windows"
 $sockscapRuntime = @("sockscap-helper.exe", "WinDivert.dll", "WinDivert64.sys")
-if (Test-Path -LiteralPath (Join-Path $sockscapStaging "xray.exe") -PathType Leaf) {
-  $sockscapRuntime += "xray.exe"
-}
 $nsis = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseDir "bundle/nsis") -Filter '*-setup.exe')
 $msi = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseDir "bundle/msi") -Filter '*.msi')
 if ($nsis.Count -ne 1 -or $msi.Count -ne 1) {
@@ -37,6 +34,9 @@ try {
     $appDir = $executables[0].DirectoryName
     if (Get-ChildItem -LiteralPath $directory -Recurse -File -Filter acp-fake-agent.exe) {
       throw "The Windows installer contains the ACP integration test fixture"
+    }
+    if (Get-ChildItem -LiteralPath $directory -Recurse -File -Filter xray.exe) {
+      throw "The Windows core installer contains the SocksCap Xray executable"
     }
     if (Get-ChildItem -LiteralPath $directory -Recurse -File -Filter taomni-vnc-key-helper.exe) {
       throw "The Windows installer contains the independently shipped VNC key helper"
