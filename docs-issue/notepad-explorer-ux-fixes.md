@@ -108,3 +108,42 @@
 - browser QA（本机 Windows）：新增/更新 TC-NP-007（Notepad 主题/保存默认目录/右键菜单）与 TC-EXPLORER-011（tab 对齐/空白关闭/侧栏移除/图标）；受影响既有用例 TC-NP-002/101/102、TC-EXPLORER-001/002/003/007/010、TC-FILE-OPEN-009/010 等回归。
 - native QA（Windows 本机 QA 构建）：TC-NP-101/102 与新增 native 断言（真实 `$HOME` 下默认路径、真实保存）。
 - GitHub `qa-ui-auto-platforms`：仅 linux/macos，browser+native，selected 用例 + crash-regression；执行中按 shard 下载报告，失败修复重跑。
+
+## 6. 实施记录与偏差
+
+- 分支 `fix/notepad-explorer-ux`；checkpoint：`e4a93edde`（产品 + 单测）、`b981ea872`（QA 用例与 catalog）、`87050719a`（Save As 首次渲染竞态修复）。
+- 共享 ContextMenu 根节点沿用默认 `data-testid="context-menu"`（而不是设计稿里的 `notepad-context-menu` / `explorer-tab-context-menu`），以便 QA runner 的 `assert_menu_items` / `click_menu` / `hover` 直接命中；行级 testid 按设计稿保留。
+- Explorer 侧栏空面板守卫落在 `src/layouts/main/sidebarToggle.ts` + `useMainLayoutState`（`toggleSidebar` 包装），未改 `appStore`；Ctrl/Cmd+B、View 菜单、标题栏按钮共用该守卫。
+- “已保存文档 Save As 预填当前路径”的旧行为保持不变；只有 untitled 使用 `<lastSaveDir or $HOME>/<name>.txt`。
+- macOS browser QA 首次 hosted 运行暴露一个真实竞态：`FileLifecycleDialogs` 常驻挂载、Save As 路径依赖 passive effect 从 `initialPath` 回填，导致弹窗已可见但输入框短暂为空（TC-NP-002 / TC-NP-007 在 macOS 失败）。已把 Save As 拆为按打开键值挂载的子组件（`87050719a`），并新增“常驻宿主 → 打开 saveAs 后同步断言预填值”的单测；该修复后的 hosted 复验见 §8。
+- TC-WS-057 本机 Windows native 首次运行在 hover 菜单子项步骤失败一次（子菜单未展开，DOM 无 `code-workspace-tree-menu-compact`），重建最终二进制后单独重跑通过；判定为本机 native hover 时序 flake，与本次改动无调用关系（未改工作区树菜单），hosted crash-regression 继续覆盖三端。
+- 本机 native 环境的既有边界：`TC-FILE-OPEN-008` 无 POSIX SSH PTY 跳过、`TC-WS-054` 需 release profile 跳过、`TC-MOBILE-013` 缺 appcache Playwright chromium 失败；由 hosted linux/macOS 覆盖。
+
+## 7. 本地执行证据
+
+- 单元测试：全量 `vitest run` 883 文件 / 7498 通过 / 1 跳过（`qa-ui-auto-report/_local/unit-full-ux.log`）；`tsc -b`、refactor contracts/boundaries/source-size 通过。
+- 新增 browser：TC-NP-007、TC-EXPLORER-011 2/2 通过（`qa-ui-auto-report/ux-browser-new/run-20261122-163803-815050200`）。
+- 受影响 browser：29/29 通过（`ux-browser-affected/run-20261122-164317-409577800`）。
+- 最终源码 browser 子集（NP-001..007 + EXPLORER-011）8/8 通过（`ux-browser-final/run-20261122-171437-345518100`）。
+- crash-regression browser：17 通过 / 1 跳过（`ux-browser-crash/run-20261122-165050-242528100`，TC-FILE-OPEN-008 本机无 POSIX SSH PTY）。
+- 受影响 native（Windows QA debug 构建）：7/7 通过（`ux-native-affected/run-20261122-164632-799346200`）。
+- 最终源码 native 子集（TC-NP-101/102/103 + TC-WS-057 复跑）：4/4 通过（`ux-native-final/run-20261122-171140-330474600`）。
+- 本机 native crash-regression：18 通过 / 2 失败 / 2 跳过（`ux-native-crash/run-20261122-165345-221190200`；失败为 TC-MOBILE-013 本机环境与 TC-WS-057 hover flake，后者已复跑通过）。
+
+## 8. GitHub `qa-ui-auto-platforms` 执行证据（linux + macOS）
+
+主运行 [45005824556](https://github.com/engcapa/taomni/actions/runs/45005824556)，head `87050719a7be2e92af4e4ddbd789dd62e599a0d6`，scope=selected，platforms=linux,macos，modes=browser,native，selected 用例会并集 crash-regression；artifact UUID `a90654c865cd4bf398cd7c55c198f968`。浏览器用例执行过程中持续下载已完成 shard（见 `qa-ui-auto-report/hosted-ux/run-45005824556/monitor.log` 与 `qa-ui-auto-report/_local/hosted-monitor2.log`），未等待 result summary。
+
+| 组合 | 执行 | 通过 | 失败 | 跳过 | 说明 |
+|---|---:|---:|---:|---:|---|
+| linux browser | 40 | 40 | 0 | 0 | 含 TC-NP-001..007、TC-EXPLORER-011 与 browser crash-regression |
+| macOS browser | 40 | 39 | 1 | 0 | 唯一失败 TC-EXPLORER-002（macOS 预览窗格收起等待超时，既有已记录 flake） |
+| linux native (release) | 32 | 32 | 0 | 0 | 含 TC-NP-101/102/103、TC-EXPLORER-003/010 与 native crash-regression |
+| macOS native (release) | 32 | 32 | 0 | 0 | 同上 |
+
+- 结果汇总 `qa-summary-a90654c865cd4bf398cd7c55c198f968/ci-summary.json`：`passed=false`，唯一 failure 为 TC-EXPLORER-002，`merge_eligible=true`，无基础设施/缺失报告/selected skip。
+- 既有 flake 复验：定向运行 [45013282658](https://github.com/engcapa/taomni/actions/runs/45013282658)（macOS browser selected，head 同 commit，artifact UUID `fcdb7dc5f1804ec1b41762e470057f5a`）**success**，TC-EXPLORER-002 + browser crash-regression 19/19 通过（shard-1 18/18、shard-2 1/1），确认主运行失败为 macOS runner 预览收起时序 flake，与本次改动无关（本机该用例在受影响 29/29 与 crash 17/18 中均通过；历史 Explorer 文档亦记录过同签名 flake）。
+- 结论：本次 7 项修复在所有选中组合上通过（144 次选中执行 + 两次 browser crash-regression 并集），唯一失败已有同 commit 复验通过；macOS native 与 linux 双端均通过真实 release QA 构建执行。
+- 证据保留：`qa-ui-auto-report/hosted-ux/run-45005824556/**`（12 个 shard summary、selection、ci-summary、monitor.log）与 `run-45013282658/**`；不入库（report 目录被 gitignore），本文件记录 run/head/UUID 身份。
+- 未执行边界：Windows hosted 按用户要求不跑（Windows 由本机 browser/native 覆盖）；物理 OS 键盘/AppKit 菜单/真机打印等不计入本批。
+
