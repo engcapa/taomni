@@ -166,6 +166,7 @@ steps:
 - assert_text:
     selector: '[data-testid="mail-archive-notice"]'
     contains: policy.txt
+- wait_for: '[data-testid="mail-archive-attachment"]:enabled'
 - click: '[data-testid="mail-archive-row"]:first-child input[type="checkbox"]'
 - click: '[data-testid="mail-archive-cleanup"]'
 - wait_for: '[data-testid="mail-archive-confirm"]'
@@ -308,12 +309,19 @@ verification:
   requirements:
   - id: attachment-cache-preference
     requirement: Each saved Mail account retains its opt-in attachment cache setting.
-    actions: [132, 133, 134, 135, 136, 138, 139, 140, 142]
+    actions: [133, 134, 135, 136, 137, 139, 140, 141, 143]
     checkpoints:
-    - {step: 137, expectation: Saving closes the account editor.}
-    - {step: 141, expectation: Reopening the same account shows the checked attachment cache setting.}
-    - {step: 143, expectation: The account preference roundtrip leaves the renderer running.}
-    results: [137, 141, 143]
+    - {step: 138, expectation: Saving closes the account editor.}
+    - {step: 142, expectation: Reopening the same account shows the checked attachment cache setting.}
+    - {step: 144, expectation: The account preference roundtrip leaves the renderer running.}
+    results: [138, 142, 144]
+  - id: archive-attachment-save
+    requirement: The archive remains open and permits another attachment save after the export.
+    actions: [67]
+    checkpoints:
+    - {step: 68, expectation: The archive reports the selected export path.}
+    - {step: 69, expectation: The same attachment remains available for another save.}
+    results: [68, 69]
   - id: R1
     requirement: Save/reopen directory and include/exclude settings; read saved originals; cancellation preserves them
       and confirmed cleanup pauses storage.
@@ -356,27 +364,27 @@ verification:
     - 62
     - 64
     - 67
-    - 69
     - 70
-    - 72
-    - 74
+    - 71
+    - 73
     - 75
-    - 77
-    - 79
-    - 81
+    - 76
+    - 78
+    - 80
     - 82
-    - 84
+    - 83
     - 85
     - 86
-    - 88
-    - 90
-    - 92
+    - 87
+    - 89
+    - 91
     - 93
     - 94
     - 95
     - 96
     - 97
     - 98
+    - 99
     checkpoints:
     - step: 33
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-directory"]'', ''name'': ''value'',
@@ -402,18 +410,18 @@ verification:
     - step: 60
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-preview"]'', ''contains'': ''Save original
         EML''}}'
-    - step: 73
+    - step: 74
       expectation: '{''assert_not_visible'': ''[data-testid="mail-archive-confirm"]''}'
-    - step: 76
+    - step: 77
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-notice"]'', ''contains'': ''Removed
         1 local originals'', ''timeout_sec'': 30}}'
-    - step: 78
+    - step: 79
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''paused'',
         ''timeout_sec'': 30}}'
-    - step: 80
+    - step: 81
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''completed'',
         ''timeout_sec'': 30}}'
-    - step: 100
+    - step: 101
       expectation: Automatic mail inclusion remains checked after changing the manual scope.
     - step: 16
       expectation: Browse fills the chosen directory.
@@ -425,13 +433,13 @@ verification:
       expectation: The original export UI reports the chosen filename; real bytes are a native boundary.
     - step: 68
       expectation: The attachment save UI completes; MIME integrity is checked in the native case.
-    - step: 83
+    - step: 84
       expectation: The 205 new messages enter the summary cache.
-    - step: 87
+    - step: 88
       expectation: Archive pages are bounded to 200 originals.
-    - step: 89
+    - step: 90
       expectation: Next displays the remaining originals.
-    - step: 91
+    - step: 92
       expectation: Previous restores the first page.
     results:
     - 33
@@ -442,20 +450,20 @@ verification:
     - 52
     - 56
     - 60
-    - 73
-    - 76
-    - 78
-    - 80
-    - 100
+    - 74
+    - 77
+    - 79
+    - 81
+    - 101
     - 16
     - 37
     - 39
     - 63
     - 68
-    - 83
-    - 87
-    - 89
-    - 91
+    - 84
+    - 88
+    - 90
+    - 92
   - id: R3
     requirement: A new unconnected session has no discovered folders and explains how to populate the local cache; manual
       exact names remain supported by the main flow.
@@ -473,60 +481,60 @@ verification:
     requirement: After syncing, encoded IMAP names display decoded labels; selected exact server keys persist when saved
       and reopened, and survive switching include/exclude mode.
     actions:
-    - 101
     - 102
     - 103
-    - 105
+    - 104
     - 106
-    - 108
+    - 107
     - 109
-    - 111
-    - 113
-    - 115
-    - 117
-    - 118
-    - 119
-    - 122
-    - 127
-    checkpoints:
-    - step: 112
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-settings"]'', ''contains'': ''Folders
-        from the last sync; available offline''}}'
-    - step: 114
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'': ''value'',
-        ''equals'': ''&U,BTFw-''}}'
-    - step: 120
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folders"] input[aria-label="台北"]'',
-        ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
-    - step: 121
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'': ''value'',
-        ''equals'': ''&U,BTFw-''}}'
-    - step: 123
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'': ''value'',
-        ''equals'': ''&U,BTFw-''}}'
-    - step: 128
-      expectation: Settings close normally after inspecting cached folder selections.
-    results:
+    - 110
     - 112
     - 114
+    - 116
+    - 118
+    - 119
     - 120
-    - 121
     - 123
     - 128
+    checkpoints:
+    - step: 113
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-settings"]'', ''contains'': ''Folders
+        from the last sync; available offline''}}'
+    - step: 115
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'': ''value'',
+        ''equals'': ''&U,BTFw-''}}'
+    - step: 121
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folders"] input[aria-label="台北"]'',
+        ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
+    - step: 122
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'': ''value'',
+        ''equals'': ''&U,BTFw-''}}'
+    - step: 124
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'': ''value'',
+        ''equals'': ''&U,BTFw-''}}'
+    - step: 129
+      expectation: Settings close normally after inspecting cached folder selections.
+    results:
+    - 113
+    - 115
+    - 121
+    - 122
+    - 124
+    - 129
   - id: R5
     requirement: The archive and settings workflow completes without runtime errors and returning from settings retains Resume.
     actions:
-    - 127
+    - 128
     results:
-    - 129
     - 130
     - 131
+    - 132
     checkpoints:
-    - step: 129
-      expectation: The completed archive has a usable Resume action.
     - step: 130
-      expectation: The opposite Pause action is absent.
+      expectation: The completed archive has a usable Resume action.
     - step: 131
+      expectation: The opposite Pause action is absent.
+    - step: 132
       expectation: The renderer reports no uncaught errors during the archive and settings workflow.
   visual:
   - check: Storage settings, progress and archive list remain readable without clipping.

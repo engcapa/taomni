@@ -1,6 +1,6 @@
 id: TC-MODULES-070
 title: Signed Mail archives complete originals after pausing and resuming
-description: Install the signed module and use its IMAP connection to pause and resume a complete-storage scan. Verify original messages with the independent MIME and SQLite fixture.
+description: Pause and resume complete storage through signed Mail, then read the local archive and export the selected attachment after deleting the messages on the server. Compare the original and exported bytes with the fixture.
 covers: [F-Modules-1, F-MAIL-23]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
@@ -108,6 +108,10 @@ steps:
 - assert_text: {selector: '[data-testid="mail-archive-preview"]', contains: complete.bin}
 - click: '[data-testid="mail-archive-preview"] [data-testid="mail-body-mode-plain"]'
 - assert_text: {selector: '[data-testid="mail-archive-preview"]', contains: Offline body Complete INBOX}
+- seed_dialog: {prompt: '${fixture.mail_storage_a}/exported-complete.bin'}
+- click: '[data-testid="mail-archive-attachment"]:has-text("complete.bin")'
+- assert_text: {selector: '[data-testid="mail-archive-notice"]', contains: exported-complete.bin}
+- assert_file_sha256: {path: '${fixture.mail_storage_a}/exported-complete.bin', equals: '${fixture.mail_archive_attachment_sha256}'}
 - click: '[data-testid="mail-archive-close"]'
 - mail_storage_assert:
     root: ${fixture.mail_storage_a}
@@ -132,17 +136,19 @@ verification:
     - {step: 45, expectation: The verified Mail host and renderer own the enabled module.}
     results: [39, 41, 43, 44, 45]
   - id: read-after-server-removal
-    requirement: Local originals remain readable after both messages have been removed from IMAP.
-    actions: [46, 47, 49, 52, 54, 56]
+    requirement: Local originals and their attachments remain readable after both messages have been removed from IMAP.
+    actions: [46, 47, 49, 52, 54, 56, 57, 60]
     checkpoints:
     - {step: 48, expectation: The synced inbox matches the now-empty server inbox.}
     - {step: 51, expectation: The local archive still lists both originals.}
     - {step: 53, expectation: The saved MIME exposes the original attachment.}
     - {step: 55, expectation: The saved plaintext body identifies the expunged fixture message.}
-    - {step: 57, expectation: Both originals and attachments still match the fixture digests after their live headers disappear.}
-    - {step: 58, expectation: The workflow finishes without runtime errors.}
-    - {step: 59, expectation: The signed host still owns the mailbox after decoding the original.}
-    results: [48, 51, 53, 55, 57, 58, 59]
+    - {step: 58, expectation: The archive manager reports saving the selected attachment.}
+    - {step: 59, expectation: The exported file matches the original attachment digest.}
+    - {step: 61, expectation: Both originals and attachments still match the fixture digests after their live headers disappear.}
+    - {step: 62, expectation: The workflow finishes without runtime errors.}
+    - {step: 63, expectation: The signed host still owns the mailbox after decoding the original.}
+    results: [48, 51, 53, 55, 58, 59, 61, 62, 63]
   visual:
   - check: The Mail pane displays downloading, paused and completed as the scan runs.
     method: automated

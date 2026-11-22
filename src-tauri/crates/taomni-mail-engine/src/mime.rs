@@ -343,7 +343,7 @@ pub fn extract_attachment(
     let mut attachments = message.attachments();
     let part = attachments
         .nth(attachment_index)
-        .ok_or_else(|| format!("attachment #{} not found", attachment_index + 1))?;
+        .ok_or_else(|| format!("attachment #{} not found", attachment_index.saturating_add(1)))?;
     decoded_attachment(part)
 }
 

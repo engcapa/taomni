@@ -28,20 +28,22 @@ def setup(ctx: Any) -> None:
         raise RuntimeError("mail_storage requires mail_server first")
     server.state.archive_chunk_delay = 1
     expected = {}
+    attachment = bytes(range(256)) * 2400
+    attachment_digest = hashlib.sha256(attachment).hexdigest()
+    ctx.values["mail_archive_attachment_sha256"] = attachment_digest
     with server.state.lock:
         for folder in server.state.folders.values():
             folder.messages.clear()
         for folder_name in ("INBOX", "Archive"):
             for index in range(2):
                 subject = f"Complete {folder_name} {index}"
-                attachment = bytes(range(256)) * 2400
                 raw = (f"From: qa@example.com\r\nTo: reader@example.com\r\nSubject: {subject}\r\n"
                        f"MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=qa-full\r\n\r\n"
                        f"--qa-full\r\nContent-Type: text/plain\r\n\r\nOffline body {subject}\r\n"
                        f"--qa-full\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=complete.bin\r\n"
                        f"Content-Transfer-Encoding: base64\r\n\r\n").encode() + base64.encodebytes(attachment).replace(b"\n", b"\r\n") + b"\r\n--qa-full--\r\n"
                 uid = server.state.append_raw(folder_name, raw, [])
-                expected[f"{folder_name}/{uid}"] = {"sha256": hashlib.sha256(raw).hexdigest(), "rawSize": len(raw), "attachmentSha256": hashlib.sha256(attachment).hexdigest()}
+                expected[f"{folder_name}/{uid}"] = {"sha256": hashlib.sha256(raw).hexdigest(), "rawSize": len(raw), "attachmentSha256": attachment_digest}
     (root / "expected.json").write_text(json.dumps(expected), encoding="utf-8")
 
 

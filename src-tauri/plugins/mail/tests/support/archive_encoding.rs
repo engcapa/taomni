@@ -2,8 +2,11 @@
 use super::{ACCOUNT, MailHost, WAIT};
 use serde_json::json;
 use taomni_mail_api::{
-    DECODE_ARCHIVE_ORIGINAL, ENCODE_ARCHIVE_ORIGINAL,
-    archive::{ARCHIVE_FRAME_BYTES, ArchiveDecoding, ArchiveEncoding, receive_encoding},
+    DECODE_ARCHIVE_ATTACHMENT, DECODE_ARCHIVE_ORIGINAL, ENCODE_ARCHIVE_ORIGINAL,
+    archive::{
+        ARCHIVE_FRAME_BYTES, ArchiveAttachmentDecoding, ArchiveDecoding, ArchiveEncoding,
+        receive_encoding,
+    },
     imap_exchange::{read_body_frame, write_body_frame},
     message::MailMessageBody,
 };
@@ -107,4 +110,26 @@ pub(super) fn check_decoding(host: &mut MailHost) {
     assert_eq!(body.subject, "Stored original");
     assert_eq!(body.text.as_deref().map(str::trim), Some("Offline payload"));
     assert_eq!(body.attachments[0].name.as_deref(), Some("file.bin"));
+
+    let (_route, exchange, mut peer) = io.block_on(Route::pair()).unwrap();
+    let request = ArchiveAttachmentDecoding {
+        exchange,
+        attachment_index: 0,
+    };
+    let sent = host.write_request(
+        DECODE_ARCHIVE_ATTACHMENT,
+        serde_json::to_value(request).unwrap(),
+    );
+    let attachment = io.block_on(async {
+        tokio::time::timeout(WAIT, async {
+            write_body_frame(&mut peer, raw.as_bytes()).await.unwrap();
+            read_body_frame(&mut peer).await.unwrap()
+        })
+        .await
+        .unwrap()
+    });
+    let response = host.read_response();
+    assert_eq!(response.id, Some(sent));
+    assert_eq!(response.result, Some(json!({"Ok": null})));
+    assert_eq!(attachment, b"bytes");
 }

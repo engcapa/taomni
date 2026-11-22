@@ -4,7 +4,7 @@ mod archive;
 mod archive_decoding;
 mod archive_encoding;
 pub(super) mod attachment_cache;
-pub(super) use archive_decoding::decode_archive_original;
+pub(super) use archive_decoding::{decode_archive_attachment, decode_archive_original};
 pub(super) use archive_encoding::ArchiveEncoder;
 mod downloads;
 mod local_mailbox;

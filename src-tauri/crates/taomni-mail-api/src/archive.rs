@@ -23,6 +23,13 @@ pub struct ArchiveDecoding {
     pub uid: u32,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ArchiveAttachmentDecoding {
+    pub exchange: Endpoint,
+    pub attachment_index: usize,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MessageObject {
