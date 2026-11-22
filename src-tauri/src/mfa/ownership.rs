@@ -2,7 +2,7 @@
 use std::{fs, io::ErrorKind, path::Path};
 
 use crate::plugin::{
-    data_contract::open_regular,
+    data_contract::{PluginDataRoot, open_regular},
     migration::MigrationJournal,
     retained_data::{self, DataFileKind},
 };
@@ -25,9 +25,21 @@ pub(crate) fn uses_module_data(profile: &Path) -> Result<bool, String> {
                 .iter()
                 .any(|file| file.path == "mfa.db" && file.kind == DataFileKind::Sqlite)
         });
-    // The restore transaction publishes the locator with the data. If an older
-    // profile contains both stores, keep the established legacy accounts visible.
-    Ok(restored_store && !legacy_has_accounts(profile)?)
+    // A fresh profile can create module data without a migration journal. The
+    // store stays authoritative across restart, including after uninstall.
+    let root = PluginDataRoot::open(&plugins, "mfa").map_err(|error| error.to_string())?;
+    let database = root.data.join("mfa.db");
+    let module_store = match fs::symlink_metadata(&database) {
+        Ok(_) => {
+            root.open_file("mfa.db")
+                .map_err(|error| error.to_string())?;
+            true
+        }
+        Err(error) if error.kind() == ErrorKind::NotFound => false,
+        Err(error) => return Err(error.to_string()),
+    };
+    // Profiles with preexisting accounts still use their explicit migration.
+    Ok((restored_store || module_store) && !legacy_has_accounts(profile)?)
 }
 
 pub(crate) fn legacy_has_accounts(profile: &Path) -> Result<bool, String> {
@@ -58,4 +70,29 @@ pub(crate) fn legacy_has_accounts(profile: &Path) -> Result<bool, String> {
         row.get(0)
     })
     .map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reopened_profile_uses_module_store_unless_legacy_accounts_still_need_migration() {
+        let profile = tempfile::tempdir().unwrap();
+        let data = profile.path().join("plugins/mfa/data");
+        fs::create_dir_all(&data).unwrap();
+        assert!(!uses_module_data(profile.path()).unwrap());
+        rusqlite::Connection::open(data.join("mfa.db")).unwrap();
+        assert!(uses_module_data(profile.path()).unwrap());
+
+        let legacy = rusqlite::Connection::open(profile.path().join("mfa.db")).unwrap();
+        legacy
+            .execute("CREATE TABLE mfa_accounts(id TEXT PRIMARY KEY)", [])
+            .unwrap();
+        assert!(uses_module_data(profile.path()).unwrap());
+        legacy
+            .execute("INSERT INTO mfa_accounts VALUES ('legacy')", [])
+            .unwrap();
+        assert!(!uses_module_data(profile.path()).unwrap());
+    }
 }

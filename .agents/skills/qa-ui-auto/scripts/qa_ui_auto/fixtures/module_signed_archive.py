@@ -124,6 +124,7 @@ def setup_mfa(ctx):
         ctx.values.update(
             mfa_signed_frontend=(root / "versions" / receipt["version"] / "frontend/index.js").as_posix(),
             mfa_signed_frontend_sha256=receipt["frontendSha256"],
+            mfa_module_database=(root / "data/mfa.db").as_posix(),
         )
 
 

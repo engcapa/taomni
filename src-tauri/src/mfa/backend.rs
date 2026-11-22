@@ -1,6 +1,10 @@
-//! MFA selects its data owner once while startup holds its profile lease.
+//! Select the legacy store or the signed host while preserving each profile's data owner.
 use std::{
     path::Path,
+    sync::{
+        Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -17,27 +21,53 @@ use crate::{
 
 use super::{access, crypto::DataKey, store::MfaStore};
 
-pub(crate) enum MfaBackend {
-    Legacy(MfaStore),
-    Module,
-    Unavailable(String),
+pub(crate) struct MfaBackend {
+    legacy: Result<Option<MfaStore>, String>,
+    selected_module: AtomicBool,
+    legacy_dispatch: Mutex<()>,
 }
 
 impl MfaBackend {
     pub(crate) fn load(profile: &Path) -> Self {
-        match super::ownership::uses_module_data(profile) {
-            Ok(false) => Self::Legacy(MfaStore::new(profile.join("mfa.db"))),
-            Ok(true) => Self::Module,
-            Err(error) => Self::Unavailable(error),
+        Self {
+            legacy: super::ownership::uses_module_data(profile)
+                .map(|owned| (!owned).then(|| MfaStore::new(profile.join("mfa.db")))),
+            selected_module: AtomicBool::new(false),
+            legacy_dispatch: Mutex::new(()),
         }
     }
 
     pub(crate) fn legacy_store(&self) -> Result<Option<&MfaStore>, String> {
-        match self {
-            Self::Legacy(store) => Ok(Some(store)),
-            Self::Module => Ok(None),
-            Self::Unavailable(error) => Err(error.clone()),
+        if self.selected_module.load(Ordering::Acquire) {
+            return Ok(None);
         }
+        self.legacy
+            .as_ref()
+            .map(Option::as_ref)
+            .map_err(Clone::clone)
+    }
+
+    /// The dispatch lock also covers each legacy operation, so a concurrent
+    /// legacy add cannot race the decision that the profile has no accounts.
+    fn with_legacy<T>(
+        &self,
+        registry: &PluginRegistry,
+        profile: &Path,
+        operation: impl FnOnce(&MfaStore) -> Result<T, String>,
+    ) -> Result<Option<T>, String> {
+        let _dispatch = self.legacy_dispatch.lock().map_err(|e| e.to_string())?;
+        let Some(store) = self.legacy_store()? else {
+            return Ok(None);
+        };
+        if let Some(record) = registry.get("mfa") {
+            if !super::ownership::legacy_has_accounts(profile)? {
+                if record.state == LifecycleState::Enabled && record.reason.is_none() {
+                    self.selected_module.store(true, Ordering::Release);
+                }
+                return Ok(None);
+            }
+        }
+        operation(store).map(Some)
     }
 }
 
@@ -49,21 +79,28 @@ pub(crate) async fn run<T: DeserializeOwned + Send + 'static, A: Send + 'static>
     wire: impl Fn(&A) -> Value + Send + 'static,
     legacy: impl FnOnce(&mut rusqlite::Connection, &DataKey, A) -> Result<T, String>,
 ) -> Result<T, String> {
-    match state.legacy.mfa.legacy_store()? {
-        Some(store) => access::with_key(
-            &state.plugins,
-            &state.core.vault,
-            store,
-            kind,
-            |conn, key| legacy(conn, key, args),
-        ),
-        None => {
-            on_host(state, move |registry| {
-                call(registry, method, kind, || wire(&args), deadline()).and_then(decode)
-            })
-            .await
-        }
+    let mut args = Some(args);
+    if let Some(result) =
+        state
+            .legacy
+            .mfa
+            .with_legacy(&state.plugins, &state.core.paths.data, |store| {
+                access::with_key(
+                    &state.plugins,
+                    &state.core.vault,
+                    store,
+                    kind,
+                    |conn, key| legacy(conn, key, args.take().expect("legacy operation runs once")),
+                )
+            })?
+    {
+        return Ok(result);
     }
+    let args = args.expect("module operation retains its arguments");
+    on_host(state, move |registry| {
+        call(registry, method, kind, || wire(&args), deadline()).and_then(decode)
+    })
+    .await
 }
 
 pub(crate) async fn export(
@@ -71,35 +108,49 @@ pub(crate) async fn export(
     id: String,
     password: zeroize::Zeroizing<String>,
 ) -> Result<String, String> {
-    match state.legacy.mfa.legacy_store()? {
-        Some(store) => {
-            access::export_with_password(&state.plugins, &state.core.vault, store, &id, &password)
-        }
-        None => {
-            on_host(state, move |registry| {
-                registry
-                    .export_mfa_uri(&id, &password, deadline())
-                    .map_err(error)
-                    .and_then(decode)
-            })
-            .await
-        }
+    if let Some(result) =
+        state
+            .legacy
+            .mfa
+            .with_legacy(&state.plugins, &state.core.paths.data, |store| {
+                access::export_with_password(
+                    &state.plugins,
+                    &state.core.vault,
+                    store,
+                    &id,
+                    &password,
+                )
+            })?
+    {
+        return Ok(result);
     }
+    on_host(state, move |registry| {
+        registry
+            .export_mfa_uri(&id, &password, deadline())
+            .map_err(error)
+            .and_then(decode)
+    })
+    .await
 }
 
 pub(crate) async fn reset(state: &AppState) -> Result<(), String> {
-    match state.legacy.mfa.legacy_store()? {
-        Some(store) => access::reset_store(&state.plugins, &state.core.vault, store),
-        None => {
-            on_host(state, move |registry| {
-                registry
-                    .reset_mfa_host(deadline())
-                    .map_err(error)
-                    .and_then(decode)
-            })
-            .await
-        }
+    if state
+        .legacy
+        .mfa
+        .with_legacy(&state.plugins, &state.core.paths.data, |store| {
+            access::reset_store(&state.plugins, &state.core.vault, store)
+        })?
+        .is_some()
+    {
+        return Ok(());
     }
+    on_host(state, move |registry| {
+        registry
+            .reset_mfa_host(deadline())
+            .map_err(error)
+            .and_then(decode)
+    })
+    .await
 }
 
 pub(super) async fn scan_in_host(

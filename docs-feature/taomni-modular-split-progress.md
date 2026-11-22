@@ -2,6 +2,9 @@
 
 ## 2026-11-23 当前进展
 
+- 新配置在签名 MFA 启用后使用模块宿主。已有账户继续走显式迁移。新增原生断言检查 `plugins/mfa/data/mfa.db`，并在独立新进程解锁后读回同一 HOTP。新配置的三端原生验证待复跑。
+- `4c5b6e429` 的三端 Browser 均通过 MFA 管理页和浮窗的启停用例及 Mail 分页。四目标 Cargo 树和基座 Vite 清单已归档，412 个入口均未包含 MFA 模块前端。基座兼容引擎及最终安装载荷继续核对。 [三端分片](https://github.com/engcapa/taomni/actions/runs/45067527972) · [基座清单](https://github.com/engcapa/taomni/actions/runs/45068537504)
+- `91df69f28` 的 Linux Native 已通过运行、禁用、卸载保留三态的备份自动还原，以及 Mail IDLE 的推送、关标签和停用释放连接。分页用例在鼠标自动滚动后找不到按钮，键盘复验随 MFA 回归执行。 [Linux Native 分片](https://github.com/engcapa/taomni/actions/runs/45064193835)
 - Mail 0.1.31 将 CalDAV 集合状态和已展开的议程事件迁到签名宿主。宿主在同一事务写入两类数据，已恢复的模块目录优先作为数据源，旧版 Mail 仍使用原有缓存。TC-MODULES-091 核对实际 CalDAV 写入和停用后保留的账本。TC-MAIL-AGENDA-01 增加议程重开和去重断言。
 - MFA 0.1.1 将管理页和浮窗的组件、二维码工具及样式打入签名模块前端。基座提供共享 Vault、布局和 IPC 服务，模块切换后清除已加载验证码并丢弃迟到的结果。TC-MODULES-089 和 090 验证双入口、相同 HOTP、停用及重新启用。原生用例还核对安装后前端文件的 SHA-256。独立前端构建、66 项前端单测、11 项宿主单测和 QA 目录检查通过，等待 GitHub 的签名包和三端运行回执。
 - Mail 0.1.30 的宿主进程测试已在 Linux、Windows 和 macOS ARM64 通过，原始断言覆盖 IMAP IDLE 到达通知和断开。三端回执绑定 `5caf56dba`。 [Mail IDLE 协议回执](https://github.com/engcapa/taomni/actions/runs/45063394131)

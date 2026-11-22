@@ -6,7 +6,7 @@ tags: [modules, mfa, native-boundary, p1]
 modes: [native]
 native_platforms: [Linux, Windows, macOS]
 fixtures: [reset_db, module_signed_mfa_archive, release_build_required]
-timeout_sec: 240
+timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
@@ -53,6 +53,15 @@ steps:
 - wait_for: '[data-testid="module-action-disable-mfa"]'
 - click: '[data-testid="rail-mfa-button"]'
 - assert_text_equals: {selector: '[data-testid="mfa-floating-code"]', equals: 287 082}
+- assert_file_exists: '${fixture.mfa_module_database}'
+- native_restart_app: null
+- wait_for: {selector: '[data-testid="status-bar"]', timeout_sec: 60}
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-mfa-renderer-native}
+- click: '[data-testid="vault-unlock-confirm"]'
+- wait_for: {selector: '[data-testid="vault-unlock-dialog"]', state: detached}
+- click: '[data-testid="rail-mfa-button"]'
+- assert_text_equals: {selector: '[data-testid="mfa-floating-code"]', equals: 287 082}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -72,13 +81,15 @@ verification:
     results: [8, 9, 15, 25, 27, 29, 30, 33]
   - id: retained-native-account
     requirement: Disabling removes code access and enabling reloads the retained account.
-    actions: [36, 38, 42, 44]
+    actions: [36, 38, 42, 44, 47, 50, 51, 53]
     checkpoints:
     - {step: 39, expectation: The disabled module displays the lifecycle message.}
     - {step: 40, expectation: No cached code is rendered for the disabled module.}
     - {step: 45, expectation: The signed host reopens the same saved counter.}
-    - {step: 46, expectation: No renderer runtime errors were recorded.}
-    results: [39, 40, 45, 46]
+    - {step: 46, expectation: The account is stored in the installed module's data directory.}
+    - {step: 54, expectation: A new desktop process uses the module store and returns the same counter.}
+    - {step: 55, expectation: No renderer runtime errors were recorded.}
+    results: [39, 40, 45, 46, 54, 55]
   visual:
   - check: The floating panel displays the same code as the manager and expands into its tab.
     method: automated
