@@ -39,17 +39,17 @@ ASSETS = {
 FIRST_UPGRADE_VERSION = "0.5.12"
 FIRST_UPGRADE_ASSETS = {
     ("Linux", "x64"): ReleaseAsset(
-        778140971, "Taomni_0.5.12_amd64.deb", 111121068,
-        "f832e8a8c4831fba93f7ccce3142b9fd897fccd078a652147cba2fa2a216528a"),
+        778338425, "Taomni_0.5.12_amd64.deb", 111121038,
+        "eacf3848a7378d590a7e9724912824d8affcb69b484d060927db0809cce09f3e"),
     ("Windows", "x64"): ReleaseAsset(
-        778141256, "Taomni_0.5.12_x64_en-US.msi", 97583104,
-        "5b02169cb3cd4d4700fd98c397b3dbad1ef81604a18d617e9573dfd4cba2fd2c"),
+        778338806, "Taomni_0.5.12_x64_en-US.msi", 97587200,
+        "850bd681779d4996684e82963459001051fe03df770682d5b13510516a16421f"),
     ("Darwin", "arm64"): ReleaseAsset(
-        778140588, "Taomni_0.5.12_aarch64.dmg", 101059589,
-        "e2f3305d5f7b8a8c40fbc874af920cc9e1df6a1608e0f75d9a923b2a26d2f902"),
+        778338053, "Taomni_0.5.12_aarch64.dmg", 101059621,
+        "b8f639710020ae5a407e45d09797c6930facd20a6c28cecb88a33240f672dc96"),
     ("Darwin", "x64"): ReleaseAsset(
-        778141173, "Taomni_0.5.12_x64.dmg", 107199989,
-        "5c1912e553fe9246ddaf81e250b1a6b50eff229081e13e463c33ad4b1a68d297"),
+        778338688, "Taomni_0.5.12_x64.dmg", 107200003,
+        "78088495bc7cb2a9a8d44bc4dd74b7a96e5352a4e0c3a7f70f68c0b1cc306660"),
 }
 RELEASES = {
     RELEASE_VERSION: (RELEASE_ID, ASSETS),
