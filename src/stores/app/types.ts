@@ -146,8 +146,6 @@ export interface AppState {
   /** Sidebar collapsed state remembered per tab group (see sidebarRailPolicy). */
   sidebarCollapsedByGroup: SidebarCollapsedByGroup;
   activeSideTab: SideTab;
-  /** Right context sidebar (`◨`, AI / session assist) collapsed state. */
-  rightSidebarCollapsed: boolean;
   /** Bottom-left floating MFA authenticator window (v6.1 AC-04). */
   floatingMfa: FloatingMfaWindowState;
   /**
@@ -250,8 +248,6 @@ export interface AppState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveSideTab: (tab: SideTab) => void;
-  toggleRightSidebar: () => void;
-  setRightSidebarCollapsed: (collapsed: boolean) => void;
   /** Toggle the bottom-left floating MFA window. */
   toggleFloatingMfa: () => void;
   openFloatingMfa: () => void;
