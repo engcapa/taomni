@@ -1,11 +1,15 @@
 import { fuzzyScore } from "../../../lib/fuzzyMatch";
 
+export type OverviewSurface = "sessions" | "workspaces" | "explorer";
+
 export interface PreviewItem {
   id: string;
   title: string;
   kind: string;
   group: string;
   workspaceId?: string;
+  /** Owning platform surface; omitted on legacy session items means Sessions. */
+  surface?: OverviewSurface;
   endpoint: string;
   summary: string;
   active: boolean;

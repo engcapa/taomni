@@ -323,6 +323,7 @@ TC-WELCOME-RS-N-05-home-cold-restore: []
 TC-EXPLORER-007: []
 TC-EXPLORER-008: []
 TC-EXPLORER-009: []
+TC-EXPLORER-010: []
 # Notepad browser workbench cases are self-contained: reset_db gives a fresh
 # context and file_open_files seeds the isolated VFS root when bytes matter.
 TC-NP-001: []

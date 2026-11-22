@@ -52,6 +52,10 @@ def operation_states() -> dict[str, Any]:
     files = dict(OP_FILES)
     extras = {EMPTY_DIR, "target", "trash", "target/folder/nested", "source/folder/nested"}
     states = {"seeded": snapshot(files, extras)}
+    # Deleting trash/delete-me.txt directly from the seeded tree (without the
+    # copy/move/rename sequence above). Recovery-oriented cases assert this
+    # state after moving to Trash or permanent deletion and "seeded" after Undo.
+    states["trash-seeded"] = snapshot({name: data for name, data in OP_FILES.items() if name != "trash/delete-me.txt"}, extras)
     files["target/alpha - 副本.txt"] = files["source/alpha.txt"]
     states["copied"] = snapshot(files, extras)
     files["target/beta.txt"] = files.pop("source/beta.txt")

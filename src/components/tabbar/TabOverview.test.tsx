@@ -2,9 +2,18 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { TabOverview } from "./TabOverview";
 import { useAppStore } from "../../stores/appStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useTabOverviewStore } from "../../stores/tabOverviewStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import type { Tab } from "../../types";
+
+const explorerFolder = (id: string, title: string, path: string): Tab => ({
+  id, type: "file-browser", title, closable: true, fileBrowser: { initialPath: path, explorer: true },
+});
+const explorerViewer = (id: string, title: string, path: string): Tab => ({
+  id, type: "file-viewer", title, closable: true, fileViewer: { path, kind: "text", mode: "source", source: "local" },
+});
 
 const terminal = vi.hoisted(() => ({ text: "first output", read: vi.fn() }));
 vi.mock("../../lib/terminal/terminalRegistry", () => {
@@ -18,9 +27,10 @@ beforeEach(() => {
   terminal.text = "first output";
   terminal.read.mockClear();
   useSessionStore.setState({ sessions: [] });
+  useExplorerStore.setState({ tabs: [], activeTabId: null });
   useWorkspacePlatformStore.getState().reloadFromStorage();
   useAppStore.setState({
-    activeSideTab: "sessions", activeTabId: "session-1", tabFilter: null,
+    activeSideTab: "sessions", activeTabId: "session-1", tabFilter: null, sidebarCollapsed: false,
     tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false },
       { id: "session-1", type: "terminal", title: "Build", closable: true }],
   });
@@ -79,6 +89,62 @@ it("switches between current and all scopes and activates the correct workspace 
   expect(useAppStore.getState().activeSideTab).toBe("sessions");
   expect(useAppStore.getState().activeTabId).toBe("session-1");
   expect(useAppStore.getState().tabFilter).toBeNull();
+});
+
+it("opens the Explorer overview scope and activates the chosen Explorer tab", () => {
+  useAppStore.setState({ activeSideTab: "explorer", sidebarCollapsed: true });
+  useExplorerStore.setState({
+    tabs: [explorerFolder("f1", "Downloads", "/home/me/Downloads"), explorerViewer("v1", "README.md", "/home/me/Downloads/README.md")],
+    activeTabId: "f1",
+  });
+  render(<TabOverview />);
+  expect(screen.getByTestId("tab-overview")).toHaveAttribute("data-scope", "explorer");
+  const cards = screen.getAllByTestId("tab-overview-card");
+  expect(cards).toHaveLength(2);
+  expect(cards[0]).toHaveAttribute("data-surface", "explorer");
+  expect(cards[0]).toHaveAttribute("data-tab-id", "f1");
+  expect(cards[0]).toHaveAttribute("data-active", "true");
+  expect(cards[0]).toHaveTextContent("EXPL");
+  expect(cards[0]).toHaveTextContent("/home/me/Downloads");
+  expect(cards[1]).toHaveTextContent("VIEW");
+  expect(screen.getByTestId("tab-overview-current")).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(cards[1]);
+  expect(useAppStore.getState().activeSideTab).toBe("explorer");
+  expect(useExplorerStore.getState().activeTabId).toBe("v1");
+  expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+  expect(screen.queryByTestId("tab-overview")).not.toBeInTheDocument();
+});
+
+it("includes Explorer tabs in the all scope from other surfaces and filters them by path", () => {
+  useAppStore.setState({ activeSideTab: "sessions" });
+  useExplorerStore.setState({
+    tabs: [explorerFolder("f1", "Downloads", "/home/me/Downloads")],
+    activeTabId: "f1",
+  });
+  render(<TabOverview />);
+  fireEvent.click(screen.getByTestId("tab-overview-all"));
+  const cards = screen.getAllByTestId("tab-overview-card");
+  expect(cards).toHaveLength(2);
+  expect(cards.filter((card) => card.dataset.surface === "explorer")).toHaveLength(1);
+  fireEvent.change(screen.getByTestId("tab-overview-search"), { target: { value: "Downloads" } });
+  const filtered = screen.getAllByTestId("tab-overview-card");
+  expect(filtered).toHaveLength(1);
+  expect(filtered[0]).toHaveAttribute("data-tab-id", "f1");
+  fireEvent.click(filtered[0]);
+  expect(useAppStore.getState().activeSideTab).toBe("explorer");
+  expect(useExplorerStore.getState().activeTabId).toBe("f1");
+});
+
+it("keeps Workspace and Explorer cards together in the all scope", () => {
+  const ws = useWorkspacePlatformStore.getState();
+  const workspace = ws.createWorkspace({ name: "Explorer mix" });
+  ws.openLocalTerminalInWorkspace(workspace.id);
+  useExplorerStore.setState({ tabs: [explorerFolder("f1", "Downloads", "/home/me/Downloads")], activeTabId: "f1" });
+  useAppStore.setState({ activeSideTab: "home" });
+  render(<TabOverview />);
+  expect(screen.getByTestId("tab-overview")).toHaveAttribute("data-scope", "all");
+  const surfaces = screen.getAllByTestId("tab-overview-card").map((card) => card.dataset.surface);
+  expect(surfaces).toEqual(expect.arrayContaining(["sessions", "workspaces", "explorer"]));
 });
 
 it("filters fuzzy preview text, preserves query across scopes and clears without navigation", () => {

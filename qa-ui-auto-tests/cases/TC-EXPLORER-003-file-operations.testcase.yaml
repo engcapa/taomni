@@ -77,8 +77,11 @@ steps:
 - wait_for: '[data-testid="explorer-file-row"][data-name="delete-me.txt"]'
 - click: '[data-testid="explorer-file-row"][data-name="delete-me.txt"]'
 - press: {selector: '[data-testid="explorer-file-list"]', key: Delete}
-- wait_for: '[data-testid="explorer-undo"]'
-- assert_count: {selector: '[data-testid="explorer-file-row"][data-name="delete-me.txt"]', equal: 0}
+- click: '[data-testid="explorer-delete-trash"]'
+- eval_readonly:
+    expression: 'document.querySelectorAll(".ex-frow").length === 0 && !!document.querySelector(".ex-toast button")'
+    timeout_sec: 10
+    expect_truthy: true
 - assert_explorer_files: {state: trashed}
 - click: '[data-testid="explorer-undo"]'
 - wait_for: '[data-testid="explorer-file-row"][data-name="delete-me.txt"]'
@@ -183,11 +186,11 @@ verification:
     - {step: 49, expectation: Successful rename preserves all fixture bytes.}
     results: [28, 33, 37, 41, 45, 49]
   - id: R3
-    requirement: Properties reflects selected file; Del uses real recoverable trash, Undo restores original bytes, and ShiftDelete requires confirmation with cancel preserving files.
-    actions: [50, 51, 54, 55, 56, 57, 59, 60, 64, 67, 68, 70, 72, 73]
+    requirement: Properties reflects selected file; Del opens a Trash/persistent-delete choice and choosing Trash uses real recoverable trash, Undo restores original bytes, and ShiftDelete requires confirmation with cancel preserving files.
+    actions: [50, 51, 54, 55, 56, 57, 59, 60, 61, 64, 67, 68, 70, 72, 73]
     checkpoints:
     - {step: 53, expectation: Properties names the selected renamed file.}
-    - {step: 62, expectation: Deleted row is absent.}
+    - {step: 62, expectation: Choosing Move to Trash removes the row and exposes Undo.}
     - {step: 63, expectation: Full-tree trash state matches; Linux real trashinfo and payload SHA prove actual system trash.}
     - {step: 66, expectation: Undo restores exact original bytes and directories.}
     - {step: 71, expectation: Cancelling permanent delete leaves exact restored tree.}
