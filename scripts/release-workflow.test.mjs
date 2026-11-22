@@ -3,11 +3,13 @@ import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, matchesGlob } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 const workflow = readFileSync(fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)), "utf8").replace(/\r\n/g, "\n");
+const coreAction = readFileSync(new URL("../.github/actions/stage-core-updater/action.yml", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+const coreScript = coreAction.split("      run: |\n")[1];
 test("desktop bundles stage only their own SocksCap runtime resources and include shared licenses", () => {
   const config = (target = "") => JSON.parse(readFileSync(new URL(`../src-tauri/tauri${target}.conf.json`, import.meta.url), "utf8"));
   assert.deepEqual(config().bundle.resources, ["resources/licenses/*"]);
@@ -54,6 +56,29 @@ test("joint releases use the same source for core and selected modules and requi
   assert.match(finalizer, /needs\.package-modules\.result == 'success'/);
   assert.match(finalizer, /needs\.plan\.outputs\.modules == '\[\]' && needs\.package-modules\.result == 'skipped'/);
 });
+
+test("joint builds download core bundles and signed module packages from their respective builders", () => {
+  const version = "0.6.0";
+  const runId = "42";
+  const corePattern = coreAction.match(/pattern: (.+)/)[1].replace("${{ inputs.version }}", version);
+  const finalizer = workflow.split("  finalize-updater-manifest:\n")[1];
+  const modulePattern = finalizer.match(/pattern: (.+)/)[1].replace("${{ github.run_id }}", runId);
+  const core = ["windows-latest", "ubuntu-22.04", "macos-aarch64", "macos-x86_64"].map((target) => `taomni-${version}-${target}`);
+  const signed = ["module-signed-mail-darwin-x86_64-42", "module-signed-rdp-server-linux-x86_64-42"];
+  const artifacts = [...core, ...signed, "module-unsigned-mail-darwin-x86_64-42", "module-linux-abi-mail-42",
+    "taomni-0.5.12-ubuntu-22.04", "macos-bundle-diagnostics-aarch64-42", "modular-candidate-updater-42"];
+  assert.deepEqual(artifacts.filter((name) => matchesGlob(name, corePattern)), core);
+  assert.deepEqual(artifacts.filter((name) => matchesGlob(name, modulePattern)), signed);
+  assert(coreAction.includes("path: core-bundles"));
+  assert(coreAction.includes("merge-multiple: false"));
+  assert(finalizer.includes("path: signed-module-artifacts"));
+  assert(finalizer.includes("compose-modules-manifest.mjs signed-module-artifacts changed-module-catalog --delta"));
+  assert(finalizer.includes("compose-modules-manifest.mjs signed-module-artifacts module-assets --first-release"));
+  const rehearsal = workflow.split("  verify-candidate-updater:\n")[1].split("  finalize-updater-manifest:\n")[0];
+  for (const job of [rehearsal, finalizer]) assert(job.includes("uses: ./.github/actions/stage-core-updater"));
+  assert(rehearsal.includes("contents: read") && rehearsal.includes("needs.plan.outputs.tag == ''"));
+  assert(rehearsal.includes("inputs.platforms == 'all' && inputs.macos_arch == 'both'"));
+});
 const publishStep = workflow.split("      - name: Verify and publish release assets\n")[1];
 assert(publishStep, "the tested publishing step must exist in release.yml");
 const publishScript = publishStep.split("        run: |\n")[1].split("\n")
@@ -61,7 +86,7 @@ const publishScript = publishStep.split("        run: |\n")[1].split("\n")
 
 test("checks the previously published first-upgrade roster before signing new catalogs", () => {
   const stage = workflow.indexOf("node scripts/stage-published-module-catalog.mjs carried-module-catalog --allow-missing");
-  const assemble = workflow.indexOf("node scripts/compose-modules-manifest.mjs artifacts module-assets");
+  const assemble = workflow.indexOf("node scripts/compose-modules-manifest.mjs signed-module-artifacts module-assets");
   const verify = workflow.indexOf('--verify-release-roster module-assets "${previous[@]}"');
   const sign = workflow.indexOf("--sign-catalog module-assets");
   assert(stage > 0 && stage < assemble && assemble < verify && verify < sign);
@@ -90,7 +115,7 @@ function fixture(t, tag = "v0.4.30") {
   const version = tag.slice(1);
   const signedPaths = [];
   const add = (platform, name) => {
-    const path = join(root, "artifacts", `taomni-${version}-${platform}`, name);
+    const path = join(root, "core-bundles", `taomni-${version}-${platform}`, name);
     const bytes = Buffer.from(`${platform}: exact ${name} bytes`);
     put(path, bytes);
     const signature = sign(null, createHash("blake2b512").update(bytes).digest(), privateKey);
@@ -101,7 +126,7 @@ function fixture(t, tag = "v0.4.30") {
   };
   for (const arch of ["aarch64", "x86_64"]) {
     add(`macos-${arch}`, "Taomni.app.tar.gz");
-    put(join(root, "artifacts", `taomni-${version}-macos-${arch}`, `Taomni_${version}_${arch}.dmg`), `${arch} installer bytes`);
+    put(join(root, "core-bundles", `taomni-${version}-macos-${arch}`, `Taomni_${version}_${arch}.dmg`), `${arch} installer bytes`);
   }
   add("ubuntu-22.04", `Taomni_${version}.AppImage`);
   add("ubuntu-22.04", `Taomni_${version}.deb`);
@@ -131,7 +156,7 @@ if (args[1] === "upload" && process.env.TEST_GH_UPLOAD_FAIL && !args[3].endsWith
     root, signedPaths,
     put,
     calls: () => existsSync(trace) ? readFileSync(trace, "utf8").trim().split("\n").map(JSON.parse) : [],
-    run: (overrides = {}) => spawnSync("bash", ["-c", publishScript], { cwd: root, env: { ...env, ...overrides }, encoding: "utf8" }),
+    run: (overrides = {}) => spawnSync("bash", ["-ec", coreScript + "\n" + publishScript], { cwd: root, env: { ...env, ...overrides }, encoding: "utf8" }),
   };
 }
 
@@ -270,7 +295,7 @@ for (const failure of ["modified archive", "missing signature", "missing install
     const f = fixture(t);
     if (failure === "modified archive") writeFileSync(f.signedPaths[0], "changed bytes");
     if (failure === "missing signature") rmSync(`${f.signedPaths[0]}.sig`);
-    if (failure === "missing installer") rmSync(join(f.root, "artifacts/taomni-0.4.30-macos-aarch64/Taomni_0.4.30_aarch64.dmg"));
+    if (failure === "missing installer") rmSync(join(f.root, "core-bundles/taomni-0.4.30-macos-aarch64/Taomni_0.4.30_aarch64.dmg"));
     assert.notEqual(f.run().status, 0);
     assert.deepEqual(f.calls(), []);
   });

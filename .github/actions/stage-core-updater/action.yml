@@ -1,0 +1,21 @@
+name: Stage signed core installers
+description: Assemble and verify the four-target updater from this build's core bundles.
+inputs:
+  version:
+    description: Version embedded in the core bundles
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: taomni-${{ inputs.version }}-*
+        path: core-bundles
+        merge-multiple: false
+    - name: Compose and verify the core updater
+      shell: bash
+      env:
+        TAG: v${{ inputs.version }}
+      run: |
+        node scripts/compose-updater-manifest.mjs core-bundles updater-assets
+        node scripts/verify-updater-signatures.mjs updater-assets

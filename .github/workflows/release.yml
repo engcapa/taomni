@@ -493,6 +493,37 @@ jobs:
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
 
+  verify-candidate-updater:
+    name: Verify four-target candidate updater
+    needs: [plan, build, build-macos]
+    if: github.event_name == 'workflow_dispatch' && needs.plan.outputs.tag == '' && inputs.platforms == 'all' && inputs.macos_arch == 'both'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: ./.github/actions/stage-core-updater
+        with:
+          version: ${{ needs.plan.outputs.version }}
+      - name: Record candidate inputs and installer digests
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          mkdir candidate-updater
+          cp updater-assets/latest.json candidate-updater/
+          (cd updater-assets && sha256sum -- *) > candidate-updater/SHA256SUMS
+          jq -n --arg sha "$GITHUB_SHA" --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg version "$VERSION" --arg image "$ImageOS/$ImageVersion" \
+            '{sourceSha:$sha, runId:$run, runAttempt:$attempt, version:$version, runnerImage:$image}' > candidate-updater/receipt.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modular-candidate-updater-${{ github.run_id }}
+          path: candidate-updater
+          if-no-files-found: error
+
   # ---------------------------------------------------------------------------
   # Compose a single, complete latest.json for tauri-plugin-updater.
   #
@@ -516,11 +547,16 @@ jobs:
           node-version: '22'
       - name: Updater and plugin manifest unit contracts
         run: node --test scripts/compose-updater-manifest.test.mjs scripts/compose-modules-manifest.test.mjs scripts/verify-updater-signatures.test.mjs scripts/stage-published-module-catalog.test.mjs scripts/release-workflow.test.mjs
-      - name: Download workflow artifacts
-        if: needs.plan.outputs.tag != ''
+      - uses: ./.github/actions/stage-core-updater
+        with:
+          version: ${{ needs.plan.outputs.version }}
+      - name: Download signed module packages
+        if: needs.plan.outputs.modules != '[]'
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          pattern: module-signed-*-${{ github.run_id }}
+          path: signed-module-artifacts
+          merge-multiple: false
 
       - name: Assemble or carry forward the signed module catalog
         id: module-catalog
@@ -537,9 +573,9 @@ jobs:
             export MODULE_UPDATED_AT="$(git show -s --format=%cI HEAD)"
             if [[ -d carried-module-catalog ]]; then
               export MODULES_PUBLISHED_CATALOG=carried-module-catalog/modules.json
-              node scripts/compose-modules-manifest.mjs artifacts changed-module-catalog --delta
+              node scripts/compose-modules-manifest.mjs signed-module-artifacts changed-module-catalog --delta
             else
-              node scripts/compose-modules-manifest.mjs artifacts module-assets --first-release
+              node scripts/compose-modules-manifest.mjs signed-module-artifacts module-assets --first-release
             fi
             echo 'present=true' >> "$GITHUB_OUTPUT"
           elif [[ ! -d carried-module-catalog ]]; then
@@ -590,9 +626,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/compose-updater-manifest.mjs artifacts updater-assets
-          node scripts/verify-updater-signatures.mjs updater-assets
-
           if [ -d module-assets ]; then
             scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog module-assets
             (cd module-assets && sha256sum --check --strict SHA256SUMS)
