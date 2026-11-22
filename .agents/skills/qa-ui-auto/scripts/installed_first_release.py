@@ -1,4 +1,4 @@
-"""Check first enrollment in a replacement deb using its production desktop and signed business packages."""
+"""Check first enrollment in a replacement desktop installation using its production desktop and signed business packages."""
 import json
 import os
 import time
@@ -42,12 +42,13 @@ def enrollment(profile, origin):
     raise RuntimeError("Installed core did not finish first enrollment with the release packages")
 
 
-def exercise(ctx, executable, work, profile, evidence, origin):
+def exercise(ctx, executable, work, profile, evidence, origin, *, environment=None):
     observation = {"passed": False, "binarySha256": digest(executable), "stages": {}}
     try:
         for label, removed in [("first-business-install", None), ("reopen-without-mail", "mail")]:
             stage = observation["stages"][label] = {}
-            with installed_desktop(ctx, executable, work / "desktop", evidence, label, timeout=300) as (driver, session):
+            with installed_desktop(ctx, executable, work / "desktop", evidence, label,
+                                   environment=environment, timeout=300) as (driver, session):
                 steps = unlock_vault(ctx, session, evidence)
                 stage["enrollment"] = enrollment(profile, origin)
                 stage["activePointers"] = observe_legacy_roster(profile / "plugins", origin, removed)

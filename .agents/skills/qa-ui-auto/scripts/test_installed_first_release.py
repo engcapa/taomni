@@ -4,9 +4,12 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from installed_first_release import enrollment
+from native_driver_lifecycle import windows_webview_options
+from native_webdriver_transport import WebDriverError
+from qa_ui_auto.fixtures.module_legacy_mfa import close_installed_desktop
 from qa_ui_auto.module_marketplace_observation import current_roster_modules
 
 
@@ -44,3 +47,31 @@ class InstalledFirstReleaseTests(unittest.TestCase):
         session.execute.return_value = ["taomni-plugin-mail", "taomni-plugin-rdp-client"]
         with self.assertRaisesRegex(RuntimeError, "shows current modules"):
             current_roster_modules(session, self.roster, "mail")
+
+    def test_installed_and_isolated_windows_webview_profiles_are_selected_independently(self):
+        explicit = str(self.profile / "production-webview")
+        expected = {"userDataFolder": explicit, "additionalBrowserArguments": ["--force-color-profile=srgb"]}
+        self.assertEqual(windows_webview_options({"TAOMNI_QA_WEBVIEW_DIR": explicit}, "qa-id"), expected)
+        qa = windows_webview_options({"NEWMOB_DATA_DIR": str(self.profile)}, "qa-id")
+        self.assertEqual(qa["userDataFolder"], str(self.profile / "qa-id/webview"))
+        with self.assertRaises(WebDriverError):
+            windows_webview_options({}, "qa-id")
+
+    def test_windows_close_requires_the_installed_process_to_exit_before_the_next_launch(self):
+        exe = self.profile / "Taomni.exe"
+        app = Mock(pid=42)
+        app.exe.return_value = str(exe)
+        app.wait.return_value = 0
+        driver = SimpleNamespace(proc=SimpleNamespace(pid=7))
+        session = SimpleNamespace(session_id="old", application_restart_observation={"exit_confirmation": {"status": "closed"}})
+        with patch("platform.system", return_value="Windows"), patch("psutil.Process") as process, \
+                patch("qa_ui_auto.fixtures.module_legacy_mfa.close_application_window") as close:
+            process.return_value.children.return_value = [app]
+            report = close_installed_desktop(driver, session, exe)
+            self.assertEqual(report["shutdown"], {"pid": 42, "exitCode": 0})
+            self.assertIsNone(session.session_id)
+            close.assert_called_once()
+            app.wait.assert_called_with(timeout=20)
+            app.wait.return_value = 1
+            with self.assertRaisesRegex(RuntimeError, "exited with 1"):
+                close_installed_desktop(driver, session, exe)

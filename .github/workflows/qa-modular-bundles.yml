@@ -22,6 +22,9 @@ on:
       upgrade_desktop:
         type: boolean
         default: false
+      first_release:
+        type: boolean
+        default: false
       macos_hardened_mfa:
         type: boolean
         default: false
@@ -75,7 +78,7 @@ jobs:
             --github-output "$GITHUB_OUTPUT" "${args[@]}"
 
   signed-mfa:
-    if: inputs.upgrade_desktop
+    if: inputs.upgrade_desktop && !inputs.first_release
     needs: plan
     uses: ./.github/workflows/qa-modular-packages.yml
     with:
@@ -94,7 +97,7 @@ jobs:
 
   bundle-samples:
     needs: [plan, signed-mfa]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && (!inputs.upgrade_desktop || needs.signed-mfa.result == 'success') }}
+    if: ${{ !cancelled() && needs.plan.result == 'success' && (!inputs.upgrade_desktop || inputs.first_release || needs.signed-mfa.result == 'success') }}
     name: Real release bundle (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
@@ -124,7 +127,7 @@ jobs:
       - name: Install the pinned QA fixture dependencies
         run: python -m pip install -r .agents/skills/qa-ui-auto/requirements-ci.txt
       - name: Pure package evidence contracts
-        run: python -m unittest test_modular_bundle_inventory test_installed_desktop_upgrade
+        run: python -m unittest test_modular_bundle_inventory test_installed_desktop_upgrade test_installed_first_release test_module_first_release
       - name: Install the process observer for installed-app recovery
         if: inputs.upgrade_desktop
         run: python -m pip install psutil==7.2.2
@@ -208,13 +211,51 @@ jobs:
         run: |
           python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py validate-payload \
             --target "$SAMPLE_TARGET" --directory bundle-evidence
+      - uses: actions/checkout@v4
+        if: inputs.first_release
+        with:
+          ref: ${{ inputs.package_source }}
+          path: first-release-input/source
+          sparse-checkout: src-tauri/plugins
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        if: inputs.first_release
+        with:
+          name: modular-candidate-roster-${{ inputs.package_run }}
+          run-id: ${{ inputs.package_run }}
+          github-token: ${{ github.token }}
+          path: first-release-input/catalog
+      - uses: actions/download-artifact@v4
+        if: inputs.first_release
+        with:
+          pattern: module-signed-*-${{ matrix.target }}-${{ inputs.package_run }}
+          run-id: ${{ inputs.package_run }}
+          github-token: ${{ github.token }}
+          path: first-release-input/packages
+          merge-multiple: false
+      - name: Install the matching Windows WebView2 driver
+        if: inputs.first_release && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $runtimeRoot = "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application"
+          $runtime = Get-ChildItem -LiteralPath $runtimeRoot -Directory | Where-Object Name -Match '^\d+\.\d+\.\d+\.\d+$' | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+          if (-not $runtime) { throw 'WebView2 runtime unavailable' }
+          $zip = Join-Path $env:RUNNER_TEMP 'first-release-edgedriver.zip'
+          $driver = Join-Path $env:RUNNER_TEMP 'first-release-edgedriver'
+          Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
+          Expand-Archive -LiteralPath $zip -DestinationPath $driver
+          $driver >> $env:GITHUB_PATH
+      - name: Install the Windows Tauri adapter
+        if: inputs.first_release && runner.os == 'Windows'
+        run: cargo install tauri-driver --version 2.0.4 --locked
       - name: Fetch the platform's pinned legacy installer
         if: inputs.upgrade_desktop
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python -m qa_ui_auto.legacy_release legacy-input
+          OLD_VERSION: ${{ inputs.first_release && '0.5.12' || '0.5.10' }}
+        run: python -m qa_ui_auto.legacy_release legacy-input --version "$OLD_VERSION"
       - uses: actions/download-artifact@v4
-        if: inputs.upgrade_desktop
+        if: inputs.upgrade_desktop && !inputs.first_release
         with:
           name: qa-modular-package-${{ matrix.target }}-installed-desktop-${{ github.run_id }}
           path: signed-mfa-input
@@ -222,15 +263,19 @@ jobs:
         if: inputs.upgrade_desktop
         env:
           SAMPLE_MACOS_HARDENED_MFA: ${{ inputs.macos_hardened_mfa }}
+          FIRST_RELEASE: ${{ inputs.first_release }}
           MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
         run: |
-          args=()
+          args=(--signed signed-mfa-input)
+          if [[ "$FIRST_RELEASE" == true ]]; then
+            args=(--first-release first-release-input)
+          fi
           if [[ "$SAMPLE_MACOS_HARDENED_MFA" == true ]]; then
             args+=(--macos-hardened-mfa)
           fi
           python .agents/skills/qa-ui-auto/scripts/installed_desktop_upgrade.py \
             --identity bundle-evidence/bundle-source.json --legacy legacy-input \
-            --candidate package-input --signed signed-mfa-input \
+            --candidate package-input \
             --work installed-upgrade-work --evidence bundle-evidence "${args[@]}"
       - uses: actions/upload-artifact@v4
         if: always()

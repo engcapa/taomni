@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import subprocess
 import time
+from pathlib import Path
 from typing import Callable, Protocol
 
 from native_process_group import wait_for_driver_ports
@@ -27,6 +28,17 @@ def driver_start_environment(driver: DriverOwner) -> dict[str, str]:
     environment = dict(os.environ)
     driver._inherited_path = environment.get("PATH")
     return environment
+
+
+def windows_webview_options(environment, app_id):
+    # EdgeDriver must watch the app's persistent directory for DevToolsActivePort.
+    directory = environment.get("TAOMNI_QA_WEBVIEW_DIR")
+    if not directory:
+        root = environment.get("NEWMOB_DATA_DIR")
+        if not root:
+            raise WebDriverError("Windows WebView2 session requires the QA data directory or an explicit WebView directory")
+        directory = str(Path(root) / app_id / "webview")
+    return {"userDataFolder": directory, "additionalBrowserArguments": ["--force-color-profile=srgb"]}
 
 
 def ensure_owned_driver_running(

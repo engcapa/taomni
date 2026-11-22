@@ -147,29 +147,45 @@ def installed_desktop(ctx, executable, desktop, evidence, label, *, environment=
 
 
 def close_installed_desktop(driver, session, executable):
-    processes = linux_storage_processes(driver, executable)
+    system = platform.system()
+    windows_owner = None
+    if system == "Windows":
+        import psutil
+        applications = []
+        for process in psutil.Process(driver.proc.pid).children(recursive=True):
+            try:
+                if Path(process.exe()).resolve() == executable.resolve():
+                    applications.append(process)
+            except psutil.NoSuchProcess:
+                continue
+        if len(applications) != 1:
+            raise RuntimeError("The installed Windows driver must own one matching application")
+        windows_owner = applications[0]
+    processes = linux_storage_processes(driver, executable) if system == "Linux" else {}
     close = close_application_window(session, processes=processes, expect_exit_confirmation={
         "title": "Exit", "message": "There is 1 open tab. Exit Taomni and close it?",
         "confirm_label": "Exit",
     })
-    if close is None or close.get("pid") not in processes:
-        raise RuntimeError("The closed window does not belong to the installed desktop")
     session.session_id = None
-    shutdown = wait_for_application_shutdown(driver, session, processes)
+    if windows_owner is not None:
+        exit_code = windows_owner.wait(timeout=20)
+        if exit_code != 0:
+            raise RuntimeError(f"The installed Windows app exited with {exit_code}")
+        shutdown = {"pid": windows_owner.pid, "exitCode": exit_code}
+        close = {"transport": "Windows application close control", "pid": windows_owner.pid}
+    else:
+        expected = processes if system == "Linux" else {driver.proc.pid}
+        if not close or close.get("pid") not in expected:
+            raise RuntimeError("The closed window does not belong to the installed desktop")
+        shutdown = wait_for_application_shutdown(driver, session, processes)
     return {"close": close, "shutdown": shutdown,
             "confirmation": session.application_restart_observation["exit_confirmation"]}
 
 
-def run_legacy_desktop(ctx, executable, work, evidence, *, catalog_source=None):
-    desktop = work / "desktop"
-    _, profile = desktop_environment(desktop)
-    if profile.exists() or profile.is_symlink():
-        raise RuntimeError("The installed desktop requires a fresh isolated profile")
-    with installed_desktop(ctx, executable, desktop, evidence, "legacy-window") as (driver, session):
+def seed_legacy_desktop(ctx, executable, desktop, evidence, profile, *, catalog_source=None, environment=None):
+    with installed_desktop(ctx, executable, desktop, evidence, "legacy-window", environment=environment) as (driver, session):
         create_account(session, ctx, evidence)
         if catalog_source:
-            # Persist only the mirror preference in the original WebView. The
-            # replacement core must discover its first catalog on normal start.
             session.execute("localStorage.setItem('taomni.module-catalog-source.v1', "
                             + json.dumps(catalog_source) + "); return true;")
         close = close_installed_desktop(driver, session, executable)
@@ -177,6 +193,14 @@ def run_legacy_desktop(ctx, executable, work, evidence, *, catalog_source=None):
             "appId": APP_ID, "profile": str(profile), "executable": str(executable),
             "uiHotpCodes": ["755 224", "287 082"], "catalogSource": catalog_source, **close,
         })
+
+
+def run_legacy_desktop(ctx, executable, work, evidence, *, catalog_source=None):
+    desktop = work / "desktop"
+    _, profile = desktop_environment(desktop)
+    if profile.exists() or profile.is_symlink():
+        raise RuntimeError("The installed desktop requires a fresh isolated profile")
+    seed_legacy_desktop(ctx, executable, desktop, evidence, profile, catalog_source=catalog_source)
     return profile
 
 
