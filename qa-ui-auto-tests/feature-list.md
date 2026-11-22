@@ -9036,6 +9036,7 @@ files:
   - src/components/ElevationPasswordPrompt.tsx
   - src/lib/sockscap/
   - src-tauri/crates/taomni-sockscap-api/
+  - src-tauri/crates/taomni-module-settings/
   - src-tauri/plugins/sockscap/
   - src-tauri/src/sockscap/
   - src/lib/sockscap.ts

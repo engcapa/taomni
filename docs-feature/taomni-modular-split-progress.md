@@ -2,6 +2,9 @@
 
 ## 2026-11-22 当前进展
 
+- 候选 `645b7291e` 的 Intel 和 ARM64 DMG 均已完成从 0.5.12 实装升级、十模块首装、卸载 Mail、重开及回退。Linux deb 通过首装和卸载重开后，在 MFA 数据迁移处遇到目录签名与原件末尾换行不同。修复 `05b9c10eb` 的 17 项验签单测通过，真实 deb 需要包含修复的新安装件。Windows 已验证原 MSI 安装，旧版 WebView2 自动化仍待接通。 [Intel](https://github.com/engcapa/taomni/actions/runs/45003587566) · [ARM64 和 Windows](https://github.com/engcapa/taomni/actions/runs/45004885811) · [Linux](https://github.com/engcapa/taomni/actions/runs/45003581530)
+- SocksCap 0.1.3 的签名宿主接管配置的首次导入、写入、重新打开和备份快照。旧版模块仍可使用原配置，用户启用新版后再导入。TC-MODULES-071/072/073 覆盖重开后再次编辑、旧文件摘要、模块内保存的端点与 Vault 引用，以及停用再启用。驱动、提权及恢复日志仍在核心过渡层。
+
 - 候选 `645b7291e` 的四份核心安装件和 40/40 份已验签模块已收齐。首发目录包含四个目标各十个业务模块，SHA-256 为 `c19d60d46761b9cb6929bedb6f996846ece3da92b2a10f5daca149022dc3bc8c`。实装作业使用同批工件执行 0.5.12 → 0.6.0 → 0.5.12，安装替换、用户数据及回退结论待各端回执。 [打包](https://github.com/engcapa/taomni/actions/runs/44995722930) · [Linux](https://github.com/engcapa/taomni/actions/runs/45002915065) · [Windows / macOS](https://github.com/engcapa/taomni/actions/runs/45002929910) · [首发名单及卸载保留](https://github.com/engcapa/taomni/actions/runs/45002902815)
 - Mail 0.1.22 由独立引擎执行 IMAP 历史回填、POP3 原件归档和索引事务。签名宿主接收选定的 MIME 字节，分块压缩后返回摘要。桌面核验原始字节、大小和完整 gzip 流后才提交，超时、暂停或损坏会保留可重试的原件。现有自选邮箱目录和索引写锁仍由桌面持有。TC-MODULES-070 新增服务端删除后读本机正文、附件和摘要核对，TC-MAIL-STORAGE-06 新增恢复后阅读保留原件。宿主进程测试覆盖两次中断后的大原件重试。7 项协议、76 项引擎和 12 项宿主单元通过。三端真实应用及进程用例等待此批源码的 runner 回执。
 

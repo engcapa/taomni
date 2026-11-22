@@ -45,6 +45,19 @@ steps:
 - wait_for: '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
 - assert_count: {selector: '[data-testid="sockscap-panel"]', equal: 0}
 - assert_no_runtime_errors: null
+- assert_file_sha256: {path: '${fixture.sockscap_original_file}', equals: '${fixture.sockscap_original_sha256}'}
+- assert_file_contains: {path: '${fixture.sockscap_module_config}', contains: '"host":"127.0.0.2"'}
+- assert_file_contains: {path: '${fixture.sockscap_module_config}', contains: '"passwordRef":"vault:'}
+- click: '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-settings"]'
+- click: '[data-testid="module-action-enable-sockscap"]'
+- wait_for: '[data-testid="module-action-disable-sockscap"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- show_sockscap_section: upstream
+- wait_for: '[data-testid="sockscap-upstream-host"][value="127.0.0.2"]'
+- assert_attribute: {selector: '[data-testid="sockscap-upstream-port"]', name: value, equals: '19392'}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -64,6 +77,17 @@ verification:
     - {step: 37, expectation: The proxy configuration panel has unmounted.}
     - {step: 38, expectation: Import and disable complete without runtime errors.}
     results: [8, 9, 22, 24, 25, 26, 31, 32, 36, 37, 38]
+  - id: module-owned-settings
+    requirement: Save the edited endpoint and Vault reference in the module data directory and use that copy after enabling again.
+    actions: [23, 29, 42, 43, 45, 46, 47, 48]
+    checkpoints:
+    - {step: 39, expectation: The original monolithic configuration retains its initial digest.}
+    - {step: 40, expectation: The retained module file contains the new upstream host.}
+    - {step: 41, expectation: The persisted proxy password is referenced in Vault.}
+    - {step: 49, expectation: The re-enabled panel reads the edited host.}
+    - {step: 50, expectation: The re-enabled panel reads the edited port.}
+    - {step: 51, expectation: Reopening completes without runtime errors.}
+    results: [39, 40, 41, 49, 50, 51]
   visual:
   - check: The upstream settings reflect the imported proxy link.
     method: automated

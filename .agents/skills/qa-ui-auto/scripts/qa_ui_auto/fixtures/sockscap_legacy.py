@@ -36,6 +36,9 @@ def setup(ctx):
         path = isolated_data_root(ctx) / "sockscap" / "config.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(serialized, encoding="utf-8")
+        ctx.values.update(sockscap_original_file=path.as_posix(),
+                          sockscap_original_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                          sockscap_module_config=(isolated_data_root(ctx) / "plugins/sockscap/data/config.json").as_posix())
 
 
 def setup_signed(ctx):

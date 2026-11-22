@@ -789,7 +789,7 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 | Vault | `vault.db` | 核心（插件只拿引用） |
 | Servers | `taomni.db` 里的 `server_configs` 表（`servers/db.rs`）；其中 RDP / VNC Server 的配置行按 `server_type` 区分 | `plugin-servers`；RDP / VNC Server 行随 `plugin-rdp-server / plugin-vnc-server` 走（§4） |
 | RDP 客户端 | `taomni.db` 里的 `rdp_certificate_pins`（`rdp/tls.rs`）；会话记录是 `sessions` 表 | 证书钉扎表迁入 `plugin-rdp-client` 自有库；会话记录留核心 |
-| SocksCap | 文件而非数据库：`<应用数据目录>/sockscap/{config.json, rules/, recovery.json}` | 沿用该目录作为插件 `dataDir`（不搬迁）；`recovery.json` 是崩溃恢复日志，见 §8.2 |
+| SocksCap | `<应用数据目录>/sockscap/{config.json, rules/, recovery.json}` | 0.1.3 起，签名宿主首次读取时将旧配置导入 `plugins/sockscap/data/config.json`。保存、重开和备份使用该文件，旧配置保留供回退。规则缓存和崩溃恢复日志仍由原路径持有，见 §8.2。 |
 | 移动端 | `mobile_feishu_events` 等表（`mobile/`）、`mobile-desktop-remote.json`（桌面远控策略文件），其余配置在核心设置 | 插件自有库，逐表核查后迁移 |
 | VNC 客户端 / 截图 | 实测未发现独立表（偏好存核心设置） | 无需新库；M0 逐模块再核一遍 |
 

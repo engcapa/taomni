@@ -28,6 +28,7 @@ members = [
     "crates/taomni-mail-api",
     "crates/taomni-mail-engine",
     "crates/taomni-mfa-engine",
+    "crates/taomni-module-settings",
     "crates/taomni-plugin-api",
     "crates/taomni-plugin-services",
     "crates/taomni-plugin-sdk",

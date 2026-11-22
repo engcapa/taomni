@@ -22,7 +22,7 @@ steps:
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-sockscap"]'
 - wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]'
-- assert_signed_sockscap_host: idle
+- assert_file_contains: {path: '${fixture.sockscap_module_config}', contains: 'route.example.test', timeout_sec: 15}
 - show_sockscap_section: test
 - fill: {selector: '[data-testid="sockscap-test-host"]', value: route.example.test}
 - click: '[data-testid="sockscap-test-target"]'
@@ -39,10 +39,10 @@ verification:
     actions: [6, 9, 13, 16, 17, 18, 22]
     checkpoints:
     - {step: 8, expectation: The executable identity matches the signed package.}
-    - {step: 15, expectation: Opening the panel leaves the enabled host idle.}
+    - {step: 15, expectation: Opening the tool imports the old routing rule into the signed host's configuration.}
     - {step: 19, expectation: The result reports that the target is blocked.}
     - {step: 20, expectation: The result identifies the exact retained rule.}
-    - {step: 21, expectation: Test Target started the signed module host.}
+    - {step: 21, expectation: The signed module holds its writer lease after the target test.}
     - {step: 23, expectation: The dry-run completes without runtime errors.}
     results: [8, 15, 19, 20, 21, 23]
   visual:
@@ -52,4 +52,4 @@ verification:
   native:
   - check: The verified host holds the writer lease after the targeted request.
     method: automated
-    reason: The test checks the lease before and after the action. Linux launch-only mode lacks this panel control.
+    reason: The test reads the adopted file and checks the active writer lease. Linux launch-only mode lacks this panel control.

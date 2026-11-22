@@ -47,6 +47,20 @@ impl Operation {
         self.context.as_ref()
     }
 
+    /// Drop a pending transfer when the request is cancelled or its deadline expires.
+    pub async fn while_current<T>(
+        &self,
+        work: impl std::future::Future<Output = T>,
+    ) -> Result<T, RpcError> {
+        self.check_current()?;
+        tokio::select! {
+            biased;
+            _ = self.cancelled.cancelled() => Err(CoreServiceError::Cancelled.into_rpc_error()),
+            _ = tokio::time::sleep_until(self.deadline.into()) => Err(CoreServiceError::TimedOut.into_rpc_error()),
+            result = work => Ok(result),
+        }
+    }
+
     pub fn check_current(&self) -> Result<(), RpcError> {
         if self.cancelled.is_cancelled() {
             return Err(CoreServiceError::Cancelled.into_rpc_error());

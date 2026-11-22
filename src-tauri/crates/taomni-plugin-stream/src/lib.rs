@@ -7,6 +7,7 @@
 //! This library does not itself grant a plugin permission to capture or read.
 
 mod handshake;
+pub mod length_prefixed;
 pub mod native_channel;
 mod pool;
 mod receiver;

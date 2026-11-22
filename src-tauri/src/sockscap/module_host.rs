@@ -46,7 +46,7 @@ fn supports(registry: &PluginRegistry, command: &str) -> bool {
     })
 }
 
-async fn invoke<T: DeserializeOwned + Send + 'static>(
+pub(super) async fn invoke<T: DeserializeOwned + Send + 'static>(
     registry: &Arc<PluginRegistry>,
     command: &'static str,
     payload: Value,

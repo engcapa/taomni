@@ -42,4 +42,14 @@ pub use settings::SocksCapConfig;
 pub const SLUG: &str = "sockscap";
 pub const PARSE_SHARE_LINK: &str = "sockscap/parse-share-link";
 pub const TEST_TARGET: &str = "sockscap/test-target";
-pub const COMMANDS: [&str; 2] = [PARSE_SHARE_LINK, TEST_TARGET];
+pub const SETTINGS: &str = "sockscap/settings";
+pub const CONFIG_PATH: &str = "plugins/sockscap/data/config.json";
+pub const COMMANDS: [&str; 3] = [PARSE_SHARE_LINK, TEST_TARGET, SETTINGS];
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(tag = "operation", content = "config", rename_all = "camelCase", deny_unknown_fields)]
+pub enum SettingsRequest {
+    Read,
+    Adopt(Box<SocksCapConfig>),
+    Save(Box<SocksCapConfig>),
+}

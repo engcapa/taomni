@@ -265,6 +265,15 @@ fn inspects_real_legacy_sqlite_and_builds_only_file_specs() {
 
     let specs = build_file_migration_specs(&data, &snapshot.candidates).unwrap();
     assert_eq!(specs.len(), 2);
+    let sockscap = specs
+        .iter()
+        .find(|spec| spec.item == MigrationItem::SocksCap)
+        .unwrap();
+    assert_eq!(
+        sockscap.source,
+        std::path::Path::new("sockscap/config.json")
+    );
+    assert_eq!(sockscap.target, std::path::Path::new("data/config.json"));
     assert!(
         specs
             .iter()

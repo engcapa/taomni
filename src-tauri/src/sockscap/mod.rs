@@ -11,6 +11,7 @@ mod lifecycle;
 pub use lifecycle::*;
 mod configuration_commands;
 mod module_host;
+mod module_settings;
 pub use configuration_commands::*;
 mod upstream;
 pub use upstream::*;

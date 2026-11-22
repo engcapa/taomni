@@ -35,6 +35,15 @@ steps:
     expression: "document.getElementById('sockscap-section-upstream-content')?.querySelector('select')?.value === 'http'"
     expect_truthy: true
 - assert_no_runtime_errors: null
+- fill: {selector: '[data-testid="sockscap-upstream-port"]', value: '19397'}
+- wait_for: '[data-testid="sockscap-upstream-port"][value="19397"]'
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- show_sockscap_section: upstream
+- wait_for: '[data-testid="sockscap-upstream-port"][value="19397"]'
+- assert_attribute: {selector: '[data-testid="sockscap-upstream-host"]', name: value, equals: '127.0.0.1'}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -52,6 +61,15 @@ verification:
     - {step: 20, expectation: Reload restores the selected protocol.}
     - {step: 21, expectation: Opening and editing the profile produces no runtime errors.}
     results: [6, 8, 9, 10, 12, 18, 19, 20, 21]
+  - id: edit-reopened-settings
+    requirement: A second edit to the restored profile persists with the previously retained host.
+    actions: [22, 24, 25, 26, 27]
+    checkpoints:
+    - {step: 23, expectation: The port field shows the second edit.}
+    - {step: 28, expectation: Reopening the tool restores the new port.}
+    - {step: 29, expectation: The original host is retained.}
+    - {step: 30, expectation: The second edit and reopen produce no runtime errors.}
+    results: [23, 28, 29, 30]
   visual:
   - check: The legacy settings can be opened from the native and browser Tools areas.
     method: automated

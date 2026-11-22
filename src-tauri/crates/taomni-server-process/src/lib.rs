@@ -15,7 +15,7 @@ mod config;
 pub use config::ServerConfig;
 pub mod local;
 pub mod rdp;
-mod settings_file;
+use taomni_module_settings as settings_file;
 pub mod system_rdp;
 pub mod vnc;
 

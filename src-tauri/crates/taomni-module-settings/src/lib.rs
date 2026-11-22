@@ -1,4 +1,4 @@
-//! Read and atomically publish one local server's profile-owned settings.
+//! Read and atomically publish a module's profile-owned settings.
 
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
@@ -7,24 +7,36 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const MAX_SETTINGS_BYTES: u64 = 64 * 1024;
+const SERVER_SETTINGS_LIMIT: u64 = 64 * 1024;
 
-pub(crate) struct SettingsFile(PathBuf);
+pub struct SettingsFile {
+    path: PathBuf,
+    limit: u64,
+}
 
 impl SettingsFile {
-    pub(crate) fn new(profile: &Path, relative: &str) -> Self {
-        Self(profile.join(relative))
+    /// Use a fixed path of the form `plugins/<slug>/data/<filename>`.
+    pub fn new(profile: &Path, relative: &'static str) -> Self {
+        Self::with_limit(profile, relative, SERVER_SETTINGS_LIMIT)
+    }
+
+    pub fn with_limit(profile: &Path, relative: &'static str, limit: u64) -> Self {
+        Self {
+            path: profile.join(relative),
+            limit,
+        }
     }
 
     /// A reader opens the atomically replaced file without creating it or
     /// acquiring write ownership. The caller holds a live profile lease.
-    pub(crate) fn load<T: DeserializeOwned>(&self) -> io::Result<Option<T>> {
+    pub fn load<T: DeserializeOwned>(&self) -> io::Result<Option<T>> {
         let Some(file) = self.open()? else {
             return Ok(None);
         };
         let mut body = Vec::new();
-        file.take(MAX_SETTINGS_BYTES + 1).read_to_end(&mut body)?;
-        if body.len() as u64 > MAX_SETTINGS_BYTES {
+        file.take(self.limit.saturating_add(1))
+            .read_to_end(&mut body)?;
+        if body.len() as u64 > self.limit {
             return Err(invalid_settings());
         }
         serde_json::from_slice(&body)
@@ -32,8 +44,8 @@ impl SettingsFile {
             .map_err(io::Error::other)
     }
 
-    pub(crate) fn open(&self) -> io::Result<Option<File>> {
-        for directory in self.0.ancestors().skip(1).take(3) {
+    pub fn open(&self) -> io::Result<Option<File>> {
+        for directory in self.path.ancestors().skip(1).take(3) {
             match fs::symlink_metadata(directory) {
                 Ok(metadata) if metadata.is_dir() && ordinary(&metadata) => {}
                 Ok(_) => return Err(invalid_settings()),
@@ -53,7 +65,7 @@ impl SettingsFile {
             use std::os::windows::fs::OpenOptionsExt;
             options.custom_flags(0x0020_0000);
         }
-        match options.open(&self.0) {
+        match options.open(&self.path) {
             Ok(file) => {
                 let metadata = file.metadata()?;
                 if !metadata.is_file() || !ordinary(&metadata) {
@@ -75,23 +87,32 @@ impl SettingsFile {
 
     /// Callers must hold the module writer lease. Receipt and settings share
     /// one atomic file so interrupted migrations can recover their identity.
-    pub(crate) fn save(&self, record: &impl Serialize) -> io::Result<()> {
+    pub fn save(&self, record: &impl Serialize) -> io::Result<()> {
+        self.save_checked(record, || Ok(()))
+    }
+
+    pub fn save_checked(
+        &self,
+        record: &impl Serialize,
+        before_publish: impl FnOnce() -> io::Result<()>,
+    ) -> io::Result<()> {
         let parent = self.prepare_parent()?;
         let contents = serde_json::to_vec(record).map_err(io::Error::other)?;
-        if contents.len() as u64 > MAX_SETTINGS_BYTES {
+        if contents.len() as u64 > self.limit {
             return Err(invalid_settings());
         }
         let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
         temporary.write_all(&contents)?;
         temporary.as_file().sync_all()?;
-        temporary.persist(&self.0).map_err(|error| error.error)?;
+        before_publish()?;
+        temporary.persist(&self.path).map_err(|error| error.error)?;
         #[cfg(unix)]
         File::open(parent)?.sync_all()?;
         Ok(())
     }
 
-    pub(crate) fn prepare_parent(&self) -> io::Result<&Path> {
-        let directories: Vec<_> = self.0.ancestors().skip(1).take(3).collect();
+    pub fn prepare_parent(&self) -> io::Result<&Path> {
+        let directories: Vec<_> = self.path.ancestors().skip(1).take(3).collect();
         for directory in directories.iter().rev() {
             match fs::create_dir(directory) {
                 Ok(()) => {}
@@ -119,8 +140,5 @@ fn ordinary(metadata: &Metadata) -> bool {
 }
 
 fn invalid_settings() -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidData,
-        "Invalid local server settings file",
-    )
+    io::Error::new(io::ErrorKind::InvalidData, "Invalid module settings file")
 }

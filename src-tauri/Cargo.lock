@@ -11211,6 +11211,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-module-settings"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "taomni-plugin-ai-voice-local"
 version = "0.1.0"
 dependencies = [
@@ -11370,12 +11380,16 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-sockscap"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde_json",
+ "taomni-module-settings",
  "taomni-plugin-api",
  "taomni-plugin-sdk",
+ "taomni-plugin-stream",
  "taomni-sockscap-api",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -11624,9 +11638,9 @@ dependencies = [
 name = "taomni-server-process"
 version = "0.1.0"
 dependencies = [
- "libc",
  "serde",
  "serde_json",
+ "taomni-module-settings",
  "tempfile",
  "tokio",
  "tokio-util 0.7.19",

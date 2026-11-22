@@ -86,15 +86,15 @@ pub async fn sockscap_start(
     #[cfg(not(target_os = "linux"))]
     let _ = sudo_password;
 
-    let cfg_path = config_path(&app)?;
     #[cfg(target_os = "macos")]
-    let mut cfg = SocksCapConfig::load(&cfg_path);
+    let mut cfg = module_settings::load(&app, &state.plugins).await?;
     #[cfg(not(target_os = "macos"))]
-    let cfg = SocksCapConfig::load(&cfg_path);
+    let cfg = module_settings::load(&app, &state.plugins).await?;
 
     #[cfg(target_os = "macos")]
     if redirector::app_identity::revalidate_configuration(&mut cfg)? {
-        cfg.save(&cfg_path)
+        module_settings::save(&app, &state.plugins, &cfg)
+            .await
             .map_err(|error| format!("save refreshed macOS application identity: {error}"))?;
     }
     cfg.validate()?;

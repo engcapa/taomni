@@ -181,7 +181,10 @@ pub fn build_file_migration_specs(
     for candidate in candidates {
         let (source, target) = match candidate.item {
             MigrationItem::Mfa => (PathBuf::from("mfa.db"), PathBuf::from("data/mfa.db")),
-            MigrationItem::SocksCap => (PathBuf::from("sockscap"), PathBuf::from("data/sockscap")),
+            MigrationItem::SocksCap => (
+                PathBuf::from("sockscap/config.json"),
+                PathBuf::from("data/config.json"),
+            ),
             MigrationItem::Mobile
             | MigrationItem::RdpVncSessions
             | MigrationItem::VncSessions

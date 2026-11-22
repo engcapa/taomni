@@ -43,9 +43,11 @@ pub async fn sockscap_install_redirector(app: AppHandle) -> Result<serde_json::V
 /* ---------------------------- config ------------------------------------ */
 
 #[tauri::command]
-pub async fn sockscap_get_config(app: AppHandle) -> Result<SocksCapConfig, String> {
-    let path = config_path(&app)?;
-    Ok(SocksCapConfig::load(&path))
+pub async fn sockscap_get_config(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<SocksCapConfig, String> {
+    module_settings::load(&app, &state.plugins).await
 }
 
 /// Resolve and validate a macOS application selector before it is persisted.
@@ -74,10 +76,9 @@ pub async fn sockscap_set_config(
     config: SocksCapConfig,
 ) -> Result<(), String> {
     config.validate()?;
-    let path = config_path(&app)?;
     let mut orch = state.legacy.sockscap.orch.write().await;
     ensure_configuration_unlocked(&orch)?;
-    config.save(&path)?;
+    module_settings::save(&app, &state.plugins, &config).await?;
     orch.apply_config(config);
     Ok(())
 }
@@ -138,8 +139,7 @@ pub async fn sockscap_refresh_gfwlist(
     // the old rules while a refresh is being committed.
     let mut orch = state.legacy.sockscap.orch.write().await;
     ensure_configuration_unlocked(&orch)?;
-    let cfg_path = config_path(&app)?;
-    let mut cfg = SocksCapConfig::load(&cfg_path);
+    let mut cfg = module_settings::load(&app, &state.plugins).await?;
     let fetch_url = url
         .filter(|u| !u.trim().is_empty())
         .unwrap_or_else(|| cfg.gfwlist.url.clone());
@@ -152,7 +152,7 @@ pub async fn sockscap_refresh_gfwlist(
     match result {
         Ok(compiled) => {
             let meta = compiled.meta.clone();
-            cfg.save(&cfg_path)?;
+            module_settings::save(&app, &state.plugins, &cfg).await?;
             orch.apply_config(cfg);
             orch.set_rules(compiled);
             Ok(GfwListStatus {
@@ -234,7 +234,7 @@ pub async fn sockscap_test_target(
             }
         }
         if orch.config().is_none() {
-            let cfg = SocksCapConfig::load(&config_path(&app)?);
+            let cfg = module_settings::load(&app, &state.plugins).await?;
             orch.apply_config(cfg);
         }
     }
