@@ -45,6 +45,7 @@ jobs:
       - uses: ./.github/actions/qa-runtime
         with:
           mode: ${{ matrix.mode }}
+          install_node_deps: ${{ inputs.operation != 'run' || matrix.mode != 'native' || contains(matrix.capabilities, 'updater') || contains(matrix.capabilities, 'mobile') }}
       - name: Chromium for mobile against the real native service
         if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'mobile')
         timeout-minutes: 15
@@ -91,7 +92,7 @@ jobs:
           QA_CAPABILITIES: ${{ join(matrix.capabilities, ',') }}
         run: bash .agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh
       - uses: dtolnay/rust-toolchain@stable
-        if: matrix.mode == 'native'
+        if: matrix.mode == 'native' && inputs.operation != 'run'
       - name: Install verified fixed protoc
         if: (matrix.mode == 'native') && inputs.operation != 'run'
         run: python .agents/skills/qa-ui-auto/scripts/ci_setup_protoc.py
@@ -108,8 +109,8 @@ jobs:
       - name: Linux backup credential service
         if: (runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'secret-service')) && inputs.operation == 'run'
         run: sudo apt-get update && sudo apt-get install -y gnome-keyring libsecret-tools libglib2.0-bin
-      - name: Windows build tools and WebView2 driver
-        if: runner.os == 'Windows' && matrix.mode == 'native'
+      - name: Windows build tools (Perl)
+        if: runner.os == 'Windows' && matrix.mode == 'native' && inputs.operation != 'run'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -119,6 +120,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
           "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
           'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
+      - name: Windows native runtime tools
+        if: runner.os == 'Windows' && matrix.mode == 'native' && inputs.operation == 'run'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
           $runtimeRoot = "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application"
           $runtime = Get-ChildItem -LiteralPath $runtimeRoot -Directory | Where-Object Name -Match '^\d+\.\d+\.\d+\.\d+$' | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
           if (-not $runtime) { throw 'WebView2 runtime unavailable' }
@@ -184,23 +190,31 @@ jobs:
                   raise SystemExit('BlackHole HAL output unavailable')
               time.sleep(0.5)
           PYTHON
-      - name: macOS build dependencies
-        if: runner.os == 'macOS' && matrix.mode == 'native'
+      - name: macOS build dependencies (krb5)
+        if: runner.os == 'macOS' && matrix.mode == 'native' && inputs.operation != 'run'
         run: |
-          brew install krb5 tesseract
+          brew install krb5
           echo "SHELL=/bin/zsh" >> "$GITHUB_ENV"
           echo "LIBGSSAPI_IMPL=mit" >> "$GITHUB_ENV"
           echo "LIBGSSAPI_PREFIX=$(brew --prefix krb5)" >> "$GITHUB_ENV"
           echo "PKG_CONFIG_PATH=$(brew --prefix krb5)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: macOS native runtime dependencies (krb5, OCR)
+        if: runner.os == 'macOS' && matrix.mode == 'native' && inputs.operation == 'run'
+        run: |
+          brew install krb5 tesseract
+          echo "SHELL=/bin/zsh" >> "$GITHUB_ENV"
       - name: Verify OCR executable and pinned English/Chinese data
         if: (matrix.mode == 'native') && inputs.operation == 'run'
         run: python .agents/skills/qa-ui-auto/scripts/setup_screenshot_ocr.py
       - name: Native adapter cache
+        id: native-adapter-cache
         if: (matrix.mode == 'native' && runner.os != 'macOS') && inputs.operation == 'run'
         uses: actions/cache@v4
         with:
           path: ~/.cache/taomni-qa/adapter
           key: qa-tauri-driver-2.0.4-${{ runner.os }}-${{ runner.arch }}-${{ matrix.runner }}
+      - uses: dtolnay/rust-toolchain@stable
+        if: (matrix.mode == 'native' && runner.os != 'macOS') && inputs.operation == 'run' && steps.native-adapter-cache.outputs.cache-hit != 'true'
       - name: Native adapter
         if: (matrix.mode == 'native' && runner.os != 'macOS') && inputs.operation == 'run'
         run: |

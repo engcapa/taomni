@@ -61,8 +61,13 @@ def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_work
         total = sum(cost(cid) for cid in ids)
         if shards == 'auto':
             # Selected native cases have no shared desktop across VMs; one build
-            # serves all shards, so even short independent selections can fan out.
-            desired = min(limit, len(units)) if scope == 'selected' and entry['mode'] == 'native' else min(limit, max(len(buckets), math.ceil(total / 900)))
+            # serves all shards, so longer independent selections fan out once
+            # estimated runtime justifies the per-VM setup cost.
+            desired = (
+                min(limit, len(units), max(1, math.ceil(total / 180)))
+                if scope == 'selected' and entry['mode'] == 'native'
+                else min(limit, max(len(buckets), math.ceil(total / 900)))
+            )
         else:
             desired = min(limit, len(units))
         while sum(counts.values()) < desired:
