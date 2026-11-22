@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import yaml
 from qa_ui_auto import file_open_observation as oracle
@@ -43,6 +43,23 @@ class FileOpenAssetsTests(unittest.TestCase):
             oracle.native(self.ctx, {"path": str(self.root / "notes.txt"), "equals": fixture.TEXT, "timeout_sec": 0})
         records = [json.loads(line) for line in (self.ctx.case_dir / "file-open-byte-observations.jsonl").read_text().splitlines()]
         self.assertEqual([row["passed"] for row in records], [True, False])
+
+    def test_atomic_save_temporarily_denies_the_native_byte_reader(self):
+        path = str(self.root / "notes.txt")
+        with patch.object(oracle.sys, "platform", "win32"), patch.object(oracle.time, "sleep"), \
+             patch.object(Path, "read_bytes", side_effect=[PermissionError(13, "sharing"), b"updated"]):
+            oracle.native(self.ctx, {"path": path, "equals": "updated"})
+        receipt = json.loads((self.ctx.case_dir / "file-open-byte-observations.jsonl").read_text())
+        self.assertTrue(receipt["passed"])
+        self.assertIn("sharing", receipt["samples"][0]["readError"])
+        self.assertEqual(receipt["samples"][1]["sha256"], hashlib.sha256(b"updated").hexdigest())
+
+    def test_locked_file_is_neither_absent_nor_empty(self):
+        with patch.object(oracle.sys, "platform", "win32"), \
+             patch.object(Path, "read_bytes", side_effect=PermissionError(13, "sharing")):
+            for condition in [{"absent": True}, {"equals": ""}]:
+                with self.subTest(condition=condition), self.assertRaises(PermissionError):
+                    oracle.native(self.ctx, {"path": str(self.root / "notes.txt"), "timeout_sec": 0, **condition})
 
     def test_unowned_paths_mismatched_mode_symlinks_and_bad_postcondition_are_rejected(self):
         with self.assertRaisesRegex(StepError, "outside"):
@@ -244,15 +261,19 @@ for (const fixture of fixtures) {
 
     def test_file_open_case_schemas_references_and_native_verbs(self):
         files = sorted((ROOT / "qa-ui-auto-tests/cases").glob("TC-FILE-OPEN-*.testcase.yaml"))
-        self.assertEqual(len(files), 12)
+        crash_cases = {f"TC-FILE-OPEN-{index:03}" for index in range(1, 13)}
+        seen = set()
         for path in files:
             document = yaml.safe_load(path.read_text())
             self.assertEqual(validate_contract(document), [], path.name)
             case = load_case(path)
-            self.assertIn("crash-regression", case.tags)
-            if "native" in case.modes:
+            seen.add(case.id)
+            if case.id in crash_cases:
+                self.assertIn("crash-regression", case.tags)
+            if case.id in crash_cases and "native" in case.modes:
                 for platform in ["Linux", "Windows", "macOS"]:
                     self.assertIsNone(native_support(case, platform), (case.id, platform))
+        self.assertTrue(crash_cases <= seen, crash_cases - seen)
 
 
 if __name__ == "__main__":
