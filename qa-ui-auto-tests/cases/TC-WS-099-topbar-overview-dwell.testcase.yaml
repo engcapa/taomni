@@ -1,0 +1,215 @@
+id: TC-WS-099
+title: Main-view top-right actions keep overview only and overview hover enlargement follows the 0.5-1 s dwell
+description: >-
+  Retired right context sidebar: Home keeps its two launch pills plus global search and the large overview; Sessions,
+  Workspaces, File Explorer and Tools expose their mode actions, global search and the large overview only, with no
+  right-sidebar trigger, panel, close or resize handle anywhere. The large overview enlarges a hovered card only after
+  the configured 0.5-1 s dwell (700 ms), never immediately, shows the hovered document, and clicking the enlarged card
+  activates that document. Browser VFS/image evidence covers rendering and timing; native reuses real files under the
+  isolated QA profile.
+modes: [browser, native]
+covers: [F1.5, F-WS-1, F-WS-2, F-EXPLORER-1]
+tags: [p1, overview, workspace, toolbar, regression]
+fixtures: [reset_db, platform_workspace_root, explorer_files]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-099
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_items:
+    selector: '[data-testid="platform-toolbar-actions"] button'
+    attribute: data-testid
+    equals:
+    - home-toolbar-workspaces
+    - home-toolbar-sessions
+    - global-search-trigger
+    - tab-overview-trigger
+- assert_not_visible: '[data-testid="toggle-right-sidebar"]'
+- assert_not_visible: '[data-testid="right-sidebar"]'
+- click: '[data-testid="home-toolbar-sessions"]'
+- wait_for: '[data-testid="sessions-empty-state"]'
+- assert_items:
+    selector: '[data-testid="platform-toolbar-actions"] button'
+    attribute: data-testid
+    equals:
+    - tab-more
+    - global-search-trigger
+    - tab-overview-trigger
+    - titlebar-actions-more
+- assert_not_visible: '[data-testid="toggle-right-sidebar"]'
+- assert_count:
+    selector: '[data-testid="right-sidebar"], [data-testid="right-sidebar-close"], [data-testid="right-sidebar-resize-handle"]'
+    equal: 0
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="tools-empty-state"]'
+- assert_items:
+    selector: '[data-testid="platform-toolbar-actions"] button'
+    attribute: data-testid
+    equals:
+    - tools-toolbar-workspaces
+    - global-search-trigger
+    - tab-overview-trigger
+- assert_not_visible: '[data-testid="toggle-right-sidebar"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-main-panel"]'
+- assert_items:
+    selector: '[data-testid="platform-toolbar-actions"] button'
+    attribute: data-testid
+    equals:
+    - workspace-tabs-filter-trigger
+    - global-search-trigger
+    - tab-overview-trigger
+    - titlebar-actions-more
+- assert_not_visible: '[data-testid="right-sidebar-resize-handle"]'
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- seed_storage:
+    key: taomni.explorer.tabs.v1
+    value: '{"activeTabId":"qa-f01","foreground":{"kind":"main","tabId":"qa-f01"},"tabs":[{"id":"qa-f01","type":"file-browser","title":"QA Folder 01","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_source}","explorer":true}}]}'
+- reload_window: null
+- wait_for: '[data-testid="explorer-platform-view"]'
+- assert_items:
+    selector: '[data-testid="platform-toolbar-actions"] button'
+    attribute: data-testid
+    equals:
+    - explorer-tabs-filter-trigger
+    - global-search-trigger
+    - tab-overview-trigger
+- assert_count:
+    selector: '[data-testid="right-sidebar"], [data-testid="right-sidebar-close"], [data-testid="toggle-right-sidebar"]'
+    equal: 0
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-main-panel"]'
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- dblclick: '[data-testid="code-workspace-tree-root"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="src/index.ts"] .cm-content'
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview-search"]:focus'
+- eval_readonly:
+    expression: Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"tab-overview"]').dataset.previewDelayMs) >= 500 && Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"tab-overview"]').dataset.previewDelayMs) <= 1000
+    expect_truthy: true
+- hover: '[data-testid="tab-overview-card"]:nth-child(1)'
+- assert_not_visible: '[data-testid="tab-overview-enlarged"]'
+- wait_for: '[data-testid="tab-overview-enlarged"]'
+- assert_text:
+    selector: '[data-testid="tab-overview-enlarged"]'
+    contains: README.md
+- hover: '[data-testid="tab-overview-card"]:nth-child(2)'
+- assert_not_visible: '[data-testid="tab-overview-enlarged"]'
+- wait_for: '[data-testid="tab-overview-enlarged"]'
+- assert_text:
+    selector: '[data-testid="tab-overview-enlarged"]'
+    contains: index.ts
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"tab-overview-enlarged"]').dataset.tabId === document.querySelectorAll('[data-testid' + String.fromCharCode(61) + '"tab-overview-card"]')[1].dataset.tabId
+    expect_truthy: true
+- click: '[data-testid="tab-overview-enlarged"]'
+- assert_not_visible: '[data-testid="tab-overview"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="src/index.ts"] .cm-content'
+- screenshot: ws-099-topbar-overview-dwell.png
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: HOME-TOPBAR
+    requirement: Home keeps its Workspaces/Sessions launch pills plus global search and the large overview; the retired right-sidebar trigger and panel are not mounted.
+    actions: [1, 2]
+    checkpoints:
+    - step: 3
+      expectation: Home renders the welcome panel from a clean QA profile.
+    - step: 4
+      expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["home-toolbar-workspaces", "home-toolbar-sessions", "global-search-trigger", "tab-overview-trigger"]}}'
+    - step: 5
+      expectation: '{"assert_not_visible": "[data-testid=\"toggle-right-sidebar\"]"}'
+    - step: 6
+      expectation: '{"assert_not_visible": "[data-testid=\"right-sidebar\"]"}'
+    results: [3, 4, 5, 6]
+  - id: SESSIONS-TOOLS-WORKSPACES-TOPBAR
+    requirement: Sessions, Tools and Workspaces expose only their mode actions, global search and the large overview; no right-sidebar trigger, panel, close or resize control exists.
+    actions: [7, 12, 16]
+    checkpoints:
+    - step: 8
+      expectation: Sessions empty state remains the onboarding surface.
+    - step: 9
+      expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["tab-more", "global-search-trigger", "tab-overview-trigger", "titlebar-actions-more"]}}'
+    - step: 10
+      expectation: '{"assert_not_visible": "[data-testid=\"toggle-right-sidebar\"]"}'
+    - step: 11
+      expectation: '{"assert_count": {"selector": "[data-testid=\"right-sidebar\"], [data-testid=\"right-sidebar-close\"], [data-testid=\"right-sidebar-resize-handle\"]", "equal": 0}}'
+    - step: 13
+      expectation: Tools empty state renders after switching modes.
+    - step: 14
+      expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["tools-toolbar-workspaces", "global-search-trigger", "tab-overview-trigger"]}}'
+    - step: 15
+      expectation: '{"assert_not_visible": "[data-testid=\"toggle-right-sidebar\"]"}'
+    - step: 17
+      expectation: Workspaces main panel renders after switching modes.
+    - step: 18
+      expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["workspace-tabs-filter-trigger", "global-search-trigger", "tab-overview-trigger", "titlebar-actions-more"]}}'
+    - step: 19
+      expectation: '{"assert_not_visible": "[data-testid=\"right-sidebar-resize-handle\"]"}'
+    results: [8, 9, 10, 11, 13, 14, 15, 17, 18, 19]
+  - id: EXPLORER-TOPBAR
+    requirement: File Explorer restores from its persisted tab and exposes only its tab filter, global search and the large overview; the retired right-sidebar controls stay absent after reload.
+    actions: [20, 21, 22, 26]
+    checkpoints:
+    - step: 23
+      expectation: Explorer platform view restores the seeded Explorer tab after reload.
+    - step: 24
+      expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["explorer-tabs-filter-trigger", "global-search-trigger", "tab-overview-trigger"]}}'
+    - step: 25
+      expectation: '{"assert_count": {"selector": "[data-testid=\"right-sidebar\"], [data-testid=\"right-sidebar-close\"], [data-testid=\"toggle-right-sidebar\"]", "equal": 0}}'
+    - step: 27
+      expectation: Workspaces main panel returns from Explorer.
+    results: [23, 24, 25, 27]
+  - id: OVERVIEW-DWELL
+    requirement: The large overview advertises a 0.5-1 s hover dwell, never enlarges a card immediately, enlarges only the hovered document after the dwell, and activates it from the enlarged card.
+    actions: [29, 31, 33, 34, 36, 39, 43, 48]
+    checkpoints:
+    - step: 28
+      expectation: The workspace file tree is available for real file opening.
+    - step: 30
+      expectation: Expanding the workspace root lists README.md from the seeded fixture.
+    - step: 32
+      expectation: README.md opens in the Markdown editor.
+    - step: 35
+      expectation: src/index.ts opens in the workspace file editor.
+    - step: 37
+      expectation: Opening Overview focuses the search field.
+    - step: 38
+      expectation: The dialog publishes a preview dwell within the agreed 500-1000 ms range.
+    - step: 40
+      expectation: No enlargement appears immediately after the pointer enters a card.
+    - step: 41
+      expectation: The enlargement appears after the dwell.
+    - step: 42
+      expectation: The enlarged preview shows the hovered README.md document.
+    - step: 44
+      expectation: Moving to another card clears the previous enlargement.
+    - step: 45
+      expectation: The second card enlarges after the dwell.
+    - step: 46
+      expectation: The enlarged preview shows the hovered index.ts document.
+    - step: 47
+      expectation: The enlarged preview is bound to the second hovered card.
+    - step: 49
+      expectation: Clicking the enlarged preview closes Overview.
+    - step: 50
+      expectation: The clicked document is activated in the editor.
+    - step: 52
+      expectation: No runtime errors were recorded during the flow.
+    results: [28, 30, 32, 35, 37, 38, 40, 41, 42, 44, 45, 46, 47, 49, 50, 52]
+  visual:
+  - check: Screenshot keeps the 33px toolbar density and the enlarged preview inside the viewport.
+    method: manual
+    reason: DOM assertions verify layout geometry and state; the retained screenshot supports human comparison with the prototype.
+  native:
+  - check: Real WebView hover and mode switching with packaged assets.
+    method: automated
+    reason: The native run reuses the isolated QA app, real workspace root and Explorer fixture; browser stubs alone do not prove WebView pointer behavior.
