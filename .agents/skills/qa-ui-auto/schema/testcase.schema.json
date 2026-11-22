@@ -1025,7 +1025,7 @@
         },
         "assert_signed_windows_capture": {
           "type": "string",
-          "enum": ["unstaged", "running", "disabled"]
+          "enum": ["unstaged", "running", "disabled", "uninstalled"]
         },
         "assert_signed_sockscap_host": {
           "enum": ["idle", "running", "disabled"],

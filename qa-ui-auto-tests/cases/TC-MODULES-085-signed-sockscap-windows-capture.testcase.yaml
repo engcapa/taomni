@@ -1,6 +1,6 @@
 id: TC-MODULES-085
-title: Windows SocksCap verifies WinDivert and releases its elevated capture helper
-description: Reject changed driver files, start with the restored signed payload and disable capture through the Module Store.
+title: Windows SocksCap verifies WinDivert, releases its helper and uninstalls capture code
+description: Reject changed driver files, start with the restored signed payload, then disable and uninstall the module while preserving its configuration.
 covers: [F-Modules-1, F-Sockscap-1]
 tags: [modules, sockscap, native-boundary, p1]
 modes: [native]
@@ -45,13 +45,20 @@ steps:
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-sockscap"]'
 - wait_for: '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-uninstall-sockscap"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-sockscap"]'
+- assert_signed_windows_capture: uninstalled
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: trusted-windows-capture
     requirement: Windows validates the signed files before launching the helper and releases the helper when its owning module is disabled.
-    actions: [6, 8, 12, 15, 16, 18, 21, 24, 26, 29, 31, 36]
+    actions: [6, 8, 12, 15, 16, 18, 21, 24, 26, 29, 31, 36, 38, 40, 42]
     checkpoints:
     - {step: 7, expectation: The module came from the signed archive.}
     - {step: 14, expectation: The signed host holds the process writer lease.}
@@ -62,8 +69,10 @@ verification:
     - {step: 28, expectation: The elevated helper runs from the verified payload under the active signed host.}
     - {step: 33, expectation: The owning host and its elevated helper have exited and removed the ready file.}
     - {step: 37, expectation: The existing desktop shows the disabled module state.}
-    - {step: 38, expectation: Capture startup and cleanup leave the renderer usable.}
-    results: [7, 14, 19, 20, 22, 23, 28, 33, 37, 38]
+    - {step: 43, expectation: The store offers installation again after uninstall completes.}
+    - {step: 44, expectation: The version and staged runtime are gone and the retained configuration digest matches.}
+    - {step: 45, expectation: Capture startup and cleanup leave the renderer usable.}
+    results: [7, 14, 19, 20, 22, 23, 28, 33, 37, 43, 44, 45]
   visual:
   - check: The capture panel displays the integrity error.
     method: automated

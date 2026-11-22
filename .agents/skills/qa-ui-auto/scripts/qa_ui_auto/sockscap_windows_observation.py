@@ -35,8 +35,9 @@ def matching_images(rows, path):
 
 def run(ctx, phase):
     owner = ctx.fixture_context
+    phases = {"unstaged", "running", "disabled", "uninstalled"}
     if (owner.case_id != WINDOWS_CAPTURE_CASE_ID or platform.system() != "Windows"
-            or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted" or phase not in {"unstaged", "running", "disabled"}):
+            or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted" or phase not in phases):
         raise StepError("Windows capture observation requires the signed case on a hosted runner")
 
     root = isolated_data_root(owner)
@@ -48,6 +49,18 @@ def run(ctx, phase):
     result = {"sourceSha": receipt["sourceSha"], "platform": receipt["platform"], "packageSha256": receipt["sha256"],
               "phase": phase, "passed": False}
     status_path = Path(ctx.case_dir) / f"sockscap-windows-capture-{phase}.json"
+    if phase == "uninstalled":
+        module = root / "plugins/sockscap"
+        retained_config = module / "data/config.json"
+        before = json.loads((Path(ctx.case_dir) / "sockscap-windows-capture-disabled.json").read_text(encoding="utf-8"))
+        actual = hashlib.sha256(retained_config.read_bytes()).hexdigest()
+        result.update(expectedConfigSha256=before["configSha256"], configSha256=actual,
+                      versionTree=(module / "versions").exists(), runtimeTree=(module / "runtime").exists())
+        result["passed"] = not result["versionTree"] and not result["runtimeTree"] and actual == before["configSha256"]
+        status_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        if not result["passed"]:
+            raise StepError("Uninstall kept module code or changed the retained SocksCap configuration")
+        return "Windows capture code removed and configuration retained"
     if phase == "unstaged":
         result["passed"] = not staged.exists() and not any(ready_dir.glob("helper-ready-*.json"))
         status_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -71,6 +84,8 @@ def run(ctx, phase):
                     continue
             if phase == "disabled":
                 if not result["hosts"] and not result["helpers"] and not ready:
+                    config = root / "plugins/sockscap/data/config.json"
+                    result["configSha256"] = hashlib.sha256(config.read_bytes()).hexdigest()
                     break
             elif len(result["hosts"]) == len(result["helpers"]) == 1:
                 helper_pid = result["helpers"][0]["ProcessId"]

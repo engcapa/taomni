@@ -44,7 +44,7 @@ impl PluginRegistry {
         }
         installer.mark_uninstalled(slug, UninstalledModule::from(&record.manifest))?;
         let cleanup = (|| -> Result<(), PluginError> {
-            installer.remove_version_tree(slug)?;
+            installer.remove_code_trees(slug)?;
             if delete_data {
                 match fs::remove_dir_all(self.root.join(slug).join("data")) {
                     Ok(()) => (),
@@ -75,7 +75,7 @@ impl PluginRegistry {
         if let Some(display) = &pointer.uninstalled {
             // A restart or refresh can finish deleting code after an interrupted
             // uninstall. Every scan holds the cross-process mutation lock.
-            if let Err(error) = installer.remove_version_tree(slug) {
+            if let Err(error) = installer.remove_code_trees(slug) {
                 log::warn!("Could not remove uninstalled module {slug}: {error}");
             }
             display.apply(&mut manifest);

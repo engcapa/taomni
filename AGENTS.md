@@ -24,6 +24,8 @@ code lives under `<app-data>/plugins/<slug>/versions/<version>/`, the active
 version is selected by `active.json`, and module data lives under
 `<app-data>/plugins/<slug>/data/`. Disabling or uninstalling a module keeps its
 data until the user explicitly confirms permanent deletion.
+Derived module binaries and caches staged under `<app-data>/plugins/<slug>/runtime/`
+are removed with the version directories during uninstall.
 
 Every module change updates the module manifest, browser and native cases,
 feature-list and testid catalogs, migration and backup fixtures, and the

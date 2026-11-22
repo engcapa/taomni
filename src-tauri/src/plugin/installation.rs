@@ -96,7 +96,7 @@ impl PluginRegistry {
         )
         .map_err(|error| PluginError::InvalidManifest(error.to_string()))?;
         if previous.uninstalled.is_some() && previous.was_uninstalled() {
-            installer.remove_version_tree(slug)?;
+            installer.remove_code_trees(slug)?;
         }
         // Stage and recheck content before stopping a working host or changing
         // the pointer. A bad download never interrupts the active version.

@@ -339,27 +339,39 @@ impl ModuleInstaller {
         self.write_pointer(slug, &pointer)
     }
 
-    /// Only called under the registry mutation lock after uninstall commits.
-    /// Refuse a redirected root so cleanup cannot affect a different module.
-    pub(super) fn remove_version_tree(&self, slug: &str) -> Result<(), InstallError> {
+    /// Remove installed versions and derived runtime files after uninstall.
+    pub(super) fn remove_code_trees(&self, slug: &str) -> Result<(), InstallError> {
         validate_slug(slug)?;
         let owner = self.root.join(slug);
-        let versions = owner.join("versions");
-        for path in [&self.root, &owner, &versions] {
+        for path in [&self.root, &owner] {
             match fs::symlink_metadata(path) {
                 Ok(metadata) if metadata.is_dir() && !super::data_contract::is_link(&metadata) => {
                     ()
                 }
                 Ok(_) => {
                     return Err(InstallError::InvalidPointer(
-                        "invalid module versions directory".into(),
+                        "invalid module code directory".into(),
                     ));
                 }
                 Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
                 Err(error) => return Err(error.into()),
             }
         }
-        fs::remove_dir_all(versions)?;
+        for name in ["versions", "runtime"] {
+            let directory = owner.join(name);
+            match fs::symlink_metadata(&directory) {
+                Ok(metadata) if metadata.is_dir() && !super::data_contract::is_link(&metadata) => {
+                    remove_code_directory(&directory)?;
+                }
+                Ok(_) => {
+                    return Err(InstallError::InvalidPointer(format!(
+                        "invalid module {name} directory"
+                    )));
+                }
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
         #[cfg(unix)]
         fs::File::open(owner)?.sync_all()?;
         Ok(())
@@ -378,6 +390,26 @@ impl ModuleInstaller {
         #[cfg(unix)]
         fs::File::open(directory)?.sync_all()?;
         Ok(())
+    }
+}
+
+fn remove_code_directory(path: &Path) -> io::Result<()> {
+    #[cfg(windows)]
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    loop {
+        match fs::remove_dir_all(path) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+            #[cfg(windows)]
+            // A child process's image or driver can remain mapped briefly
+            // after the module host has released its own process handle.
+            Err(error)
+                if matches!(error.raw_os_error(), Some(5 | 32 | 33))
+                    && std::time::Instant::now() < deadline =>
+            {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            result => return result,
+        }
     }
 }
 
@@ -492,7 +524,7 @@ mod tests {
     }
 
     #[test]
-    fn rollback_and_uninstall_remove_all_versions_but_retain_history_and_data() {
+    fn rollback_and_uninstall_remove_code_and_runtime_but_retain_history_and_data() {
         let root = tempdir().unwrap();
         let package = tempdir().unwrap();
         fs::write(package.path().join("host"), b"host").unwrap();
@@ -508,6 +540,9 @@ mod tests {
         let rolled = installer.rollback("rdp-client").unwrap();
         assert_eq!(rolled.active_version.as_deref(), Some("1.0.0"));
         fs::create_dir_all(root.path().join("rdp-client/data")).unwrap();
+        let runtime = root.path().join("rdp-client/runtime");
+        fs::create_dir_all(&runtime).unwrap();
+        fs::write(runtime.join("derived-helper"), b"runtime").unwrap();
         installer
             .mark_uninstalled(
                 "rdp-client",
@@ -519,8 +554,9 @@ mod tests {
                 },
             )
             .unwrap();
-        installer.remove_version_tree("rdp-client").unwrap();
+        installer.remove_code_trees("rdp-client").unwrap();
         assert!(!root.path().join("rdp-client/versions").exists());
+        assert!(!runtime.exists());
         assert!(root.path().join("rdp-client/data").exists());
         let removed = installer.active_pointer("rdp-client").unwrap();
         assert!(removed.was_uninstalled());

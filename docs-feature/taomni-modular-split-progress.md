@@ -2,6 +2,9 @@
 
 ## 2026-11-22 当前进展
 
+- `c0a64b5c0` 的 Linux、Windows、macOS Intel 和 ARM64 基座构建及四目标更新器验签全部成功，已保存四份安装件和含 11 个平台格式的 `latest.json`。取消了该批剩余的旧模块构建，把名额交给新版 Mail 和还原回归。 [发布构建](https://github.com/engcapa/taomni/actions/runs/45024083491)
+- Mail 0.1.26 的归档读取协议通过 Linux、Windows 和 macOS ARM64，三份宿主回执均已归档。0.1.27 的桌面首次运行在选集阶段拒绝了仅支持 Browser 的文件对话框夹具。Native 用例已换成实际系统文件保存窗口，并通过三端静态选集规划。 [归档读取协议](https://github.com/engcapa/taomni/actions/runs/45032138611) · [首次规划](https://github.com/engcapa/taomni/actions/runs/45034611258)
+- 卸载完成后删除模块版本目录和暂存的运行文件，并保留配置数据。启动扫描继续清理上一次中断的卸载。Windows 对辅助程序或驱动释放文件的短暂等待做重试。TC-MODULES-085 增加版本、运行目录和配置摘要的卸载回执，Browser 074 核对卸载确认及安装入口。
 - Mail 0.1.27 将归档管理器的附件解码交给签名宿主。核心读取用户选择的本地原件并在完整接收附件后原子更新导出文件。TC-MODULES-070 增加在服务端删除原件之后导出并核对 SHA-256，Browser 用例检查导出后仍可再次保存。归档索引与同步缓存的写入继续迁移。
 - 还原启动使用核心和模块共享的 profile 锁。应用重启时，后继进程最多等待 3 秒取得排他租约，旧进程释放文件后才应用待还原数据。QA 将运行、禁用、卸载保留三态用例扩到 Linux 和 Windows，通过隔离的本机 WebView 桥接到应用自行启动的后继进程。原生截图分别记录 Mac WebView 或 Windows/Linux 桌面来源。三端实际还原回执待收。
 - SocksCap 0.1.8 的 Windows 签名包携带提权辅助程序、WinDivert 和许可证。启动从启用的模块核对字节，暂存到独立运行目录，并在打开驱动前锁定已核验文件。辅助程序记录宿主 PID 和创建时间，模块宿主退出时停止并回收辅助程序。MSI、NSIS 的实际载荷检查排除这些文件。TC-MODULES-085 覆盖损坏拒绝、正常启动与停用，Browser 074 补充重新启用后仍处于停止状态的断言。Windows Runner 实测与新安装件回执待收。
@@ -679,7 +682,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-022 Mobile | 首发按 DEC-2 留在核心 | 已将决定写入设计、签名目录生成器和 Release 说明。核心回归保留 Mobile，待正式候选回执。 |
 | TASK-023 发布验收 | 目录签名、首装名单和独立模块发布准备已验证 | 发布工具覆盖已暂存模块的签名、声明平台、描述和摘要。核心发布继承签名目录，独立发布保留原模块的资产地址。正式模块构建矩阵、系统签名、首批目录及最终两种安装集合的回归和性能仍待交付。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
-| TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
+| TASK-025 密钥/一致快照 | A–G 已有阶段回执，H/I 尚未验收 | Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证。macOS Intel 的真实确认自动重启三态通过，ARM64、Linux 和 Windows 待匹配源码的回执。继续补独立 MFA 宿主的三态、旧 v1 归档及正式候选实装。 [实施方案](taomni-modular-vault-services-plan.md) |
 | TASK-026 Mail | 签名前端、主要 IMAP 读写、POP3 收信和归档连接已接入独立宿主 | POP3 真实进程收信和中断处理已在三端通过。签名宿主已接管草稿、发件箱，现已接入地址簿。归档索引与过渡缓存的数据写入仍需迁移，接着验证正式安装升级、数据接管及回滚。 |
 | TASK-027 G1–G11 全门禁收口 | 新增任务，未闭合 | G1–G11 的当前证据仍存在正式发行包、业务模块、核心依赖闭包、系统信任和完整入口矩阵缺口；必须用匹配源码的 GitHub runner receipt 逐项闭合后才能进入生产发布。 |
 
@@ -727,15 +730,13 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 
 ### 当前待办（按依赖顺序）
 
-已完成 retained locator、离线 v2 备份/还原、宿主自持 ProfileUseLease/PluginDataLease 和运行中 prepare/snapshot/release 的接线。运行/禁用/卸载保留数据的三态正常重启与第二次重启已有 matching native 结果，仍使用核心 MFA；不能移用为独立 MFA 宿主后的还原或真实单体升级通过。已有证据只绑定实际输入，无关失败保留原始记录并不计通过。
-
-1. **保留当前验证并补 ARM64 缺口**：三端 browser 各 35/35、Linux native 43/43、Mac Intel native 44/44 已核验；Windows 原轮 42/43 与同 SHA #44142742009 的 25/25 按相同 case 身份合并，覆盖所选 43 项。各端完整 crash 通过，新文件、Live 表格和 Intel 三态自动 relaunch 均通过；原 Windows 超时记录及失败 workflow 保留。ARM64 hosted 容量取消、steps=[]，新源码覆盖缺口未补，不用 Intel 代替。历史 SDK/宿主/包采样通过项保留原身份，系统信任缺口仍在。后续新批次仍完成 shard 即下载，不等 summary。
-2. **闭合 Vault、profile 与一致快照剩余边界（TASK-024/025）**：macOS 15 Intel 的真实还原确认自动 relaunch 三态已由当前 #44128351358 完整通过（旧 #44095029967 证据仍绑定原输入）；继续收齐 macOS 26 ARM64，另行实现 Linux/Windows 已存在新进程的安全接管，并补齐所有入口的多实例占用、取消/崩溃恢复矩阵。已有核心 MFA 三态正常重启结果保留。MFA 迁出时另需 v1 legacy alias 与独立宿主后的三态还原，不能用旧连接 owner 的结果代替。
-3. **迁出真实业务（TASK-005-B、013/014、016–022）**：MFA 原型和可信签名安装已有 runner 证据，长期有界防重放已由 `a41b27e72` 的三端协议/真实宿主门复验；继续补完整相关 G 门、旧库只读迁移、capture RPC 业务接线与动态 UI，最后切换生产 facade/连接 owner。之后依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
-4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
-5. **补齐实际业务模块生命周期（TASK-007、009–011）**：远端签名目录、三种代理、跨重启下载、后台进度、动态 tab 和缺失或禁用的占位已有用例。签名 Hello 已验证运行中更新、回滚及失败恢复。实际业务模块还需验证各自的资源释放和主窗、分离窗行为。安装、启禁、更新和回滚须无需重启核心。
-6. **交付正式首装清单和剩余业务迁移（TASK-012）**：已有旧版安装件替换与回退、签名 MFA 迁移、中断恢复及 macOS 自动重启证据。正式首批模块要逐个验证自动安装、数据提交和回退。其他模块仍由 `plugin_migration_execute` 记录待迁移状态。历史 LanChat 库原位保留。
-7. **完成生产发布验收（TASK-001/002/023/027）**：闭合 G1–G11、冻结真实插件契约；完成四发布目标的宿主系统签名/包签名、原子 modules 清单、模块独立更新/回滚。核心-only 与实际全插件集合分别完成受影响用例及完整 crash-regression，并归档包体积、启动、内存、帧吞吐的匹配基线与原始样本。
+1. **收齐当前源码的多端回归。** `c0a64b5c0` 的 18 个分片已在运行中收齐。三端 Browser 各 28/28，Linux Native 32/32，Windows Native 33/33，macOS ARM64 Native 34/35。后者唯一失败保留在 `TC-FILE-OPEN-007` 的系统目录面板超时回执中。Live 表格、Explorer 和 macOS SocksCap 用例通过。继续收齐新版 SocksCap、Mail 与还原回归，并按既有故障证据处理目录面板。 [原始回归](https://github.com/engcapa/taomni/actions/runs/45024092869) · [新版模块](https://github.com/engcapa/taomni/actions/runs/45032759747)
+2. **交付 Vault、profile 与一致快照（TASK-024/025）。** 离线 v2、宿主自持锁、运行中快照及 macOS Intel 三态自动还原已有阶段验证。当前分支将三态接管扩至 Linux、Windows，等待 GitHub 原生结果。仍需独立 MFA 宿主的运行、禁用、卸载保留三态回执，覆盖旧 v1 归档、GUI/headless 多实例、取消和崩溃恢复。 [macOS Intel 回执](https://github.com/engcapa/taomni/actions/runs/44128351358)
+3. **完成业务归属（TASK-005-B、013/014、016–022、026）。** 十个业务模块已有签名候选。Mail 缓存和归档索引、SocksCap 捕获清理及恢复日志仍有基座路径。RDP/VNC 客户端和服务端、Servers、截图 OCR 与录制、本地语音及 MFA 继续按任务表核对宿主、前端、文件和迁移。Mobile 首发留在核心，LanChat 已删除。
+4. **验证核心依赖闭包（TASK-006）。** 最终四目标的默认 Cargo 树、生产前端清单和实际安装包排除迁出功能的引擎、chunk、运行资源和辅助程序。Windows 独立基座安装件正在验证 WinDivert、Xray 和 ACP 测试程序的排除。 [Windows 发布构建](https://github.com/engcapa/taomni/actions/runs/45033601048)
+5. **验收业务模块生命周期（TASK-007、009–011）。** 已有签名 Hello 的真实启用、禁用、更新和回滚回执。对每个首发业务模块验收主窗和分离窗、已有数据保留、进程与系统资源释放、更新失败恢复、无重启回滚及卸载。 [生命周期回执](https://github.com/engcapa/taomni/actions/runs/44287815253)
+6. **交付正式首装及业务迁移（TASK-012）。** 四目标已演练 0.5.12 升至候选 0.6.0、十模块首装、卸载 Mail 后保留九个模块并回退。最终候选还要逐模块核对旧数据迁移、失败恢复、退回旧版，以及后续仅更新已装模块和展示新增模块选装提示。 [实装与升级验证](taomni-modular-installed-upgrade-verification.md)
+7. **完成生产发布验收（TASK-001/002/023/027）。** 最终候选收齐 G1–G11、仅核心和全模块的受影响用例及完整崩溃回归。核对四目标包体积、启动、内存和帧吞吐。发行记录逐项绑定源码 SHA、runner、包身份和原始工件。业务模块通过后转为 `stable`，按已确认的系统签名方式逐件核对更新包、模块包、目录和签名，再发布正式清单。
 
 ### 2026-11-16 启用与原生观察修复批次（`911f411b2` 已提交，hosted 验证中）
 
