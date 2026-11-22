@@ -27,7 +27,7 @@ class NativeArtifactTests(unittest.TestCase):
         self.binary = native_build.qa_binary()
         self.binary.parent.mkdir(parents=True)
         self.binary.write_bytes(b'test binary');self.binary.chmod(0o755)
-        record=dict(identifier=native_build.QA_APP_ID, binary_sha256=native_build.binary_digest(self.binary), source_sha256='source',profile='debug',build_inputs={'original':'unchanged'})
+        record=dict(identifier=native_build.QA_APP_ID, binary_sha256=native_build.binary_digest(self.binary), source_sha256='source',profile='debug',build_inputs={'original':'unchanged','recipe_sha256':native_build.recipe_identity()})
         native_build.identity_path(self.binary).write_text(json.dumps(record))
         self.sidecar=self.binary.parent/'rdp-probe';self.sidecar.write_bytes(b'sidecar');self.sidecar.chmod(0o755)
         deps=self.binary.parent/'deps';deps.mkdir();(deps/'unused').write_bytes(b'object')
@@ -85,3 +85,66 @@ class NativeArtifactTests(unittest.TestCase):
     def test_no_traversal_or_foreign_profile(self):
         for name in ('../outside','/absolute','src-tauri/target/qa-ui-auto/debug/../../escape','C:/escape','src-tauri/target/qa-ui-auto/release/taomni'):
             self.assertFalse(runtime.allowed(name,'debug'),name)
+
+    def test_reusable_roundtrip_serves_new_run_and_rejects_recipe_or_source_drift(self):
+        reusable = self.root / 'reusable.tar.gz'
+        runtime.export_reusable(reusable, self.selection, self.build)
+        self.binary.unlink()
+        self.sidecar.unlink()
+        other_run = copy.deepcopy(self.selection)
+        other_run.update(run_id='999', head='other-commit')
+        other_run['identity'] = {'source_sha256': 'source', 'runner_sha256': 'different-runner'}
+        with patch.object(runtime, 'commit', return_value='other-commit'), \
+             patch.object(runtime, 'execution_identity', return_value=other_run['identity']):
+            runtime.install_reusable(reusable, other_run, self.build)
+            runtime.export(self.archive, other_run, self.build)
+        self.assertTrue(self.binary.is_file())
+        self.assertEqual(self.sidecar.read_bytes(), b'sidecar')
+        # Per-run export still strictly binds the new invocation.
+        with patch.object(runtime, 'commit', return_value='other-commit'), \
+             patch.object(runtime, 'execution_identity', return_value=other_run['identity']):
+            runtime.install(self.archive, other_run, self.entry)
+        with self.assertRaisesRegex(ValueError, 'identity differs'):
+            runtime.install(self.archive, self.selection, self.entry)
+
+        # Reject recipe drift and source drift on reusable archive.
+        with patch.object(native_build, 'recipe_identity', return_value='drifted-recipe'):
+            with patch.object(runtime, 'commit', return_value='other-commit'), \
+                 patch.object(runtime, 'execution_identity', return_value=other_run['identity']):
+                with self.assertRaisesRegex(ValueError, 'identity differs'):
+                    runtime.install_reusable(reusable, other_run, self.build)
+        other_run['identity'] = {'source_sha256': 'changed-source', 'runner_sha256': 'different-runner'}
+        with patch.object(runtime, 'commit', return_value='other-commit'), \
+             patch.object(runtime, 'execution_identity', return_value=other_run['identity']):
+            with self.assertRaisesRegex(ValueError, 'identity differs'):
+                runtime.install_reusable(reusable, other_run, self.build)
+
+    def test_main_uses_reusable_archive_without_building_and_fails_closed_on_corruption(self):
+        reusable = self.root / 'reusable.tar.gz'
+        selection_path = self.root / 'selection.json'
+        selection_path.write_text(json.dumps(self.selection), encoding='utf-8')
+        # Cache miss builds once and populates both archives.
+        with patch.object(native_build, 'build_qa') as build_qa, \
+             patch('sys.argv', ['ci_native_artifact.py', '--selection', str(selection_path),
+                                '--build', self.build['id'], '--archive', str(self.archive),
+                                '--reusable-archive', str(reusable)]):
+            runtime.main()
+            build_qa.assert_called_once_with(release=False)
+        self.assertTrue(reusable.is_file())
+        self.binary.unlink()
+        self.sidecar.unlink()
+        with patch.object(native_build, 'build_qa') as build_qa, \
+             patch('sys.argv', ['ci_native_artifact.py', '--selection', str(selection_path),
+                                '--build', self.build['id'], '--archive', str(self.archive),
+                                '--reusable-archive', str(reusable)]):
+            runtime.main()
+            build_qa.assert_not_called()
+        self.assertTrue(self.binary.is_file())
+        reusable.write_bytes(b'corrupt-archive')
+        with self.assertRaises(tarfile.TarError), \
+             patch.object(native_build, 'build_qa') as build_qa, \
+             patch('sys.argv', ['ci_native_artifact.py', '--selection', str(selection_path),
+                                '--build', self.build['id'], '--archive', str(self.archive),
+                                '--reusable-archive', str(reusable)]):
+            runtime.main()
+            build_qa.assert_not_called()

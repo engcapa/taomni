@@ -31,17 +31,16 @@ class BuildPipelineTests(unittest.TestCase):
         expected_key = '${{ steps.windows-cache-scope.outputs.platform || matrix.cache_key }}'
         dependencies = next(s for s in steps if s.get('uses') == 'swatinem/rust-cache@v2')
         self.assertIn(expected_key, dependencies['with']['shared-key'])
-        for name in ('Native QA workspace cache', 'Native Rust contracts cache'):
-            paths = next(s['with'] for s in steps if s.get('name') == name)
-            self.assertIn(expected_key, paths['key'])
+        reusable = next(s for s in steps if s.get('id') == 'reusable-key')
+        self.assertIn('steps.windows-cache-scope.outputs.platform', reusable['env']['QA_PLATFORM_KEY'])
+        self.assertLess(steps.index(scope), steps.index(reusable))
 
     def test_compiled_workspace_caches_require_the_current_build_inputs(self):
         entry = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
         steps = entry['jobs']['entry']['steps']
-        for name in ('Native QA workspace cache', 'Native Rust contracts cache'):
-            cache = next(step['with'] for step in steps if step.get('name') == name)
-            self.assertIn('steps.native-cache-key.outputs.key', cache['key'])
-            self.assertNotIn('restore-keys', cache)
+        cache = next(step['with'] for step in steps if step.get('id') == 'reusable-runtime-cache')
+        self.assertEqual(cache['key'], '${{ steps.reusable-key.outputs.key }}')
+        self.assertNotIn('restore-keys', cache)
         performance = yaml.safe_load((ROOT / '.github/workflows/qa-workspace-performance.yml').read_text())
         perf_steps = next(job['steps'] for job in performance['jobs'].values() if 'steps' in job)
         self.assertFalse(any(step.get('with', {}).get('path') == 'src-tauri/target/qa-ui-auto'
@@ -52,18 +51,32 @@ class BuildPipelineTests(unittest.TestCase):
             self.assertIs(dependencies['cache-targets'], True)
             self.assertIs(dependencies['cache-workspace-crates'], False)
 
-    def test_frontend_regressions_run_once_on_linux_producer_and_keep_original_log(self):
-        workflow = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
-        steps = workflow['jobs']['entry']['steps']
-        step = next(s for s in steps if s.get('name') == 'Frontend behavior unit regressions')
-        self.assertEqual(step['if'], "runner.os == 'Linux' && inputs.operation == 'build'")
-        self.assertIn('pnpm check:refactor', step['run'])
-        self.assertIn('pnpm exec vitest run 2>&1 | tee qa-build-output/frontend-unit-contracts.log', step['run'])
+    def test_frontend_regressions_run_in_parallel_sharded_job_and_keep_original_log(self):
+        entry = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
+        entry_steps = entry['jobs']['entry']['steps']
+        self.assertIsNone(
+            next((s for s in entry_steps if s.get('name') == 'Frontend behavior unit regressions'), None)
+        )
+        platforms = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())
+        job = platforms['jobs']['frontend-contracts']
+        self.assertEqual(job['needs'], 'plan')
+        self.assertEqual(job['strategy']['matrix']['shard'], [1, 2, 3, 4])
+        self.assertIn("github.event_name == 'pull_request'", job['if'])
+        self.assertIn("github.event_name == 'schedule'", job['if'])
+        steps = job['steps']
+        refactor_step = next(s for s in steps if s.get('name') == 'Frontend refactor and QA script unit contracts')
+        self.assertEqual(refactor_step['if'], 'matrix.shard == 1')
+        self.assertIn('pnpm check:refactor', refactor_step['run'])
+        vitest_step = next(s for s in steps if s.get('name') == 'Frontend Vitest unit regressions')
+        self.assertIn('pnpm exec vitest run --shard=${{ matrix.shard }}/4', vitest_step['run'])
         # No path filters: the final candidate must retain the complete frontend
-        # unit suite, including the newly merged mail/editor lifecycle tests.
-        self.assertEqual(step['run'].count('pnpm exec vitest run'), 1)
-        upload = next(s for s in steps if s.get('name') == 'Retain native build diagnostics')
+        # unit suite across shards, including the newly merged mail/editor lifecycle tests.
+        self.assertEqual(vitest_step['run'].count('pnpm exec vitest run'), 1)
+        upload = next(s for s in steps if s.get('name') == 'Retain frontend contract logs')
         self.assertIn('qa-build-output/frontend-unit-contracts.log', upload['with']['path'])
+        self.assertIn('frontend-contracts', platforms['jobs']['summarize']['needs'])
+        for platform in ('linux', 'windows', 'macos'):
+            self.assertNotIn('frontend-contracts', platforms['jobs'][f'execute-{platform}-native']['needs'])
 
     def test_failed_contracts_cannot_leave_a_passing_aggregate(self):
         jobs = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']
@@ -142,6 +155,32 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertIn('APPLE_CERTIFICATE', jobs['signed-rdp-server-macos']['secrets'])
         self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-module')", jobs['signed-modular-packages']['if'])
         self.assertNotIn('Validate QA tools', [s.get('name') for s in jobs['plan']['steps']])
+
+    def test_rust_cache_prunes_targets_reusable_runtime_cache_replaces_raw_target_and_windows_contracts_decouple(self):
+        entry = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
+        steps = entry['jobs']['entry']['steps']
+        names = [s.get('name') for s in steps]
+        self.assertNotIn('Native QA workspace cache', names)
+        self.assertNotIn('Native Rust contracts cache', names)
+        reusable = next(s for s in steps if s.get('name') == 'Native QA reusable runtime cache')
+        self.assertEqual(reusable['id'], 'reusable-runtime-cache')
+        rust_cache = next(s for s in steps if str(s.get('uses', '')).startswith('swatinem/rust-cache@'))
+        self.assertTrue(rust_cache['with']['cache-targets'])
+        self.assertIn('steps.reusable-runtime-cache.outputs.cache-hit', rust_cache['if'])
+        build_step = next(s for s in steps if s.get('name') == 'Build and export the verified native runtime')
+        self.assertIn('--reusable-archive qa-build-output/reusable-runtime/reusable.tar.gz', build_step['run'])
+        for contract_name in (
+            'Windows native session cleanup contracts',
+            'Windows atomic file replacement contracts',
+            'Windows backup journal reader contracts',
+            'Windows file observation contracts',
+            'Windows capture helper contracts',
+        ):
+            step = next(s for s in steps if s.get('name') == contract_name)
+            self.assertIn("inputs.operation == 'contracts'", step['if'])
+            self.assertNotIn("inputs.operation == 'build'", step['if'])
+        rust_contracts = next(s for s in steps if s.get('name') == 'Native Rust contracts')
+        self.assertIn("runner.os == 'Linux'", rust_contracts['if'])
 
     @unittest.skipUnless(os.name == 'posix' and shutil.which('bash'), 'POSIX shell contract')
     def test_rust_contracts_use_one_root_binary_with_all_selected_filters(self):

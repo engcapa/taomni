@@ -379,6 +379,9 @@ class FeatureCoverage:
 def build_coverage(
     features_path: Path = Path("qa-ui-auto-tests/feature-list.md"),
     cases_dir: Path = Path("qa-ui-auto-tests/cases"),
+    *,
+    features: list[Feature] | None = None,
+    cases: list[Any] | None = None,
 ) -> tuple[list[FeatureCoverage], list[str]]:
     """Compute (per-feature coverage, orphan-selectors-from-cases).
 
@@ -387,8 +390,8 @@ def build_coverage(
     case is using a selector that should be promoted to a control entry, OR
     the test is reaching into UI not yet documented as a feature.
     """
-    feats = load_features(features_path)
-    cases = discover(cases_dir)
+    feats = load_features(features_path) if features is None else features
+    cases_list = discover(cases_dir) if cases is None else cases
 
     # Per-feature normalized selector index. Each entry is
     #   (normalized_selector, feature_id, control_id)
@@ -409,22 +412,22 @@ def build_coverage(
     # most specific one (longest prefix wins). Ties in length stay in source
     # order, which is deterministic across runs.
     catalog.sort(key=lambda e: -len(e[0]))
+    # First entry per selector in sorted order == the linear scan's first hit.
+    exact: dict[str, tuple[str, str]] = {}
+    for ctrl_sel, fid, cid in catalog:
+        exact.setdefault(ctrl_sel, (fid, cid))
 
     # Tally touches.
     interactive_hits: dict[tuple[str, str], list[str]] = {}
     display_hits: dict[tuple[str, str], list[str]] = {}
     orphans: dict[str, list[str]] = {}   # selector → [case_id, ...]
 
-    for case in cases:
+    for case in cases_list:
         for t in _touches_for_case(case):
             key = _normalize_selector(t.selector)
             # First try exact match (still wins; preserves prior behaviour
             # for cases that copied a selector verbatim).
-            matched: tuple[str, str] | None = None
-            for ctrl_sel, fid, cid in catalog:
-                if ctrl_sel == key:
-                    matched = (fid, cid)
-                    break
+            matched: tuple[str, str] | None = exact.get(key)
             if matched is None:
                 # Fall back to derivation: case selector starts with control
                 # selector + a CSS boundary character. This catches

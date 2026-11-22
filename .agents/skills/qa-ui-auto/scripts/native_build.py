@@ -135,13 +135,49 @@ def configured_environment(base: dict[str, str] | None = None) -> dict[str, str]
     return add_target_bindgen_args(env)
 
 
+def stable_platform() -> str:
+    """Return an OS/architecture/distro identifier stable across kernel patches."""
+    system = platform.system()
+    machine = platform.machine().lower()
+    if system == "Linux":
+        os_release = Path("/etc/os-release")
+        if os_release.is_file():
+            distro = ""
+            version = ""
+            for line in os_release.read_text(encoding="utf-8", errors="replace").splitlines():
+                if line.startswith("ID="):
+                    distro = line.split("=", 1)[1].strip().strip('"')
+                elif line.startswith("VERSION_ID="):
+                    version = line.split("=", 1)[1].strip().strip('"')
+            if distro or version:
+                return f"{system}-{machine}-{distro}-{version}"
+    return f"{system}-{machine}"
+
+
+def recipe_identity() -> str:
+    try:
+        config_rel = str(QA_CONFIG.relative_to(ROOT)).replace("\\", "/")
+    except ValueError:
+        config_rel = ".agents/skills/qa-ui-auto/assets/tauri.qa.conf.json"
+    return fingerprint(
+        ROOT,
+        [config_rel, ".agents/skills/qa-ui-auto/scripts/native_build.py"],
+    )
+
+
+def reusable_cache_key(*, platform_key: str, arch: str, runner: str, profile: str) -> str:
+    return (
+        f"runtime-reuse-v1-{platform_key}-{arch.lower()}-{runner}-{profile}-"
+        f"{source_identity(ROOT)[:16]}-{recipe_identity()[:16]}"
+    )
+
+
 def build_inputs(*, release: bool = False, env: dict[str, str] | None = None) -> dict:
     effective_env = configured_environment(env)
     return {
         "source_sha256": source_identity(ROOT),
-        "recipe_sha256": fingerprint(ROOT, [str(QA_CONFIG.relative_to(ROOT)).replace("\\", "/"),
-                                             ".agents/skills/qa-ui-auto/scripts/native_build.py"]),
-        "platform": platform.platform(),
+        "recipe_sha256": recipe_identity(),
+        "platform": stable_platform(),
         "profile": "release" if release else "debug",
         "cargo": subprocess.check_output(["cargo", "--version"], text=True, env=effective_env).strip(),
         "rustc": subprocess.check_output(["rustc", "--version"], text=True, env=effective_env).strip(),

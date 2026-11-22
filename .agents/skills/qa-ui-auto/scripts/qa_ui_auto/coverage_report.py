@@ -89,10 +89,15 @@ class FeatureRow:
 def build_matrix(
     features_path: Path = Path("qa-ui-auto-tests/feature-list.md"),
     cases_dir: Path = Path("qa-ui-auto-tests/cases"),
+    *,
+    features: list[Any] | None = None,
+    cases: list[Any] | None = None,
+    control_coverage: tuple[list[Any], list[str]] | None = None,
 ) -> list[FeatureRow]:
-    if not features_path.exists():
+    if features is None and not features_path.exists():
         raise FileNotFoundError(f"feature-list.md not found at {features_path}")
-    feats = load_features(features_path)
+    feats = load_features(features_path) if features is None else features
+    case_list = discover(cases_dir) if cases is None else cases
     rows: dict[str, FeatureRow] = {
         f.id: FeatureRow(
             id=f.id,
@@ -105,7 +110,7 @@ def build_matrix(
         for f in feats
     }
 
-    for case in discover(cases_dir):
+    for case in case_list:
         is_needs_review = "needs-review" in case.tags
         for fid in case.covers:
             if fid in rows:
@@ -116,10 +121,15 @@ def build_matrix(
     # Layer in control-level coverage. The control_coverage module owns the
     # selector-derivation logic; we just consume its FeatureCoverage results
     # and merge into our FeatureRow records.
-    try:
-        ctrl_results, _orphans = _build_control_coverage(features_path, cases_dir)
-    except Exception:  # noqa: BLE001 — coverage_report must keep working even
-        ctrl_results = []                 # if control_coverage breaks
+    if control_coverage is not None:
+        ctrl_results, _orphans = control_coverage
+    else:
+        try:
+            ctrl_results, _orphans = _build_control_coverage(
+                features_path, cases_dir, features=feats, cases=case_list,
+            )
+        except Exception:  # noqa: BLE001 — coverage_report must keep working even
+            ctrl_results = []                 # if control_coverage breaks
     for fc in ctrl_results:
         row = rows.get(fc.feature.id)
         if row is None:

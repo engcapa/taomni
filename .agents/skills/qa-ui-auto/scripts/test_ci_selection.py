@@ -290,6 +290,23 @@ class SelectionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'case changed'):
                 selection_entry(path, 'linux-browser')
 
+    def test_quick_defaults_to_linux_native_retains_crash_and_marks_non_merge_eligible(self):
+        plan = make_plan(args(scope="smoke", platforms="", modes="", case_ids="TC-NATIVE-CORE-001", quick=True))
+        self.assertTrue(plan["quick"])
+        self.assertFalse(plan["merge_eligible"])
+        self.assertEqual(plan["scope"], "selected")
+        self.assertEqual([e["id"] for e in plan["entries"]], ["linux-native"])
+        selected = set(plan["entries"][0]["selected_ids"])
+        self.assertIn("TC-NATIVE-CORE-001", selected)
+        self.assertIn("TC-WS-054", selected)
+        self.assertEqual(plan["builds"][0]["profile"], "release")
+
+    def test_empty_platform_and_mode_defaults_resolve_to_full_matrix_when_not_quick(self):
+        plan = make_plan(args(scope="smoke", platforms="", modes="", quick=False))
+        self.assertFalse(plan["quick"])
+        self.assertTrue(plan["merge_eligible"])
+        self.assertEqual(len(plan["entries"]), 6)
+
     def test_git_diff_preserves_both_rename_paths_and_deletion(self):
         original = Path.cwd()
         with tempfile.TemporaryDirectory() as d:
