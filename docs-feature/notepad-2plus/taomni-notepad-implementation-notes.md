@@ -34,7 +34,7 @@
 | TASK-NP-21 | 已实现待验证 | 打印/立即打印/打印设置/打印到 PDF（隐藏 iframe）；三端行为待真机确认 |
 | TASK-NP-22 | 已实现待验证 | 首选项分页、快捷键映射器、新建默认值（默认编码/EOL/命名规则） |
 | TASK-NP-23 | 部分实现 | 拖放（文件/文件夹 20 个上限）、外部打开、提权保存（S-5 方案）、大文件降级 |
-| TASK-NP-24 | 进行中 | 单元测试通过；browser/native 用例、三端构建与真机验证进行中 |
+| TASK-NP-24 | 已验证（自动化三端全绿） | 单元测试（71 文件 / 441 tests）、本机 browser（8/8）、本机隔离 Linux native（3/3）及托管三端 browser + native（18 shards / 144 用例执行）全部通过；物理真机 §8 手工项待测 |
 | TASK-NP-25 | 已实现待验证 | `ViewerShell` 文本分支（text/source/large）改挂 `NotepadEditor`，删除旧 `TextEditor`；外壳横幅与轮询保留；V-47 单测 |
 | TASK-NP-26 | 已实现待验证 | `FileHandler` 增加 `notepad`/`taoffice`、注册表、Explorer 打开方式与设置、TaOffice 禁用占位 |
 
@@ -67,66 +67,61 @@
 
 ### 4.1 单元测试（本机，Linux）
 
-命令：`pnpm exec vitest run src/lib/notepad src/components/notepad src/lib/openFile src/components/viewer`
-结果：63 个测试文件、402 个测试通过（2026-11-21）。覆盖 V-01～V-08、V-13～V-16、V-22～V-29、V-34～V-39、V-46～V-49 等单测层。
+命令：`pnpm exec vitest run src/lib/notepad src/components/notepad src/lib/openFile src/components/viewer src/stores/documentStore.test.ts src/stores/explorerStore.test.ts src/stores/explorerPinning.test.ts src/components/settings/FileOpenSettings.test.tsx`
+结果：71 个测试文件、441 个测试通过（2026-11-22，`4c3cf006f`）。覆盖 V-01～V-08、V-13～V-16、V-22～V-29、V-34～V-39、V-46～V-49 等单测层，并包含 `commandsRegression.test.ts`、`DialogsRegression.test.tsx`、`PickerDialogs.test.tsx`、`NotepadEditor.test.tsx`、`documentStore.test.ts`、`viewerTabHost.test.ts`、`cm6.test.ts`、`macro.test.ts` 回归用例。
 
-新增/更新的关键测试：
+关键原有/新增测试：
 - `src/lib/notepad/transforms/transforms.test.ts`（21 项：排序 7 口径×升降、大小写 8 种、空白、行操作、列序列）
 - `src/lib/notepad/commands/menus.test.ts`（菜单树 9 项顺序、命令引用完整、子菜单 key 唯一、动态节点、zhLabel、快捷键唯一性）
-- `src/components/notepad/__tests__/NotepadEditor.test.tsx`、`dec16Exclusions.test.ts`
-- `src/components/notepad/actions/extraCommands.test.ts`、`dialogs/PickerDialogs.test.tsx`
+- `src/components/notepad/__tests__/NotepadEditor.test.tsx`、`dec16Exclusions.test.ts`、`NotepadDialogsHost.tsx`（对话框焦点归还）
+- `src/components/notepad/actions/commandsRegression.test.ts`、`extraCommands.test.ts`、`dialogs/PickerDialogs.test.tsx`、`dialogs/DialogsRegression.test.tsx`
 - `src/components/viewer/ViewerShell.test.tsx`（V-47：文本/源码/大文件挂载 Notepad，横幅与关闭守卫保留）
-- `src/lib/notepad/host/viewerTabHost.test.ts`（V-46）
+- `src/lib/notepad/host/viewerTabHost.test.ts`（V-46 + workspace `closeMany` 脏守卫）
 
-静态检查：`pnpm check:refactor` 通过（4910+ 文件，全部 ≤ 800 行）。
+静态检查：`pnpm check:refactor` 通过（884 native commands / 328 facade exports / 951 modules / 4994 files，全部 ≤ 800 行）、`./node_modules/.bin/tsc --noEmit` 通过、`qa_ui_auto.audit --gate` 通过（844 cases，0 新增孤儿，0 回归）。
 
 ### 4.2 浏览器 QA（本机）
 
-用例：`qa-ui-auto-tests/cases/TC-NP-001..005`（F-NOTEPAD-1～4），全部在真实渲染器上执行：
+用例：`qa-ui-auto-tests/cases/TC-NP-001..006`（F-NOTEPAD-1～4）+ `TC-FILE-OPEN-001` + `TC-FILE-OPEN-006`，全部在真实渲染器上执行：
 
 ```bash
-python -m qa_ui_auto run --mode browser --filter TC-NP-001,TC-NP-002,TC-NP-003,TC-NP-004,TC-NP-005   --require-pass --workers 2   --config .agents/skills/qa-ui-auto/assets/qa-ui-auto.config.browser.yaml   --report-dir qa-ui-auto-report/browser
+PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto run --mode browser \
+  --filter TC-NP-001,TC-NP-002,TC-NP-003,TC-NP-004,TC-NP-005,TC-NP-006,TC-FILE-OPEN-001,TC-FILE-OPEN-006 \
+  --require-pass --workers 2 \
+  --config .agents/skills/qa-ui-auto/assets/qa-ui-auto.config.browser.yaml \
+  --report-dir qa-ui-auto-report/browser
 ```
 
-结果：5 passed / 0 failed / 0 skipped。证据目录 `qa-ui-auto-report/browser/run-20261122-004206-322632473/`（summary.json、runner_receipt.json、每用例截图、空 runtime-errors）。
+结果：8 passed / 0 failed / 0 skipped（0 runtime errors；检查完毕后已清理 `qa-ui-auto-report/browser` 以节省磁盘空间）。
 
 ### 4.3 Linux native QA（隔离会话）
 
-`TC-NP-101`/`TC-NP-102` 使用真实宿主目录（`file_open_files` fixture）验证真实磁盘写入、外部变更冲突、另存为/保存副本路径语义。本机执行方式：
+`TC-NP-101`/`TC-NP-102`/`TC-FILE-OPEN-002` 使用真实宿主目录（`file_open_files` fixture）验证真实磁盘写入、外部变更冲突、另存为/保存副本路径语义与草稿恢复。本机在独立 `Xvfb :139`（1600×1000×24）+ `openbox` + `dbus-run-session` 与 `/tmp` 私有 `XDG_DATA_HOME`/`XDG_CONFIG_HOME`/`XDG_CACHE_HOME` 下使用当前代码编译的 `com.taomni.app.qa` debug 二进制执行：
 
-```bash
-# 独立 X11 会话 + 独立 D-Bus + 私有 XDG 目录，与 :0 桌面隔离
-Xvfb :137 -screen 0 1600x1000x24 & DISPLAY=:137 openbox &
-dbus-run-session -- bash -c 'export DISPLAY=:137 \
-  XDG_DATA_HOME=qa-ui-auto-report/_local/native-session/data \
-  XDG_CONFIG_HOME=qa-ui-auto-report/_local/native-session/config \
-  XDG_CACHE_HOME=qa-ui-auto-report/_local/native-session/cache; \
-  python -m qa_ui_auto run --mode native --filter TC-NP-101,TC-NP-102'
-```
-
-结果：两个用例均 1 passed；QA 二进制身份记录 `src-tauri/target/qa-ui-auto/debug/taomni.qa-identity.json`。
+结果：3 passed / 0 failed / 0 skipped（`TC-NP-101` 15.70s、`TC-NP-102` 25.77s、`TC-FILE-OPEN-002` 52.71s，0 runtime errors；检查后已清理临时报告目录与 `src-tauri/target/qa-ui-auto`）。
 
 ### 4.4 GitHub 托管 CI（qa-ui-auto-platforms）
 
 ```bash
 gh workflow run qa-ui-auto-platforms.yml --ref feat/notepad-2plus-impl \
   -f scope=selected -f platforms=linux,windows,macos -f modes=browser,native \
-  -f case_ids=TC-NP-001,TC-NP-002,TC-NP-003,TC-NP-004,TC-NP-005,TC-NP-101,TC-NP-102
+  -f case_ids=TC-NP-001,TC-NP-002,TC-NP-003,TC-NP-004,TC-NP-005,TC-NP-006,TC-NP-101,TC-NP-102,TC-FILE-OPEN-001,TC-FILE-OPEN-002,TC-FILE-OPEN-006
 ```
 
 selected scope 会自动并入 `crash-regression` 标签用例（AGENTS.md 要求）。
 
-**结果（多轮修复后）：**
+**结果（历史多轮及 Review 全量修复后终版）：**
 
 | run / head | browser | native |
 |---|---|---|
-| `44936461619` / `3fab61357` | Linux/Windows/macOS 各 23 passed（22+1 单用例 shard），0 failed；含 TC-NP-001..005 | macOS 4 shards：TC-NP-101/102 通过；Linux/Windows `TC-FILE-OPEN-002`（后续定位为 CM 缺 `defaultKeymap`）与 `TC-FILE-OPEN-006`（`has-text` 选择器不支持 native）失败，其余 crash 套件通过 |
-| `44945018379` / `5327b1af9` | 同上，三端 69/69 通过（含 5 个 Notepad 用例） | 三端各 24 cases：TC-NP-101/102 **全部通过**；仅剩 `TC-FILE-OPEN-006` 的 Playwright-only `:has-text` 等待（分支已修） |
-| `44951373132` / `a6158201a` | **最终证据：全绿**（Linux/Windows/macOS 各 22+1，0 failed） | **最终证据：全绿**（三端 native 各 4 shards × 6 cases，0 failed；TC-NP-101/102 三端通过，crash-regression 套件三端通过） |
+| `44936461619` / `3fab61357` | Linux/Windows/macOS 各 23 passed（22+1 单用例 shard），0 failed；含 TC-NP-001..005 | macOS 4 shards：TC-NP-101/102 通过；Linux/Windows `TC-FILE-OPEN-002` 与 `TC-FILE-OPEN-006` 失败 |
+| `44945018379` / `5327b1af9` | 同上，三端 69/69 通过（含 5 个 Notepad 用例） | 三端各 24 cases：TC-NP-101/102 **全部通过**；仅剩 `TC-FILE-OPEN-006` 的 Playwright-only `:has-text` 等待 |
+| `44951373132` / `a6158201a` | 全绿（Linux/Windows/macOS 各 22+1，0 failed） | 全绿（三端 native 各 4 shards × 6 cases，0 failed；TC-NP-101/102 三端通过，crash-regression 套件三端通过） |
+| **`44969769671` / `4c3cf006f`** | **终版全绿：三端各 24/24（23+1），合计 72/72 passed，0 failed，0 runtime errors（含 `TC-NP-001..006` 与 browser `crash-regression`）** | **终版全绿：三端 native release 各 4 shards × 6 = 24/24，合计 72/72 passed，0 failed，0 runtime errors（含 `TC-NP-101/102`、`TC-FILE-OPEN-002` 与三端 native `crash-regression`）** |
 
-**最终运行 `44951373132`（head `a6158201a`）conclusion=success：**浏览器 69/69、native 60/60，合计 129 个用例执行、0 失败；Notepad 7 个用例在 Linux/Windows/macOS 的 browser+native（共 21 次执行）全部通过，崩溃回归套件三端全绿。shard 报告产物在 `qa-ui-auto-report/hosted/run6/`。
+**最终运行 `44969769671`（head `4c3cf006fb77e19ab67615392cc31d2a55d14a5e`）conclusion=success：**18 shards 合计 144/144 用例执行通过、0 失败、0 跳过、0 能力缺口、0 基础设施错误；`native-contracts` 与三端 release 构建全部通过（已即时清理本地下载产物）。
 
-本地同时用同一 head 的 debug QA 二进制在隔离 Xvfb/DBus 会话验证 TC-NP-101/102 与 `TC-FILE-OPEN-002`。与本次改动无关的既有 flake（如 DB-GRID 指针稳定性、Markdown 导出质量用例）在各轮单独出现且与本分支无因果关系，未混入 Notepad 结论；未执行平台/项目保持“未验证”。
+未执行平台/物理真机项目（如系统打印/提权/物理 macOS AppKit 系统菜单/大文件 5/12/35 MB 真机）保持“未验证”。
 
 ### 4.4 Linux 真机（Xvfb 隔离会话）
 
