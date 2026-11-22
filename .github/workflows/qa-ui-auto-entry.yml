@@ -168,7 +168,8 @@ jobs:
           # Keep the shared dependency/tool cache pruned within the 10 GB repo
           # quota; full runtime reuse is handled by the lightweight tarball above.
           cache-targets: true
-          cache-on-failure: true
+          # An interrupted build must not reserve the immutable dependency key.
+          cache-on-failure: false
           save-if: ${{ !(runner.os == 'Linux' && inputs.operation == 'contracts') }}
       - name: Sherpa-ONNX prebuilt cache
         id: sherpa-cache

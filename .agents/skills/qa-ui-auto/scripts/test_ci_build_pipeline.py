@@ -43,6 +43,19 @@ class BuildPipelineTests(unittest.TestCase):
         for platform in ('linux', 'windows', 'macos'):
             self.assertNotIn('frontend-contracts', platforms['jobs'][f'execute-{platform}-native']['needs'])
 
+    def test_focused_native_runs_still_check_frontend_build_inputs(self):
+        jobs = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']
+        checks = jobs['selected-build-checks']
+        self.assertEqual(checks['needs'], 'plan')
+        self.assertIn("inputs.scope == 'selected'", checks['if'])
+        self.assertIn("needs.plan.outputs.has_native == 'true'", checks['if'])
+        self.assertIn("github.event_name != 'pull_request'", checks['if'])
+        self.assertIn("github.event_name != 'schedule'", checks['if'])
+        self.assertEqual(checks['steps'][0]['with']['ref'], '${{ needs.plan.outputs.head }}')
+        self.assertIn('pnpm exec tsc -b && pnpm check:refactor',
+                      [step.get('run') for step in checks['steps']])
+        self.assertIn('selected-build-checks', jobs['summarize']['needs'])
+
     def test_failed_contracts_cannot_leave_a_passing_aggregate(self):
         jobs = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']
         step = next(s for s in jobs['summarize']['steps'] if s.get('name') == 'Include supporting job results')
@@ -85,6 +98,7 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertEqual(reusable['id'], 'reusable-runtime-cache')
         rust_cache = next(s for s in steps if str(s.get('uses', '')).startswith('swatinem/rust-cache@'))
         self.assertTrue(rust_cache['with']['cache-targets'])
+        self.assertFalse(rust_cache['with'].get('cache-on-failure', False))
         self.assertIn('steps.reusable-runtime-cache.outputs.cache-hit', rust_cache['if'])
         self.assertIn('-sockscap', rust_cache['with']['shared-key'])
         self.assertIn("!(runner.os == 'Linux' && inputs.operation == 'contracts')", str(rust_cache['with']['save-if']))

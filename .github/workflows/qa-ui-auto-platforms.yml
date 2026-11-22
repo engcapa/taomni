@@ -365,6 +365,25 @@ jobs:
       operation: contracts
       run_rdp_unit_contracts: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts }}
 
+  # The native packaging hook bundles the frontend on each OS. Check its TS
+  # and source contracts once, including focused runs that omit Vitest.
+  selected-build-checks:
+    name: Selected native frontend build checks
+    needs: plan
+    if: >-
+      inputs.scope == 'selected' && needs.plan.outputs.has_native == 'true' &&
+      github.event_name != 'pull_request' && github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.head }}
+          persist-credentials: false
+      - uses: ./.github/actions/qa-runtime
+        with:
+          mode: contracts
+      - run: pnpm exec tsc -b && pnpm check:refactor
+
   frontend-contracts:
     name: Frontend contracts (shard ${{ matrix.shard }}/4)
     needs: plan
@@ -412,7 +431,7 @@ jobs:
   summarize:
     name: qa-ui-auto-platforms-result
     if: always() && needs.plan.result != 'skipped'
-    needs: [plan, tool-contracts, sftp-contracts, frontend-contracts, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
+    needs: [plan, tool-contracts, sftp-contracts, selected-build-checks, frontend-contracts, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
