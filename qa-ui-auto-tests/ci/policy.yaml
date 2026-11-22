@@ -1,7 +1,7 @@
 # Register new cases after checking modes, fixtures and hosted capabilities.
 schema: qa-ui-auto.ci-policy.v1
 smoke:
-- TC-EXPLORER-011
+- TC-EXPLORER-013
 - TC-FILE-OPEN-041
 - TC-TAO-HOME-002
 - TC-FILE-OPEN-013
@@ -34,7 +34,7 @@ smoke:
 - TC-FILE-OPEN-006
 unavailable: {}
 cases:
-- TC-EXPLORER-011
+- TC-EXPLORER-013
 - TC-EXPLORER-012
 - TC-FILE-OPEN-041
 - TC-MODULES-001

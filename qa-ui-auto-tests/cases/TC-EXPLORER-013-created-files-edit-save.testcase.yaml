@@ -1,4 +1,4 @@
-id: TC-EXPLORER-011
+id: TC-EXPLORER-013
 title: Files created by Explorer open in their real editor and save exact source through reopen
 description: Create Markdown, HTML, SVG, JSON and TypeScript using the type selector; open through Explorer and edit/save/reopen through
   their existing editor routes. Independently read full bytes after creation, save and reopen. This is native disk/IPC coverage on native
@@ -308,7 +308,7 @@ steps:
 
       '
 - assert_no_runtime_errors: null
-- screenshot: TC-EXPLORER-011-created-files-edit-save.png
+- screenshot: TC-EXPLORER-013-created-files-edit-save.png
 verification:
   review: reviewed
   requirements:

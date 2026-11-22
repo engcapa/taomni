@@ -26,7 +26,7 @@
 | TC-FILE-OPEN-005 | HTML 协议与本地资源、隔离/网络策略、设备/源码/控制台生命周期 | browser/native |
 | TC-FILE-OPEN-006 | 工作区/全局设置切换、邮件只读副本去重与关闭清理 | browser/native |
 | TC-FILE-OPEN-013 | Markdown Live 默认只读、显式编辑、split 实际拖拽、独立 Mermaid 主题与目录选项；切换后正文保持 | browser/native |
-| TC-EXPLORER-011 | 新建 Markdown/HTML/SVG/JSON/TypeScript，进入实际编辑器、保存与关闭重开；独立文件字节和代码工作区 reload 恢复 | browser/native |
+| TC-EXPLORER-013 | 新建 Markdown/HTML/SVG/JSON/TypeScript，进入实际编辑器、保存与关闭重开；独立文件字节和代码工作区 reload 恢复 | browser/native |
 | TC-FILE-OPEN-041 | Live 表格格式与 Split 一致，源码编辑、Tab、Undo 和 Redo 后格式及邻居保留，覆盖完整 GFM 保存重开、受控图片及 HTML 清理 | browser/native |
 | TC-TAO-HOME-002 | Tao Messages 原生 IPC、慢流停止后的真实网络关闭、多轮顺序、reload 历史及三种代理路径 | native/release |
 
