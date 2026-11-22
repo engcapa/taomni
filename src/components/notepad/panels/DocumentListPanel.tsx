@@ -2,6 +2,10 @@ import { useState } from "react";
 import { Pin, X } from "lucide-react";
 import { viewerTabHost } from "../../../lib/notepad/host/viewerTabHost";
 import type { HostedDocRef } from "../../../lib/notepad/host/types";
+import { useAppStore } from "../../../stores/appStore";
+import { useDocumentStore } from "../../../stores/documentStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
+import { useWorkspacePlatformStore } from "../../../stores/workspacePlatformStore";
 import { useViewerLabels } from "../../viewer/viewerLabels";
 
 export function DocumentListPanel({
@@ -15,6 +19,12 @@ export function DocumentListPanel({
 }) {
   const label = useViewerLabels();
   const [sortBy, setSortBy] = useState<"order" | "name" | "dirty">("order");
+  // Subscribe to all tab/document hosts so closing, renaming, pinning or
+  // modifying any tab updates the Document List immediately.
+  useExplorerStore((state) => state.tabs);
+  useAppStore((state) => state.tabs);
+  useWorkspacePlatformStore((state) => state.workspaces);
+  useDocumentStore((state) => state.documents);
   const docs = viewerTabHost.listOpenDocs();
 
   const sorted = [...docs].sort((a, b) => {

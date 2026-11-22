@@ -63,8 +63,12 @@ export function changedLineIndexes(content: string, savedContent: string): numbe
   return changed;
 }
 
+function effectiveSavedContent(ctx: NotepadActionContext): string {
+  return ctx.docState.changeHistoryBaseline?.join("\n") ?? ctx.document.savedContent;
+}
+
 function moveToChangedLine(ctx: NotepadActionContext, direction: -1 | 1): void {
-  const changed = changedLineIndexes(ctx.document.content, ctx.document.savedContent);
+  const changed = changedLineIndexes(ctx.document.content, effectiveSavedContent(ctx));
   if (changed.length === 0) {
     ctx.onError("No changes to navigate.");
     return;
@@ -144,9 +148,18 @@ export function createExtraCommandMap(ctx: NotepadActionContext): Record<string,
       }
     },
     "file.toggleReadonlyAttr": async () => {
-      if (isUntitledKey(ctx.document.path)) return;
-      const next = !ctx.document.readOnly;
-      await viewerSetReadonlyAttr(ctx.document.path, next).catch((error) => ctx.onError(String(error)));
+      if (isUntitledKey(ctx.document.path)) {
+        ctx.onError("Save the document to disk before changing its read-only file attribute.");
+        return;
+      }
+      const liveDoc = useDocumentStore.getState().documents[ctx.docKey] ?? ctx.document;
+      const next = !liveDoc.readOnly;
+      try {
+        await viewerSetReadonlyAttr(ctx.document.path, next);
+        useDocumentStore.getState().setEditorReadOnly(ctx.document.path, next);
+      } catch (error) {
+        ctx.onError(String(error));
+      }
     },
     "file.openAllRecentFiles": async () => {
       const recent = useRecentFilesStore.getState().recentFiles.slice(0, 5);
@@ -192,21 +205,21 @@ export function createExtraCommandMap(ctx: NotepadActionContext): Record<string,
     "edit.insertDateTimeCustom": () => ctx.setPickerModal({ kind: "insertDate" }),
     "edit.insertBlankLineAbove": () => ctx.applyTransform((text, range) => insertBlankLineAbove(text, range)),
     "edit.insertBlankLineBelow": () => ctx.applyTransform((text, range) => insertBlankLineBelow(text, range)),
-    "edit.shuffleLines": () => ctx.applyTransform((text, range) => shuffleLines(text, range, true)),
-    "edit.sortCiDesc": () => ctx.applySort({ kind: "ci", descending: true }),
-    "edit.sortLocaleAsc": () => ctx.applySort({ kind: "loc", descending: false }),
-    "edit.sortLocaleDesc": () => ctx.applySort({ kind: "loc", descending: true }),
-    "edit.sortNumDesc": () => ctx.applySort({ kind: "int", descending: true }),
-    "edit.sortDecimalCommaAsc": () => ctx.applySort({ kind: "dc", descending: false }),
-    "edit.sortDecimalCommaDesc": () => ctx.applySort({ kind: "dc", descending: true }),
-    "edit.sortDecimalDotAsc": () => ctx.applySort({ kind: "dd", descending: false }),
-    "edit.sortDecimalDotDesc": () => ctx.applySort({ kind: "dd", descending: true }),
-    "edit.sortLenDesc": () => ctx.applySort({ kind: "len", descending: true }),
+    "edit.shuffleLines": () => ctx.applyTransform((text, range) => shuffleLines(text, range, true), { wholeDocLabel: "Randomize Line Order" }),
+    "edit.sortCiDesc": () => ctx.applySort({ kind: "ci", descending: true }, "Sort Lines Ignoring Case Descending"),
+    "edit.sortLocaleAsc": () => ctx.applySort({ kind: "loc", descending: false }, "Sort Lines Locale Ascending"),
+    "edit.sortLocaleDesc": () => ctx.applySort({ kind: "loc", descending: true }, "Sort Lines Locale Descending"),
+    "edit.sortNumDesc": () => ctx.applySort({ kind: "int", descending: true }, "Sort Lines as Integers Descending"),
+    "edit.sortDecimalCommaAsc": () => ctx.applySort({ kind: "dc", descending: false }, "Sort Lines as Decimal Ascending"),
+    "edit.sortDecimalCommaDesc": () => ctx.applySort({ kind: "dc", descending: true }, "Sort Lines as Decimal Descending"),
+    "edit.sortDecimalDotAsc": () => ctx.applySort({ kind: "dd", descending: false }, "Sort Lines as Decimal Ascending"),
+    "edit.sortDecimalDotDesc": () => ctx.applySort({ kind: "dd", descending: true }, "Sort Lines as Decimal Descending"),
+    "edit.sortLenDesc": () => ctx.applySort({ kind: "len", descending: true }, "Sort Lines by Length Descending"),
     "edit.toTitleCaseKeep": () => applyCaseKind(ctx, "properBlend"),
     "edit.toSentenceCase": () => applyCaseKind(ctx, "sentence"),
     "edit.toSentenceCaseKeep": () => applyCaseKind(ctx, "sentenceBlend"),
     "edit.toRandomCase": () => applyCaseKind(ctx, "random"),
-    "edit.spacesToTabsAll": () => ctx.applyTransform((text, range) => spacesToTabsAll(text, range, 4, true)),
+    "edit.spacesToTabsAll": () => ctx.applyTransform((text, range) => spacesToTabsAll(text, range, 4, true), { wholeDocLabel: "Space to TAB (All)" }),
     "edit.toggleVirtualSpace": () => useNotepadStore.getState().setVirtualSpace(!useNotepadStore.getState().virtualSpace),
     "edit.toggleChangeHistory": () => setNotepadPreferences({ showChangeHistory: !useNotepadPreferences.getState().showChangeHistory }),
     "edit.pasteReplaceBookmarkedLines": async () => {
@@ -219,7 +232,7 @@ export function createExtraCommandMap(ctx: NotepadActionContext): Record<string,
       bookmarks.forEach((line0, index) => {
         if (line0 < content.length) content[line0] = lines[index] ?? lines[lines.length - 1] ?? "";
       });
-      useDocumentStore.getState().edit(ctx.document.path, content.join("\n"));
+      ctx.editContent(content.join("\n"));
     },
     "edit.copyDirectoryPath": () => copySelectionOr(ctx, () => parentPath(ctx.document.path)),
     "edit.copyAllOpenPaths": () => copySelectionOr(ctx, () => viewerTabHost.listOpenDocs(ctx.hostCtx).map((doc) => doc.path).filter(Boolean).join("\n")),
@@ -234,7 +247,7 @@ export function createExtraCommandMap(ctx: NotepadActionContext): Record<string,
     "search.selectAndFindVolatile": () => {
       const query = selectionText(ctx);
       if (!query) return;
-      ctx.runFindDirection(false);
+      ctx.runFindDirection(false, query);
     },
     "search.findAllCurrent": () => {
       const query = ctx.docState.find;
@@ -292,8 +305,11 @@ export function createExtraCommandMap(ctx: NotepadActionContext): Record<string,
     "search.nextChange": () => moveToChangedLine(ctx, 1),
     "search.prevChange": () => moveToChangedLine(ctx, -1),
     "search.clearChangeHistory": () => {
-      useDocumentStore.getState().edit(ctx.document.path, ctx.document.content);
-      useNotepadStore.getState().patchDoc(ctx.docKey, { activeMatch: null });
+      useNotepadStore.getState().patchDoc(ctx.docKey, {
+        activeMatch: null,
+        changeHistoryBaseline: ctx.document.content.split("\n"),
+        changeHistoryResetNonce: ctx.docState.changeHistoryResetNonce + 1,
+      });
       ctx.setFindStatus("Change history cleared.");
     },
 
@@ -320,13 +336,13 @@ export function createExtraCommandMap(ctx: NotepadActionContext): Record<string,
       const text = selectionText(ctx) || ctx.document.content;
       const redacted = text.replace(/[^\n]/gu, REDACT_BLOCK);
       if (selectionText(ctx)) replaceSelection(ctx, redacted);
-      else if (!ctx.effectiveReadOnly) useDocumentStore.getState().edit(ctx.document.path, redacted);
+      else if (!ctx.effectiveReadOnly) ctx.editContent(redacted);
     },
     "tools.redactDot": () => {
       const text = selectionText(ctx) || ctx.document.content;
       const redacted = text.replace(/[^\n]/gu, REDACT_DOT);
       if (selectionText(ctx)) replaceSelection(ctx, redacted);
-      else if (!ctx.effectiveReadOnly) useDocumentStore.getState().edit(ctx.document.path, redacted);
+      else if (!ctx.effectiveReadOnly) ctx.editContent(redacted);
     },
     "tools.openSelectionPath": async () => {
       const target = selectionText(ctx).trim();

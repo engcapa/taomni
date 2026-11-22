@@ -792,6 +792,5 @@ F 编号按 decisions 文件中**支持与待定条目**的出现顺序编号；
 | V-41 | **通过（托管）** | 最终 run `44951373132` scope=selected 自动并入 `crash-regression` 标签用例，三端 browser+native 全绿（129 cases / 0 failed） |
 | V-42 | **托管通过** | 托管 run `44931303328` 在 Linux/Windows/macOS 三端完成 release QA 构建与 native 执行；本机同时通过 `pnpm exec tsc -b`、`pnpm check:refactor` |
 | V-43～V-45、V-51 | **未执行** | 真机手册 §8 项目；打印/提权/回收站/远程副本/大文件 5/12/35 MB/遗留草稿迁移等仍需真机逐项执行 |
-| V-30～V-33、V-47～V-51（托管三端） | **托管运行中** | `gh workflow run qa-ui-auto-platforms.yml --ref feat/notepad-2plus-impl -f scope=selected -f platforms=linux,windows,macos -f modes=browser,native -f case_ids=TC-NP-001,...,TC-NP-102`；shard 报告与失败修复记录见运行页面 |
 
 实现范围与有意偏差见 [taomni-notepad-implementation-notes.md](taomni-notepad-implementation-notes.md)。

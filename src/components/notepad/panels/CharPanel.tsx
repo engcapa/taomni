@@ -88,7 +88,6 @@ export function CharPanel({ onInsertChar }: { onInsertChar: (ch: string) => void
             type="button"
             data-testid={`notepad-char-row-${r.code}`}
             className="grid grid-cols-4 w-full text-left px-2 py-0.5 hover:bg-[var(--taomni-hover)] border-b border-[var(--taomni-divider)]/30"
-            onDoubleClick={() => onInsertChar(r.char)}
             onClick={() => onInsertChar(r.char)}
             title={label("点击插入", "Click to insert")}
           >

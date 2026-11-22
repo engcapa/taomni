@@ -8,11 +8,12 @@ import {
   createNotepadCompartments,
 } from "../../lib/notepad/cm6/extensions";
 import {
+  clearChangeHistoryEffect,
   markHistoryBaselineEffect,
   setBookmarksEffect,
   setShowChangeHistoryEffect,
 } from "../../lib/notepad/cm6/bookmarksAndHistory";
-import { setMarkHighlightsEffect } from "../../lib/notepad/cm6/marksAndTokens";
+import { setMarkHighlightsEffect, type FindHighlightSpec } from "../../lib/notepad/cm6/marksAndTokens";
 import {
   setOverwriteModeEffect,
   setVirtualSpaceEffect,
@@ -47,7 +48,13 @@ export function NotepadCodeMirrorPane({
   bookmarks,
   marks,
   activeMatch,
+  findHighlight = null,
+  historyResetNonce = 0,
+  initialSelection,
+  initialScroll,
   onChange,
+  onUserTextInsert,
+  onScrollPosition,
   onCursorMetrics,
   onToggleBookmark,
   onToggleInsertMode,
@@ -69,7 +76,13 @@ export function NotepadCodeMirrorPane({
   bookmarks: number[];
   marks: NotepadMarkRule[];
   activeMatch: { from: number; to: number } | null;
+  findHighlight?: FindHighlightSpec | null;
+  historyResetNonce?: number;
+  initialSelection?: { from: number; to: number };
+  initialScroll?: { top: number; left: number };
   onChange: (nextText: string) => void;
+  onUserTextInsert?: (text: string) => void;
+  onScrollPosition?: (top: number, left: number) => void;
   onCursorMetrics: (metrics: CursorMetrics) => void;
   onToggleBookmark: (lineZeroBased: number) => void;
   onToggleInsertMode: (insertMode: boolean) => void;
@@ -78,10 +91,14 @@ export function NotepadCodeMirrorPane({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const isSyncingFromPropRef = useRef(false);
   const lastMetricsRef = useRef<CursorMetrics | null>(null);
+  const lastResetNonceRef = useRef(historyResetNonce);
   const compartments = useMemo(() => createNotepadCompartments(), []);
   const latest = useRef({
     onChange,
+    onUserTextInsert,
+    onScrollPosition,
     onCursorMetrics,
     onToggleBookmark,
     onToggleInsertMode,
@@ -89,6 +106,8 @@ export function NotepadCodeMirrorPane({
   });
   latest.current = {
     onChange,
+    onUserTextInsert,
+    onScrollPosition,
     onCursorMetrics,
     onToggleBookmark,
     onToggleInsertMode,
@@ -130,9 +149,12 @@ export function NotepadCodeMirrorPane({
       latest.current.onCursorMetrics(next);
     };
 
+    const clampedAnchor = initialSelection ? Math.max(0, Math.min(initialSelection.from, content.length)) : 0;
+    const clampedHead = initialSelection ? Math.max(0, Math.min(initialSelection.to, content.length)) : 0;
     const view = new EditorView({
       state: EditorState.create({
         doc: content,
+        selection: { anchor: clampedAnchor, head: clampedHead },
         extensions: buildNotepadExtensions({
           compartments,
           readOnly,
@@ -154,6 +176,17 @@ export function NotepadCodeMirrorPane({
         }).concat(
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
+              if (!isSyncingFromPropRef.current && !update.view.composing) {
+                for (const tr of update.transactions) {
+                  if (tr.isUserEvent("input")) {
+                    let inserted = "";
+                    tr.changes.iterChanges((_fromA, _toA, _fromB, _toB, text) => {
+                      inserted += text.toString();
+                    });
+                    if (inserted) latest.current.onUserTextInsert?.(inserted);
+                  }
+                }
+              }
               latest.current.onChange(update.state.doc.toString());
             }
           }),
@@ -162,11 +195,25 @@ export function NotepadCodeMirrorPane({
       parent,
     });
 
+    const handleScroll = () => {
+      latest.current.onScrollPosition?.(view.scrollDOM.scrollTop, view.scrollDOM.scrollLeft);
+    };
+    view.scrollDOM.addEventListener("scroll", handleScroll, { passive: true });
+
     viewRef.current = view;
     onViewReady(paneIndex, view);
     emitMetrics(view);
+    if (initialScroll && (initialScroll.top > 0 || initialScroll.left > 0)) {
+      requestAnimationFrame(() => {
+        if (viewRef.current === view) {
+          view.scrollDOM.scrollTop = initialScroll.top;
+          view.scrollDOM.scrollLeft = initialScroll.left;
+        }
+      });
+    }
 
     return () => {
+      view.scrollDOM.removeEventListener("scroll", handleScroll);
       onViewReady(paneIndex, null);
       view.destroy();
       viewRef.current = null;
@@ -186,7 +233,12 @@ export function NotepadCodeMirrorPane({
       const view = viewRef.current;
       if (!view) return;
       if (view.state.doc.toString() === content) return;
-      syncViewDocumentText(view, content);
+      isSyncingFromPropRef.current = true;
+      try {
+        syncViewDocumentText(view, content);
+      } finally {
+        isSyncingFromPropRef.current = false;
+      }
     });
     return () => cancelAnimationFrame(frame);
   }, [content]);
@@ -218,17 +270,24 @@ export function NotepadCodeMirrorPane({
         setVirtualSpaceEffect.of(virtualSpace),
         setSymbolConfigEffect.of(symbols),
         setBookmarksEffect.of(bookmarks),
-        setMarkHighlightsEffect.of({ rules: marks, activeMatch }),
+        setMarkHighlightsEffect.of({ rules: marks, activeMatch, findHighlight }),
         setShowChangeHistoryEffect.of(showChangeHistory),
       ],
     });
-  }, [insertMode, virtualSpace, symbols, bookmarks, marks, activeMatch, showChangeHistory]);
+  }, [insertMode, virtualSpace, symbols, bookmarks, marks, activeMatch, findHighlight, showChangeHistory]);
 
   useEffect(() => {
+    if (historyResetNonce !== lastResetNonceRef.current) {
+      lastResetNonceRef.current = historyResetNonce;
+      viewRef.current?.dispatch({
+        effects: clearChangeHistoryEffect.of(savedLines),
+      });
+      return;
+    }
     viewRef.current?.dispatch({
       effects: markHistoryBaselineEffect.of(savedLines),
     });
-  }, [savedLines]);
+  }, [savedLines, historyResetNonce]);
 
   return (
     <div

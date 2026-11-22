@@ -8,7 +8,7 @@ import type { NotepadCaseKind } from "../../../lib/notepad/transforms/case";
 import type { TextRange, TextTransformResult } from "../../../lib/notepad/transforms/lines";
 import type { SortOptions } from "../../../lib/notepad/transforms/sort";
 import type { ViewerDocument } from "../../../lib/viewer";
-import type { NotepadDocState } from "../../../stores/notepadStore";
+import type { NotepadDocState, NotepadMacroStep } from "../../../stores/notepadStore";
 import type { NotepadEditModalKind } from "../dialogs/EditToolDialogs";
 import type { NotepadLifecycleModal } from "../dialogs/FileLifecycleDialogs";
 import type { NotepadMacroModalKind } from "../dialogs/MacroDialogs";
@@ -45,14 +45,14 @@ export interface NotepadActionDeps {
 export interface NotepadActionContext extends NotepadActionDeps {
   registry: NotepadCommandRegistry;
   replaceViewSelection: (view: EditorView | null, nextText: string, onlySelection: boolean) => void;
-  applyTransform: (fn: (text: string, range: TextRange) => TextTransformResult) => void;
-  applySort: (opts: SortOptions) => void;
+  applyTransform: (fn: (text: string, range: TextRange) => TextTransformResult, options?: { wholeDocLabel?: string }) => void;
+  applySort: (opts: SortOptions, actionLabel?: string) => void;
   applyCaseOp: (kind: NotepadCaseKind) => void;
-  jumpToOffset: (from: number, to?: number) => void;
-  runFindDirection: (backward: boolean) => void;
+  jumpToOffset: (from: number, to?: number, options?: { preserveFocus?: boolean }) => void;
+  runFindDirection: (backward: boolean, overrideQuery?: string, options?: { preserveFocus?: boolean }) => void;
   performSave: () => Promise<void>;
   macroHost: MacroPlaybackHost;
-  toRecordedSteps: (steps: Array<{ commandId: string; args?: Record<string, unknown> }>) => RecordedMacroStep[];
-  /** Persist an arbitrary text edit against the authoritative document store. */
+  toRecordedSteps: (steps: NotepadMacroStep[]) => RecordedMacroStep[];
+  /** Persist an arbitrary text edit against the authoritative document store / active CM6 view. */
   editContent: (text: string) => void;
 }

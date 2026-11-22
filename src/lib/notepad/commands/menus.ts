@@ -357,6 +357,8 @@ export const NOTEPAD_MENUS: readonly NotepadTopMenu[] = [
     zhLabel: "窗口",
     enLabel: "Window",
     items: [
+      command("window.togglePinTab"),
+      separator,
       command("view.toggleDocList"),
       separator,
       documents,

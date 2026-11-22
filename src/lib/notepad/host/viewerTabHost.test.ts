@@ -57,4 +57,24 @@ describe("viewerTabHost adapter (V-46)", () => {
     expect(viewerTabHost.closeDoc("/preview/ws-doc.txt", { host: "workspace", workspaceId: ws.id })).toBe(true);
     expect(viewerTabHost.listOpenDocs({ host: "workspace", workspaceId: ws.id })).toHaveLength(0);
   });
+
+  it("supports closeMany and untitled formatting options in workspace host", () => {
+    const ws = useWorkspacePlatformStore.getState().workspaces[0];
+    const u1 = viewerTabHost.openUntitled({ host: "workspace", workspaceId: ws.id }, "", {
+      title: "Restored.txt",
+      encoding: "GBK",
+      eol: "CRLF",
+    });
+    const u2 = viewerTabHost.openUntitled({ host: "workspace", workspaceId: ws.id }, "");
+    expect(viewerTabHost.listOpenDocs({ host: "workspace", workspaceId: ws.id })).toHaveLength(2);
+    expect(useDocumentStore.getState().documents[u1]).toMatchObject({ encoding: "GBK", eol: "CRLF" });
+
+    viewerTabHost.closeMany([u1, u2], { host: "workspace", workspaceId: ws.id });
+    expect(viewerTabHost.listOpenDocs({ host: "workspace", workspaceId: ws.id })).toHaveLength(0);
+
+    // Dirty workspace tab guards batch close via closeRequest
+    const u3 = viewerTabHost.openUntitled({ host: "workspace", workspaceId: ws.id }, "unsaved");
+    viewerTabHost.closeMany([u3], { host: "workspace", workspaceId: ws.id });
+    expect(useDocumentStore.getState().closeRequest?.paths).toEqual([u3]);
+  });
 });

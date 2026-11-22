@@ -1,11 +1,24 @@
 import { RangeSetBuilder, StateEffect, StateField, type Extension } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView } from "@codemirror/view";
 import type { NotepadMarkRule } from "../../../stores/notepadStore";
-import { buildSearchRegExp } from "../transforms/escape";
+import {
+  buildSearchRegExp,
+  hasCatastrophicBacktrackingRisk,
+  type NotepadSearchMode,
+} from "../transforms/escape";
+
+export interface FindHighlightSpec {
+  query: string;
+  mode: NotepadSearchMode;
+  caseSensitive: boolean;
+  wholeWord: boolean;
+  dotAll: boolean;
+}
 
 export interface MarkHighlightPayload {
   rules: NotepadMarkRule[];
   activeMatch?: { from: number; to: number } | null;
+  findHighlight?: FindHighlightSpec | null;
 }
 
 export const setMarkHighlightsEffect = StateEffect.define<MarkHighlightPayload>();
@@ -53,6 +66,34 @@ export function computeMarkSpans(text: string, payload: MarkHighlightPayload): S
       if (spans.length >= MAX_DECORATIONS_PER_DOC) break;
     }
     if (spans.length >= MAX_DECORATIONS_PER_DOC) break;
+  }
+
+  if (
+    payload.findHighlight?.query &&
+    !(payload.findHighlight.mode === "re" && hasCatastrophicBacktrackingRisk(payload.findHighlight.query))
+  ) {
+    let findRe: RegExp | null = null;
+    try {
+      findRe = buildSearchRegExp(payload.findHighlight, true);
+    } catch {
+      findRe = null;
+    }
+    if (findRe) {
+      findRe.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = findRe.exec(text)) !== null) {
+        if (m[0].length === 0) {
+          findRe.lastIndex += 1;
+          continue;
+        }
+        spans.push({
+          from: m.index,
+          to: m.index + m[0].length,
+          className: "np-search-all-match",
+        });
+        if (spans.length >= MAX_DECORATIONS_PER_DOC) break;
+      }
+    }
   }
 
   if (

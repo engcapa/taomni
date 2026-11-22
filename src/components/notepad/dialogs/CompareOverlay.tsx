@@ -1,45 +1,48 @@
-import { useMemo } from "react";
-import { X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, X } from "lucide-react";
+import { Change, diff, MergeView } from "@codemirror/merge";
+import { EditorState } from "@codemirror/state";
+import { EditorView, lineNumbers } from "@codemirror/view";
+import { normalizeWhitespace } from "../../../lib/diffWhitespace";
 import type { NotepadCompareState } from "../../../stores/notepadStore";
 import { useViewerLabels } from "../../viewer/viewerLabels";
 
-interface DiffRow {
-  lineNumLeft: number | null;
-  lineNumRight: number | null;
-  left: string;
-  right: string;
-  kind: "same" | "changed" | "added" | "removed";
+export const MAX_COMPARE_BYTES = 5 * 1024 * 1024;
+
+function foldCaseSameLength(text: string): string {
+  let out = "";
+  for (let i = 0; i < text.length; i += 1) {
+    const folded = text[i].toLowerCase();
+    out += folded.length === 1 ? folded : text[i];
+  }
+  return out;
 }
 
-function buildLineDiffRows(
-  leftText: string,
-  rightText: string,
+export function buildCompareDiffOverride(
   ignoreWhitespace: boolean,
   ignoreCase: boolean,
-): DiffRow[] {
-  const norm = (s: string) => {
-    let v = ignoreWhitespace ? s.trim().replace(/\s+/g, " ") : s;
-    if (ignoreCase) v = v.toLowerCase();
-    return v;
+): ((a: string, b: string) => readonly Change[]) | undefined {
+  if (!ignoreWhitespace && !ignoreCase) return undefined;
+  return (a: string, b: string) => {
+    const na = normalizeWhitespace(a, ignoreWhitespace ? "all" : "none");
+    const nb = normalizeWhitespace(b, ignoreWhitespace ? "all" : "none");
+    const normA = ignoreCase ? foldCaseSameLength(na.norm) : na.norm;
+    const normB = ignoreCase ? foldCaseSameLength(nb.norm) : nb.norm;
+    const mapPos = (origLen: number, map: number[], pos: number) => {
+      if (pos <= 0) return 0;
+      if (pos >= map.length) return origLen;
+      return map[pos];
+    };
+    return diff(normA, normB, { scanLimit: 500 }).map(
+      (c) =>
+        new Change(
+          mapPos(a.length, na.map, c.fromA),
+          mapPos(a.length, na.map, c.toA),
+          mapPos(b.length, nb.map, c.fromB),
+          mapPos(b.length, nb.map, c.toB),
+        ),
+    );
   };
-  const a = leftText.split("\n");
-  const b = rightText.split("\n");
-  const max = Math.max(a.length, b.length);
-  const rows: DiffRow[] = [];
-  for (let i = 0; i < max; i += 1) {
-    const l = a[i];
-    const r = b[i];
-    if (l === undefined) {
-      rows.push({ lineNumLeft: null, lineNumRight: i + 1, left: "", right: r, kind: "added" });
-    } else if (r === undefined) {
-      rows.push({ lineNumLeft: i + 1, lineNumRight: null, left: l, right: "", kind: "removed" });
-    } else if (norm(l) === norm(r)) {
-      rows.push({ lineNumLeft: i + 1, lineNumRight: i + 1, left: l, right: r, kind: "same" });
-    } else {
-      rows.push({ lineNumLeft: i + 1, lineNumRight: i + 1, left: l, right: r, kind: "changed" });
-    }
-  }
-  return rows;
 }
 
 export function CompareOverlay({
@@ -52,29 +55,74 @@ export function CompareOverlay({
   onClose: () => void;
 }) {
   const label = useViewerLabels();
-  const rows = useMemo(
-    () =>
-      compare
-        ? buildLineDiffRows(compare.leftContent, compare.rightContent, compare.ignoreWhitespace, compare.ignoreCase)
-        : [],
-    [compare],
-  );
-  if (!compare || !compare.open) return null;
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [diffCount, setDiffCount] = useState(0);
 
-  const diffCount = rows.filter((r) => r.kind !== "same").length;
+  const open = Boolean(compare?.open);
+  const leftContent = compare?.leftContent ?? "";
+  const rightContent = compare?.rightContent ?? "";
+  const ignoreWhitespace = Boolean(compare?.ignoreWhitespace);
+  const ignoreCase = Boolean(compare?.ignoreCase);
+
+  const exceedsLimit = useMemo(() => {
+    if (!open) return false;
+    const enc = new TextEncoder();
+    return (
+      enc.encode(leftContent).byteLength > MAX_COMPARE_BYTES ||
+      enc.encode(rightContent).byteLength > MAX_COMPARE_BYTES
+    );
+  }, [open, leftContent, rightContent]);
+
+  useEffect(() => {
+    const container = hostRef.current;
+    if (!open || !container || exceedsLimit) {
+      setDiffCount(0);
+      return;
+    }
+    const extensions = [
+      lineNumbers(),
+      EditorState.readOnly.of(true),
+      EditorView.editable.of(false),
+      EditorView.theme({
+        "&": { height: "100%", color: "var(--taomni-text)", background: "var(--taomni-bg)", fontSize: "12px" },
+        ".cm-scroller": { overflow: "auto", fontFamily: "var(--taomni-font-mono, monospace)" },
+      }),
+    ];
+    const override = buildCompareDiffOverride(ignoreWhitespace, ignoreCase);
+    const mv = new MergeView({
+      parent: container,
+      a: { doc: leftContent, extensions },
+      b: { doc: rightContent, extensions },
+      orientation: "a-b",
+      highlightChanges: true,
+      gutter: true,
+      diffConfig: override ? { override } : { scanLimit: 500 },
+    });
+    setDiffCount(mv.chunks.length);
+    return () => {
+      mv.destroy();
+    };
+  }, [open, leftContent, rightContent, ignoreWhitespace, ignoreCase, exceedsLimit]);
+
+  if (!compare || !compare.open) return null;
 
   return (
     <div className="np-modal-backdrop" role="dialog" aria-modal="true" data-testid="notepad-compare-dialog">
-      <div className="np-modal wide" style={{ width: "min(960px, calc(100vw - 32px))" }}>
+      <div className="np-modal wide" style={{ width: "min(980px, calc(100vw - 32px))" }}>
         <div className="np-modal-header">
-          <span>{label("文档对比", "Compare Documents")} ({diffCount} {label("处差异行", "differences")})</span>
-          <button type="button" className="np-btn" data-testid="notepad-compare-close" onClick={onClose}><X size={14} /></button>
+          <span>
+            {label("文档对比", "Compare Documents")} ({diffCount} {label("处差异块", "diff chunk(s)")})
+          </span>
+          <button type="button" className="np-btn" data-testid="notepad-compare-close" onClick={onClose}>
+            <X size={14} />
+          </button>
         </div>
 
         <div className="flex items-center gap-4 text-[12px]">
           <label className="inline-flex items-center gap-1.5">
             <input
               type="checkbox"
+              data-testid="notepad-compare-ignore-ws"
               checked={compare.ignoreWhitespace}
               onChange={(e) => onPatch({ ignoreWhitespace: e.target.checked })}
             />
@@ -83,6 +131,7 @@ export function CompareOverlay({
           <label className="inline-flex items-center gap-1.5">
             <input
               type="checkbox"
+              data-testid="notepad-compare-ignore-case"
               checked={compare.ignoreCase}
               onChange={(e) => onPatch({ ignoreCase: e.target.checked })}
             />
@@ -95,31 +144,26 @@ export function CompareOverlay({
           <div className="truncate">{compare.rightTitle}</div>
         </div>
 
-        <div className="max-h-96 overflow-auto border border-[var(--taomni-divider)] rounded font-mono text-[11px]">
-          {rows.map((row, idx) => (
-            <div
-              key={idx}
-              className={`grid grid-cols-2 border-b border-[var(--taomni-divider)]/40 ${
-                row.kind === "changed"
-                  ? "bg-amber-500/15"
-                  : row.kind === "added"
-                    ? "bg-emerald-500/15"
-                    : row.kind === "removed"
-                      ? "bg-red-500/15"
-                      : ""
-              }`}
-            >
-              <div className="flex gap-2 px-2 py-0.5 border-r border-[var(--taomni-divider)] whitespace-pre-wrap break-all">
-                <span className="w-8 text-right opacity-50 select-none">{row.lineNumLeft ?? ""}</span>
-                <span>{row.left}</span>
-              </div>
-              <div className="flex gap-2 px-2 py-0.5 whitespace-pre-wrap break-all">
-                <span className="w-8 text-right opacity-50 select-none">{row.lineNumRight ?? ""}</span>
-                <span>{row.right}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        {exceedsLimit ? (
+          <div
+            className="flex items-center gap-2 p-4 rounded border border-amber-500/50 bg-amber-500/10 text-[12px]"
+            data-testid="notepad-compare-too-large"
+          >
+            <AlertTriangle size={16} className="text-amber-500 shrink-0" />
+            <span>
+              {label(
+                "文档超过 5 MB 对比上限，无法在交互界面直接展开合并差异视图。",
+                "One or both documents exceed the 5 MB interactive compare limit.",
+              )}
+            </span>
+          </div>
+        ) : (
+          <div
+            ref={hostRef}
+            data-testid="notepad-compare-merge-view"
+            className="h-96 overflow-auto border border-[var(--taomni-divider)] rounded"
+          />
+        )}
       </div>
     </div>
   );

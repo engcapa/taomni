@@ -46,10 +46,14 @@ const READ_ONLY_ALLOWED = new Set<string>([
   "edit.beginEndSelect",
   "edit.selectNextOccurrence",
   "edit.clipboardHistory",
-  "edit.toggleReadonly",
-  "edit.toggleReadonlyAttr",
-  "edit.toggleAllReadonly",
   "file.toggleReadonly",
+  "file.toggleReadonlyAttr",
+  "file.toggleAllReadonly",
+  "file.saveAs",
+  "file.saveCopy",
+  "file.reload",
+  "file.print",
+  "file.printNow",
   "search.find",
   "search.replace",
   "search.findInFiles",
@@ -91,7 +95,7 @@ function readOnlyBlocked(commandId: string): boolean {
   if (READ_ONLY_ALLOWED.has("*")) return false;
   if (commandId.startsWith("view.") || commandId.startsWith("window.") || commandId.startsWith("help.")) return false;
   if (commandId.startsWith("file.")) {
-    return ["file.save", "file.saveAs", "file.saveCopy", "file.saveAll", "file.rename", "file.moveToTrash", "file.reload", "file.print", "file.printNow"].includes(commandId);
+    return ["file.save", "file.saveAll", "file.rename", "file.moveToTrash"].includes(commandId);
   }
   if (commandId.startsWith("macro.")) return false;
   if (commandId.startsWith("encoding.")) return false;
@@ -163,6 +167,7 @@ export function NotepadMenuBar({
         continue;
       }
       if (node.type === "command") {
+        if (node.id === "window.togglePinTab" && !capabilities.pinTabs) continue;
         const item = commandItem(node.id);
         if (node.shortcut === false) item.shortcut = undefined;
         items.push(item);

@@ -1,45 +1,34 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { ChevronLeft, ChevronRight, Lock } from "lucide-react";
-import { extractMarkedMatchesText } from "../../lib/notepad/cm6/marksAndTokens";
+import { extractMarkedMatchesText, type FindHighlightSpec } from "../../lib/notepad/cm6/marksAndTokens";
 import { isImeComposing, useNotepadKeymap } from "../../lib/notepad/commands/keymap";
 import { createHostContext, viewerTabHost } from "../../lib/notepad/host/viewerTabHost";
 import { notepadListDirTextFiles } from "../../lib/notepad/ipc";
-import {
-  acceptTamperedMacros,
-  loadValidatedMacros,
-  runMacroOnce,
-  saveMacrosList,
-} from "../../lib/notepad/macro/macroManager";
+import { loadValidatedMacros, normalizeMacroSteps } from "../../lib/notepad/macro/macroManager";
 import { NotepadBackupManager } from "../../lib/notepad/persistence/backupManager";
 import { documentPathKey, isUntitledKey } from "../../lib/openFile/pathIdentity";
-import type { ViewerDocument } from "../../lib/viewer";
+import { VIEWER_TEXT_HARD_LIMIT, type ViewerDocument } from "../../lib/viewer";
 import { useRecentFilesStore } from "../../stores/app/recentFiles";
 import { useDocumentStore } from "../../stores/documentStore";
 import { useNotepadPreferences } from "../../stores/notepadPreferences";
-import { createDefaultDocState, useNotepadStore } from "../../stores/notepadStore";
+import { createDefaultDocState, useNotepadStore, type NotepadSearchResultHit } from "../../stores/notepadStore";
 import { useViewerLabels } from "../viewer/viewerLabels";
-import { CompareOverlay } from "./dialogs/CompareOverlay";
-import { PickerDialogs, type NotepadPickerDialog } from "./dialogs/PickerDialogs";
-import { EditToolDialogs, type NotepadEditModalKind } from "./dialogs/EditToolDialogs";
-import { EncodingDialog } from "./dialogs/EncodingDialog";
-import { FileLifecycleDialogs, type NotepadLifecycleModal } from "./dialogs/FileLifecycleDialogs";
-import { MacroDialogs, type NotepadMacroModalKind } from "./dialogs/MacroDialogs";
-import { PreferencesDialog } from "./dialogs/PreferencesDialog";
-import { PrintDialog } from "./dialogs/PrintDialog";
-import { SessionBackupDialogs, type NotepadSessionModalKind } from "./dialogs/SessionBackupDialogs";
-import { ShortcutMapperDialog } from "./dialogs/ShortcutMapperDialog";
-import { ToolboxDialogs, type NotepadToolboxKind } from "./dialogs/ToolboxDialogs";
+import type { NotepadEditModalKind } from "./dialogs/EditToolDialogs";
+import type { NotepadLifecycleModal } from "./dialogs/FileLifecycleDialogs";
+import type { NotepadMacroModalKind } from "./dialogs/MacroDialogs";
+import type { NotepadPickerDialog } from "./dialogs/PickerDialogs";
+import type { NotepadSessionModalKind } from "./dialogs/SessionBackupDialogs";
+import type { NotepadToolboxKind } from "./dialogs/ToolboxDialogs";
 import { FindReplaceBar } from "./FindReplaceBar";
+import { type CursorMetrics } from "./NotepadCodeMirrorPane";
+import { NotepadDialogsHost } from "./NotepadDialogsHost";
 import { NotepadMenuBar } from "./NotepadMenuBar";
 import { NotepadSplitPanes } from "./NotepadSplitPanes";
 import { NotepadStatusBar } from "./NotepadStatusBar";
 import { NotepadToolbar } from "./NotepadToolbar";
-import { type CursorMetrics } from "./NotepadCodeMirrorPane";
 import { FloatingPanels, PanelDockView } from "./panels/PanelHost";
 import { useNotepadActions } from "./useNotepadActions";
-import { rememberOpenWith } from "./actions/extraCommands";
-import { openFile } from "../../lib/openFile";
 import "./notepad.css";
 
 export function NotepadEditor({
@@ -167,7 +156,7 @@ export function NotepadEditor({
           saved: res.macros.map((m) => ({
             name: m.name,
             key: m.shortcut,
-            steps: m.steps.map((s) => ({ commandId: s.commandId ?? "", args: s.args })),
+            steps: normalizeMacroSteps(m.steps),
           })),
         });
         if (res.tampered) {
@@ -202,18 +191,82 @@ export function NotepadEditor({
     setPickerModal,
   });
 
-  // Record commands when macro recording is active
+  // Record commands and user text inserts when macro recording is active
   useEffect(() => {
     return actions.registry.onRecordStep((step) => {
       const m = useNotepadStore.getState().macro;
-      if (!m.recording || step.type !== "command" || !step.commandId) return;
-      useNotepadStore.getState().patchMacro({
-        buffer: [...m.buffer, { commandId: step.commandId, args: step.args }],
-      });
+      if (!m.recording) return;
+      if (step.type === "insertText" && step.text) {
+        const prev = m.buffer[m.buffer.length - 1];
+        if (prev && prev.type === "insertText") {
+          const updated = [...m.buffer];
+          updated[updated.length - 1] = { type: "insertText", text: `${prev.text ?? ""}${step.text}` };
+          useNotepadStore.getState().patchMacro({ buffer: updated });
+        } else {
+          useNotepadStore.getState().patchMacro({
+            buffer: [...m.buffer, { type: "insertText", text: step.text }],
+          });
+        }
+        return;
+      }
+      if (step.type === "command" && step.commandId) {
+        useNotepadStore.getState().patchMacro({
+          buffer: [...m.buffer, { type: "command", commandId: step.commandId, args: step.args }],
+        });
+      }
     });
   }, [actions.registry]);
 
-  const savedLines = useMemo(() => document.savedContent.split("\n"), [document.savedContent]);
+  // Reset cleared change-history baseline whenever disk saved content updates (save / reload / keepMine)
+  const prevSavedContentRef = useRef(document.savedContent);
+  useEffect(() => {
+    if (prevSavedContentRef.current !== document.savedContent) {
+      prevSavedContentRef.current = document.savedContent;
+      if (useNotepadStore.getState().docs[docKey]?.changeHistoryBaseline !== null) {
+        useNotepadStore.getState().patchDoc(docKey, { changeHistoryBaseline: null });
+      }
+    }
+  }, [docKey, document.savedContent]);
+
+  // Apply external activeMatch jump when a panel activates/targets this document
+  useEffect(() => {
+    const match = docState.activeMatch;
+    if (!match) return;
+    const v = viewsRef.current[docState.activePane] ?? viewsRef.current[0];
+    if (!v) return;
+    const sel = v.state.selection.main;
+    const from = Math.max(0, Math.min(match.from, v.state.doc.length));
+    const to = Math.max(from, Math.min(match.to, v.state.doc.length));
+    if (sel.from !== from || sel.to !== to) {
+      v.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true });
+    }
+  }, [docState.activeMatch, docState.activePane]);
+
+  const savedLines = useMemo(
+    () => docState.changeHistoryBaseline ?? document.savedContent.split("\n"),
+    [docState.changeHistoryBaseline, document.savedContent],
+  );
+  const findHighlight: FindHighlightSpec | null = useMemo(
+    () =>
+      docState.find.open && docState.find.highlightAll && docState.find.query
+        ? {
+            query: docState.find.query,
+            mode: docState.find.mode,
+            caseSensitive: docState.find.caseSensitive,
+            wholeWord: docState.find.wholeWord,
+            dotAll: docState.find.dotAll,
+          }
+        : null,
+    [
+      docState.find.open,
+      docState.find.highlightAll,
+      docState.find.query,
+      docState.find.mode,
+      docState.find.caseSensitive,
+      docState.find.wholeWord,
+      docState.find.dotAll,
+    ],
+  );
   const eolLabel: "LF" | "CRLF" | "CR" = document.eol === "CRLF" || document.eol === "CR" ? document.eol : "LF";
   const symbolConfig = useMemo(
     () => ({
@@ -244,7 +297,8 @@ export function NotepadEditor({
     "view.indentGuide": store.symbols.indent,
     "view.showAllSymbols": allSymbolsOn,
     "view.toggleSplit": docState.split,
-    "view.toggleSyncV": docState.syncScroll,
+    "view.toggleSyncV": docState.syncScrollV,
+    "view.toggleSyncH": docState.syncScrollH,
     "view.toggleDocMap": store.panels.minimap.open,
     "view.toggleDocList": store.panels.doclist.open,
     "view.toggleCharPanel": store.panels.chars.open,
@@ -291,6 +345,31 @@ export function NotepadEditor({
     }
   };
 
+  const focusActiveEditor = useCallback(() => {
+    const active = viewsRef.current[useNotepadStore.getState().docs[docKey]?.activePane ?? 0] ?? viewsRef.current[0];
+    active?.focus();
+  }, [docKey]);
+
+  const handleJumpSearchHit = (hit: NotepadSearchResultHit) => {
+    if (hit.docId === docKey || hit.filePath === document.path) {
+      actions.jumpToOffset(hit.from, hit.from + hit.matchLength);
+      return;
+    }
+    const targetKey = hit.docId || (hit.filePath ? documentPathKey(hit.filePath) : "");
+    if (targetKey) {
+      const span = { from: hit.from, to: hit.from + hit.matchLength };
+      useNotepadStore.getState().patchDoc(targetKey, {
+        activeMatch: span,
+        paneSelections: [span, { from: 0, to: 0 }],
+      });
+    }
+    if (hit.filePath) {
+      void viewerTabHost.openFile(hit.filePath, hostCtx);
+    } else if (hit.docId) {
+      viewerTabHost.activateDoc(hit.docId, hostCtx);
+    }
+  };
+
   return (
     <div
       className={`np-workbench ${store.viewMode ? `np-mode-${store.viewMode}` : ""}`}
@@ -311,6 +390,13 @@ export function NotepadEditor({
           if (mapperOpen) { e.preventDefault(); e.stopPropagation(); setMapperOpen(false); return; }
           if (store.compare) { e.preventDefault(); e.stopPropagation(); store.setCompare(null); return; }
           if (aboutOpen) { e.preventDefault(); e.stopPropagation(); setAboutOpen(false); return; }
+          if (store.viewMode) {
+            e.preventDefault();
+            e.stopPropagation();
+            store.setViewMode("");
+            queueMicrotask(focusActiveEditor);
+            return;
+          }
         }
         const target = e.target as HTMLElement | null;
         if (target?.closest(".np-modal, .np-find-bar") && target.tagName === "INPUT") return;
@@ -325,6 +411,11 @@ export function NotepadEditor({
           void actions.registry.execute(cmd);
         }
       }}
+      onDragOver={(e) => {
+        if (e.dataTransfer?.types?.includes("Files")) {
+          e.preventDefault();
+        }
+      }}
       onDrop={(e) => {
         const dropped = Array.from(e.dataTransfer?.files ?? []).map((f) => (f as File & { path?: string }).path).filter((p): p is string => Boolean(p));
         if (dropped.length > 0) {
@@ -333,6 +424,19 @@ export function NotepadEditor({
         }
       }}
     >
+      {store.viewMode && (
+        <button
+          type="button"
+          className="np-exit-view-mode"
+          data-testid="notepad-exit-view-mode"
+          onClick={() => {
+            store.setViewMode("");
+            queueMicrotask(focusActiveEditor);
+          }}
+        >
+          {label("退出当前视图 (Esc)", "Exit View Mode (Esc)")}
+        </button>
+      )}
       <FloatingPanels
         activeDocKey={docKey}
         content={document.content}
@@ -340,11 +444,7 @@ export function NotepadEditor({
         onInsertChar={(ch) => void actions.sessionAndMacroHelpers.insertChar(ch)}
         onSelectDoc={(doc) => viewerTabHost.activateDoc(doc.docKey, { host: doc.host, workspaceId: doc.workspaceId })}
         onCloseDoc={(doc) => viewerTabHost.closeDoc(doc.docKey, { host: doc.host, workspaceId: doc.workspaceId })}
-        onJumpHit={(hit) => {
-          if (hit.docId === docKey || hit.filePath === document.path) actions.jumpToOffset(hit.from, hit.from + hit.matchLength);
-          else if (hit.filePath) void viewerTabHost.openFile(hit.filePath, hostCtx);
-          else if (hit.docId) viewerTabHost.activateDoc(hit.docId, hostCtx);
-        }}
+        onJumpHit={handleJumpSearchHit}
       />
       {store.ui.menubar && (
         <NotepadMenuBar
@@ -357,17 +457,17 @@ export function NotepadEditor({
           savedMacros={store.macro.saved.map((m) => ({ name: m.name, shortcut: m.key }))}
           documents={menuDocuments}
           checks={menuChecks}
-          capabilities={{ pinTabs: true }}
+          capabilities={{ pinTabs: hostCtx.host !== "workspace" }}
           onCommand={(id) => void actions.registry.execute(id)}
           onOpenRecent={(path) => void viewerTabHost.openFile(path, hostCtx)}
           onOpenAllRecent={() => void actions.registry.execute("file.openAllRecentFiles")}
           onClearRecent={() => void actions.registry.execute("file.clearRecentFiles")}
           onOpenSavedMacro={(name) => {
             const macro = useNotepadStore.getState().macro.saved.find((m) => m.name === name);
-            if (macro) void actions.sessionAndMacroHelpers.runMulti("times", 1);
+            if (macro) void actions.sessionAndMacroHelpers.runSavedMacro(macro);
           }}
           onValidateMacros={() => void actions.registry.execute("tools.validateMacros")}
-          onActivateDocument={(docKey) => viewerTabHost.activateDoc(docKey, hostCtx)}
+          onActivateDocument={(targetDocKey) => viewerTabHost.activateDoc(targetDocKey, hostCtx)}
         />
       )}
 
@@ -380,6 +480,8 @@ export function NotepadEditor({
           wrap={prefs.wrap}
           allSymbols={allSymbolsOn}
           split={docState.split}
+          syncScroll={docState.syncScrollV || docState.syncScrollH}
+          hasRecordedBuffer={store.macro.buffer.length > 0}
           panels={{
             minimap: store.panels.minimap.open,
             doclist: store.panels.doclist.open,
@@ -394,12 +496,34 @@ export function NotepadEditor({
         <div className="fv-banner info" data-testid="viewer-large-file">
           <Lock size={14} />
           <span>
-            {label(
-              `大文件只读分段预览（${(document.size / 1024 / 1024).toFixed(1)} MB）`,
-              `Large file read-only chunk preview (${(document.size / 1024 / 1024).toFixed(1)} MB)`,
-            )}
+            {document.size <= VIEWER_TEXT_HARD_LIMIT
+              ? label(
+                  `大文件只读分段预览（${(document.size / 1024 / 1024).toFixed(1)} MB）`,
+                  `Large file read-only chunk preview (${(document.size / 1024 / 1024).toFixed(1)} MB)`,
+                )
+              : label(
+                  `超大文件仅支持只读分段预览（${(document.size / 1024 / 1024).toFixed(1)} MB，超过 20 MB 编辑上限）`,
+                  `Oversized file read-only preview (${(document.size / 1024 / 1024).toFixed(1)} MB, exceeds 20 MB edit limit)`,
+                )}
           </span>
           <span className="fv-spacer" />
+          {document.size <= VIEWER_TEXT_HARD_LIMIT && (
+            <button
+              type="button"
+              className="fv-button outline"
+              data-testid="notepad-large-force-edit"
+              onClick={async () => {
+                try {
+                  await useDocumentStore.getState().open(document.path, undefined, true);
+                  useNotepadStore.getState().patchDoc(docKey, { largeEditConfirmed: true });
+                } catch (err) {
+                  onError(err instanceof Error ? err.message : String(err));
+                }
+              }}
+            >
+              {label("加载全文并编辑", "Open Full File for Editing")}
+            </button>
+          )}
           <button
             type="button"
             className="fv-button outline"
@@ -430,6 +554,7 @@ export function NotepadEditor({
         onPatch={(patch) => store.patchFind(docKey, patch)}
         onFindNext={actions.searchActions.findNext}
         onFindPrev={actions.searchActions.findPrev}
+        onIncrementalSearch={actions.searchActions.incrementalSearch}
         onCount={actions.searchActions.count}
         onFindAllCurrent={actions.searchActions.findAllCurrent}
         onFindAllOpen={actions.searchActions.findAllOpen}
@@ -444,8 +569,16 @@ export function NotepadEditor({
         onCopyMarked={() => {
           const txt = extractMarkedMatchesText(document.content, docState.marks);
           void navigator.clipboard?.writeText(txt).catch(() => undefined);
+          setFindStatus(
+            txt
+              ? label(`已复制 ${txt.split("\n").length} 条标记文本。`, `Copied ${txt.split("\n").length} marked match(es).`)
+              : label("暂无标记匹配可复制。", "No marked text to copy."),
+          );
         }}
-        onClose={() => store.patchFind(docKey, { open: false })}
+        onClose={() => {
+          store.patchFind(docKey, { open: false });
+          queueMicrotask(focusActiveEditor);
+        }}
       />
 
       <div className="np-main-area">
@@ -453,7 +586,9 @@ export function NotepadEditor({
           <NotepadSplitPanes
             split={docState.split}
             orient={docState.orient}
-            syncScroll={docState.syncScroll}
+            syncScroll={docState.syncScrollV || docState.syncScrollH}
+            syncScrollV={docState.syncScrollV}
+            syncScrollH={docState.syncScrollH}
             activePane={docState.activePane}
             content={document.content}
             savedLines={savedLines}
@@ -468,10 +603,45 @@ export function NotepadEditor({
             bookmarks={docState.bookmarks}
             marks={docState.marks}
             activeMatch={docState.activeMatch}
+            findHighlight={findHighlight}
+            historyResetNonce={docState.changeHistoryResetNonce}
+            paneSelections={docState.paneSelections}
+            paneScrolls={docState.paneScrolls}
             onChange={(nextText) => useDocumentStore.getState().edit(document.path, nextText)}
-            onCursorMetrics={(_pane, nextMetrics) => {
+            onUserTextInsert={(text) => {
+              if (useNotepadStore.getState().macro.recording) {
+                actions.registry.recordTextInsert(text);
+              }
+            }}
+            onScrollPosition={(pane, top, left) => {
+              const cur = useNotepadStore.getState().docs[docKey];
+              if (!cur) return;
+              const prev = cur.paneScrolls[pane];
+              const roundedTop = Math.round(top);
+              const roundedLeft = Math.round(left);
+              if (prev.top === roundedTop && prev.left === roundedLeft) return;
+              const nextScrolls: [{ top: number; left: number }, { top: number; left: number }] = [
+                cur.paneScrolls[0],
+                cur.paneScrolls[1],
+              ];
+              nextScrolls[pane] = { top: roundedTop, left: roundedLeft };
+              useNotepadStore.getState().patchDoc(docKey, { paneScrolls: nextScrolls });
+            }}
+            onCursorMetrics={(pane, nextMetrics) => {
               setMetrics(nextMetrics);
               onCursorChange({ line: nextMetrics.line, column: nextMetrics.column });
+              const cur = useNotepadStore.getState().docs[docKey];
+              if (cur) {
+                const prev = cur.paneSelections[pane];
+                if (prev.from !== nextMetrics.from || prev.to !== nextMetrics.to) {
+                  const nextSels: [{ from: number; to: number }, { from: number; to: number }] = [
+                    cur.paneSelections[0],
+                    cur.paneSelections[1],
+                  ];
+                  nextSels[pane] = { from: nextMetrics.from, to: nextMetrics.to };
+                  useNotepadStore.getState().patchDoc(docKey, { paneSelections: nextSels });
+                }
+              }
             }}
             onToggleBookmark={(ln0) => store.toggleBookmark(docKey, ln0)}
             onToggleInsertMode={(ins) => store.setInsertMode(ins)}
@@ -486,15 +656,7 @@ export function NotepadEditor({
             onInsertChar={(ch) => void actions.sessionAndMacroHelpers.insertChar(ch)}
             onSelectDoc={(doc) => viewerTabHost.activateDoc(doc.docKey, { host: doc.host, workspaceId: doc.workspaceId })}
             onCloseDoc={(doc) => viewerTabHost.closeDoc(doc.docKey, { host: doc.host, workspaceId: doc.workspaceId })}
-            onJumpHit={(hit) => {
-              if (hit.docId === docKey || hit.filePath === document.path) {
-                actions.jumpToOffset(hit.from, hit.from + hit.matchLength);
-              } else if (hit.filePath) {
-                void viewerTabHost.openFile(hit.filePath, hostCtx);
-              } else if (hit.docId) {
-                viewerTabHost.activateDoc(hit.docId, hostCtx);
-              }
-            }}
+            onJumpHit={handleJumpSearchHit}
           />
         </div>
 
@@ -506,9 +668,7 @@ export function NotepadEditor({
           onInsertChar={(ch) => void actions.sessionAndMacroHelpers.insertChar(ch)}
           onSelectDoc={(doc) => viewerTabHost.activateDoc(doc.docKey, { host: doc.host, workspaceId: doc.workspaceId })}
           onCloseDoc={(doc) => viewerTabHost.closeDoc(doc.docKey, { host: doc.host, workspaceId: doc.workspaceId })}
-          onJumpHit={(hit) => {
-            if (hit.docId === docKey) actions.jumpToOffset(hit.from, hit.from + hit.matchLength);
-          }}
+          onJumpHit={handleJumpSearchHit}
         />
       </div>
 
@@ -525,6 +685,7 @@ export function NotepadEditor({
           bom={document.bom}
           insertMode={store.insertMode}
           readOnly={effectiveReadOnly}
+          readOnlyLocked={Boolean(document.readOnlyReason) || (document.large && !docState.largeEditConfirmed)}
           remote={Boolean(document.readOnlyReason)}
           recording={store.macro.recording}
           backupIntervalSec={prefs.backupSec}
@@ -539,25 +700,44 @@ export function NotepadEditor({
         />
       )}
 
-      <FileLifecycleDialogs
-        modal={lifecycleModal}
-        onClose={() => setLifecycleModal(null)}
+      <NotepadDialogsHost
+        document={document}
+        docState={docState}
+        hostCtx={hostCtx}
+        effectiveReadOnly={effectiveReadOnly}
+        selectionText={selectionText}
+        currentLine={metrics.line}
+        currentOffset={metrics.offset}
+        lifecycleModal={lifecycleModal}
+        setLifecycleModal={setLifecycleModal}
+        editModal={editModal}
+        setEditModal={setEditModal}
+        encodingOpen={encodingOpen}
+        setEncodingOpen={setEncodingOpen}
+        toolboxKind={toolboxKind}
+        setToolboxKind={setToolboxKind}
+        macroModal={macroModal}
+        setMacroModal={setMacroModal}
+        printOpen={printOpen}
+        setPrintOpen={setPrintOpen}
+        sessionModal={sessionModal}
+        setSessionModal={setSessionModal}
+        prefsOpen={prefsOpen}
+        setPrefsOpen={setPrefsOpen}
+        mapperOpen={mapperOpen}
+        setMapperOpen={setMapperOpen}
+        pickerModal={pickerModal}
+        setPickerModal={setPickerModal}
+        aboutOpen={aboutOpen}
+        setAboutOpen={setAboutOpen}
+        compare={store.compare}
+        tamperInfo={tamperInfo}
+        savedMacros={store.macro.saved}
+        onError={onError}
         onSaveAs={actions.handleSaveAs}
         onRename={actions.handleRename}
         onTrash={actions.handleTrash}
         onElevatedSave={actions.handleElevatedSave}
-        onOpenFolderFiles={async (files) => {
-          for (const f of files) await viewerTabHost.openFile(f, hostCtx);
-        }}
-      />
-
-      <EditToolDialogs
-        kind={editModal}
-        currentLine={metrics.line}
-        totalLines={document.content.split("\n").length}
-        currentOffset={metrics.offset}
-        totalLength={document.content.length}
-        onClose={() => setEditModal(null)}
         onGoTo={(mode, val) => {
           const v = viewsRef.current[docState.activePane] ?? viewsRef.current[0];
           if (!v) return;
@@ -569,154 +749,26 @@ export function NotepadEditor({
           }
         }}
         onApplyColumn={actions.applyColumnSpec}
-      />
-
-      <EncodingDialog
-        open={encodingOpen}
-        currentEncoding={document.encoding === "UTF-8" && document.bom ? "UTF-8 BOM" : document.encoding}
-        canReopenFromDisk={!isUntitledKey(document.path)}
-        content={document.content}
-        onClose={() => setEncodingOpen(false)}
-        onReopenAs={(enc) => useDocumentStore.getState().reload(document.path, enc)}
-        onConvertTo={(enc) => {
-          const isBom = enc.toUpperCase() === "UTF-8 BOM";
-          useDocumentStore.getState().configure(document.path, {
-            encoding: isBom ? "UTF-8" : enc,
-            bom: isBom,
-          });
-        }}
-      />
-
-      <ToolboxDialogs
-        kind={toolboxKind}
-        documentText={document.content}
-        selectionText={selectionText}
-        filePath={isUntitledKey(document.path) ? null : document.path}
-        onClose={() => setToolboxKind(null)}
-        onApplyText={(nextText, onlySel) => {
+        onApplyToolboxText={(nextText, onlySel) => {
           if (!effectiveReadOnly) actions.replaceViewSelection(viewsRef.current[0], nextText, onlySel);
         }}
-      />
-
-      <MacroDialogs
-        kind={macroModal}
-        macros={store.macro.saved.map((m) => ({ name: m.name, shortcut: m.key, steps: m.steps.map((s) => ({ type: "command", commandId: s.commandId, args: s.args })) }))}
-        tamperInfo={tamperInfo}
-        onClose={() => setMacroModal(null)}
-        onSaveNamed={actions.sessionAndMacroHelpers.saveNamedMacro}
-        onRunMulti={actions.sessionAndMacroHelpers.runMulti}
+        onSaveNamedMacro={actions.sessionAndMacroHelpers.saveNamedMacro}
+        onRunMultiMacro={actions.sessionAndMacroHelpers.runMulti}
         onDeleteMacro={actions.sessionAndMacroHelpers.deleteMacro}
         onRenameMacro={actions.sessionAndMacroHelpers.renameMacro}
-        onRunSavedMacro={(m) =>
-          runMacroOnce(m.steps, {
-            executeCommand: async (id, args) => { await actions.registry.execute(id, args, { skipRecord: true }); },
-            insertText: (txt) => actions.sessionAndMacroHelpers.insertChar(txt),
-            getCursorAndLength: () => {
-              const v = viewsRef.current[0];
-              return v ? { pos: v.state.selection.main.head, length: v.state.doc.length } : { pos: 0, length: 0 };
-            },
-          })
-        }
-        onAcceptTampered={async () => {
-          await acceptTamperedMacros();
-          store.patchMacro({ tampered: false });
-        }}
-        onResetMacros={async () => {
-          await saveMacrosList([]);
-          store.patchMacro({ saved: [], tampered: false });
-        }}
-      />
-
-      <CompareOverlay
-        compare={store.compare}
-        onPatch={(patch) => store.setCompare(store.compare ? { ...store.compare, ...patch } : null)}
-        onClose={() => store.setCompare(null)}
-      />
-
-      <PrintDialog
-        open={printOpen}
-        title={docState.titleHint || document.path}
-        content={document.content}
-        selection={selectionText}
-        onClose={() => setPrintOpen(false)}
-      />
-
-      <SessionBackupDialogs
-        kind={sessionModal}
-        onClose={() => setSessionModal(null)}
+        onRunSavedMacro={actions.sessionAndMacroHelpers.runSavedMacro}
         onSaveSession={actions.sessionAndMacroHelpers.saveSession}
         onLoadSession={actions.sessionAndMacroHelpers.loadSession}
-        onRestoreBackup={(entry, restoredContent) => {
-          if (entry.path) {
-            void viewerTabHost.openFile(entry.path, hostCtx).then(() => {
-              useDocumentStore.getState().applyRestoredBackup(entry.path!, {
-                content: restoredContent,
-                encoding: entry.encoding,
-                bom: entry.bom,
-                eol: entry.eol as "LF" | "CRLF" | "CR",
-                savedHash: entry.savedHash,
-              });
-            });
-          } else {
-            viewerTabHost.openUntitled(hostCtx, restoredContent);
-          }
-        }}
-      />
-
-      <PreferencesDialog open={prefsOpen} onClose={() => setPrefsOpen(false)} />
-      <ShortcutMapperDialog open={mapperOpen} onClose={() => setMapperOpen(false)} />
-
-      <PickerDialogs
-        modal={pickerModal}
-        onClose={() => setPickerModal(null)}
-        onOpenWith={(mode) => {
-          setPickerModal(null);
-          if (mode === "taoffice") return;
-          void openFile({ path: document.path }, { context: "notepad", mode }).catch((error) => onError(String(error)));
-        }}
-        onRememberHandler={(mode) => rememberOpenWith(document.path, mode)}
-        onPaste={(text, kind) => {
-          if (!text || effectiveReadOnly) return;
+        onPasteSpecial={(text, kind) => {
           const view = viewsRef.current[docState.activePane] ?? viewsRef.current[0];
           if (!view) return;
           const sel = view.state.selection.main;
           const value = kind === "binary" ? text : text.replace(/\0/g, "");
           view.dispatch({ changes: { from: sel.from, to: sel.to, insert: value }, selection: { anchor: sel.from + value.length } });
         }}
-        onInsertText={(text) => actions.sessionAndMacroHelpers.insertChar(text)}
-        onCompare={(leftTitle, leftContent) => {
-          useNotepadStore.getState().setCompare({
-            open: true,
-            leftTitle,
-            leftContent,
-            rightTitle: docState.titleHint || document.path,
-            rightContent: document.content,
-            ignoreWhitespace: false,
-            ignoreCase: false,
-          });
-        }}
-        readClipboard={() => navigator.clipboard?.readText().catch(() => "") ?? Promise.resolve("")}
+        onInsertText={actions.sessionAndMacroHelpers.insertChar}
+        onReturnFocus={focusActiveEditor}
       />
-
-      {aboutOpen && (
-        <div className="np-modal-backdrop" role="dialog" aria-modal="true" data-testid="notepad-about-dialog">
-          <div className="np-modal">
-            <div className="np-modal-header">
-              <span>Taomni Notepad</span>
-              <button type="button" className="np-btn" onClick={() => setAboutOpen(false)}>×</button>
-            </div>
-            <p className="text-[12px]">
-              {label(
-                "Taomni 原生多文档记事本工作台：支持列块编辑、宏录制、定期磁盘备份与多编码无损转换。",
-                "Taomni native Notepad workbench: column selection, recorded macros, disk backups, and safe multi-encoding editing.",
-              )}
-            </p>
-            <div className="flex justify-end">
-              <button type="button" className="np-btn primary" onClick={() => setAboutOpen(false)}>{label("关闭", "Close")}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

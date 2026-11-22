@@ -9,6 +9,7 @@ export type NotepadLifecycleModal =
   | { kind: "trash"; path: string; name: string }
   | { kind: "elevated"; path: string; error: string }
   | { kind: "folderDrop"; folder: string; totalCandidates: number; skippedBinary: number; files: string[] }
+  | { kind: "wholeDocConfirm"; actionLabel: string; onConfirm: () => Promise<void> | void }
   | {
       kind: "summary";
       name: string;
@@ -27,6 +28,7 @@ export function FileLifecycleDialogs({
   onTrash,
   onElevatedSave,
   onOpenFolderFiles,
+  onDisableWholeDocPrompt,
 }: {
   modal: NotepadLifecycleModal | null;
   onClose: () => void;
@@ -35,6 +37,7 @@ export function FileLifecycleDialogs({
   onTrash: () => Promise<void>;
   onElevatedSave: () => Promise<void>;
   onOpenFolderFiles: (files: string[]) => Promise<void>;
+  onDisableWholeDocPrompt?: () => void;
 }) {
   const label = useViewerLabels();
   const [pathInput, setPathInput] = useState(
@@ -42,6 +45,7 @@ export function FileLifecycleDialogs({
   );
   const [overwrite, setOverwrite] = useState(false);
   const [nameInput, setNameInput] = useState(modal?.kind === "rename" ? modal.currentName : "");
+  const [dontAskAgain, setDontAskAgain] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const lastModalRef = useRef<NotepadLifecycleModal | null>(null);
@@ -52,6 +56,7 @@ export function FileLifecycleDialogs({
     lastModalRef.current = modal;
     setOverwrite(false);
     setErr(null);
+    setDontAskAgain(false);
     if (modal?.kind === "saveAs") setPathInput(modal.initialPath || modal.defaultPath);
     if (modal?.kind === "rename") setNameInput(modal.currentName);
   }, [modal]);
@@ -274,6 +279,50 @@ export function FileLifecycleDialogs({
               }}
             >
               {label(`打开 ${modal.files.length} 个文件`, `Open ${modal.files.length} Files`)}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (modal.kind === "wholeDocConfirm") {
+    return (
+      <div className="np-modal-backdrop" role="dialog" aria-modal="true" data-testid="notepad-whole-doc-dialog">
+        <div className="np-modal">
+          <div className="np-modal-header">
+            <span>{label("确认对全文执行行操作", "Confirm Whole-Document Operation")}</span>
+            <button type="button" className="np-btn" onClick={onClose}><X size={14} /></button>
+          </div>
+          <p className="text-[12px]">
+            {label(
+              `当前没有选中文本，将对整个文档执行「${modal.actionLabel}」。是否继续？`,
+              `No selection is active. Apply "${modal.actionLabel}" to the entire document?`,
+            )}
+          </p>
+          <label className="inline-flex items-center gap-2 text-[12px] cursor-pointer">
+            <input
+              type="checkbox"
+              data-testid="notepad-whole-doc-dont-ask"
+              checked={dontAskAgain}
+              onChange={(e) => setDontAskAgain(e.target.checked)}
+            />
+            {label("不再提示（可在首选项中恢复）", "Don't ask again (can re-enable in Preferences)")}
+          </label>
+          <div className="flex justify-end gap-2">
+            <button type="button" className="np-btn" onClick={onClose}>{label("取消", "Cancel")}</button>
+            <button
+              type="button"
+              className="np-btn primary"
+              data-testid="notepad-whole-doc-confirm"
+              onClick={() => {
+                if (dontAskAgain) onDisableWholeDocPrompt?.();
+                const action = modal.onConfirm;
+                onClose();
+                void action();
+              }}
+            >
+              {label("继续执行", "Apply")}
             </button>
           </div>
         </div>

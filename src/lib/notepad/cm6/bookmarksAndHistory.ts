@@ -3,6 +3,7 @@ import { gutter, GutterMarker } from "@codemirror/view";
 
 export const setBookmarksEffect = StateEffect.define<number[]>();
 export const markHistoryBaselineEffect = StateEffect.define<string[]>();
+export const clearChangeHistoryEffect = StateEffect.define<string[]>();
 export const setShowChangeHistoryEffect = StateEffect.define<boolean>();
 
 class BookmarkMarker extends GutterMarker {
@@ -66,7 +67,9 @@ export const changeHistoryField = StateField.define<ChangeHistoryState>({
   update(state, tr) {
     let next = state;
     for (const e of tr.effects) {
-      if (e.is(markHistoryBaselineEffect)) {
+      if (e.is(clearChangeHistoryEffect)) {
+        next = { ...next, baseline: e.value, savedTouched: new Set<number>() };
+      } else if (e.is(markHistoryBaselineEffect)) {
         const nextSaved = new Set(next.savedTouched);
         const curLines = tr.state.doc.toString().split("\n");
         for (let i = 0; i < curLines.length; i += 1) {

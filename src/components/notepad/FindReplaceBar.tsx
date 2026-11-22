@@ -75,8 +75,7 @@ function formatFindStatus(statusText: string, label: (zh: string, en: string) =>
   return statusText;
 }
 
-// `onCopyMarked` stays part of the public props contract (NotepadEditor still passes it);
-// the prototype Mark tab exposes 标记并加书签 instead of a copy-marked button.
+// `onCopyMarked` is rendered in the Mark tab and copies all marked matches.
 export function FindReplaceBar({
   find,
   statusText,
@@ -84,6 +83,7 @@ export function FindReplaceBar({
   onPatch,
   onFindNext,
   onFindPrev,
+  onIncrementalSearch,
   onCount,
   onFindAllCurrent,
   onFindAllOpen,
@@ -95,6 +95,7 @@ export function FindReplaceBar({
   onReplaceInFiles,
   onMarkAll,
   onClearMarks,
+  onCopyMarked,
   onClose,
 }: {
   find: NotepadFindState;
@@ -103,6 +104,7 @@ export function FindReplaceBar({
   onPatch: (patch: Partial<NotepadFindState>) => void;
   onFindNext: () => void;
   onFindPrev: () => void;
+  onIncrementalSearch?: (query: string) => void;
   onCount: () => void;
   onFindAllCurrent: () => void;
   onFindAllOpen: () => void;
@@ -124,23 +126,33 @@ export function FindReplaceBar({
 
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const [purgePrev, setPurgePrev] = useState(true);
   const [findHistory, setFindHistory] = useState<readonly string[]>(() => readSearchHistory("find"));
   const [replaceHistory, setReplaceHistory] = useState<readonly string[]>(() => readSearchHistory("replace"));
   const panelRef = useRef<HTMLElement | null>(null);
   const anchorRef = useRef<HTMLSpanElement | null>(null);
+  const findInputRef = useRef<HTMLInputElement | null>(null);
+  const wasOpenRef = useRef(false);
   const dragRef = useRef<{ dx: number; dy: number } | null>(null);
   const countRef = useRef(onCount);
   countRef.current = onCount;
 
   // The panel must float over the editor area (below the toolbar, inside the editor
   // column), so it is portalled into `.np-editor-column` and positioned absolutely there.
+  // Keep the anchor mounted continuously so `portalHost` is resolved without a 1-frame flash.
   useLayoutEffect(() => {
-    if (!find.open) {
-      setPortalHost(null);
-      return;
-    }
     const workbench = anchorRef.current?.closest(".np-workbench") ?? null;
     setPortalHost(workbench?.querySelector<HTMLElement>(".np-editor-column") ?? null);
+  }, [find.open]);
+
+  useEffect(() => {
+    if (find.open && !wasOpenRef.current) {
+      queueMicrotask(() => {
+        findInputRef.current?.focus();
+        findInputRef.current?.select();
+      });
+    }
+    wasOpenRef.current = find.open;
   }, [find.open]);
 
   const patternErr = validateSearchPattern({
@@ -159,7 +171,9 @@ export function FindReplaceBar({
     return () => window.clearTimeout(timer);
   }, [find.open, find.query, find.mode, find.caseSensitive, find.wholeWord, find.dotAll, patternErr]);
 
-  if (!find.open) return null;
+  if (!find.open) {
+    return <span ref={anchorRef} className="np-find-anchor" aria-hidden="true" />;
+  }
 
   const rememberFind = (value: string) => {
     if (!value) return;
@@ -249,12 +263,19 @@ export function FindReplaceBar({
     <div className="np-find-row" data-testid="notepad-find-input">
       <label className="np-find-label">{label("查找", "Find")}</label>
       <input
+        ref={findInputRef}
         type="text"
         className="np-find-input"
         data-testid="np-find-input"
         list={findListId}
         value={find.query}
-        onChange={(event) => onPatch({ query: event.target.value })}
+        onChange={(event) => {
+          const nextQuery = event.target.value;
+          onPatch({ query: nextQuery });
+          if (find.incremental && nextQuery) {
+            onIncrementalSearch?.(nextQuery);
+          }
+        }}
         onKeyDown={(event) => {
           if (event.key !== "Enter") return;
           event.preventDefault();
@@ -340,7 +361,7 @@ export function FindReplaceBar({
 
   const messageLine = (
     <div className={`np-find-message${patternErr ? " error" : ""}`} data-testid="notepad-find-status" title={patternErr ?? undefined}>
-      {patternErr ? label("正则表达式无效", "Invalid regular expression") : message}
+      {patternErr ?? message}
     </div>
   );
 
@@ -408,8 +429,9 @@ export function FindReplaceBar({
     ),
     mark: (
       <>
-        {actionButton("np-find-mark-all", "notepad-mark-all", label("标记全部", "Mark All"), () => commitFindAndRun(() => onMarkAll(false, true)), true)}
-        {actionButton("np-find-mark-bookmark", "notepad-mark-bookmark", label("标记并加书签", "Mark and Bookmark"), () => commitFindAndRun(() => onMarkAll(true, true)))}
+        {actionButton("np-find-mark-all", "notepad-mark-all", label("标记全部", "Mark All"), () => commitFindAndRun(() => onMarkAll(false, purgePrev)), true)}
+        {actionButton("np-find-mark-bookmark", "notepad-mark-bookmark", label("标记并加书签", "Mark and Bookmark"), () => commitFindAndRun(() => onMarkAll(true, purgePrev)))}
+        {actionButton("np-find-copy-marked", "notepad-mark-copy", label("复制标记文本", "Copy Marked Text"), onCopyMarked)}
         {actionButton("np-find-clear-marks", "notepad-mark-clear", label("清除标记", "Clear Marks"), onClearMarks)}
       </>
     ),
@@ -527,6 +549,15 @@ export function FindReplaceBar({
                   </button>
                 ))}
               </div>
+              <label className="np-find-opt ml-auto">
+                <input
+                  type="checkbox"
+                  data-testid="notepad-mark-purge"
+                  checked={purgePrev}
+                  onChange={(event) => setPurgePrev(event.target.checked)}
+                />
+                {label("清除上次标记", "Purge for each search")}
+              </label>
             </div>
           )}
           {modeRow}

@@ -1,10 +1,14 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ViewerDocument } from "../../../lib/viewer";
 import { useDocumentStore } from "../../../stores/documentStore";
 import { resetNotepadPreferences } from "../../../stores/notepadPreferences";
 import { useNotepadStore } from "../../../stores/notepadStore";
 import { NotepadEditor } from "../NotepadEditor";
+import { NotepadMenuBar } from "../NotepadMenuBar";
+import { CharPanel } from "../panels/CharPanel";
+import { DocumentListPanel } from "../panels/DocumentListPanel";
+import { useExplorerStore } from "../../../stores/explorerStore";
 
 function makeDoc(overrides: Partial<ViewerDocument> = {}): ViewerDocument {
   return {
@@ -110,9 +114,95 @@ describe("NotepadEditor UI workbench", () => {
     );
 
     expect(screen.getByTestId("viewer-large-file")).toBeInTheDocument();
+    expect(screen.getByTestId("notepad-large-force-edit")).toBeEnabled();
     expect(screen.getByTestId("viewer-chunk-prev")).toBeDisabled();
     expect(screen.getByTestId("viewer-chunk-next")).toBeEnabled();
     // Large-file chunk previews are read-only, so the shared save control stays disabled.
     expect(screen.getByTestId("viewer-save")).toBeDisabled();
+  });
+
+  it("replays saved macro steps instead of live buffer and shows View-mode Exit pill in focus mode", async () => {
+    const doc = makeDoc({ content: "hello" });
+    useDocumentStore.setState({ documents: { [doc.key]: doc } });
+    useNotepadStore.setState((s) => ({
+      ...s,
+      macro: {
+        ...s.macro,
+        loaded: true,
+        buffer: [{ type: "insertText", text: "WRONG" }],
+        saved: [{ name: "SayHi", steps: [{ type: "insertText", text: "HI!" }] }],
+      },
+    }));
+
+    render(<NotepadEditor document={doc} onError={vi.fn()} onCursorChange={vi.fn()} />);
+
+    // Saved macro click runs saved macro's steps ("HI!"), not buffer ("WRONG").
+    fireEvent.click(screen.getByTestId("notepad-menu-macro"));
+    fireEvent.click(screen.getByTestId("notepad-menu-macro-SayHi"));
+    expect(useDocumentStore.getState().documents[doc.key].content).toContain("HI!");
+    expect(useDocumentStore.getState().documents[doc.key].content).not.toContain("WRONG");
+
+    // Distraction-free sets focus mode and shows floating Exit button
+    fireEvent.click(screen.getByTestId("notepad-menu-view"));
+    fireEvent.click(screen.getByTestId("notepad-menu-item-view.distractionFree"));
+    expect(useNotepadStore.getState().viewMode).toBe("focus");
+    const exitBtn = screen.getByTestId("notepad-exit-view-mode");
+    fireEvent.click(exitBtn);
+    expect(useNotepadStore.getState().viewMode).toBe("");
+  });
+
+  it("allows Save As / Save Copy / Reload / Print in read-only menu bar, fires single CharPanel insert, and updates DocumentListPanel reactively", () => {
+    const onCmd = vi.fn();
+    render(
+      <NotepadMenuBar
+        dirty={true}
+        readOnly={true}
+        recordingMacro={false}
+        hasRecordedBuffer={false}
+        recentFiles={[]}
+        savedMacros={[]}
+        documents={[]}
+        checks={{}}
+        capabilities={{ pinTabs: false }}
+        onCommand={onCmd}
+        onOpenRecent={vi.fn()}
+        onOpenAllRecent={vi.fn()}
+        onClearRecent={vi.fn()}
+        onOpenSavedMacro={vi.fn()}
+        onValidateMacros={vi.fn()}
+        onActivateDocument={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("notepad-menu-file"));
+    expect(screen.getByTestId("notepad-menu-item-file.save")).toBeDisabled();
+    expect(screen.getByTestId("notepad-menu-item-file.saveAs")).not.toBeDisabled();
+    expect(screen.getByTestId("notepad-menu-item-file.saveCopy")).not.toBeDisabled();
+    expect(screen.getByTestId("notepad-menu-item-file.reload")).not.toBeDisabled();
+    expect(screen.getByTestId("notepad-menu-item-file.print")).not.toBeDisabled();
+    expect(screen.getByTestId("notepad-menu-item-file.printNow")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("notepad-menu-window"));
+    expect(screen.queryByTestId("notepad-menu-item-window.togglePinTab")).toBeNull();
+
+    // CharPanel doubleClick does not insert duplicates (single click only)
+    const onInsert = vi.fn();
+    render(<CharPanel onInsertChar={onInsert} />);
+    const row65 = screen.getByTestId("notepad-char-row-65");
+    fireEvent.dblClick(row65);
+    expect(onInsert).not.toHaveBeenCalled();
+    fireEvent.click(row65);
+    expect(onInsert).toHaveBeenCalledTimes(1);
+
+    // DocumentListPanel reactively updates when explorer tabs change
+    useExplorerStore.setState({
+      tabs: [{ id: "t1", type: "file-viewer", title: "a.txt", closable: true, fileViewer: { path: "/a.txt", kind: "text", mode: "notepad" } }],
+      activeTabId: "t1",
+    });
+    render(<DocumentListPanel activeDocKey="/a.txt" onSelectDoc={vi.fn()} onCloseDoc={vi.fn()} />);
+    expect(screen.getByTestId("notepad-doc-list-item-a.txt")).toBeInTheDocument();
+    act(() => {
+      useExplorerStore.setState({ tabs: [], activeTabId: null });
+    });
+    expect(screen.queryByTestId("notepad-doc-list-item-a.txt")).toBeNull();
   });
 });
