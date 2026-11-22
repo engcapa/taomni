@@ -27,7 +27,7 @@ const nameField={role:()=> 'AXTextField',enabled:()=>true,
 Object.defineProperty(nameField,'value',{get:()=>()=>savedName,set:(value)=>{savedName=value;actions.push('name:'+value);}});
 const button = (name) => ({role:()=> 'AXButton',name:()=>name, enabled:()=>name === 'Cancel' || navigated,
   click:()=>{actions.push(name);opened=false;}});
-const field = {role:()=> 'AXTextField'};
+const field = {role:()=> 'AXTextField',exists:()=>goTo};
 Object.defineProperty(field,'value',{get:()=>()=>location,set:(value)=>{location=value;actions.push(value);}});
 const locationSheet = {textFields:()=>now >= (config.slowGoTo ? 800 : 0) ? [field] : []};
 const normalPanel = {buttons:()=>[button(actionName),button('Cancel')],

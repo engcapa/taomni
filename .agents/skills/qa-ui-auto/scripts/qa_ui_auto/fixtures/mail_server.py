@@ -26,6 +26,7 @@ def setup(ctx: Any) -> None:
     values: dict[str, str] = getattr(ctx, "values")
     values["mail_mode"] = mode
     if mode != "native":
+        values.update(mail_host="imap.example.com", mail_imap_port="143", mail_smtp_port="25")
         values["mail_quick_connect"] = "mail://qa%40example.com@imap.example.com:993"
         # The stub server model is protocol-agnostic; POP3 renders the same.
         values["mail_pop3_quick_connect"] = "pop3://qa%40example.com@pop.example.com:995"
@@ -39,6 +40,7 @@ def setup(ctx: Any) -> None:
     server = mail_fake_server.FakeMailServer()
     server.state.deliver("INBOX", SEED_INBOX, prefix="Seed")
     mail_fake_server.ACTIVE = server
+    values["mail_host"] = "127.0.0.1"
     values["mail_imap_port"] = str(server.imap_port)
     values["mail_smtp_port"] = str(server.smtp_port)
     values["mail_quick_connect"] = (

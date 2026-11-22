@@ -158,7 +158,11 @@ try {
     if (field.value() !== location) throw new Error("Go to Folder did not retain the complete path");
     events.keyCode(36);
     log("Go to Folder submitted");
-    waitFor(() => !locationField(findPanel() || panel), "Go to Folder did not finish navigation");
+    // The location field belongs to the nested Go to Folder sheet. Poll its
+    // existence directly so scrolling the directory contents cannot stall AX
+    // traversal of the whole file panel during navigation.
+    waitFor(() => !field.exists(), "Go to Folder did not finish navigation");
+    log("Go to Folder sheet closed");
     if (kind === "save") {
       // Limit traversal to native panel groups. NSSavePanel's filename is the
       // enabled text field whose AX identifier or label names the save name.
