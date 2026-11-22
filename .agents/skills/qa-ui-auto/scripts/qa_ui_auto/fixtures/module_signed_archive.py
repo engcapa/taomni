@@ -33,6 +33,9 @@ def platform_key(system=None, machine=None):
 
 
 def load_artifact(root: Path, source_sha: str, expected_platform: str, slug: str = "hello-plugin", *, version="0.1.0"):
+    if version is None:
+        manifest = Path(__file__).resolve().parents[6] / "src-tauri/plugins" / slug / "module.json"
+        version = json.loads(manifest.read_text(encoding="utf-8"))["version"]
     root = root.absolute()
     if root.resolve() != root or not root.is_dir():
         raise RuntimeError("Signed module artifact must be a real directory")
@@ -57,7 +60,7 @@ def load_artifact(root: Path, source_sha: str, expected_platform: str, slug: str
     if len(detached.splitlines()) != 4 or detached.splitlines()[2] != trusted:
         raise RuntimeError("Official module signature does not bind the expected metadata")
     frontend = None
-    if slug in {"hello-plugin", "vnc-client", "rdp-client"}:
+    if slug in {"hello-plugin", "vnc-client", "rdp-client", "mfa"}:
         with zipfile.ZipFile(archive) as zipped:
             frontend = zipped.read("frontend/index.js")
     return receipt, archive, detached, frontend
@@ -97,13 +100,14 @@ def setup(ctx):
 
 
 def setup_mfa(ctx):
-    if ctx.case_id not in {"TC-MODULES-038", "TC-MODULES-039", "TC-MODULES-044", MFA_RESTORE_CASE} or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    if ctx.case_id not in {"TC-MODULES-038", "TC-MODULES-039", "TC-MODULES-044", "TC-MODULES-090", MFA_RESTORE_CASE} or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Signed MFA input requires its registered native upgrade case")
     raw = os.environ.get("QA_SIGNED_MFA_ROOT")
     if not raw:
         raise RuntimeError("QA_SIGNED_MFA_ROOT is required; build the signed MFA artifact first")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    receipt, archive, signature, _ = load_artifact(Path(raw), source, platform_key(), "mfa")
+    receipt, archive, signature, frontend = load_artifact(Path(raw), source, platform_key(), "mfa", version=None)
+    receipt["frontendSha256"] = hashlib.sha256(frontend).hexdigest()
     owned = Path(ctx.case_dir).resolve() / "signed-mfa"
     owned.mkdir()
     destination = owned / archive.name
@@ -112,6 +116,12 @@ def setup_mfa(ctx):
     detached.write_text(signature, encoding="utf-8")
     (owned / "provenance.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     ctx.values.update(mfa_signed_archive=destination.as_posix(), mfa_signed_signature=detached.as_posix(), mfa_signed_signature_text=signature)
+    if ctx.case_id == "TC-MODULES-090":
+        root = isolated_data_root(ctx) / "plugins" / "mfa"
+        ctx.values.update(
+            mfa_signed_frontend=(root / "versions" / receipt["version"] / "frontend/index.js").as_posix(),
+            mfa_signed_frontend_sha256=receipt["frontendSha256"],
+        )
 
 
 def setup_vnc(ctx):

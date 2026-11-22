@@ -1,14 +1,14 @@
 import { ChevronRight, KeyRound, Lock, Pin, PinOff, Plus, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useT } from "../../lib/i18n";
-import { errorText } from "../../lib/mfa/format";
-import type { MfaAccount } from "../../lib/mfa/types";
-import { useAppStore } from "../../stores/appStore";
-import { useMfaStore } from "../../stores/mfaStore";
-import { useVaultStore } from "../../stores/vaultStore";
-import { VaultSetupDialog } from "../vault/VaultSetupDialog";
-import { VaultUnlockDialog } from "../vault/VaultUnlockDialog";
-import { FLOATING_MFA_WIDTH } from "../../stores/app/layoutSlice";
+import { useT } from "../../../../src/lib/i18n";
+import { errorText } from "../../../../src/lib/mfa/format";
+import type { MfaAccount } from "../../../../src/lib/mfa/types";
+import { isFloatingMfaOpen, useFloatingMfa } from "../../../../src/lib/mfa/rendererServices";
+import { useMfaStore } from "../../../../src/stores/mfaStore";
+import { useVaultStore } from "../../../../src/stores/vaultStore";
+import { VaultSetupDialog } from "../../../../src/components/vault/VaultSetupDialog";
+import { VaultUnlockDialog } from "../../../../src/components/vault/VaultUnlockDialog";
+import { FLOATING_MFA_WIDTH } from "../../../../src/stores/app/layoutSlice";
 
 const TICK_MS = 500;
 
@@ -22,12 +22,7 @@ const TICK_MS = 500;
  */
 export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
   const t = useT();
-  const floating = useAppStore((s) => s.floatingMfa);
-  const setPosition = useAppStore((s) => s.setFloatingMfaPosition);
-  const setPinned = useAppStore((s) => s.setFloatingMfaPinned);
-  const setSearch = useAppStore((s) => s.setFloatingMfaSearch);
-  const close = useAppStore((s) => s.closeFloatingMfa);
-  const setStatusMessage = useAppStore((s) => s.setStatusMessage);
+  const { floating, setPosition, setPinned, setSearch, close, setStatusMessage } = useFloatingMfa();
   const vaultState = useVaultStore((s) => s.state);
   const vaultEpoch = useVaultStore((s) => s.securityEpoch);
   const vaultPending = useVaultStore((s) => s.transitionPending);
@@ -43,6 +38,7 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
   const [setupOpen, setSetupOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; left: number; bottom: number } | null>(null);
+  const endDragRef = useRef<(() => void) | null>(null);
   const copiedTimer = useRef<number | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -63,20 +59,20 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
     const timer = window.setInterval(() => setNow(Date.now()), TICK_MS);
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      const state = useAppStore.getState();
-      if (!state.floatingMfa.open) return;
+      if (!isFloatingMfaOpen()) return;
       event.stopPropagation();
-      state.closeFloatingMfa();
+      close();
     };
     window.addEventListener("keydown", onKey, true);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("keydown", onKey, true);
     };
-  }, [floating.open]);
+  }, [floating.open, close]);
 
   useEffect(() => () => {
     if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current);
+    endDragRef.current?.();
   }, []);
 
   const visibleAccounts = useMemo(() => {
@@ -94,6 +90,7 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
+    endDragRef.current?.();
     dragRef.current = {
       startX: event.clientX,
       startY: event.clientY,
@@ -109,14 +106,21 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
         drag.bottom - (move.clientY - drag.startY),
       );
     };
-    const finish = () => {
+    const release = () => {
       dragRef.current = null;
-      setDragging(false);
+      endDragRef.current = null;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
     };
+    const finish = () => {
+      release();
+      setDragging(false);
+    };
+    endDragRef.current = release;
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
   };
 
   const copy = async (account: MfaAccount) => {

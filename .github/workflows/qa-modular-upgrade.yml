@@ -678,11 +678,11 @@ jobs:
           src/components/tabbar/TabBar.test.tsx
           src/stores/mfaStore.test.ts
           src/stores/mfaVaultLifecycle.test.ts
-          src/components/mfa/MfaAddDialog.test.tsx
-          src/components/mfa/MfaPanel.test.tsx
-          src/components/mfa/MfaQrDialog.test.tsx
-          src/components/mfa/MfaQrDialog.lifecycle.test.tsx
-          src/components/mfa/__tests__/MfaFloatingWindow.test.tsx
+          src-tauri/plugins/mfa/renderer/MfaAddDialog.test.tsx
+          src-tauri/plugins/mfa/renderer/MfaPanel.test.tsx
+          src-tauri/plugins/mfa/renderer/MfaQrDialog.test.tsx
+          src-tauri/plugins/mfa/renderer/MfaQrDialog.lifecycle.test.tsx
+          src-tauri/plugins/mfa/renderer/__tests__/MfaFloatingWindow.test.tsx
           src/components/vault/VaultSettings.test.tsx
           src/components/vault/VaultSetupDialog.test.tsx
           src/components/vault/VaultUnlockDialog.test.tsx

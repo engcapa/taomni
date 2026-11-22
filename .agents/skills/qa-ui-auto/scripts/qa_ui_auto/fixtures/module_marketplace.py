@@ -130,7 +130,7 @@ def setup_roster(ctx):
         return start_first_upgrade(ctx, files, roster, module_first_release.CATALOG, "mail", producer)
     root = Path(os.environ["QA_SIGNED_MODULE_ROOT"])
     hello, hello_archive, _, _ = load_artifact(root, receipt["sourceSha"], receipt["platform"])
-    mfa, mfa_archive, _, _ = load_artifact(root / "legacy-roster-mfa", receipt["sourceSha"], receipt["platform"], "mfa")
+    mfa, mfa_archive, _, _ = load_artifact(root / "legacy-roster-mfa", receipt["sourceSha"], receipt["platform"], "mfa", version=None)
     skipped_releases = ctx.case_id == "TC-MODULES-046"
     catalog = root / (LATER_ROSTER_CATALOG if skipped_releases else ROSTER_CATALOG)
     signature = catalog.with_name(catalog.name + ".minisig")

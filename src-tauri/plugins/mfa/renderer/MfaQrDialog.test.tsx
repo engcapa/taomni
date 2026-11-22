@@ -2,22 +2,22 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const writeText = vi.fn(async (_text: string) => undefined);
-vi.mock("../../lib/clipboard", () => ({
+vi.mock("../../../../src/lib/clipboard", () => ({
   writeText: (text: string) => writeText(text),
   readClipboardImageFiles: async () => [],
 }));
 
 const MASTER = "qa-master-password";
 vi.mock("@tauri-apps/api/core", async () => {
-  const { stubMfaInvoke } = await import("../../stubs/mfaStub");
+  const { stubMfaInvoke } = await import("../../../../src/stubs/mfaStub");
   return { invoke: (cmd: string, args?: Record<string, unknown>) => stubMfaInvoke(cmd, args, true, MASTER) };
 });
 
-import { stubMfaInvoke, MFA_STUB_STORAGE_KEY } from "../../stubs/mfaStub";
-import type { MfaAccount, MfaAddResult } from "../../lib/mfa/types";
-import { defaultMfaInput } from "../../lib/mfa/types";
+import { stubMfaInvoke, MFA_STUB_STORAGE_KEY } from "../../../../src/stubs/mfaStub";
+import type { MfaAccount, MfaAddResult } from "../../../../src/lib/mfa/types";
+import { defaultMfaInput } from "../../../../src/lib/mfa/types";
 import { MfaQrDialog } from "./MfaQrDialog";
-import { useVaultStore } from "../../stores/vaultStore";
+import { useVaultStore } from "../../../../src/stores/vaultStore";
 
 async function seedAccount(): Promise<MfaAccount> {
   const input = { ...defaultMfaInput(), issuer: "QA Bank", accountName: "qa@example.com", secret: "JBSWY3DPEHPK3PXP" };

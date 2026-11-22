@@ -2545,6 +2545,7 @@
 - `[data-testid="mfa-floating-account"]` — interactive — F-WS-3.mfa-floating-account
 - `[data-testid="mfa-floating-close"]` — interactive — F-WS-3.mfa-floating-close
 - `[data-testid="mfa-floating-drag-handle"]` — interactive — F-WS-3.mfa-floating-drag-handle
+- `[data-testid="mfa-floating-entry"]` — display — F-WS-3.mfa-floating-entry
 - `[data-testid="mfa-floating-expand-tab"]` — interactive — F-WS-3.mfa-floating-expand-tab
 - `[data-testid="mfa-floating-locked"]` — display — F-WS-3.mfa-floating-locked
 - `[data-testid="mfa-floating-pin"]` — interactive — F-WS-3.mfa-floating-pin

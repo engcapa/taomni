@@ -30,4 +30,5 @@
 
 @source not "../src-tauri/plugins/vnc-client/renderer";
 @source not "../src-tauri/plugins/mail/renderer";
+@source not "../src-tauri/plugins/mfa/renderer";
 @source not "../src-tauri/plugins/sockscap/renderer";

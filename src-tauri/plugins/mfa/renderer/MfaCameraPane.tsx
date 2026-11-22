@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { useT } from "../../lib/i18n";
-import { errorText } from "../../lib/mfa/format";
-import { decodeVideoFrame } from "../../lib/mfa/qrImage";
+import { useT } from "../../../../src/lib/i18n";
+import { errorText } from "../../../../src/lib/mfa/format";
+import { decodeVideoFrame } from "../../../../src/lib/mfa/qrImage";
 import type { MfaTextsOutcome } from "./MfaImagePane";
 
 export type MfaCameraState = "starting" | "scanning" | "no-camera" | "denied" | "error";

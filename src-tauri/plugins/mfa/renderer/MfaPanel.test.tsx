@@ -2,15 +2,15 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const writeText = vi.fn(async (_text: string) => undefined);
-vi.mock("../../lib/clipboard", () => ({ writeText: (text: string) => writeText(text), readClipboardImageFiles: async () => [] }));
+vi.mock("../../../../src/lib/clipboard", () => ({ writeText: (text: string) => writeText(text), readClipboardImageFiles: async () => [] }));
 vi.mock("@tauri-apps/api/core", async () => {
-  const { stubMfaInvoke } = await import("../../stubs/mfaStub");
+  const { stubMfaInvoke } = await import("../../../../src/stubs/mfaStub");
   return { invoke: (cmd: string, args?: Record<string, unknown>) => stubMfaInvoke(cmd, args, true) };
 });
 
-import { MFA_STUB_STORAGE_KEY } from "../../stubs/mfaStub";
-import { useMfaStore } from "../../stores/mfaStore";
-import { useVaultStore } from "../../stores/vaultStore";
+import { MFA_STUB_STORAGE_KEY } from "../../../../src/stubs/mfaStub";
+import { useMfaStore } from "../../../../src/stores/mfaStore";
+import { useVaultStore } from "../../../../src/stores/vaultStore";
 import { MfaPanel } from "./MfaPanel";
 
 const RFC4226 = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";

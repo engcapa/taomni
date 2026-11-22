@@ -14,7 +14,7 @@ SCREENSHOT_ASSETS = {
 
 
 def frontend_files(built: Path, slug: str, *, with_receipt: bool) -> dict[str, Path]:
-    if slug not in {"rdp-client", "vnc-client", "mail", "screenshot", "sockscap"}:
+    if slug not in {"rdp-client", "vnc-client", "mail", "mfa", "screenshot", "sockscap"}:
         raise ValueError("Unexpected module")
     expected = {"index.js"}
     directories = {"screenshot-ocr"} if slug == "screenshot" else set()

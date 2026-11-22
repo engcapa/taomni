@@ -12415,12 +12415,12 @@ files:
   - src/lib/mfa/qrSvg.ts
   - src/stores/mfaStore.ts
   - src/stubs/mfaStub.ts
-  - src/components/mfa/MfaTab.tsx
-  - src/components/mfa/MfaPanel.tsx
-  - src/components/mfa/MfaAccountRow.tsx
-  - src/components/mfa/MfaCountdown.tsx
-  - src/components/mfa/MfaEditDialog.tsx
-  - src/components/mfa/MfaQrDialog.tsx
+  - src-tauri/plugins/mfa/renderer/MfaTab.tsx
+  - src-tauri/plugins/mfa/renderer/MfaPanel.tsx
+  - src-tauri/plugins/mfa/renderer/MfaAccountRow.tsx
+  - src-tauri/plugins/mfa/renderer/MfaCountdown.tsx
+  - src-tauri/plugins/mfa/renderer/MfaEditDialog.tsx
+  - src-tauri/plugins/mfa/renderer/MfaQrDialog.tsx
   - src/components/vault/VaultGate.tsx
 controls:
   - id: open-sidebar
@@ -12659,12 +12659,12 @@ files:
   - src/lib/mfa/qrImage.ts
   - src/lib/mfa/frames.ts
   - src/lib/mfa/sources.ts
-  - src/components/mfa/MfaAddDialog.tsx
-  - src/components/mfa/MfaSecretForm.tsx
-  - src/components/mfa/MfaImagePane.tsx
-  - src/components/mfa/MfaScreenPane.tsx
-  - src/components/mfa/MfaCameraPane.tsx
-  - src/components/mfa/MfaImportPreview.tsx
+  - src-tauri/plugins/mfa/renderer/MfaAddDialog.tsx
+  - src-tauri/plugins/mfa/renderer/MfaSecretForm.tsx
+  - src-tauri/plugins/mfa/renderer/MfaImagePane.tsx
+  - src-tauri/plugins/mfa/renderer/MfaScreenPane.tsx
+  - src-tauri/plugins/mfa/renderer/MfaCameraPane.tsx
+  - src-tauri/plugins/mfa/renderer/MfaImportPreview.tsx
 controls:
   - id: dialog
     selector: '[data-testid="mfa-add-dialog"]'
@@ -14154,7 +14154,7 @@ files:
 - src/components/workspace/WorkspaceGitPanel.tsx
 - src/components/workspace/WorkspaceSessionPickerModal.tsx
 - src/components/workspace/WorkspaceSessionPane.tsx
-- src/components/mfa/MfaFloatingWindow.tsx
+- src-tauri/plugins/mfa/renderer/MfaFloatingWindow.tsx
 - src/components/agents/AgentsPlatformView.tsx
 - src/components/search/GlobalCommandModal.tsx
 - src/stores/workspacePlatformStore.ts
@@ -14334,7 +14334,7 @@ files:
 - src/components/workspace/WorkspaceGitPanel.tsx
 - src/components/workspace/WorkspaceSessionPickerModal.tsx
 - src/components/workspace/WorkspaceSessionPane.tsx
-- src/components/mfa/MfaFloatingWindow.tsx
+- src-tauri/plugins/mfa/renderer/MfaFloatingWindow.tsx
 - src/components/agents/AgentsPlatformView.tsx
 - src/components/search/GlobalCommandModal.tsx
 - src/stores/workspacePlatformStore.ts
@@ -15036,7 +15036,8 @@ files:
   - src/components/workspace/WorkspaceGitPanel.tsx
   - src/components/workspace/WorkspaceSessionPickerModal.tsx
   - src/components/workspace/WorkspaceSessionPane.tsx
-  - src/components/mfa/MfaFloatingWindow.tsx
+  - src/components/plugins/MfaSessionPane.tsx
+  - src-tauri/plugins/mfa/renderer/MfaFloatingWindow.tsx
   - src/components/agents/AgentsPlatformView.tsx
   - src/components/search/GlobalCommandModal.tsx
   - src/stores/workspacePlatformStore.ts
@@ -15053,6 +15054,9 @@ controls:
   - id: mfa-floating-drag-handle
     selector: '[data-testid="mfa-floating-drag-handle"]'
     kind: interactive
+  - id: mfa-floating-entry
+    selector: '[data-testid="mfa-floating-entry"]'
+    kind: display
   - id: mfa-floating-expand-tab
     selector: '[data-testid="mfa-floating-expand-tab"]'
     kind: interactive
@@ -15100,7 +15104,7 @@ files:
   - src/components/workspace/WorkspaceGitPanel.tsx
   - src/components/workspace/WorkspaceSessionPickerModal.tsx
   - src/components/workspace/WorkspaceSessionPane.tsx
-  - src/components/mfa/MfaFloatingWindow.tsx
+  - src-tauri/plugins/mfa/renderer/MfaFloatingWindow.tsx
   - src/components/agents/AgentsPlatformView.tsx
   - src/components/search/GlobalCommandModal.tsx
   - src/stores/workspacePlatformStore.ts
@@ -15170,7 +15174,7 @@ files:
   - src/components/workspace/WorkspaceGitPanel.tsx
   - src/components/workspace/WorkspaceSessionPickerModal.tsx
   - src/components/workspace/WorkspaceSessionPane.tsx
-  - src/components/mfa/MfaFloatingWindow.tsx
+  - src-tauri/plugins/mfa/renderer/MfaFloatingWindow.tsx
   - src/components/agents/AgentsPlatformView.tsx
   - src/components/search/GlobalCommandModal.tsx
   - src/stores/workspacePlatformStore.ts
@@ -15217,7 +15221,7 @@ files:
 - src/components/workspace/WorkspaceGitPanel.tsx
 - src/components/workspace/WorkspaceSessionPickerModal.tsx
 - src/components/workspace/WorkspaceSessionPane.tsx
-- src/components/mfa/MfaFloatingWindow.tsx
+- src-tauri/plugins/mfa/renderer/MfaFloatingWindow.tsx
 - src/components/agents/AgentsPlatformView.tsx
 - src/components/search/GlobalCommandModal.tsx
 - src/stores/workspacePlatformStore.ts

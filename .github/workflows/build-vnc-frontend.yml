@@ -35,6 +35,7 @@ jobs:
             vnc-client) dependencies=(src/lib/vnc src/lib/vncOptions.ts src/lib/terminal/keyboardGuards.ts) ;;
             rdp-client) dependencies=(src/lib/rdpViewerHost.ts src/lib/rdpViewerContract.ts) ;;
             mail) dependencies=(src/lib/mail src/lib/mailHtml ':(glob)src/lib/mail*.ts') ;;
+            mfa) dependencies=(src/lib/mfa) ;;
             screenshot) dependencies=(vite-plugins/screenshotOcr.ts scripts/stage-vnc-frontend.py) ;;
             sockscap) dependencies=(src/lib/sockscap src/lib/sockscap.ts src/lib/sessionPaths.ts src/lib/sockscapPreflight.ts) ;;
             *) echo 'Unknown module frontend' >&2; exit 1 ;;

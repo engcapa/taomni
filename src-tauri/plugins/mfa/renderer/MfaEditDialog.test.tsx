@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { MfaAccount } from "../../lib/mfa/types";
+import type { MfaAccount } from "../../../../src/lib/mfa/types";
 import { MfaEditDialog } from "./MfaEditDialog";
 
 afterEach(cleanup);

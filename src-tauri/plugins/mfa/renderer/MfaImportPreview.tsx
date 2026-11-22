@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useT } from "../../lib/i18n";
-import { errorText } from "../../lib/mfa/format";
-import type { MfaParsedItem } from "../../lib/mfa/otpauth";
-import type { MfaAccountInput, MfaInspectItem } from "../../lib/mfa/types";
-import { useMfaStore } from "../../stores/mfaStore";
+import { useT } from "../../../../src/lib/i18n";
+import { errorText } from "../../../../src/lib/mfa/format";
+import type { MfaParsedItem } from "../../../../src/lib/mfa/otpauth";
+import type { MfaAccountInput, MfaInspectItem } from "../../../../src/lib/mfa/types";
+import { useMfaStore } from "../../../../src/stores/mfaStore";
 
 interface Row {
   label: string;

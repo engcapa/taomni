@@ -1,0 +1,89 @@
+id: TC-MODULES-090
+title: The signed MFA frontend opens on the desktop and shares its HOTP counter across both entries
+description: Install the matching signed package and verify its installed ESM digest. Use a new Vault and account to check the module manager, floating panel and a disable and re-enable cycle.
+covers: [F-Modules-1, F-MFA-1, F-MFA-2, F-WS-3]
+tags: [modules, mfa, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, module_signed_mfa_archive, release_build_required]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mfa_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mfa_signed_signature_text}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- assert_file_sha256: {path: '${fixture.mfa_signed_frontend}', equals: '${fixture.mfa_signed_frontend_sha256}'}
+- press: {selector: '[data-testid="module-action-enable-mfa"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mfa"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mfa"][data-plugin-kind="manager"] [data-testid="mfa-tab"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mfa-renderer-native
+- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
+- click: '[data-testid="mfa-add"]'
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: Signed Module HOTP}
+- fill: {selector: '[data-testid="mfa-add-secret"]', value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ}
+- click: '[data-testid="mfa-add-advanced"]'
+- select_option: {selector: '[data-testid="mfa-add-kind"]', value: hotp}
+- click: '[data-testid="mfa-add-submit"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 755 224, timeout_sec: 30}
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082}
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mfa"][data-plugin-kind="floating"] [data-testid="mfa-floating-window"]'
+- assert_text_equals: {selector: '[data-testid="mfa-floating-code"]', equals: 287 082}
+- click: '[data-testid="mfa-floating-expand-tab"]'
+- wait_for: {selector: '[data-testid="mfa-floating-window"]', state: detached}
+- assert_visible: '[data-testid="mfa-account-row"][data-issuer="Signed Module HOTP"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-disable-mfa"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-enable-mfa"]'
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-entry"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="mfa-floating-code"]', equal: 0}
+- click: '[data-testid="rail-mfa-button"]'
+- press: {selector: '[data-testid="module-action-enable-mfa"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mfa"]'
+- click: '[data-testid="rail-mfa-button"]'
+- assert_text_equals: {selector: '[data-testid="mfa-floating-code"]', equals: 287 082}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: installed-mfa-frontend
+    requirement: The signed frontend provides both native entries and reads the actual HOTP counter.
+    actions: [5, 6, 7, 10, 14, 17, 24, 26, 28, 31]
+    checkpoints:
+    - {step: 8, expectation: The ordinary offline install completes signature verification.}
+    - {step: 9, expectation: The installed ESM matches the signed archive bytes.}
+    - {step: 15, expectation: The module renderer mounts the manager in the native WebView.}
+    - {step: 25, expectation: The installed host creates the account at counter zero.}
+    - {step: 27, expectation: The manager advances to counter one.}
+    - {step: 29, expectation: The module renderer also mounts the floating panel.}
+    - {step: 30, expectation: The floating panel shows counter one.}
+    - {step: 33, expectation: Expanding the panel returns to the manager and same account.}
+    results: [8, 9, 15, 25, 27, 29, 30, 33]
+  - id: retained-native-account
+    requirement: Disabling removes code access and enabling reloads the retained account.
+    actions: [36, 38, 42, 44]
+    checkpoints:
+    - {step: 39, expectation: The disabled module displays the lifecycle message.}
+    - {step: 40, expectation: No cached code is rendered for the disabled module.}
+    - {step: 45, expectation: The signed host reopens the same saved counter.}
+    - {step: 46, expectation: No renderer runtime errors were recorded.}
+    results: [39, 40, 45, 46]
+  visual:
+  - check: The floating panel displays the same code as the manager and expands into its tab.
+    method: automated
+    reason: Native WebView assertions inspect the mounted controls and their code text.
+  native:
+  - check: Use the installed signed module, native module registry and encrypted account store.
+    method: automated
+    reason: The signed bundle digest, actual Vault round trip and HOTP counter advance are asserted.

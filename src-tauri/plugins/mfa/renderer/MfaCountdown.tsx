@@ -1,4 +1,4 @@
-import { useT } from "../../lib/i18n";
+import { useT } from "../../../../src/lib/i18n";
 
 /** Seconds at or below which the countdown turns to the warning colour. */
 export const MFA_WARNING_SECONDS = 5;

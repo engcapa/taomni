@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useT } from "../../lib/i18n";
-import { errorText } from "../../lib/mfa/format";
-import type { MfaAccount } from "../../lib/mfa/types";
-import { useMfaStore } from "../../stores/mfaStore";
+import { useT } from "../../../../src/lib/i18n";
+import { errorText } from "../../../../src/lib/mfa/format";
+import type { MfaAccount } from "../../../../src/lib/mfa/types";
+import { useMfaStore } from "../../../../src/stores/mfaStore";
 
 const labelStyle = { color: "var(--taomni-text-muted)" };
 

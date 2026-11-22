@@ -65,10 +65,11 @@ def installed_mfa_state(ctx):
 
     plugins = plugin_root(ctx)
     pointer = (plugins / "mfa/active.json").read_bytes()
-    if json.loads(pointer).get("activeVersion") != "0.1.0":
-        raise StepError("Expected the QA signed MFA version to already be installed")
-    proof = plugins / "mfa/versions/0.1.0/.taomni-trust/package.taomni-plugin"
     provenance = json.loads((ctx.case_dir / "signed-mfa/provenance.json").read_text(encoding="utf-8"))
+    version = provenance["version"]
+    if json.loads(pointer).get("activeVersion") != version:
+        raise StepError("Expected the QA signed MFA version to already be installed")
+    proof = plugins / "mfa/versions" / version / ".taomni-trust/package.taomni-plugin"
     if hashlib.sha256(proof.read_bytes()).hexdigest() != provenance["sha256"]:
         raise StepError("Installed MFA package differs from its signed input receipt")
     legacy = plugins.parent / "mfa.db"

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useT } from "../../lib/i18n";
-import { secretProblem } from "../../lib/mfa/base32";
-import { errorText, invalidInputField } from "../../lib/mfa/format";
-import { MfaImportError, isOtpauthLink, parseImportText, parseOtpauthUri, type MfaParsedItem } from "../../lib/mfa/otpauth";
-import { defaultMfaInput, type MfaAccountInput, type MfaAlgorithm, type MfaKind } from "../../lib/mfa/types";
-import { useMfaStore } from "../../stores/mfaStore";
+import { useT } from "../../../../src/lib/i18n";
+import { secretProblem } from "../../../../src/lib/mfa/base32";
+import { errorText, invalidInputField } from "../../../../src/lib/mfa/format";
+import { MfaImportError, isOtpauthLink, parseImportText, parseOtpauthUri, type MfaParsedItem } from "../../../../src/lib/mfa/otpauth";
+import { defaultMfaInput, type MfaAccountInput, type MfaAlgorithm, type MfaKind } from "../../../../src/lib/mfa/types";
+import { useMfaStore } from "../../../../src/stores/mfaStore";
 
 const labelClass = "block text-[12px] mb-1";
 const labelStyle = { color: "var(--taomni-text-muted)" };

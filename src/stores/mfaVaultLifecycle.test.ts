@@ -17,6 +17,7 @@ vi.mock("../lib/clipboard", () => ({ writeText }));
 
 import { useVaultStore } from "./vaultStore";
 import { useMfaStore } from "./mfaStore";
+import { usePluginFrontendStore } from "./pluginFrontendStore";
 
 beforeEach(() => {
   Object.values(vault).forEach((fn) => fn.mockReset());
@@ -29,6 +30,18 @@ beforeEach(() => {
 });
 
 describe("Vault requests invalidate sensitive MFA work", () => {
+  it("clears codes and rejects old replies when the MFA renderer loses its activation", async () => {
+    const codes = deferred<MfaCode[]>();
+    mfa.mfaCodes.mockReturnValueOnce(codes.promise);
+    const request = useMfaStore.getState().refreshCodes();
+    usePluginFrontendStore.setState((state) => ({ epochs: { ...state.epochs, mfa: (state.epochs.mfa ?? 0) + 1 } }));
+    expect(useVaultStore.getState().state).toBe("unlocked");
+    expect(useMfaStore.getState()).toMatchObject({ status: "idle", accounts: [], codes: {}, lastCopied: null });
+    codes.resolve([mfaCode("287082")]);
+    await request;
+    expect(useMfaStore.getState().codes).toEqual({});
+  });
+
   it("hides existing codes immediately and discards list/code replies before lock confirmation", async () => {
     const lock = deferred<void>();
     const codes = deferred<MfaCode[]>();

@@ -9,14 +9,14 @@ const scanScreen = vi.fn(async (): Promise<string[] | null> => {
 });
 const captureScreens = vi.fn();
 
-vi.mock("../../lib/clipboard", () => ({ writeText: async () => undefined, readClipboardImageFiles: async () => [new File(["x"], "shot.png", { type: "image/png" })] }));
-vi.mock("../../lib/mfa/qrImage", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../lib/mfa/qrImage")>()),
+vi.mock("../../../../src/lib/clipboard", () => ({ writeText: async () => undefined, readClipboardImageFiles: async () => [new File(["x"], "shot.png", { type: "image/png" })] }));
+vi.mock("../../../../src/lib/mfa/qrImage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../../src/lib/mfa/qrImage")>()),
   decodeImageBlob: (blob: Blob) => decodeImageBlob(blob),
   decodeVideoFrame: () => decodeVideoFrame(),
 }));
 vi.mock("@tauri-apps/api/core", async () => {
-  const { stubMfaInvoke } = await import("../../stubs/mfaStub");
+  const { stubMfaInvoke } = await import("../../../../src/stubs/mfaStub");
   return {
     invoke: (cmd: string, args?: Record<string, unknown>) => {
       if (cmd === "mfa_capture_screens") return args?.decode ? scanScreen() : captureScreens();
@@ -25,9 +25,9 @@ vi.mock("@tauri-apps/api/core", async () => {
   };
 });
 
-import { MFA_STUB_STORAGE_KEY } from "../../stubs/mfaStub";
-import { useMfaStore } from "../../stores/mfaStore";
-import { useVaultStore } from "../../stores/vaultStore";
+import { MFA_STUB_STORAGE_KEY } from "../../../../src/stubs/mfaStub";
+import { useMfaStore } from "../../../../src/stores/mfaStore";
+import { useVaultStore } from "../../../../src/stores/vaultStore";
 import { MfaAddDialog } from "./MfaAddDialog";
 
 function setMediaDevices(value: unknown) {

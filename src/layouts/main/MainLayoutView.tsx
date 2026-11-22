@@ -14,7 +14,7 @@ import { Sidebar } from "../../components/sidebar/Sidebar";
 import { StatusBar } from "../../components/statusbar/StatusBar";
 import { AgentsPlatformView } from "../../components/agents/AgentsPlatformView";
 import { ExplorerPlatformView } from "../../components/explorer/ExplorerPlatformView";
-import { MfaFloatingWindow } from "../../components/mfa/MfaFloatingWindow";
+import { MfaFloatingPane } from "../../components/plugins/MfaSessionPane";
 import { GlobalCommandModal } from "../../components/search/GlobalCommandModal";
 import { WorkspaceMainPanel } from "../../components/workspace/WorkspaceMainPanel";
 import { useAppStore } from "../../stores/appStore";
@@ -404,7 +404,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
         <ModuleReleaseNotice openSettings={utilityTabs.openSettingsTab} />
         <StatusBar />
 
-        <MfaFloatingWindow
+        <MfaFloatingPane
           onExpand={() => {
             useAppStore.getState().setActiveSideTab("sessions");
             menuActions.handleCommand("mfa");

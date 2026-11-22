@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Copy, Eye, EyeOff, Link2 } from "lucide-react";
-import { useT } from "../../lib/i18n";
-import { writeText } from "../../lib/clipboard";
-import { errorText, formatSecretKey } from "../../lib/mfa/format";
-import { mfaExportUri } from "../../lib/mfa/ipc";
-import { accountLabel, parseOtpauthUri } from "../../lib/mfa/otpauth";
-import { qrSvgModel, type QrSvgModel } from "../../lib/mfa/qrSvg";
-import type { MfaAccount } from "../../lib/mfa/types";
-import { requireVaultUnlock, useVaultStore, vaultSessionIsCurrent } from "../../stores/vaultStore";
+import { useT } from "../../../../src/lib/i18n";
+import { writeText } from "../../../../src/lib/clipboard";
+import { errorText, formatSecretKey } from "../../../../src/lib/mfa/format";
+import { mfaExportUri } from "../../../../src/lib/mfa/ipc";
+import { accountLabel, parseOtpauthUri } from "../../../../src/lib/mfa/otpauth";
+import { qrSvgModel, type QrSvgModel } from "../../../../src/lib/mfa/qrSvg";
+import type { MfaAccount } from "../../../../src/lib/mfa/types";
+import { requireVaultUnlock, useVaultStore, vaultSessionIsCurrent } from "../../../../src/stores/vaultStore";
 
 const labelStyle = { color: "var(--taomni-text-muted)" };
 

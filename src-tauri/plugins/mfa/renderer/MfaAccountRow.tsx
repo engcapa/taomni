@@ -1,10 +1,10 @@
 import { useRef, useState } from "react";
 import { Copy, GripVertical, MoreHorizontal, RotateCw, Star } from "lucide-react";
-import { useT } from "../../lib/i18n";
-import { startCustomDrag, useCustomDropTarget } from "../../lib/customDnD";
-import { formatCode, remainingSeconds } from "../../lib/mfa/format";
-import { accountLabel } from "../../lib/mfa/otpauth";
-import type { MfaAccount, MfaCode } from "../../lib/mfa/types";
+import { useT } from "../../../../src/lib/i18n";
+import { startCustomDrag, useCustomDropTarget } from "../../../../src/lib/customDnD";
+import { formatCode, remainingSeconds } from "../../../../src/lib/mfa/format";
+import { accountLabel } from "../../../../src/lib/mfa/otpauth";
+import type { MfaAccount, MfaCode } from "../../../../src/lib/mfa/types";
 import { MfaCountdown } from "./MfaCountdown";
 
 export const MFA_DRAG_MIME = "taomni/mfa-account";

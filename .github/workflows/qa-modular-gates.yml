@@ -157,6 +157,7 @@ jobs:
           assert(!Object.keys(manifest).some((path) => path.includes('plugins/screenshot/renderer/')), 'Core contains the Screenshot OCR renderer');
           for (const path of Object.keys(manifest)) {
             assert(!/plugins\/(vnc|rdp)-client\/renderer\//.test(path), `Bundled remote desktop frontend ${path}`);
+            assert(!path.includes('plugins/mfa/renderer/'), `Bundled MFA frontend ${path}`);
           }
           for (const [source, asset] of Object.entries(manifest)) {
             assert(!source.includes('plugins/sockscap/renderer/'), `Bundled SocksCap renderer ${source}`);

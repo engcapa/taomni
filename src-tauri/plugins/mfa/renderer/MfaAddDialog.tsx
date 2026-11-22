@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Camera, Image as ImageIcon, KeyRound, ScanLine, X } from "lucide-react";
-import { useT } from "../../lib/i18n";
-import { MfaImportError, parseImportTexts, type MfaParsedItem } from "../../lib/mfa/otpauth";
+import { useT } from "../../../../src/lib/i18n";
+import { MfaImportError, parseImportTexts, type MfaParsedItem } from "../../../../src/lib/mfa/otpauth";
 import { MfaCameraPane } from "./MfaCameraPane";
 import { MfaImagePane, type MfaTextsOutcome } from "./MfaImagePane";
 import { MfaImportPreview } from "./MfaImportPreview";

@@ -105,11 +105,11 @@ steps:
 - wait_for:
     selector: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
     timeout_sec: 35
-- click: '[data-testid="mail-load-more"]'
+- wait_for: {selector: '[data-testid="mail-load-more"]', state: attached}
+- mail_server_assert_list_matches:
+    timeout_sec: 35
 - wait_for:
     selector: '[data-testid="mail-message-row"][data-subject="Live mail page 0001"]'
-    timeout_sec: 35
-- mail_server_assert_list_matches:
     timeout_sec: 35
 - assert_count:
     selector: '[data-testid="mail-message-row"][data-subject="Live mail page 0061"]'
@@ -147,12 +147,14 @@ verification:
   - id: older-live-headers
     requirement: Load older messages appends the remaining server headers and exhausts the mailbox without duplicates.
     actions:
-    - 40
+    - 41
     checkpoints:
+    - step: 40
+      expectation: The older-page action is present after the first page.
     - step: 41
-      expectation: The previously absent older header is visible.
-    - step: 42
       expectation: The loaded count matches all messages in the server fixture.
+    - step: 42
+      expectation: The previously absent older header is visible.
     - step: 43
       expectation: The newest header still appears once.
     - step: 44
@@ -164,6 +166,7 @@ verification:
     - step: 47
       expectation: The verified Mail host owns the profile writer lease.
     results:
+    - 40
     - 41
     - 42
     - 43

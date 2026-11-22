@@ -332,6 +332,19 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
+  signed-mfa-windows:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.windows_native_matrix, 'signed-mfa')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: mfa
+      artifact_key: ${{ format('{0}-mfa', needs.plan.outputs.artifact_key) }}
+      native_builds: ${{ needs.plan.outputs.windows_build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
   signed-mfa-macos:
     needs: plan
     if: github.event_name != 'pull_request' && contains(needs.plan.outputs.macos_native_matrix, 'signed-mfa')
@@ -598,8 +611,8 @@ jobs:
       operation: build
 
   execute-windows-native:
-    needs: [plan, build-windows, signed-modular-packages, signed-vnc-windows, signed-rdp-windows, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-rdp-server-windows]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-windows.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && (needs.signed-vnc-windows.result == 'success' || needs.signed-vnc-windows.result == 'skipped') && (needs.signed-rdp-windows.result == 'success' || needs.signed-rdp-windows.result == 'skipped') && (needs.signed-mail.result == 'success' || needs.signed-mail.result == 'skipped') && (needs.signed-screenshot.result == 'success' || needs.signed-screenshot.result == 'skipped') && (needs.signed-vnc-server.result == 'success' || needs.signed-vnc-server.result == 'skipped') && (needs.signed-servers.result == 'success' || needs.signed-servers.result == 'skipped') && (needs.signed-voice.result == 'success' || needs.signed-voice.result == 'skipped') && (needs.signed-sockscap.result == 'success' || needs.signed-sockscap.result == 'skipped') && (needs.signed-rdp-server-windows.result == 'success' || needs.signed-rdp-server-windows.result == 'skipped') && needs.plan.outputs.has_windows_native == 'true' }}
+    needs: [plan, build-windows, signed-modular-packages, signed-mfa-windows, signed-vnc-windows, signed-rdp-windows, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-rdp-server-windows]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-windows.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && (needs.signed-mfa-windows.result == 'success' || needs.signed-mfa-windows.result == 'skipped') && (needs.signed-vnc-windows.result == 'success' || needs.signed-vnc-windows.result == 'skipped') && (needs.signed-rdp-windows.result == 'success' || needs.signed-rdp-windows.result == 'skipped') && (needs.signed-mail.result == 'success' || needs.signed-mail.result == 'skipped') && (needs.signed-screenshot.result == 'success' || needs.signed-screenshot.result == 'skipped') && (needs.signed-vnc-server.result == 'success' || needs.signed-vnc-server.result == 'skipped') && (needs.signed-servers.result == 'success' || needs.signed-servers.result == 'skipped') && (needs.signed-voice.result == 'success' || needs.signed-voice.result == 'skipped') && (needs.signed-sockscap.result == 'success' || needs.signed-sockscap.result == 'skipped') && (needs.signed-rdp-server-windows.result == 'success' || needs.signed-rdp-server-windows.result == 'skipped') && needs.plan.outputs.has_windows_native == 'true' }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
       matrix: ${{ needs.plan.outputs.windows_native_matrix }}
@@ -748,7 +761,7 @@ jobs:
   summarize:
     name: qa-ui-auto-platforms-result
     if: always() && needs.plan.result != 'skipped'
-    needs: [plan, tool-contracts, sftp-contracts, selected-build-checks, frontend-contracts, signed-modular-packages, signed-mfa-linux, signed-mfa-macos, signed-vnc-linux, signed-vnc-windows, signed-vnc-macos, signed-rdp-linux, signed-rdp-windows, signed-rdp-macos, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-rdp-server-linux, signed-rdp-server-windows, signed-rdp-server-macos, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
+    needs: [plan, tool-contracts, sftp-contracts, selected-build-checks, frontend-contracts, signed-modular-packages, signed-mfa-linux, signed-mfa-windows, signed-mfa-macos, signed-vnc-linux, signed-vnc-windows, signed-vnc-macos, signed-rdp-linux, signed-rdp-windows, signed-rdp-macos, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-rdp-server-linux, signed-rdp-server-windows, signed-rdp-server-macos, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

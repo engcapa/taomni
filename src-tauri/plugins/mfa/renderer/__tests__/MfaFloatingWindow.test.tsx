@@ -1,10 +1,10 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MfaFloatingWindow } from "../MfaFloatingWindow";
-import { useAppStore } from "../../../stores/appStore";
-import { useMfaStore } from "../../../stores/mfaStore";
-import { useVaultStore } from "../../../stores/vaultStore";
-import type { MfaAccount } from "../../../lib/mfa/types";
+import { useAppStore } from "../../../../../src/stores/appStore";
+import { useMfaStore } from "../../../../../src/stores/mfaStore";
+import { useVaultStore } from "../../../../../src/stores/vaultStore";
+import type { MfaAccount } from "../../../../../src/lib/mfa/types";
 
 const account = (id: string, issuer: string): MfaAccount => ({
   id,

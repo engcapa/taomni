@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ClipboardPaste, ImageUp } from "lucide-react";
-import { useT } from "../../lib/i18n";
-import { readFileBytes } from "../../lib/ipc";
-import { NATIVE_FILE_DROP_EVENT, type NativeFileDropDetail } from "../../lib/osFileDrop";
-import { errorText } from "../../lib/mfa/format";
+import { useT } from "../../../../src/lib/i18n";
+import { readFileBytes } from "../../../../src/lib/ipc";
+import { NATIVE_FILE_DROP_EVENT, type NativeFileDropDetail } from "../../../../src/lib/osFileDrop";
+import { errorText } from "../../../../src/lib/mfa/format";
 import {
   NO_IMAGE,
   decodeImageFiles,
@@ -11,7 +11,7 @@ import {
   isImageFile,
   pasteEventQrTexts,
   readClipboardQrTexts,
-} from "../../lib/mfa/sources";
+} from "../../../../src/lib/mfa/sources";
 
 /** Outcome reported by the dialog after parsing decoded QR texts. */
 export type MfaTextsOutcome = { ok: true } | { ok: false; message: string };

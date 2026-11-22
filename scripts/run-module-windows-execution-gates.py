@@ -66,9 +66,11 @@ def run(evidence, *, require_defender=False):
         local_data = Path(os.environ["LOCALAPPDATA"]).resolve(strict=True)
         with tempfile.TemporaryDirectory(prefix="taomni-module-execution-", dir=local_data) as temporary:
             owner = Path(temporary).resolve()
+            mfa_manifest = ROOT / "src-tauri/plugins/mfa/module.json"
+            mfa_version = json.loads(mfa_manifest.read_text(encoding="utf-8"))["version"]
             paths = {"core": owner / "core/gate-core.exe",
                      "hello": owner / "modules/hello/0.1.0/taomni-hello-plugin.exe",
-                     "mfa": owner / "modules/mfa/0.1.0/taomni-plugin-mfa.exe"}
+                     "mfa": owner / "modules" / "mfa" / mfa_version / "taomni-plugin-mfa.exe"}
             for name, source_path in {"core": executable,
                                       "hello": ROOT / "src-tauri/target/debug/taomni-hello-plugin.exe",
                                       "mfa": ROOT / "src-tauri/target/debug/taomni-plugin-mfa.exe"}.items():

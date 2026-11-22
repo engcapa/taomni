@@ -3,11 +3,11 @@ import type { VncSessionProperties } from "../../lib/vnc/viewerContract";
 import type { MailTabInfo, Tab } from "../../types";
 import { useT } from "../../lib/i18n";
 import MailSessionPane from "./MailSessionPane";
+import { MfaSessionPane } from "./MfaSessionPane";
 import RdpSessionPane from "./RdpSessionPane";
 import SocksCapSessionPane from "./SocksCapSessionPane";
 import VncSessionPane from "./VncSessionPane";
 
-const LegacyMfaTab = lazy(() => import("../mfa/MfaTab").then((module) => ({ default: module.MfaTab })));
 const LegacyServersPanel = lazy(() => import("../servers/ServersPanel").then((module) => ({ default: module.ServersPanel })));
 const LegacyProxyTestTab = lazy(() => import("../proxy/ProxyTestTab"));
 
@@ -48,7 +48,7 @@ export function LegacyPluginTabPane(props: LegacyPluginTabPaneProps) {
   let content: ReactNode;
   switch (tab.type) {
     case "mfa":
-      content = <LegacyMfaTab onStatusMessage={props.onStatusMessage} />;
+      content = <MfaSessionPane tabId={tab.id} active={active} view="manager" onStatusMessage={props.onStatusMessage} />;
       break;
     case "servers":
       content = <LegacyServersPanel onClose={() => props.onClose(tab.id)} />;

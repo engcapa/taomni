@@ -1,5 +1,5 @@
-import { useT } from "../../lib/i18n";
-import { VaultGate } from "../vault/VaultGate";
+import { useT } from "../../../../src/lib/i18n";
+import { VaultGate } from "../../../../src/components/vault/VaultGate";
 import { MfaPanel } from "./MfaPanel";
 
 /**

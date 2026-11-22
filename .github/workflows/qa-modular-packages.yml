@@ -56,6 +56,7 @@ jobs:
       build_matrix: ${{ steps.macos_runner.outputs.build_matrix }}
       sign_matrix: ${{ steps.macos_runner.outputs.sign_matrix }}
       frontend_artifact: ${{ steps.macos_runner.outputs.frontend_artifact }}
+      roster_mfa_frontend_artifact: ${{ steps.macos_runner.outputs.roster_mfa_frontend_artifact }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -134,19 +135,30 @@ jobs:
               output.write('sign_matrix=' + json.dumps({'include': [
                   {'platform': target['platform'], 'legacy_roster': target['legacy_roster']} for target in targets
               ]}, separators=(',', ':')) + '\n')
-              if os.environ['QA_MODULE'] in {'vnc-client', 'rdp-client', 'mail', 'screenshot', 'sockscap'}:
-                  suffix = '-'.join(target['platform'] for target in targets)
+              suffix = '-'.join(target['platform'] for target in targets)
+              if os.environ['QA_MODULE'] in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap'}:
                   output.write(f"frontend_artifact=qa-{os.environ['QA_MODULE']}-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
+              if roster:
+                  output.write(f"roster_mfa_frontend_artifact=qa-roster-mfa-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
           PY
 
   desktop-frontend:
-    if: inputs.module == 'vnc-client' || inputs.module == 'rdp-client' || inputs.module == 'mail' || inputs.module == 'screenshot' || inputs.module == 'sockscap'
+    if: needs.source.outputs.frontend_artifact != ''
     needs: source
     uses: ./.github/workflows/build-vnc-frontend.yml
     with:
       source: ${{ needs.source.outputs.sha }}
       artifact: ${{ needs.source.outputs.frontend_artifact }}
       module: ${{ inputs.module }}
+
+  roster-mfa-frontend:
+    if: needs.source.outputs.roster_mfa_frontend_artifact != ''
+    needs: source
+    uses: ./.github/workflows/build-vnc-frontend.yml
+    with:
+      source: ${{ needs.source.outputs.sha }}
+      artifact: ${{ needs.source.outputs.roster_mfa_frontend_artifact }}
+      module: mfa
 
   build:
     name: Build unsigned ${{ inputs.module || 'hello-plugin' }} (${{ matrix.platform }})
@@ -234,7 +246,7 @@ jobs:
               if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
                   helper = 'taomni-vnc-key-helper.exe'
                   shutil.copyfile(binaries / helper, output / helper)
-              if slug not in {'vnc-client', 'rdp-client', 'mail', 'screenshot', 'sockscap'} and manifest['entry'].get('frontend'):
+              if slug not in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap'} and manifest['entry'].get('frontend'):
                   shutil.copytree(source / 'frontend', output / 'frontend')
 
           stage(os.environ['QA_MODULE'], 'unsigned-module')
@@ -292,10 +304,10 @@ jobs:
 
   sign:
     name: Sign official ${{ inputs.module || 'hello-plugin' }} (${{ matrix.platform }})
-    needs: [source, build, desktop-frontend]
+    needs: [source, build, desktop-frontend, roster-mfa-frontend]
     # Fork pull requests cannot request a production signature. A manual or
     # reusable invocation runs the workflow revision trusted by its operator.
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'engcapa/taomni' && needs.build.result == 'success' && (needs.desktop-frontend.result == 'success' || (inputs.module != 'vnc-client' && inputs.module != 'rdp-client' && inputs.module != 'mail' && inputs.module != 'screenshot' && inputs.module != 'sockscap' && needs.desktop-frontend.result == 'skipped')) }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'engcapa/taomni' && needs.build.result == 'success' && (needs.desktop-frontend.result == 'success' || (needs.source.outputs.frontend_artifact == '' && needs.desktop-frontend.result == 'skipped')) && (needs.roster-mfa-frontend.result == 'success' || (needs.source.outputs.roster_mfa_frontend_artifact == '' && needs.roster-mfa-frontend.result == 'skipped')) }}
     runs-on: ${{ inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-') && needs.source.outputs.macos_runner || 'ubuntu-24.04' }}
     timeout-minutes: 20
     strategy:
@@ -359,7 +371,7 @@ jobs:
                       windows_capture.verify(trusted_source, payload)
               allowed = {'module.json', *binaries, *resources}
               frontend = expected['entry'].get('frontend')
-              if frontend and slug not in {'vnc-client', 'rdp-client', 'mail', 'screenshot', 'sockscap'}:
+              if frontend and slug not in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap'}:
                   assert (trusted_source / frontend).is_file()
                   for source in (trusted_source / 'frontend').rglob('*'):
                       assert not source.is_symlink()
@@ -379,7 +391,7 @@ jobs:
           expected = check_payload(module, 'unsigned-module')
           if os.environ['MODULE_LEGACY_ROSTER'] == 'true':
               assert module == 'hello-plugin'
-              check_payload('mfa', 'unsigned-roster-mfa', '0.1.0')
+              check_payload('mfa', 'unsigned-roster-mfa')
           if module == 'hello-plugin':
               assert expected['version'] == '0.1.0', 'Update the lifecycle fixture versions together'
               check_payload(module, 'unsigned-previous', '0.0.9')
@@ -391,16 +403,27 @@ jobs:
               (failing / 'module.json').write_text(json.dumps({**expected, 'version': '0.1.1'}), encoding='utf-8')
           PY
       - uses: actions/download-artifact@v4
-        if: env.QA_MODULE == 'vnc-client' || env.QA_MODULE == 'rdp-client' || env.QA_MODULE == 'mail' || env.QA_MODULE == 'screenshot' || env.QA_MODULE == 'sockscap'
+        if: needs.source.outputs.frontend_artifact != ''
         with:
           name: ${{ needs.source.outputs.frontend_artifact }}
           path: trusted-desktop-frontend
       - name: Stage the verified module frontend bytes
-        if: env.QA_MODULE == 'vnc-client' || env.QA_MODULE == 'rdp-client' || env.QA_MODULE == 'mail' || env.QA_MODULE == 'screenshot' || env.QA_MODULE == 'sockscap'
+        if: needs.source.outputs.frontend_artifact != ''
         env:
           MODULE_SOURCE: ${{ needs.source.outputs.sha }}
           FRONTEND_TOOLING: ${{ github.workflow_sha }}
         run: python scripts/stage-vnc-frontend.py trusted-desktop-frontend candidate/unsigned-module "$MODULE_SOURCE" "$FRONTEND_TOOLING" "$QA_MODULE"
+      - uses: actions/download-artifact@v4
+        if: matrix.legacy_roster
+        with:
+          name: ${{ needs.source.outputs.roster_mfa_frontend_artifact }}
+          path: trusted-roster-mfa-frontend
+      - name: Stage the verified first-upgrade MFA frontend
+        if: matrix.legacy_roster
+        env:
+          MODULE_SOURCE: ${{ needs.source.outputs.sha }}
+          FRONTEND_TOOLING: ${{ github.workflow_sha }}
+        run: python scripts/stage-vnc-frontend.py trusted-roster-mfa-frontend candidate/unsigned-roster-mfa "$MODULE_SOURCE" "$FRONTEND_TOOLING" mfa
       - name: Check Linux module ABI against the core baseline
         if: matrix.platform == 'linux-x86_64'
         env:

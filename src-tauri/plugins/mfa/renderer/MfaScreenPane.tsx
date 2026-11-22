@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import { ScanLine } from "lucide-react";
-import { useT } from "../../lib/i18n";
-import { errorText, mfaErrorCode } from "../../lib/mfa/format";
-import { mfaCaptureScreens, mfaScanScreenTexts } from "../../lib/mfa/ipc";
-import { decodeLumaFrames } from "../../lib/mfa/qrImage";
+import { useT } from "../../../../src/lib/i18n";
+import { errorText, mfaErrorCode } from "../../../../src/lib/mfa/format";
+import { mfaCaptureScreens, mfaScanScreenTexts } from "../../../../src/lib/mfa/ipc";
+import { decodeLumaFrames } from "../../../../src/lib/mfa/qrImage";
 import type { MfaTextsOutcome } from "./MfaImagePane";
 
 export type MfaScreenDecoder = "renderer" | "module";

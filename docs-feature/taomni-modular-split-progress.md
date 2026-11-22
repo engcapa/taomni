@@ -2,7 +2,11 @@
 
 ## 2026-11-23 当前进展
 
-- Mail 0.1.30 由签名宿主持有 IMAP IDLE 连接。桌面在关闭标签时取消通知通道，宿主在通道关闭后结束服务器连接。TC-MODULES-088 检查收信、关闭和重开标签，以及停用后的真实连接数量。104 项 Rust 单测、核心编译和新协议测试编译通过，等待多端执行回执。
+- MFA 0.1.1 将管理页和浮窗的组件、二维码工具及样式打入签名模块前端。基座提供共享 Vault、布局和 IPC 服务，模块切换后清除已加载验证码并丢弃迟到的结果。TC-MODULES-089 和 090 验证双入口、相同 HOTP、停用及重新启用。原生用例还核对安装后前端文件的 SHA-256。独立前端构建、66 项前端单测、11 项宿主单测和 QA 目录检查通过，等待 GitHub 的签名包和三端运行回执。
+- Mail 0.1.30 的宿主进程测试已在 Linux、Windows 和 macOS ARM64 通过，原始断言覆盖 IMAP IDLE 到达通知和断开。三端回执绑定 `5caf56dba`。 [Mail IDLE 协议回执](https://github.com/engcapa/taomni/actions/runs/45063394131)
+- `45059590681` 的 18 个分片在执行期间收齐。Windows TC-MODULES-085 已核对端口关闭、驱动文件删除和卸载后的状态，同片后续崩溃回归通过。Windows 和 macOS 的三态自动还原均通过。Linux 的运行态和卸载保留态在离线安装表单改用键盘提交后复验。 [Windows 和三态还原回执](https://github.com/engcapa/taomni/actions/runs/45059590681)
+- Browser Mail 分页现读取实时邮箱。`91df69f28` 在 Linux 和 Windows 通过 TC-MODULES-087。macOS 点击时自动加载抢先移除了按钮。后续两种模式先断言按钮存在，再通过现有分页夹具执行加载，继续检查完整页数和邮件唯一性。 [浏览器和原生复跑](https://github.com/engcapa/taomni/actions/runs/45064193835)
+- Mail 0.1.30 由签名宿主持有 IMAP IDLE 连接。桌面在关闭标签时取消通知通道，宿主在通道关闭后结束服务器连接。TC-MODULES-088 检查收信、关闭和重开标签，以及停用后的真实连接数量。104 项 Rust 单测和核心编译通过，等待桌面用例的多端执行回执。
 - Mail 0.1.29 的含正文同步在 Linux、Windows 和 macOS ARM64 的宿主验证均通过。用例核对分页正文、用户目录写入失败的返回和全账号同步的标记刷新。 [三端进程回执](https://github.com/engcapa/taomni/actions/runs/45062202715)
 - 独立 MFA 的三端宿主各通过 11 项迁移与还原测试，包含运行、禁用、卸载保留三态、旧版归档恢复和 HOTP 计数回退。正式安装件和最终源码的回执仍待收齐。 [独立 MFA 回执](https://github.com/engcapa/taomni/actions/runs/45060444782)
 - Mail 0.1.28 的签名宿主支持按偏移量读取 IMAP 邮件头。关闭缓存时，邮件列表使用服务器分页并保留文件夹树。TC-MODULES-086 和 087 覆盖首页、继续加载、无重复和最后一页。三个 GitHub Runner 已通过宿主协议验证。首轮 Browser 用例缺少连接夹具变量，已补齐并派发复跑。 [宿主回执](https://github.com/engcapa/taomni/actions/runs/45059596326) · [Browser 复跑](https://github.com/engcapa/taomni/actions/runs/45061276996)

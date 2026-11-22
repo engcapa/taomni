@@ -1,16 +1,16 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { deferred, mfaAccount } from "../../test/mfaHarness";
-import type { QrSvgModel } from "../../lib/mfa/qrSvg";
+import { deferred, mfaAccount } from "../../../../src/test/mfaHarness";
+import type { QrSvgModel } from "../../../../src/lib/mfa/qrSvg";
 
 const exportUri = vi.hoisted(() => vi.fn());
 const qrModel = vi.hoisted(() => vi.fn());
 const writeText = vi.hoisted(() => vi.fn(async (_text: string) => undefined));
-vi.mock("../../lib/mfa/ipc", () => ({ mfaExportUri: exportUri }));
-vi.mock("../../lib/mfa/qrSvg", () => ({ qrSvgModel: qrModel }));
-vi.mock("../../lib/clipboard", () => ({ writeText }));
+vi.mock("../../../../src/lib/mfa/ipc", () => ({ mfaExportUri: exportUri }));
+vi.mock("../../../../src/lib/mfa/qrSvg", () => ({ qrSvgModel: qrModel }));
+vi.mock("../../../../src/lib/clipboard", () => ({ writeText }));
 
-import { useVaultStore } from "../../stores/vaultStore";
+import { useVaultStore } from "../../../../src/stores/vaultStore";
 import { MfaQrDialog } from "./MfaQrDialog";
 
 const URI = "otpauth://hotp/QA:qa?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&counter=0";
