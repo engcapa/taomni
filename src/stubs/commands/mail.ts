@@ -1,5 +1,5 @@
 import { mailArchiveStub } from "../mailArchiveStub";
-import { stubMailAppend, stubMailChangeFolder, stubMailClearCache, stubMailExpunge, stubMailFindHeader, stubMailListCached, stubMailListFolders, stubMailSearch, stubMailSyncAll, stubMailSyncFolder, stubMailIdleStart, stubMailSetSubscription, stubMailIdleStop, stubMailRecordSent, stubMailMutation, stubMailUpdateCachedFlags, stubMailMarkRead, stubMailPrefetchBodies, type Seed as MailStubSeed, type StubMailSearchQuery } from "../mailServerStub";
+import { stubMailAppend, stubMailChangeFolder, stubMailClearCache, stubMailExpunge, stubMailFindHeader, stubMailListCached, stubMailListFolders, stubMailSearch, stubMailSyncAll, stubMailSyncFolder, stubMailSyncHeaders, stubMailIdleStart, stubMailSetSubscription, stubMailIdleStop, stubMailRecordSent, stubMailMutation, stubMailUpdateCachedFlags, stubMailMarkRead, stubMailPrefetchBodies, type Seed as MailStubSeed, type StubMailSearchQuery } from "../mailServerStub";
 import { stubApplyFilters, stubListFilters, stubSaveFilters } from "../mailFiltersStub";
 import { stubAddressBookSuggestions, stubDeleteAddressBookEntry, stubListAddressBook, stubSaveAddressBookEntry } from "../mailContactsStub";
 import type { MailAddressBookEntry } from "../../lib/mailContacts";
@@ -291,23 +291,12 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
     case "mail_sync_headers": {
       const invokeArgs = args as InvokeArgs | undefined;
       const accountId = stubMailAccountId(invokeArgs);
-      const folder = ((invokeArgs?.folder as string | null | undefined) ?? "INBOX") || "INBOX";
-      const messages = stubMailMessages(accountId, folder);
-      const limit = Math.max(1, Number((invokeArgs?.limit as number | undefined) ?? messages.length));
+      const requestedFolder = invokeArgs?.folder as string | null | undefined;
+      const folder = requestedFolder?.trim() ? requestedFolder : "INBOX";
+      const config = invokeArgs?.config as { sync?: { maxFetchPerSync?: number } } | undefined;
+      const limit = Math.min(2000, Math.max(1, Number(invokeArgs?.limit ?? config?.sync?.maxFetchPerSync ?? 200)));
       const offset = Math.max(0, Number((invokeArgs?.offset as number | undefined) ?? 0));
-      const page = messages.slice(offset, offset + limit);
-      return {
-        accountId,
-        folder,
-        folders: stubMailListFolders(accountId, mailStubSeed),
-        messages: page,
-        fetchedMessages: page.length,
-        cachedBodies: page.filter((message) => message.bodyCached).length,
-        syncedAt: Math.floor(Date.now() / 1000),
-        offset,
-        limit,
-        hasMore: offset + page.length < messages.length,
-      } as T;
+      return stubMailSyncHeaders(accountId, mailStubSeed, folder, limit, offset) as T;
     }
 
     case "mail_idle_start": {

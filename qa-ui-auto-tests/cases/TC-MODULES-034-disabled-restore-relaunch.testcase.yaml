@@ -76,7 +76,7 @@ steps:
 - fill:
     selector: '[data-testid="module-offline-signature"]'
     value: ${fixture.module_signed_signature}
-- click: '[data-testid="module-offline-submit"]'
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
 - wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
 - module_signed_probe:
     phase: installed

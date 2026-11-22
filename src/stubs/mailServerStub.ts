@@ -165,6 +165,26 @@ export function stubMailListCached(accountId: string, seed: Seed, folder: string
   return rows.slice(offset, offset + limit);
 }
 
+export function stubMailSyncHeaders(accountId: string, seed: Seed, folder: string, limit: number, offset: number) {
+  const state = account(accountId, seed);
+  const { server } = folderState(state, folder);
+  const messages = [...server.values()]
+    .sort((left, right) => right.uid - left.uid)
+    .slice(offset, offset + limit);
+  return {
+    accountId,
+    folder,
+    folders: state.meta.map((meta) => folderPayload(accountId, state, meta)),
+    messages,
+    fetchedMessages: messages.length,
+    cachedBodies: messages.filter((message) => message.bodyCached).length,
+    syncedAt: nowTs(),
+    offset,
+    limit,
+    hasMore: offset + messages.length < server.size,
+  };
+}
+
 export function stubMailFindHeader(accountId: string, seed: Seed, folder: string, uid: number) {
   const state = account(accountId, seed);
   const entry = folderState(state, folder);
