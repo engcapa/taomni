@@ -21,7 +21,7 @@ steps:
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-sockscap"]'
-- wait_for: '[data-testid="sockscap-panel"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]'
 - assert_signed_sockscap_host: idle
 - show_sockscap_section: test
 - fill: {selector: '[data-testid="sockscap-test-host"]', value: route.example.test}

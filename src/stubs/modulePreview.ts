@@ -1,6 +1,7 @@
 import type { PluginManifest, PluginRecord } from "../lib/pluginRegistry";
 import mailManifest from "../../src-tauri/plugins/mail/module.json";
 import rdpManifest from "../../src-tauri/plugins/rdp-client/module.json";
+import socksCapManifest from "../../src-tauri/plugins/sockscap/module.json";
 import vncManifest from "../../src-tauri/plugins/vnc-client/module.json";
 
 /** Explicit browser-only fixture model. Never verifies or installs an archive. */
@@ -8,6 +9,7 @@ export const MODULE_PREVIEW_KEY = "taomni.preview.modules.v1";
 const VNC_PREVIEW_KEY = "taomni.preview.modules.vnc.v1";
 const RDP_PREVIEW_KEY = "taomni.preview.modules.rdp.v1";
 const MAIL_PREVIEW_KEY = "taomni.preview.modules.mail.v1";
+const SOCKSCAP_PREVIEW_KEY = "taomni.preview.modules.sockscap.v1";
 export const previewHelloManifest: PluginManifest = {
   id: "taomni-plugin-hello-plugin", slug: "hello-plugin", name: "Hello Plugin", version: "0.1.0",
   coreApiVersion: "1", kind: "collaboration", status: "provisional",
@@ -22,6 +24,7 @@ const previewModules = [
   { manifest: vncManifest as PluginManifest, key: VNC_PREVIEW_KEY },
   { manifest: rdpManifest as PluginManifest, key: RDP_PREVIEW_KEY },
   { manifest: mailManifest as PluginManifest, key: MAIL_PREVIEW_KEY },
+  { manifest: socksCapManifest as PluginManifest, key: SOCKSCAP_PREVIEW_KEY },
 ];
 
 interface PreviewState { lifecycle: PluginRecord["lifecycle"]; values: string[]; version?: string; previousVersion?: string }

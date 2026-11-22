@@ -31,6 +31,7 @@ LOCAL_STORAGE_KEYS = [
     "taomni.preview.module-network.v1",
     "taomni.preview.module-network-fail-once",
     "taomni.preview.modules.v1",
+    "taomni.preview.modules.sockscap.v1",
     "taomni.plugin-tabs.v1",
     "taomni.plugin-registry-revision.v1",
     "qa.recovery.bootstrap",

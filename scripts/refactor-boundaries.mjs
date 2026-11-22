@@ -81,7 +81,7 @@ const boundaries = [
   ["src/components/git/panel", "src/components/git/GitPanel.tsx"],
   ["src/components/terminal/panel", "src/components/terminal/TerminalPanel.tsx"],
   ["src/components/session/editor", "src/components/session/SessionEditor.tsx"],
-  ["src/components/sockscap/panel", "src/components/sockscap/SocksCapPanel.tsx"],
+  ["src-tauri/plugins/sockscap/renderer/panel", "src-tauri/plugins/sockscap/renderer/SocksCapPanel.tsx"],
   ["src/layouts/main", "src/layouts/MainLayout.tsx"],
 ];
 function sources(directory) {

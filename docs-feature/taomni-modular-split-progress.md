@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- Mail 0.1.20 的 POP3 进程复验在 Linux x64、Windows x64 和 macOS ARM64 全部通过。三个原始回执绑定 `4ed8042bf`，记录了宿主摘要和 runner 镜像。另一个应用运行在 `5a6e98c61` 上的三端 Browser 各通过 34/34。Windows Native 通过 42/44，其中 TC-MODULES-076 在桌面应用完成真实收信和去重。两个失败均为 SocksCap 宿主已返回结果后核心多解一层 Rust `Result`。 [POP3 宿主回执](https://github.com/engcapa/taomni/actions/runs/44985590659) · [应用分片](https://github.com/engcapa/taomni/actions/runs/44983227602)
+- SocksCap 0.1.2 将面板和样式放入签名包的 `frontend/index.js`。核心的系统更新仍可单独请求恢复授权。TC-MODULES-072 核对安装的前端摘要、Vault 导入和停用，TC-MODULES-073 核对实际规则响应，TC-MODULES-074 验证打开的标签经过启停后仍可继续使用。驱动、提权 helper、配置和恢复日志仍待迁出。正式发布须补齐同一候选的核心包、首发全模块包及 G1–G11 回执。
 - 合入远程 `main` 的 `ab6c4831a`（#860）。标签概览与工具栏相关 44 项单测、TypeScript、重构边界和 QA 静态审计通过。`5a6e98c61` 三端 Browser 各通过 34/34。POP3 进程测试的三端原始回执均显示测试服务器漏答登录后的 `STAT`，夹具已补齐并通过编译检查。 [Browser 与 Native](https://github.com/engcapa/taomni/actions/runs/44983227602) · [POP3 进程回执](https://github.com/engcapa/taomni/actions/runs/44983222465)
 - Mail 0.1.20 由签名宿主执行 POP3 的 UIDL、原件读取和删除标记。核心过渡层持有原账户库，先提交原件再允许宿主发送 QUIT。新增 TC-MODULES-076 验证签名安装、真实收信、读信、去重和停用。宿主进程用例核对二进制 MIME、主动提交和中断时关闭连接。83 项 Rust 单测、核心和宿主测试编译通过。
 - GitHub 原生分片发现 SocksCap 从空 Vault 导入链接时打开了解锁窗口。上游凭据改用统一 Vault 流程，首次设置完成后继续当前导入。TC-MODULES-075 验证 Browser 的取消、续办和 UUID 引用，TC-MODULES-072 核对签名宿主及实际端点。首轮用于预置 macOS 引导的字符串被测试工具拒绝，配置用例改为通过关闭按钮退出实际引导。Local Voice 复跑在设置页选预置模型，回到打开的聊天窗口验证实际录音。 [原生失败分片](https://github.com/engcapa/taomni/actions/runs/44975396751) · [合并版分片](https://github.com/engcapa/taomni/actions/runs/44981741088)

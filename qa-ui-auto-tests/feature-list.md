@@ -385,6 +385,7 @@ controls:
     aliases:
       - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
       - '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
       - '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
       - '[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
     kind: display
@@ -399,6 +400,7 @@ controls:
     aliases:
       - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-settings"]'
       - '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-settings"]'
+      - '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-settings"]'
       - '[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]'
     kind: interactive
   - id: plugin-tab-loading
@@ -9025,8 +9027,9 @@ status: partial
 area: network/sockscap
 components: [SocksCapPanel]
 files:
-  - src/components/sockscap/SocksCapPanel.tsx
-  - src/components/sockscap/SocksCapRootPrompt.tsx
+  - src/components/plugins/SocksCapSessionPane.tsx
+  - src/components/ElevationPasswordPrompt.tsx
+  - src/lib/sockscap/
   - src-tauri/crates/taomni-sockscap-api/
   - src-tauri/plugins/sockscap/
   - src-tauri/src/sockscap/
@@ -9042,8 +9045,15 @@ controls:
   - id: sidebar-entry
     selector: '[data-testid="sidebar-tool-sockscap"]'
     kind: interactive
+  - id: module-panel
+    selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"]'
+    kind: display
+    optional: true
   - id: panel
     selector: '[data-testid="sockscap-panel"]'
+    aliases:
+      - '[data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]'
+      - '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]'
     kind: display
   - id: locked-banner
     selector: '[data-testid="sockscap-locked-banner"]'
@@ -9238,7 +9248,7 @@ controls:
 -->
 
 - 提供全局/按应用 TCP 路由、上游代理、GFWList、规则 dry-run、状态与流量统计的控制面板。
-- 启用签名 SocksCap 后，测试目标会在独立宿主计算实际决策并显示命中的规则。TC-MODULES-073 从旧配置验证签名宿主，TC-MODULES-074 验证 Browser 结果面板。
+- 启用 SocksCap 后，Tools 标签加载模块前端和样式，测试目标在独立宿主计算实际决策并显示命中的规则。TC-MODULES-073 从旧配置验证签名宿主。TC-MODULES-074 在 Browser 从停用占位进入商店，在同一标签验证启用、试算和再次停用。
 - TC-MODULES-075 验证上游 UUID 保存时的 Vault 设置、取消和续办。TC-MODULES-072 验证签名代理链接导入在完成首次 Vault 设置后继续保存端点。
 - Linux 有权限时继续通过 nftables + cgroup v2 做透明 TCP 重定向；无 sudo、受限桌面容器等环境自动切换为“从 SocksCap 启动应用”的 loopback 捕获，不注入 HTTP_PROXY/ALL_PROXY 等代理变量。该模式只覆盖由面板启动的动态链接应用及其继承进程。
 - 浏览器预览覆盖控制面板状态流转；内核捕获和原始目标恢复由 Rust 单元/集成验证覆盖。

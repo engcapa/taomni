@@ -26,3 +26,7 @@ def setup_rdp(ctx):
 
 def setup_mail(ctx):
     _seed(ctx, "taomni.preview.modules.mail.v1")
+
+
+def setup_sockscap(ctx):
+    _seed(ctx, "taomni.preview.modules.sockscap.v1")

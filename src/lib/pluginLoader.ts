@@ -72,6 +72,7 @@ export async function loadPluginFrontend<Props = PluginFrontendProps>(
       if (manifest.slug === "vnc-client") url = "/src-tauri/plugins/vnc-client/renderer/VncPanel.tsx";
       if (manifest.slug === "rdp-client") url = "/src-tauri/plugins/rdp-client/renderer/RdpPanel.tsx";
       if (manifest.slug === "mail") url = "/src-tauri/plugins/mail/renderer/MailView.tsx";
+      if (manifest.slug === "sockscap") url = "/src-tauri/plugins/sockscap/renderer/SocksCapViewEntry.tsx";
     }
     if (manifest.slug === "vnc-client") {
       const { installVncViewerHost } = await import("./vnc/viewerHost");
@@ -84,6 +85,10 @@ export async function loadPluginFrontend<Props = PluginFrontendProps>(
     if (manifest.slug === "mail") {
       const { installMailRendererHost } = await import("./mail/rendererHost");
       installMailRendererHost();
+    }
+    if (manifest.slug === "sockscap") {
+      const { installSocksCapRendererHost } = await import("./sockscap/rendererHost");
+      installSocksCapRendererHost();
     }
     // A fragment changes ESM identity for retry/reactivation without changing
     // the signed resource path or allowing a query through the native protocol.

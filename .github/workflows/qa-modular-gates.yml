@@ -157,6 +157,13 @@ jobs:
           for (const path of Object.keys(manifest)) {
             assert(!/plugins\/(vnc|rdp)-client\/renderer\//.test(path), `Bundled remote desktop frontend ${path}`);
           }
+          for (const [source, asset] of Object.entries(manifest)) {
+            assert(!source.includes('plugins/sockscap/renderer/'), `Bundled SocksCap renderer ${source}`);
+            if (!/\.(js|css)$/.test(asset.file)) continue;
+            const bytes = readFileSync(`dist/${asset.file}`, 'utf8');
+            assert(!bytes.includes('taomni.sockscap.macosSetupGuide.v1') && !bytes.includes('.sockscap-panel'),
+              `Bundled SocksCap panel or stylesheet in ${asset.file}`);
+          }
           JS
       - uses: actions/upload-artifact@v4
         if: always()

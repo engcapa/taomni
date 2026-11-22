@@ -21,7 +21,7 @@ steps:
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-sockscap"]'
-- wait_for: '[data-testid="sockscap-panel"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]'
 - show_sockscap_section: upstream
 - wait_for: '[data-testid="sockscap-upstream-kind"]'
 - select_option: {selector: '[data-testid="sockscap-upstream-kind"]', value: trojan}
@@ -38,6 +38,12 @@ steps:
 - click: '[data-testid="module-action-disable-sockscap"]'
 - wait_for: '[data-testid="module-action-enable-sockscap"]'
 - assert_signed_sockscap_host: disabled
+- assert_file_sha256: {path: '${fixture.sockscap_signed_frontend}', equals: '${fixture.sockscap_signed_frontend_sha256}'}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="sockscap-panel"]', equal: 0}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -53,8 +59,11 @@ verification:
     - {step: 25, expectation: The profile also shows the parsed port.}
     - {step: 26, expectation: The signed parser owns a live writer lease during use.}
     - {step: 31, expectation: Module disable releases the lease.}
-    - {step: 32, expectation: Import and disable complete without runtime errors.}
-    results: [8, 9, 22, 24, 25, 26, 31, 32]
+    - {step: 32, expectation: The installed frontend matches the entry in the signed archive.}
+    - {step: 36, expectation: Reopening the retained tool displays the disabled module.}
+    - {step: 37, expectation: The proxy configuration panel has unmounted.}
+    - {step: 38, expectation: Import and disable complete without runtime errors.}
+    results: [8, 9, 22, 24, 25, 26, 31, 32, 36, 37, 38]
   visual:
   - check: The upstream settings reflect the imported proxy link.
     method: automated

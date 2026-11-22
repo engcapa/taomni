@@ -52,7 +52,8 @@ def run(ctx, phase):
     observed = writer_lease(isolated_data_root(owner) / "plugins", slug="sockscap", enabled=phase == "running")
     result = {
         "phase": phase, "sourceSha": receipt["sourceSha"], "platform": receipt["platform"],
-        "packageSha256": receipt["sha256"], "hostSha256": receipt["hostSha256"], "writerLease": observed,
+        "packageSha256": receipt["sha256"], "hostSha256": receipt["hostSha256"],
+        "frontendSha256": receipt["frontendSha256"], "writerLease": observed,
     }
     (ctx.case_dir / f"signed-sockscap-{phase}.json").write_text(
         json.dumps(result, indent=2) + "\n", encoding="utf-8",

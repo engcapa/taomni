@@ -2915,6 +2915,7 @@
 - `[data-testid="plugin-tab-unavailable"]` — display — F-Modules-1.plugin-tab-unavailable
   ↳ `[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
   ↳ `[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
+  ↳ `[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
   ↳ `[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
   ↳ `[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
 - `[data-testid="plugin-tab-error"]` — display — F-Modules-1.plugin-tab-error
@@ -2922,6 +2923,7 @@
 - `[data-testid="plugin-tab-settings"]` — interactive — F-Modules-1.plugin-tab-settings
   ↳ `[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-settings"]` — alias
   ↳ `[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-settings"]` — alias
+  ↳ `[data-plugin-slug="sockscap"] [data-testid="plugin-tab-settings"]` — alias
   ↳ `[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]` — alias
 - `[data-testid="plugin-tab-loading"]` — display [optional] — F-Modules-1.plugin-tab-loading
 - `[data-testid="hello-plugin-view"]` — display — F-Modules-1.hello-plugin-view
@@ -2937,7 +2939,10 @@
 - `[data-testid="side-tab-tools"]` — interactive — F-Sockscap-1.tools-side-tab
 - `[data-testid="sidebar-tools-panel"]` — display — F-Sockscap-1.tools-panel
 - `[data-testid="sidebar-tool-sockscap"]` — interactive — F-Sockscap-1.sidebar-entry
+- `[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"]` — display [optional] — F-Sockscap-1.module-panel
 - `[data-testid="sockscap-panel"]` — display — F-Sockscap-1.panel
+  ↳ `[data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]` — alias
+  ↳ `[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]` — alias
 - `[data-testid="sockscap-locked-banner"]` — display [optional] — F-Sockscap-1.locked-banner
 - `[data-testid="sockscap-add-profile"]` — interactive — F-Sockscap-1.add-profile
 - `[data-testid="sockscap-start"]` — interactive — F-Sockscap-1.start

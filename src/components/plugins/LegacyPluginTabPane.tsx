@@ -4,11 +4,11 @@ import type { MailTabInfo, Tab } from "../../types";
 import { useT } from "../../lib/i18n";
 import MailSessionPane from "./MailSessionPane";
 import RdpSessionPane from "./RdpSessionPane";
+import SocksCapSessionPane from "./SocksCapSessionPane";
 import VncSessionPane from "./VncSessionPane";
 
 const LegacyMfaTab = lazy(() => import("../mfa/MfaTab").then((module) => ({ default: module.MfaTab })));
 const LegacyServersPanel = lazy(() => import("../servers/ServersPanel").then((module) => ({ default: module.ServersPanel })));
-const LegacySocksCapPanel = lazy(() => import("../sockscap/SocksCapPanel").then((module) => ({ default: module.SocksCapPanel })));
 const LegacyProxyTestTab = lazy(() => import("../proxy/ProxyTestTab"));
 
 export interface LegacyPluginTabPaneProps {
@@ -54,7 +54,8 @@ export function LegacyPluginTabPane(props: LegacyPluginTabPaneProps) {
       content = <LegacyServersPanel onClose={() => props.onClose(tab.id)} />;
       break;
     case "sockscap":
-      content = <LegacySocksCapPanel onStatusMessage={props.onStatusMessage} onClose={() => props.onClose(tab.id)} />;
+      content = <SocksCapSessionPane tabId={tab.id} active={active} onStatusMessage={props.onStatusMessage}
+        onClose={() => props.onClose(tab.id)} />;
       break;
     case "proxy-test":
       content = tab.proxyTest ? <LegacyProxyTestTab info={tab.proxyTest} /> : <MissingPayload tab={tab} />;

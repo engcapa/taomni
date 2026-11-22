@@ -36,6 +36,7 @@ jobs:
             rdp-client) dependencies=(src/lib/rdpViewerHost.ts src/lib/rdpViewerContract.ts) ;;
             mail) dependencies=(src/lib/mail src/lib/mailHtml ':(glob)src/lib/mail*.ts') ;;
             screenshot) dependencies=(vite-plugins/screenshotOcr.ts scripts/stage-vnc-frontend.py) ;;
+            sockscap) dependencies=(src/lib/sockscap src/lib/sockscap.ts src/lib/sessionPaths.ts src/lib/sockscapPreflight.ts) ;;
             *) echo 'Unknown module frontend' >&2; exit 1 ;;
           esac
           git diff --quiet HEAD "${MODULE_SOURCE}^{commit}" -- \
