@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use taomni_mail_api::{ImapFolderTree, IncomingTest, MailIncomingProtocol};
+use taomni_mail_api::{HOST_REQUEST_TIMEOUT, ImapFolderTree, IncomingTest, MailIncomingProtocol};
 use taomni_mail_engine::{
     MailFolder,
     imap_transport::{ImapConnection, ImapSession},
@@ -12,7 +12,7 @@ use taomni_mail_engine::{
 };
 use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_plugin_sdk::Operation;
-use tokio::runtime::Runtime;
+use tokio::{io::AsyncReadExt, net::tcp::OwnedReadHalf, runtime::Runtime, task::JoinHandle};
 
 pub(super) fn check(
     runtime: &Runtime,
@@ -89,6 +89,21 @@ pub(super) async fn while_current<T>(
     }
 }
 
+pub(super) async fn while_connected<T>(
+    peer: &mut OwnedReadHalf,
+    interrupt: &TcpStream,
+    mut worker: JoinHandle<T>,
+) -> Option<T> {
+    tokio::select! {
+        result = &mut worker => return result.ok(),
+        _ = peer.read_u8() => {},
+        _ = tokio::time::sleep(HOST_REQUEST_TIMEOUT) => {},
+    }
+    let _ = interrupt.shutdown(Shutdown::Both);
+    let _ = worker.await;
+    None
+}
+
 pub(super) fn configure(
     stream: &TcpStream,
     protocol: MailIncomingProtocol,
@@ -127,16 +142,22 @@ fn probe(stream: TcpStream, input: IncomingTest) -> Result<usize, String> {
     match input.protocol {
         MailIncomingProtocol::Imap => Ok(open_imap(stream, &input)?.list_folders("")?.len()),
         MailIncomingProtocol::Pop3 => {
-            let connection = Pop3Connection {
-                server_name: &input.server_name,
-                security: input.security,
-                trusted_certificate: input.trusted_certificate.as_deref(),
-                username: &input.username,
-                secret: &input.secret,
-                authentication: input.authentication,
-            };
-            Pop3Session::open(stream, &connection)?.quit()?;
+            open_pop3(stream, &input)?.quit()?;
             Ok(0)
         }
     }
+}
+
+pub(super) fn open_pop3(stream: TcpStream, input: &IncomingTest) -> Result<Pop3Session, String> {
+    Pop3Session::open(
+        stream,
+        &Pop3Connection {
+            server_name: &input.server_name,
+            security: input.security,
+            trusted_certificate: input.trusted_certificate.as_deref(),
+            username: &input.username,
+            secret: &input.secret,
+            authentication: input.authentication,
+        },
+    )
 }

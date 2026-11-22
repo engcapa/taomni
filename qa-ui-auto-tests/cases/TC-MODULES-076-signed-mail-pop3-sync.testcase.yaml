@@ -1,0 +1,72 @@
+id: TC-MODULES-076
+title: The signed Mail host synchronizes a POP3 inbox without duplicates
+description: Install and enable the signed Mail module. Download from the fixture POP3 server through Quick Connect, check the real reader and repeat the sync before disabling the module.
+covers: [F-MAIL-3, F-MAIL-17, F-Modules-1]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, mail_server, module_signed_mail_archive]
+timeout_sec: 230
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: {selector: '[data-testid="module-action-disable-mail"]', timeout_sec: 45}
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_pop3_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
+- mail_server_assert_list_matches: {timeout_sec: 60}
+- assert_signed_mail_host: running
+- mail_server_deliver: {count: 1, prefix: Signed-POP3}
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- mail_server_assert_list_matches: {timeout_sec: 60}
+- press: {selector: '[data-testid="mail-message-row"][data-subject="Signed-POP3 0001"]', key: Enter}
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent
+      ?? document.querySelector('.taomni-mail-reader-text')?.textContent
+      ?? '').includes('Signed-POP3 0001')
+    expect_truthy: true
+    timeout_sec: 30
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- wait_for: {selector: '[data-testid="mail-sync-button"]:not([disabled])', timeout_sec: 45}
+- mail_server_assert_list_matches: {timeout_sec: 45}
+- assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Signed-POP3 0001"]', equal: 1}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-mail"]'
+- wait_for: {selector: '[data-testid="module-action-enable-mail"]', timeout_sec: 45}
+- assert_signed_mail_host: disabled
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: pop3-sync
+    requirement: An installed Mail host reads a real POP3 inbox. Repeated sync keeps one local copy of the new message, which opens in the reader. Disabling Mail releases the host.
+    actions: [8, 10, 15, 19, 20, 22, 24, 30]
+    checkpoints:
+    - {step: 12, expectation: The verified host is installed and idle before the session opens.}
+    - {step: 17, expectation: The initial local mailbox matches the fixture server.}
+    - {step: 18, expectation: The signed host holds the writer lease during use.}
+    - {step: 21, expectation: The local mailbox includes the newly delivered message.}
+    - {step: 23, expectation: The reader renders the original message body.}
+    - {step: 27, expectation: A repeat sync leaves exactly one copy of the new message.}
+    - {step: 32, expectation: Disabling Mail releases the host lease.}
+    - {step: 33, expectation: The workflow produces no runtime errors.}
+    results: [12, 17, 18, 21, 23, 27, 32, 33]
+  visual:
+  - check: The opened message shows the body fetched from the server.
+    method: automated
+    reason: The case reads the active Mail reader after selecting the new message.
+  native:
+  - check: Signed package installation, real POP3 synchronization and host cleanup.
+    method: automated
+    reason: The case checks the installed host, mailbox contents and writer lease.

@@ -10,6 +10,26 @@ use crate::{MailMessageCached, now_ts};
 /// Messages fetched per sync call. The consumer repeats while mail remains.
 const FETCH_BATCH: usize = 50;
 
+pub trait Pop3Mailbox {
+    fn uidl(&mut self) -> Result<Vec<(u32, String)>, String>;
+    fn retr(&mut self, number: u32) -> Result<Vec<u8>, String>;
+    fn dele(&mut self, number: u32) -> Result<(), String>;
+}
+
+impl Pop3Mailbox for Pop3Session {
+    fn uidl(&mut self) -> Result<Vec<(u32, String)>, String> {
+        Pop3Session::uidl(self)
+    }
+
+    fn retr(&mut self, number: u32) -> Result<Vec<u8>, String> {
+        Pop3Session::retr(self, number)
+    }
+
+    fn dele(&mut self, number: u32) -> Result<(), String> {
+        Pop3Session::dele(self, number)
+    }
+}
+
 pub struct Pop3SyncOutcome {
     pub messages: Vec<MailMessageCached>,
     pub remaining: usize,
@@ -17,7 +37,7 @@ pub struct Pop3SyncOutcome {
 }
 
 pub fn sync_inbox(
-    client: &mut Pop3Session,
+    client: &mut dyn Pop3Mailbox,
     conn: &Connection,
     account_id: &str,
     leave_days: Option<u32>,

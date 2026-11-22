@@ -8,6 +8,7 @@ use taomni_plugin_stream::routed_tcp::Endpoint;
 use zeroize::Zeroizing;
 
 pub mod imap_exchange;
+pub mod pop3_exchange;
 
 pub const SLUG: &str = "mail";
 pub const CHECK_INCOMING: &str = "mail/check-incoming";
@@ -23,6 +24,7 @@ pub const FETCH_IMAP_RAW: &str = "mail/fetch-imap-raw";
 pub const FETCH_IMAP_BODY: &str = "mail/fetch-imap-body";
 pub const PREFETCH_IMAP_BODIES: &str = "mail/prefetch-imap-bodies";
 pub const OPEN_IMAP_ARCHIVE: &str = "mail/open-imap-archive";
+pub const OPEN_POP3_SYNC: &str = "mail/open-pop3-sync";
 pub const FETCH_IMAP_ATTACHMENT: &str = "mail/fetch-imap-attachment";
 pub const SEND_SMTP: &str = "mail/send-smtp";
 pub const STORE_IMAP_SENT: &str = "mail/store-imap-sent";

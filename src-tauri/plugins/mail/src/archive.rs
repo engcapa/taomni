@@ -1,10 +1,8 @@
 //! Keep one cancellable IMAP connection for a full-message storage scan.
 
-use std::net::{Shutdown, TcpStream};
-
 use serde::Serialize;
 use taomni_mail_api::{
-    HOST_REQUEST_TIMEOUT, IncomingTest, MailIncomingProtocol,
+    IncomingTest, MailIncomingProtocol,
     imap_exchange::{ImapExchange, read_frame, write_frame},
 };
 use taomni_mail_engine::{
@@ -15,12 +13,10 @@ use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_plugin_sdk::Operation;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::tcp::OwnedReadHalf,
     runtime::Runtime,
-    task::JoinHandle,
 };
 
-use super::incoming::{configure, open_imap, while_current};
+use super::incoming::{configure, open_imap, while_connected, while_current};
 
 pub(super) fn start(
     runtime: &Runtime,
@@ -90,21 +86,6 @@ async fn serve(exchange: tokio::net::TcpStream, connection: IncomingTest) -> std
         }
         write.flush().await?;
     }
-}
-
-async fn while_connected<T>(
-    peer: &mut OwnedReadHalf,
-    interrupt: &TcpStream,
-    mut worker: JoinHandle<T>,
-) -> Option<T> {
-    tokio::select! {
-        result = &mut worker => return result.ok(),
-        _ = peer.read_u8() => {},
-        _ = tokio::time::sleep(HOST_REQUEST_TIMEOUT) => {},
-    }
-    let _ = interrupt.shutdown(Shutdown::Both);
-    let _ = worker.await;
-    None
 }
 
 fn encode<T: Serialize>(result: Result<T, String>) -> std::io::Result<Vec<u8>> {

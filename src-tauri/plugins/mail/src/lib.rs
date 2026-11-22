@@ -6,6 +6,7 @@ mod commands;
 mod imap_exchange;
 mod incoming;
 mod outgoing;
+mod pop3_sync;
 mod prefetch;
 mod snapshot;
 mod store;
@@ -16,8 +17,8 @@ use serde_json::Value;
 use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, DISCARD_IMAP_DRAFT, FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY,
     FETCH_IMAP_RAW, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, LIST_IMAP_UNREAD, MUTATE_IMAP_FOLDER,
-    OPEN_IMAP_ARCHIVE, PREFETCH_IMAP_BODIES, SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS,
-    STORE_IMAP_DRAFT, STORE_IMAP_SENT, SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND,
+    OPEN_IMAP_ARCHIVE, OPEN_POP3_SYNC, PREFETCH_IMAP_BODIES, SEARCH_IMAP, SEND_SMTP,
+    SET_IMAP_FLAGS, STORE_IMAP_DRAFT, STORE_IMAP_SENT, SYNC_IMAP_HEADERS, SYNC_IMAP_ROUND,
 };
 use taomni_plugin_api::{
     ErrorCode, RpcError,
@@ -53,6 +54,7 @@ fn host_config() -> HostConfig {
                 FETCH_IMAP_BODY,
                 PREFETCH_IMAP_BODIES,
                 OPEN_IMAP_ARCHIVE,
+                OPEN_POP3_SYNC,
                 FETCH_IMAP_ATTACHMENT,
                 SNAPSHOT_PREPARE_METHOD,
                 SNAPSHOT_METHOD,
@@ -185,6 +187,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(archive::start(&self.io, operation, input)?)
+            }
+            OPEN_POP3_SYNC => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(pop3_sync::start(&self.io, operation, input)?)
             }
             FETCH_IMAP_ATTACHMENT => {
                 let input = serde_json::from_value(params.unwrap_or_default())

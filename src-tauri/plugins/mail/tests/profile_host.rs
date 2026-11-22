@@ -31,6 +31,8 @@ use taomni_sqlite_snapshot::SnapshotControl;
 
 #[path = "support/imap.rs"]
 mod imap;
+#[path = "support/pop3.rs"]
+mod pop3;
 #[path = "support/smtp.rs"]
 mod smtp;
 
@@ -324,6 +326,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     imap::check_routed_attachment(&mut host);
     imap::check_routed_sent_copy(&mut host);
     imap::check_routed_draft(&mut host);
+    pop3::check_routed_sync(&mut host);
     snapshot_cache(&mut host, &context, &profile, &filename, &attachment);
     let folders = host.call("mail_list_cached_folders", json!({"accountId":ACCOUNT}));
     assert_eq!(folders[0]["name"], "INBOX");

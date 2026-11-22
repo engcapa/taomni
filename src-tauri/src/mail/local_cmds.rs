@@ -71,15 +71,25 @@ async fn download(
     let account_id = account.config.session_id.clone();
     let leave_days = account.config.pop3_leave_days;
     let db = state.mail_db(&account_id)?;
+    let registry = state.plugins.clone();
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let mut client = Pop3Client::connect(&account, &handle)?;
-        let outcome = {
+        let sync = |mailbox: &mut dyn taomni_mail_engine::pop3::Pop3Mailbox| {
             let conn = db.lock().map_err(|e| e.to_string())?;
             super::init_mail_tables(&conn).map_err(|e| e.to_string())?;
-            pop3::sync_inbox(&mut client.session, &conn, &account_id, leave_days)?
+            pop3::sync_inbox(mailbox, &conn, &account_id, leave_days)
         };
-        client.quit()?;
+        let outcome = if super::module_host::syncs_pop3(&registry) {
+            let mut client = super::module_host::HostedPop3::open(registry, &account, handle)?;
+            let outcome = sync(&mut client)?;
+            client.quit()?;
+            outcome
+        } else {
+            let mut client = Pop3Client::connect(&account, &handle)?;
+            let outcome = sync(&mut client.session)?;
+            client.quit()?;
+            outcome
+        };
         let new_unseen = outcome.messages.len();
         let headers = outcome.messages.into_iter().map(|m| m.header).collect();
         Ok((headers, new_unseen, outcome.remaining))

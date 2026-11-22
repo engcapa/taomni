@@ -3,6 +3,7 @@
 mod archive;
 mod downloads;
 mod imap_outgoing;
+mod pop3;
 mod prefetch;
 
 pub(super) use archive::{HostedArchive, archives_imap};
@@ -11,6 +12,7 @@ pub(super) use imap_outgoing::{
     discard_remote_draft, discards_remote_drafts, store_remote_draft, store_sent_copy,
     stores_remote_drafts,
 };
+pub(super) use pop3::{HostedPop3, syncs_pop3};
 pub(super) use prefetch::{prefetch_imap_bodies, prefetches_imap_bodies};
 
 use std::{
