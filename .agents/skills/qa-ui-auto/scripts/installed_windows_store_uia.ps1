@@ -6,11 +6,24 @@ param(
 $ErrorActionPreference = 'Stop'
 $script:diagnosticStage = 'initialization'
 trap {
+    $failure = $_
+    $observed = @()
+    if ($null -ne $window) {
+        foreach ($label in @('Search modules', 'No matching modules in this catalog.',
+                             'This version is installed', 'Install', 'Uninstall', 'Mail')) {
+            try {
+                $items = @(Named $window $label)
+                $observed += [pscustomobject]@{ label = $label; count = $items.Count }
+            } catch {}
+        }
+    }
     [Console]::Error.WriteLine(([pscustomobject]@{
         stage = $script:diagnosticStage
-        line = $_.InvocationInfo.ScriptLineNumber
-        exception = $_.Exception.GetBaseException().GetType().Name
-    } | ConvertTo-Json -Compress))
+        line = $failure.InvocationInfo.ScriptLineNumber
+        exception = $failure.Exception.GetBaseException().GetType().Name
+        module = $script:checkingModule
+        observed = $observed
+    } | ConvertTo-Json -Depth 3 -Compress))
     exit 1
 }
 $fixture = [Console]::In.ReadToEnd() | ConvertFrom-Json
@@ -24,7 +37,7 @@ function Named($Root, [string]$Name) {
 function Scoped-Control([string]$Label, [string]$ControlName, $Type, [string[]]$Exclude) {
     # The managed UIA client doesn't expose Chromium's ARIA role property.
     # Find the nearest group with this label and exactly one matching control.
-    $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+    $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
     foreach ($item in (Named $window $Label)) {
         $parent = $walker.GetParent($item)
         while ($null -ne $parent -and $parent -ne $window -and $parent.Current.ControlType -ne $types::Document) {
@@ -85,14 +98,31 @@ switch ($Phase) {
     }
     'roster' {
         $names = @()
+        $search = Wait-Element { Find-Control $window $types::Edit 'Search modules' } 'market-search'
         foreach ($entry in $fixture.modules) {
+            $script:checkingModule = $entry.id
+            # WebView2 can flatten an article's static text into its document.
+            # Clear the previous result before checking this signed catalog entry.
+            Set-Value $search ('absent-fixture-' + $entry.id)
+            $empty = 'No matching modules in this catalog.'
+            $null = Wait-Element { Named $window $empty } 'market-empty'
+            Set-Value $search $entry.query
+            $null = Wait-Element {
+                if (@(Named $window $empty).Count -eq 0) { return $true }
+            } 'market-result'
             if ($entry.removed) {
+                $null = Wait-Element {
+                    foreach ($label in @('Download module', 'Review and install')) {
+                        $action = Named $window $label | Where-Object { $_.Current.ControlType -eq $types::Button }
+                        if ($null -ne $action) { return $action }
+                    }
+                } 'removed-market-action'
                 $null = Wait-Element { Card-Control $entry.name 'Install' $types::Button } 'removed-mail-install'
-                if ($null -ne (Card-Control $entry.name 'This version is installed' $types::Text)) {
+                if (@(Named $window 'This version is installed').Count -gt 0) {
                     throw 'Removed Mail is still current'
                 }
             } else {
-                $null = Wait-Element { Card-Control $entry.name 'This version is installed' $types::Text } 'current-module'
+                $null = Wait-Element { Named $window 'This version is installed' } 'current-module'
                 $names += $entry.id
             }
         }

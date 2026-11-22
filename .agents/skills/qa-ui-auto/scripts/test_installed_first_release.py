@@ -90,7 +90,7 @@ class InstalledFirstReleaseTests(unittest.TestCase):
             self.assertEqual(owned_listener([*connections, connection(addr, 9222)], {48}, 9222), 48)
 
     def test_windows_reopens_same_store_after_removal_without_another_catalog_selection(self):
-        catalog = {i: {"name": r["slug"]} for i, r in self.roster.items()}
+        catalog = {i: {"name": r["slug"], "description": "Official desktop module"} for i, r in self.roster.items()}
         self.origin.start_catalog = "signed.json"
         self.origin.current_catalog = json.dumps({"plugins": catalog}).encode()
         owner = Mock(pid=401)
@@ -110,6 +110,9 @@ class InstalledFirstReleaseTests(unittest.TestCase):
                 self.assertEqual(phases, ["open-store", "roster"] + ([] if removed else ["remove-mail"]))
                 source = ui.call_args_list[0].kwargs["catalogSource"]
                 self.assertEqual(source, None if removed else windows_store.ORIGIN + "/signed.json")
+                for row in ui.call_args_list[1].kwargs["modules"]:
+                    slug = self.roster[row["id"]]["slug"]
+                    self.assertEqual(row["query"], f"{slug} Official desktop module {slug}")
                 self.assertEqual(stage["currentModules"], expected)
 
     def test_windows_store_rejects_another_owner_and_an_abnormal_exit(self):

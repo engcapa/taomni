@@ -55,8 +55,12 @@ def exercise_stage(executable, work, profile, evidence, origin, label, removed, 
     folder = evidence / label
     folder.mkdir()
     catalog = json.loads(origin.current_catalog)["plugins"]
-    modules = [{"id": module_id, "name": catalog[module_id]["name"], "removed": row["slug"] == removed}
-               for module_id, row in sorted(origin.roster.items())]
+    modules = []
+    for module_id, row in sorted(origin.roster.items()):
+        entry = catalog[module_id]
+        # The marketplace searches the displayed name, description and slug in this order.
+        query = f"{entry['name']} {entry.get('description') or ''} {row['slug']}"
+        modules.append({"id": module_id, "name": entry["name"], "query": query, "removed": row["slug"] == removed})
     with installed_windows_desktop(executable, work, folder, label, webview=work / "webview") as owner:
         # The monolith has no catalog setting. On first candidate launch, select
         # the verified CI feed through the product mirror input. Reopen must
