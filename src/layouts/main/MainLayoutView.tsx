@@ -65,6 +65,10 @@ export function MainLayoutView(props: MainLayoutViewProps) {
   const { pendingAuth } = layout;
   const activeSideTab = useAppStore((s) => s.activeSideTab);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
+  // Explorer has no left sidebar panel at all. Do not merely collapse it:
+  // unmounting the Panel and its resize handle removes the empty strip and the
+  // draggable divider, so no gesture can pull the retired panel back open.
+  const railOnlyExplorer = activeSideTab === "explorer";
   const setForceRailMerge = useWorkspaceRailStore((s) => s.setForceMerge);
   const openGlobalSearch = useWorkspaceUiStore((s) => s.openGlobalSearch);
   usePlatformShortcuts();
@@ -149,66 +153,78 @@ export function MainLayoutView(props: MainLayoutViewProps) {
           <PanelGroup
             orientation="horizontal"
             id="main-layout"
-            defaultLayout={loadResizableLayout("main-layout", ["sidebar", "content"])}
-            onLayoutChanged={saveResizableLayout("main-layout")}
+            // A persisted two-panel layout must not be applied while the
+            // sidebar panel is absent from the tree.
+            {...(railOnlyExplorer
+              ? {}
+              : {
+                  defaultLayout: loadResizableLayout("main-layout", ["sidebar", "content"]),
+                  onLayoutChanged: saveResizableLayout("main-layout"),
+                })}
             className="flex-1 min-w-0"
             // Size the resize hit target to match the 6px visible divider.
             // Sizing the hit target to the divider width keeps it from bleeding onto content/terminal.
             resizeTargetMinimumSize={{ coarse: 6, fine: 6 }}
           >
-            <Panel
-              panelRef={layout.sidebarPanelRef}
-              id="sidebar"
-              defaultSize="260px"
-              minSize="180px"
-              maxSize="520px"
-              collapsible
-              collapsedSize={0}
-              // The panel's default scroll container can pan the fixed rail when
-              // a focused/selected session is scrolled into view. Its children
-              // own their scrolling; this frame must keep the rail in place.
-              style={{ overflow: "clip" }}
-              onResize={(size: PanelSize, _id, prevSize?: PanelSize) => {
-                const percentage = size.asPercentage;
-                if (percentage > 2) {
-                  layout.lastSidebarSizeRef.current = percentage;
-                }
-                // The first report is the restored layout, which may carry another
-                // tab group's collapsed sidebar (ED-PARITY-027); the store's state
-                // wins and the sync effect resizes the panel to it.
-                if (!prevSize) return;
-                const collapsed = percentage <= 2;
-                // A resize that applies the store's current state is not a
-                // manual preference change (for example returning from Home).
-                if (collapsed !== useAppStore.getState().sidebarCollapsed) {
-                  layout.setSidebarCollapsed(collapsed);
-                }
-              }}
-            >
-              <div data-testid="expanded-sidebar-panel" className="taomni-navigator-frame h-full overflow-clip" style={layout.sidebarCollapsed ? { display: "none" } : undefined}>
-                <Sidebar
-                  panelOnly
-                  onNewSession={sessionActions.handleNewSession}
-                  onNewSftpSession={sessionActions.handleNewSftpSession}
-                  onEditSession={sessionActions.handleEditSession}
-                  onConnectSession={connections.handleConnectSession}
-                  onOpenSettings={() => menuActions.handleCommand("settings")}
-                  onCommand={handleSidebarCommand}
-                  onStartLocalTerminal={() => sessionActions.openLocalTab(tr("tabs.localTerminal"))}
+            {!railOnlyExplorer && (
+              <>
+                <Panel
+                  key="sidebar-panel"
+                  panelRef={layout.sidebarPanelRef}
+                  id="sidebar"
+                  defaultSize="260px"
+                  minSize="180px"
+                  maxSize="520px"
+                  collapsible
+                  collapsedSize={0}
+                  // The panel's default scroll container can pan the fixed rail when
+                  // a focused/selected session is scrolled into view. Its children
+                  // own their scrolling; this frame must keep the rail in place.
+                  style={{ overflow: "clip" }}
+                  onResize={(size: PanelSize, _id, prevSize?: PanelSize) => {
+                    const percentage = size.asPercentage;
+                    if (percentage > 2) {
+                      layout.lastSidebarSizeRef.current = percentage;
+                    }
+                    // The first report is the restored layout, which may carry another
+                    // tab group's collapsed sidebar (ED-PARITY-027); the store's state
+                    // wins and the sync effect resizes the panel to it.
+                    if (!prevSize) return;
+                    const collapsed = percentage <= 2;
+                    // A resize that applies the store's current state is not a
+                    // manual preference change (for example returning from Home).
+                    if (collapsed !== useAppStore.getState().sidebarCollapsed) {
+                      layout.setSidebarCollapsed(collapsed);
+                    }
+                  }}
+                >
+                  <div data-testid="expanded-sidebar-panel" className="taomni-navigator-frame h-full overflow-clip" style={layout.sidebarCollapsed ? { display: "none" } : undefined}>
+                    <Sidebar
+                      panelOnly
+                      onNewSession={sessionActions.handleNewSession}
+                      onNewSftpSession={sessionActions.handleNewSftpSession}
+                      onEditSession={sessionActions.handleEditSession}
+                      onConnectSession={connections.handleConnectSession}
+                      onOpenSettings={() => menuActions.handleCommand("settings")}
+                      onCommand={handleSidebarCommand}
+                      onStartLocalTerminal={() => sessionActions.openLocalTab(tr("tabs.localTerminal"))}
+                    />
+                  </div>
+                </Panel>
+
+                <PanelResizeHandle
+                  key="sidebar-resize-handle"
+                  id="main-sidebar-resize-handle"
+                  data-testid="main-sidebar-resize-handle"
+                  className="taomni-platform-resizer"
+                  // Keep the separator in layout so the panel library retains its
+                  // adjacent-panel mapping when Home collapses the navigator.
+                  style={layout.sidebarCollapsed ? { width: 0, visibility: "hidden", pointerEvents: "none" } : undefined}
                 />
-              </div>
-            </Panel>
+              </>
+            )}
 
-            <PanelResizeHandle
-              id="main-sidebar-resize-handle"
-              data-testid="main-sidebar-resize-handle"
-              className="taomni-platform-resizer"
-              // Keep the separator in layout so the panel library retains its
-              // adjacent-panel mapping when Home collapses the navigator.
-              style={layout.sidebarCollapsed ? { width: 0, visibility: "hidden", pointerEvents: "none" } : undefined}
-            />
-
-            <Panel id="content">
+            <Panel key="content-panel" id="content">
               <div className="h-full flex min-w-0">
                 {chrome.chatDrawerInline && layout.chatDrawerPosition === "left" && <ChatDrawer />}
                 <div data-testid="main-canvas-frame" className="taomni-main-canvas-frame h-full flex flex-col min-w-0 flex-1">

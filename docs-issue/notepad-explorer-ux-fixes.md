@@ -85,7 +85,10 @@
 ### 3.6 移除 Explorer 左侧边栏（U6）
 
 - 删除 `src/components/explorer/ExplorerSidebarPanel.tsx`；`Sidebar.tsx` 移除其 import 与 `case "explorer"`（回退到空面板），explorer 模式不再渲染扩展侧栏内容。
-- `MainLayoutView` 在 `activeSideTab === "explorer"` 时 `setSidebarCollapsed(true)`（与 home 一致）；`openExplorer.activateExplorer`、`PrimaryNavigationRail.activateMode("explorer")` 不再展开侧栏。
+- 进入 Explorer 时**从布局树中卸载整个侧栏 Panel 与可拖拽分隔条**（不是仅折叠）：`MainLayoutView` 在 `activeSideTab === "explorer"` 时不再渲染 `Panel id="sidebar"` 与 `PanelResizeHandle`，并临时不传持久化 `defaultLayout`；内容 Panel 使用稳定 key，切换模式时不重挂载（终端/编辑器状态保留）。
+- store 层把 Explorer 视为 rail-only 模式：`setActiveSideTab("explorer")` 直接置 `sidebarCollapsed: true` 且不写入 per-group 记忆；`setSidebarCollapsed`/`toggleSidebar` 在 explorer 下不污染其他模式的分组状态；`applySidebarForActiveTab` 在 explorer 下直接返回，避免恢复的空面板被重新展开。
+- `useMainWindowLifecycle` 的侧栏尺寸同步改为：panel 不存在时跳过，对重新挂载的 Panel 用 rAF 有界重试（规避 `Layout not found for Panel sidebar`），并以 `activeSideTab` 作为依赖，使从 Explorer 返回其它模式时重新应用折叠/宽度状态。
+- `openExplorer.activateExplorer`、`PrimaryNavigationRail.activateMode("explorer")` 不再展开侧栏。
 - `explorerPreferences` 移除 `pinnedPaths`；`ExplorerCommandBar` 更多菜单移除“固定到快速访问”；旧 localStorage 未知字段被忽略。
 - `Sidebar.test.tsx` 更新为 explorer 模式不再渲染 `explorer-sidebar-panel`。
 
@@ -147,3 +150,21 @@
 - 证据保留：`qa-ui-auto-report/hosted-ux/run-45005824556/**`（12 个 shard summary、selection、ci-summary、monitor.log）与 `run-45013282658/**`；不入库（report 目录被 gitignore），本文件记录 run/head/UUID 身份。
 - 未执行边界：Windows hosted 按用户要求不跑（Windows 由本机 browser/native 覆盖）；物理 OS 键盘/AppKit 菜单/真机打印等不计入本批。
 
+## 9. 追加修复：Explorer 左侧空白 Panel 彻底移除（2026-11-22 晚）
+
+用户复测截图显示：进入 File Explorer 后左侧仍有一条空白 panel 和可拖拽分隔条。根因不是内容未移除，而是视图只做了“折叠”：
+`MainLayoutView` 仍渲染 `Panel id="sidebar"` 与 `PanelResizeHandle`；同时 store 的 `setActiveSideTab` 对 explorer 返回 `sidebarCollapsed: false`，`applySidebarForActiveTab` 又可能按 tab group 记忆把面板重新展开，因此出现空白可拖拽面板。
+
+追加修改（本批仅 Windows 本机 browser/native 验证，未再触发 hosted）：
+
+- 视图层：explorer 模式下从 `PanelGroup` 中**卸载** sidebar Panel 与 resize handle（不渲染可拖拽分隔条），内容 Panel 加稳定 key 保证 —— 切换模式不重挂载会话/编辑器内容；explorer 时省略持久化 `defaultLayout` 避免单 Panel 组套用双 Panel 布局。
+- store 层：explorer 视为 rail-only —— `setActiveSideTab("explorer")` 直接 `sidebarCollapsed: true` 且不写 per-group 记忆；`setSidebarCollapsed`/`toggleSidebar` 在 explorer 不污染其它模式分组；`applySidebarForActiveTab` 在 explorer 直接返回。
+- `useMainWindowLifecycle`：panel 缺失时跳过、对重挂载 Panel 做有界 rAF 重试（消除 `Layout not found for Panel sidebar`），并以 `activeSideTab` 为依赖重新应用折叠/宽度。
+- 用例：新增 [`TC-EXPLORER-012`](../../qa-ui-auto-tests/cases/TC-EXPLORER-012-explorer-rail-only-layout.testcase.yaml)（browser+native）断言 explorer 下 `expanded-sidebar-panel`、`main-sidebar-resize-handle` 均为 0（结构性不存在），切回 Sessions 后二者恢复；unit 层新增/扩展 appStore sidebar 与 MainLayout layout 用例。
+
+验证（Windows 本机）：
+
+- 单元：`vitest run src/stores/appStore.test.ts src/layouts/MainLayout.test.tsx` 118/118 通过；`tsc -b` 通过；QA `audit --gate` / lint / testid catalog 通过（无 orphan/coverage 回归）。
+- browser：`TC-EXPLORER-012`、`TC-EXPLORER-011`、`TC-NP-007` 3/3 通过（`qa-ui-auto-report/ux-browser-railonly`）。
+- native（Windows QA debug 构建）：`TC-EXPLORER-012`、`TC-EXPLORER-010`、`TC-EXPLORER-003` 3/3 通过（`qa-ui-auto-report/ux-native-railonly`）。
+- 浏览器实测：explorer 下无 panel/handle，旧位置拖拽无任何展开；往返 Sessions 后内容 DOM 节点保持连接（无重挂载），控制台无错误。

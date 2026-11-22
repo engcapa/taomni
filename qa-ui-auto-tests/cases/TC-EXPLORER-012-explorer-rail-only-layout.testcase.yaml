@@ -1,0 +1,66 @@
+id: TC-EXPLORER-012
+title: Explorer is truly rail-only with no sidebar panel or draggable divider, and other modes restore the sidebar
+description: >-
+  U6 follow-up. The Explorer surface must not merely collapse the left navigator panel: the panel and its resize
+  handle are absent from the DOM, so the retired side bar cannot appear by default or be dragged open. The primary
+  rail and the Explorer tab strip stay visible and usable. Switching to Sessions must mount the sidebar panel and
+  divider again so every other mode keeps its normal collapsible navigator. Renderer layout evidence only; it does
+  not claim OS-level pointer delivery or a packaged-WebView repaint.
+modes: [browser, native]
+covers: [F-EXPLORER-1]
+tags: [p1, explorer, regression]
+fixtures: [reset_db]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+- vault_first_run: qa-explorer-rail-only
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
+# U6 follow-up: the old side panel is unmounted, so neither the empty panel
+# surface nor the resize divider exists for a pointer to grab.
+- assert_count: {selector: '[data-testid="expanded-sidebar-panel"]', equal: 0}
+- assert_count: {selector: '[data-testid="main-sidebar-resize-handle"]', equal: 0}
+- assert_visible: '[data-testid="sidebar-rail"]'
+- assert_count: {selector: '[data-testid="explorer-workspace-tab"]', min: 1}
+# Every other mode keeps the normal navigator surface and its divider.
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="main-sidebar-resize-handle"]'
+- assert_count: {selector: '[data-testid="expanded-sidebar-panel"]', equal: 1}
+- assert_visible: '[data-testid="main-canvas-frame"]'
+- assert_no_runtime_errors: null
+- screenshot: explorer-rail-only-layout.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: >-
+      The Explorer surface renders without a sidebar Panel or draggable resize divider while the rail and Explorer
+      tab strip remain visible.
+    actions: [4]
+    checkpoints:
+    - {step: 5, expectation: The Explorer platform view mounted.}
+    - {step: 6, expectation: The retired sidebar panel surface is absent from the DOM.}
+    - {step: 7, expectation: The draggable sidebar resize divider is absent from the DOM.}
+    - {step: 8, expectation: The primary navigation rail remains visible.}
+    - {step: 9, expectation: At least one Explorer tab remains rendered and usable.}
+    results: [6, 7]
+  - id: R2
+    requirement: >-
+      Switching back to Sessions remounts the sidebar panel and its resize divider, so non-Explorer modes keep their
+      collapsible navigator, and the workflow raises no uncaught runtime errors.
+    actions: [10]
+    checkpoints:
+    - {step: 11, expectation: The Sessions sidebar resize divider is mounted again.}
+    - {step: 12, expectation: The expanded sidebar panel surface is mounted again.}
+    - {step: 13, expectation: The main content canvas remains mounted.}
+    - {step: 14, expectation: No uncaught runtime errors occurred.}
+    results: [11, 12, 14]
+  visual:
+  - check: Rail-only Explorer layout and restored Sessions layout screenshots.
+    method: manual
+    reason: Structural DOM assertions are automated; pixel review of the layout is recorded separately.
+  native:
+  - check: Packaged WebView layout and OS pointer delivery for the removed divider.
+    method: external
+    reason: This case asserts renderer DOM/layout; physical pointer delivery is not established by WebView actions.

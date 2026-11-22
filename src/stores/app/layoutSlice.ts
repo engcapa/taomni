@@ -38,7 +38,10 @@ export function createInitialFloatingMfaState(): FloatingMfaWindowState {
 }
 
 function rememberSidebarChange(s: AppState, collapsed: boolean): Partial<AppState> {
-  if (s.activeSideTab === "home") return {};
+  // Home and Explorer are rail-only surfaces: their collapsed state is implied
+  // by the mode and must never overwrite the remembered state of a real
+  // sidebar group.
+  if (s.activeSideTab === "home" || s.activeSideTab === "explorer") return {};
   if (s.activeSideTab === "workspaces") {
     writeWorkspaceSidebarCollapsed(collapsed);
     return { workspaceSidebarCollapsed: collapsed };
@@ -69,8 +72,11 @@ export const createLayoutSlice: StateCreator<AppState, [], [], Pick<AppState, "s
       ...(tab === "sessions" && s.tabs.find((candidate) => candidate.id === s.activeTabId)?.type === "welcome"
         ? { activeTabId: [...s.tabs].reverse().find((candidate) => candidate.type !== "welcome")?.id ?? s.activeTabId }
         : {}),
-      sidebarCollapsed: tab === "home" || (tab === "workspaces" && s.workspaceSidebarCollapsed),
-      ...(tab === "home" || tab === "workspaces" || s.activeSideTab === "home" || s.activeSideTab === "workspaces"
+      // Explorer is a rail-only surface (no sidebar panel at all), so entering
+      // it must also mean "collapsed" at the store level; otherwise a later
+      // group-state application or resize callback can expand an empty panel.
+      sidebarCollapsed: tab === "home" || tab === "explorer" || (tab === "workspaces" && s.workspaceSidebarCollapsed),
+      ...(tab === "home" || tab === "explorer" || tab === "workspaces" || s.activeSideTab === "home" || s.activeSideTab === "workspaces"
         ? {} : rememberSidebarForActiveGroup(s, false)),
     }));
   },
@@ -87,7 +93,9 @@ export const createLayoutSlice: StateCreator<AppState, [], [], Pick<AppState, "s
   },
   applySidebarForActiveTab: () => {
     const s = get();
-    if (!s.mergeToolWindowRail || s.activeSideTab === "home" || s.activeSideTab === "workspaces") return;
+    // Rail-only surfaces never consume a remembered group sidebar state: doing
+    // so used to re-expand an empty Explorer panel after navigation/resize.
+    if (!s.mergeToolWindowRail || s.activeSideTab === "home" || s.activeSideTab === "workspaces" || s.activeSideTab === "explorer") return;
     const active = s.tabs.find((tab) => tab.id === s.activeTabId);
     const collapsed = s.sidebarCollapsedByGroup[sidebarRailGroup(active?.type)];
     if (collapsed === s.sidebarCollapsed) return;

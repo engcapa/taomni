@@ -2,6 +2,11 @@
 
 ## 2026-11-22 当前进展
 
+- 首发十模块升级已经在四个发布目标完成实装演练。Windows 最新的 `b7725bfb6` 工具回执确认正式 0.5.12 原 profile 升至候选 `647fec73c` 的 0.6.0，在商店逐项核对十个签名模块，卸载 Mail 后正常退出，重开核对九个活动模块，再回退并重开旧版。Linux deb、Intel DMG 和 ARM64 DMG 也已完成同一候选的这条路径。Windows 安装件 Authenticode 为 `NotSigned`，两个 DMG 的 Gatekeeper 评估均未接受。 [Windows 实装](https://github.com/engcapa/taomni/actions/runs/45022319884) · [Linux](https://github.com/engcapa/taomni/actions/runs/45016606951) · [双架构 macOS](https://github.com/engcapa/taomni/actions/runs/45016613506)
+- G9 已收齐候选 `647fec73c` 四个实际安装包的完整文件清单。Windows MSI、Linux deb、Intel DMG、ARM64 DMG 分别记录了 9、10、18、15 个常规文件。四份清单都发现了 ACP 集成测试程序和 SocksCap 的 Xray。Windows 还包含 WinDivert。每份回执附安装包 SHA-256、runner、原始清单路径和摘要。 [四目标清单](https://github.com/engcapa/taomni/actions/runs/45021836430)
+- Mail 0.1.25 的真实宿主附件缓存测试在三端均已通过。测试工具 `cdcbdd736` 保留 15 秒断言、旧缓存读取、分块传输和中断后保留原件的检查。产品源码 `95aea5939` 的三端 Browser 各通过 26/26，Linux Native 30/30。 [三端宿主](https://github.com/engcapa/taomni/actions/runs/45020690404) · [桌面用例](https://github.com/engcapa/taomni/actions/runs/45018022923)
+- 合入 main #865 的 Explorer 侧栏修复时，主线的侧栏用例与本分支的新建文件类型用例都使用 TC-EXPLORER-012。主线侧栏保留此编号，新建文件类型改为 TC-EXPLORER-014，新建后编辑保存的崩溃回归继续使用 TC-EXPLORER-013。合并后 118 项布局和应用状态单测、模块边界和 QA 用例目录检查通过。
+
 - 候选 `647fec73c` 的 Linux deb、macOS Intel 和 ARM64 DMG 已实装完成 0.5.12 → 0.6.0 → 0.5.12。三者均核对十个签名模块首装、卸载 Mail、重开后的九个活动模块和回退。Linux 还通过 MFA 强退恢复。Windows 已安装并启动旧 MSI。两次启动日志都记录了自有 WebView2 进程和 EdgeDriver，旧应用未提供预期的调试端口，升级未执行。Windows 安装件 Authenticode 为 `NotSigned`，两个 DMG 的 Gatekeeper 评估均未接受。[Linux 实装](https://github.com/engcapa/taomni/actions/runs/45016606951) · [Windows 和双架构 macOS 实装](https://github.com/engcapa/taomni/actions/runs/45016613506)
 - `8b2526b30` 的 18 个 Browser/Native 分片已在汇总前收齐。三端 Browser 各 35/35，macOS Native 41/41，Linux Native 38/39，Windows Native 38/40。后两端均遇到旧版 SocksCap 端口重开问题，Windows 的 TC-EXPLORER-013 在读取刚保存的 TypeScript 文件时收到访问拒绝。三端 Mail 宿主协议均通过。SocksCap 0.1.6 的首次复跑停在选集规划，缺少 macOS 安装包校验脚本的签名测试夹具已经修复。[桌面分片](https://github.com/engcapa/taomni/actions/runs/45011830158) · [宿主协议](https://github.com/engcapa/taomni/actions/runs/45014087694) · [规划失败](https://github.com/engcapa/taomni/actions/runs/45015861992)
 - Mail 0.1.25 将可选的 IMAP 附件缓存交给签名宿主。新包按账号、文件夹、UID、MIME 部件读写，完整传输后才替换缓存；只升级核心且仍启用旧 Mail 时继续使用原目录。TC-MODULES-083 覆盖服务器移除原件后重新打开同一附件，并核对模块数据和临时查看器的实际字节，TC-MAIL-STORAGE-01 补充账号缓存选项。7 项协议、82 项引擎及 13 项宿主单元通过。正文与归档索引仍有核心过渡代码，附件的三端运行结果待收取。

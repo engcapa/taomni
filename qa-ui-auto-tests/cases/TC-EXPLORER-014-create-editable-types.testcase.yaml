@@ -1,4 +1,4 @@
-id: TC-EXPLORER-012
+id: TC-EXPLORER-014
 title: Explorer creates recognized editable file types and rejects invalid names without overwriting files
 description: Toolbar and directory blank-area context entry open the same type selector. Exercise cancellation, path/preview-only rejection,
   an existing-file conflict, retry, extension-specific numbered names, selected rename and exact empty bytes. Native proves real exclusive
@@ -318,7 +318,7 @@ steps:
     path: ${fixture.file_open_root}/New file.md
     equals: ''
 - assert_no_runtime_errors: null
-- screenshot: TC-EXPLORER-012-create-editable-types.png
+- screenshot: TC-EXPLORER-014-create-editable-types.png
 verification:
   review: reviewed
   requirements:
