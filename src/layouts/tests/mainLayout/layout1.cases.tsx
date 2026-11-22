@@ -63,17 +63,24 @@ export function registerMainLayoutLayout1Cases() {
       render(<MainLayout />);
       act(() => useAppStore.getState().setActiveSideTab("explorer"));
       await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
+      // U6 follow-up: Explorer has no sidebar Panel at all, so neither the
+      // empty panel surface nor the draggable divider exists in the DOM.
+      expect(screen.queryByTestId("expanded-sidebar-panel")).toBeNull();
+      expect(screen.queryByTestId("main-sidebar-resize-handle")).toBeNull();
       // The title-bar/View-menu toggle (the mocked ControlBar button) and Ctrl+B
       // must not expand an empty explorer panel.
       fireEvent.click(screen.getByTestId("mock-sidebar-toggle"));
       expect(useAppStore.getState().sidebarCollapsed).toBe(true);
       fireEvent.keyDown(document.body, { ctrlKey: true, key: "b", code: "KeyB" });
       expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+      expect(screen.queryByTestId("main-sidebar-resize-handle")).toBeNull();
       // Returning to a mode with real sidebar content restores the toggle: the
       // terminal group's own ED-PARITY-027 preference applies again and the
       // title-bar/View-menu toggle expands the panel.
       act(() => useAppStore.getState().setActiveSideTab("sessions"));
       expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+      await waitFor(() => expect(screen.queryByTestId("main-sidebar-resize-handle")).not.toBeNull());
+      expect(screen.getByTestId("expanded-sidebar-panel")).toBeInTheDocument();
       fireEvent.click(screen.getByTestId("mock-sidebar-toggle"));
       expect(useAppStore.getState().sidebarCollapsed).toBe(false);
     });
