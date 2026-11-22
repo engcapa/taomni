@@ -121,13 +121,14 @@ class AdoptedProcess:
     """
     EXIT_UNAVAILABLE = "process gone; exit status unavailable (adopted process)"
 
-    def __init__(self, expected: dict):
+    def __init__(self, expected: dict, inspect=None):
         self.expected = dict(expected)
         self.pid = expected["pid"]
         self.returncode = None
+        self.inspect = inspect
 
     def poll(self):
-        current = identity(self.pid)
+        current = (self.inspect or identity)(self.pid)
         if current is None or current != self.expected:
             self.returncode = self.EXIT_UNAVAILABLE
         return self.returncode
@@ -141,7 +142,7 @@ class AdoptedProcess:
         return self.returncode
 
     def send_signal(self, value):
-        if identity(self.pid) == self.expected:
+        if (self.inspect or identity)(self.pid) == self.expected:
             try:
                 os.kill(self.pid, value)
             except ProcessLookupError:

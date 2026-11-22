@@ -63,7 +63,7 @@ class ProcessObservationTests(unittest.TestCase):
 
 
 class RelaunchTests(unittest.TestCase):
-    def scenario(self, stack, root, *, exit_code=0, after_pid=222, wrong_environment=False):
+    def scenario(self, stack, root, *, exit_code=0, after_pid=222, wrong_environment=False, system="Darwin"):
         binary = root / "taomni"
         binary.write_bytes(b"unit-only fixture; never executed")
         isolation = {f"NEWMOB_{kind.upper()}_DIR": str(root / kind) for kind in ("data", "config", "cache")}
@@ -76,7 +76,7 @@ class RelaunchTests(unittest.TestCase):
                                  host="127.0.0.1", port=4444, start=Mock())
         ready = {"dialog": True, "count": 1, "enabled": True, "visible": True, "staged": False, "error": None}
         session = NativeSession("http://127.0.0.1:4444", binary)
-        session.transport = "macOS WKWebView bridge"
+        session.transport = "macOS WKWebView bridge" if system == "Darwin" else "Taomni QA WebView bridge"
         session.session_id = "constant-mac-id"
         session.execute = Mock(side_effect=[ready, {**ready, "staged": True, "enabled": False}])
         session.click, session.close = Mock(), Mock()
@@ -85,7 +85,7 @@ class RelaunchTests(unittest.TestCase):
         session.start = Mock(side_effect=attach)
         def current(pid):
             return {"pid": pid, "start_sec": pid, "start_usec": 1, "executable": str(binary)}
-        stack.enter_context(patch("native_restore_relaunch.platform.system", return_value="Darwin"))
+        stack.enter_context(patch("native_restore_relaunch.platform.system", return_value=system))
         stack.enter_context(patch("native_restore_relaunch.identity", side_effect=current))
         stack.enter_context(patch("native_restore_relaunch.listener_pid", side_effect=[111, after_pid, after_pid]))
         stack.enter_context(patch("native_restore_relaunch.environment", side_effect=lambda pid, keys:
@@ -94,18 +94,19 @@ class RelaunchTests(unittest.TestCase):
         return driver, session
 
     def test_real_click_staged_success_normal_exit_and_existing_child_attachment(self):
-        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
-            driver, session = self.scenario(stack, Path(directory).resolve())
-            result = confirm_restore_relaunch(driver, session)
-            self.assertTrue(result["passed"])
-            self.assertFalse(result["manual_launch"])
-            self.assertEqual(result["original_exit_code"], 0)
-            self.assertNotEqual(result["before"]["pid"], result["after"]["pid"])
-            self.assertIsInstance(driver.proc, AdoptedProcess)
-            session.click.assert_called_once_with(CONFIRM)
-            session.start.assert_called_once_with()
-            session.close.assert_not_called()
-            driver.start.assert_not_called()
+        for system in ("Darwin", "Linux", "Windows"):
+            with self.subTest(system=system), tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+                driver, session = self.scenario(stack, Path(directory).resolve(), system=system)
+                result = confirm_restore_relaunch(driver, session)
+                self.assertTrue(result["passed"])
+                self.assertFalse(result["manual_launch"])
+                self.assertEqual(result["original_exit_code"], 0)
+                self.assertNotEqual(result["before"]["pid"], result["after"]["pid"])
+                self.assertIsInstance(driver.proc, AdoptedProcess)
+                session.click.assert_called_once_with(CONFIRM)
+                session.start.assert_called_once_with()
+                session.close.assert_not_called()
+                driver.start.assert_not_called()
 
     def test_crash_same_pid_and_changed_isolation_all_fail_without_manual_fallback(self):
         for kwargs in ({"exit_code": 1}, {"after_pid": 111}, {"wrong_environment": True}):

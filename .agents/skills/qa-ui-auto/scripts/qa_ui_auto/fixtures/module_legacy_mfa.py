@@ -15,7 +15,6 @@ from tauri_webdriver import NativeSession, TauriDriverProcess, native_binary, na
 
 from ..deadline import Deadline
 from ..legacy_install import install
-from ..native_steps import NativeStepContext, run_native_step
 from . import module_mfa_restore
 from .backup_policy import isolated_data_root
 
@@ -57,6 +56,8 @@ def legacy_driver(ctx, executable, desktop):
 
 
 def desktop_action(steps, verb, args):
+    from ..native_steps import run_native_step
+
     try:
         run_native_step(steps, verb, args)
     except Exception as error:
@@ -72,6 +73,8 @@ def open_mfa(steps):
 
 
 def unlock_vault(ctx, session, evidence):
+    from ..native_steps import NativeStepContext
+
     steps = NativeStepContext(session, evidence, ctx.cfg)
     desktop_action(steps, "wait_for", element("vault-unlock-dialog"))
     desktop_action(steps, "fill", {"selector": element("vault-unlock-pw"), "value": PASSWORD})
@@ -89,6 +92,8 @@ def open_unlocked_mfa(ctx, session, evidence):
 
 
 def create_account(session, ctx, evidence):
+    from ..native_steps import NativeStepContext
+
     steps = NativeStepContext(session, evidence, ctx.cfg)
 
     def action(verb, args):

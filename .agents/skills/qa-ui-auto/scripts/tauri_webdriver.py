@@ -272,6 +272,7 @@ class TauriDriverProcess:
         self.native_driver = webdriver.get("native_driver")
         self.native_port = int(webdriver.get("native_port", 4445))
         self._restart_required = False
+        self.restore_bridge = False
         self.startup_timeout = float(webdriver.get("startup_timeout", 20))
         self.macos_lldb = platform.system() == "Darwin" and cfg.get("app", {}).get("macos_lldb") is True
 
@@ -280,37 +281,16 @@ class TauriDriverProcess:
             raise WebDriverError("Native isolation requires a local driver started by this run")
         if _tcp_ok(self.host, self.port):
             raise WebDriverError(f"Driver port {self.port} is occupied; choose a free port so the driver inherits QA isolation")
-        if platform.system() != "Darwin" and (
+        if not self.uses_bridge and (
             self.native_port == self.port or _tcp_ok(self.host, self.native_port)
         ):
             raise WebDriverError(f"Native driver port {self.native_port} must be free and distinct from the driver port")
         out = self.report_root / "tauri-driver.out.log"
         err = self.report_root / "tauri-driver.err.log"
         out.parent.mkdir(parents=True, exist_ok=True)
-        if platform.system() == "Darwin":
-            # tauri-driver intentionally refuses to run on macOS.  The QA
-            # binary contains an opt-in WKWebView bridge which exposes the
-            # same W3C subset over this run-owned loopback port.
-            if not self.application.is_file():
-                raise WebDriverError(f"macOS QA application not found: {self.application}")
-            env = driver_start_environment(self)
-            env["TAOMNI_QA_WEBDRIVER_HOST"] = self.host
-            env["TAOMNI_QA_WEBDRIVER_PORT"] = str(self.port)
-            command = [str(self.application.resolve())]
-            if self.macos_lldb:
-                command = ["lldb", "--batch", "-o", "settings set target.disable-aslr false",
-                           "-o", "run", "-k", "thread backtrace all", "-k", "process kill",
-                           "--", *command]
-            with out.open("a", encoding="utf-8") as stdout, err.open("a", encoding="utf-8") as stderr:
-                self.proc = subprocess.Popen(
-                    command,
-                    start_new_session=self.macos_lldb,
-                    cwd=ROOT,
-                    env=env,
-                    stdout=stdout,
-                    stderr=stderr,
-                    text=True,
-                )
+        if self.uses_bridge:
+            from native_qa_bridge import launch
+            self.proc = launch(self, ROOT, out, err)
         else:
             cmd = [self.command, "--port", str(self.port), "--native-port", str(self.native_port)]
             if self.native_driver:
@@ -337,12 +317,16 @@ class TauriDriverProcess:
             # request is forwarded while the native driver is still absent
             # and fails as RemoteDisconnected/connection refused.
             ready = _tcp_ok(self.host, self.port)
-            if platform.system() != "Darwin":
+            if not self.uses_bridge:
                 ready = ready and _tcp_ok(self.host, self.native_port)
             if ready:
                 return
             time.sleep(0.25)
         raise WebDriverError(f"native driver did not listen on {self.url}")
+
+    @property
+    def uses_bridge(self) -> bool:
+        return platform.system() == "Darwin" or self.restore_bridge
 
     def ensure_running(self) -> None:
         from native_driver_lifecycle import ensure_owned_driver_running
@@ -352,7 +336,7 @@ class TauriDriverProcess:
         """Release owned Windows children before the next fixture reset."""
         if platform.system() in ("Darwin", "Windows"):
             self._restart_required = True
-        if platform.system() == "Windows":
+        if self.restore_bridge or platform.system() == "Windows":
             # DELETE can fail or return while WebView2/the app still owns the
             # profile. The isolated driver owns this entire process tree;
             # terminate it now, before reset_db, and restart for the next case.
@@ -361,12 +345,12 @@ class TauriDriverProcess:
     def stop(self) -> None:
         if not self.proc:
             return
-        if platform.system() == "Linux":
+        if platform.system() == "Linux" and not self.uses_bridge:
             from native_process_group import stop_owned_process_group
             stop_owned_process_group(self.proc)
             self.proc = None
             return
-        if platform.system() == "Windows" and self.proc.poll() is None:
+        if platform.system() == "Windows" and not self.uses_bridge and self.proc.poll() is None:
             result = subprocess.run(
                 ["taskkill", "/PID", str(self.proc.pid), "/T", "/F"],
                 capture_output=True, text=True, timeout=20,
@@ -1033,6 +1017,9 @@ class NativeSession(WebDriverTransport):
         return str(self.request("GET", self.element_path(element, "/text")) or "")
 
     def screenshot(self, target: Path) -> str:
+        if self.transport == "Taomni QA WebView bridge":
+            from native_qa_bridge import capture_desktop
+            return capture_desktop(target, platform.system())
         data = self.request("GET", self.endpoint("/screenshot"))
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(base64.b64decode(str(data)))
@@ -1109,7 +1096,10 @@ class NativeHarness:
                     os.environ[key] = previous
             self._previous_env.clear()
 
-    def create_session(self, *, tooling_java_home: str | None = None) -> NativeSession:
+    def create_session(self, *, tooling_java_home: str | None = None, restore_bridge: bool = False) -> NativeSession:
+        if restore_bridge != self.driver.restore_bridge:
+            self.driver.stop()
+            self.driver.restore_bridge = restore_bridge
         self.driver.ensure_running()
         java_home = tooling_java_home or self.cfg.get("app", {}).get("tooling_java_home")
         if java_home and self._previous_env:
@@ -1122,8 +1112,10 @@ class NativeHarness:
                 encoding="utf-8",
             )
         session = NativeSession(self.driver.url, self.application, self.driver.mark_session_closed)
+        if restore_bridge:
+            session.transport = "Taomni QA WebView bridge"
         session.pointer_observations_path = self.report_root / "native-pointer-clicks.jsonl"
-        session.owned_app_pid = (self.driver.proc.pid if platform.system() == "Darwin"
+        session.owned_app_pid = (self.driver.proc.pid if self.driver.uses_bridge
                                  and self.driver.proc and not self.driver.macos_lldb else None)
         from native_application_restart import bind_application_restarter
         bind_application_restarter(self.driver, session)

@@ -461,8 +461,9 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     harness.deadline = deadline
                     java25_home = (cfg.get("app", {}).get("tooling_java25_home")
                                    if "java25_projects" in c.fixtures else None)
-                    session = (harness.create_session(tooling_java_home=java25_home)
-                               if java25_home else harness.create_session())
+                    bridge = any("native_confirm_restore_relaunch" in step for step in c.steps)
+                    session = harness.create_session(tooling_java_home=java25_home) if java25_home else (
+                        harness.create_session(restore_bridge=True) if bridge and current_target != "macOS" else harness.create_session())
                     r["timings"]["session_setup_sec"] = time.monotonic() - session_started
                     nctx: NativeStepContext | None = None
                     try:

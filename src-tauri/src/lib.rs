@@ -238,12 +238,10 @@ pub fn run() {
             }
 
             if let Some(main_window_config) = app.config().app.windows.first().cloned() {
-                #[allow(unused_mut)]
-                let mut builder =
-                    WebviewWindowBuilder::from_config(app.handle(), &main_window_config)?
-                        // Required on Linux/Windows for navigator.clipboard.readText().
-                        // Terminal right-click paste and Shift+Insert use that API.
-                        .enable_clipboard_access();
+                let builder = WebviewWindowBuilder::from_config(app.handle(), &main_window_config)?
+                    // Required on Linux/Windows for navigator.clipboard.readText().
+                    // Terminal right-click paste and Shift+Insert use that API.
+                    .enable_clipboard_access();
                 builder = webview_environment::configure(app.handle(), builder);
                 // On macOS use the native traffic-light controls with an overlay
                 // title bar so the window feels native (the frontend reserves a
@@ -251,37 +249,11 @@ pub fn run() {
                 // and Linux keep the borderless custom chrome from tauri.conf.json
                 // (decorations = false).
                 #[cfg(target_os = "macos")]
-                {
-                    builder = builder
-                        .decorations(true)
-                        .title_bar_style(tauri::TitleBarStyle::Overlay)
-                        .hidden_title(true);
-
-                    // A WebView accepts the bridge's TCP connection before
-                    // its document can service `eval_with_callback`.  Delay
-                    // exposing the QA endpoint until the initial page has
-                    // finished loading; subsequent reloads are harmless as
-                    // the bridge start is idempotent within this process.
-                    if let Ok(raw_port) = std::env::var("TAOMNI_QA_WEBDRIVER_PORT") {
-                        if let Ok(port) = raw_port.trim().parse::<u16>() {
-                            let host = std::env::var("TAOMNI_QA_WEBDRIVER_HOST")
-                                .unwrap_or_else(|_| "127.0.0.1".to_string());
-                            let app_handle = app.handle().clone();
-                            builder = builder.on_page_load(move |window, payload| {
-                                if payload.event() == tauri::webview::PageLoadEvent::Finished {
-                                    qa_driver::start(
-                                        app_handle.clone(),
-                                        window,
-                                        host.clone(),
-                                        port,
-                                    );
-                                }
-                            });
-                        } else {
-                            log::warn!("qa webdriver bridge ignored invalid port {raw_port:?}");
-                        }
-                    }
-                }
+                let builder = builder
+                    .decorations(true)
+                    .title_bar_style(tauri::TitleBarStyle::Overlay)
+                    .hidden_title(true);
+                let builder = qa_driver::configure(app.handle(), builder);
                 let main_window = builder.build()?;
                 webview_recovery::install(&main_window);
                 screenshot::prewarm(app.handle());

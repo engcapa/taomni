@@ -44,6 +44,11 @@ def windows_webview_options(environment, app_id):
 def ensure_owned_driver_running(
     driver: DriverOwner, *, system: str, tcp_probe: Callable[[str, int], bool],
 ) -> None:
+    if getattr(driver, "restore_bridge", False):
+        if driver.proc is None or driver.proc.poll() is not None:
+            wait_for_driver_ports(driver.host, (driver.port,))
+            driver.start()
+        return
     # Fixtures may temporarily prepend a disposable executable. A reused
     # tauri-driver otherwise keeps its old PATH when spawning the next app.
     if (hasattr(driver, "_inherited_path")

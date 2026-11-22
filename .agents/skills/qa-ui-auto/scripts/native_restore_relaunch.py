@@ -1,8 +1,7 @@
-"""Click the real restore confirmation once and observe its own macOS relaunch.
+"""Click the real restore confirmation once and observe its relaunch.
 
 This observer never starts an application or calls the restore/restart IPC.
-The macOS bridge's POST /session attaches to the already running QA app.
-Linux/Windows driver attachment remains a separate, explicit coverage gap.
+The QA bridge's POST /session attaches to the already running desktop.
 """
 from __future__ import annotations
 
@@ -11,7 +10,9 @@ from pathlib import Path
 import platform
 import time
 
-from native_macos_process import AdoptedProcess, environment, identity, listener_pid
+import native_macos_process
+import native_qa_bridge
+from native_macos_process import AdoptedProcess
 
 CONFIRM = '[data-testid="backup-restore-confirm"]'
 STATE = """
@@ -24,6 +25,22 @@ return {dialog: !!dialog, count: buttons.length, enabled: !!button && !button.di
  staged: !!document.querySelector('[data-testid="backup-restore-staged"]'),
  error: document.querySelector('[data-testid="backup-restore-error"]')?.textContent ?? null};
 """
+
+
+def process_probe():
+    return native_macos_process if platform.system() == "Darwin" else native_qa_bridge
+
+
+def identity(pid):
+    return process_probe().identity(pid)
+
+
+def environment(pid, keys):
+    return process_probe().environment(pid, keys)
+
+
+def listener_pid(port):
+    return process_probe().listener_pid(port)
 
 
 def expected_environment(driver):
@@ -50,8 +67,9 @@ def confirm_restore_relaunch(driver, session):
                    "input": "session.click", "selector": CONFIRM,
                    "click_attempted": False, "manual_launch": False, "stage": "preflight"}
     session.restore_relaunch_observation = observation
-    if platform.system() != "Darwin" or session.transport != "macOS WKWebView bridge" or driver.macos_lldb:
-        raise RuntimeError("Automatic relaunch observation requires the directly owned macOS QA bridge")
+    if (getattr(session, "transport", None) not in {"Taomni QA WebView bridge", "macOS WKWebView bridge"}
+            or driver.macos_lldb):
+        raise RuntimeError("Automatic relaunch observation requires a directly owned QA bridge")
     application = session.application.resolve(strict=True)
     expected_env = expected_environment(driver)
     original = driver.proc
@@ -112,11 +130,11 @@ def attach_after_exit(driver, session, application, expected_env, before, observ
             if after == before or after["pid"] == before["pid"]:
                 raise RuntimeError("Automatic relaunch did not create a different native application process")
             # Adopt before any WebView request so failure cleanup retains ownership.
-            driver.proc = AdoptedProcess(after)
+            driver.proc = AdoptedProcess(after, inspect=identity)
             session.owned_app_pid = pid
             observation["after"] = after
             observation["stage"] = "attach-existing-process"
-            session.start()  # macOS attach only: no driver.start(), spawn or native cold restart.
+            session.start()  # Bind to the restarted application's existing bridge.
             if listener_pid(driver.port) != pid or identity(pid) != after:
                 raise RuntimeError("QA process changed while attaching the relaunched WebView")
             observation.update(passed=True, reattached=True, after_session=session.session_id, stage="complete")

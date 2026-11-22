@@ -1,44 +1,73 @@
 use std::fs::{File, OpenOptions};
 use std::path::Path;
+use std::time::{Duration, Instant};
+use taomni_profile_locks::{
+    LeaseError, ProfileRestoreLease, ProfileRoot, ProfileUseLease, WaitControl,
+};
 use tauri::AppHandle;
 
 const LOCK_FILE_NAME: &str = ".backup-operation.lock";
+const RESTORE_HANDOFF: Duration = Duration::from_secs(3);
+const RESTORE_BUSY: &str = "Close the other Taomni instances using this profile before applying the pending backup restore";
 
 /// Multiple instances may share a profile, but restoring replaces SQLite files
 /// and requires all other instances using that profile to have closed first.
-pub struct ProfileLease(File);
+pub struct ProfileLease {
+    _shared: ProfileUseLease,
+}
 impl ProfileLease {
     pub fn prepare(app_data: &Path, before_restore: impl FnOnce()) -> Result<Self, String> {
-        std::fs::create_dir_all(app_data).map_err(|e| e.to_string())?;
-        let file = OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .read(true)
-            .write(true)
-            .open(app_data.join(".profile-use.lock"))
-            .map_err(|e| e.to_string())?;
-        file.try_lock_shared().map_err(
-            |_| "Another Taomni instance is restoring this profile; retry after it finishes",
-        )?;
-        let lease = Self(file);
-        let has_restore = app_data.join(super::restore::RESTORE_INTENT_FILE).exists()
-            || app_data.join(super::restore::JOURNAL_FILE).exists();
-        if has_restore {
-            lease.0.unlock().map_err(|e| e.to_string())?;
-            lease.0.try_lock().map_err(|_| "Close the other Taomni instances using this profile before applying the pending backup restore")?;
+        Self::prepare_with_wait(app_data, before_restore, RESTORE_HANDOFF)
+    }
+
+    fn prepare_with_wait(
+        app_data: &Path,
+        before_restore: impl FnOnce(),
+        handoff: Duration,
+    ) -> Result<Self, String> {
+        let profile = ProfileRoot::prepare(app_data).map_err(|error| error.to_string())?;
+        let shared = ProfileUseLease::try_acquire(&profile).map_err(shared_error)?;
+        if !restore_pending(app_data) {
+            before_restore();
+            return Ok(Self { _shared: shared });
         }
-        before_restore();
-        if has_restore {
-            super::restore::apply_pending_restore(app_data)?;
-            lease.0.unlock().map_err(|e| e.to_string())?;
-            lease.0.lock_shared().map_err(|e| e.to_string())?;
+
+        // The platform restart launches its successor before the old process
+        // exits. Give that process time to release its shared lease. If a
+        // different startup consumes the restore, rejoin as an ordinary reader.
+        drop(shared);
+        let consumed = || !restore_pending(app_data);
+        let wait = WaitControl::new(Instant::now() + handoff, &consumed);
+        match ProfileRestoreLease::acquire(&profile, &wait) {
+            Ok(exclusive) => {
+                before_restore();
+                super::restore::apply_pending_restore(app_data)?;
+                drop(exclusive);
+                let shared = ProfileUseLease::try_acquire(&profile).map_err(shared_error)?;
+                Ok(Self { _shared: shared })
+            }
+            Err(LeaseError::Cancelled) => {
+                let shared = ProfileUseLease::try_acquire(&profile).map_err(shared_error)?;
+                before_restore();
+                Ok(Self { _shared: shared })
+            }
+            Err(LeaseError::TimedOut) => Err(RESTORE_BUSY.to_owned()),
+            Err(error) => Err(error.to_string()),
         }
-        Ok(lease)
     }
 }
-impl Drop for ProfileLease {
-    fn drop(&mut self) {
-        let _ = self.0.unlock();
+
+fn restore_pending(app_data: &Path) -> bool {
+    app_data.join(super::restore::RESTORE_INTENT_FILE).exists()
+        || app_data.join(super::restore::JOURNAL_FILE).exists()
+}
+
+fn shared_error(error: LeaseError) -> String {
+    match error {
+        LeaseError::Busy(_) => {
+            "Another Taomni instance is restoring this profile; retry after it finishes".into()
+        }
+        error => error.to_string(),
     }
 }
 
@@ -112,15 +141,53 @@ mod tests {
         let second = ProfileLease::prepare(root.path(), || {}).unwrap();
         let intent = root.path().join(super::super::restore::RESTORE_INTENT_FILE);
         std::fs::write(&intent, b"pending fixture").unwrap();
-        let error = ProfileLease::prepare(root.path(), || panic!("Profile remains in use"))
-            .err()
-            .unwrap();
+        let error = ProfileLease::prepare_with_wait(
+            root.path(),
+            || panic!("Profile remains in use"),
+            Duration::from_millis(20),
+        )
+        .err()
+        .unwrap();
         assert!(error.contains("Close the other Taomni instances"));
         assert_eq!(std::fs::read(&intent).unwrap(), b"pending fixture");
         drop(first);
         drop(second);
         std::fs::remove_file(intent).unwrap();
         let _reopened = ProfileLease::prepare(root.path(), || {}).unwrap();
+    }
+
+    #[test]
+    fn restart_waits_for_the_existing_reader_before_applying_a_pending_restore() {
+        let root = tempfile::tempdir().unwrap();
+        let previous = ProfileLease::prepare(root.path(), || {}).unwrap();
+        let journal = root.path().join(super::super::restore::JOURNAL_FILE);
+        let database = root.path().join("taomni.db");
+        let safety = root.path().join("rollback.db");
+        std::fs::write(&database, b"incomplete restore").unwrap();
+        std::fs::write(&safety, b"previous database").unwrap();
+        super::super::control::write_json(
+            &journal,
+            &serde_json::json!({
+                "entries": [{"path": database, "saved": safety, "existed": true}],
+                "committed": false
+            }),
+        )
+        .unwrap();
+
+        std::thread::scope(|scope| {
+            let successor = scope.spawn(|| ProfileLease::prepare(root.path(), || {}));
+            std::thread::sleep(Duration::from_millis(40));
+            assert!(
+                !successor.is_finished(),
+                "successor exited while the lease was held"
+            );
+            assert_eq!(std::fs::read(&database).unwrap(), b"incomplete restore");
+            drop(previous);
+
+            let _reopened = successor.join().unwrap().unwrap();
+            assert_eq!(std::fs::read(&database).unwrap(), b"previous database");
+            assert!(!journal.exists());
+        });
     }
 
     impl Drop for ChildGuard {

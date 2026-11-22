@@ -13,13 +13,13 @@ use std::time::Duration;
 use tauri::Runtime;
 
 pub(super) async fn status() -> Response {
-    ok(json!({"ready": true, "message": "Taomni macOS WKWebView QA bridge"}))
+    ok(json!({"ready": true, "message": "Taomni QA WebView bridge"}))
 }
 
 pub(super) async fn create_session(Json(_payload): Json<Value>) -> Response {
     ok(json!({
         "sessionId": SESSION_ID,
-        "capabilities": {"browserName": "taomni-wkwebview", "platformName": "macOS"}
+        "capabilities": {"browserName": "taomni-webview", "platformName": std::env::consts::OS}
     }))
 }
 

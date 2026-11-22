@@ -1,11 +1,11 @@
-id: TC-MODULES-035
-title: The native confirmation automatically relaunches macOS and restores uninstalled module data with paired Vault/MFA
-description: Reuse the uninstalled signed hello and original paired Vault/MFA backup input from 015, then mutate module data, increment
+id: TC-MODULES-033
+title: The native restore confirmation automatically relaunches the desktop and restores paired module, Vault and HOTP data
+description: Reuse the running signed hello and original paired Vault/MFA backup input from 013, then mutate module data, increment
   HOTP and rekey Vault. Open the exact UI-created local backup through Settings. Reject the old current-profile password in the real
   dialog, then confirm with the new password. Observe staged success, original exit=0 and a different kernel PID/start-time with the
-  same QA executable and isolated environment. Attach to the app-created WKWebView bridge without launching or manually restarting an
+  same QA executable and isolated environment. Attach to the app-created QA WebView bridge without launching or manually restarting an
   application. Independently verify original module rows, active pointer, advanced generation, password rollback and HOTP 755224. This
-  case covers macOS automatic relaunch; Linux/Windows driver attachment and independently hosted MFA remain unverified. Existing 013/014/015
+  case exercises automatic relaunch on Linux, Windows and macOS with paired MFA and Vault data. Existing 013/014/015
   retain the separate three-platform normal-cold-start matrix.
 covers:
 - F-Modules-1
@@ -20,10 +20,11 @@ tags:
 - vault
 - native-boundary
 - persistence
-- macos
 modes:
 - native
 native_platforms:
+- Linux
+- Windows
 - macOS
 fixtures:
 - reset_db
@@ -85,12 +86,6 @@ steps:
     phase: enabled
 - module_restore_probe:
     phase: write-original
-- click: '[data-testid="module-action-uninstall-hello-plugin"]'
-- wait_for: '[data-testid="confirm-dialog"]'
-- click: '[data-testid="confirm-dialog-confirm"]'
-- wait_for: '[data-testid="module-action-install-hello-plugin"]'
-- module_signed_probe:
-    phase: uninstalled
 - fill:
     selector: '[data-testid="settings-search-input"]'
     value: backup
@@ -108,23 +103,7 @@ steps:
     timeout_sec: 90
 - wait_for: '[data-testid="backup-manual-result"][data-target-id="local"][data-job-id]'
 - module_restore_probe:
-    phase: retained-archive
-- fill:
-    selector: '[data-testid="settings-search-input"]'
-    value: module store
-- wait_for: '[data-testid="module-offline-install"]'
-- fill:
-    selector: '[data-testid="module-offline-archive"]'
-    value: ${fixture.module_signed_archive}
-- fill:
-    selector: '[data-testid="module-offline-signature"]'
-    value: ${fixture.module_signed_signature}
-- click: '[data-testid="module-offline-submit"]'
-- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
-- click: '[data-testid="module-action-enable-hello-plugin"]'
-- wait_for: '[data-testid="module-action-disable-hello-plugin"]'
-- module_signed_probe:
-    phase: enabled
+    phase: running-archive
 - module_restore_probe:
     phase: write-mutated
 - click: '[data-testid="nav-mode-home"]'
@@ -165,12 +144,6 @@ steps:
     selector: '[data-testid="settings-search-input"]'
     value: module store
 - wait_for: '[data-testid="module-offline-install"]'
-- click: '[data-testid="module-action-uninstall-hello-plugin"]'
-- wait_for: '[data-testid="confirm-dialog"]'
-- click: '[data-testid="confirm-dialog-confirm"]'
-- wait_for: '[data-testid="module-action-install-hello-plugin"]'
-- module_signed_probe:
-    phase: uninstalled
 - module_restore_probe:
     phase: reject-password
 - fill:
@@ -202,7 +175,7 @@ steps:
 - native_confirm_restore_relaunch: null
 - wait_for: '[data-testid="status-bar"]'
 - module_signed_probe:
-    phase: uninstalled
+    phase: enabled
 - module_restore_probe:
     phase: ui-restored
 - wait_for: '[data-testid="vault-unlock-dialog"]'
@@ -231,94 +204,99 @@ steps:
     equals: 755 224
     timeout_sec: 30
 - assert_no_runtime_errors: null
-- screenshot: module-uninstalled-restore-automatic-relaunch-decrypted.png
+- screenshot: module-restore-automatic-relaunch-decrypted.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: The exact manual backup contains the module in its selected lifecycle state plus the original encrypted HOTP and Vault
-      snapshots.
+    requirement: A real paired backup precedes changed module values, HOTP and Vault password; staging rejection leaves data unchanged.
     actions:
     - 17
     - 31
-    - 41
+    - 36
+    - 40
+    - 45
+    - 56
     checkpoints:
     - step: 18
-      expectation: The real initial HOTP is 755224.
-    - step: 44
-      expectation: The exact v2 job, all hashes, standalone module rows, original HOTP counter and paired Vault SQLite pass independent
-        inspection; writer ownership matches the lifecycle state.
+      expectation: Initial RFC HOTP is 755224.
+    - step: 39
+      expectation: The exact v2 job contains original module rows and valid paired encrypted Vault/MFA SQLite snapshots.
+    - step: 46
+      expectation: HOTP advances to 287082.
+    - step: 57
+      expectation: The live master password changes.
+    - step: 60
+      expectation: Old current-profile credentials are rejected without pending restore files or data changes.
     results:
     - 18
-    - 44
+    - 39
+    - 46
+    - 57
+    - 60
   - id: R2
     requirement: Settings opens the local archive and rejects the old current master password without staging.
     actions:
-    - 80
-    - 82
-    - 87
+    - 61
+    - 63
+    - 68
     checkpoints:
-    - step: 84
+    - step: 65
       expectation: The actual native inventory lists the MFA snapshot.
-    - step: 85
+    - step: 66
       expectation: The actual native inventory lists the Vault snapshot.
-    - step: 88
+    - step: 69
       expectation: The real confirmation reports the translated bad-current-password error.
-    - step: 89
+    - step: 70
       expectation: Rejected verification leaves staged success absent.
-    - step: 92
+    - step: 73
       expectation: The original renderer has no runtime errors before automatic relaunch.
     results:
-    - 84
-    - 85
-    - 88
-    - 89
-    - 92
+    - 65
+    - 66
+    - 69
+    - 70
+    - 73
   - id: R3
     requirement: One valid confirmation stages and performs its own normal native relaunch while retaining the exact isolated profile.
     actions:
-    - 91
-    - 93
+    - 72
+    - 74
     checkpoints:
-    - step: 93
+    - step: 74
       expectation: The observer clicks once, sees staged success/disabled confirmation, reaps the original at exit=0, validates a different
         PID/start-time and identical executable/QA environment, and attaches without spawning an app.
-    - step: 95
-      expectation: The signed native module remains uninstalled with an inactive code pointer, rejected invocation and no writer lease.
-    - step: 96
+    - step: 77
       expectation: Independent disk/host observations prove original module values, unchanged active pointer, new generation, clean
-        restore state, original lifecycle and correct writer lease; the retained flag, exact SQLite locator and full database bytes
-        match the original verified snapshot.
+        restore state and enabled module writer lease.
     results:
-    - 93
-    - 95
-    - 96
+    - 74
+    - 77
   - id: R4
     requirement: The restored paired Vault/MFA accepts only the original password and decrypts the original account.
     actions:
-    - 99
-    - 103
+    - 80
+    - 84
     checkpoints:
-    - step: 100
+    - step: 81
       expectation: The changed password is rejected after actual restore.
-    - step: 110
+    - step: 91
       expectation: Exactly one restored account decrypts and displays the original HOTP 755224.
-    - step: 111
+    - step: 92
       expectation: Expected password rejection and native relaunch produce no renderer runtime errors.
     results:
-    - 100
-    - 110
-    - 111
+    - 81
+    - 91
+    - 92
   visual:
   - check: Restored original HOTP and usable MFA pane.
     method: manual
-    reason: Review module-uninstalled-restore-automatic-relaunch-decrypted.png; collection alone is not a visual verdict.
+    reason: Review module-restore-automatic-relaunch-decrypted.png; screenshot collection alone is not a visual verdict.
   native:
-  - check: Actual UI-triggered macOS process relaunch, isolated profile, native module data, Vault/MFA pairing and real host ownership.
+  - check: Actual UI-triggered desktop process relaunch, isolated profile, native module data, Vault/MFA pairing and real host ownership.
     method: automated
     reason: Kernel PID/start-time, listener ownership and selected process environment are independently read. No driver.start, subprocess
       launch, restart IPC or native_restart_app substitutes for automatic relaunch.
-  - check: Linux/Windows automatic-relaunch attachment and all supported macOS versions/architectures.
+  - check: Automatic restore of data written by the independent MFA host.
     method: external
-    reason: Current adapter supports only the directly owned macOS WKWebView bridge. These other targets remain unverified; 013/014/015
-      prove their separate backend normal-cold-start restore path.
+    reason: This fixture exercises the legacy MFA database alongside a separately installed signed module.

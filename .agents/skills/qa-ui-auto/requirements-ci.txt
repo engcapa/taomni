@@ -7,4 +7,5 @@ cryptography==46.0.1
 pyte==0.8.2
 numpy==2.4.4
 Pillow==12.1.1
+psutil==7.2.2
 pypdf==6.9.1
