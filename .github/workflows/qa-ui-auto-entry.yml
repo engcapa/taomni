@@ -470,7 +470,7 @@ jobs:
         run: |
           set -o pipefail
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-redirector --lib --locked
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-sockscap-tools --bin sockscap-redirector-bridge --locked
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-sockscap-tools --lib --locked
           args=()
           if [[ "$QA_RELEASE" == "true" ]]; then
             args+=(--release)

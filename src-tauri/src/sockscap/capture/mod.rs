@@ -165,7 +165,10 @@ pub const HELPER_IMAGE_NAME: &str = "sockscap-helper.exe";
 /// terminate. They are elevated and we are (normally) not, so only another
 /// elevated process can reap them — the caller hands the list to the next
 /// helper launch, which runs under UAC and can finish the job.
-pub async fn recover_system(sudo_password: Option<&str>) -> Result<Vec<u32>, String> {
+pub async fn recover_system(
+    _registry: &std::sync::Arc<crate::plugin::PluginRegistry>,
+    sudo_password: Option<&str>,
+) -> Result<Vec<u32>, String> {
     #[cfg(target_os = "linux")]
     {
         return linux::recover_system(sudo_password).map(|()| Vec::new());
@@ -178,7 +181,7 @@ pub async fn recover_system(sudo_password: Option<&str>) -> Result<Vec<u32>, Str
     #[cfg(target_os = "macos")]
     {
         let _ = sudo_password;
-        return macos::recover_system().await.map(|()| Vec::new());
+        return macos::recover_system(_registry).await.map(|()| Vec::new());
     }
     #[cfg(all(not(target_os = "linux"), not(windows), not(target_os = "macos")))]
     {

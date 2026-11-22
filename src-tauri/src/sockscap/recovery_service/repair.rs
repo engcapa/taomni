@@ -201,7 +201,7 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
 
     // The previous helper cannot be contacted without its token, so recovery
     // terminates what it can and reports what needs elevation.
-    match capture::recover_system(None).await {
+    match capture::recover_system(&state.plugins, None).await {
         Ok(needs_elevation) => {
             for pid in needs_elevation {
                 if !orphans.contains(&pid) {

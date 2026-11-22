@@ -10,17 +10,18 @@ import shutil
 import subprocess
 import zipfile
 
+from . import sockscap_redirector
 from .backup_policy import isolated_data_root
 from .module_signed_archive import load_artifact, platform_key
 
-SIGNED_CASES = {"TC-MODULES-072", "TC-MODULES-073"}
+SIGNED_CASES = {"TC-MODULES-072", "TC-MODULES-073", sockscap_redirector.CASE_ID}
 
 
 def setup(ctx):
     user_rules = []
     if ctx.case_id == "TC-MODULES-073":
         user_rules.append({"pattern": "route.example.test", "action": "block"})
-    serialized = json.dumps({
+    config = {
         "enabled": False,
         "mode": "global",
         "apps": [],
@@ -30,7 +31,10 @@ def setup(ctx):
         "userRules": user_rules,
         "bypassCidrs": ["127.0.0.0/8"],
         "defaultAction": "direct",
-    })
+    }
+    if ctx.case_id == sockscap_redirector.CASE_ID:
+        config.update(mode="apps", apps=[{"path": "/usr/bin/true", "name": "true"}], ruleMode="off")
+    serialized = json.dumps(config)
     ctx.values["sockscap_legacy_config"] = serialized
     if (ctx.cfg.get("app") or {}).get("mode") == "native":
         path = isolated_data_root(ctx) / "sockscap" / "config.json"
@@ -73,3 +77,6 @@ def setup_signed(ctx):
         sockscap_signed_frontend=(installed / frontend).as_posix(),
         sockscap_signed_frontend_sha256=receipt["frontendSha256"],
     )
+
+    if ctx.case_id == sockscap_redirector.CASE_ID:
+        sockscap_redirector.prepare(ctx)

@@ -15,6 +15,16 @@ use taomni_sockscap_api::{
 };
 
 fn main() -> io::Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        let mut args = std::env::args().skip(1);
+        if args.next().as_deref() == Some(taomni_sockscap_api::REDIRECTOR_BRIDGE_ARG) {
+            std::process::exit(taomni_sockscap_tools::redirector_bridge::run_from_cli(
+                args, true,
+            ));
+        }
+    }
+
     taomni_plugin_sdk::serve_stdio_with(
         HostConfig {
             plugin_id: "taomni-plugin-sockscap".into(),
@@ -66,6 +76,28 @@ impl PluginHandler for Host {
         operation.check_current()?;
         let params = params.ok_or_else(|| RpcError::from_code(ErrorCode::InvalidParams))?;
         let reply = match method {
+            taomni_sockscap_api::RUNTIME_INFO => {
+                if params != serde_json::json!({}) {
+                    return Err(RpcError::from_code(ErrorCode::InvalidParams));
+                }
+                #[cfg(target_os = "macos")]
+                let (protocol, host_start_micros) = (
+                    Some(taomni_redirector::bridge_protocol::BRIDGE_PROTOCOL_VERSION),
+                    Some(
+                        taomni_sockscap_tools::redirector_bridge::process_start_micros(
+                            std::process::id(),
+                        )
+                        .ok_or_else(|| RpcError::from_code(ErrorCode::InternalError))?,
+                    ),
+                );
+                #[cfg(not(target_os = "macos"))]
+                let (protocol, host_start_micros) = (None, None);
+                serde_json::to_value(taomni_sockscap_api::RuntimeInfo {
+                    host_pid: std::process::id(),
+                    host_start_micros,
+                    redirector_bridge_protocol: protocol,
+                })
+            }
             SETTINGS => {
                 let endpoint = serde_json::from_value(params)
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;

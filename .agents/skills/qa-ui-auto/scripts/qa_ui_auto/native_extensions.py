@@ -35,6 +35,8 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     from .module_mail_observation import run as assert_signed_mail_host
     register_verb("assert_signed_mail_host")(assert_signed_mail_host)
     from .module_sockscap_observation import run as assert_signed_sockscap_host
+    from .sockscap_redirector_observation import run as assert_signed_redirector_bridge
+    register_verb("assert_signed_redirector_bridge")(assert_signed_redirector_bridge)
     from .module_sockscap_observation import show_section
     register_verb("assert_signed_sockscap_host")(assert_signed_sockscap_host)
     register_verb("show_sockscap_section")(lambda ctx, args: show_section(ctx, args, mode="native"))

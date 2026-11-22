@@ -50,12 +50,14 @@ pub(super) fn random_socket_path(label: &str) -> PathBuf {
 pub(super) fn bind_private_listener(path: &PathBuf) -> Result<UnixListener, String> {
     let listener = UnixListener::bind(path)
         .map_err(|error| format!("bind Redirector IPC {}: {error}", path.display()))?;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
-        .map_err(|error| format!("secure Redirector IPC {}: {error}", path.display()))?;
+    if let Err(error) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)) {
+        let _ = std::fs::remove_file(path);
+        return Err(format!("secure Redirector IPC {}: {error}", path.display()));
+    }
     Ok(listener)
 }
 
-fn bridge_executable() -> Result<PathBuf, String> {
+fn legacy_bridge_executable() -> Result<PathBuf, String> {
     const NAME: &str = "sockscap-redirector-bridge";
     let app =
         std::env::current_exe().map_err(|error| format!("resolve Taomni executable: {error}"))?;
@@ -80,7 +82,85 @@ fn bridge_executable() -> Result<PathBuf, String> {
     Err(format!("SocksCap is missing its Redirector helper: {NAME}"))
 }
 
+/// An enabled package advertises its secondary entrypoint over the normal
+/// host channel. The old standalone helper can still clear a stranded scope.
+async fn spawn_bridge(
+    registry: &std::sync::Arc<crate::plugin::PluginRegistry>,
+    recovery: bool,
+    redirector: &std::path::Path,
+    provider_socket: &std::path::Path,
+    flow_socket: &std::path::Path,
+) -> Result<Child, String> {
+    use crate::plugin::LifecycleState;
+    use taomni_sockscap_api::{REDIRECTOR_BRIDGE_ARG, RUNTIME_INFO, RuntimeInfo, SLUG};
+    let provider = provider_socket.to_path_buf();
+    let flow = flow_socket.to_path_buf();
+    let redirector = redirector.to_path_buf();
+    let spawn = move |mut command: Command| {
+        command
+            .arg("--provider-socket")
+            .arg(provider)
+            .arg("--flow-socket")
+            .arg(flow)
+            .arg("--redirector")
+            .arg(redirector)
+            .arg("--parent-pid")
+            .arg(std::process::id().to_string())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .kill_on_drop(false)
+            .spawn()
+    };
+    if let Some(record) = registry.get(SLUG) {
+        if record.state == LifecycleState::Enabled
+            && record.manifest.commands.contains(RUNTIME_INFO)
+        {
+            let info: RuntimeInfo =
+                crate::sockscap::module_host::invoke(registry, RUNTIME_INFO, serde_json::json!({}))
+                    .await?;
+            if info.redirector_bridge_protocol != Some(BRIDGE_PROTOCOL_VERSION) {
+                return Err(
+                    "The installed SocksCap module has an incompatible Redirector bridge".into(),
+                );
+            }
+            let birth = info
+                .host_start_micros
+                .filter(|birth| *birth > 0)
+                .ok_or("The SocksCap module did not identify its running host")?;
+            let registry = registry.clone();
+            return tokio::task::spawn_blocking(move || {
+                registry.launch_verified_mode(
+                    SLUG,
+                    &record.manifest.version,
+                    RUNTIME_INFO,
+                    |executable| {
+                        let mut command = Command::new(executable);
+                        command
+                            .arg(REDIRECTOR_BRIDGE_ARG)
+                            .arg("--module-host")
+                            .arg(format!("{}:{birth}", info.host_pid));
+                        spawn(command)
+                    },
+                )
+            })
+            .await
+            .map_err(|error| error.to_string())?
+            .map_err(|error| error.to_string());
+        }
+        if record.state != LifecycleState::Enabled && !recovery {
+            return Err("Enable the SocksCap module before starting capture".into());
+        }
+    } else if !recovery {
+        return Err("Install and enable the SocksCap module before starting capture".into());
+    }
+    spawn(Command::new(legacy_bridge_executable()?))
+        .map_err(|error| format!("launch legacy Redirector bridge: {error}"))
+}
+
 pub(super) async fn launch_bridge(
+    registry: &std::sync::Arc<crate::plugin::PluginRegistry>,
+    recovery: bool,
     redirector: &std::path::Path,
     provider_socket: &std::path::Path,
     flow_socket: &std::path::Path,
@@ -97,22 +177,8 @@ pub(super) async fn launch_bridge(
             "Redirector bridge session id must not be empty",
         ));
     }
-    let executable = bridge_executable()?;
-    let mut child = Command::new(&executable)
-        .arg("--provider-socket")
-        .arg(provider_socket)
-        .arg("--flow-socket")
-        .arg(flow_socket)
-        .arg("--redirector")
-        .arg(redirector)
-        .arg("--parent-pid")
-        .arg(std::process::id().to_string())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .kill_on_drop(false)
-        .spawn()
-        .map_err(|error| format!("launch isolated Redirector bridge: {error}"))?;
+    let mut child =
+        spawn_bridge(registry, recovery, redirector, provider_socket, flow_socket).await?;
     let Some(stdin) = child.stdin.take() else {
         terminate_bridge_child(&mut child).await;
         return Err(RedirectorStartError::before_scope(

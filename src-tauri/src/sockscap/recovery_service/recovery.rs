@@ -91,7 +91,7 @@ pub async fn sockscap_recover(
     }
     let sudo_password = sudo_password.map(Zeroizing::new);
     let sudo_pw = sudo_password.as_deref().map(|password| password.as_str());
-    match capture::recover_system(sudo_pw).await {
+    match capture::recover_system(&state.plugins, sudo_pw).await {
         Ok(needs_elevation) => {
             // Queue anything only an elevated process can kill; the next Start
             // hands the list to the helper it launches under UAC.

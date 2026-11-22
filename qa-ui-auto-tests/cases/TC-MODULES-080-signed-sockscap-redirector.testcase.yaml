@@ -1,0 +1,61 @@
+id: TC-MODULES-080
+title: Disabling SocksCap releases a pending macOS Redirector activation
+description: Start application-scoped capture with the verified upstream launcher on a fresh Mac, then disable the module while its first approval is pending.
+covers: [F-Modules-1, F-Sockscap-1]
+tags: [modules, sockscap, macos, native-boundary, p0]
+modes: [native]
+native_platforms: [macOS]
+fixtures: [reset_db, sockscap_legacy_config, module_signed_sockscap_archive]
+timeout_sec: 330
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.sockscap_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.sockscap_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-sockscap"]'
+- wait_for: '[data-testid="module-action-disable-sockscap"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- show_sockscap_section: upstream
+- wait_for: '[data-testid="sockscap-upstream-port"][value="19391"]'
+- click: '[data-testid="sockscap-start"]'
+- wait_for: '[data-testid="sockscap-probe-fail-dialog"]'
+- click: '[data-testid="sockscap-probe-fail-force"]'
+- assert_signed_redirector_bridge: pending
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-sockscap"]'
+- wait_for: '[data-testid="module-action-enable-sockscap"]'
+- assert_signed_redirector_bridge: disabled
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: approval-lifecycle
+    requirement: Disabling the installed module during activation reaps its launcher and bridge and clears the pre-activation journal with the same desktop still running.
+    actions: [6, 8, 12, 15, 17, 19, 21, 24, 26]
+    checkpoints:
+    - {step: 7, expectation: The signed module installs through the store.}
+    - {step: 14, expectation: The retained loopback profile is loaded.}
+    - {step: 16, expectation: The closed loopback upstream prompts before starting anyway.}
+    - {step: 18, expectation: The real desktop owns the signed host and bridge. The bridge owns the upstream launcher during preparation and both sockets are private.}
+    - {step: 23, expectation: Disabling releases the writer lease and removes both sockets and the preparing journal. All three processes exit while the core remains live.}
+    - {step: 27, expectation: The original tool opens with its disabled placeholder.}
+    - {step: 28, expectation: Disabling during first-use approval completes without a renderer exception.}
+    results: [7, 14, 16, 18, 23, 27, 28]
+  visual:
+  - check: The store and original tool reflect the disabled module.
+    method: automated
+    reason: The case observes the available enable action and the disabled placeholder.
+  native:
+  - check: OS process and file ownership across module disable.
+    method: automated
+    reason: The kernel reports executable paths and process parentage. The case checks live file locks, socket modes and the durable journal.

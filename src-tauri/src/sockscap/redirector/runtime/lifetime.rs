@@ -20,6 +20,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicU64;
+use tauri::Manager;
 use tokio::sync::RwLock;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
@@ -126,7 +127,10 @@ pub async fn start(
     let provider_socket_path = random_socket_path("provider");
     let listener = bind_private_listener(&flow_socket_path)?;
     let cleanup = SocketCleanup(flow_socket_path.clone());
+    let state = app.state::<crate::state::AppState>();
     let bridge = launch_bridge(
+        &state.plugins,
+        false,
         &executable,
         &provider_socket_path,
         &flow_socket_path,

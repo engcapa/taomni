@@ -41,6 +41,16 @@ steps:
 - assert_count: {selector: '[data-testid="sockscap-panel"]', equal: 0}
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="sockscap"]', equal: 1}
 - assert_no_runtime_errors: null
+- assert_count: {selector: '[data-testid="sockscap-start"]', equal: 0}
+- click: '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-settings"]'
+- click: '[data-testid="module-action-enable-sockscap"]'
+- wait_for: '[data-testid="module-action-disable-sockscap"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]'
+- assert_count: {selector: '[data-testid="plugin-tab-unavailable"][data-reason="disabled"]', equal: 0}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -65,6 +75,15 @@ verification:
     - {step: 33, expectation: The Sessions tab strip contains exactly one SocksCap tab.}
     - {step: 34, expectation: The lifecycle and target test run without runtime errors.}
     results: [29, 31, 32, 33, 34]
+  - id: reenable
+    requirement: Users can reopen the capture panel after disabling and enabling its module in the same desktop.
+    actions: [36, 37, 39, 40, 41]
+    checkpoints:
+    - {step: 35, expectation: Capture cannot be started from the disabled tool.}
+    - {step: 42, expectation: The original tool displays the enabled panel again.}
+    - {step: 43, expectation: The disabled placeholder has been removed.}
+    - {step: 44, expectation: Re-enabling completes without runtime errors.}
+    results: [35, 42, 43, 44]
   visual:
   - check: The detail displays the requested host alongside the decision and rule.
     method: automated

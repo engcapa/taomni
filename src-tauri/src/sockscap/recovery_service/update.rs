@@ -67,7 +67,7 @@ pub async fn sockscap_prepare_for_update(
     if should_recover_stale_capture_for_update(owned_capture, recovery_required, dirty_journal) {
         let sudo_password = sudo_password.map(Zeroizing::new);
         let sudo_pw = sudo_password.as_deref().map(|password| password.as_str());
-        if let Err(error) = capture::recover_system(sudo_pw).await {
+        if let Err(error) = capture::recover_system(&state.plugins, sudo_pw).await {
             let message = format!("automatic SocksCap recovery before updating failed: {error}");
             state
                 .legacy

@@ -13,7 +13,9 @@ use tokio::process::Command;
 /// Reacquire Redirector control after an unclean shutdown and replace any
 /// residual process scope with a fresh inert sentinel. No business scope or
 /// relay context is constructed on this path.
-pub async fn recover() -> Result<(), String> {
+pub async fn recover(
+    registry: &std::sync::Arc<crate::plugin::PluginRegistry>,
+) -> Result<(), String> {
     super::super::verify_installed()?;
     match super::super::installer::system_extension_state() {
         super::super::installer::RedirectorSystemExtensionState::WaitingForUser => {
@@ -32,6 +34,8 @@ pub async fn recover() -> Result<(), String> {
     let listener = bind_private_listener(&flow_socket_path)?;
     let cleanup = SocketCleanup(flow_socket_path.clone());
     let mut bridge = launch_bridge(
+        registry,
+        true,
         &installed_executable_path(),
         &provider_socket_path,
         &flow_socket_path,

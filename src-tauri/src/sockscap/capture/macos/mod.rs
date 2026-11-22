@@ -30,6 +30,6 @@ pub async fn start(
 /// Reacquire Redirector control and replace any scope stranded by an unclean
 /// shutdown with a fresh inert sentinel. There is deliberately no legacy proxy
 /// cleanup: new Taomni versions do not own or mutate system proxy settings.
-pub async fn recover_system() -> Result<(), String> {
-    runtime::recover().await
+pub async fn recover_system(registry: &Arc<crate::plugin::PluginRegistry>) -> Result<(), String> {
+    runtime::recover(registry).await
 }

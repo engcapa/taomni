@@ -213,6 +213,42 @@ impl PluginRegistry {
         Ok(self.root.join(slug).join("versions").join(version))
     }
 
+    /// Recheck the installed host before launching an advertised secondary entrypoint.
+    #[cfg(target_os = "macos")]
+    pub(crate) fn launch_verified_mode<T>(
+        &self,
+        slug: &str,
+        version: &str,
+        command: &str,
+        launch: impl FnOnce(PathBuf) -> std::io::Result<T>,
+    ) -> Result<T, PluginError> {
+        let _lifecycle = self
+            .lifecycle
+            .lock()
+            .expect("plugin lifecycle lock poisoned");
+        let _mutation = install::ModuleInstaller::new(&self.root).lock_mutations()?;
+        let record = self.enabled_record(slug)?;
+        if record.manifest.version != version {
+            return Err(PluginError::HostUnavailable(format!(
+                "{slug} changed version while starting its secondary entrypoint"
+            )));
+        }
+        if !record.manifest.commands.contains(command) {
+            return Err(PluginError::CommandDenied {
+                slug: slug.into(),
+                command: command.into(),
+            });
+        }
+        let host = record
+            .manifest
+            .entry
+            .host
+            .as_deref()
+            .ok_or_else(|| PluginError::HostUnavailable(slug.into()))?;
+        let (_, executable, _) = self.host_location(slug, host)?;
+        launch(executable).map_err(|error| PluginError::HostUnavailable(error.to_string()))
+    }
+
     fn host_location(
         &self,
         slug: &str,

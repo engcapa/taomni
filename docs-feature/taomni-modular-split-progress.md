@@ -2,6 +2,9 @@
 
 ## 2026-11-22 当前进展
 
+- SocksCap 0.1.4 让基座在模块生命周期锁内验签并启动已安装的 macOS 宿主，由其桥接 Redirector。桥接进程分别核验核心数据对端和模块宿主的 PID 与启动时间。宿主在等待批准时退出会清理启动器和私有套接字，在已应用规则后退出会先恢复空匹配规则。旧模块和遗留恢复仍使用独立 helper。TC-MODULES-080 在 macOS 从面板启动后停用，检查真实进程、两处套接字、写锁及恢复记录。TC-MODULES-074 增加重新启用后的 Browser 断言。Linux 协议、设置和宿主 57 项单测通过，macOS ARM64 和 Intel 的桥接库及其测试代码通过类型检查。系统批准、实际流量与正式系统签名仍须对应 runner 回执。
+- 合入远程 main 的 #863。保留标签栏两侧的断言和新记事本用例，新建文件编辑、保存与重开的崩溃回归现用 TC-EXPLORER-013，主线的标签栏用例保留 TC-EXPLORER-011。53 项受影响前端单测、34 项选择与 crash-regression 单测通过。上一批 Mail 的 Linux 和 Windows Native 均已收齐 34/34，三端 Browser 各 25/25。 [main 合并](https://github.com/engcapa/taomni/commit/7c16faaa3) · [已下载分片](https://github.com/engcapa/taomni/actions/runs/45003592759)
+
 - Mail 0.1.23 的签名宿主接管 iTIP 邀请回复与 RFC 8098 已读回执的 MIME 组装和 SMTP 投递。普通写信、密送与旧模块沿用已准备好的 SMTP 信封。核心 Cargo 清单已移除对 `lettre` 的直接依赖，过渡期 Mail 引擎仍间接链接该库。TC-MODULES-079 比对两份真实服务器回信与原件、去重标志和宿主身份。TC-MAIL-INVITE-01 与 TC-MAIL-RECEIPT-01 补充 Browser/Native 断言。7 项协议、78 项引擎、12 项宿主及 9 项桌面单测通过，三端 UI 和新协议实跑待收证。
 - 在 `bc19f8dc3` 的 Mail 归档批次中，三端 Browser 各通过 25/25，Linux Native 通过 34/34，均已在运行期间取得分片。其三端真实宿主协议验证通过。候选 `647fec73c` 正在四平台打包并验证 SocksCap、升级与崩溃回归。 [Mail 分片](https://github.com/engcapa/taomni/actions/runs/45003592759) · [宿主协议](https://github.com/engcapa/taomni/actions/runs/45003911729) · [候选打包](https://github.com/engcapa/taomni/actions/runs/45005581790) · [升级分片](https://github.com/engcapa/taomni/actions/runs/45005586816)
 
