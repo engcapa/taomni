@@ -23,6 +23,7 @@ def run(ctx, args):
     phase = args.get("phase") if isinstance(args, dict) else args
     active = {
         "folder-tree", "folder-changes", "running", "imap-delivery", "pop3-delivery",
+        "attachment-saved", "attachment-reopened",
         "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source", "imap-prefetch", "outbox-queued", "outbox-sent",
     }
     if phase not in active | {"idle", "disabled", "outbox-retained", "contact-retained"} or not signed or owner.case_id not in SIGNED_MAIL_CASES:
@@ -53,6 +54,16 @@ def run(ctx, args):
     report = {"phase": phase, "sourceSha": receipt["sourceSha"], "platform": receipt["platform"],
               "packageSha256": receipt["sha256"], "hostSha256": digest,
               "frontendSha256": frontend_digest, "writerLease": observed}
+    if phase.startswith("attachment-"):
+        from .module_mail_attachment import observe
+        if owner.case_id != "TC-MODULES-083":
+            raise StepError("Attachment cache observation requires the signed attachment case")
+        observation = observe(module / "data", plugins.parent / "mail-cache", owner.values, signed.get("cachedPart"))
+        if phase == "attachment-saved":
+            signed["cachedPart"] = observation
+        elif not signed.get("cachedPart"):
+            raise StepError("Missing the initial attachment download")
+        report["cachedPart"] = observation
     if phase.startswith("contact-"):
         from .module_mail_contacts import observe
         if owner.case_id != "TC-MODULES-081":

@@ -8870,6 +8870,9 @@ controls:
   - id: mail-storage-mode
     selector: '[data-testid="mail-storage-mode"]'
     kind: interactive
+  - id: mail-cache-attachments
+    selector: '[data-testid="mail-cache-attachments"]'
+    kind: interactive
   - id: mail-storage-folders
     selector: '[data-testid="mail-storage-folders"]'
     kind: interactive
@@ -9285,6 +9288,7 @@ controls:
 - 启用 SocksCap 后，Tools 标签加载模块前端和样式，测试目标在独立宿主计算实际决策并显示命中的规则。TC-MODULES-073 从旧配置验证签名宿主。TC-MODULES-074 在 Browser 从停用占位进入商店，在同一标签验证启用、试算和再次停用。
 - TC-MODULES-080 从 macOS 原生面板启动针对单个程序的捕获，在等待系统批准时从商店停用。核对签名宿主、桥接进程、上游启动器、私有套接字、写锁和恢复记录。
 - TC-MODULES-081 从邮件地址簿新增联系人并停用模块，逐阶段核对签名宿主、模块邮箱库中的联系人和旧缓存。重新启用后从写信界面选择联系人，再从地址簿删除同一条记录。
+- TC-MODULES-083 从保存的账户打开附件，复核签名 Mail 模块写入的实际文件、关闭后删除的查看器副本及再次打开时的服务器请求数。TC-MAIL-STORAGE-01 核对该账户的附件缓存开关保存后恢复。
 - TC-MODULES-075 验证上游 UUID 保存时的 Vault 设置、取消和续办。TC-MODULES-072 验证签名代理链接导入在完成首次 Vault 设置后继续保存端点。
 - Linux 有权限时继续通过 nftables + cgroup v2 做透明 TCP 重定向；无 sudo、受限桌面容器等环境自动切换为“从 SocksCap 启动应用”的 loopback 捕获，不注入 HTTP_PROXY/ALL_PROXY 等代理变量。该模式只覆盖由面板启动的动态链接应用及其继承进程。
 - 浏览器预览覆盖控制面板状态流转；内核捕获和原始目标恢复由 Rust 单元/集成验证覆盖。

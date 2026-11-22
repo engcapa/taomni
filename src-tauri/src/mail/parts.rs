@@ -1,33 +1,8 @@
-//! Cached attachment files owned by the desktop adapter.
+//! Attachment helpers for the desktop compatibility path.
 
 use std::io::Write;
-use std::path::{Path, PathBuf};
-
-/// On-disk attachment cache path: `<root>/<uid>-<key>.bin` under a folder dir.
-pub(super) fn attachment_cache_path(
-    root: &Path,
-    account_stem: &str,
-    folder: &str,
-    uid: u32,
-    key: &str,
-) -> PathBuf {
-    let safe = |value: &str| -> String {
-        value
-            .chars()
-            .map(|c| {
-                if c.is_ascii_alphanumeric() || c == '-' || c == '.' {
-                    c
-                } else {
-                    '_'
-                }
-            })
-            .collect()
-    };
-    root.join("attachments")
-        .join(safe(account_stem))
-        .join(safe(folder))
-        .join(format!("{uid}-{}.bin", safe(key)))
-}
+use std::path::Path;
+pub(super) use taomni_mail_engine::attachment_cache::attachment_cache_path;
 
 pub(super) fn write_cache_file(path: &Path, bytes: &[u8]) {
     if let Some(parent) = path.parent() {

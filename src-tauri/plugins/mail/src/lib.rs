@@ -4,6 +4,7 @@
 mod address_book;
 mod archive;
 mod archive_encoding;
+mod attachment_cache;
 mod commands;
 mod imap_exchange;
 mod incoming;
@@ -43,6 +44,7 @@ fn host_config() -> HostConfig {
             .chain([
                 taomni_mail_api::LOCAL_DRAFTS,
                 taomni_mail_api::ADDRESS_BOOK,
+                taomni_mail_api::ATTACHMENT_CACHE,
                 CHECK_INCOMING,
                 CHECK_OUTGOING,
                 IMAP_FOLDER_TREE,
@@ -113,6 +115,16 @@ impl PluginHandler for Handler {
     ) -> Result<Value, RpcError> {
         operation.check_current()?;
         let result = match method {
+            taomni_mail_api::ATTACHMENT_CACHE => {
+                let request = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(attachment_cache::transfer(
+                    &self.io,
+                    &self.store,
+                    operation,
+                    request,
+                )?)
+            }
             taomni_mail_api::LOCAL_DRAFTS | taomni_mail_api::ADDRESS_BOOK => {
                 let endpoint = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;

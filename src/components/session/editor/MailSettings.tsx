@@ -692,7 +692,7 @@ export function MailSettings({
           Cache headers and recent bodies
         </label>
         <label className="ml-3 flex items-center gap-1.5">
-          <Checkbox checked={attachmentCache} onChange={setAttachmentCache} />
+          <Checkbox dataTestId="mail-cache-attachments" checked={attachmentCache} onChange={setAttachmentCache} />
           Cache attachments
         </label>
       </Field>

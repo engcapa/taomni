@@ -61,6 +61,7 @@ mod account_config;
 mod imap_messages;
 
 mod attachment_files;
+mod attachment_storage;
 
 mod mime;
 

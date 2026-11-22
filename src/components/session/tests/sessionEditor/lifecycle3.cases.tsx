@@ -317,6 +317,7 @@ export function registerSessionEditorLifecycle3Cases() {
     await user.type(screen.getByLabelText("Mail password or app password token"), "imap-secret");
     await user.type(screen.getByLabelText("SMTP server"), "smtp.example.com");
     await user.type(screen.getByLabelText("Mail save directory"), "D:\\mail-cache");
+    await user.click(screen.getByTestId("mail-cache-attachments"));
     await user.type(screen.getByTestId("mail-storage-directory"), "D:\\complete-mail");
     await user.selectOptions(screen.getByTestId("mail-storage-mode"), "include");
     fireEvent.change(screen.getByTestId("mail-storage-folder-names"), { target: { value: "INBOX\nProjects/Work\nINBOX\n" } });
@@ -347,6 +348,7 @@ export function registerSessionEditorLifecycle3Cases() {
     });
     expect(savedOptions.mailEmailAddress).toBeUndefined();
     expect(savedOptions.mailSmtpHost).toBe("smtp.example.com");
+    expect(savedOptions.mailAttachmentCache).toBe(true);
     expect(savedOptions.mailSaveDirectory).toBe("D:\\mail-cache");
     expect(savedOptions.mailStorageDirectory).toBe("D:\\complete-mail");
     expect(savedOptions.mailFullMessageMode).toBe("include");

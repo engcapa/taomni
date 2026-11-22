@@ -291,9 +291,29 @@ steps:
     selector: '[data-testid="mail-storage-pause"]'
     equal: 0
 - assert_no_runtime_errors: null
+- click: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
+- click: '[data-testid="session-edit"]'
+- click: '[data-testid="session-section-mail"]'
+- click: '[data-testid="mail-cache-attachments"][data-checked="false"]'
+- click: '[data-testid="session-save"]'
+- wait_for: {selector: '[data-testid="session-editor"]', state: detached}
+- click: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
+- click: '[data-testid="session-edit"]'
+- click: '[data-testid="session-section-mail"]'
+- assert_attribute: {selector: '[data-testid="mail-cache-attachments"]', name: data-checked, equals: 'true'}
+- click: '[data-testid="session-cancel"]'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
+  - id: attachment-cache-preference
+    requirement: Each saved Mail account retains its opt-in attachment cache setting.
+    actions: [132, 133, 134, 135, 136, 138, 139, 140, 142]
+    checkpoints:
+    - {step: 137, expectation: Saving closes the account editor.}
+    - {step: 141, expectation: Reopening the same account shows the checked attachment cache setting.}
+    - {step: 143, expectation: The account preference roundtrip leaves the renderer running.}
+    results: [137, 141, 143]
   - id: R1
     requirement: Save/reopen directory and include/exclude settings; read saved originals; cancellation preserves them
       and confirmed cleanup pauses storage.

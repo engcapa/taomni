@@ -31,6 +31,8 @@ use taomni_sqlite_snapshot::SnapshotControl;
 
 #[path = "support/archive_encoding.rs"]
 mod archive_encoding;
+#[path = "support/attachment_cache.rs"]
+mod attachment_cache;
 #[path = "support/imap.rs"]
 mod imap;
 #[path = "support/local_mailbox.rs"]
@@ -335,6 +337,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     imap::check_routed_archive(&mut host);
     archive_encoding::check(&mut host);
     imap::check_routed_attachment(&mut host);
+    attachment_cache::check(&mut host, &root, &old_storage, &attachment);
     imap::check_routed_sent_copy(&mut host);
     imap::check_routed_draft(&mut host);
     pop3::check_routed_sync(&mut host);

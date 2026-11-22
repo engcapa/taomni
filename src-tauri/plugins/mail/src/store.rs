@@ -95,21 +95,42 @@ impl Store {
     }
 
     fn data_root(&self, create: bool) -> Result<Option<PathBuf>, RpcError> {
-        let mut root = self.profile.clone();
-        for component in ["plugins", "mail", "data"] {
-            root.push(component);
-            if create {
-                match fs::create_dir(&root) {
-                    Ok(()) => (),
-                    Err(error) if error.kind() == ErrorKind::AlreadyExists => (),
-                    Err(_) => return Err(unavailable()),
-                }
-            }
-            if !directory(&root)? {
-                return Ok(None);
-            }
+        checked_directory(&self.profile, Path::new("plugins/mail/data"), create)
+    }
+
+    pub(super) fn attachment_path(
+        &self,
+        key: &taomni_mail_api::attachment_cache::AttachmentKey,
+        create: bool,
+    ) -> Result<Option<(PathBuf, PathBuf)>, RpcError> {
+        validate_account(&key.account_id)?;
+        if key.uid == 0 || key.folder.trim().is_empty() || key.part.is_empty() {
+            return Err(RpcError::from_code(ErrorCode::InvalidParams));
         }
-        Ok(Some(root))
+        let Some(root) = self.data_root(create)? else {
+            return Ok(None);
+        };
+        let relative = taomni_mail_engine::attachment_cache::attachment_cache_path(
+            Path::new(""),
+            &mail_db_file_stem(&key.account_id),
+            &key.folder,
+            key.uid,
+            &key.part,
+        );
+        let Some(parent) =
+            checked_directory(&root, relative.parent().ok_or_else(unavailable)?, create)?
+        else {
+            return Ok(None);
+        };
+        let path = parent.join(relative.file_name().ok_or_else(unavailable)?);
+        if !regular(&path)? && !create {
+            return Ok(None);
+        }
+        // Incomplete writes stay outside the snapshotted data directory.
+        Ok(Some((
+            path,
+            root.parent().ok_or_else(unavailable)?.to_owned(),
+        )))
     }
 
     pub(super) fn snapshot_source(&self, relative: &str) -> Result<PathBuf, RpcError> {
@@ -127,17 +148,34 @@ impl Store {
     }
 }
 
-fn checked_data_file(mut root: PathBuf, relative: &Path) -> Result<PathBuf, RpcError> {
-    let parent = relative.parent().ok_or_else(unavailable)?;
-    for component in parent.components() {
+fn checked_directory(
+    base: &Path,
+    relative: &Path,
+    create: bool,
+) -> Result<Option<PathBuf>, RpcError> {
+    let mut root = base.to_owned();
+    for component in relative.components() {
         let Component::Normal(part) = component else {
             return Err(unavailable());
         };
         root.push(part);
+        if create {
+            match fs::create_dir(&root) {
+                Ok(()) => (),
+                Err(error) if error.kind() == ErrorKind::AlreadyExists => (),
+                Err(_) => return Err(unavailable()),
+            }
+        }
         if !directory(&root)? {
-            return Err(unavailable());
+            return Ok(None);
         }
     }
+    Ok(Some(root))
+}
+
+fn checked_data_file(root: PathBuf, relative: &Path) -> Result<PathBuf, RpcError> {
+    let mut root = checked_directory(&root, relative.parent().ok_or_else(unavailable)?, false)?
+        .ok_or_else(unavailable)?;
     root.push(relative.file_name().ok_or_else(unavailable)?);
     if !regular(&root)? {
         return Err(unavailable());

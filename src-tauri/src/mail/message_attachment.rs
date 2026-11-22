@@ -1,6 +1,7 @@
 //! Save cached attachments or fetch them through the signed Mail host.
 
 use super::*;
+use taomni_mail_api::{ATTACHMENT_CACHE, attachment_cache::AttachmentKey};
 
 #[tauri::command]
 pub async fn mail_download_attachment(
@@ -67,6 +68,35 @@ pub async fn mail_download_attachment(
     });
     let cache_account = account.config.session_id.clone();
     let cache_folder = folder.clone();
+    if let Some(part) = &cache_key
+        && local_storage::is_hosted(&state, &cache_account, ATTACHMENT_CACHE).await?
+    {
+        let key = AttachmentKey {
+            account_id: cache_account,
+            folder: cache_folder,
+            uid,
+            part: part.clone(),
+        };
+        if let Some(size) = attachment_storage::load(&state, &key, Path::new(&target_path)).await? {
+            return Ok(MailDownloadAttachmentResult {
+                path: target_path,
+                name: None,
+                content_type: None,
+                size: size as usize,
+            });
+        }
+        return download_host_attachment(
+            &state,
+            &account,
+            &folder,
+            uid,
+            attachment_index,
+            target_path,
+            section.as_deref(),
+            Some(key),
+        )
+        .await;
+    }
     if let Some(key) = cache_key.clone() {
         let folder = cache_folder.clone();
         let cached = with_mail_db_async(&state, &cache_account, move |db, id| {
@@ -88,17 +118,8 @@ pub async fn mail_download_attachment(
             // attachment must not keep every other mailbox operation waiting.
             return decode_mail_original(move || {
                 let target = Path::new(&target_path);
-                let parent = target
-                    .parent()
-                    .filter(|p| !p.as_os_str().is_empty())
-                    .unwrap_or(Path::new("."));
-                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-                let mut temp =
-                    tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
-                let size =
-                    std::io::copy(&mut cached, temp.as_file_mut()).map_err(|e| e.to_string())?;
-                temp.as_file().sync_all().map_err(|e| e.to_string())?;
-                temp.persist(target).map_err(|e| e.error.to_string())?;
+                let size = attachment_storage::publish_cached_file(&mut cached, target)
+                    .map_err(|e| e.to_string())?;
                 Ok(MailDownloadAttachmentResult {
                     path: target_path,
                     name: None,
@@ -118,6 +139,7 @@ pub async fn mail_download_attachment(
             attachment_index,
             target_path,
             section.as_deref(),
+            None,
         )
         .await?
     } else {
@@ -187,6 +209,7 @@ async fn download_host_attachment(
     index: usize,
     target_path: String,
     section: Option<&str>,
+    cache_key: Option<AttachmentKey>,
 ) -> Result<MailDownloadAttachmentResult, String> {
     let first = module_host::fetch_imap_attachment(
         state.plugins.clone(),
@@ -213,16 +236,31 @@ async fn download_host_attachment(
     } else {
         first?
     };
-    decode_mail_original(move || {
+    let (result, bytes) = decode_mail_original(move || {
         attachment_files::publish_mail_bytes(Path::new(&target_path), &attachment.bytes)?;
-        Ok(MailDownloadAttachmentResult {
-            path: target_path,
-            name: attachment.name,
-            content_type: attachment.content_type,
-            size: attachment.bytes.len(),
-        })
+        Ok((
+            MailDownloadAttachmentResult {
+                path: target_path,
+                name: attachment.name,
+                content_type: attachment.content_type,
+                size: attachment.bytes.len(),
+            },
+            attachment.bytes,
+        ))
     })
-    .await
+    .await?;
+    if let Some(key) = cache_key {
+        // Cache the bytes that were actually saved, even if the destination
+        // was later replaced by another download. The user file is complete.
+        let _ = module_host::attachment_cache::store(
+            state.plugins.clone(),
+            key,
+            bytes.as_slice(),
+            bytes.len() as u64,
+        )
+        .await;
+    }
+    Ok(result)
 }
 
 async fn download_legacy_attachment(

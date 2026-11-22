@@ -2,6 +2,7 @@
 
 mod archive;
 mod archive_encoding;
+pub(super) mod attachment_cache;
 pub(super) use archive_encoding::ArchiveEncoder;
 mod downloads;
 mod local_mailbox;

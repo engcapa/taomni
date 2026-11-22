@@ -2006,6 +2006,7 @@
 - `[data-testid="mail-storage-directory"]` — interactive — F-MAIL-23.mail-storage-directory
 - `[data-testid="mail-storage-browse"]` — interactive — F-MAIL-23.mail-storage-browse
 - `[data-testid="mail-storage-mode"]` — interactive — F-MAIL-23.mail-storage-mode
+- `[data-testid="mail-cache-attachments"]` — interactive — F-MAIL-23.mail-cache-attachments
 - `[data-testid="mail-storage-folders"]` — interactive — F-MAIL-23.mail-storage-folders
 - `[data-testid="mail-storage-folder-names"]` — interactive — F-MAIL-23.mail-storage-folder-names
 - `[data-testid="mail-storage-edit-folders"]` — interactive — F-MAIL-23.mail-storage-edit-folders

@@ -1,6 +1,7 @@
 //! Mail message data, MIME parsing and archived message codecs.
 
 pub mod archive;
+pub mod attachment_cache;
 pub mod cache;
 pub mod calendar;
 pub mod compose;

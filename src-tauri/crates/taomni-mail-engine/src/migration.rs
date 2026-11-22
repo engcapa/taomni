@@ -297,6 +297,47 @@ fn copy_attachments(
     Ok(())
 }
 
+/// A core-only upgrade can leave old attachment bytes in the account's
+/// custom storage directory. Open a single regular file from that layout.
+pub fn legacy_attachment(
+    db: &Connection,
+    account: &str,
+    folder: &str,
+    uid: u32,
+    part: &str,
+) -> Result<Option<File>, String> {
+    let root = Path::new(db.path().ok_or("Missing Mail database path")?)
+        .parent()
+        .ok_or("Missing Mail storage directory")?;
+    let relative = crate::attachment_cache::attachment_cache_path(
+        Path::new(""),
+        &mail_db_file_stem(account),
+        folder,
+        uid,
+        part,
+    );
+    let mut parent = root.to_owned();
+    for component in relative
+        .parent()
+        .ok_or("Invalid Mail cache directory")?
+        .components()
+    {
+        let std::path::Component::Normal(name) = component else {
+            return Err("Invalid Mail attachment directory".into());
+        };
+        parent.push(name);
+        if !directory_exists(&parent)? {
+            return Ok(None);
+        }
+    }
+    let path = root.join(relative);
+    if regular_file_exists(&path)? {
+        open_file(&path).map(Some)
+    } else {
+        Ok(None)
+    }
+}
+
 fn copy_file(source: &Path, target: &Path, control: &SnapshotControl) -> Result<(), String> {
     let mut input = open_file(source)?;
     let parent = target.parent().ok_or("Invalid Mail staging path")?;

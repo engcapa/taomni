@@ -1,0 +1,87 @@
+id: TC-MODULES-083
+title: Signed Mail retains the exact attachment across two viewer opens
+description: Enable attachment caching for an IMAP account, open an unarchived attachment, close the temporary viewer and reopen from the module after the server stops supplying the original.
+covers: [F-Modules-1, F-MAIL-23, F-FILEOPEN-1]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, file_open_mail, module_signed_mail_archive, file_open_files]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill: {selector: 'input[aria-label="IMAP server"]', value: 127.0.0.1}
+- select_option: {selector: '[data-testid="mail-imap-security"]', value: None}
+- fill: {selector: 'input[aria-label="IMAP port"]', value: '${fixture.mail_imap_port}'}
+- fill: {selector: 'input[aria-label="Mail email or username"]', value: qa@example.com}
+- fill: {selector: 'input[aria-label="Mail password or app password token"]', value: qa-pass}
+- fill: {selector: 'input[aria-label="SMTP server"]', value: 127.0.0.1}
+- select_option: {selector: '[data-testid="mail-smtp-security"]', value: None}
+- fill: {selector: 'input[aria-label="SMTP port"]', value: '${fixture.mail_smtp_port}'}
+- click: '[data-testid="mail-cache-attachments"][data-checked="false"]'
+- assert_attribute: {selector: '[data-testid="mail-cache-attachments"]', name: data-checked, equals: 'true'}
+- select_option: {selector: '[data-testid="mail-storage-mode"]', value: include}
+- click: '[data-testid="mail-storage-edit-folders"]'
+- fill: {selector: '[data-testid="mail-storage-folder-names"]', value: Archive}
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: QA cached attachment}
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-attachment-password
+- wait_for: {selector: '[data-testid="session-editor"]', state: detached, timeout_sec: 60}
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA cached attachment"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"] [data-testid="mail-client-tab"][data-active="true"]'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 40}
+- click: '[data-testid="mail-message-row"][data-subject="${fixture.file_open_mail_subject}"]'
+- wait_for: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- wait_for: {selector: '[data-testid="mail-body-warming-progress"]', state: detached, timeout_sec: 35}
+- dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
+- assert_file_open_bytes: {selector: '[data-testid="file-viewer"][data-readonly="true"]', remember: signed-part, equals: '${fixture.file_open_mail_text}'}
+- assert_signed_mail_host: attachment-saved
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-readonly="true"]', state: detached}
+- assert_file_open_bytes: {remember: signed-part, absent: true}
+- mail_server_archive_fault: {folder: INBOX, empty_newest: true}
+- dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
+- assert_file_open_bytes: {selector: '[data-testid="file-viewer"][data-readonly="true"]', equals: '${fixture.file_open_mail_text}'}
+- assert_signed_mail_host: attachment-reopened
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: cached-attachment
+    requirement: The opt-in account writes one attachment to the signed module and can open the same bytes without another IMAP body fetch.
+    actions: [6, 8, 15, 24, 26, 28, 31, 35, 38, 41, 45, 48, 49]
+    checkpoints:
+    - {step: 10, expectation: The installed renderer and host match the verified package.}
+    - {step: 25, expectation: The saved account opts into the attachment cache.}
+    - {step: 37, expectation: The active account synchronizes the isolated INBOX.}
+    - {step: 43, expectation: The first real read-only viewer opens the exact attachment bytes.}
+    - {step: 44, expectation: The signed host owns the writer lease and the single on-disk part matches the original digest in module storage.}
+    - {step: 47, expectation: Closing the first viewer releases its actual temporary file.}
+    - {step: 51, expectation: The second viewer reads the same bytes while the original is unavailable.}
+    - {step: 52, expectation: The module file and the IMAP body fetch count are unchanged across the second open.}
+    - {step: 53, expectation: The reader and viewer complete both opens without runtime errors.}
+    results: [10, 25, 37, 43, 44, 47, 51, 52, 53]
+  visual:
+  - check: The opened attachment appears in the read-only text viewer.
+    method: automated
+    reason: Both opens inspect the real file viewer and its bytes.
+  native:
+  - check: On-disk storage owner and IMAP transport.
+    method: automated
+    reason: The case checks the signed package identity, module and legacy directories, temporary viewer file and independent IMAP server log.

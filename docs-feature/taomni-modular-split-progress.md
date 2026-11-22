@@ -2,6 +2,10 @@
 
 ## 2026-11-22 当前进展
 
+- 候选 `647fec73c` 的 Linux deb、macOS Intel 和 ARM64 DMG 已实装完成 0.5.12 → 0.6.0 → 0.5.12。三者均核对十个签名模块首装、卸载 Mail、重开后的九个活动模块和回退。Linux 还通过 MFA 强退恢复。Windows 已安装并启动旧 MSI。两次启动日志都记录了自有 WebView2 进程和 EdgeDriver，旧应用未提供预期的调试端口，升级未执行。Windows 安装件 Authenticode 为 `NotSigned`，两个 DMG 的 Gatekeeper 评估均未接受。[Linux 实装](https://github.com/engcapa/taomni/actions/runs/45016606951) · [Windows 和双架构 macOS 实装](https://github.com/engcapa/taomni/actions/runs/45016613506)
+- `8b2526b30` 的 18 个 Browser/Native 分片已在汇总前收齐。三端 Browser 各 35/35，macOS Native 41/41，Linux Native 38/39，Windows Native 38/40。后两端均遇到旧版 SocksCap 端口重开问题，Windows 的 TC-EXPLORER-013 在读取刚保存的 TypeScript 文件时收到访问拒绝。三端 Mail 宿主协议均通过。SocksCap 0.1.6 的首次复跑停在选集规划，缺少 macOS 安装包校验脚本的签名测试夹具已经修复。[桌面分片](https://github.com/engcapa/taomni/actions/runs/45011830158) · [宿主协议](https://github.com/engcapa/taomni/actions/runs/45014087694) · [规划失败](https://github.com/engcapa/taomni/actions/runs/45015861992)
+- Mail 0.1.25 将可选的 IMAP 附件缓存交给签名宿主。新包按账号、文件夹、UID、MIME 部件读写，完整传输后才替换缓存；只升级核心且仍启用旧 Mail 时继续使用原目录。TC-MODULES-083 覆盖服务器移除原件后重新打开同一附件，并核对模块数据和临时查看器的实际字节，TC-MAIL-STORAGE-01 补充账号缓存选项。7 项协议、82 项引擎及 13 项宿主单元通过。正文与归档索引仍有核心过渡代码，附件的三端运行结果待收取。
+
 - SocksCap 0.1.6 把 macOS Redirector 的上游安装包、清单和许可证从基座移到双架构的签名模块。安装按钮从已启用模块取出验签字节，在私有暂存目录复核摘要后才申请系统安装授权。核心安装件和 updater 检查排除这份资源。TC-MODULES-074、080、082 覆盖设置页、宿主停用和安装包损坏后拒绝安装。082 尚待 GitHub macOS Native 实跑。Xray 和旧桥接 helper 仍有核心过渡路径。
 - `8b2526b30` 的三端 Browser 各 35/35。已下载的 Linux Native 第二分片中，旧 SocksCap 重开后也读出 `10801`，预期为 `19397`，与 Windows 已修复的问题一致。该分片的邮件邀请、已读回执、Markdown Live 表格和 Explorer 编辑重开均通过。0.1.6 的 43 项发布脚本、55 项组件、2 项资源打包和 1 项核心验签单元通过。仓库 Rust 包格式、QA 用例审计和含完整崩溃回归的三端静态选集通过。[执行中取得的分片](https://github.com/engcapa/taomni/actions/runs/45011830158)
 - SocksCap 0.1.5 修复 Windows Native 在重开旧配置后编辑端口的问题。清空后键入 `19397` 时，原生失败现场保留了 `10801`。现在焦点内保留未输完的值，有效配置按输入顺序持久化，写入失败回到最后成功值。TC-MODULES-071 验证重开，072 从模块配置文件读回端口并复核原文件摘要，075 覆盖浏览器写入。55 项组件单测通过，修复后的桌面结果待收取。[Windows 原始分片](https://github.com/engcapa/taomni/actions/runs/45005586816)
