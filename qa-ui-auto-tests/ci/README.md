@@ -36,9 +36,10 @@ that require release still use it, and other native selections retain their
 existing debug profile. Browser selection and production release workflows are
 unchanged. The planner records the choice and the native `release` capability,
 so execution and cache keys cannot disagree about the profile.
-Workspace cache keys use the same source, recipe, toolchain and environment
-fingerprint as the QA build verifier. Test/runner-only commits therefore reuse
-one cache entry instead of saving duplicate binaries under each commit SHA.
+The reusable runtime key includes the platform, architecture, runner baseline,
+profile and source/recipe digests. Documentation, case and independent frontend
+unit-test changes can reuse a verified runtime across commits. The producer
+binds the verified files to this invocation before the shards execute.
 
 `run_rdp_unit_contracts` defaults to `true`. For a focused native reproduction,
 `-f run_rdp_unit_contracts=false` can reuse a recorded successful unit-contract
@@ -87,14 +88,19 @@ uses the union of selected filters in one invocation. Tool contracts also run
 outside planning. Both contract jobs remain required by the final workflow
 result, including when all UI cases passed.
 
-GitHub remote caches survive disposable runners: app workspaces retain the
-verified build-input key and can seed from the existing Ubuntu 22.04 X11 cache.
-Rust contracts have a separate cache, seeded from app intermediates on a miss.
-Ubuntu 22.04 PipeWire 1.0.9 installs reuse a staged cache keyed by setup recipe
-and architecture; execution adapters cache pinned tauri-driver 2.0.4 separately
-per runner OS/version/architecture. Python packages use setup-python's pip
-cache. Missing/evicted caches rebuild normally; cached application binaries still
-undergo full verification before reuse. Builds/contracts skip desktop provisioning.
+When the runtime misses, Cargo can still restore matching compiled dependencies.
+Linux contracts read the producer's Rust cache. The Windows helper contracts
+have their own cache. Direct manual runs against the selected branch's head
+retain the verified runtime for three days and Cargo dependencies for one day
+as workflow artifacts. Restore uses the same repository, branch and workflow.
+A dispatch can also restore compatible Actions caches from its workflow ref or
+the default branch. Each platform provisions a fresh build after a miss.
+Use the `Native runtime cache miss` and `Rust dependency cache miss` steps to
+identify a cold path before it starts compiling during cache measurements.
+
+Ubuntu 22.04 PipeWire, Sherpa native libraries, execution adapters and mobile
+Chromium have separate caches. Builds and contracts install their compilation
+dependencies. Native shards also provision the selected desktop and services.
 
 `selection.json` records logical groups, exact shard membership, worker counts,
 estimates and build IDs. Collection rejects missing/duplicate cases and verifies
@@ -158,6 +164,7 @@ jobs:
   qa:
     permissions:
       contents: read
+      actions: read
       issues: write
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
@@ -401,16 +408,11 @@ Read the run's **qa-ui-auto-platforms-result** summary and download
 The UUID keeps multiple reusable calls within one caller isolated. The plan
 summary lists exact selected IDs, reasons and changed paths before execution. `selection.json` binds the selected commit, source,
 runner and case hashes. Raw runner summaries and receipts are not rewritten.
-Case failures and selected skips remain in the aggregate report but do not fail
-the report workflow. Missing reports, native build/source mismatch, failed
-setup, selected skips without a completed runner report, and other
-infrastructure errors make the aggregate fail. `build.log`, `runner.log`, `ci-outcome.json`,
-service/desktop readiness and screenshot metadata identify the failing phase.
-Original failures remain available in each Actions run.
-
-`scope=selected` additionally requires `ci-summary.json.passed` to be true: a
-complete report with failed or skipped selected cases fails the final workflow
-gate. Other scopes retain the existing report-completeness behavior.
+Every scope requires `ci-summary.json.passed`. A failed or skipped planned
+case, missing evidence, native identity mismatch, failed setup or failed
+supporting job makes the final check fail. `build.log`, `runner.log`,
+`ci-outcome.json`, service/desktop readiness and screenshot metadata identify
+the failing phase. Each Actions run retains its original failures.
 
 Issue sync deduplicates
 by combination/case and updates the run link; it does not close issues from a

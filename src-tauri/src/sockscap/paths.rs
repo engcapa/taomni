@@ -110,7 +110,7 @@ pub fn resolve_helper_exe(app: &AppHandle) -> Result<PathBuf, String> {
         .collect::<Vec<_>>()
         .join("\n  ");
     Err(format!(
-        "sockscap-helper not found. Build with:\n  cd src-tauri && cargo build --bin sockscap-helper\n\
+        "sockscap-helper not found. Build with:\n  cd src-tauri && cargo build -p sockscap-helper --bin sockscap-helper\n\
          Searched:\n  {listed}"
     ))
 }

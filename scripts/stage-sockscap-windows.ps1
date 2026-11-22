@@ -1,4 +1,4 @@
-# Stage sockscap-helper + WinDivert next to the built taomni binary (dev/release).
+﻿# Stage sockscap-helper + WinDivert next to the built taomni binary (dev/release).
 # Usage (from repo root):
 #   pwsh scripts/stage-sockscap-windows.ps1
 #   pwsh scripts/stage-sockscap-windows.ps1 -Configuration release
@@ -140,9 +140,9 @@ Push-Location $tauri
 try {
   Write-Host "Building sockscap-helper ($Configuration)..."
   if ($Configuration -eq "release") {
-    cargo build --bin sockscap-helper --release
+    cargo build -p sockscap-helper --bin sockscap-helper --release
   } else {
-    cargo build --bin sockscap-helper
+    cargo build -p sockscap-helper --bin sockscap-helper
   }
 } finally {
   Pop-Location

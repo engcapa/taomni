@@ -2,7 +2,7 @@
 
 每次新功能开发、UI 重构和组件升级都要运行完整 `crash-regression` 集合，再运行本次功能及受影响的既有用例。专项不代替功能回归。失败、未执行、旧源码二进制和缺失报告都不能作为通过。
 
-`qa-ui-auto-platforms.yml` 在产品 PR 上自动选择此 tag，覆盖三平台 browser/native。手动 `selected` / `impacted` 会合并此 tag；`smoke` 包含相同集合；`all` 包含全部用例；`quick` 开关仍保留此 tag 但默认收窄到单平台（Linux native），结果 job 带 `-quick` 后缀且 `merge_eligible: false`，不替代三平台 PR 门禁。汇总检查在所有 scope 下都要求实际用例通过。GitHub 分支保护是否要求这个 check 由仓库管理员配置，workflow 自身会在失败时返回失败。
+`qa-ui-auto-platforms.yml` 在产品 PR 上自动选择此 tag，覆盖三平台 browser/native。手动 `selected` / `impacted` 会合并此 tag；`smoke` 包含相同集合；`all` 包含全部用例。汇总检查在所有 scope 下都要求实际用例通过。GitHub 分支保护是否要求这个 check 由仓库管理员配置，workflow 自身会在失败时返回失败。
 
 | 用例 | 保护的状态与结果 | 模式 |
 | --- | --- | --- |

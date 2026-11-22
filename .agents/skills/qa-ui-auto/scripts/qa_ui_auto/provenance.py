@@ -45,7 +45,15 @@ def input_digest(path: Path) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _is_frontend_unit_test(name: str) -> bool:
+    return name.startswith(("src/", "mobile-web/src/")) and name.endswith(
+        (".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx")
+    )
+
+
 def source_input(name: str) -> bool:
+    if _is_frontend_unit_test(name):
+        return False
     return (name.startswith(("src/", "mobile-web/", "src-tauri/", "vite-plugins/", "scripts/", "public/", ".cargo/", "patches/"))
             and not name.startswith(("src-tauri/target/", "src-tauri/tests/"))) or (
         name in {"package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "vite.config.ts", "index.html", "rust-toolchain.toml", "rust-toolchain"}

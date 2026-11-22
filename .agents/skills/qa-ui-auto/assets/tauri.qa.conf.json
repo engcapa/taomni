@@ -3,6 +3,6 @@
   "productName": "Taomni QA",
   "mainBinaryName": "taomni",
   "build": {
-    "beforeBuildCommand": "pnpm build --mode qa && bash scripts/bundle-krb5-macos.sh stage"
+    "beforeBuildCommand": "pnpm build:mobile && pnpm exec vite build --mode qa && bash scripts/bundle-krb5-macos.sh stage"
   }
 }

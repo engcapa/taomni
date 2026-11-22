@@ -10409,6 +10409,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sockscap-helper"
+version = "0.3.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tracing",
+ "winapi",
+]
+
+[[package]]
 name = "softbuffer"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -172,7 +172,8 @@ def build_inputs(*, release: bool = False, env: dict[str, str] | None = None) ->
         "environment": {key: effective_env.get(key) for key in (
             "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET", "RUSTUP_TOOLCHAIN",
             "CARGO_BUILD_JOBS", "CARGO_PROFILE_DEV_DEBUG", "CC", "CXX", "CFLAGS",
-            "CARGO_PROFILE_DEV_INCREMENTAL", "CXXFLAGS", "BINDGEN_EXTRA_CLANG_ARGS",
+            "CARGO_PROFILE_DEV_INCREMENTAL", "CARGO_PROFILE_RELEASE_CODEGEN_UNITS",
+            "CXXFLAGS", "BINDGEN_EXTRA_CLANG_ARGS",
             "CMAKE_C_FLAGS_RELEASE", "CMAKE_CXX_FLAGS_RELEASE",
             "BINDGEN_EXTRA_CLANG_ARGS_x86_64-unknown-linux-gnu",
             "BINDGEN_EXTRA_CLANG_ARGS_x86_64_unknown_linux_gnu",
