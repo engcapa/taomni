@@ -4,7 +4,7 @@ use taomni_mail_api::{
     DISCARD_IMAP_DRAFT, FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, ImapDraftDiscard, ImapDraftStore,
     ImapSentCopy, IncomingTest, MailAuthMode, MailConnectionSecurity, MailIncomingProtocol,
     MailProvider, MimeUpload, PREFETCH_IMAP_BODIES, RemoteDraftLocation, STORE_IMAP_DRAFT,
-    STORE_IMAP_SENT,
+    STORE_IMAP_SENT, SYNC_IMAP_PAGE,
     imap_exchange::{
         AttachmentReceipt, AttachmentRequest, ImapExchange, PrefetchBodies, read_body_frame,
         read_frame, write_frame,
@@ -12,6 +12,7 @@ use taomni_mail_api::{
 };
 use taomni_mail_engine::{
     archive::{ArchiveChunk, ArchiveQuery, CHUNK},
+    imap_sync::{HeaderPageOutcome, HeaderPageRequest},
     imap_transport::{ImapBodyReply, ImapBodyRequest},
 };
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
@@ -26,6 +27,68 @@ use super::{MailHost, WAIT};
 const HEADER: &str =
     "From: sender@example.test\r\nSubject: Routed body\r\nContent-Type: text/plain\r\n\r\n";
 const TEXT: &str = "Body from the routed IMAP connection\r\n";
+
+pub(super) fn check_routed_header_pages(host: &mut MailHost) {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    for (offset, uid) in [(0, 24), (1, 23)] {
+        std::thread::scope(|scope| {
+            runtime.block_on(async {
+                let (listener, _route, connection) = routed_mailbox().await;
+                let (_exchange, exchange, mut peer) = Route::pair().await.unwrap();
+                let request = ImapExchange {
+                    connection,
+                    exchange,
+                };
+                let (publish, response) = oneshot::channel();
+                let host = &mut *host;
+                scope.spawn(move || {
+                    let result = host.call(SYNC_IMAP_PAGE, serde_json::to_value(request).unwrap());
+                    publish.send(result).unwrap();
+                });
+                let list_folders = offset == 0;
+                let page = HeaderPageRequest {
+                    account_id: "routed-mail".into(),
+                    folder: "INBOX".into(),
+                    offset,
+                    limit: 1,
+                    list_folders,
+                };
+                let read = async {
+                    write_frame(&mut peer, &serde_json::to_vec(&page).unwrap())
+                        .await
+                        .unwrap();
+                    let reply: Result<HeaderPageOutcome, String> =
+                        serde_json::from_slice(&read_frame(&mut peer).await.unwrap()).unwrap();
+                    let reply = reply.unwrap();
+                    assert_eq!(reply.has_more, offset == 0);
+                    assert_eq!(reply.selected.name, page.folder);
+                    assert_eq!(reply.selected.account_id, page.account_id);
+                    assert_eq!(reply.selected.total, Some(2));
+                    assert_eq!(reply.messages.len(), 1);
+                    assert_eq!(reply.messages[0].header.uid, uid);
+                    assert!(reply.messages[0].body_cached_at.is_none());
+                    if list_folders {
+                        assert_eq!(reply.folders.unwrap()[0].name, "INBOX");
+                    } else {
+                        assert!(reply.folders.is_none());
+                    }
+                };
+                let fixture = FixtureFetch::Page { uid, list_folders };
+                let (response, (), ()) = tokio::time::timeout(WAIT, async {
+                    tokio::join!(response, read, serve(listener, fixture))
+                })
+                .await
+                .unwrap();
+                serde_json::from_value::<Result<(), String>>(response.unwrap())
+                    .unwrap()
+                    .unwrap();
+            });
+        });
+    }
+}
 
 pub(super) fn check_routed_body(host: &mut MailHost) {
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -499,6 +562,7 @@ async fn routed_mailbox() -> (TcpListener, Route, IncomingTest) {
 }
 
 enum FixtureFetch {
+    Page { uid: u32, list_folders: bool },
     Body,
     Prefetch,
     Archive,
@@ -509,6 +573,7 @@ enum FixtureFetch {
 impl FixtureFetch {
     fn uids(&self) -> &[u32] {
         match self {
+            Self::Page { uid, .. } => std::slice::from_ref(uid),
             Self::Prefetch => &[23, 24],
             Self::Archive => &[23, 23],
             _ => &[23],
@@ -523,6 +588,16 @@ impl FixtureFetch {
         );
         const BINARY: &str = "JVFB/wA=\r\n";
         match self {
+            Self::Page { .. } => {
+                assert!(
+                    request.ends_with("(UID FLAGS RFC822.SIZE INTERNALDATE BODY.PEEK[HEADER])")
+                );
+                format!(
+                    "* 1 FETCH (UID {uid} FLAGS () RFC822.SIZE {} BODY[HEADER] {{{}}}\r\n{HEADER})\r\n",
+                    HEADER.len() + TEXT.len(),
+                    HEADER.len()
+                )
+            }
             Self::Archive => {
                 let len = HEADER.len() + TEXT.len();
                 let size = format!("RFC822.SIZE {len}");
@@ -582,9 +657,31 @@ async fn serve(listener: TcpListener, fixture: FixtureFetch) {
         let data = match command {
             "LOGIN" => String::new(),
             "CAPABILITY" => "* CAPABILITY IMAP4rev1\r\n".to_owned(),
+            "LIST" | "LSUB"
+                if matches!(
+                    fixture,
+                    FixtureFetch::Page {
+                        list_folders: true,
+                        ..
+                    }
+                ) =>
+            {
+                format!("* {command} () \"/\" \"INBOX\"\r\n")
+            }
             "EXAMINE" => {
                 assert!(input.ends_with("\"INBOX\"") || input.ends_with(" INBOX"));
-                "* 1 EXISTS\r\n* OK [UIDVALIDITY 2] UIDs valid\r\n".to_owned()
+                let count = if matches!(fixture, FixtureFetch::Page { .. }) {
+                    2
+                } else {
+                    1
+                };
+                format!("* {count} EXISTS\r\n* OK [UIDVALIDITY 2] UIDs valid\r\n")
+            }
+            "UID"
+                if matches!(fixture, FixtureFetch::Page { .. })
+                    && input.starts_with("UID SEARCH ") =>
+            {
+                "* SEARCH 23 24\r\n".to_owned()
             }
             "UID" => {
                 let uid = fixture.uids()[fetches];

@@ -8875,6 +8875,15 @@ controls:
   - id: mail-cache-attachments
     selector: '[data-testid="mail-cache-attachments"]'
     kind: interactive
+  - id: mail-cache-enabled
+    selector: '[data-testid="mail-cache-enabled"]'
+    kind: interactive
+  - id: mail-sync-interval
+    selector: 'input[aria-label="Mail sync interval minutes"]'
+    kind: interactive
+  - id: mail-sync-fetch-limit
+    selector: 'input[aria-label="Mail max fetch per sync"]'
+    kind: interactive
   - id: mail-storage-folders
     selector: '[data-testid="mail-storage-folders"]'
     kind: interactive

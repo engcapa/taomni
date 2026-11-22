@@ -39,12 +39,13 @@ use taomni_mail_api::{
     FolderSubscription, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, ImapFlagUpdate, ImapFolderChange,
     ImapFolderMutation, ImapFolderTree, IncomingTest, LIST_IMAP_UNREAD, MUTATE_IMAP_FOLDER,
     SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, SLUG, SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_HEADERS,
-    SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
+    SYNC_IMAP_PAGE, SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
     imap_exchange::{ImapExchange, read_frame, write_frame},
 };
 use taomni_mail_engine::delivery::PreparedMail;
 use taomni_mail_engine::imap_sync::{
-    FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest,
+    FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderPageOutcome,
+    HeaderPageRequest, HeaderStepRequest,
 };
 use taomni_mail_engine::search::ImapSearchRequest;
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
@@ -73,6 +74,10 @@ pub(super) fn changes_imap_folders(registry: &PluginRegistry) -> bool {
 
 pub(super) fn syncs_imap_headers(registry: &PluginRegistry) -> bool {
     supports(registry, SYNC_IMAP_HEADERS)
+}
+
+pub(super) fn syncs_imap_page(registry: &PluginRegistry) -> bool {
+    supports(registry, SYNC_IMAP_PAGE)
 }
 
 pub(super) fn syncs_imap_round(registry: &PluginRegistry) -> bool {
@@ -112,6 +117,34 @@ pub(super) async fn sync_imap_headers(
         exchange_imap(registry, account, SYNC_IMAP_HEADERS, step).await?;
     if outcome.folder.account_id != step.account_id || outcome.folder.name != step.folder {
         return Err("Mail module returned another folder's result".into());
+    }
+    Ok(outcome)
+}
+
+pub(super) async fn sync_imap_page(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    request: &HeaderPageRequest,
+) -> Result<HeaderPageOutcome, String> {
+    let outcome: HeaderPageOutcome =
+        exchange_imap(registry, account, SYNC_IMAP_PAGE, request).await?;
+    let valid_folders = match &outcome.folders {
+        Some(folders) => {
+            request.list_folders && folders.iter().all(|f| f.account_id == request.account_id)
+        }
+        None => !request.list_folders,
+    };
+    if !valid_folders
+        || outcome.selected.account_id != request.account_id
+        || outcome.selected.name != request.folder
+        || outcome.messages.iter().any(|message| {
+            let header = &message.header;
+            header.account_id != request.account_id
+                || header.folder != request.folder
+                || header.uid == 0
+        })
+    {
+        return Err("Mail module returned another mailbox's header page".into());
     }
     Ok(outcome)
 }

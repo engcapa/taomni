@@ -1,0 +1,165 @@
+id: TC-MODULES-087
+title: Browser Mail loads older IMAP messages with caching disabled
+description: Open an uncached IMAP account with a short page size, load the remaining headers and retain the folder
+  tree.
+covers:
+- F-Modules-1
+- F-MAIL-3
+- F-MAIL-23
+tags:
+- modules
+- mail
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- mail_server
+- module_mail_preview
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill:
+    selector: input[aria-label="IMAP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-imap-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="IMAP port"]
+    value: ${fixture.mail_imap_port}
+- fill:
+    selector: input[aria-label="Mail email or username"]
+    value: qa@example.com
+- fill:
+    selector: input[aria-label="Mail password or app password token"]
+    value: qa-pass
+- fill:
+    selector: input[aria-label="SMTP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-smtp-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="SMTP port"]
+    value: ${fixture.mail_smtp_port}
+- fill:
+    selector: input[aria-label="Mail sync interval minutes"]
+    value: '0'
+- fill:
+    selector: input[aria-label="Mail max fetch per sync"]
+    value: '50'
+- set_check:
+    selector: '[data-testid="mail-idle-push"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="mail-cache-enabled"]'
+    checked: false
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: QA uncached mail
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mail-pagination-password
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 60
+- mail_server_deliver:
+    count: 61
+    prefix: Live mail page
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA uncached mail"]'
+- wait_for:
+    selector: '[data-testid="mail-message-row"][data-subject="Live mail page 0061"]'
+    timeout_sec: 35
+- wait_for:
+    selector: '[data-testid="mail-message-count"][data-count="50"][data-has-more="true"]'
+    timeout_sec: 35
+- assert_count:
+    selector: '[data-testid="mail-message-row"][data-subject="Live mail page 0001"]'
+    equal: 0
+- wait_for:
+    selector: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+    timeout_sec: 35
+- click: '[data-testid="mail-load-more"]'
+- wait_for:
+    selector: '[data-testid="mail-message-row"][data-subject="Live mail page 0001"]'
+    timeout_sec: 35
+- mail_server_assert_list_matches:
+    timeout_sec: 35
+- assert_count:
+    selector: '[data-testid="mail-message-row"][data-subject="Live mail page 0061"]'
+    equal: 1
+- assert_visible: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- wait_for:
+    selector: '[data-testid="mail-load-more"]'
+    state: detached
+    timeout_sec: 10
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: first-live-page
+    requirement: Opening an account with caching disabled shows the newest page and makes older messages available.
+    actions:
+    - 22
+    - 29
+    - 30
+    checkpoints:
+    - step: 31
+      expectation: The newest delivered message is visible.
+    - step: 32
+      expectation: Only the first 50 headers are shown, with a continuation.
+    - step: 33
+      expectation: The oldest delivered header is outside the first page.
+    - step: 34
+      expectation: The server folder list is populated.
+    results:
+    - 31
+    - 32
+    - 33
+    - 34
+  - id: older-live-headers
+    requirement: Load older messages appends the remaining server headers and exhausts the mailbox without duplicates.
+    actions:
+    - 35
+    checkpoints:
+    - step: 36
+      expectation: The previously absent older header is visible.
+    - step: 37
+      expectation: The loaded count matches all messages in the server fixture.
+    - step: 38
+      expectation: The newest header still appears once.
+    - step: 39
+      expectation: The rest of the folder tree remains available.
+    - step: 40
+      expectation: No older page remains.
+    - step: 41
+      expectation: The renderer reports no runtime errors.
+    results:
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+  visual:
+  - check: The first page, Load older messages action and retained folder tree are visible.
+    method: automated
+    reason: Assertions use the mailbox counters, controls and delivered subjects.
+  native:
+  - check: Use the verified Mail host and real IMAP fixture.
+    method: not-applicable
+    reason: TC-MODULES-086 exercises the actual native host.

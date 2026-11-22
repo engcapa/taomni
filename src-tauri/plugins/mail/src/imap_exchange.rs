@@ -9,7 +9,7 @@ use taomni_mail_api::{
         write_body_frame, write_frame,
     },
 };
-use taomni_mail_engine::imap_sync::{FolderRoundRequest, HeaderStepRequest};
+use taomni_mail_engine::imap_sync::{FolderRoundRequest, HeaderPageRequest, HeaderStepRequest};
 use taomni_mail_engine::imap_transport::{
     ImapBodyReply, ImapBodyRequest, ImapSession, imap_catch_result,
 };
@@ -34,6 +34,22 @@ pub(super) fn sync_headers(
         |session, step: HeaderStepRequest| {
             validate_folder(&step.account_id, &step.folder)?;
             session.sync_headers(&step)
+        },
+    )
+}
+
+pub(super) fn sync_page(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: ImapExchange,
+) -> Result<Result<(), String>, RpcError> {
+    transfer(
+        runtime,
+        operation,
+        request,
+        |session, page: HeaderPageRequest| {
+            validate_folder(&page.account_id, &page.folder)?;
+            session.sync_header_page(&page)
         },
     )
 }

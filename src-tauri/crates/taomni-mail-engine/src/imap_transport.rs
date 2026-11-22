@@ -14,8 +14,9 @@ use crate::imap_messages::{Mailbox, imap_fetch_attachment, imap_fetch_raw};
 use crate::imap_mutations::{imap_delete_messages, imap_set_flags, unread_uids};
 use crate::imap_outgoing::{store_remote_draft, store_sent_copy};
 use crate::imap_sync::{
-    FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest, StepParams,
-    imap_has_capability, imap_sync_folder_step, sync_folder_round,
+    FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderPageOutcome,
+    HeaderPageRequest, HeaderStepRequest, StepParams, imap_has_capability, imap_sync_folder_step,
+    sync_folder_round,
 };
 use crate::search::{ImapSearchRequest, search_imap_messages};
 use crate::tls::{MailConnectionSecurity, certificate_error_hint, tls_connector};
@@ -151,6 +152,29 @@ impl ImapSession {
             Self::Tls(session) => sync_headers(session, request),
         }
     }
+
+    pub fn sync_header_page(
+        &mut self,
+        page: &HeaderPageRequest,
+    ) -> Result<HeaderPageOutcome, String> {
+        let folders = page
+            .list_folders
+            .then(|| self.list_folders(&page.account_id))
+            .transpose()?;
+        let cache = MailCacheSettings::default();
+        let mut mailbox = header_mailbox(&page.account_id, &page.folder, &cache);
+        let (selected, messages, has_more) = match self {
+            Self::Plain(session) => mailbox.fetch_page(session, page.offset, page.limit, false),
+            Self::Tls(session) => mailbox.fetch_page(session, page.offset, page.limit, false),
+        }?;
+        Ok(HeaderPageOutcome {
+            folders,
+            selected,
+            messages,
+            has_more,
+        })
+    }
+
     pub fn sync_header_round(&mut self, request: &FolderRoundRequest) -> FolderRoundOutcome {
         let cache = MailCacheSettings::default();
         let mut mailbox = header_mailbox(&request.folder.account_id, &request.folder.name, &cache);

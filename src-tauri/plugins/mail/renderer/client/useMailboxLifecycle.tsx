@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type SetStateAction } from "react";
 import { mailIdleStart, mailIdleStop, MAIL_IDLE_EVENT, type MailFolder, type MailIdleEvent, type MailMessageBody, type MailMessageHeader } from "../../../../../src/lib/mail";
 import { listen } from "@tauri-apps/api/event";
 import { type OpenMailMessageTab, type BodyWarmState } from "./types";
@@ -86,10 +86,6 @@ export function useMailboxLifecycle(context: UseMailboxLifecycleContext) {
     messageTabs,
   } = context;
 
-  const loadInitialMessages = useCallback(async (folder: string) => {
-    await loadCachedMessages(folder);
-  }, [loadCachedMessages]);
-
   useEffect(() => {
     initialSyncDoneRef.current = false;
     foldersRef.current = [];
@@ -116,8 +112,9 @@ export function useMailboxLifecycle(context: UseMailboxLifecycleContext) {
   }, [info.sessionId, loadCachedFolders, updateSelectedFolder]);
 
   useEffect(() => {
-    void loadInitialMessages(selectedFolder);
-  }, [loadInitialMessages, selectedFolder]);
+    // The on-open sync owns the initial live page when caching is disabled.
+    if (info.cache.enabled || info.incoming === "pop3") void loadCachedMessages(selectedFolder);
+  }, [info.cache.enabled, info.incoming, loadCachedMessages, selectedFolder]);
 
   useEffect(() => {
     if (!visible || !pendingCacheRefreshRef.current) return;

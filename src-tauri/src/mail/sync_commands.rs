@@ -1,6 +1,6 @@
 use taomni_mail_engine::{
     cache::upsert_folder_status,
-    imap_sync::{FolderRoundOutcome, FolderRoundRequest},
+    imap_sync::{FolderRoundOutcome, FolderRoundRequest, HeaderPageOutcome, HeaderPageRequest},
 };
 
 use super::*;
@@ -44,78 +44,117 @@ pub async fn mail_sync_headers(
         Vec::new()
     };
     let do_list = should_list_remote_folders(refresh_folders, cached_folders.len());
+    let page = HeaderPageRequest {
+        account_id: account_id.clone(),
+        folder,
+        offset,
+        limit,
+        list_folders: do_list,
+    };
+    let outcome = if !include_bodies && module_host::syncs_imap_page(&state.plugins) {
+        let registry = &state.plugins;
+        let first = module_host::sync_imap_page(registry.clone(), &account, &page).await;
+        if first
+            .as_ref()
+            .is_err_and(|error| is_imap_transport_error(error))
+        {
+            module_host::sync_imap_page(registry.clone(), &account, &page).await?
+        } else {
+            first?
+        }
+    } else {
+        sync_legacy_imap_page(&state, account, page, include_bodies).await?
+    };
 
+    let HeaderPageOutcome {
+        folders,
+        selected,
+        messages,
+        has_more,
+    } = outcome;
+    let folders = folders_for_header_sync(folders.unwrap_or(cached_folders), selected.clone());
+    let (folders, selected, messages) = if cache_enabled {
+        with_mail_db_async(&state, &account_id, move |db, account_id| {
+            cache_sync_result(
+                db,
+                &account_id,
+                &folders,
+                &messages,
+                &selected.name,
+                &cache_settings,
+                do_list,
+            )?;
+            Ok((folders, selected, messages))
+        })
+        .await?
+    } else {
+        (folders, selected, messages)
+    };
+
+    tracing::debug!(
+        account_id = %account_id,
+        folder = %selected.name,
+        listed_remote = do_list,
+        refresh_folders,
+        "mail sync headers folders source"
+    );
+
+    let cached_bodies = messages
+        .iter()
+        .filter(|m| m.body_cached_at.is_some())
+        .count();
+    let messages = messages.into_iter().map(|m| m.header).collect::<Vec<_>>();
+    Ok(MailSyncResult {
+        account_id,
+        folder: selected.name,
+        folders,
+        fetched_messages: messages.len(),
+        cached_bodies,
+        messages,
+        synced_at: now_ts(),
+        offset,
+        limit,
+        has_more,
+    })
+}
+
+async fn sync_legacy_imap_page(
+    state: &AppState,
+    account: ResolvedMailAccount,
+    page: HeaderPageRequest,
+    include_bodies: bool,
+) -> Result<HeaderPageOutcome, String> {
     let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
-    let mut result = tokio::task::spawn_blocking(move || {
+    tokio::task::spawn_blocking(move || {
         with_imap_session(
             &pool,
             &account,
             &handle,
             ImapSessionOpts::background(),
             |imap| {
-                let base_folders = if do_list {
-                    imap.list_folders(&account.config.session_id)?
-                } else {
-                    // Clone: with_imap_session may invoke this FnMut twice on retry.
-                    cached_folders.clone()
-                };
-                let (selected_folder, cached, has_more) =
-                    imap.sync_folder(&account, &folder, offset, limit, include_bodies)?;
-                let folders = folders_for_header_sync(base_folders, selected_folder.clone());
-                let cached_bodies = cached.iter().filter(|m| m.body_cached_at.is_some()).count();
-                Ok((
+                let folders = page
+                    .list_folders
+                    .then(|| imap.list_folders(&page.account_id))
+                    .transpose()?;
+                let (selected, messages, has_more) = imap.sync_folder(
+                    &account,
+                    &page.folder,
+                    page.offset,
+                    page.limit,
+                    include_bodies,
+                )?;
+                Ok(HeaderPageOutcome {
                     folders,
-                    selected_folder,
-                    cached,
-                    cached_bodies,
+                    selected,
+                    messages,
                     has_more,
-                    do_list,
-                ))
+                })
             },
         )
     })
     .await
-    .map_err(|e| format!("mail sync task failed: {e}"))??;
-
-    if cache_enabled {
-        result = with_mail_db_async(&state, &account_id, move |db, account_id| {
-            cache_sync_result(
-                db,
-                &account_id,
-                &result.0,
-                &result.2,
-                &result.1.name,
-                &cache_settings,
-                result.5,
-            )?;
-            Ok(result)
-        })
-        .await?;
-    }
-
-    tracing::debug!(
-        account_id = %account_id,
-        folder = %result.1.name,
-        listed_remote = result.5,
-        refresh_folders,
-        "mail sync headers folders source"
-    );
-
-    let synced_at = now_ts();
-    let messages = result.2.drain(..).map(|m| m.header).collect::<Vec<_>>();
-    Ok(MailSyncResult {
-        account_id,
-        folder: result.1.name,
-        folders: result.0,
-        fetched_messages: messages.len(),
-        cached_bodies: result.3,
-        messages,
-        synced_at,
-        offset,
-        limit,
-        has_more: result.4,
-    })
+    .map_err(|error| format!("mail sync task failed: {error}"))?
 }
 
 /// Sync one folder by one bounded, gap-free step (see `sync.rs`). Callers

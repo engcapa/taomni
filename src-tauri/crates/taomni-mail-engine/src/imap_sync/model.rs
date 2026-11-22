@@ -110,6 +110,25 @@ pub struct HeaderStepRequest {
     pub limit: usize,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HeaderPageRequest {
+    pub account_id: String,
+    pub folder: String,
+    pub offset: u32,
+    pub limit: u32,
+    pub list_folders: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HeaderPageOutcome {
+    pub folders: Option<Vec<MailFolder>>,
+    pub selected: MailFolder,
+    pub messages: Vec<MailMessageCached>,
+    pub has_more: bool,
+}
+
 pub struct AppliedStep {
     pub flags_updated: usize,
     pub folder: Option<MailFolder>,

@@ -45,7 +45,7 @@ export function useMailCacheLoading(context: UseMailCacheLoadingContext) {
     messagesRef: cacheOwner.messagesRef,
     setMessages: cacheOwner.setMessages,
     setStatus,
-  }), [info.sessionId, pageSize]);
+  }), [info, pageSize]);
 
   const rememberBody = useCallback(createRememberBody({
     bodyCacheRef: cacheOwner.bodyCacheRef,

@@ -1,6 +1,6 @@
 import { type SetStateAction } from "react";
 import { mailGetMessageBody, mailPrefetchMessageBody, mailListCachedFolders, mailListCachedMessages, mailSyncFolder, mailSyncHeaders, type MailFolder, type MailMessageBody, type MailMessageHeader } from "../../../../../src/lib/mail";
-import { folderHasMoreToLoad, mergeSyncedMessages } from "../../../../../src/lib/mailSync";
+import { folderHasMoreToLoad } from "../../../../../src/lib/mailSync";
 import { type OpenMailMessageTab, type BodyWarmState } from "./types";
 import { messageKey, sortMessages, mailClientErrorMessage, bodyMatchesMessage, mergeMessagePages, delay } from "./messages";
 import type { MailSubscriptionSnapshots } from "./subscriptionSnapshots";
@@ -95,7 +95,10 @@ export function createLoadCachedMessages(controllerContext: LoadCachedMessagesCo
     try {
       const limit = Math.max(controllerContext.pageSize, limitOverride ?? controllerContext.pageSize);
       const removalVersion = controllerContext.cacheRemovalVersionsRef.current.get(folder) ?? 0;
-      const cached = await mailListCachedMessages(controllerContext.info.sessionId, folder, limit + 1, offset);
+      const { info } = controllerContext;
+      const fromServer = !info.cache.enabled && info.incoming !== "pop3";
+      const remote = fromServer ? await mailSyncHeaders(info, folder, { limit, offset, refreshFolders: false }) : null;
+      const messages = remote?.messages ?? await mailListCachedMessages(info.sessionId, folder, limit + 1, offset);
       if (!controllerContext.visibleRef.current) {
         controllerContext.pendingCacheRefreshRef.current = true;
         return { page: [], hasMore: false, applied: false };
@@ -106,18 +109,18 @@ export function createLoadCachedMessages(controllerContext: LoadCachedMessagesCo
         // removed rows. Keep the current list until the next fresh query.
         return { page: [], hasMore: false, applied: false };
       }
-      const page = cached.slice(0, limit);
+      const page = messages.slice(0, limit);
       const loadedCount = offset + page.length;
-      const hasMore = folderHasMoreToLoad(
+      const hasMore = remote?.hasMore ?? folderHasMoreToLoad(
         controllerContext.foldersRef.current.find((entry) => entry.name === folder),
         loadedCount,
-        cached.length > limit,
+        messages.length > limit,
       );
       controllerContext.setHasMoreMessages(hasMore);
       // Update the ref synchronously: concurrent sync steps merge against it.
       const next = append ? mergeMessagePages(controllerContext.messagesRef.current, page) : sortMessages(page);
       controllerContext.setMessages(next);
-      if (!quiet) {
+      if (!quiet && !fromServer) {
         controllerContext.setStatus(
           append
             ? page.length > 0 ? `Loaded ${page.length} older cached messages` : "No more cached messages"
@@ -380,9 +383,6 @@ export interface LoadMoreMessagesContext {
   info: import("../../../../../src/types").MailTabInfo;
   setLoadingMoreMessages: import("react").Dispatch<SetStateAction<boolean>>;
   pageSize: number;
-  selectedFolderRef: import("react").RefObject<string>;
-  messagesRef: import("react").RefObject<MailMessageHeader[]>;
-  setMessages: (next: SetStateAction<MailMessageHeader[]>) => void;
   setHasMoreMessages: import("react").Dispatch<SetStateAction<boolean>>;
   setError: import("react").Dispatch<SetStateAction<string | null>>;
   loadCachedMessages: (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<import("./types").MailCachePageResult>;
@@ -398,28 +398,11 @@ export function createLoadMoreMessages(controllerContext: LoadMoreMessagesContex
     if (controllerContext.query.trim() || controllerContext.loadingMessages || controllerContext.loadingMoreMessages || !controllerContext.hasMoreMessages) return;
     const folder = controllerContext.selectedFolder;
     const loaded = controllerContext.messages.length;
-    if (!controllerContext.info.cache.enabled) {
-      // No cache to page: fall back to server offset paging.
-      controllerContext.setLoadingMoreMessages(true);
-      try {
-        const result = await mailSyncHeaders(controllerContext.info, folder, { limit: controllerContext.pageSize, offset: loaded, refreshFolders: false });
-        const merged = mergeSyncedMessages(controllerContext.selectedFolderRef.current, folder, controllerContext.messagesRef.current, result.messages, sortMessages);
-        if (merged) {
-          controllerContext.setMessages(merged);
-        }
-        controllerContext.setHasMoreMessages(result.hasMore);
-      } catch (e) {
-        controllerContext.setError(mailClientErrorMessage(e));
-      } finally {
-        controllerContext.setLoadingMoreMessages(false);
-      }
-      return;
-    }
     // Cache first; only when the cache is exhausted backfill older history.
     const { page, applied } = await controllerContext.loadCachedMessages(folder, loaded, true);
     // A superseded page is not an empty current cache. Its caller must not
     // clear a newer refresh's pagination or start backfill for an old folder.
-    if (!applied || page.length > 0) return;
+    if (!controllerContext.info.cache.enabled || !applied || page.length > 0) return;
     const meta = controllerContext.foldersRef.current.find((entry) => entry.name === folder);
     if (!meta || meta.syncComplete || controllerContext.syncInFlightRef.current) {
       if (meta?.syncComplete) controllerContext.setHasMoreMessages(false);

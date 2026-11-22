@@ -688,7 +688,7 @@ export function MailSettings({
 
       <Field label="Cache">
         <label className="flex items-center gap-1.5">
-          <Checkbox checked={cacheEnabled} onChange={setCacheEnabled} />
+          <Checkbox dataTestId="mail-cache-enabled" checked={cacheEnabled} onChange={setCacheEnabled} />
           Cache headers and recent bodies
         </label>
         <label className="ml-3 flex items-center gap-1.5">

@@ -73,9 +73,9 @@ export function createRunFolderSync(controllerContext: RunFolderSyncContext): (f
           }
         },
       });
-      // The archive or a peer may have populated the cache after our initial
-      // read. A zero-change foreground sync still needs that current snapshot.
-      if (controllerContext.info.cache.enabled) await controllerContext.reloadVisibleFromCache(folder);
+      // Refresh the visible page and its continuation after sync. Cached
+      // accounts may already have newer rows from the archive or a peer.
+      await controllerContext.reloadVisibleFromCache(folder);
       if (loop.fetched > 0 && folder.trim().toUpperCase() === "INBOX") {
         await controllerContext.incomingFiltersRef.current?.();
       }
