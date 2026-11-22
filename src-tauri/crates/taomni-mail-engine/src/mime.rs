@@ -341,9 +341,10 @@ pub fn extract_attachment(
         .parse(body)
         .ok_or_else(|| "failed to parse message attachments".to_string())?;
     let mut attachments = message.attachments();
+    let ordinal = attachment_index.saturating_add(1);
     let part = attachments
         .nth(attachment_index)
-        .ok_or_else(|| format!("attachment #{} not found", attachment_index.saturating_add(1)))?;
+        .ok_or_else(|| format!("attachment #{ordinal} not found"))?;
     decoded_attachment(part)
 }
 

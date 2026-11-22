@@ -105,14 +105,14 @@ steps:
 - wait_for: '[data-testid="mail-archive-row"]'
 - assert_count: {selector: '[data-testid="mail-archive-row"]', equal: 2}
 - click: '[data-testid="mail-archive-row"]:first-child [data-testid="mail-archive-read"]'
-- assert_text: {selector: '[data-testid="mail-archive-preview"]', contains: complete.bin}
+- assert_text_equals: {selector: '[data-testid="mail-archive-attachment"]', equals: complete.bin}
 - click: '[data-testid="mail-archive-preview"] [data-testid="mail-body-mode-plain"]'
 - assert_text: {selector: '[data-testid="mail-archive-preview"]', contains: Offline body Complete INBOX}
 - wait_for: '[data-testid="mail-archive-attachment"]:enabled'
 - native_file_dialog:
     kind: save
     action: choose
-    trigger: '[data-testid="mail-archive-attachment"]:has-text("complete.bin")'
+    trigger: '[data-testid="mail-archive-attachment"]'
     path: ${fixture.mail_storage_a}/exported-complete.bin
 - assert_text: {selector: '[data-testid="mail-archive-notice"]', contains: exported-complete.bin}
 - assert_file_sha256: {path: '${fixture.mail_storage_a}/exported-complete.bin', equals: '${fixture.mail_archive_attachment_sha256}'}
