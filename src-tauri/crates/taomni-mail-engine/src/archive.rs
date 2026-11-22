@@ -1,8 +1,10 @@
 //! Streaming codec for immutable, content-addressed email archives.
 mod imap_chunks;
 mod metadata;
+mod transfer;
 
 pub use imap_chunks::{CHUNK, CONTENT_ERROR, fetch_imap_chunk};
+pub use transfer::download_imap_original;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

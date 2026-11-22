@@ -91,6 +91,10 @@ def check(ctx: Any, args: dict) -> str:
                 result = {"archive": str(archives[-1]), "mail": mail}
             else:
                 result = observe(root, expected, args.get("full", {}), args.get("headers", {}))
+                if "partial_files" in args:
+                    partials = sorted(path.name for path in root.glob("*.mail/partial/*"))
+                    assert len(partials) == args["partial_files"], f"Transfer files remaining: {partials}"
+                    result["partial_files"] = partials
             out = ctx.case_dir / f"mail-storage-observation-{time.time_ns()}.json"
             out.write_text(json.dumps(result, indent=2), encoding="utf-8")
             return str(out)

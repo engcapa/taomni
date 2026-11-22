@@ -479,6 +479,10 @@
             "include_mail": {
               "type": "boolean"
             },
+            "partial_files": {
+              "type": "integer",
+              "minimum": 0
+            },
             "objects": {
               "type": "integer",
               "minimum": 0

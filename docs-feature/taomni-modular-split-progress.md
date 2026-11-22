@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- Mail 的归档续传、分段写入和发布后清理迁入 `taomni-mail-engine`。保留旧版部分文件与续传元数据格式。新增单测核对传输取消和发布失败后的实际续传偏移，TC-MODULES-070 增加归档后无临时文件的断言。67 项引擎单测、核心与宿主编译以及用例审计通过。归档索引的写入仍由核心过渡层持有。
 - 合入远程 `main` 的 `4e19707e4`（#855），合并提交为 `5a911b255`。记事本相关 36 项单测和 TypeScript 检查通过。
 - Windows 的本地 SSH/SFTP 分片复验通过，包含精确命令输出和端口释放。Local Voice 分片确认签名包已安装且应用检测到预置 Whisper 模型，原测试配置缺少必填字段，录音按钮打开了模型设置。TC-MODULES-067 现通过界面选用 Whisper Base 和英语，继续验证原录音路径、转写和停用。29 项相关前端单测及用例审计通过。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44969347390)
 - Mail 预取的 Linux 和 macOS 原生分片记录了同一连接预取四封邮件。Linux 失败快照中的 HTML 阅读器已加载正确正文，并显示来自本地缓存。TC-MODULES-068 改为读取实际呈现的 HTML 或纯文本正文，继续核对缓存来源和模块停用。 [预取分片](https://github.com/engcapa/taomni/actions/runs/44967113628)
@@ -9,7 +10,7 @@
 - SocksCap 的存盘配置、链接解析和本地代理进程的配置生成迁入 `taomni-sockscap-api`，为核心与独立宿主共用。27 项契约单测和基座编译通过，包含旧配置默认值和原有序列化字段。TC-MODULES-071 在 Browser 与 Native 读取旧端点和 QUIC 默认值，再修改地址与端口并重开核对保存结果。宿主仍需接管驱动、子进程和恢复日志。
 - Mail 0.1.18 让签名宿主通过独立的 IMAP 会话提供归档文件夹、邮件头和 256 KiB 分段。核心过渡层继续管理当前归档索引、暂停状态与安全发布，取消时关闭归档会话。66 项邮件引擎单测、10 项宿主单测、核心编译及宿主集成用例编译通过。新增 TC-MODULES-070 验证签名 Native 实际归档与恢复。
 - 邮件原件归档的 IMAP 分段读取迁入 `taomni-mail-engine`。保留 256 KiB 范围检查、UID 与邮箱身份校验、大小不一致后的续传恢复及实际文件发布。原范围单测随实现迁移并通过，核心编译通过。现有 TC-MAIL-STORAGE-02/03 覆盖保存、重试和完整原件，后台归档会话迁入签名宿主后继续用这两项验证。
-- Mail 0.1.17（`a192bde02`）将后台正文预取迁入签名宿主，每批读取同一文件夹最多四封。手动打开邮件使用单独的请求。缓存提交校验 UIDVALIDITY，保留已读标记和先完成的正文。77 项前端单测、15 项 Rust 单测、核心编译与用例审计通过。GitHub 正在执行签名 Native、Browser 和完整崩溃回归。 [Mail 三端回归](https://github.com/engcapa/taomni/actions/runs/44967113628)
+- Mail 0.1.17（`a192bde02`）将后台正文预取迁入签名宿主，每批读取同一文件夹最多四封。手动打开邮件使用单独的请求。缓存提交校验 UIDVALIDITY，保留已读标记和先完成的正文。原选集已收齐 18 个分片，三端 Browser 各 24/24，Windows Native 28/28，Linux 和 macOS Native 各 27/28。修正正文断言后，在 `f0b9490ea` 上联合 SocksCap、Local Voice、Notepad 和完整崩溃回归复跑。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44967113628) · [当前复跑](https://github.com/engcapa/taomni/actions/runs/44975396751)
 - `469de51f4` 的三端 Browser 分片已收齐，各 39/39，覆盖 Local Voice、Local servers、Notepad、Explorer 和 Markdown Live 表格。Linux Native 的流程断言漏列 Local Voice 签名任务，`3a5f37ff3` 修正后已开始复跑。Windows Native 为 29/32，TC-MODULES-066 切换面板时读到了 SSH 端口 28491，失败快照随后显示迁移后的 HTTP 端口 28489。用例现等待该值后核对连接、备份和清理。TC-MODULES-067 从设置打开新终端后显式打开该终端的聊天面板。TC-SERVERS-004 已收到退出码 0，输出标记仍需验证，复跑分片会保留原始输出并在去除终端控制序列后检查完整标记行。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44963910380) · [Linux 复验](https://github.com/engcapa/taomni/actions/runs/44965415995)
 - Local servers 0.1.1 收齐 18/18 分片。三端 Browser 各 24/24，Linux 与 macOS Native 各 31/31，Windows Native 27/30。Windows 已通过签名安装、真实鉴权和文件读取，两个 SSH 用例卡在 PTY 输出结束。0.1.2 在进程退出时释放 ConPTY，并继续转发剩余输出和退出码。第三个失败是 HTTP 停止后 TCP 连接超时，复验将同时核对 Windows 实际监听表。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44957237883)
 - 合入远程 `main` 的 `3dd574044`（#854）。合并提交 `6eed8689b` 保留新版记事本、不可用关联处理器的回退和模块设置，原生 Mail 附件崩溃回归沿用主线等待只读文本就绪的断言。
