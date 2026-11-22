@@ -14,15 +14,28 @@ from qa_ui_auto.deadline import Deadline
 from tauri_webdriver import NativeSession
 
 
-def owned_listener(processes, port):
-    for process in processes:
-        try:
-            for conn in process.net_connections(kind="tcp4"):
-                if conn.status == psutil.CONN_LISTEN and conn.laddr == ("127.0.0.1", port):
-                    return process.pid
-        except psutil.NoSuchProcess:
+def owned_listener(connections, pids, port):
+    return next((c.pid for c in connections if c.pid in pids and c.status == psutil.CONN_LISTEN
+                 and c.laddr.port == port and c.laddr.ip in ("127.0.0.1", "::1")), None)
+
+
+def webview_processes(app, webview):
+    """WebView2 may start its browser through the runtime broker on Windows."""
+    children = {p.pid for p in app.children(recursive=True)}
+    owned = set(children)
+    observations = []
+    for process in psutil.process_iter(["pid", "name", "cmdline"], ad_value=None):
+        if (process.info["name"] or "").casefold() != "msedgewebview2.exe":
             continue
-    return None
+        arguments = process.info["cmdline"] or []
+        data = next((arg.partition("=")[2] for arg in arguments if arg.startswith("--user-data-dir=")), "")
+        same_profile = bool(data and (Path(data) == webview or Path(data).is_relative_to(webview)))
+        if same_profile:
+            owned.add(process.pid)
+        observations.append({"pid": process.pid, "child": process.pid in children, "expectedProfile": same_profile,
+                             "debugPort": next((arg.partition("=")[2] for arg in arguments
+                                                if arg.startswith("--remote-debugging-port=")), None)})
+    return owned, observations
 
 
 def stop_child(process):
@@ -52,15 +65,26 @@ def installed_webview(executable, webview, evidence, timeout):
         driver = launch(["msedgedriver.exe", f"--port={driver_port}"], "edgedriver.log", os.environ)
         deadline = Deadline(timeout)
         app = psutil.Process(owner.pid)
-        adapter = psutil.Process(driver.pid)
-        while True:
-            if owner.poll() is not None or driver.poll() is not None:
-                raise RuntimeError(f"Installed app or EdgeDriver exited before attachment: {owner.returncode}, {driver.returncode}")
-            browser_pid = owned_listener(app.children(recursive=True), app_port)
-            if browser_pid and owned_listener([adapter], driver_port):
-                break
-            deadline.remaining()
-            time.sleep(.2)
+        observation = {"applicationPid": owner.pid, "driverPid": driver.pid, "requestedDebugPort": app_port,
+                       "driverPort": driver_port, "webviewData": str(webview)}
+        try:
+            while True:
+                if owner.poll() is not None or driver.poll() is not None:
+                    raise RuntimeError(f"Installed app or EdgeDriver exited before attachment: {owner.returncode}, {driver.returncode}")
+                pids, browsers = webview_processes(app, Path(webview))
+                connections = psutil.net_connections(kind="tcp")
+                browser_pid = owned_listener(connections, pids, app_port)
+                adapter_pid = owned_listener(connections, {driver.pid}, driver_port)
+                observation.update(browsers=browsers, browserPid=browser_pid, listeningDriver=adapter_pid,
+                                   listeners=[{"pid": c.pid, "address": c.laddr.ip, "port": c.laddr.port}
+                                              for c in connections if c.status == psutil.CONN_LISTEN
+                                              and (c.pid in pids or c.laddr.port in (app_port, driver_port))])
+                if browser_pid and adapter_pid:
+                    break
+                deadline.remaining()
+                time.sleep(.25)
+        finally:
+            (evidence / "webview-startup.json").write_text(json.dumps(observation, indent=2), encoding="utf-8")
         session = NativeSession(f"http://127.0.0.1:{driver_port}", executable)
         session.deadline = deadline
         stack.callback(session.close)

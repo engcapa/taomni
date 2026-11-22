@@ -77,13 +77,12 @@ class InstalledFirstReleaseTests(unittest.TestCase):
                 close_installed_desktop(driver, session, exe)
 
     def test_attach_requires_a_loopback_listener_on_the_port_of_an_owned_process(self):
-        process = Mock(pid=48)
-        def connection(address, port, status="LISTEN"):
-            return SimpleNamespace(laddr=(address, port), status=status)
-        process.net_connections.return_value = [
+        def connection(address, port, status="LISTEN", pid=48):
+            return SimpleNamespace(laddr=SimpleNamespace(ip=address, port=port), status=status, pid=pid)
+        connections = [
             connection("0.0.0.0", 9222), connection("127.0.0.1", 9223),
-            connection("127.0.0.1", 9222, "ESTABLISHED"),
+            connection("127.0.0.1", 9222, "ESTABLISHED"), connection("127.0.0.1", 9222, pid=52),
         ]
-        self.assertIsNone(owned_listener([process], 9222))
-        process.net_connections.return_value.append(connection("127.0.0.1", 9222))
-        self.assertEqual(owned_listener([process], 9222), 48)
+        self.assertIsNone(owned_listener(connections, {48}, 9222))
+        for addr in ("127.0.0.1", "::1"):
+            self.assertEqual(owned_listener([*connections, connection(addr, 9222)], {48}, 9222), 48)
