@@ -1,0 +1,46 @@
+id: TC-MODULES-071
+title: SocksCap opens a legacy configuration with its recorded endpoint
+description: Load a single-profile configuration written before profile metadata and QUIC settings. Check the restored endpoint and effective default in the visible SocksCap panel.
+covers: [F-Sockscap-1]
+tags: [modules, sockscap, p1]
+modes: [browser, native]
+fixtures: [reset_db, sockscap_legacy_config]
+timeout_sec: 60
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.sockscap.config.v1, value: '${fixture.sockscap_legacy_config}'}
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-testid="sockscap-panel"]'
+- eval_readonly:
+    expression: >-
+      document.querySelector('#sockscap-section-upstream-content select')?.value === 'socks5'
+        && document.querySelectorAll('#sockscap-section-upstream-content input').item(0)?.value === '127.0.0.1'
+        && document.querySelectorAll('#sockscap-section-upstream-content input').item(1)?.type === 'number'
+        && document.querySelectorAll('#sockscap-section-upstream-content input').item(1)?.value === '19391'
+    expect_truthy: true
+- eval_readonly:
+    expression: "document.querySelector('#sockscap-section-gfwlist-content input')?.checked === true"
+    expect_truthy: true
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: legacy-settings
+    requirement: Opening old settings retains the saved endpoint and obtains the current default for missing fields.
+    actions: [3, 4, 5]
+    checkpoints:
+    - {step: 6, expectation: The SocksCap panel loads the existing configuration.}
+    - {step: 7, expectation: The settings form receives the original loopback host and saved port.}
+    - {step: 8, expectation: The control reports the default for the previously absent field.}
+    - {step: 9, expectation: The panel opens without runtime errors.}
+    results: [6, 7, 8, 9]
+  visual:
+  - check: The legacy settings can be opened from the native and browser Tools areas.
+    method: automated
+    reason: The same panel selector is observed in both modes.
+  native:
+  - check: The real desktop reads the old config file from the isolated profile.
+    method: automated
+    reason: The native fixture writes an actual legacy configuration before the app starts.

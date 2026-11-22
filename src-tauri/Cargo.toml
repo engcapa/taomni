@@ -37,6 +37,7 @@ members = [
     "crates/taomni-screenshot-api",
     "crates/taomni-screenshot-ocr",
     "crates/taomni-screenshot-recording",
+    "crates/taomni-sockscap-api",
     "crates/taomni-server-process",
     "crates/taomni-pty",
     "crates/taomni-local-servers-engine",
@@ -195,6 +196,7 @@ imap = "2.4.1"
 # BODYSTRUCTURE / section types; same version `imap` already uses.
 lettre = "0.11.22"
 taomni-mail-api = { path = "crates/taomni-mail-api" }
+taomni-sockscap-api = { path = "crates/taomni-sockscap-api" }
 taomni-mail-engine = { path = "crates/taomni-mail-engine" }
 native-tls = "0.2"
 tokio-native-tls = "0.3"

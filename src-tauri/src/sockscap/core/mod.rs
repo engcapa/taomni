@@ -13,8 +13,7 @@
 //! child. The manager also exposes a synchronous [`XrayManager::shutdown_all`]
 //! for the `RunEvent::Exit` hook so a normal quit never leaks an xray process.
 
-pub mod config_gen;
-pub mod share_link;
+pub use taomni_sockscap_api::{share_link, xray_config as config_gen};
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

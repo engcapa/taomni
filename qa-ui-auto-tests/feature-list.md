@@ -9025,6 +9025,7 @@ components: [SocksCapPanel]
 files:
   - src/components/sockscap/SocksCapPanel.tsx
   - src/components/sockscap/SocksCapRootPrompt.tsx
+  - src-tauri/crates/taomni-sockscap-api/
   - src/lib/sockscap.ts
   - src/stubs/tauri-core.ts
 controls:

@@ -8,7 +8,7 @@
 
 use base64::{Engine as _, engine::general_purpose};
 
-use crate::sockscap::config::{UpstreamKind, UpstreamParams};
+use crate::{UpstreamKind, UpstreamParams};
 
 /// A share link decoded into upstream fields. `secret` / `uuid` are plaintext
 /// (the frontend vaults them into `password_ref` / `params.uuid_ref`).

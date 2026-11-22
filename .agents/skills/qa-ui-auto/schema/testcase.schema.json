@@ -91,6 +91,7 @@
           "module_vnc_preview",
           "module_rdp_preview",
           "module_mail_preview",
+          "sockscap_legacy_config",
           "module_upgrade",
           "module_legacy_install",
           "module_legacy_mfa",

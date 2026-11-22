@@ -14,7 +14,7 @@
 
 use serde_json::{Value, json};
 
-use crate::sockscap::config::{UpstreamKind, UpstreamParams};
+use crate::{UpstreamKind, UpstreamParams};
 
 /// An upstream with all `vault:<id>` references already resolved to plaintext by
 /// the caller (orchestrator). Never persisted; lives only for the duration of a

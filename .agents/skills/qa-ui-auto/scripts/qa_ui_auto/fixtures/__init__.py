@@ -60,6 +60,7 @@ from . import mobile_web, mobile_service, mobile_openssh
 from .. import servers_http_observation, servers_ssh_observation
 from . import ard_required, editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_desktop_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, vnc_required, welcome_recents, workspace_root
 from . import platform_workspace_root
+from . import sockscap_legacy
 from . import workspace_restore_sessions
 from . import bookmark_assets
 from . import clickhouse_required
@@ -146,6 +147,7 @@ REGISTRY: dict[str, Fixture] = {
     "module_vnc_preview": Fixture("module_vnc_preview", module_preview.setup_vnc),
     "module_rdp_preview": Fixture("module_rdp_preview", module_preview.setup_rdp),
     "module_mail_preview": Fixture("module_mail_preview", module_preview.setup_mail),
+    "sockscap_legacy_config": Fixture("sockscap_legacy_config", sockscap_legacy.setup),
     "module_upgrade": Fixture("module_upgrade", module_upgrade.setup, module_upgrade.teardown),
     "module_legacy_install": Fixture("module_legacy_install", module_legacy_install.setup),
     "module_legacy_mfa": Fixture("module_legacy_mfa", module_legacy_mfa.setup),
