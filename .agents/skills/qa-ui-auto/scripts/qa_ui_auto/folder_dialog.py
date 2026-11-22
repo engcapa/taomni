@@ -25,6 +25,19 @@ def command(*args: str, check: bool = True) -> str:
     return result.stdout.strip()
 
 
+def run_picker(argv: list[str], env: dict[str, str], log_path: Path) -> subprocess.CompletedProcess[str]:
+    try:
+        result = subprocess.run(argv, env=env, text=True, capture_output=True, timeout=60)
+    except subprocess.TimeoutExpired as error:
+        output = error.stderr or error.stdout or ""
+        if isinstance(output, bytes):
+            output = output.decode("utf-8", errors="replace")
+        log_path.write_text(output, encoding="utf-8")
+        raise
+    log_path.write_text(result.stderr, encoding="utf-8")
+    return result
+
+
 def selected_path(ctx, args: dict) -> Path | None:
     if not isinstance(args, dict) or set(args) - {"action", "path", "trigger"}:
         raise StepError("native_folder_dialog: expected {action: choose|cancel, path?, trigger?}")
@@ -136,15 +149,7 @@ def _operate_folder_dialog(ctx, args, trigger_click: Future | None = None) -> st
                 cmd = ["osascript", "-l", "JavaScript", str(helper / "folder_dialog_macos.js")]
             else:
                 raise StepError("native_folder_dialog: unsupported OS")
-            try:
-                result = subprocess.run(cmd, env=env, text=True, capture_output=True, timeout=60)
-            except subprocess.TimeoutExpired as error:
-                output = error.stderr or error.stdout or ""
-                if isinstance(output, bytes):
-                    output = output.decode("utf-8", errors="replace")
-                (ctx.case_dir / "native-folder-dialog-helper.log").write_text(output, encoding="utf-8")
-                raise
-            (ctx.case_dir / "native-folder-dialog-helper.log").write_text(result.stderr, encoding="utf-8")
+            result = run_picker(cmd, env, ctx.case_dir / "native-folder-dialog-helper.log")
             if result.returncode:
                 raise StepError(f"native_folder_dialog: {result.stderr.strip() or result.stdout.strip()}")
             observation.update(json.loads(result.stdout))

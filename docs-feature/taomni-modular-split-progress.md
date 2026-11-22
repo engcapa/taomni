@@ -2,6 +2,9 @@
 
 ## 2026-11-22 当前进展
 
+- `f9b8a7dfb` 的三端 Browser 和 Native 回归已启动，覆盖 Mail 附件导出、三态还原、SocksCap 运行文件和完整崩溃回归。工作流分 18 片，采集器在分片上传后下载工件。 [三端回归](https://github.com/engcapa/taomni/actions/runs/45036209138)
+- Mail 0.1.27 的独立宿主在 Linux、Windows 和 macOS ARM64 通过归档附件解码和字节核对。三份跨进程回执绑定 `8b9e6fc58`，原始日志已收取，桌面实际保存对话框仍由 TC-MODULES-070 验收。 [三端宿主回执](https://github.com/engcapa/taomni/actions/runs/45034741888)
+- `TC-FILE-OPEN-007` 的实际屏幕截图显示 macOS 已打开系统导出目录面板，操作助手随后超时。QA 工具已改为按步骤保存助手的部分日志并保留失败结果。32 项对话框工具单测通过。 [原始分片](https://github.com/engcapa/taomni/actions/runs/45024092869)
 - `c0a64b5c0` 的 Linux、Windows、macOS Intel 和 ARM64 基座构建及四目标更新器验签全部成功，已保存四份安装件和含 11 个平台格式的 `latest.json`。取消了该批剩余的旧模块构建，把名额交给新版 Mail 和还原回归。 [发布构建](https://github.com/engcapa/taomni/actions/runs/45024083491)
 - Mail 0.1.26 的归档读取协议通过 Linux、Windows 和 macOS ARM64，三份宿主回执均已归档。0.1.27 的桌面首次运行在选集阶段拒绝了仅支持 Browser 的文件对话框夹具。Native 用例已换成实际系统文件保存窗口，并通过三端静态选集规划。 [归档读取协议](https://github.com/engcapa/taomni/actions/runs/45032138611) · [首次规划](https://github.com/engcapa/taomni/actions/runs/45034611258)
 - 卸载完成后删除模块版本目录和暂存的运行文件，并保留配置数据。启动扫描继续清理上一次中断的卸载。Windows 对辅助程序或驱动释放文件的短暂等待做重试。TC-MODULES-085 增加版本、运行目录和配置摘要的卸载回执，Browser 074 核对卸载确认及安装入口。
