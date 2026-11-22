@@ -1,3 +1,4 @@
+use super::connection::{ArchiveConnection, HostedConnection};
 use super::download::download_one;
 use super::lifetime::ArchiveJob;
 use super::lifetime::update;
@@ -10,7 +11,7 @@ use crate::mail::folders;
 use crate::mail::pop3;
 use crate::mail::storage;
 use crate::mail::sync;
-use crate::mail::{ActiveImapSession, connect_imap_with_socket, folder_is_noselect};
+use crate::mail::{connect_imap_with_socket, folder_is_noselect, module_host};
 use crate::state::AppState;
 use rusqlite::Connection;
 use rusqlite::Result as SqlResult;
@@ -84,18 +85,28 @@ pub(super) fn run(
     let handle = state.mail_db(id)?;
     // A cancellable connection owned by this job cannot stall interactive or
     // header/body-prefetch lanes, and is dropped when the job stops.
-    let (mut imap, socket) = connect_imap_with_socket(account, runtime)?;
-    *job.socket.lock().map_err(|e| e.to_string())? = socket;
+    let mut hosted;
+    let mut legacy;
+    let (imap, condstore): (&mut dyn ArchiveConnection, bool) =
+        if module_host::archives_imap(&state.plugins) {
+            hosted = HostedConnection::open(state.plugins.clone(), account, runtime, job)?;
+            (&mut hosted, false)
+        } else {
+            let (session, socket) = connect_imap_with_socket(account, runtime)?;
+            *job.socket.lock().map_err(|e| e.to_string())? = socket;
+            legacy = session;
+            let condstore = legacy.has_capability("CONDSTORE");
+            (&mut legacy, condstore)
+        };
     update(job, |_| {})?;
-    let folders = imap.list_folders(id)?;
-    let condstore = imap.has_capability("CONDSTORE");
+    let folders = imap.list(id)?;
     let mut failures = ContentFailures::default();
     for folder in folders
         .into_iter()
         .filter(|folder| !folder_is_noselect(folder))
     {
         run_folder(
-            &mut imap,
+            imap,
             account,
             &handle,
             &folder.name,
@@ -115,7 +126,7 @@ pub(super) fn run(
 /// the first readable original. Failed content is attempted once per scan.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn run_folder(
-    imap: &mut ActiveImapSession,
+    imap: &mut dyn ArchiveConnection,
     account: &ResolvedMailAccount,
     handle: &crate::state::MailDbHandle,
     folder: &str,
@@ -150,7 +161,7 @@ pub(super) fn run_folder(
                 status.total_bytes = None;
             })?;
             let started = sync::now_ms();
-            let step = imap.sync_folder_step(
+            let step = imap.headers(
                 account,
                 folder,
                 &snapshot,
@@ -228,7 +239,7 @@ pub(super) fn run_folder(
 // Network/disk/identity failures still stop immediately and preserve safe partials.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn download_targets(
-    imap: &mut ActiveImapSession,
+    imap: &mut dyn ArchiveConnection,
     account: &ResolvedMailAccount,
     handle: &crate::state::MailDbHandle,
     folder: &str,

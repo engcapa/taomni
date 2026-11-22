@@ -5,6 +5,7 @@ mod limits;
 mod lifetime;
 
 mod commands;
+mod connection;
 
 mod sync;
 

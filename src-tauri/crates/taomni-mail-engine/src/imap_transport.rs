@@ -160,6 +160,19 @@ impl ImapSession {
         }
     }
 
+    pub fn archive_chunk(
+        &mut self,
+        folder: &str,
+        uid: u32,
+        offset: u64,
+    ) -> Result<(u32, u64, Vec<u8>), String> {
+        use crate::archive::fetch_imap_chunk;
+        match self {
+            Self::Plain(session) => fetch_imap_chunk(session, folder, uid, offset),
+            Self::Tls(session) => fetch_imap_chunk(session, folder, uid, offset),
+        }
+    }
+
     pub fn search_imap(
         &mut self,
         request: &ImapSearchRequest,

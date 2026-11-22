@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- Mail 0.1.18 让签名宿主通过独立的 IMAP 会话提供归档文件夹、邮件头和 256 KiB 分段。核心过渡层继续管理当前归档索引、暂停状态与安全发布，取消时关闭归档会话。66 项邮件引擎单测、10 项宿主单测、核心编译及宿主集成用例编译通过。新增 TC-MODULES-070 验证签名 Native 实际归档与恢复。
 - 邮件原件归档的 IMAP 分段读取迁入 `taomni-mail-engine`。保留 256 KiB 范围检查、UID 与邮箱身份校验、大小不一致后的续传恢复及实际文件发布。原范围单测随实现迁移并通过，核心编译通过。现有 TC-MAIL-STORAGE-02/03 覆盖保存、重试和完整原件，后台归档会话迁入签名宿主后继续用这两项验证。
 - Mail 0.1.17（`a192bde02`）将后台正文预取迁入签名宿主，每批读取同一文件夹最多四封。手动打开邮件使用单独的请求。缓存提交校验 UIDVALIDITY，保留已读标记和先完成的正文。77 项前端单测、15 项 Rust 单测、核心编译与用例审计通过。GitHub 正在执行签名 Native、Browser 和完整崩溃回归。 [Mail 三端回归](https://github.com/engcapa/taomni/actions/runs/44967113628)
 - `469de51f4` 的三端 Browser 分片已收齐，各 39/39，覆盖 Local Voice、Local servers、Notepad、Explorer 和 Markdown Live 表格。Linux Native 的流程断言漏列 Local Voice 签名任务，`3a5f37ff3` 修正后已开始复跑。Windows Native 为 29/32，TC-MODULES-066 切换面板时读到了 SSH 端口 28491，失败快照随后显示迁移后的 HTTP 端口 28489。用例现等待该值后核对连接、备份和清理。TC-MODULES-067 从设置打开新终端后显式打开该终端的聊天面板。TC-SERVERS-004 已收到退出码 0，输出标记仍需验证，复跑分片会保留原始输出并在去除终端控制序列后检查完整标记行。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44963910380) · [Linux 复验](https://github.com/engcapa/taomni/actions/runs/44965415995)
@@ -607,7 +608,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-023 发布验收 | 目录签名、首装名单和独立模块发布准备已验证 | 发布工具覆盖已暂存模块的签名、声明平台、描述和摘要。核心发布继承签名目录，独立发布保留原模块的资产地址。正式模块构建矩阵、系统签名、首批目录及最终两种安装集合的回归和性能仍待交付。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
 | TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
-| TASK-026 Mail | 签名前端与主要 IMAP 读写已接入独立宿主 | 签名宿主负责连接测试、SMTP 发送、IMAP 文件夹、邮件头、搜索、标记、原文、正文预取和附件读取。归档、过渡缓存归属和正式安装升级、数据接管及回滚继续验收。 |
+| TASK-026 Mail | 签名前端、主要 IMAP 读写和归档连接已接入独立宿主 | 签名宿主负责连接测试、SMTP 发送、IMAP 文件夹、邮件头、搜索、标记、原文、正文预取、归档网络请求和附件读取。归档和过渡缓存的数据归属仍需迁移，接着验证正式安装升级、数据接管及回滚。 |
 | TASK-027 G1–G11 全门禁收口 | 新增任务，未闭合 | G1–G11 的当前证据仍存在正式发行包、业务模块、核心依赖闭包、系统信任和完整入口矩阵缺口；必须用匹配源码的 GitHub runner receipt 逐项闭合后才能进入生产发布。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。

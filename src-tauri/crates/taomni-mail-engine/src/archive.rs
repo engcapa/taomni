@@ -4,6 +4,28 @@ mod metadata;
 
 pub use imap_chunks::{CHUNK, CONTENT_ERROR, fetch_imap_chunk};
 
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub enum ArchiveQuery {
+    Folders {
+        account_id: String,
+    },
+    Headers(crate::imap_sync::HeaderStepRequest),
+    Chunk {
+        folder: String,
+        uid: u32,
+        offset: u64,
+    },
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ArchiveChunk {
+    pub uid_validity: u32,
+    pub reported_size: u64,
+    pub length: usize,
+}
+
 use std::io::{Read, Write};
 
 use flate2::{Compression, read::GzDecoder, write::GzEncoder};

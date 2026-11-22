@@ -1,0 +1,121 @@
+id: TC-MODULES-070
+title: Signed Mail archives complete originals after pausing and resuming
+description: Install the signed module and use its IMAP connection to pause and resume a complete-storage scan. Verify original messages with the independent MIME and SQLite fixture.
+covers: [F-Modules-1, F-MAIL-23]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, mail_server, mail_storage, module_signed_mail_archive]
+timeout_sec: 210
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill:
+    selector: input[aria-label="IMAP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-imap-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="IMAP port"]
+    value: ${fixture.mail_imap_port}
+- fill:
+    selector: input[aria-label="Mail email or username"]
+    value: qa@example.com
+- fill:
+    selector: input[aria-label="Mail password or app password token"]
+    value: qa-pass
+- fill:
+    selector: input[aria-label="SMTP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-smtp-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="SMTP port"]
+    value: ${fixture.mail_smtp_port}
+- fill:
+    selector: '[data-testid="mail-storage-directory"]'
+    value: ${fixture.mail_storage_a}
+- select_option:
+    selector: '[data-testid="mail-storage-mode"]'
+    value: include
+- assert_text:
+    selector: '[data-testid="mail-storage-settings"]'
+    contains: No cached folders. Connect and sync this account first
+- assert_count:
+    selector: '[data-testid="mail-storage-folders"] input'
+    equal: 0
+- click: '[data-testid="mail-storage-edit-folders"]'
+- fill:
+    selector: '[data-testid="mail-storage-folder-names"]'
+    value: INBOX
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: QA complete mail
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mail-storage-password
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 60
+- wait_for: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
+- wait_for: '[data-testid="mail-storage-pause"]'
+- assert_text: {selector: '[data-testid="mail-storage-progress"]', contains: downloading, timeout_sec: 40}
+- click: '[data-testid="mail-storage-pause"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: paused
+    timeout_sec: 60
+- click: '[data-testid="mail-storage-resume"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    full:
+      INBOX: 2
+    headers:
+      INBOX: 2
+      Archive: 2
+- assert_signed_mail_host: running
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: archive-pause-resume
+    requirement: The installed Mail module preserves complete originals after interrupting and resuming a live archive scan.
+    actions: [6, 8, 40, 42]
+    checkpoints:
+    - {step: 39, expectation: The initial scan reaches the downloading phase before it is paused.}
+    - {step: 41, expectation: The scan reports that it paused.}
+    - {step: 43, expectation: The resumed transfer finishes the scan.}
+    - {step: 44, expectation: 'Gzip originals, MIME attachments and SQLite metadata match the independent fixture.'}
+    - {step: 45, expectation: The verified Mail host and renderer own the enabled module.}
+    - {step: 46, expectation: The storage workflow produces no runtime errors.}
+    results: [39, 41, 43, 44, 45, 46]
+  visual:
+  - check: The Mail pane displays downloading, paused and completed as the scan runs.
+    method: automated
+    reason: The case reads the visible storage progress around the pause and resume actions.
+  native:
+  - check: Signed Mail, loopback IMAP and actual disk storage.
+    method: automated
+    reason: The runner validates signed executables, visible archive state and byte-exact persisted originals.

@@ -1,8 +1,8 @@
+use super::connection::ArchiveConnection;
 use super::lifetime::ArchiveJob;
 use super::lifetime::update;
 use super::limits::CHUNK;
 use super::sync::check_publication;
-use crate::mail::ActiveImapSession;
 use crate::mail::ResolvedMailAccount;
 use crate::mail::storage;
 use lettre::transport::smtp::client::Tls;
@@ -13,10 +13,9 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Seek;
 use std::io::Write;
-use taomni_mail_engine::archive::fetch_imap_chunk;
 
 pub(super) fn download_one(
-    imap: &mut ActiveImapSession,
+    imap: &mut dyn ArchiveConnection,
     account: &ResolvedMailAccount,
     handle: &crate::state::MailDbHandle,
     folder: &str,
@@ -55,14 +54,7 @@ pub(super) fn download_one(
             status.bytes = offset;
             status.total_bytes = expected.map(|size| size.max(offset));
         })?;
-        let (remote_validity, size, bytes) = match imap {
-            ActiveImapSession::Tls { session, .. } => {
-                fetch_imap_chunk(session, folder, uid, offset)
-            }
-            ActiveImapSession::Plain { session, .. } => {
-                fetch_imap_chunk(session, folder, uid, offset)
-            }
-        }?;
+        let (remote_validity, size, bytes) = imap.chunk(folder, uid, offset)?;
         update(job, |_| {})?;
         if remote_validity != validity {
             return Err("Mailbox identity changed; refresh before resuming full storage".into());

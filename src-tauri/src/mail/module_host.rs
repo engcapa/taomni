@@ -1,9 +1,11 @@
 //! Bind the session's resolved mail route and grant it only to the verified host.
 
+mod archive;
 mod downloads;
 mod imap_outgoing;
 mod prefetch;
 
+pub(super) use archive::{HostedArchive, archives_imap};
 pub(super) use downloads::{fetch_imap_attachment, fetch_imap_body, fetch_imap_raw};
 pub(super) use imap_outgoing::{
     discard_remote_draft, discards_remote_drafts, store_remote_draft, store_sent_copy,

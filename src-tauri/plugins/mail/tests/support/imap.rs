@@ -10,7 +10,10 @@ use taomni_mail_api::{
         read_frame, write_frame,
     },
 };
-use taomni_mail_engine::imap_transport::{ImapBodyReply, ImapBodyRequest};
+use taomni_mail_engine::{
+    archive::{ArchiveChunk, ArchiveQuery, CHUNK},
+    imap_transport::{ImapBodyReply, ImapBodyRequest},
+};
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
@@ -209,6 +212,70 @@ pub(super) fn check_routed_prefetch(host: &mut MailHost) {
             .await
             .expect("The background connection and its exchange must end");
         });
+    });
+}
+
+pub(super) fn check_routed_archive(host: &mut MailHost) {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    std::thread::scope(|scope| {
+        runtime.block_on(async {
+            tokio::time::timeout(WAIT, async {
+                let (listener, incoming, connection) = routed_mailbox().await;
+                let (exchange_guard, exchange, mut peer) = Route::pair().await.unwrap();
+                let request = ImapExchange {
+                    connection,
+                    exchange,
+                };
+                let (publish, response) = oneshot::channel();
+                scope.spawn(move || {
+                    publish
+                        .send(host.call(
+                            taomni_mail_api::OPEN_IMAP_ARCHIVE,
+                            serde_json::to_value(request).unwrap(),
+                        ))
+                        .unwrap();
+                });
+                let read = async move {
+                    serde_json::from_value::<Result<(), String>>(response.await.unwrap())
+                        .unwrap()
+                        .unwrap();
+                    let frame = read_frame(&mut peer).await.unwrap();
+                    serde_json::from_slice::<Result<(), String>>(&frame)
+                        .unwrap()
+                        .unwrap();
+                    let original = format!("{HEADER}{TEXT}").into_bytes();
+                    for (offset, expected) in
+                        [(0, original.as_slice()), (original.len() as u64, &[])]
+                    {
+                        let query = ArchiveQuery::Chunk {
+                            folder: "INBOX".into(),
+                            uid: 23,
+                            offset,
+                        };
+                        write_frame(&mut peer, &serde_json::to_vec(&query).unwrap())
+                            .await
+                            .unwrap();
+                        let frame = read_frame(&mut peer).await.unwrap();
+                        let reply = serde_json::from_slice::<Result<ArchiveChunk, String>>(&frame)
+                            .unwrap()
+                            .unwrap();
+                        assert_eq!(reply.uid_validity, 2);
+                        assert_eq!(reply.reported_size as usize, original.len());
+                        assert_eq!(reply.length, expected.len());
+                        assert_eq!(read_frame(&mut peer).await.unwrap(), expected);
+                    }
+                    drop(peer);
+                    drop(exchange_guard);
+                    drop(incoming);
+                };
+                tokio::join!(read, serve(listener, FixtureFetch::Archive));
+            })
+            .await
+            .expect("The archive session must close when its controlling exchange ends");
+        })
     });
 }
 
@@ -434,6 +501,7 @@ async fn routed_mailbox() -> (TcpListener, Route, IncomingTest) {
 enum FixtureFetch {
     Body,
     Prefetch,
+    Archive,
     Attachment,
     Section,
 }
@@ -442,6 +510,7 @@ impl FixtureFetch {
     fn uids(&self) -> &[u32] {
         match self {
             Self::Prefetch => &[23, 24],
+            Self::Archive => &[23, 23],
             _ => &[23],
         }
     }
@@ -454,6 +523,18 @@ impl FixtureFetch {
         );
         const BINARY: &str = "JVFB/wA=\r\n";
         match self {
+            Self::Archive => {
+                let len = HEADER.len() + TEXT.len();
+                let size = format!("RFC822.SIZE {len}");
+                if request.contains(&format!("BODY.PEEK[]<0.{CHUNK}>")) {
+                    format!(
+                        "* 1 FETCH (UID {uid} {size} BODY[]<0> {{{len}}}\r\n{HEADER}{TEXT})\r\n"
+                    )
+                } else {
+                    assert!(request.contains(&format!("BODY.PEEK[]<{len}.{CHUNK}>")));
+                    format!("* 1 FETCH (UID {uid} {size} BODY[] NIL)\r\n")
+                }
+            }
             Self::Body | Self::Prefetch => {
                 assert!(request.contains("BODY.PEEK[]<0.1024>"));
                 format!(

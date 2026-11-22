@@ -22,6 +22,7 @@ pub const LIST_IMAP_UNREAD: &str = "mail/list-imap-unread";
 pub const FETCH_IMAP_RAW: &str = "mail/fetch-imap-raw";
 pub const FETCH_IMAP_BODY: &str = "mail/fetch-imap-body";
 pub const PREFETCH_IMAP_BODIES: &str = "mail/prefetch-imap-bodies";
+pub const OPEN_IMAP_ARCHIVE: &str = "mail/open-imap-archive";
 pub const FETCH_IMAP_ATTACHMENT: &str = "mail/fetch-imap-attachment";
 pub const SEND_SMTP: &str = "mail/send-smtp";
 pub const STORE_IMAP_SENT: &str = "mail/store-imap-sent";
