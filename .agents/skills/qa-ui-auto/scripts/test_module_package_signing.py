@@ -56,12 +56,32 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
         source = guard.split("\n", 1)[1].rsplit("\nPY", 1)[0]
         scripts = root / "scripts"
         scripts.mkdir(exist_ok=True)
-        shutil.copyfile(ROOT / "scripts/local_voice_runtime.py", scripts / "local_voice_runtime.py")
+        for helper in ("local_voice_runtime.py", "sockscap_redirector_resource.py"):
+            shutil.copyfile(ROOT / "scripts" / helper, scripts / helper)
         with chdir(root), patch.object(sys, "path", list(sys.path)), patch.dict(os.environ, {
             "QA_MODULE": module, "MODULE_PLATFORM": platform, "MODULE_SOURCE_SHA": "a" * 40,
             "MODULE_LEGACY_ROSTER": legacy_roster,
         }):
             exec(compile(source, "trusted-workflow-payload-guard", "exec"), {})
+
+    def test_macos_sockscap_requires_the_exact_pinned_installer(self):
+        resource = Path("resources/macos/redirector/0.12.11")
+        for platform in ("darwin-aarch64", "darwin-x86_64"):
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                payload = self.seed(root, "sockscap", platform)
+                trusted = root / "src-tauri/plugins/sockscap" / resource
+                trusted.mkdir(parents=True)
+                archive = b"inert test archive"
+                (trusted / "manifest.json").write_text(json.dumps({"appTarSha256": hashlib.sha256(archive).hexdigest()}))
+                (trusted / "LICENSE").write_text("fixture license")
+                shutil.copytree(trusted, payload / resource)
+                target = payload / resource / "Mitmproxy Redirector.app.tar"
+                target.write_bytes(archive)
+                self.guard(root, "sockscap", platform)
+                target.write_bytes(archive + b"altered")
+                with self.assertRaisesRegex(ValueError, "differs from the pinned release"):
+                    self.guard(root, "sockscap", platform)
 
     def test_local_voice_requires_its_windows_runtime_in_the_signed_payload(self):
         runtime = runpy.run_path(str(ROOT / "scripts/local_voice_runtime.py"))["WINDOWS_RUNTIME"]
