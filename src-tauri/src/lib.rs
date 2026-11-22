@@ -242,7 +242,7 @@ pub fn run() {
                     // Required on Linux/Windows for navigator.clipboard.readText().
                     // Terminal right-click paste and Shift+Insert use that API.
                     .enable_clipboard_access();
-                builder = webview_environment::configure(app.handle(), builder);
+                let builder = webview_environment::configure(app.handle(), builder);
                 // On macOS use the native traffic-light controls with an overlay
                 // title bar so the window feels native (the frontend reserves a
                 // left inset and hides its custom min/max/close there). Windows
@@ -257,13 +257,6 @@ pub fn run() {
                 let main_window = builder.build()?;
                 webview_recovery::install(&main_window);
                 screenshot::prewarm(app.handle());
-
-                // The macOS QA runner cannot use tauri-driver (there is no
-                // Tauri WebDriver adapter for WKWebView).  An opt-in bridge
-                // exposes the same small W3C surface from inside this exact
-                // QA window.  Normal launches never set this environment
-                // variable and therefore never start a local HTTP server.
-                let _ = main_window;
             }
             runtime::desktop::start(app.handle());
             Ok(())
