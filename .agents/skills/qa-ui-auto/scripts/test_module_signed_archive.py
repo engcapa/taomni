@@ -12,6 +12,7 @@ import yaml
 
 from qa_ui_auto.behavior_contract import is_check
 from qa_ui_auto.ci import capabilities
+from qa_ui_auto.fixtures import sockscap_legacy
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_key, setup, setup_mfa
 from qa_ui_auto.module_signed_observation import check, validate
 from qa_ui_auto.steps import StepError
@@ -78,6 +79,41 @@ class OfficialModuleArtifactTests(unittest.TestCase):
                                           ("Darwin", "arm64", "darwin-aarch64"),
                                           ("Darwin", "x86_64", "darwin-x86_64")]:
             self.assertEqual(platform_key(system, machine), expected)
+
+    def test_sockscap_recovery_fixture_only_writes_its_legacy_marker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            context = SimpleNamespace(case_id="TC-MODULES-094", values={})
+            with patch.object(sockscap_legacy, "isolated_data_root", return_value=root):
+                sockscap_legacy.setup_pending_recovery(context)
+            marker = root / "sockscap/recovery.json/keep.txt"
+            self.assertEqual(context.values["sockscap_recovery_marker"], marker.as_posix())
+            self.assertEqual(context.values["sockscap_recovery_marker_sha256"],
+                             hashlib.sha256(marker.read_bytes()).hexdigest())
+            self.assertFalse((root / "plugins").exists())
+
+    def test_signed_sockscap_fixture_records_the_packaged_runtime_resource(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            archive = root / "fixture.taomni-plugin"
+            manifest = json.loads((ROOT / "src-tauri/plugins/sockscap/module.json").read_text())
+            resource = "resources/xray/xray"
+            with zipfile.ZipFile(archive, "w") as package:
+                package.writestr("taomni-plugin-sockscap", b"fixture host")
+                package.writestr(manifest["entry"]["frontend"], b"fixture frontend")
+                package.writestr(resource, b"fixture runtime resource")
+            context = SimpleNamespace(case_id=sockscap_legacy.XRAY_CASE_ID, case_dir=root, values={},
+                                      cfg={"app": {"mode": "native"}})
+            with patch.dict("os.environ", {"QA_SIGNED_SOCKSCAP_ROOT": str(root)}), \
+                    patch.object(sockscap_legacy, "isolated_data_root", return_value=root), \
+                    patch.object(sockscap_legacy, "platform_key", return_value="linux-x86_64"), \
+                    patch.object(sockscap_legacy.subprocess, "check_output", return_value="a" * 40), \
+                    patch.object(sockscap_legacy, "load_artifact", return_value=({}, archive, "signature", None)):
+                sockscap_legacy.setup_signed(context)
+            copied = root / "signed-sockscap" / archive.name
+            receipt = json.loads((copied.parent / "provenance.json").read_text())
+            self.assertEqual(context.sockscap_resource_restore, (copied, resource))
+            self.assertEqual(receipt["resourceSha256"], hashlib.sha256(b"fixture runtime resource").hexdigest())
 
     def test_mfa_case_requires_its_own_signed_module_without_a_frontend(self):
         case = load_case(ROOT / "qa-ui-auto-tests/cases/TC-MODULES-038-macos-signed-mfa-relaunch.testcase.yaml")
