@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { FolderOpen, ShieldAlert, Trash2, X } from "lucide-react";
 import { useViewerLabels } from "../../viewer/viewerLabels";
 import { selectSaveFilePath } from "../../../lib/ipc/files";
+import { notepadDialogDirectory } from "../../../lib/notepad/persistence/savePath";
 
 export type NotepadLifecycleModal =
-  | { kind: "saveAs"; defaultPath: string; initialPath: string; copy?: boolean }
+  | { kind: "saveAs"; defaultPath: string; initialPath: string; defaultDir: string; copy?: boolean }
   | { kind: "rename"; currentName: string }
   | { kind: "trash"; path: string; name: string }
   | { kind: "elevated"; path: string; error: string }
@@ -103,8 +104,13 @@ export function FileLifecycleDialogs({
               type="button"
               className="np-btn"
               data-testid="notepad-save-as-browse"
+              title={modal.defaultDir}
               onClick={async () => {
-                const picked = await selectSaveFilePath(modal.defaultPath.split(/[\\/]/).pop());
+                // U2: the native picker opens in the resolved default directory.
+                const picked = await selectSaveFilePath(
+                  modal.defaultPath.split(/[\\/]/).pop(),
+                  notepadDialogDirectory(modal.defaultDir),
+                );
                 if (picked) setPathInput(picked);
               }}
             >

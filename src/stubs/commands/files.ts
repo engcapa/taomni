@@ -88,6 +88,12 @@ export function concatChunks(chunks: Uint8Array[]): ArrayBuffer {
 export async function invokeFiles<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
   switch (cmd) {
 
+    case "get_home_dir": {
+      // Browser preview has no OS home directory; the virtual FS root is the
+      // Explorer home (matches src/stubs/localVfs.ts VIRTUAL_ROOT).
+      return VFS_ROOT as T;
+    }
+
     case "select_private_key_file": {
       const current = (args?.currentPath as string | null) || "~/.ssh/id_ed25519";
       const selected = await promptAppDialog({

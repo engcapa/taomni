@@ -22,6 +22,7 @@ import type { ColumnInsertSpec } from "../../lib/notepad/transforms/column";
 import { sortLines, type SortOptions } from "../../lib/notepad/transforms/sort";
 import { getLineStarts, lineIndexAt, type TextRange, type TextTransformResult } from "../../lib/notepad/transforms/lines";
 import { documentPathKey, isUntitledKey } from "../../lib/openFile/pathIdentity";
+import { parentPath } from "../../lib/sftp";
 import type { ViewerEol } from "../../lib/viewer";
 import { useRecentFilesStore } from "../../stores/app/recentFiles";
 import { useDocumentStore } from "../../stores/documentStore";
@@ -30,6 +31,7 @@ import { applyColumnEditorToView } from "../../lib/notepad/cm6/columnSelection";
 import { useNotepadStore, type NotepadMacroStep } from "../../stores/notepadStore";
 import { createCoreCommandMap } from "./actions/coreCommands";
 import { createExtraCommandMap } from "./actions/extraCommands";
+import { resolveNotepadSaveAsDefaults } from "./actions/saveDefaults";
 import type { NotepadActionContext, NotepadActionDeps } from "./actions/context";
 
 export type { NotepadActionDeps, NotepadActionContext } from "./actions/context";
@@ -77,7 +79,10 @@ export function useNotepadActions(deps: NotepadActionDeps) {
       return;
     }
     if (isUntitledKey(doc.path)) {
-      deps.setLifecycleModal({ kind: "saveAs", defaultPath: `${deps.docState.titleHint || "untitled"}.txt`, initialPath: "" });
+      // U2: untitled Save As opens at the last save directory (or $HOME) with an
+      // absolute path instead of a bare file name.
+      const defaults = await resolveNotepadSaveAsDefaults(doc.path, deps.docState.titleHint || "");
+      deps.setLifecycleModal({ kind: "saveAs", ...defaults });
       return;
     }
     const prefs = useNotepadPreferences.getState();
@@ -246,6 +251,9 @@ export function useNotepadActions(deps: NotepadActionDeps) {
         eol: doc.eol,
         overwrite,
       });
+      // U2: remember where the user saved so the next untitled Save As and the
+      // native browse picker reopen in that directory (also for Save a Copy).
+      setNotepadPreferences({ lastSaveDir: parentPath(res.path) });
       if (copy) {
         // AC-01: Save a Copy writes a new file but the open document keeps
         // pointing at its original path and stays the active editable buffer.

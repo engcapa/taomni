@@ -85,12 +85,9 @@ export function PrimaryNavigationRail({
 
   const activateMode = (mode: PrimaryNavMode, clickCount = 0) => {
     if (mode === "explorer") {
-      if (hasExplorerTabs) {
-        setActiveSideTab("explorer");
-        setSidebarCollapsed(false);
-      } else {
-        void openExplorer().catch((error) => useAppStore.getState().setStatusMessage(String(error)));
-      }
+      // Explorer is rail-only (U6): never expand the left navigator for it.
+      if (hasExplorerTabs) setActiveSideTab("explorer");
+      else void openExplorer().catch((error) => useAppStore.getState().setStatusMessage(String(error)));
       return;
     }
     if (mode === "home") {

@@ -38,6 +38,7 @@ export function NotepadSplitPanes({
   onToggleInsertMode,
   onFocusPane,
   onViewsChanged,
+  onContextMenuRequest,
 }: {
   split: boolean;
   orient: NotepadSplitOrient;
@@ -70,6 +71,7 @@ export function NotepadSplitPanes({
   onToggleInsertMode: (insertMode: boolean) => void;
   onFocusPane: (paneIndex: 0 | 1) => void;
   onViewsChanged: (views: [EditorView | null, EditorView | null]) => void;
+  onContextMenuRequest?: (request: { x: number; y: number; paneIndex: 0 | 1 }) => void;
 }) {
   const viewsRef = useRef<[EditorView | null, EditorView | null]>([null, null]);
   const coord = useMemo(() => createSplitScrollCoordinator(), []);
@@ -128,6 +130,7 @@ export function NotepadSplitPanes({
           onToggleInsertMode={onToggleInsertMode}
           onViewReady={handleViewReady}
           onFocusPane={onFocusPane}
+          onContextMenuRequest={onContextMenuRequest}
         />
       </div>
       {split && (
@@ -162,6 +165,7 @@ export function NotepadSplitPanes({
               onToggleInsertMode={onToggleInsertMode}
               onViewReady={handleViewReady}
               onFocusPane={onFocusPane}
+              onContextMenuRequest={onContextMenuRequest}
             />
           </div>
         </>

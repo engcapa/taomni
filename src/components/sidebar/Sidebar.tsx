@@ -11,7 +11,6 @@ import { ToolsPanel } from "./ToolsPanel";
 import { HomeSidebar } from "./HomeSidebar";
 import { AgentsSidebar } from "./AgentsSidebar";
 import { WorkspaceSidebar } from "../workspace/WorkspaceSidebar";
-import { ExplorerSidebarPanel } from "../explorer/ExplorerSidebarPanel";
 
 interface SidebarProps {
   onNewSession?: (groupPath?: string | null) => void;
@@ -73,7 +72,9 @@ export function Sidebar({
       case "agents":
         return <AgentsSidebar />;
       case "explorer":
-        return <ExplorerSidebarPanel />;
+        // Explorer is a rail-only surface (U6): the old side panel duplicated
+        // the in-tab navigation tree and was removed.
+        return null;
       case "tools":
         return <ToolsPanel onCommand={onCommand} />;
       case "sessions":

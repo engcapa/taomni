@@ -47,7 +47,7 @@ export function SearchResultsPanel({
         ) : (
           Array.from(grouped.entries()).map(([groupKey, items]) => (
             <div key={groupKey} className="border-b border-[var(--taomni-divider)]">
-              <div className="px-2 py-1 bg-[var(--taomni-panel)] font-sans font-semibold text-[11px] truncate">
+              <div className="px-2 py-1 bg-[var(--taomni-panel-bg)] font-sans font-semibold text-[11px] truncate">
                 {items[0]?.name} ({items.length}) <span className="font-normal opacity-65">{groupKey}</span>
               </div>
               {items.map((hit, idx) => (

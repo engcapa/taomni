@@ -185,6 +185,12 @@ describe("ControlBar shared toolbar (TASK-03)", () => {
       // including Home whose two launch pills stay unchanged.
       expect(screen.queryByTestId("toggle-right-sidebar")).not.toBeInTheDocument();
       expect(screen.queryByTestId("right-sidebar")).not.toBeInTheDocument();
+      // Home and the rail-only Explorer surface have no expandable navigator.
+      if (mode === "home" || mode === "explorer") {
+        expect(screen.queryByTestId("toggle-left-sidebar")).not.toBeInTheDocument();
+      } else {
+        expect(screen.getByTestId("toggle-left-sidebar")).toBeInTheDocument();
+      }
     }
   });
 

@@ -158,6 +158,47 @@ describe("ContextMenu", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("closes on an outside pointerdown even when the page prevents the following mousedown", () => {
+    const onClose = vi.fn();
+    const onMouseDown = vi.fn();
+    render(
+      <>
+        <div
+          data-testid="file-list-blank"
+          onPointerDown={(event) => event.preventDefault()}
+          onMouseDown={onMouseDown}
+        />
+        <ContextMenu items={[{ label: "Connect", onClick: vi.fn() }]} x={10} y={10} onClose={onClose} />
+      </>,
+    );
+
+    // This is the Explorer file-list blank gesture: pointerdown is cancelled, so
+    // the browser never emits a mousedown and a mousedown-only listener leaks
+    // the menu.
+    fireEvent.pointerDown(screen.getByTestId("file-list-blank"), { button: 0 });
+    expect(onMouseDown).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledWith("outside");
+  });
+
+  it("dismisses once when one outside gesture dispatches pointerdown and mousedown", () => {
+    const onClose = vi.fn();
+    render(<ContextMenu items={[{ label: "Connect", onClick: vi.fn() }]} x={10} y={10} onClose={onClose} />);
+
+    fireEvent.pointerDown(document.body, { button: 0 });
+    fireEvent.mouseDown(document.body, { button: 0 });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledWith("outside");
+  });
+
+  it("keeps the menu open for a pointerdown inside any menu surface", () => {
+    const onClose = vi.fn();
+    render(<ContextMenu items={[{ label: "Connect", onClick: vi.fn() }]} x={10} y={10} onClose={onClose} />);
+
+    fireEvent.pointerDown(screen.getByTestId("context-menu-item-connect"));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("supports keyboard navigation with arrow keys, skips separators and disabled items, and applies with Enter", () => {
     const onClose = vi.fn();
     const onClick1 = vi.fn();
