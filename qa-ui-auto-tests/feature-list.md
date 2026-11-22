@@ -14100,6 +14100,7 @@ controls:
 - TC-MAIL-SYNC-02 verifies that remote deletions and read flags still match the reopened mailbox in browser and native mode (F-MAIL-5/F-MAIL-3).
 - TC-MAIL-SYNC-03 covers native sparse UID command limits, FETCH reconnect, gap-free catch-up, remote deletion and flag reconciliation, and runtime error checks (F-MAIL-5/F-MAIL-3).
 - TC-MAIL-IDLE-01 and TC-MAIL-POP3-01 check renderer and native connection behavior, including IDLE release after closing the tab, POP3 sync without duplicates and reading the newly downloaded message (F-MAIL-10/F-MAIL-17).
+- TC-MODULES-088 verifies IDLE delivery, close and reopen, and connection release after disabling the signed Mail module (F-MAIL-10).
 
 ---
 

@@ -8,24 +8,26 @@
 //! Stopping shuts the socket down so a blocked IDLE wait returns at once.
 
 use std::collections::HashMap;
-use std::io::{Read, Write};
 use std::net::{Shutdown, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use serde::Serialize;
+use taomni_mail_api::imap_exchange::ImapIdleNotice;
+use taomni_mail_engine::imap_idle as engine;
+use taomni_plugin_stream::CancellationToken;
 use tauri::{AppHandle, Emitter, State};
 
 use super::{
     ActiveImapSession, MailAccountConfig, ResolvedMailAccount, connect_imap_with_socket,
+    module_host::imap_idle::{HostedIdle, available},
     resolve_config, retire_imap_session,
 };
+use crate::plugin::PluginRegistry;
 use crate::state::AppState;
 
 pub const MAIL_IDLE_EVENT: &str = "mail://idle";
-/// Re-issue IDLE well inside the 30-minute server timeout (RFC 2177).
-const IDLE_REFRESH: Duration = Duration::from_secs(25 * 60);
 const RECONNECT_DELAYS_SECS: [u64; 5] = [2, 5, 15, 30, 60];
 
 #[derive(Debug, Clone, Serialize)]
@@ -42,12 +44,14 @@ pub struct MailIdleEvent {
 struct Watcher {
     folder: String,
     stop: Arc<AtomicBool>,
+    cancel: CancellationToken,
     socket: Arc<Mutex<Option<TcpStream>>>,
 }
 
 impl Watcher {
     fn shutdown(&self) {
         self.stop.store(true, Ordering::SeqCst);
+        self.cancel.cancel();
         if let Ok(mut socket) = self.socket.lock() {
             if let Some(socket) = socket.take() {
                 let _ = socket.shutdown(Shutdown::Both);
@@ -61,42 +65,18 @@ fn watchers() -> &'static Mutex<HashMap<String, Watcher>> {
     WATCHERS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-enum IdleOutcome {
-    Changed,
-    TimedOut,
-}
-
-fn imap_idle_once<T: Read + Write + imap::extensions::idle::SetReadTimeout>(
-    session: &mut imap::Session<T>,
-) -> Result<IdleOutcome, String> {
-    let mut handle = session
-        .idle()
-        .map_err(|e| format!("IMAP IDLE failed: {e}"))?;
-    handle.set_keepalive(IDLE_REFRESH);
-    match handle.wait_with_timeout(IDLE_REFRESH) {
-        Ok(imap::extensions::idle::WaitOutcome::MailboxChanged) => Ok(IdleOutcome::Changed),
-        Ok(imap::extensions::idle::WaitOutcome::TimedOut) => Ok(IdleOutcome::TimedOut),
-        Err(e) => Err(format!("IMAP IDLE wait failed: {e}")),
-    }
-}
-
 impl ActiveImapSession {
-    fn supports_idle(&mut self) -> bool {
-        self.has_capability("IDLE")
-    }
-
-    fn examine_folder(&mut self, folder: &str) -> Result<(), String> {
-        let result = match self {
-            Self::Tls { session, .. } => session.examine(folder).map(|_| ()),
-            Self::Plain { session, .. } => session.examine(folder).map(|_| ()),
-        };
-        result.map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))
-    }
-
-    fn idle_once(&mut self) -> Result<IdleOutcome, String> {
+    fn prepare_idle(&mut self, folder: &str) -> Result<bool, String> {
         match self {
-            Self::Tls { session, .. } => imap_idle_once(session),
-            Self::Plain { session, .. } => imap_idle_once(session),
+            Self::Tls { session, .. } => engine::prepare(session, folder),
+            Self::Plain { session, .. } => engine::prepare(session, folder),
+        }
+    }
+
+    fn idle_changed(&mut self) -> Result<bool, String> {
+        match self {
+            Self::Tls { session, .. } => engine::wait(session),
+            Self::Plain { session, .. } => engine::wait(session),
         }
     }
 }
@@ -145,18 +125,21 @@ fn run_watcher(
             retire_imap_session(session);
             break;
         }
-        if !session.supports_idle() {
-            emit(&app, &account_id, &folder, "unsupported", None);
-            retire_imap_session(session);
-            break;
-        }
-        if let Err(e) = session.examine_folder(&folder) {
-            emit(&app, &account_id, &folder, "error", Some(e));
-            retire_imap_session(session);
-            if !backoff(&stop, &mut failures) {
+        match session.prepare_idle(&folder) {
+            Ok(true) => {}
+            Ok(false) => {
+                emit(&app, &account_id, &folder, "unsupported", None);
+                retire_imap_session(session);
                 break;
             }
-            continue;
+            Err(error) => {
+                emit(&app, &account_id, &folder, "error", Some(error));
+                retire_imap_session(session);
+                if !backoff(&stop, &mut failures) {
+                    break;
+                }
+                continue;
+            }
         }
         emit(&app, &account_id, &folder, "ready", None);
         loop {
@@ -164,14 +147,14 @@ fn run_watcher(
                 break;
             }
             let outcome =
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| session.idle_once()))
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| session.idle_changed()))
                     .unwrap_or_else(|_| Err("IMAP protocol desync".into()));
             match outcome {
-                Ok(IdleOutcome::Changed) => {
+                Ok(true) => {
                     failures = 0;
                     emit(&app, &account_id, &folder, "changed", None);
                 }
-                Ok(IdleOutcome::TimedOut) => failures = 0,
+                Ok(false) => failures = 0,
                 Err(e) => {
                     if !stop.load(Ordering::SeqCst) {
                         emit(&app, &account_id, &folder, "error", Some(e));
@@ -204,6 +187,66 @@ fn backoff(stop: &AtomicBool, failures: &mut usize) -> bool {
     true
 }
 
+async fn watch_host(
+    app: AppHandle,
+    registry: Arc<PluginRegistry>,
+    account: ResolvedMailAccount,
+    folder: String,
+    cancel: CancellationToken,
+) {
+    let account_id = &account.config.session_id;
+    let mut failures = 0;
+    while available(&registry) {
+        let one_connection = async {
+            let mut watch = HostedIdle::open(registry.clone(), &account, &folder).await?;
+            loop {
+                match watch.next().await? {
+                    ImapIdleNotice::Ready => emit(&app, account_id, &folder, "ready", None),
+                    ImapIdleNotice::Changed => {
+                        failures = 0;
+                        emit(&app, account_id, &folder, "changed", None);
+                    }
+                    ImapIdleNotice::Refresh => failures = 0,
+                    ImapIdleNotice::Unsupported => {
+                        emit(&app, account_id, &folder, "unsupported", None);
+                        return Ok(());
+                    }
+                    ImapIdleNotice::Error(error) => return Err(error),
+                }
+            }
+        };
+        let result = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => break,
+            result = one_connection => result,
+        };
+        let Err(error) = result else { break };
+        if !available(&registry) {
+            break;
+        }
+        emit(&app, account_id, &folder, "error", Some(error));
+        let Some(delay) = RECONNECT_DELAYS_SECS.get(failures) else {
+            break;
+        };
+        failures += 1;
+        tokio::select! {
+            _ = cancel.cancelled() => break,
+            _ = tokio::time::sleep(Duration::from_secs(*delay)) => {},
+        }
+    }
+    emit(&app, account_id, &folder, "stopped", None);
+}
+
+fn remove_watcher(account_id: &str, owner: &Arc<AtomicBool>) {
+    if let Ok(mut map) = watchers().lock()
+        && map
+            .get(account_id)
+            .is_some_and(|watcher| Arc::ptr_eq(&watcher.stop, owner))
+    {
+        map.remove(account_id);
+    }
+}
+
 /// Start (or keep) the IDLE watcher of an open mail tab.
 #[tauri::command]
 pub async fn mail_idle_start(
@@ -233,31 +276,37 @@ pub async fn mail_idle_start(
             old.shutdown();
         }
         let stop = Arc::new(AtomicBool::new(false));
+        let cancel = CancellationToken::new();
         let socket = Arc::new(Mutex::new(None));
         map.insert(
             account_id.clone(),
             Watcher {
                 folder: folder.clone(),
                 stop: Arc::clone(&stop),
+                cancel: cancel.clone(),
                 socket: Arc::clone(&socket),
             },
         );
+        if available(&state.plugins) {
+            let registry = state.plugins.clone();
+            tokio::spawn(async move {
+                watch_host(app, registry, account, folder, cancel).await;
+                remove_watcher(&account_id, &stop);
+            });
+            return Ok(true);
+        }
         let runtime = tokio::runtime::Handle::current();
         let thread_account_id = account_id.clone();
-        std::thread::Builder::new()
+        let started = std::thread::Builder::new()
             .name(format!("mail-idle-{account_id}"))
             .spawn(move || {
                 run_watcher(app, account, runtime, folder, Arc::clone(&stop), socket);
-                if let Ok(mut map) = watchers().lock() {
-                    if map
-                        .get(&thread_account_id)
-                        .is_some_and(|watcher| Arc::ptr_eq(&watcher.stop, &stop))
-                    {
-                        map.remove(&thread_account_id);
-                    }
-                }
-            })
-            .map_err(|e| format!("failed to start mail IDLE thread: {e}"))?;
+                remove_watcher(&thread_account_id, &stop);
+            });
+        if let Err(error) = started {
+            map.remove(&account_id);
+            return Err(format!("failed to start mail IDLE thread: {error}"));
+        }
     }
     Ok(true)
 }

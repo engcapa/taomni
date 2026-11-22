@@ -28,6 +28,7 @@ pub const SYNC_IMAP_ROUND: &str = "mail/sync-imap-round";
 pub const SEARCH_IMAP: &str = "mail/search-imap";
 pub const SET_IMAP_FLAGS: &str = "mail/set-imap-flags";
 pub const LIST_IMAP_UNREAD: &str = "mail/list-imap-unread";
+pub const OPEN_IMAP_IDLE: &str = "mail/open-imap-idle";
 pub const FETCH_IMAP_RAW: &str = "mail/fetch-imap-raw";
 pub const FETCH_IMAP_BODY: &str = "mail/fetch-imap-body";
 pub const PREFETCH_IMAP_BODIES: &str = "mail/prefetch-imap-bodies";

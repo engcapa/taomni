@@ -48,6 +48,24 @@ pub struct ImapExchange {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OpenImapIdle {
+    pub connection: IncomingTest,
+    pub exchange: Endpoint,
+    pub folder: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", content = "error", rename_all = "camelCase")]
+pub enum ImapIdleNotice {
+    Ready,
+    Changed,
+    Refresh,
+    Unsupported,
+    Error(String),
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RawMessageRequest {
     pub connection: IncomingTest,
     pub exchange: Endpoint,

@@ -13,6 +13,7 @@ pub mod drafts;
 pub mod filters;
 pub mod imap_auth;
 pub mod imap_folders;
+pub mod imap_idle;
 pub mod imap_messages;
 pub mod imap_mutations;
 pub mod imap_outgoing;

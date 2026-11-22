@@ -1,0 +1,81 @@
+id: TC-MODULES-088
+title: Signed Mail watches IMAP and releases the connection on close and disable
+description: Open an account with the signed module, receive mail over IMAP IDLE, then close, reopen and disable Mail while the server counts its actual connections.
+covers: [F-Modules-1, F-MAIL-10, F-MAIL-5]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, mail_server, module_signed_mail_archive]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_list_matches: {timeout_sec: 45}
+- wait_for: {selector: '[data-testid="mail-idle-status"][data-active="true"]', timeout_sec: 30}
+- mail_server_assert_idle_clients: {equals: 1, timeout_sec: 20}
+- assert_signed_mail_host: running
+- mail_server_deliver: {count: 3, prefix: Hosted IDLE}
+- wait_for: {selector: '[data-testid="mail-message-row"][data-subject="Hosted IDLE 0003"]', timeout_sec: 15}
+- mail_server_assert_list_matches: {timeout_sec: 15}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="mail-client-tab"]', state: detached}
+- mail_server_assert_idle_clients: {equals: 0, timeout_sec: 10}
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
+- wait_for: {selector: '[data-testid="mail-idle-status"][data-active="true"]', timeout_sec: 30}
+- mail_server_assert_idle_clients: {equals: 1, timeout_sec: 20}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-mail"]'
+- wait_for: '[data-testid="module-action-enable-mail"]'
+- assert_signed_mail_host: disabled
+- mail_server_assert_idle_clients: {equals: 0, timeout_sec: 10}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: imap-push
+    requirement: An enabled signed Mail module receives pushed mail without a manual refresh.
+    actions: [8, 10, 16, 18, 23]
+    checkpoints:
+    - {step: 12, expectation: The signed package is installed and has not started its host.}
+    - {step: 21, expectation: The IMAP fixture observes exactly one idle connection.}
+    - {step: 22, expectation: The signed Mail host holds the profile writer lease.}
+    - {step: 24, expectation: The newest pushed header appears within 15 seconds.}
+    - {step: 25, expectation: The visible mailbox matches the server.}
+    results: [12, 21, 22, 24, 25]
+  - id: imap-idle-lifecycle
+    requirement: Closing the tab and disabling the module both release the actual IMAP IDLE socket.
+    actions: [27, 31, 37]
+    checkpoints:
+    - {step: 29, expectation: The server sees the original IDLE socket close after the tab closes.}
+    - {step: 34, expectation: Reopening the same account creates exactly one idle connection.}
+    - {step: 39, expectation: The disabled module has released its writer lease.}
+    - {step: 40, expectation: The server sees zero idle connections after disabling Mail.}
+    - {step: 41, expectation: The lifecycle transitions produce no renderer errors.}
+    results: [29, 34, 39, 40, 41]
+  visual:
+  - check: The open mail tab displays the active connection and the pushed header.
+    method: automated
+    reason: The runner observes the status indicator and exact delivered subject.
+  native:
+  - check: The installed package is verified and the loopback IMAP fixture counts real sockets.
+    method: automated
+    reason: The case saves package and lease evidence and checks connection ownership during the tab and module lifecycle.

@@ -9,6 +9,7 @@ mod attachment_cache;
 mod commands;
 mod imap_body_sync;
 mod imap_exchange;
+mod imap_idle;
 mod incoming;
 mod local_drafts;
 mod mailbox;
@@ -64,6 +65,7 @@ fn host_config() -> HostConfig {
                 SEARCH_IMAP,
                 SET_IMAP_FLAGS,
                 LIST_IMAP_UNREAD,
+                taomni_mail_api::OPEN_IMAP_IDLE,
                 FETCH_IMAP_RAW,
                 FETCH_IMAP_BODY,
                 PREFETCH_IMAP_BODIES,
@@ -249,6 +251,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(imap_exchange::list_unread(&self.io, operation, input)?)
+            }
+            taomni_mail_api::OPEN_IMAP_IDLE => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(imap_idle::start(&self.io, operation, input)?)
             }
             FETCH_IMAP_RAW => {
                 let input = serde_json::from_value(params.unwrap_or_default())
