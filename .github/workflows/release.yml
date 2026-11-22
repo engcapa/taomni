@@ -75,6 +75,7 @@ jobs:
       - name: Resolve build selection and version
         id: plan
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
           INPUT_RELEASE_TAG: ${{ inputs.tag }}
           INPUT_PLATFORMS: ${{ inputs.platforms }}
@@ -567,7 +568,6 @@ jobs:
         id: module-catalog
         env:
           TAG: ${{ needs.plan.outputs.tag }}
-          MODULES_LEGACY_UPGRADE_IDS: ${{ vars.TAOMNI_LEGACY_UPGRADE_IDS }}
           MODULE_SELECTION: ${{ needs.plan.outputs.modules }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -581,10 +581,10 @@ jobs:
               export MODULES_PUBLISHED_CATALOG=carried-module-catalog/modules.json
               node scripts/compose-modules-manifest.mjs artifacts changed-module-catalog --delta
             else
-              node scripts/compose-modules-manifest.mjs artifacts module-assets
+              node scripts/compose-modules-manifest.mjs artifacts module-assets --first-release
             fi
             echo 'present=true' >> "$GITHUB_OUTPUT"
-          elif [[ -n "$MODULES_LEGACY_UPGRADE_IDS" && ! -d carried-module-catalog ]]; then
+          elif [[ ! -d carried-module-catalog ]]; then
             echo 'The first modular release requires signed module packages.' >&2
             exit 1
           fi

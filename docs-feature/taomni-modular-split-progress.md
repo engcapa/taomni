@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- 首发十模块名单已写入源码。正式首发会自动选择完整名单，后续核心发布从 GitHub Latest 核心 Release 继承目录。独立发布会下载原包和原始分离签名，并与目录核对。十个业务模块的稳定状态、首发签名和用户升级仍待候选验收。
 - 回查 `617bce843` 的 Linux RDP Server 签名包，包 SHA-256 为 `a26a46cebbb2197e7afb9aebf9987243c1fe53af91d1ab9815e6c38f4f9c05dc`。宿主的 ELF 版本需求含 `GLIBC_2.38` 与 `GLIBC_2.39`，高于核心支持的 Ubuntu 22.04 / glibc 2.35。模块 QA 和发布改在 Ubuntu 22.04 编译 Linux 宿主，RDP Server 与基座共用 PipeWire 构建步骤。签名前检查每个 ELF 文件的架构和 glibc 需求并保存二进制摘要。 [原始签名包](https://github.com/engcapa/taomni/actions/runs/44951621527)
 - 远程 `main` 的 #861 已合入 `9e0d9fb8d`，包含单体应用版本 `0.5.12`。在 `a1b8995a5` 上，四目标 Cargo 依赖树和生产 Vite 清单已验证 SocksCap 面板与样式从基座移出。十个业务模块仍声明为 `provisional`。正式首发目录、同一候选的全部业务升级、仅核心与全模块两套回归以及 G1–G11 发行回执仍待完成。 [四目标清单](https://github.com/engcapa/taomni/actions/runs/44987147927)
 - 在 `a1b8995a5` 的 18 个计划分片中，先收到的 Linux 与 Windows Browser 各通过 26/27。TC-MODULES-074 已完成启用、目标试算、停用与占位展示，最后在 Tools 视图查询了仅在 Sessions 展示的标签条。复验改从标签概览核对原 `sockscap-main` 唯一存在，再返回该标签检验停用占位和 Sessions 标签条。另在上一轮 Linux Native 编译日志中确认跨源码恢复了 Cargo 工作目录，邮件库缺少当前提交声明的 POP3 接口。`d8574f95d` 限定完整工作目录的复用输入，并跨源码复用外部依赖。 [分片与原始回执](https://github.com/engcapa/taomni/actions/runs/44987145412) · [Linux 编译日志](https://github.com/engcapa/taomni/actions/runs/44983227602/job/137089125019)

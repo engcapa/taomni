@@ -148,6 +148,34 @@ test("cannot publish an incomplete first-upgrade module", (t) => {
     tag: "v0.6.0", repository: "engcapa/taomni", legacyUpgrade: [manifest.id] }), /all declared platform assets/);
 });
 
+test("the initial catalog uses the checked-in business roster and requires every platform", (t) => {
+  const f = fixture(t);
+  const roster = JSON.parse(readFileSync(new URL("../src-tauri/plugins/legacy-upgrade.json", import.meta.url), "utf8"));
+  const script = fileURLToPath(new URL("./compose-modules-manifest.mjs", import.meta.url));
+  const run = () => spawnSync(process.execPath, [script, f.artifacts, f.output, "--first-release"], {
+    // An old operator setting cannot silently narrow the actual first release.
+    env: { TAG: "v0.6.0", GITHUB_REPOSITORY: "engcapa/taomni", MODULES_LEGACY_UPGRADE_IDS: roster[0] },
+    encoding: "utf8",
+  });
+  for (const id of roster) {
+    const slug = id.slice("taomni-plugin-".length);
+    const manifest = JSON.parse(readFileSync(new URL(`../src-tauri/plugins/${slug}/module.json`, import.meta.url), "utf8"));
+    for (const platform of manifest.platforms) {
+      f.add(platform, `${slug} ${platform}`, { ...manifest, status: "stable" });
+    }
+  }
+  const complete = run();
+  assert.equal(complete.status, 0, complete.stderr);
+  const catalog = JSON.parse(readFileSync(join(f.output, "modules.json"), "utf8"));
+  assert.deepEqual(catalog.legacyUpgrade, roster);
+  assert.deepEqual(Object.keys(catalog.plugins), roster);
+  rmSync(f.output, { recursive: true });
+  rmSync(join(f.artifacts, "plugin-mail", "darwin-aarch64"), { recursive: true });
+  const partial = run();
+  assert.notEqual(partial.status, 0);
+  assert.match(partial.stderr, /all declared platform assets for taomni-plugin-mail/);
+});
+
 test("the first roster records Mobile as continuing in the core and adds the release note once", (t) => {
   const f = fixture(t);
   const module = moduleManifest({ platforms: ["linux-x86_64"], description: "First module" });

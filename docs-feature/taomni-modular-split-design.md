@@ -759,6 +759,7 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 
 ### 7.6 核心与模块差异发布规则（v1.7）
 
+- 首次带标签发布时，Release Bundle 从源码中的 `src-tauri/plugins/legacy-upgrade.json` 选取十个模块。每个模块的全部声明平台均须提供稳定包和签名。后续发布以 GitHub Latest 核心 Release 的签名目录为准。如果新核心 Release 刚创建，发布流程从带 `latest.json` 的上一个核心 Release 取目录。独立模块 Release 只保存对应发布的工件和目录快照。
 - **只改核心**：构建新的核心安装包和 `latest.json`。发布工作流从上一份正式目录继承原始 `modules.json` 与 `modules.json.minisig`，把目录文件带到新的核心 Release，模块包继续使用原 Release 的资产地址，不重新构建或上传未变化模块。
 - **只改模块**：只构建该模块声明的全部平台包。以已发布目录和全部原始模块资产为基线生成完整的新 `modules.json`，保留 `legacyUpgrade` 和未变化模块的原始 URL。新的包、签名及目录快照保存在独立的模块 Release。该 Release 可下载后，把验签的目录签名与目录同步到 Latest 核心 Release，商店继续从固定入口刷新。
 - **核心与模块同时改**：从同一源码手动运行 Release Bundle，通过 `modules` 指定改动模块的 slug，逗号分隔。工作流构建核心和所选模块声明的平台。模块签名作业只交付 Actions 工件，由核心发布作业在同一 draft Release 统一上传。发布作业验证并继承旧目录中的未变更条目和首装名单，上传新包与签名后再提交目录签名、`modules.json` 和 `latest.json`。在分支上使用空 `tag` 可只生成 Actions 工件。

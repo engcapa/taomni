@@ -257,8 +257,8 @@ export function composeModulesManifest({
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const [artifactsDir, outputDir, mode, ...extra] = process.argv.slice(2);
-  if (!artifactsDir || !outputDir || (mode && mode !== "--delta") || extra.length) {
-    throw new Error("Usage: node scripts/compose-modules-manifest.mjs <artifacts-dir> <staging-dir> [--delta]");
+  if (!artifactsDir || !outputDir || (mode && !["--delta", "--first-release"].includes(mode)) || extra.length) {
+    throw new Error("Usage: node scripts/compose-modules-manifest.mjs <artifacts-dir> <staging-dir> [--delta|--first-release]");
   }
   const published = process.env.MODULES_PUBLISHED_CATALOG
     ? readJson(process.env.MODULES_PUBLISHED_CATALOG, "published modules.json") : null;
@@ -267,6 +267,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   }
   const requestedSequence = process.env.MODULE_SEQUENCE ?? process.env.GITHUB_RUN_NUMBER ?? "1";
   const configuredRoster = process.env.MODULES_LEGACY_UPGRADE_IDS?.split(",").map((id) => id.trim()).filter(Boolean);
+  let roster = configuredRoster?.length ? configuredRoster : published?.legacyUpgrade;
+  if (mode === "--delta") roster = undefined;
+  if (mode === "--first-release") {
+    if (published) throw new Error("The initial roster cannot replace an existing published catalog");
+    roster = readJson(new URL("../src-tauri/plugins/legacy-upgrade.json", import.meta.url), "first-release roster");
+  }
   const result = composeModulesManifest({
     artifactsDir,
     outputDir,
@@ -277,7 +283,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     updatedAt: process.env.MODULE_UPDATED_AT ?? new Date().toISOString(),
     requireManifestSignature: process.env.MODULES_REQUIRE_SIGNATURE === "1",
     manifestSignaturePath: process.env.MODULES_MANIFEST_SIGNATURE,
-    legacyUpgrade: mode === "--delta" ? undefined : (configuredRoster?.length ? configuredRoster : published?.legacyUpgrade),
+    legacyUpgrade: roster,
   });
   console.log(`Staged ${result.assets.length} plugin packages for ${Object.keys(result.manifest.plugins).length} plugins${result.signedManifest ? " with signed modules.json" : ""}`);
 }

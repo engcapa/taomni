@@ -8,35 +8,72 @@ const signature = "modules.json.minisig";
 const releaseTag = /^v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.]+)*$/;
 const runGh = (args) => execFileSync("gh", args, { encoding: "utf8" });
 
-/** Stage the signed index for a core-only release after modules have shipped. */
-export function stagePublishedModuleCatalog(output, gh = runGh, { allowMissing = false } = {}) {
-  const releases = JSON.parse(gh([
-    "release", "list", "--exclude-drafts", "--exclude-pre-releases", "--limit", "2", "--json", "tagName,isLatest",
-  ])).sort((left, right) => Number(right.isLatest) - Number(left.isLatest));
+const releaseQuery = `query($owner: String!, $repo: String!, $cursor: String) {
+  repository(owner: $owner, name: $repo) {
+    latestRelease { ...assets }
+    releases(first: 30, after: $cursor, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes { ...assets }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+fragment assets on Release {
+  tagName isDraft isPrerelease
+  updater: releaseAssets(name: "latest.json", first: 1) { totalCount }
+  catalog: releaseAssets(name: "modules.json", first: 1) { totalCount }
+  signature: releaseAssets(name: "modules.json.minisig", first: 1) { totalCount }
+}`;
 
-  for (const { tagName } of releases) {
-    if (!releaseTag.test(tagName)) throw new Error("The public core release has an invalid tag");
-    const { assets } = JSON.parse(gh(["release", "view", tagName, "--json", "assets"]));
-    const entries = assets.filter(({ name }) => name === catalog || name === signature);
-    if (!entries.length) continue;
-    if (entries.length !== 2 || new Set(entries.map(({ name }) => name)).size !== 2) {
+function* coreReleases(gh) {
+  let cursor;
+  do {
+    const args = ["api", "graphql", "-F", "owner={owner}", "-F", "repo={repo}", "-f", `query=${releaseQuery}`];
+    if (cursor) args.push("-f", `cursor=${cursor}`);
+    const { latestRelease, releases } = JSON.parse(gh(args)).data.repository;
+    if (!cursor && latestRelease) yield latestRelease;
+    // A newly published core tag can still be waiting for its bundle assets.
+    // Only a previous core release with an updater can supply its catalog.
+    for (const release of releases.nodes) {
+      if (release.tagName !== latestRelease?.tagName && !release.isDraft && !release.isPrerelease && release.updater.totalCount) {
+        yield release;
+      }
+    }
+    cursor = releases.pageInfo.hasNextPage ? releases.pageInfo.endCursor : null;
+  } while (cursor);
+}
+
+export function publishedModuleCatalogTag(gh = runGh) {
+  for (const release of coreReleases(gh)) {
+    const { tagName } = release;
+    if (!release.catalog.totalCount && !release.signature.totalCount) continue;
+    if (release.catalog.totalCount !== 1 || release.signature.totalCount !== 1) {
       throw new Error(`Release ${tagName} has an incomplete signed module catalog`);
     }
-    mkdirSync(output);
-    try {
-      gh(["release", "download", tagName, "--dir", output, "--pattern", catalog, "--pattern", signature]);
-      for (const name of [catalog, signature]) {
-        const path = join(output, name);
-        if (!existsSync(path) || !lstatSync(path).isFile()) throw new Error(`Missing release asset ${name}`);
-      }
-    } catch (error) {
-      rmSync(output, { recursive: true, force: true });
-      throw error;
-    }
+    if (!release.updater.totalCount) continue;
+    if (!releaseTag.test(tagName)) throw new Error("The public core release has an invalid tag");
     return tagName;
   }
-  if (!allowMissing) throw new Error("The first modular release needs a complete signed module catalog");
-  return undefined;
+}
+
+/** Stage the signed index for a core-only release after modules have shipped. */
+export function stagePublishedModuleCatalog(output, gh = runGh, { allowMissing = false } = {}) {
+  const tagName = publishedModuleCatalogTag(gh);
+  if (!tagName) {
+    if (allowMissing) return undefined;
+    throw new Error("The first modular release needs a complete signed module catalog");
+  }
+  mkdirSync(output);
+  try {
+    gh(["release", "download", tagName, "--dir", output, "--pattern", catalog, "--pattern", signature]);
+    for (const name of [catalog, signature]) {
+      const path = join(output, name);
+      if (!existsSync(path) || !lstatSync(path).isFile()) throw new Error(`Missing release asset ${name}`);
+    }
+  } catch (error) {
+    rmSync(output, { recursive: true, force: true });
+    throw error;
+  }
+  return tagName;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

@@ -87,9 +87,9 @@ trust, the final UI route and monolith upgrade remain separate acceptance work.
 
 ## Production catalog preparation
 
-For the first modular release, compose the complete catalog from all stable
-packages and set `MODULES_LEGACY_UPGRADE_IDS` to the first-release roster. The
-release workflow requires each module in that catalog to be in the roster.
+For the first tagged modular release, Release Bundle selects all ten modules in
+`src-tauri/plugins/legacy-upgrade.json`. The catalog generator's
+`--first-release` mode requires stable packages for their declared platforms.
 For later core releases that include module packages, the workflow verifies
 the current public catalog and checks the roster before signing the new one.
 Those releases default to the published roster and advance past its sequence.
@@ -105,7 +105,8 @@ For a module-only release, collect the current official `modules.json`,
 in that catalog under `current-modules/`. Build and sign the changed module
 for every platform listed in its manifest. Compose a partial catalog with a
 higher sequence number and the current public GitHub Release tag for the new
-assets. Use `MODULES_LEGACY_UPGRADE_IDS` when composing the first catalog.
+assets. The preparation step downloads the published detached signatures and
+checks them against the signed catalog before verifying the packages.
 
 ```bash
 TAG=v0.6.0-mail.1 MODULE_SEQUENCE=22 GITHUB_REPOSITORY=engcapa/taomni \

@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { releaseBuildPlan, validateTestVersion } from "./resolve-release-build.mjs";
+import { releaseBuildPlan, selectPublicationModules, validateTestVersion } from "./resolve-release-build.mjs";
 
 const version = "0.4.30";
 const manual = { GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF_TYPE: "branch" };
@@ -63,6 +64,24 @@ test("manual joint builds select only the named module packages", () => {
   for (const modules of ["../mfa", "mfa,mfa", "mfa,", "MFA", "mfa\nNAME=bad"]) {
     assert.throws(() => releaseBuildPlan({ ...manual, INPUT_RELEASE_MODULES: modules }, version), /unique module slugs/);
   }
+});
+
+test("the first tagged build automatically selects the complete monolith upgrade roster", () => {
+  const tagged = releaseBuildPlan({ ...manual, INPUT_RELEASE_TAG: `v${version}` }, version);
+  const slugs = JSON.parse(selectPublicationModules(tagged, () => undefined).modules);
+  assert.deepEqual(slugs, ["ai-voice-local", "mail", "mfa", "rdp-client", "rdp-server", "screenshot", "servers", "sockscap", "vnc-client", "vnc-server"]);
+  for (const slug of slugs) {
+    const manifest = JSON.parse(readFileSync(new URL(`../src-tauri/plugins/${slug}/module.json`, import.meta.url), "utf8"));
+    assert.equal(manifest.id, `taomni-plugin-${slug}`);
+    assert.ok(manifest.description.trim());
+  }
+  assert.throws(() => selectPublicationModules({ ...tagged, modules: '["mail"]' }, () => undefined), /must build all/);
+  const complete = { ...tagged, modules: JSON.stringify([...slugs].reverse()) };
+  assert.deepEqual(JSON.parse(selectPublicationModules(complete, () => undefined).modules), slugs);
+  assert.equal(selectPublicationModules(tagged, () => "v0.6.0").modules, "[]");
+  assert.equal(selectPublicationModules({ ...tagged, modules: '["mail"]' }, () => "v0.6.0").modules, '["mail"]');
+  const rehearsal = releaseBuildPlan(manual, version);
+  assert.equal(selectPublicationModules(rehearsal, () => assert.fail("unexpected public release lookup")), rehearsal);
 });
 
 test("manual releases forbid partial builds and test versions before any bundles are built", () => {
