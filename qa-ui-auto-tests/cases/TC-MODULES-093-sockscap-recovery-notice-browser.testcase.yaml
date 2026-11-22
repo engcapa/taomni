@@ -8,7 +8,7 @@ fixtures: [reset_db]
 timeout_sec: 100
 steps:
 - open: ${cfg.app.base_url}
-- seed_storage: {key: taomni.preview.sockscapRecovery, value: Previous capture cleanup requires attention.}
+- seed_storage: {key: taomni.preview.sockscapRecovery, value: '"Previous capture cleanup requires attention."'}
 - reload_window: null
 - click: '[data-testid="status-sockscap-recovery"]'
 - wait_for: '[data-testid="module-sockscap-recovery"]'

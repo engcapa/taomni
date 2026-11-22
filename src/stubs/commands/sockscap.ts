@@ -143,7 +143,8 @@ export async function invokeSockscap<T>(cmd: string, args?: any): Promise<T> {
     }
 
     case "sockscap_status": {
-      const pending = localStorage.getItem(RECOVERY_FIXTURE_KEY);
+      const value: unknown = JSON.parse(localStorage.getItem(RECOVERY_FIXTURE_KEY) ?? "null");
+      const pending = typeof value === "string" ? value : null;
       return {
         phase: pending ? "recoveryRequired" : "idle",
         message: pending ?? "browser preview",
