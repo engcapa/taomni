@@ -114,7 +114,11 @@ describe("ControlBar settings button", () => {
     // tools group; the 33px toolbar must not grow a second entry.
     expect(screen.queryByTestId("system-screenshot")).not.toBeInTheDocument();
     expect(screen.getByTestId("global-search-trigger")).toBeInTheDocument();
-    expect(screen.getByTestId("toggle-right-sidebar")).toBeInTheDocument();
+    // The right context sidebar and its collapse trigger were retired; the
+    // large overview trigger remains the mode-independent top-right action.
+    expect(screen.getByTestId("tab-overview-trigger")).toBeInTheDocument();
+    expect(screen.queryByTestId("toggle-right-sidebar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("right-sidebar")).not.toBeInTheDocument();
   });
   afterEach(() => {
     cleanup();

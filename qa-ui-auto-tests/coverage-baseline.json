@@ -5,7 +5,7 @@
     "required": 2111,
     "covered_required": 1842,
     "shallow": 62,
-    "orphans": 5
+    "orphans": 10
   },
   "features": {
     "F1.10": {
@@ -509,8 +509,8 @@
       "shallow": 0
     },
     "F-WS-1": {
-      "required": 42,
-      "covered_required": 18,
+      "required": 34,
+      "covered_required": 16,
       "shallow": 0
     },
     "F-WS-2": {

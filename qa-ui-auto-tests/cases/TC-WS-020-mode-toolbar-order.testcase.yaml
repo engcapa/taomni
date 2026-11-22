@@ -39,7 +39,6 @@ steps:
     - tab-more
     - global-search-trigger
     - tab-overview-trigger
-    - toggle-right-sidebar
     - titlebar-actions-more
 - assert_not_visible: '[data-testid="ptt-button"]'
 - click: '[data-testid="titlebar-actions-more"]'
@@ -81,7 +80,6 @@ steps:
     - workspace-tabs-filter-trigger
     - global-search-trigger
     - tab-overview-trigger
-    - toggle-right-sidebar
     - titlebar-actions-more
 - assert_not_visible: '[data-testid="ptt-button"]'
 - click: '[data-testid="side-tab-tools"]'
@@ -93,7 +91,6 @@ steps:
     - tools-toolbar-workspaces
     - global-search-trigger
     - tab-overview-trigger
-    - toggle-right-sidebar
 - assert_not_visible: '[data-testid="ptt-button"]'
 - click: '[data-testid="tools-toolbar-workspaces"]'
 - assert_attribute:
@@ -137,7 +134,7 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"sessions-empty-state\"]"}'
     - step: 10
       expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["tab-more", "global-search-trigger",
-        "tab-overview-trigger", "toggle-right-sidebar", "titlebar-actions-more"]}}'
+        "tab-overview-trigger", "titlebar-actions-more"]}}'
     - step: 19
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 21
@@ -154,12 +151,12 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"workspace-main-panel\"]"}'
     - step: 33
       expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["workspace-tabs-filter-trigger",
-        "global-search-trigger", "tab-overview-trigger", "toggle-right-sidebar", "titlebar-actions-more"]}}'
+        "global-search-trigger", "tab-overview-trigger", "titlebar-actions-more"]}}'
     - step: 36
       expectation: '{"wait_for": "[data-testid=\"tools-empty-state\"]"}'
     - step: 37
       expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["tools-toolbar-workspaces", "global-search-trigger",
-        "tab-overview-trigger", "toggle-right-sidebar"]}}'
+        "tab-overview-trigger"]}}'
     - step: 40
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"platform-toolbar-actions\"]", "name": "data-mode", "equals": "workspaces"}}'
     - step: 41

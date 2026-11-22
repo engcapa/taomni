@@ -1,0 +1,103 @@
+id: TC-WS-100
+title: Overview enlarges a hovered card only after the 0.5-1 s dwell and clears it on pointer leave
+description: >-
+  Browser-only renderer timing contract for the large tab overview. The dialog publishes a dwell inside the agreed
+  500-1000 ms range (700 ms), a card is not enlarged immediately after the pointer enters it, the enlargement appears
+  only after the dwell, leaving the card clears it, re-entering restarts the dwell, and clicking the enlarged preview
+  activates the hovered document. Native runs keep the same enlargement/activation assertions in TC-WS-098/TC-WS-099;
+  this case is not duplicated there because WebDriver hover delivery latency exceeds the dwell and cannot prove the
+  no-immediate-enlargement boundary.
+modes: [browser]
+covers: [F1.5, F-WS-1, F-WS-2]
+tags: [p1, overview, workspace, regression]
+fixtures: [reset_db, platform_workspace_root]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-100
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="sessions-empty-state"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview-search"]:focus'
+- eval_readonly:
+    expression: Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"tab-overview"]').dataset.previewDelayMs) >= 500 && Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"tab-overview"]').dataset.previewDelayMs) <= 1000
+    expect_truthy: true
+- hover: '[data-testid="tab-overview-card"]:nth-child(1)'
+- assert_not_visible: '[data-testid="tab-overview-enlarged"]'
+- wait_for: '[data-testid="tab-overview-enlarged"]'
+- assert_text:
+    selector: '[data-testid="tab-overview-enlarged"]'
+    contains: README.md
+- hover: '[data-testid="tab-overview-search"]'
+- assert_not_visible: '[data-testid="tab-overview-enlarged"]'
+- hover: '[data-testid="tab-overview-card"]:nth-child(1)'
+- assert_not_visible: '[data-testid="tab-overview-enlarged"]'
+- wait_for: '[data-testid="tab-overview-enlarged"]'
+- click: '[data-testid="tab-overview-enlarged"]'
+- assert_not_visible: '[data-testid="tab-overview"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- screenshot: ws-100-overview-dwell.png
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: DWELL-SETUP
+    requirement: A real workspace file is open and the large overview is available with its configured preview dwell.
+    actions: [1, 2, 3, 4, 6, 8, 11, 13]
+    checkpoints:
+    - step: 5
+      expectation: Home renders the welcome panel from a clean QA profile.
+    - step: 7
+      expectation: Sessions empty state renders before switching modes.
+    - step: 9
+      expectation: The workspace file tree is available after switching to Workspaces.
+    - step: 10
+      expectation: README.md is listed under the seeded workspace root.
+    - step: 12
+      expectation: README.md opens in the Markdown editor.
+    - step: 14
+      expectation: Opening Overview focuses the search field.
+    - step: 15
+      expectation: The dialog publishes a preview dwell within the agreed 500-1000 ms range.
+    results: [5, 7, 9, 10, 12, 14, 15]
+  - id: DWELL-BEHAVIOUR
+    requirement: A hovered card is not enlarged immediately, enlarges only after the dwell, clears when the pointer leaves, restarts the dwell on re-entry, and activates from the enlarged card.
+    actions: [16, 20, 22, 25]
+    checkpoints:
+    - step: 17
+      expectation: No enlargement appears immediately after the pointer enters the card.
+    - step: 18
+      expectation: The enlargement appears after the dwell.
+    - step: 19
+      expectation: The enlarged preview shows the hovered README.md document.
+    - step: 21
+      expectation: Moving the pointer off the card clears the enlargement.
+    - step: 23
+      expectation: Re-entering the card does not enlarge immediately and restarts the dwell.
+    - step: 24
+      expectation: The enlargement reappears after the restarted dwell.
+    - step: 26
+      expectation: Clicking the enlarged preview closes Overview.
+    - step: 27
+      expectation: The hovered document is activated in the editor.
+    - step: 29
+      expectation: No runtime errors were recorded during the flow.
+    results: [17, 18, 19, 21, 23, 24, 26, 27, 29]
+  visual:
+  - check: Screenshot keeps the enlarged preview inside the viewport after the dwell.
+    method: manual
+    reason: Automated assertions read the mounted controls; the retained screenshot supports visual comparison.
+  native:
+  - check: Not selected for native.
+    method: external
+    reason: TC-WS-098/TC-WS-099 cover native enlargement and activation; WebDriver hover latency cannot prove the no-immediate boundary.

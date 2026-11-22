@@ -7,6 +7,8 @@
 
 > 正式四轮性能对照尚未通过，当前组合源码的全量尚待执行。旧全量 [40743957940](https://github.com/engcapa/taomni/actions/runs/40743957940) 的 **645 个适用 ID、2,115 passed / 3 failed、25/25 分片**仍原样保留，20,307 个发布附件 SHA 已独立核验，62 个明确上传排除的大夹具单列。RDP 性能失败按用户授权单列，不计通过；clickhousecrud 外部缺口按用户确认保留。browser/native 只在 GitHub 执行，本机仅单测、静态检查与 QA release 编译。以下历史章节以本节最新状态为准。
 
+> 2026-11-22 后续变更（分支 `feat/topbar-overview-hover-delay-and-sidebar-toggle-removal`）：按用户决策移除右侧上下文面板 `RightContextPanel` 及全部主视图右上角的 `toggle-right-sidebar` 按钮，并清理 `rightSidebarCollapsed` 状态、i18n 与测试；Home 页面按钮保持不变。大预览悬停放大延迟由 `2000ms` 调整为 `700ms`（0.5–1s 常规区间），`TabOverview` 通过 `data-preview-delay-ms` 暴露配置值。新增 `TC-WS-099`（browser/native）验证五视图右上角按钮契约与悬停时序，更新 `TC-WS-001/020/050`、`feature-list.md`、testid 目录和 coverage baseline。历史章节中的右栏描述保留为当时实现记录。
+
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)

@@ -16,7 +16,6 @@ import { AgentsPlatformView } from "../../components/agents/AgentsPlatformView";
 import { ExplorerPlatformView } from "../../components/explorer/ExplorerPlatformView";
 import { MfaFloatingWindow } from "../../components/mfa/MfaFloatingWindow";
 import { GlobalCommandModal } from "../../components/search/GlobalCommandModal";
-import { RightContextPanel } from "../../components/workspace/RightContextPanel";
 import { WorkspaceMainPanel } from "../../components/workspace/WorkspaceMainPanel";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
@@ -96,7 +95,6 @@ export function MainLayoutView(props: MainLayoutViewProps) {
   useEffect(() => {
     if (activeSideTab !== "home") return;
     useAppStore.getState().setSidebarCollapsed(true);
-    useAppStore.getState().setRightSidebarCollapsed(true);
   }, [activeSideTab]);
 
   return ((
@@ -380,7 +378,6 @@ export function MainLayoutView(props: MainLayoutViewProps) {
           </PanelGroup>
           {chrome.chatDrawerFloating && <ChatDrawer />}
           <TabOverview />
-          <RightContextPanel />
           <FloatingNotesPanel />
           <TaoAlertPoller />
         </div>

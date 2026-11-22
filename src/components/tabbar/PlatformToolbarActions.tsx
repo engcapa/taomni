@@ -1,4 +1,4 @@
-import { Columns2, ExternalLink, Grid2X2, LayoutGrid, PanelBottom, PanelRight, Radio, Search, Square, Trash2 } from "lucide-react";
+import { Columns2, ExternalLink, Grid2X2, LayoutGrid, PanelBottom, Radio, Search, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
@@ -13,7 +13,6 @@ export function PlatformToolbarActions({ children, onOpenSearch, slotRef, onDeta
 }) {
   const t = useT();
   const mode = useAppStore((s) => s.activeSideTab);
-  const rightCollapsed = useAppStore((s) => s.rightSidebarCollapsed);
   const split = useAppStore((s) => s.terminalSplitActive);
   const splitLayout = useAppStore((s) => s.terminalSplitLayout);
   const broadcast = useAppStore((s) => s.multiExecActive);
@@ -48,7 +47,6 @@ export function PlatformToolbarActions({ children, onOpenSearch, slotRef, onDeta
       <span className="taomni-toolbar-divider" />
       <ToolbarButton testId="global-search-trigger" title={`${t("platform.globalSearch")} (Ctrl/Cmd+K)`} onClick={onOpenSearch}><Search /></ToolbarButton>
       <ToolbarButton testId="tab-overview-trigger" title={`${t("platform.tabOverview")} (Ctrl/Cmd+Shift+E)`} active={overviewOpen} onClick={() => useTabOverviewStore.getState().toggle()}><LayoutGrid /></ToolbarButton>
-      {mode !== "home" && <ToolbarButton testId="toggle-right-sidebar" title={t("platform.toggleRightSidebar")} active={!rightCollapsed} onClick={() => useAppStore.getState().toggleRightSidebar()}><PanelRight /></ToolbarButton>}
       <TitleBarTrayControls compact layoutActions={false} slotRef={registerSlot}
         visible={workspaceMode || sessionMode} contextKey={`${mode}:${workspace?.id ?? ""}`}>
         {sessionMode && <ToolbarMenuAction testId="tab-multiexec-toggle" title={t(broadcast ? "titlebar.disableMultiExec" : "titlebar.enableMultiExec")}

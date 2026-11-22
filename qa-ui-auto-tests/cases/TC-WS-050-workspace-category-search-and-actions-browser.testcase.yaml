@@ -57,7 +57,6 @@ steps:
     - workspace-tabs-filter-trigger
     - global-search-trigger
     - tab-overview-trigger
-    - toggle-right-sidebar
     - titlebar-actions-more
 - click: '[data-testid="workspace-tabs-filter-trigger"]'
 - eval_readonly:
@@ -306,7 +305,7 @@ verification:
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 2}}'
     - step: 18
       expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["workspace-tabs-filter-trigger",
-        "global-search-trigger", "tab-overview-trigger", "toggle-right-sidebar", "titlebar-actions-more"]}}'
+        "global-search-trigger", "tab-overview-trigger", "titlebar-actions-more"]}}'
     - step: 20
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tabs-filter-trigger\"]'').querySelector(''svg'').classList.contains(''lucide-filter'')",
         "expect_truthy": true}}'

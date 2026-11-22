@@ -14056,7 +14056,9 @@ TC-WS-075 keeps the real native execution scan under the same Home responsivenes
 
 > 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-049`。`TC-WS-049` 覆盖 Home、Tools、Sessions、空/多标签 Workspaces 的共享标题栏拖动事件、窄窗口真实命中、双击最大化，以及按钮、标签、弹出输入框和右键的排除；`TC-MAIN-RAIL-03` 验证同一顶部边框及 Home/Tools 标题的真实系统位移。`TC-WS-029/030` 还覆盖工作区标签过多时的左右滚动控制，以及顶部空白区保留原生窗口拖动目标。`TC-WS-044` 在 browser/native 中覆盖从 Home 选择已保存工作区后，树形/详细列表的已展开子目录自动重新加载，保留文档与目录展开状态。`TC-WS-045` 覆盖 Tools / Home 显式进入空编辑器时展示文件区，以及收缩、Project 和 Sessions 工具切换后的恢复。`TC-WS-047` 覆盖普通层级文件树显示依赖/构建目录，避免将父目录误判为 Empty。`TC-WS-018/019` 保留连续快捷键开关回归，`TC-WS-046` 追加 Linux 原生 GTK/fcitx 真实输入及大预览重复打开边界。
 
-### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与右栏收纳
+### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与左栏收纳
+
+> 2026-11-22：右侧上下文面板（Structure/Tao 助手）及其右上角收缩按钮已从全部主视图移除；Home 视图按钮不变，`TC-WS-099` 验证五视图右上角仅保留模式操作、全局搜索与大预览，`TC-WS-100`（browser）验证 0.5-1s 悬停放大边界（不立即放大、离开清除、重新计时），原 `TC-WS-001/020/050` 同步收缩断言。
 
 Issue #797：`TC-WS-091/092` 保护左栏 Terminal 在数据库/shell 画布上只切换 workspace 底部工具窗，不改变当前标签或重建 Code Workspace。底部复用编辑器同一个终端 owner，隐藏/重开及跨模式恢复保留输出；native 额外验证上下 PTY 独立执行及工作区隔离。`TC-IDE-PARITY-010-01/04` 和 `024-03` 保护编辑器工具窗与移动行为。
 
@@ -14097,8 +14099,6 @@ files:
 - src/layouts/main/MainLayoutView.tsx
 - src/styles/platform.css
 - src/styles/platform-home.css
-- src/components/workspace/RightContextPanel.tsx
-- src/components/workspace/useContextPanelWidth.ts
 - src/components/welcome/PlatformLaunchCards.tsx
 controls:
 - id: global-search-trigger
@@ -14116,17 +14116,11 @@ controls:
 - id: nav-mode-workspaces
   selector: '[data-testid="nav-mode-workspaces"]'
   kind: interactive
-- id: right-sidebar
-  selector: '[data-testid="right-sidebar"]'
-  kind: display
 - id: sidebar-rail
   selector: '[data-testid="sidebar-rail"]'
   kind: interactive
 - id: toggle-left-sidebar
   selector: '[data-testid="toggle-left-sidebar"]'
-  kind: interactive
-- id: toggle-right-sidebar
-  selector: '[data-testid="toggle-right-sidebar"]'
   kind: interactive
 - id: main-canvas-frame
   selector: '[data-testid="main-canvas-frame"]'
@@ -14137,24 +14131,6 @@ controls:
 - id: global-session-surface
   selector: '[data-testid="global-session-surface"]'
   kind: display
-- id: right-sidebar-resize-handle
-  selector: '[data-testid="right-sidebar-resize-handle"]'
-  kind: interactive
-- id: right-sidebar-close
-  selector: '[data-testid="right-sidebar-close"]'
-  kind: interactive
-- id: right-sidebar-ai-tab
-  selector: '[data-testid="right-sidebar-ai-tab"]'
-  kind: interactive
-- id: right-sidebar-structure-tab
-  selector: '[data-testid="right-sidebar-structure-tab"]'
-  kind: interactive
-- id: right-sidebar-content
-  selector: '[data-testid="right-sidebar-content"]'
-  kind: display
-- id: right-sidebar-open-chat
-  selector: '[data-testid="right-sidebar-open-chat"]'
-  kind: interactive
 - id: rail-app-menu-host
   selector: '[data-testid="rail-app-menu-host"]'
   kind: display
