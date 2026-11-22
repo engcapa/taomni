@@ -33,8 +33,24 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertIn(expected_key, dependencies['with']['shared-key'])
         for name in ('Native QA workspace cache', 'Native Rust contracts cache'):
             paths = next(s['with'] for s in steps if s.get('name') == name)
-            for key in [paths['key'], *paths['restore-keys'].splitlines()]:
-                self.assertIn(expected_key, key)
+            self.assertIn(expected_key, paths['key'])
+
+    def test_compiled_workspace_caches_require_the_current_build_inputs(self):
+        entry = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
+        steps = entry['jobs']['entry']['steps']
+        for name in ('Native QA workspace cache', 'Native Rust contracts cache'):
+            cache = next(step['with'] for step in steps if step.get('name') == name)
+            self.assertIn('steps.native-cache-key.outputs.key', cache['key'])
+            self.assertNotIn('restore-keys', cache)
+        performance = yaml.safe_load((ROOT / '.github/workflows/qa-workspace-performance.yml').read_text())
+        perf_steps = next(job['steps'] for job in performance['jobs'].values() if 'steps' in job)
+        self.assertFalse(any(step.get('with', {}).get('path') == 'src-tauri/target/qa-ui-auto'
+                             for step in perf_steps))
+        for consumer in (steps, perf_steps):
+            dependencies = next(step['with'] for step in consumer
+                                if step.get('uses') == 'swatinem/rust-cache@v2')
+            self.assertIs(dependencies['cache-targets'], True)
+            self.assertIs(dependencies['cache-workspace-crates'], False)
 
     def test_frontend_regressions_run_once_on_linux_producer_and_keep_original_log(self):
         workflow = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())

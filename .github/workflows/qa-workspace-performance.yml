@@ -75,14 +75,9 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target/qa-ui-auto
-          shared-key: qa-platforms-ubuntu-22.04-x11
-          cache-targets: false
-      - uses: actions/cache/restore@v4
-        with:
-          path: src-tauri/target/qa-ui-auto
-          key: workspace-perf-release-${{ github.sha }}
-          restore-keys: |
-            qa-native-v1-ubuntu-22.04-x11-Linux-X64-release-
+          shared-key: qa-platforms-dependencies-v2-ubuntu-22.04-x11
+          cache-targets: true
+          cache-workspace-crates: false
       - uses: actions/cache@v4
         with:
           path: ~/.cache/taomni-qa/adapter
