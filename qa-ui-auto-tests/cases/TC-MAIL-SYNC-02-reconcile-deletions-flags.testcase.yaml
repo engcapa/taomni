@@ -75,6 +75,8 @@ steps:
 - click: '[data-testid="mail-message-row"]'
 - wait_for: '[data-testid="mail-message-row"][aria-pressed="true"]'
 - assert_no_runtime_errors: null
+- assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Other-client 0007"]', equal: 1}
+- assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Other-client 0010"]', equal: 0}
 - screenshot: mail-sync-02-reconcile.png
 verification:
   review: reviewed
@@ -116,12 +118,18 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"mail-message-row\"][aria-pressed=\"true\"]"}'
     - step: 26
       expectation: No runtime errors during reconciliation and reopen.
+    - step: 27
+      expectation: The newest retained message appears exactly once after reopening the mailbox.
+    - step: 28
+      expectation: The last expunged message does not reappear after reopening.
     results:
     - 16
     - 17
     - 23
     - 26
     - 19
+    - 27
+    - 28
   visual:
   - check: 截图中列表与未读样式正确，无残留的已删除邮件。
     method: manual

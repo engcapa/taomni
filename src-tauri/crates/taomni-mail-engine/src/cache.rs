@@ -31,7 +31,9 @@ pub use synchronization::{
     cache_sync_result, cache_synced_messages, reset_folder_if_uid_validity_changed,
 };
 pub use upsert::{upsert_folder, upsert_folder_status, upsert_message, upsert_message_at};
-pub use watermarks::{apply_folder_step, load_folder_sync_state, now_ms, record_folder_error};
+pub use watermarks::{
+    apply_folder_round, apply_folder_step, load_folder_sync_state, now_ms, record_folder_error,
+};
 
 pub fn init_mail_tables(conn: &Connection) -> SqlResult<()> {
     init_cache_tables(conn)?;

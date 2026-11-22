@@ -1,5 +1,5 @@
 use taomni_mail_engine::{
-    cache::upsert_folder_status,
+    cache::apply_folder_round,
     imap_sync::{FolderRoundOutcome, FolderRoundRequest, HeaderPageOutcome, HeaderPageRequest},
 };
 
@@ -400,15 +400,15 @@ pub async fn mail_sync_all_folders(
         if cache_enabled {
             let cache_settings = cache_settings.clone();
             let metadata = folder.clone();
-            with_mail_db_async(&state, &account_id, move |db, account_id| {
-                upsert_folder_status(db, &metadata)?;
-                for outcome in &outcomes {
-                    sync::apply_folder_step(db, account_id, outcome, &cache_settings, started_ms)?;
-                }
-                if let Some(error) = error {
-                    sync::record_folder_error(db, account_id, &name, &error)?;
-                }
-                Ok(())
+            with_mail_db_async(&state, &account_id, move |db, _| {
+                apply_folder_round(
+                    db,
+                    &metadata,
+                    &outcomes,
+                    &cache_settings,
+                    started_ms,
+                    error.as_deref(),
+                )
             })
             .await?;
         }

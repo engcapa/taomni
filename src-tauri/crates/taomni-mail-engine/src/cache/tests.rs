@@ -54,6 +54,81 @@ fn folder_step_keeps_current_list_metadata_across_a_subscription_change() {
 }
 
 #[test]
+fn folder_round_keeps_headers_and_watermark_at_the_same_commit() {
+    let conn = Connection::open_in_memory().unwrap();
+    init_mail_tables(&conn).unwrap();
+    let folder = MailFolder {
+        account_id: "acct".into(),
+        name: "INBOX".into(),
+        uid_validity: Some(8),
+        ..Default::default()
+    };
+    let step = |uid| FolderStepOutcome {
+        folder: folder.clone(),
+        mode: MailSyncMode::Catchup,
+        messages: vec![crate::parse_body_message(
+            "acct",
+            "INBOX",
+            uid,
+            None,
+            b"Subject: Sync\r\n\r\nBody",
+            4096,
+        )],
+        vanished: Vec::new(),
+        flag_updates: Vec::new(),
+        watermark: Watermark {
+            low: Some(5),
+            high: Some(uid),
+            complete: true,
+            needs_repair: false,
+        },
+        highest_modseq: None,
+        reconciled: false,
+        uid_validity_reset: false,
+        remaining: 0,
+        more: false,
+        new_unseen: 0,
+    };
+    let cache = MailCacheSettings::default();
+    apply_folder_step(&conn, "acct", &step(5), &cache, 1).unwrap();
+    conn.execute_batch(
+        "CREATE TRIGGER reject_second_sync_insert BEFORE INSERT ON mail_messages
+         WHEN NEW.uid=8 BEGIN SELECT RAISE(ABORT, 'fixture write failure'); END;",
+    )
+    .unwrap();
+
+    let steps = [step(7), step(8)];
+    assert!(apply_folder_round(&conn, &folder, &steps, &cache, 2, None).is_err());
+    let observed = load_folder_sync_state(&conn, "acct", "INBOX").unwrap();
+    assert_eq!(observed.cached_uids, vec![5]);
+    assert_eq!(observed.high, Some(5));
+
+    conn.execute_batch("DROP TRIGGER reject_second_sync_insert")
+        .unwrap();
+    apply_folder_round(
+        &conn,
+        &folder,
+        &steps,
+        &cache,
+        3,
+        Some("server disconnected"),
+    )
+    .unwrap();
+    let observed = load_folder_sync_state(&conn, "acct", "INBOX").unwrap();
+    assert_eq!(observed.cached_uids, vec![5, 7, 8]);
+    assert_eq!(observed.high, Some(8));
+    assert_eq!(
+        conn.query_row(
+            "SELECT last_error FROM mail_folders WHERE account_id='acct' AND name='INBOX'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .unwrap(),
+        "server disconnected",
+    );
+}
+
+#[test]
 fn migration_is_idempotent_and_keeps_rows() {
     let conn = Connection::open_in_memory().unwrap();
     // A pre-watermark schema with a saved message, before any application

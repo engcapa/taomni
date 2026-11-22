@@ -3,6 +3,7 @@ use super::cache_synced_messages;
 use super::prune_mail_cache;
 use super::reindex_cached_contacts;
 use super::upsert_folder_status;
+use crate::MailFolder;
 use crate::imap_sync::AppliedStep;
 use crate::imap_sync::FolderStepOutcome;
 use crate::imap_sync::FolderSyncState;
@@ -135,14 +136,54 @@ pub fn apply_folder_step(
     started_ms: i64,
 ) -> SqlResult<AppliedStep> {
     let tx = conn.unchecked_transaction()?;
+    let flags_updated = write_folder_step(&tx, account_id, outcome, cache, started_ms)?;
+    tx.commit()?;
+    let folder = super::list_cached_folders(conn, account_id)?
+        .into_iter()
+        .find(|folder| folder.name == outcome.folder.name);
+    Ok(AppliedStep {
+        flags_updated,
+        folder,
+    })
+}
+
+/// Commit a full folder refresh's completed steps and their UID marks as one
+/// write. A server error can accompany completed steps, so keep it in the same
+/// transaction as the progress it describes.
+pub fn apply_folder_round(
+    conn: &Connection,
+    folder: &MailFolder,
+    steps: &[FolderStepOutcome],
+    cache: &MailCacheSettings,
+    started_ms: i64,
+    server_error: Option<&str>,
+) -> SqlResult<()> {
+    let tx = conn.unchecked_transaction()?;
+    upsert_folder_status(&tx, folder)?;
+    for step in steps {
+        write_folder_step(&tx, &folder.account_id, step, cache, started_ms)?;
+    }
+    if let Some(error) = server_error {
+        record_folder_error(&tx, &folder.account_id, &folder.name, error)?;
+    }
+    tx.commit()
+}
+
+fn write_folder_step(
+    conn: &Connection,
+    account_id: &str,
+    outcome: &FolderStepOutcome,
+    cache: &MailCacheSettings,
+    started_ms: i64,
+) -> SqlResult<usize> {
     let folder_name = outcome.folder.name.as_str();
     if outcome.uid_validity_reset {
-        reset_folder_cache(&tx, account_id, folder_name)?;
+        reset_folder_cache(conn, account_id, folder_name)?;
     }
-    upsert_folder_status(&tx, &outcome.folder)?;
-    let replaced = cache_synced_messages(&tx, &outcome.messages, started_ms)?;
+    upsert_folder_status(conn, &outcome.folder)?;
+    let replaced = cache_synced_messages(conn, &outcome.messages, started_ms)?;
     if !outcome.vanished.is_empty() {
-        let mut stmt = tx.prepare(
+        let mut stmt = conn.prepare(
             "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
         )?;
         for uid in &outcome.vanished {
@@ -151,7 +192,7 @@ pub fn apply_folder_step(
     }
     let mut flags_updated = 0usize;
     if !outcome.flag_updates.is_empty() {
-        let mut stmt = tx.prepare(
+        let mut stmt = conn.prepare(
             "UPDATE mail_messages SET flags_json = ?4, updated_at = ?5
              WHERE account_id = ?1 AND folder = ?2 AND uid = ?3 AND flags_json != ?4
                AND COALESCE(flags_local_at, 0) < ?6",
@@ -174,7 +215,7 @@ pub fn apply_folder_step(
     // Backfill only lowers the watermark; completion cannot regress. Retention
     // still advances the boundary below, and UIDVALIDITY reset clears it above.
     let can_lower = matches!(outcome.mode, MailSyncMode::Initial | MailSyncMode::Backfill);
-    tx.execute(
+    conn.execute(
         "UPDATE mail_folders
          SET sync_low_uid = CASE WHEN sync_low_uid IS NULL THEN ?3
                                  WHEN ?10 = 1 THEN MIN(sync_low_uid, COALESCE(?3, sync_low_uid))
@@ -200,16 +241,9 @@ pub fn apply_folder_step(
             can_lower as i64,
         ],
     )?;
-    let pruned = prune_mail_cache(&tx, account_id, folder_name, cache)?;
+    let pruned = prune_mail_cache(conn, account_id, folder_name, cache)?;
     if replaced || pruned > 0 || outcome.uid_validity_reset || !outcome.vanished.is_empty() {
-        reindex_cached_contacts(&tx, account_id)?;
+        reindex_cached_contacts(conn, account_id)?;
     }
-    tx.commit()?;
-    let folder = super::list_cached_folders(conn, account_id)?
-        .into_iter()
-        .find(|folder| folder.name == folder_name);
-    Ok(AppliedStep {
-        flags_updated,
-        folder,
-    })
+    Ok(flags_updated)
 }
