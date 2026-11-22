@@ -70,6 +70,11 @@ pub async fn sockscap_start(
     state: State<'_, AppState>,
     sudo_password: Option<String>,
 ) -> Result<SocksCapStatus, String> {
+    let _operation = state
+        .legacy
+        .sockscap
+        .begin_activation(&state.plugins)
+        .await?;
     #[cfg(not(target_os = "linux"))]
     let _ = sudo_password;
 

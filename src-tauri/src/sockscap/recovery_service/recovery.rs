@@ -16,6 +16,7 @@ pub async fn sockscap_recover(
     state: State<'_, AppState>,
     sudo_password: Option<String>,
 ) -> Result<(), String> {
+    let _operation = state.legacy.sockscap.operation.lock().await;
     let mut acquired_recovery_lock = false;
     if !state.legacy.sockscap.has_activation_lock() {
         let lock =

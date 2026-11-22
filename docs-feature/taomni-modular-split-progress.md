@@ -2,6 +2,9 @@
 
 ## 2026-11-22 当前进展
 
+- Windows `fe80e85b9` 的 MSI 已在 GitHub runner 解包。负载只有 `taomni.exe` 和 Lark CLI 许可证，构建的 MSI 与 NSIS 内容检查均通过。原始安装包资产 ID 为 `14759987159`。这份回执覆盖 Windows G9 安装载荷，最终候选仍需核对四个目标的 Cargo 树、前端和实际安装件。 [构建](https://github.com/engcapa/taomni/actions/runs/45033601048) · [载荷回执](https://github.com/engcapa/taomni/actions/runs/45038315601)
+- `fe80e85b9` 的 18 个分片已即时收齐。三端 Browser 各 28/28，Linux Native 33/33，Windows Native 32/35，macOS Native 35/36。Windows 的 TC-MODULES-085 确认宿主和辅助程序退出。`WinDivert64.sys` 随后拒绝删除，引发同片 TC-WS-039/052/056 的夹具清理失败。macOS TC-FILE-OPEN-009 缺少 HTML 沙箱的路径越界观察，保留原始失败。 [分片](https://github.com/engcapa/taomni/actions/runs/45032759747)
+- SocksCap 0.1.9 的 Windows 辅助程序持有自己创建的驱动服务句柄，关闭捕获后通过该句柄确认服务停止。基座在停用、换版和卸载前释放实际转发和系统捕获，清理完成后再变更模块状态。TC-MODULES-085 追加实际监听端口和恢复日志检查，并保留卸载时验证驱动文件删除。Windows 辅助程序已通过编译检查，原生分片待执行。
 - `f9b8a7dfb` 的三端 Browser 和 Native 回归已启动，覆盖 Mail 附件导出、三态还原、SocksCap 运行文件和完整崩溃回归。工作流分 18 片，采集器在分片上传后下载工件。 [三端回归](https://github.com/engcapa/taomni/actions/runs/45036209138)
 - Mail 0.1.27 的独立宿主在 Linux、Windows 和 macOS ARM64 通过归档附件解码和字节核对。三份跨进程回执绑定 `8b9e6fc58`，原始日志已收取，桌面实际保存对话框仍由 TC-MODULES-070 验收。 [三端宿主回执](https://github.com/engcapa/taomni/actions/runs/45034741888)
 - `TC-FILE-OPEN-007` 的实际屏幕截图显示 macOS 已打开系统导出目录面板，操作助手随后超时。QA 工具已改为按步骤保存助手的部分日志并保留失败结果。32 项对话框工具单测通过。 [原始分片](https://github.com/engcapa/taomni/actions/runs/45024092869)

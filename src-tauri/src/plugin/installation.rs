@@ -161,6 +161,17 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Synchronize legacy native resource acquisition with any module switch.
+    /// Its resource lock must already be held, so deactivation can refuse a
+    /// concurrent start instead of waiting on a nested registry operation.
+    pub(crate) fn check_resource_admission(&self) -> Result<(), PluginError> {
+        let _lifecycle = self
+            .lifecycle
+            .lock()
+            .expect("plugin lifecycle lock poisoned");
+        self.ensure_installation_available()
+    }
+
     /// Renew an already running host before reporting activation success.
     /// If activation fails, restore the pointer and reopen the previous host.
     pub(super) fn activate_transaction(

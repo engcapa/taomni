@@ -78,10 +78,13 @@ fn construct(
         vault.clone(),
         leases.clone(),
     )?);
-    let plugins = Arc::new(crate::plugin::PluginRegistry::with_services(
-        paths.plugins.clone(),
-        services,
-    ));
+    let plugins = Arc::new(
+        crate::plugin::PluginRegistry::with_services(paths.plugins.clone(), services)
+            .with_module_cleanup(crate::sockscap::ModuleCleanup::new(
+                &legacy.sockscap,
+                &paths.data,
+            )),
+    );
     // Optional malformed packages are disabled records, never startup failures.
     let _ = plugins.scan();
     let plugin_downloads = Arc::new(crate::plugin::download::DownloadManager::persistent(

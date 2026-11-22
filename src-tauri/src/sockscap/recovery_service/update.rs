@@ -33,6 +33,7 @@ pub async fn sockscap_prepare_for_update(
     state: State<'_, AppState>,
     sudo_password: Option<String>,
 ) -> Result<(), String> {
+    let _operation = state.legacy.sockscap.operation.lock().await;
     let owned_capture = state.legacy.sockscap.has_activation_lock();
     let recovery_required = matches!(
         state.legacy.sockscap.orch.read().await.status().phase,
@@ -129,7 +130,7 @@ pub async fn sockscap_prepare_for_update(
 
     // 2) Ask the elevated helper to exit, freeing `sockscap-helper.exe` and
     //    `WinDivert.dll`. Reuses the same shutdown path as the Stop button.
-    let helper_error = helper::sockscap_helper_stop(state.clone())
+    let helper_error = helper::stop_registered(&state.legacy.sockscap.helper)
         .await
         .err()
         .map(|error| format!("SocksCap helper shutdown failed: {error}"));

@@ -4,12 +4,16 @@
 //! WinDivert 1.x is detected and rejected with a clear error (FLOW layers
 //! return ERROR_INVALID_PARAMETER on 1.x).
 
-use std::ffi::OsStr;
+use std::ffi::{CString, OsStr};
+use std::io;
 use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::ptr;
+use std::sync::Mutex;
 
+use super::driver_service::OwnedDriver;
 use winapi::shared::minwindef::{FARPROC, HMODULE};
+use winapi::shared::winerror::ERROR_SERVICE_DOES_NOT_EXIST;
 use winapi::um::libloaderapi::{FreeLibrary, GetProcAddress, LoadLibraryW};
 use winapi::um::winnt::HANDLE;
 
@@ -19,6 +23,7 @@ pub const LAYER_SOCKET: i32 = 3;
 
 pub const WINDIVERT_HELPER_NO_IP_CHECKSUM: u64 = 1;
 pub const WINDIVERT_HELPER_NO_TCP_CHECKSUM: u64 = 2;
+const NO_INSTALL: u64 = 0x0010;
 
 /// `WINDIVERT_PARAM` (windivert.h).
 pub const PARAM_QUEUE_LENGTH: i32 = 0;
@@ -46,6 +51,7 @@ pub struct QueueParams {
 
 pub struct WinDivertApi {
     module: HMODULE,
+    owned_driver: Mutex<Option<OwnedDriver>>,
     pub dll_path: PathBuf,
     open: OpenFn,
     recv: RecvFn,
@@ -113,6 +119,7 @@ impl WinDivertApi {
 
             let api = Self {
                 module,
+                owned_driver: Mutex::new(None),
                 dll_path: dll.clone(),
                 open: std::mem::transmute::<FARPROC, OpenFn>(open),
                 recv: std::mem::transmute::<FARPROC, RecvFn>(recv),
@@ -126,21 +133,7 @@ impl WinDivertApi {
                     .then(|| std::mem::transmute::<FARPROC, GetParamFn>(get_param_ptr)),
             };
 
-            // Sanity: NETWORK open must work with 2.x ABI.
-            match api.open("false", LAYER_NETWORK, 0, 0) {
-                Ok(h) => {
-                    api.close_handle(h);
-                }
-                Err(e) => {
-                    drop(api);
-                    return Err(format!(
-                        "WinDivert 2.x probe open failed for {}: {e}. \
-                         Ensure the matching WinDivert64.sys is beside the DLL and helper is elevated.",
-                        dll.display()
-                    ));
-                }
-            }
-
+            api.check_driver()?;
             Ok(api)
         }
     }
@@ -152,10 +145,7 @@ impl WinDivertApi {
         priority: i16,
         flags: u64,
     ) -> Result<HANDLE, String> {
-        let c = std::ffi::CString::new(filter).map_err(|e| e.to_string())?;
-        let h = unsafe { (self.open)(c.as_ptr(), layer, priority, flags) };
-        if h.is_null() || h == (-1isize as HANDLE) {
-            let err = std::io::Error::last_os_error();
+        self.open_raw(filter, layer, priority, flags).map_err(|err| {
             let layer_name = match layer {
                 0 => "NETWORK",
                 1 => "NETWORK_FORWARD",
@@ -164,12 +154,47 @@ impl WinDivertApi {
                 4 => "REFLECT",
                 _ => "?",
             };
-            return Err(format!(
+            format!(
                 "WinDivertOpen(layer={layer}/{layer_name}, filter={filter:?}, prio={priority}, dll={}) failed: {err}",
                 self.dll_path.display()
-            ));
+            )
+        })
+    }
+
+    fn open_raw(&self, filter: &str, layer: i32, priority: i16, flags: u64) -> io::Result<HANDLE> {
+        let filter = CString::new(filter).map_err(io::Error::other)?;
+        let handle = unsafe { (self.open)(filter.as_ptr(), layer, priority, flags | NO_INSTALL) };
+        if handle.is_null() || handle == (-1isize as HANDLE) {
+            return Err(io::Error::last_os_error());
         }
-        Ok(h)
+        Ok(handle)
+    }
+
+    fn check_driver(&self) -> Result<(), String> {
+        match self.open_raw("false", LAYER_NETWORK, 0, 0) {
+            Ok(handle) => self.close_handle(handle),
+            Err(error) if error.raw_os_error() == Some(ERROR_SERVICE_DOES_NOT_EXIST as i32) => {
+                let driver = self.dll_path.with_file_name("WinDivert64.sys");
+                let owned = OwnedDriver::start(&driver).map_err(|error| {
+                    format!("Start WinDivert driver at {}: {error}", driver.display())
+                })?;
+                *self.owned_driver.lock().map_err(|e| e.to_string())? = owned;
+                self.close_handle(self.open("false", LAYER_NETWORK, 0, 0)?);
+            }
+            Err(error) => return Err(format!("WinDivert 2.x compatibility check failed: {error}")),
+        }
+        Ok(())
+    }
+
+    pub(crate) fn stop_owned_driver(&self) -> Result<(), String> {
+        let mut owned = self.owned_driver.lock().map_err(|e| e.to_string())?;
+        if let Some(driver) = owned.as_ref() {
+            driver
+                .stop()
+                .map_err(|error| format!("Stop owned WinDivert driver: {error}"))?;
+        }
+        owned.take();
+        Ok(())
     }
 
     pub fn recv(
@@ -296,6 +321,9 @@ impl WinDivertApi {
 
 impl Drop for WinDivertApi {
     fn drop(&mut self) {
+        if let Err(error) = self.stop_owned_driver() {
+            tracing::warn!(%error, "SocksCap driver cleanup remained unconfirmed");
+        }
         if !self.module.is_null() {
             unsafe {
                 FreeLibrary(self.module);

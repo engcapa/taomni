@@ -80,6 +80,19 @@ pub async fn sockscap_helper_start(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<HelperStatus, String> {
+    let _operation = state
+        .legacy
+        .sockscap
+        .begin_activation(&state.plugins)
+        .await?;
+    ensure_helper(&app, &state).await
+}
+
+/// Ensure the helper is running while the caller owns the capture operation.
+pub async fn ensure_helper(
+    app: &AppHandle,
+    state: &State<'_, AppState>,
+) -> Result<HelperStatus, String> {
     #[cfg(windows)]
     let _start = state.legacy.sockscap.helper.start.lock().await;
     // Snapshot the registered session and release the lock before any blocking
@@ -95,15 +108,15 @@ pub async fn sockscap_helper_start(
         .and_then(|g| g.as_ref().cloned());
 
     if let Some(sess) = existing {
-        match probe_existing_helper(&app, &sess) {
+        match probe_existing_helper(app, &sess) {
             Ok(Some(st)) => return Ok(st),
             // Unusable but not worth surfacing — fall through to a fresh launch.
-            Ok(None) => discard_helper_session(&state, &sess),
+            Ok(None) => discard_helper_session(state, &sess),
             Err(e) => {
                 // Drop the broken session *before* returning: leaving it in the
                 // registry meant a retry in the same run kept re-probing the
                 // very helper we just gave up on.
-                discard_helper_session(&state, &sess);
+                discard_helper_session(state, &sess);
                 return Err(e);
             }
         }
@@ -121,11 +134,11 @@ pub async fn sockscap_helper_start(
 
     #[cfg(windows)]
     {
-        let runtime = super::package::prepare(&app, &state.plugins).await?;
+        let runtime = super::package::prepare(app, &state.plugins).await?;
         let helper = runtime.exe;
         let token = random_token();
         let port = pick_free_port()?;
-        let ready_dir = crate::resolved_app_data_dir(&app)?.join("sockscap");
+        let ready_dir = crate::resolved_app_data_dir(app)?.join("sockscap");
         std::fs::create_dir_all(&ready_dir).map_err(|e| e.to_string())?;
         let ready_file = ready_dir.join(format!("helper-ready-{port}.json"));
         let ready_file = std::fs::canonicalize(&ready_dir)
@@ -346,12 +359,4 @@ pub(super) fn elevate_and_spawn(helper: &Path, args: &[String]) -> Result<(), St
         ));
     }
     Ok(())
-}
-
-/// Ensure helper is running (elevate via UAC if needed). Returns current status.
-pub async fn ensure_helper(
-    app: &AppHandle,
-    state: &State<'_, AppState>,
-) -> Result<HelperStatus, String> {
-    sockscap_helper_start(app.clone(), state.clone()).await
 }

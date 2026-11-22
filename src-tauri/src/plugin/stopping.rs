@@ -7,7 +7,18 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Legacy application-owned resources associated with a replaceable host.
+/// Called under the lifecycle lock, so cleanup cannot invoke the registry.
+pub(crate) trait ModuleCleanup: std::fmt::Debug + Send + Sync {
+    fn prepare_stop(&self, slug: &str) -> Result<(), String>;
+}
+
 impl PluginRegistry {
+    pub(crate) fn with_module_cleanup(mut self, cleanup: impl ModuleCleanup + 'static) -> Self {
+        self.module_cleanup = Some(Arc::new(cleanup));
+        self
+    }
+
     pub fn shutdown(&self) -> Result<(), PluginError> {
         self.shutdown_until(Instant::now() + VAULT_TRANSITION_TIMEOUT)
     }
@@ -76,6 +87,11 @@ impl PluginRegistry {
     }
 
     pub(super) fn stop_host(&self, slug: &str) -> Result<(), PluginError> {
+        if let Some(cleanup) = &self.module_cleanup {
+            cleanup
+                .prepare_stop(slug)
+                .map_err(PluginError::HostRequest)?;
+        }
         self.stop_host_until(slug, Instant::now() + Duration::from_secs(5))
     }
 

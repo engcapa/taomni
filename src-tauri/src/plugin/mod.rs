@@ -49,6 +49,7 @@ pub mod verify;
 pub(crate) use installation::InstallIntent;
 pub(crate) use installation::current_platform;
 pub(crate) use signed_catalog::{fetch_trusted_catalog, package_from_cached_catalog};
+pub(crate) use stopping::ModuleCleanup;
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
@@ -208,6 +209,7 @@ pub struct PluginRegistry {
     pending_requests: Arc<Mutex<HashMap<(String, String), dispatch::PendingRequest>>>,
     frontend_trust: Arc<RwLock<HashMap<PathBuf, Arc<verify::InstalledTrust>>>>,
     services: Option<Arc<services::PluginCoreServices>>,
+    module_cleanup: Option<Arc<dyn stopping::ModuleCleanup>>,
 }
 
 impl PluginRegistry {
@@ -224,6 +226,7 @@ impl PluginRegistry {
             pending_requests: Arc::new(Mutex::new(HashMap::new())),
             frontend_trust: Arc::new(RwLock::new(HashMap::new())),
             services: None,
+            module_cleanup: None,
         }
     }
 
@@ -362,10 +365,8 @@ impl PluginRegistry {
         } else {
             None
         };
-        let mut records = self.records.write().expect("plugin registry lock poisoned");
-        let before = records.clone();
-        let record = records
-            .get_mut(slug)
+        let record = self
+            .get(slug)
             .ok_or_else(|| PluginError::NotFound(slug.to_owned()))?;
         if record.reason.is_some() {
             return Err(PluginError::InvalidManifest(
@@ -386,7 +387,9 @@ impl PluginRegistry {
         if !enabled {
             self.stop_host(slug)?;
         }
-        record.state = if enabled {
+        let mut records = self.records.write().expect("plugin registry lock poisoned");
+        let before = records.clone();
+        records.get_mut(slug).expect("lifecycle lock is held").state = if enabled {
             LifecycleState::Enabled
         } else {
             LifecycleState::Disabled

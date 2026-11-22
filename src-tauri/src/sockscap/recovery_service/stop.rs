@@ -12,6 +12,7 @@ pub async fn sockscap_stop(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SocksCapStatus, String> {
+    let _operation = state.legacy.sockscap.operation.lock().await;
     if !state.legacy.sockscap.has_activation_lock() {
         let orch = state.legacy.sockscap.orch.read().await;
         return Ok(orch.status());
@@ -29,6 +30,7 @@ pub async fn sockscap_stop(
 /// credential are still available. If teardown fails, the exit command returns
 /// an error and the UI keeps the process alive so the user can retry or Recover.
 pub async fn prepare_for_exit(app: &AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    let _operation = state.legacy.sockscap.operation.lock().await;
     let owns_capture = state.legacy.sockscap.has_activation_lock();
     let recovery_required = matches!(
         state.legacy.sockscap.orch.read().await.status().phase,
@@ -56,7 +58,7 @@ pub async fn prepare_for_exit(app: &AppHandle, state: State<'_, AppState>) -> Re
         manager.shutdown_all().await;
     }
 
-    if let Err(error) = helper::sockscap_helper_stop(state.clone()).await {
+    if let Err(error) = helper::stop_registered(&state.legacy.sockscap.helper).await {
         errors.push(format!("SocksCap helper shutdown failed: {error}"));
     }
 

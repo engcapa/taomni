@@ -93,3 +93,38 @@ fn failed_disable_and_uninstall_preserve_metadata_and_data() {
     runtime.process.clear_poison();
     registry.stop_host("mfa").unwrap();
 }
+
+#[test]
+fn disable_waits_for_the_desktop_resource_owner() {
+    use std::sync::atomic::AtomicBool;
+
+    #[derive(Debug)]
+    struct BusyResource(Arc<AtomicBool>);
+
+    impl ModuleCleanup for BusyResource {
+        fn prepare_stop(&self, slug: &str) -> Result<(), String> {
+            assert_eq!(slug, "mfa");
+            if self.0.load(Ordering::Acquire) {
+                Err("desktop resource still active".into())
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    let root = tempfile::tempdir().unwrap();
+    let (registry, _) = fixture(root.path());
+    let busy = Arc::new(AtomicBool::new(true));
+    let registry = registry.with_module_cleanup(BusyResource(busy.clone()));
+    assert!(matches!(
+        registry.set_enabled("mfa", false),
+        Err(PluginError::HostRequest(message)) if message == "desktop resource still active"
+    ));
+    assert_eq!(registry.get("mfa").unwrap().state, LifecycleState::Enabled);
+    assert!(registry.hosts.lock().unwrap().contains_key("mfa"));
+
+    busy.store(false, Ordering::Release);
+    let result = registry.set_enabled("mfa", false).unwrap();
+    assert_eq!(result.state, LifecycleState::Disabled);
+    assert!(registry.hosts.lock().unwrap().is_empty());
+}

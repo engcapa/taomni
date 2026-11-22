@@ -71,6 +71,8 @@ use zeroize::Zeroizing;
 use crate::module_lock::ModuleLock;
 use crate::state::AppState;
 
+pub(crate) use recovery_service::ModuleCleanup;
+
 /* ---------------------------- runtime handle ---------------------------- */
 
 /// Shared SocksCap runtime living on [`AppState`].
@@ -84,6 +86,7 @@ pub struct SocksCapRuntime {
     /// Cross-process ownership of the OS capture stack. SocksCap changes
     /// machine-wide capture state, so only one Taomni process may own it.
     activation_lock: std::sync::Mutex<Option<ModuleLock>>,
+    operation: tokio::sync::Mutex<()>,
     /// macOS starts boot recovery asynchronously. Start remains blocked until
     /// that audit has finished so a user click cannot race a dirty-journal
     /// recovery and replace its inert-only scope with a business scope.
@@ -102,6 +105,7 @@ impl SocksCapRuntime {
             helper: Arc::new(helper::HelperRegistry::new()),
             pending_reap: std::sync::Mutex::new(Vec::new()),
             activation_lock: std::sync::Mutex::new(None),
+            operation: tokio::sync::Mutex::new(()),
             #[cfg(target_os = "macos")]
             recovery_ready: AtomicBool::new(false),
             xray: std::sync::OnceLock::new(),
@@ -111,6 +115,19 @@ impl SocksCapRuntime {
     /// The xray manager, if it has been initialized.
     pub fn xray(&self) -> Option<&Arc<core::XrayManager>> {
         self.xray.get()
+    }
+
+    async fn begin_activation(
+        &self,
+        registry: &Arc<crate::plugin::PluginRegistry>,
+    ) -> Result<tokio::sync::MutexGuard<'_, ()>, String> {
+        let operation = self.operation.lock().await;
+        let registry = registry.clone();
+        tokio::task::spawn_blocking(move || registry.check_resource_admission())
+            .await
+            .map_err(|error| error.to_string())?
+            .map_err(|error| error.to_string())?;
+        Ok(operation)
     }
 
     fn has_activation_lock(&self) -> bool {

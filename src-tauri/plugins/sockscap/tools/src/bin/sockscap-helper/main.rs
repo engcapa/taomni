@@ -11,6 +11,8 @@
 #[cfg(windows)]
 mod capture;
 #[cfg(windows)]
+mod driver_service;
+#[cfg(windows)]
 mod proc_info;
 #[cfg(windows)]
 mod windivert;
@@ -201,8 +203,10 @@ mod windows_main {
             let engine_wd = Arc::clone(&engine);
             std::thread::spawn(move || {
                 wait_for_parent_exit(ppid, parent_start);
-                if let Ok(mut eng) = engine_wd.lock() {
-                    eng.stop();
+                if let Ok(mut eng) = engine_wd.lock()
+                    && let Err(error) = eng.shutdown()
+                {
+                    eprintln!("SocksCap helper driver cleanup: {error}");
                 }
                 // Parent is gone; nothing left to serve.
                 cleanup_and_exit(0);
@@ -516,8 +520,17 @@ mod windows_main {
             // `exit` happens in `handle_client` right after this response is
             // written, so the caller always receives an ack.
             "shutdown" => {
-                if let Ok(mut eng) = engine.lock() {
-                    eng.stop();
+                let stopped = engine
+                    .lock()
+                    .map_err(|_| "SocksCap capture state is unavailable".to_owned())
+                    .and_then(|mut engine| engine.shutdown());
+                if let Err(error) = stopped {
+                    return Response {
+                        id: req.id,
+                        ok: false,
+                        result: None,
+                        error: Some(error),
+                    };
                 }
                 running.store(false, Ordering::SeqCst);
                 Response {

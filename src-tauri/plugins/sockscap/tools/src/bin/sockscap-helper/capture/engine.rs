@@ -359,6 +359,15 @@ impl CaptureEngine {
         self.plan_live = Arc::new(Mutex::new(Arc::new(CapturePlan::default())));
     }
 
+    pub(crate) fn shutdown(&mut self) -> Result<(), String> {
+        self.stop();
+        if let Some(api) = &self.api {
+            api.stop_owned_driver()?;
+        }
+        self.api = None;
+        Ok(())
+    }
+
     pub fn lookup_orig(&self, src_port: u16) -> Option<serde_json::Value> {
         let map = self.redirects.lock().ok()?;
         Some(mapping_json(&map.mapping_by_sport(src_port)?))

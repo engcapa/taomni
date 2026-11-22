@@ -32,6 +32,7 @@ pub(crate) use startup::{
     __cmd__sockscap_helper_start, __tauri_command_name_sockscap_helper_start,
 };
 
+pub(super) use status::stop_registered;
 pub use status::{sockscap_helper_probe_windivert, sockscap_helper_status, sockscap_helper_stop};
 
 pub(crate) use status::{

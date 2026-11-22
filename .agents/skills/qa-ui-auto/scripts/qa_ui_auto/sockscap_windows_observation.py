@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import socket
 import subprocess
 import zipfile
 
@@ -33,6 +34,12 @@ def matching_images(rows, path):
     return [row for row in rows if row["ExecutablePath"] and Path(row["ExecutablePath"]).resolve() == path]
 
 
+def listening(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.settimeout(0.25)
+        return listener.connect_ex(("127.0.0.1", port)) == 0
+
+
 def run(ctx, phase):
     owner = ctx.fixture_context
     phases = {"unstaged", "running", "disabled", "uninstalled"}
@@ -46,6 +53,7 @@ def run(ctx, phase):
     host = (installed / "taomni-plugin-sockscap.exe").resolve()
     receipt = owner.signed_sockscap
     ready_dir = root / "sockscap"
+    journal_path = ready_dir / "recovery.json"
     result = {"sourceSha": receipt["sourceSha"], "platform": receipt["platform"], "packageSha256": receipt["sha256"],
               "phase": phase, "passed": False}
     status_path = Path(ctx.case_dir) / f"sockscap-windows-capture-{phase}.json"
@@ -68,10 +76,11 @@ def run(ctx, phase):
             raise StepError("SocksCap staged a helper despite the damaged package")
         return "Windows capture was not staged after the integrity failure"
     deadline = time.monotonic() + remaining_timeout(20)
-    if phase == "disabled" and not json.loads(
-        (Path(ctx.case_dir) / "sockscap-windows-capture-running.json").read_text(encoding="utf-8")
-    )["passed"]:
-        raise StepError("Capture must run before cleanup can be verified")
+    if phase == "disabled":
+        before = json.loads((Path(ctx.case_dir) / "sockscap-windows-capture-running.json").read_text(encoding="utf-8"))
+        if not before["passed"]:
+            raise StepError("Capture must run before cleanup can be verified")
+        result["relayPort"] = before["relayPort"]
     try:
         while time.monotonic() < deadline:
             rows = running_images()
@@ -83,7 +92,8 @@ def run(ctx, phase):
                 except FileNotFoundError:
                     continue
             if phase == "disabled":
-                if not result["hosts"] and not result["helpers"] and not ready:
+                result.update(relayListening=listening(result["relayPort"]), journalExists=journal_path.exists())
+                if not result["hosts"] and not result["helpers"] and not ready and not result["relayListening"] and not result["journalExists"]:
                     config = root / "plugins/sockscap/data/config.json"
                     result["configSha256"] = hashlib.sha256(config.read_bytes()).hexdigest()
                     break
@@ -93,6 +103,12 @@ def run(ctx, phase):
                 matching = [row for row in ready if row.get("pid") == helper_pid]
                 if (len(matching) == 1 and matching[0].get("elevated") is True
                         and matching[0].get("parentPid") == host_pid):
+                    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+                    port = journal.get("relayPort")
+                    if (journal.get("phase") != "active" or journal.get("clean") is not False
+                            or type(port) is not int or not 0 < port <= 65535 or not listening(port)):
+                        raise StepError("The active capture did not publish its listening relay")
+                    result.update(relayPort=port, relayListening=True)
                     result["ready"] = matching[0]
                     with zipfile.ZipFile(owner.sockscap_resource_restore[0]) as archive:
                         digests = {}

@@ -1,3 +1,4 @@
+use crate::sockscap::SocksCapRuntime;
 use crate::sockscap::capture;
 use crate::sockscap::data_dir;
 use crate::sockscap::helper;
@@ -6,6 +7,7 @@ use crate::sockscap::macos_capture;
 use crate::sockscap::recovery;
 use crate::sockscap::relay;
 use crate::state::AppState;
+use std::path::Path;
 use tauri::AppHandle;
 use tauri::State;
 
@@ -17,9 +19,19 @@ use tauri::State;
 ///
 /// Does **not** kill the elevated helper process (avoids another UAC on next Start).
 pub(in crate::sockscap) async fn full_teardown(
-    app: &AppHandle,
+    _app: &AppHandle,
     state: &State<'_, AppState>,
     clear_journal: bool,
+) -> Result<(), String> {
+    let journal = recovery::journal_path(&state.core.paths.data.join("sockscap"));
+    stop_capture(&state.legacy.sockscap, &journal, clear_journal, false).await
+}
+
+pub(super) async fn stop_capture(
+    runtime: &SocksCapRuntime,
+    journal: &Path,
+    clear_journal: bool,
+    replacing_host: bool,
 ) -> Result<(), String> {
     use std::time::Duration;
 
@@ -29,9 +41,7 @@ pub(in crate::sockscap) async fn full_teardown(
     let errors: Vec<String> = Vec::new();
 
     // --- 1) Helper capture_stop (blocking RPC) off the async runtime ----------
-    let sess = state
-        .legacy
-        .sockscap
+    let sess = runtime
         .helper
         .inner
         .lock()
@@ -57,20 +67,15 @@ pub(in crate::sockscap) async fn full_teardown(
         }
     }
 
-    // Stop Linux xray health monitoring before cgroup cleanup. A respawn is a
-    // child of Taomni and therefore inherits the global/mixed bypass cgroup;
-    // allowing that during cleanup can repopulate the cgroup after its member
-    // snapshot and make rmdir fail with EBUSY.
+    // Stop Linux upstream monitoring before restoring the capture cgroups.
     #[cfg(target_os = "linux")]
-    if let Some(mgr) = state.legacy.sockscap.xray() {
-        mgr.shutdown_all().await;
-    }
+    stop_upstreams(runtime, replacing_host).await;
 
     // --- 2) Linux removes nft rules + restores cgroups before its relay stops -
     #[cfg(target_os = "linux")]
     let retryable_linux_capture = {
         let mut linux_capture = {
-            let mut orch = state.legacy.sockscap.orch.write().await;
+            let mut orch = runtime.orch.write().await;
             orch.take_linux_capture_for_stop()
         };
         if let Some(capture) = linux_capture.as_mut() {
@@ -90,20 +95,14 @@ pub(in crate::sockscap) async fn full_teardown(
     // --- 2b) macOS first sends Redirector's inert scope, then closes IPC ------
     #[cfg(target_os = "macos")]
     {
-        if let Ok(dir) = data_dir(app) {
-            let journal = recovery::journal_path(&dir);
-            if recovery::needs_repair(&journal) {
-                if let Err(error) =
-                    recovery::update_phase_durable(&journal, recovery::RecoveryPhase::Stopping)
-                {
-                    tracing::warn!(
-                        "sockscap: could not persist macOS Stopping journal phase: {error}"
-                    );
-                }
-            }
+        if recovery::needs_repair(journal)
+            && let Err(error) =
+                recovery::update_phase_durable(journal, recovery::RecoveryPhase::Stopping)
+        {
+            tracing::warn!("sockscap: could not persist macOS Stopping journal phase: {error}");
         }
         let macos_capture = {
-            let mut orch = state.legacy.sockscap.orch.write().await;
+            let mut orch = runtime.orch.write().await;
             orch.take_macos_capture_for_stop()
         };
         if let Some(capture) = macos_capture {
@@ -116,7 +115,7 @@ pub(in crate::sockscap) async fn full_teardown(
 
     // --- 3) Take any platform relay without holding write lock during await --
     let relay = {
-        let mut orch = state.legacy.sockscap.orch.write().await;
+        let mut orch = runtime.orch.write().await;
         orch.take_relay_for_stop()
     };
     if let Some(relay) = relay {
@@ -127,13 +126,11 @@ pub(in crate::sockscap) async fn full_teardown(
     // --- 3b) Stop all xray cores (all platforms). Their node connections are
     //         now unnecessary; leaving them would leak processes on Stop.
     #[cfg(not(target_os = "linux"))]
-    if let Some(mgr) = state.legacy.sockscap.xray() {
-        mgr.shutdown_all().await;
-    }
+    stop_upstreams(runtime, replacing_host).await;
 
     // --- 4) Finish engine state + DNS + journal ------------------------------
     {
-        let mut orch = state.legacy.sockscap.orch.write().await;
+        let mut orch = runtime.orch.write().await;
         orch.finish_stop();
         if !errors.is_empty() {
             orch.set_recovery_required(&capture::capabilities().capture_backend, errors.join("; "));
@@ -146,28 +143,9 @@ pub(in crate::sockscap) async fn full_teardown(
     if errors.is_empty() {
         if clear_journal {
             #[cfg(target_os = "macos")]
-            if let Ok(dir) = data_dir(app) {
-                if let Err(error) = recovery::mark_clean_and_clear(&recovery::journal_path(&dir)) {
-                    let message = format!(
-                        "capture stopped, but the recovery journal could not be cleared: {error}"
-                    );
-                    state
-                        .legacy
-                        .sockscap
-                        .orch
-                        .write()
-                        .await
-                        .set_recovery_required(
-                            &capture::capabilities().capture_backend,
-                            message.clone(),
-                        );
-                    return Err(message);
-                }
-            }
+            clear_capture_journal(runtime, journal).await?;
             #[cfg(not(target_os = "macos"))]
-            if let Ok(dir) = data_dir(app) {
-                let _ = recovery::mark_clean_and_clear(&recovery::journal_path(&dir));
-            }
+            let _ = recovery::mark_clean_and_clear(journal);
         }
         tracing::info!("sockscap: teardown complete");
         Ok(())
@@ -176,6 +154,35 @@ pub(in crate::sockscap) async fn full_teardown(
         tracing::warn!("sockscap: teardown incomplete; Recover is required: {error}");
         Err(error)
     }
+}
+
+async fn stop_upstreams(runtime: &SocksCapRuntime, replacing_host: bool) {
+    if let Some(manager) = runtime.xray() {
+        if replacing_host {
+            // The registry will terminate the old host and its children. A
+            // stop RPC here would require reentering its lifecycle lock.
+            manager.shutdown_all_blocking();
+        } else {
+            manager.shutdown_all().await;
+        }
+    }
+}
+
+pub(super) async fn clear_capture_journal(
+    runtime: &SocksCapRuntime,
+    journal: &Path,
+) -> Result<(), String> {
+    if let Err(error) = recovery::mark_clean_and_clear(journal) {
+        let message =
+            format!("capture stopped, but the recovery journal could not be cleared: {error}");
+        runtime
+            .orch
+            .write()
+            .await
+            .set_recovery_required(&capture::capabilities().capture_backend, message.clone());
+        return Err(message);
+    }
+    Ok(())
 }
 
 /// App-exit hook (blocking): cleanly stop the elevated helper's WinDivert
