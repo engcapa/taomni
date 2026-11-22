@@ -1,0 +1,188 @@
+id: TC-EXPLORER-010
+title: Explorer tab overflow paging, open-tab filter, overview inclusion and delete choice
+description: >-
+  Production renderer workflow over isolated files. Many real Explorer tabs are recovered from the persisted tab snapshot;
+  the strip must hide its native scrollbar, expose paging arrows and an open-tab filter without closing tabs.
+  Explorer scope of the large overview must include Explorer tabs, the all scope must include Sessions, Workspaces and
+  Explorer, and activating an Explorer card must return to the Explorer surface. Delete must ask whether to move to Trash
+  or delete permanently, and only a confirmed choice may touch disk. Browser reads IndexedDB VFS; native independently
+  hashes the real disk and trash payload. WebView input is not physical OS input evidence.
+modes: [browser, native]
+covers: [F-EXPLORER-1, F-WS-2]
+tags: [p0, explorer, tabs, overview, trash, native-boundary, regression]
+fixtures: [reset_db, explorer_files]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-010
+- seed_storage:
+    key: taomni.explorer.tabs.v1
+    value: '{"activeTabId":"qa-f01","foreground":{"kind":"main","tabId":"qa-f01"},"tabs":[{"id":"qa-f01","type":"file-browser","title":"QA Folder 01","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_source}","explorer":true}},{"id":"qa-f02","type":"file-browser","title":"QA Folder 02","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_source}","explorer":true}},{"id":"qa-f03","type":"file-browser","title":"QA Folder 03","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_source}","explorer":true}},{"id":"qa-f04","type":"file-browser","title":"QA Folder 04","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_target}","explorer":true}},{"id":"qa-f05","type":"file-browser","title":"QA Folder 05","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_target}","explorer":true}},{"id":"qa-f06","type":"file-browser","title":"QA Folder 06","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_target}","explorer":true}},{"id":"qa-f07","type":"file-browser","title":"QA Folder 07","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_trash}","explorer":true}},{"id":"qa-f08","type":"file-browser","title":"QA Folder 08","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_previews}","explorer":true}},{"id":"qa-f09","type":"file-browser","title":"QA Folder 09","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_operations}","explorer":true}},{"id":"qa-f10","type":"file-browser","title":"QA Folder 10","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_source}/folder","explorer":true}},{"id":"qa-f11","type":"file-browser","title":"QA Folder 11","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_source}/folder/nested","explorer":true}},{"id":"qa-f12","type":"file-browser","title":"QA Folder 12","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_target}/folder","explorer":true}},{"id":"qa-f13","type":"file-browser","title":"QA Folder 13","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_target}/folder/nested","explorer":true}},{"id":"qa-f14","type":"file-browser","title":"QA Folder 14","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_source}/folder/empty","explorer":true}},{"id":"qa-f15","type":"file-browser","title":"QA Folder 15","closable":true,"fileBrowser":{"initialPath":"${fixture.explorer_previews}/folder","explorer":true}},{"id":"qa-v1","type":"file-viewer","title":"notes.txt","closable":true,"fileViewer":{"path":"${fixture.explorer_previews}/notes.txt","kind":"text","mode":"source","source":"local"}}]}'
+- reload_window: null
+- wait_for: '[data-testid="explorer-platform-view"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"][data-path="${fixture.explorer_source}"]'
+- assert_count: {selector: '[data-testid="explorer-workspace-tab"]', equal: 16}
+- assert_visible: '[data-testid="explorer-tab-scroll-left"]'
+- assert_visible: '[data-testid="explorer-tab-scroll-right"]'
+- eval_readonly:
+    expression: 'document.querySelector(".taomni-explorer-tab-scroll").scrollWidth > document.querySelector(".taomni-explorer-tab-scroll").clientWidth'
+    expect_truthy: true
+- eval_readonly:
+    expression: 'document.querySelector(".taomni-explorer-tab-scroll").classList.contains("taomni-explorer-tab-scroll")'
+    expect_truthy: true
+- eval_readonly:
+    expression: 'document.querySelector(".taomni-explorer-tab-scroll").scrollLeft <= 1'
+    expect_truthy: true
+- click: '[data-testid="explorer-tab-scroll-right"]'
+- eval_readonly:
+    expression: 'document.querySelector(".taomni-explorer-tab-scroll").scrollLeft > 0'
+    expect_truthy: true
+- click: '[data-testid="explorer-tab-scroll-left"]'
+- eval_readonly:
+    expression: 'document.querySelector(".taomni-explorer-tab-scroll").scrollLeft <= 1'
+    expect_truthy: true
+- click: '[data-testid="explorer-tabs-filter-trigger"]'
+- wait_for: '[data-testid="explorer-tabs-filter-menu"]'
+- assert_count: {selector: '[data-testid="explorer-tabs-filter-row"]', equal: 16}
+- click: '[data-testid="explorer-tab-filter-folders"]'
+- assert_count: {selector: '[data-testid="explorer-workspace-tab"]', equal: 15}
+- fill: {selector: '[data-testid="explorer-tabs-filter-search"]', value: 'empty'}
+- assert_count: {selector: '[data-testid="explorer-tabs-filter-row"]', equal: 1}
+- click: '[data-testid="explorer-tabs-filter-row"]'
+- assert_not_visible: '[data-testid="explorer-tabs-filter-menu"]'
+- assert_attribute: {selector: '[data-testid="explorer-workspace-tab"][data-active="true"]', name: data-tab-title, equals: empty}
+- assert_count: {selector: '[data-testid="explorer-workspace-tab"]', equal: 1}
+- click: '[data-testid="explorer-tab-filter-chip"]'
+- assert_count: {selector: '[data-testid="explorer-workspace-tab"]', equal: 16}
+- click: '[data-testid="explorer-tabs-filter-trigger"]'
+- click: '[data-testid="explorer-tab-filter-files"]'
+- assert_count: {selector: '[data-testid="explorer-workspace-tab"]', equal: 1}
+- assert_attribute: {selector: '[data-testid="explorer-workspace-tab"][data-active="true"]', name: data-tab-type, equals: file-viewer}
+- click: '[data-testid="explorer-tabs-filter-clear"]'
+- press: Escape
+- assert_count: {selector: '[data-testid="explorer-workspace-tab"]', equal: 16}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: {selector: '[data-testid="terminal-pane"]', timeout_sec: 60}
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-workspace-tab"][data-active="true"]'
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview"][data-scope="explorer"]'
+- assert_count: {selector: '[data-testid="tab-overview-card"][data-surface="explorer"]', equal: 16}
+- assert_count: {selector: '[data-testid="tab-overview-card"][data-surface="sessions"]', equal: 0}
+- fill: {selector: '[data-testid="tab-overview-search"]', value: 'notes.txt'}
+- assert_count: {selector: '[data-testid="tab-overview-card"][data-surface="explorer"]', equal: 1}
+- click: '[data-testid="tab-overview-search-clear"]'
+- click: '[data-testid="tab-overview-all"]'
+- assert_count: {selector: '[data-testid="tab-overview-card"][data-surface="sessions"]', equal: 1}
+- assert_count: {selector: '[data-testid="tab-overview-card"][data-surface="explorer"]', equal: 16}
+- click: '[data-testid="tab-overview-card"][data-surface="explorer"][data-tab-id="qa-f05"]'
+- assert_not_visible: '[data-testid="tab-overview"]'
+- assert_attribute: {selector: '[data-testid="explorer-workspace-tab"][data-active="true"]', name: data-tab-id, equals: qa-f05}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', value: '${fixture.explorer_trash}'}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="delete-me.txt"]'
+- assert_explorer_files: {state: seeded}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="delete-me.txt"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-list"]', key: Delete}
+- wait_for: '[data-testid="explorer-delete-dialog"]'
+- assert_text: {selector: '[data-testid="explorer-delete-dialog"]', contains: Move to Trash}
+- assert_explorer_files: {state: seeded}
+- click: '[data-testid="explorer-delete-cancel"]'
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="delete-me.txt"]'
+- assert_explorer_files: {state: seeded}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-list"]', key: Delete}
+- click: '[data-testid="explorer-delete-trash"]'
+- wait_for: '[data-testid="explorer-undo"]'
+- assert_count: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="delete-me.txt"]', equal: 0}
+- assert_explorer_files: {state: trash-seeded}
+- click: '[data-testid="explorer-undo"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="delete-me.txt"]'
+- assert_explorer_files: {state: seeded}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="delete-me.txt"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-list"]', key: Shift+Delete}
+- eval_readonly:
+    expression: 'document.activeElement && document.activeElement.dataset.testid === "explorer-delete-confirm"'
+    timeout_sec: 10
+    expect_truthy: true
+- click: '[data-testid="explorer-delete-cancel"]'
+- assert_explorer_files: {state: seeded}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-list"]', key: Shift+Delete}
+- click: '[data-testid="explorer-delete-confirm"]'
+- wait_for: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="delete-me.txt"]', state: detached}
+- assert_explorer_files: {state: trash-seeded}
+- assert_no_runtime_errors: null
+- screenshot: explorer-tabs-filter-overview-delete.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Many Explorer tabs hide the native scrollbar, expose paging arrows only while overflowing, page with the arrows and return to the start.
+    actions: [7, 8, 13, 15]
+    checkpoints:
+    - {step: 9, expectation: Both paging arrows are visible while the strip overflows.}
+    - {step: 10, expectation: The scroll area really overflows instead of hiding tabs.}
+    - {step: 11, expectation: The strip uses the dedicated hidden-scrollbar class.}
+    - {step: 14, expectation: The right arrow scrolls the strip to a later tab.}
+    - {step: 16, expectation: The left arrow returns the strip to its start.}
+    results: [9, 10, 11, 14, 16]
+  - id: R2
+    requirement: The open-tab filter searches titles, filters folders/files with counts and a clearable chip, and never closes tabs.
+    actions: [17, 20, 22, 24, 28, 30, 31, 34, 35]
+    checkpoints:
+    - {step: 19, expectation: The filter menu lists every open tab.}
+    - {step: 21, expectation: The folder category narrows the strip to the seeded directory tabs.}
+    - {step: 23, expectation: Title search narrows the menu to one tab.}
+    - {step: 26, expectation: Picking the row activates that Explorer tab.}
+    - {step: 27, expectation: The strip hides non-matching tabs but keeps them open.}
+    - {step: 29, expectation: Clearing the chip restores every tab.}
+    - {step: 32, expectation: The files category narrows the strip to the viewer tab.}
+    - {step: 33, expectation: Applying a category activates the first matching viewer.}
+    - {step: 36, expectation: Escape closes the menu and every tab remains open.}
+    results: [19, 21, 23, 26, 27, 29, 32, 33, 36]
+  - id: R3
+    requirement: The Explorer overview scope shows Explorer tabs, all scope includes Sessions plus Explorer, search matches paths and cards return to the Explorer surface.
+    actions: [37, 38, 40, 42, 46, 48, 49, 52]
+    checkpoints:
+    - {step: 43, expectation: The overview opens in the Explorer scope.}
+    - {step: 44, expectation: Every Explorer tab has a card in the current scope.}
+    - {step: 45, expectation: Sessions tabs are not mixed into the Explorer scope.}
+    - {step: 47, expectation: Path/title search narrows Explorer cards.}
+    - {step: 50, expectation: The all scope includes the open Sessions tab.}
+    - {step: 51, expectation: The all scope still includes every Explorer tab.}
+    - {step: 53, expectation: Activating an Explorer card closes the overview.}
+    - {step: 54, expectation: Activating an Explorer card selects that Explorer tab.}
+    results: [43, 44, 50, 51, 53, 54]
+  - id: R4
+    requirement: Delete asks Trash versus permanent first, cancel keeps the file, choosing Trash uses real recoverable trash with Undo, ShiftDelete focuses permanent confirmation and only confirmed permanent deletion removes the file.
+    actions: [55, 56, 60, 61, 65, 68, 73, 76, 79, 81]
+    checkpoints:
+    - {step: 59, expectation: Seeded fixture bytes are complete before any delete action.}
+    - {step: 62, expectation: Del opens the delete-choice dialog instead of deleting immediately.}
+    - {step: 63, expectation: The dialog offers the Move to Trash choice.}
+    - {step: 64, expectation: Opening and cancelling the dialog writes nothing to disk.}
+    - {step: 66, expectation: Cancelling preserves the selected file row.}
+    - {step: 67, expectation: The full fixture tree is still unchanged after cancel.}
+    - {step: 71, expectation: Choosing Trash removes the row and exposes Undo.}
+    - {step: 72, expectation: The exact tree with the trashed file removed matches the fixture oracle.}
+    - {step: 74, expectation: Undo restores the original row.}
+    - {step: 75, expectation: Undo restores the exact original bytes.}
+    - {step: 78, expectation: ShiftDelete focuses the permanent confirmation.}
+    - {step: 80, expectation: Cancelling permanent deletion leaves the restored tree.}
+    - {step: 83, expectation: Confirmed permanent deletion removes the row.}
+    - {step: 84, expectation: Only the intended fixtured file is permanently deleted.}
+    - step: 85
+      expectation: No runtime errors after tab, overview and delete workflows.
+    results: [59, 62, 63, 64, 66, 67, 71, 72, 74, 75, 78, 80, 83, 84, 85]
+  visual:
+  - check: Explorer tab strip paging and filter controls plus the delete-choice dialog follow the product chrome without clipping; the retained screenshot requires human visual review.
+    method: manual
+    reason: Functional assertions do not establish visual fidelity.
+  native:
+  - check: Real local files, real Trash payload and permanent deletion are independently verified in native mode; browser remains VFS-only.
+    method: automated
+    reason: assert_explorer_files reads host bytes and trash state, never product receipts.
+  - check: Physical OS keyboard delivery for Delete and ShiftDelete.
+    method: manual
+    reason: WebView key actions do not prove physical OS input.

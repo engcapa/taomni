@@ -18,7 +18,24 @@
 - Explorer 中双击所有支持内部查看的类型都留在 Explorer，保存的 Workspace association/default 不再按类型分流；只有显式“在 Code Workspace 中打开”才跳转。PDF 与不支持的二进制仍使用系统应用，不新增 PDF 查看器。
 - 新建菜单支持 TXT、MD、HTML、CSS、JS、TS、JSON，沿用 no-replace、冲突自动编号与 inline rename。搜索支持普通文本、`*`/`?`/`**`/字符类、两种路径分隔符与递归子目录；250ms 防抖、旧请求隔离、执行中取消、部分结果、错误重试、隐藏文件偏好和 1000 条上限均有明确状态。原生搜索不跟随目录符号链接。
 
-## 测试执行策略（本轮用户要求）
+## 2026-11-22 标签条溢出、Overview 纳入与删除确认（feat/explorer-tabs-overview-delete）
+
+设计：[`tab-strip-overview-delete-design.md`](tab-strip-overview-delete-design.md)。用户要求：多标签时标签条不出现原生横向滚动条，像 Sessions 一样左右箭头分页并提供过滤/查找入口；Explorer 视图的 Overview 必须包含 Explorer 标题签，其它视图「全部」也要纳入；删除必须先询问「移到回收站 / 永久删除」；补充 unit/browser/native 用例。
+
+- 共享滚动：新增 `tabbar/tabs/useTabStripScroll.ts`，Workspace 与 Explorer 标签条共用同一溢出测量、活动标签可见、分页与滚轮逻辑；`useWorkspaceTabScroll` 保持原返回契约的薄封装，Sessions/Workspace 行为与 testid 不变。
+- Explorer 标签条：`ExplorerTabStrip` 使用隐藏滚动条类（`platform.css` 新增 `.taomni-explorer-tab-scroll`）、左右箭头（`explorer-tab-scroll-left/right`）、过滤芯片/空提示；打开新标签或被外部激活的标签不会被旧过滤隐藏。
+- 打开标签过滤：`lib/explorerTabFilter.ts` + `stores/explorerUiStore.ts` + `ExplorerTabsFilter.tsx`，工具栏入口与 Sessions/Workspace 过滤同位置；支持标题/路径搜索、全部/文件夹/文件类别与计数、键盘上下/Enter、Esc/外点关闭、IME；过滤只影响显示，不关闭标签。
+- Overview：`PreviewItem` 增加 `surface`；Explorer 视图默认 `data-scope="explorer"` 只展示 Explorer 标签（当前目录、条目数或查看器文本摘要），「全部」包含 Sessions/Workspaces/Explorer；点击 Explorer 卡片激活对应标签并回到 Explorer，侧栏折叠偏好保留。
+- 删除确认：`useExplorerOperations.remove` 只打开选择框，新增 `trash()` 执行回收站；确认框提供「移到回收站」（默认）与「永久删除」；Shift+Delete 直接聚焦永久删除；取消不触盘；回收站失败仅对失败项保留原因与永久删除确认；撤销 toast 与失败汇总沿用原实现。
+- 用例：新增 `TC-EXPLORER-010`（browser/native，16 个恢复标签、分页、过滤、Overview 当前/全部、删除选择/回收站/撤销/永久删除与 `assert_explorer_files` 全树 oracle）；更新 `TC-EXPLORER-002/003` 删除步骤；fixture 新增 `trash-seeded` 状态，schema/verb catalog/feature-list/policy/dependencies 同步；新增 `ExplorerTabStrip`、`ExplorerTabsFilter`、`explorerTabFilter`、共享滚动/Overview/删除操作单测。
+
+验证记录（本地 Windows）：
+
+- 浏览器：`TC-EXPLORER-010` 全 86 步通过（`qa-ui-auto-report/run-20261122-101317-933835400`）；受影响 `TC-EXPLORER-001/002/003、TC-WS-018/027/093` 6/6 通过（`run-20261122-101417-465286900`）；`crash-regression` browser 17 通过 / 1 跳过（`TC-FILE-OPEN-008` 本机缺 POSIX SSH PTY，hosted 覆盖；`run-20261122-101653-989404600`）。
+- native（Windows 本机 QA debug 构建，匹配 WebView2 157 的 msedgedriver）：`TC-EXPLORER-010` 86/86 步通过、30.2s（`run-20261122-101145-964936800`），真实磁盘/回收站由 `assert_explorer_files` 全树 SHA256 校验；受影响的 `TC-EXPLORER-003`（新删除选择/真实回收站/撤销/永久删除）与 `TC-WS-019` 通过（`run-20261122-101832-477750700`）；`crash-regression` native 22 例中 19 通过、2 跳过、1 环境失败（`TC-MOBILE-013` 本机隔离 appcache 未预置 Playwright chromium；`TC-FILE-OPEN-008`/`TC-WS-054` 为本机已知环境 skip；`run-20261122-102020-130664700`）。WebView 按键不宣称物理 OS 键盘证据。本机 WebView2 为 157，需通过临时 `webdriver.native_driver` 指向 `C:/Users/<user>/tools/edgedriver-157/msedgedriver.exe`；未替换全局 `msedgedriver` 或修改用户数据。
+- 单元/静态：全量 Vitest 876 文件 / 7437 通过 / 1 跳过（`qa-ui-auto-report/_local/unit-full-final.log`）；`tsc -b`、`pnpm build`、`pnpm check:refactor`、QA audit/behavior contract 通过。
+
+## 测试执行策略（第一轮 Linux 执行，历史记录）
 
 本地执行 unit、静态检查及 Linux browser/native 用例；native 复用机器现有 desktop，不新建桌面，不触碰生产 `/usr/bin/taomni`。Windows/macOS browser/native 在 GitHub `qa-ui-auto-platforms.yml` 执行。外网使用用户提供的 `http://127.0.0.1:31228`，保留 `http://127.0.0.1:31128` 作为备用；GitHub 选择包含完整 `crash-regression` 与受影响既有用例，job 运行中即下载已完成 shard 的原始报告。
 
@@ -35,6 +52,7 @@
 | TC-EXPLORER-007 | browser | 导航树折叠/展开、焦点与既有目录状态保留 |
 | TC-EXPLORER-008 | browser | 七种文本类型创建、Explorer 内 Markdown viewer、递归 glob、相对路径、两种分隔符、错误重试、延迟 stub 执行中取消 |
 | TC-EXPLORER-009 | native | 真实 MD/HTML 创建与 viewer、真实递归 glob、10,000 文件无匹配搜索的进度与取消 |
+| TC-EXPLORER-010 | browser/native | 标签溢出隐藏滚动条/左右分页、打开标签过滤、Overview 当前/全部纳入、删除方式选择/回收站/撤销/永久删除 |
 
 Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS 进程冷重启。macOS bridge 按键不是物理键盘/AppKit 全局菜单证据。截图仅证明执行状态；尺寸与颜色有命名断言，完整像素/交互保真需结合截图审阅。
 

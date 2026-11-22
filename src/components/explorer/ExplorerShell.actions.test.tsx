@@ -110,7 +110,7 @@ describe("Explorer mounted context and command workflows", () => {
     expect(native.localMoveEntries).not.toHaveBeenCalled(); expect(getExplorerClipboard()).toBeNull();
   });
 
-  it("moves ordinary Delete to Trash and exposes a real restore action", async () => {
+  it("asks Trash or permanent before deleting and exposes a real restore action", async () => {
     native.localTrashEntries.mockImplementation(async (paths: string[]) => {
       filesystem.set("/fixture", filesystem.get("/fixture")!.filter((entry) => !paths.includes(entry.path)));
       return { trashed: [{ id: "trash-alpha", originalPath: "/fixture/alpha.txt" }], failed: [] };
@@ -121,6 +121,12 @@ describe("Explorer mounted context and command workflows", () => {
     });
     const { list } = await mountShell();
     fireEvent.click(row("alpha.txt")); fireEvent.keyDown(list, { key: "Delete" });
+    const dialog = screen.getByTestId("explorer-delete-dialog");
+    expect(dialog).toHaveTextContent("Move to Trash");
+    expect(dialog).toHaveTextContent("Delete permanently");
+    expect(document.activeElement).toBe(screen.getByTestId("explorer-delete-trash"));
+    expect(native.localTrashEntries).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("explorer-delete-trash"));
     await waitFor(() => expect(rows()).not.toContain("alpha.txt"));
     expect(native.sftpRemove).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("explorer-undo"));
@@ -128,15 +134,19 @@ describe("Explorer mounted context and command workflows", () => {
     expect(native.localTrashRestore).toHaveBeenCalledWith([{ id: "trash-alpha", originalPath: "/fixture/alpha.txt" }]);
   });
 
-  it("requires explicit confirmation for Shift+Delete and for unavailable Trash", async () => {
+  it("cancels without touching disk, focuses permanent for Shift+Delete and degrades when Trash is unavailable", async () => {
     const { list } = await mountShell();
     fireEvent.click(row("alpha.txt")); fireEvent.keyDown(list, { key: "Delete", shiftKey: true });
     expect(screen.getByTestId("explorer-delete-dialog")).toHaveTextContent("cannot be undone");
+    expect(document.activeElement).toBe(screen.getByTestId("explorer-delete-confirm"));
     expect(native.sftpRemove).not.toHaveBeenCalled(); expect(native.localTrashEntries).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("explorer-delete-cancel"));
+    expect(screen.queryByTestId("explorer-delete-dialog")).toBeNull();
     native.localTrashEntries.mockResolvedValue({ trashed: [], failed: [{ path: "/fixture/alpha.txt", code: "trash_unavailable", message: "No trash service" }] });
     fireEvent.keyDown(list, { key: "Delete" });
+    fireEvent.click(screen.getByTestId("explorer-delete-trash"));
     expect(await screen.findByTestId("explorer-trash-unavailable")).toHaveTextContent("No trash service");
+    expect(screen.queryByTestId("explorer-delete-trash")).toBeNull();
     expect(native.sftpRemove).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("explorer-delete-confirm"));
     await waitFor(() => expect(native.sftpRemove).toHaveBeenCalledWith(TAB, "/fixture/alpha.txt", "local", true));
