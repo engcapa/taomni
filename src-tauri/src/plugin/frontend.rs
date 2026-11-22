@@ -3,18 +3,13 @@
 use super::*;
 
 impl PluginRegistry {
-    pub(crate) fn has_verified_vnc_client(&self) -> bool {
-        let _lifecycle = self
-            .lifecycle
-            .lock()
-            .expect("plugin lifecycle lock poisoned");
-        let slug = crate::vnc::MODULE_SLUG;
+    pub(super) fn has_verified_client_locked(&self, slug: &str, start: &str, test: &str) -> bool {
         let Ok(record) = self.enabled_record(slug) else {
             return false;
         };
         record.manifest.entry.frontend.is_some()
-            && record.manifest.commands.contains("vnc/start")
-            && record.manifest.commands.contains("vnc/test")
+            && record.manifest.commands.contains(start)
+            && record.manifest.commands.contains(test)
             && self.active_directory(slug).ok().is_some_and(|path| {
                 verify::verify_installed(&path, current_platform())
                     .is_ok_and(|manifest| manifest == record.manifest)

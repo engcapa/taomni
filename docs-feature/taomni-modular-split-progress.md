@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- 旧会话预检按已验签并启用的客户端分别确认 RDP 和 VNC，会话记录保留在核心数据库。RDP 的证书导入仍有独立回执。Mobile 桌面策略继续由核心读写，升级页已移除对 Mobile 模块的推荐。TC-MODULES-005、025、056 覆盖设置回读、旧策略文件摘要和混合客户端的迁移记录。
 - 首发十模块名单已写入源码。正式首发会自动选择完整名单，后续核心发布从 GitHub Latest 核心 Release 继承目录。独立发布会下载原包和原始分离签名，并与目录核对。十个业务模块的稳定状态、首发签名和用户升级仍待候选验收。
 - 回查 `617bce843` 的 Linux RDP Server 签名包，包 SHA-256 为 `a26a46cebbb2197e7afb9aebf9987243c1fe53af91d1ab9815e6c38f4f9c05dc`。宿主的 ELF 版本需求含 `GLIBC_2.38` 与 `GLIBC_2.39`，高于核心支持的 Ubuntu 22.04 / glibc 2.35。模块 QA 和发布改在 Ubuntu 22.04 编译 Linux 宿主，RDP Server 与基座共用 PipeWire 构建步骤。签名前检查每个 ELF 文件的架构和 glibc 需求并保存二进制摘要。 [原始签名包](https://github.com/engcapa/taomni/actions/runs/44951621527)
 - 远程 `main` 的 #861 已合入 `9e0d9fb8d`，包含单体应用版本 `0.5.12`。在 `a1b8995a5` 上，四目标 Cargo 依赖树和生产 Vite 清单已验证 SocksCap 面板与样式从基座移出。十个业务模块仍声明为 `provisional`。正式首发目录、同一候选的全部业务升级、仅核心与全模块两套回归以及 G1–G11 发行回执仍待完成。 [四目标清单](https://github.com/engcapa/taomni/actions/runs/44987147927)

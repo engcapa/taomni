@@ -396,19 +396,13 @@ pub fn plugin_migration_inspect(
     from_version: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<crate::plugin::migration::LegacyInstallSnapshot, String> {
-    use crate::plugin::migration::{MigrationItem, MigrationJournal};
+    use crate::plugin::migration::MigrationJournal;
     let root = legacy_profile_root(&state);
     let mut snapshot = inspect_legacy_profile(&root, from_version, &state)?;
     if let Ok(journal) = MigrationJournal::load(&root.join("migration/journal.json")) {
-        let retained_vnc = journal.retained_vnc_sessions();
-        let migrated_rdp_pins = journal.committed_rdp_pins().unwrap_or(false);
         snapshot
             .candidates
-            .retain(|candidate| match candidate.item {
-                MigrationItem::VncSessions => !retained_vnc,
-                MigrationItem::RdpCertificatePins => !migrated_rdp_pins,
-                _ => true,
-            });
+            .retain(|candidate| !journal.has_valid_commit(candidate.item));
     }
     Ok(snapshot)
 }
@@ -428,7 +422,7 @@ fn inspect_legacy_profile(
     Ok(snapshot)
 }
 
-/// Acknowledge sessions retained by the core after the signed VNC viewer is ready.
+/// Acknowledge core-owned sessions once their verified viewer is ready.
 /// Other candidates keep their journal state until their exporters run.
 #[tauri::command]
 pub fn plugin_migration_execute(
@@ -437,10 +431,6 @@ pub fn plugin_migration_execute(
 ) -> Result<crate::plugin::migration::MigrationExecutionResult, String> {
     let source_root = legacy_profile_root(&state);
     let snapshot = inspect_legacy_profile(&source_root, from_version, &state)?;
-    let retain_vnc =
-        snapshot.candidates.iter().any(|candidate| {
-            candidate.item == crate::plugin::migration::MigrationItem::VncSessions
-        }) && state.plugins.has_verified_vnc_client();
     let journal_path = source_root.join("migration").join("journal.json");
     let executor = crate::plugin::migration::MigrationExecutor::new(
         source_root,
@@ -449,9 +439,7 @@ pub fn plugin_migration_execute(
         snapshot.from_version.clone(),
         crate::plugin::CORE_API_VERSION,
     )?;
-    state
-        .plugins
-        .record_legacy_migration(&executor, &snapshot, retain_vnc)
+    state.plugins.record_legacy_migration(&executor, &snapshot)
 }
 
 #[tauri::command]

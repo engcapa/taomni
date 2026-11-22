@@ -14,6 +14,7 @@ from .steps import StepError
 AFTER_FIRST_INSTALL = "after-first-install"
 VNC_RETAINED = "vnc-retained"
 RDP_PINS_RETAINED = "rdp-pins-retained"
+RDP_SESSIONS_RETAINED = "rdp-sessions-retained"
 RDP_LEGACY_RESTORED = "rdp-legacy-restore-applied"
 RDP_PINS_DATABASE = "plugins/rdp-client/data/data.db"
 
@@ -94,6 +95,12 @@ def observe(data, state, phase):
     result = {"sessionTypes": [row[1] for row in rows], "retainedSha256": {
         name: value["sha256"] for name, value in retained.items()},
         "moduleDirectoriesAbsent": True, "checkedAbsentModuleDirectories": absent}
+    if expected_policy := state.get("mobile_policy_sha256"):
+        policy = data / "mobile-desktop-remote.json"
+        if (policy.is_symlink() or hashlib.sha256(policy.read_bytes()).hexdigest() != expected_policy
+                or (data / "plugins/mobile").exists()):
+            raise StepError("Upgrade changed the core Mobile policy or created a Mobile module")
+        result["coreMobilePolicySha256"] = expected_policy
     if mail_preflight:
         result["unusedDefaultMailCacheAbsent"] = True
     expected_fingerprint = None
@@ -163,6 +170,26 @@ def observe_rdp_pins(data, state, journal):
             "pinDatabase": RDP_PINS_DATABASE, "sourceFingerprint": fingerprint}
 
 
+def observe_retained_rdp_sessions(data, state):
+    journal = json.loads((data / "migration/journal.json").read_text(encoding="utf-8"))
+    entries = {entry["item"]: entry for entry in journal["entries"]}
+    if len(entries) != len(journal["entries"]) or journal["status"] != "pending":
+        raise StepError("The mixed RDP/VNC profile must have one entry per owner and pending VNC work")
+    if entries.get("rdp-certificate-pins") != state["journal"]["entries"][0]:
+        raise StepError("Acknowledging RDP sessions changed the existing certificate import")
+    for item, status, target in [("rdp-vnc-sessions", "committed", "taomni.db"), ("vnc-sessions", "pending", "")]:
+        entry = entries.get(item, {})
+        if ((entry.get("state"), entry.get("source_path"), entry.get("target")) != (status, "taomni.db", target)
+                or not re.fullmatch(r"sha256:[0-9a-f]{64}:bytes:[0-9]+", entry.get("source_fingerprint", ""))):
+            raise StepError(f"Incorrect session ownership receipt for {item}")
+    with closing(sqlite3.connect((data / "taomni.db").as_uri() + "?mode=ro", uri=True)) as connection:
+        for row in state["sessions"]:
+            stored = connection.execute("SELECT session_type, options_json FROM sessions WHERE id=?", [row["id"]]).fetchone()
+            if stored != (row["session_type"], row["options_json"]):
+                raise StepError("Acknowledging RDP sessions changed an existing core session")
+    return {"journal": journal, "retainedSessionIds": [row["id"] for row in state["sessions"]]}
+
+
 def observe_rdp_legacy_restore(data, state):
     result = module_legacy_restore.observe(data, state["restored_rdp_session"])
     database = data / RDP_PINS_DATABASE
@@ -184,7 +211,7 @@ def observe_rdp_legacy_restore(data, state):
 
 def run(ctx, args):
     phases = {"preflight", "pending", "repeat", AFTER_FIRST_INSTALL, VNC_RETAINED,
-              RDP_PINS_RETAINED, RDP_LEGACY_RESTORED, module_legacy_restore.PHASE}
+              RDP_PINS_RETAINED, RDP_SESSIONS_RETAINED, RDP_LEGACY_RESTORED, module_legacy_restore.PHASE}
     if not isinstance(args, dict) or set(args) != {"phase"} or args["phase"] not in phases:
         raise StepError("module_upgrade_probe requires a fixed registered phase")
     owner = getattr(ctx, "fixture_context", None) or ctx
@@ -196,7 +223,7 @@ def run(ctx, args):
         raise StepError("After-first-install verification requires the installed legacy roster case")
     if (args["phase"] == module_legacy_restore.PHASE) != (case_id == module_legacy_restore.CASE_ID):
         raise StepError("The staged-restore observation belongs to its own legacy profile case")
-    if (args["phase"] == RDP_PINS_RETAINED) != (case_id == RDP_PIN_CASE):
+    if (args["phase"] in {RDP_PINS_RETAINED, RDP_SESSIONS_RETAINED}) != (case_id == RDP_PIN_CASE):
         raise StepError("RDP certificate migration requires its signed native lifecycle case")
     if (args["phase"] == RDP_LEGACY_RESTORED) != (case_id == RDP_RESTORE_CASE):
         raise StepError("RDP certificate restore requires its native legacy backup fixture")
@@ -209,6 +236,8 @@ def run(ctx, args):
             record.update(module_legacy_restore.observe(data, state["sessions"][0]))
         elif args["phase"] == RDP_LEGACY_RESTORED:
             record.update(observe_rdp_legacy_restore(data, state))
+        elif args["phase"] == RDP_SESSIONS_RETAINED:
+            record.update(observe_retained_rdp_sessions(data, state))
         else:
             record.update(observe(data, state, args["phase"]))
         if args["phase"] == RDP_PINS_RETAINED:

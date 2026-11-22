@@ -19,7 +19,7 @@ def is_check(step: dict) -> bool:
     if verb == "module_upgrade_probe":
         return isinstance(args, dict) and args.get("phase") in {
             "preflight", "pending", "repeat", "after-first-install", "vnc-retained",
-            "rdp-pins-retained", "rdp-legacy-restore-applied", "legacy-restore-applied",
+            "rdp-pins-retained", "rdp-sessions-retained", "rdp-legacy-restore-applied", "legacy-restore-applied",
         }
     if verb == "module_execution_probe":
         return isinstance(args, dict) and args.get("phase") in {"rejected", "recovered"}

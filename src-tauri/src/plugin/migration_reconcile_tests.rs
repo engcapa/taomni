@@ -52,7 +52,7 @@ fn refreshing_candidates_keeps_original_mfa_commit_and_returns_only_remaining_it
     let original = journal.entries[0].clone();
     let mut scan = snapshot();
     for _ in 0..2 {
-        let result = reconcile_pending(&mut journal, &scan, false).unwrap();
+        let result = reconcile_pending(&mut journal, &scan, &[]).unwrap();
         assert_eq!(result.status, MigrationRunState::Pending);
         assert_eq!(result.committed, [MigrationItem::Mfa]);
         assert_eq!(result.pending, [MigrationItem::VncSessions]);
@@ -63,7 +63,7 @@ fn refreshing_candidates_keeps_original_mfa_commit_and_returns_only_remaining_it
         );
     }
     scan.candidates.truncate(1);
-    let result = reconcile_pending(&mut journal, &scan, false).unwrap();
+    let result = reconcile_pending(&mut journal, &scan, &[]).unwrap();
     assert_eq!(result.status, MigrationRunState::Complete);
     assert!(result.pending.is_empty() && result.pending_reason.is_none());
     assert_eq!(journal.entries, [original]);
@@ -80,7 +80,7 @@ fn an_unrecognized_target_or_duplicate_commit_requires_recovery_without_rewritin
         }
         let original = journal.entries.clone();
         assert!(
-            reconcile_pending(&mut journal, &snapshot(), false)
+            reconcile_pending(&mut journal, &snapshot(), &[])
                 .unwrap_err()
                 .contains("explicit recovery")
         );
@@ -93,16 +93,14 @@ fn keeps_existing_vnc_sessions_in_the_core_database_when_the_viewer_is_available
     let mut journal = MigrationJournal::default();
     let mut scan = snapshot();
     assert_eq!(
-        reconcile_pending(&mut journal, &scan, false)
-            .unwrap()
-            .pending,
+        reconcile_pending(&mut journal, &scan, &[]).unwrap().pending,
         [MigrationItem::Mfa, MigrationItem::VncSessions]
     );
-    let result = reconcile_pending(&mut journal, &scan, true).unwrap();
+    let result = reconcile_pending(&mut journal, &scan, &[MigrationItem::VncSessions]).unwrap();
     assert_eq!(result.status, MigrationRunState::Pending);
     assert_eq!(result.pending, [MigrationItem::Mfa]);
     assert_eq!(result.committed, [MigrationItem::VncSessions]);
-    assert!(journal.retained_vnc_sessions());
+    assert!(journal.has_valid_commit(MigrationItem::VncSessions));
     let retained = journal
         .entries
         .iter()
@@ -118,10 +116,54 @@ fn keeps_existing_vnc_sessions_in_the_core_database_when_the_viewer_is_available
     scan.candidates
         .retain(|entry| entry.item != MigrationItem::Mfa);
     assert_eq!(
-        reconcile_pending(&mut journal, &scan, false)
-            .unwrap()
-            .status,
+        reconcile_pending(&mut journal, &scan, &[]).unwrap().status,
         MigrationRunState::Complete
     );
     assert_eq!(journal.entries, [retained]);
+}
+
+#[test]
+fn only_the_verified_client_retires_its_sessions_and_mobile_keeps_its_core_policy() {
+    let profile = tempfile::tempdir().unwrap();
+    let policy = profile.path().join("mobile-desktop-remote.json");
+    let original = br#"{ "allow_screen_capture": true }"#;
+    fs::write(&policy, original).unwrap();
+    let mobile = MigrationCandidate {
+        item: MigrationItem::Mobile,
+        evidence: vec!["mobile-desktop-remote.json".into()],
+        plugin_slug: "mobile".into(),
+    };
+    let scan = inspect_legacy_install(profile.path(), "0.5.x").unwrap();
+    assert!(scan.candidates.is_empty() && scan.source_fingerprints.is_empty());
+    assert!(
+        build_file_migration_specs(profile.path(), &[mobile])
+            .unwrap()
+            .is_empty()
+    );
+    let mut journal = MigrationJournal::default();
+    journal.mark_with_source(
+        MigrationItem::Mobile,
+        MigrationStepState::Pending,
+        format!("sha256:{}:bytes:31", "c".repeat(64)),
+        policy.file_name().unwrap().into(),
+        PathBuf::new(),
+    );
+    let mut scan = snapshot();
+    scan.candidates
+        .retain(|candidate| candidate.item == MigrationItem::VncSessions);
+    scan.candidates.push(MigrationCandidate {
+        item: MigrationItem::RdpVncSessions,
+        evidence: vec!["taomni.db".into()],
+        plugin_slug: "rdp-client".into(),
+    });
+    let result = reconcile_pending(&mut journal, &scan, &[MigrationItem::RdpVncSessions]).unwrap();
+    assert_eq!(result.pending, [MigrationItem::VncSessions]);
+    assert_eq!(result.committed, [MigrationItem::RdpVncSessions]);
+    assert_eq!(journal.entries.len(), 2);
+    assert!(journal.has_valid_commit(MigrationItem::RdpVncSessions));
+    assert!(!journal.has_valid_commit(MigrationItem::VncSessions));
+    let second = reconcile_pending(&mut journal, &scan, &[MigrationItem::VncSessions]).unwrap();
+    assert_eq!(second.status, MigrationRunState::Complete);
+    assert_eq!(fs::read(policy).unwrap(), original);
+    assert!(!profile.path().join("plugins/mobile").exists());
 }

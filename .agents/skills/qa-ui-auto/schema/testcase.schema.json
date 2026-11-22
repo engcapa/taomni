@@ -1025,7 +1025,7 @@
         },
         "module_upgrade_probe": {
           "type": "object", "additionalProperties": false, "required": ["phase"],
-          "properties": { "phase": { "enum": ["preflight", "pending", "repeat", "after-first-install", "vnc-retained", "rdp-pins-retained", "rdp-legacy-restore-applied", "legacy-restore-applied"] } },
+          "properties": { "phase": { "enum": ["preflight", "pending", "repeat", "after-first-install", "vnc-retained", "rdp-pins-retained", "rdp-sessions-retained", "rdp-legacy-restore-applied", "legacy-restore-applied"] } },
           "description": "Native only: read-only checks of legacy session/config/certificate-pin records, retained chat bytes/sidecars, absent pending module directories and idempotent journal items. TC-MODULES-027 can check after installing the independent signed roster, including MFA. No YAML paths, SQL, commands or product mutations."
         },
         "module_marketplace_probe": {

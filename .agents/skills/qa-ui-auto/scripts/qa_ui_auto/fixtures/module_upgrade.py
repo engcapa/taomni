@@ -110,6 +110,11 @@ def setup(ctx):
             with (data / name).open("xb") as stream:
                 stream.write(content)
     ctx.module_upgrade = {"root": data, "sessions": rows, "journal": None}
+    if ctx.case_id == "TC-MODULES-025":
+        policy = data / "mobile-desktop-remote.json"
+        original = b'{ "allow_screen_capture": true }\n'
+        policy.write_bytes(original)
+        ctx.module_upgrade["mobile_policy_sha256"] = hashlib.sha256(original).hexdigest()
     if mail_profile:
         ctx.module_upgrade["expected_items"] = ["mail-accounts"]
     if ctx.case_id == module_legacy_restore.CASE_ID:

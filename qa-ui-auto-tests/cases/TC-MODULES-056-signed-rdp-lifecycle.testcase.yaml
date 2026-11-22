@@ -121,6 +121,14 @@ steps:
     timeout_sec: 45
 - assert_no_runtime_errors: null
 - module_upgrade_probe: {phase: rdp-pins-retained}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-upgrade-migrate"]:not([disabled])'
+- click: '[data-testid="module-upgrade-migrate"]'
+- wait_for: '[data-testid="module-upgrade-pending"]'
+- assert_text_equals: {selector: '[data-testid="module-upgrade-candidates"] li:first-child', equals: vnc-client}
+- module_upgrade_probe: {phase: rdp-sessions-retained}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -159,6 +167,14 @@ verification:
     checkpoints:
     - {step: 96, expectation: "The native profile preserves the legacy rows and contains the import receipt and the new module-owned pin."}
     results: [96]
+  - id: retained-rdp-sessions
+    requirement: Upgrading with a verified RDP viewer records the existing core sessions and keeps VNC pending.
+    actions: [97, 98, 100]
+    checkpoints:
+    - {step: 102, expectation: The refreshed recommendations include the missing VNC viewer and omit the verified RDP viewer.}
+    - {step: 103, expectation: The original RDP session and committed pin import are preserved in their respective stores.}
+    - {step: 104, expectation: The refreshed upgrade view has no runtime errors.}
+    results: [102, 103, 104]
   visual:
   - check: The signed viewer and the disabled state appear in the saved tab.
     method: automated

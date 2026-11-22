@@ -23,11 +23,6 @@ fn detect_legacy_files(data_dir: &Path) -> Vec<MigrationCandidate> {
     let files = [
         ("mfa.db", MigrationItem::Mfa, "mfa"),
         ("sockscap/config.json", MigrationItem::SocksCap, "sockscap"),
-        (
-            "mobile-desktop-remote.json",
-            MigrationItem::Mobile,
-            "mobile",
-        ),
     ];
     for (relative, item, slug) in files {
         if data_dir.join(relative).exists() {
@@ -187,11 +182,8 @@ pub fn build_file_migration_specs(
         let (source, target) = match candidate.item {
             MigrationItem::Mfa => (PathBuf::from("mfa.db"), PathBuf::from("data/mfa.db")),
             MigrationItem::SocksCap => (PathBuf::from("sockscap"), PathBuf::from("data/sockscap")),
-            MigrationItem::Mobile => (
-                PathBuf::from("mobile-desktop-remote.json"),
-                PathBuf::from("data/mobile-desktop-remote.json"),
-            ),
-            MigrationItem::RdpVncSessions
+            MigrationItem::Mobile
+            | MigrationItem::RdpVncSessions
             | MigrationItem::VncSessions
             | MigrationItem::MailAccounts
             | MigrationItem::RdpCertificatePins

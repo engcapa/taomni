@@ -14,7 +14,9 @@ from qa_ui_auto.fixtures.module_upgrade import (
     input_sessions, preview_client_snapshot, preview_snapshot, preview_server_snapshot,
 )
 from qa_ui_auto.fixtures.session_config import seed_sessions
-from qa_ui_auto.module_upgrade_observation import RDP_PINS_DATABASE, observe, observe_rdp_pins, run, wal_fingerprint
+from qa_ui_auto.module_upgrade_observation import (
+    RDP_PINS_DATABASE, observe, observe_rdp_pins, observe_retained_rdp_sessions, run, wal_fingerprint,
+)
 from qa_ui_auto.steps import StepError
 from unittest.mock import patch
 
@@ -126,6 +128,30 @@ class UpgradeObservationTests(unittest.TestCase):
         (self.root / "plugins" / "vnc-client").mkdir()
         with self.assertRaisesRegex(StepError, "directory for vnc-client"):
             observe(self.root, self.state, "after-first-install")
+
+    def test_session_retention_preserves_separate_pin_receipt_and_pending_vnc(self):
+        vnc = self.journal["entries"][0]
+        pin = {**vnc, "item": "rdp-certificate-pins", "state": "committed", "target": RDP_PINS_DATABASE}
+        rdp = {**vnc, "item": "rdp-vnc-sessions", "state": "committed", "target": "taomni.db"}
+        self.state["journal"] = {"entries": [pin.copy()]}
+        self.journal["entries"] = [pin, rdp, vnc]
+        self.write_journal()
+        result = observe_retained_rdp_sessions(self.root, self.state)
+        self.assertEqual(result["retainedSessionIds"], [row["id"] for row in self.state["sessions"]])
+        vnc["state"] = "committed"
+        self.write_journal()
+        with self.assertRaisesRegex(StepError, "vnc-sessions"):
+            observe_retained_rdp_sessions(self.root, self.state)
+
+    def test_mobile_policy_remains_in_core_through_preflight(self):
+        policy = self.root / "mobile-desktop-remote.json"
+        policy.write_bytes(b'{ "allow_screen_capture": true }\n')
+        expected = hashlib.sha256(policy.read_bytes()).hexdigest()
+        self.state["mobile_policy_sha256"] = expected
+        self.assertEqual(observe(self.root, self.state, "preflight")["coreMobilePolicySha256"], expected)
+        policy.write_bytes(b"{}")
+        with self.assertRaisesRegex(StepError, "Mobile policy"):
+            observe(self.root, self.state, "preflight")
 
     def test_false_completion_wrong_owner_and_changed_fingerprint_are_rejected(self):
         self.journal["status"] = "complete"

@@ -17,7 +17,6 @@ use sha2::{Digest, Sha256};
 
 pub(crate) const MFA_MIGRATION_TARGET: &str = "plugins/mfa/data/mfa.db";
 pub(crate) const MAIL_MIGRATION_TARGET: &str = "plugins/mail/data";
-const VNC_RETAINED_DATABASE: &str = "taomni.db";
 pub(crate) const LEGACY_SOURCE_VERSION: &str = "0.5.x";
 
 /// The fixed Vault entries that the migration preflight can observe without
@@ -60,7 +59,7 @@ pub enum MigrationItem {
     VncServerConfigs,
     Mfa,
     SocksCap,
-    Mobile,
+    Mobile, // Read pending entries created before Mobile's core placement was finalized.
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -168,13 +167,10 @@ impl MigrationJournal {
             .any(|entry| entry.item == item && entry.state == MigrationStepState::Committed)
     }
 
-    pub(crate) fn retained_vnc_sessions(&self) -> bool {
-        let mut entries = self
-            .entries
-            .iter()
-            .filter(|entry| entry.item == MigrationItem::VncSessions);
+    pub(crate) fn has_valid_commit(&self, item: MigrationItem) -> bool {
+        let mut entries = self.entries.iter().filter(|entry| entry.item == item);
         entries.next().is_some_and(|entry| {
-            entry.state == MigrationStepState::Committed && valid_vnc_retention(entry)
+            entry.state == MigrationStepState::Committed && valid_commit(entry)
         }) && entries.next().is_none()
     }
 
@@ -243,11 +239,23 @@ pub(super) fn valid_mail_commit(entry: &MigrationJournalEntry) -> bool {
         && entry.target == Path::new(MAIL_MIGRATION_TARGET)
 }
 
-fn valid_vnc_retention(entry: &MigrationJournalEntry) -> bool {
-    entry.item == MigrationItem::VncSessions
-        && entry.source_path == Path::new(VNC_RETAINED_DATABASE)
+fn valid_session_retention(entry: &MigrationJournalEntry) -> bool {
+    matches!(
+        entry.item,
+        MigrationItem::VncSessions | MigrationItem::RdpVncSessions
+    ) && entry.source_path == Path::new("taomni.db")
         && entry.target == entry.source_path
         && source::valid_fingerprint(&entry.source_fingerprint)
+}
+
+fn valid_commit(entry: &MigrationJournalEntry) -> bool {
+    valid_session_retention(entry)
+        || valid_mfa_commit(entry)
+        || valid_mail_commit(entry)
+        || valid_rdp_pin_commit(entry)
+        || super::migration_local_servers::valid_commit(entry)
+        || super::migration_rdp_server::valid_commit(entry)
+        || super::migration_vnc_server::valid_commit(entry)
 }
 
 fn valid_rdp_pin_commit(entry: &MigrationJournalEntry) -> bool {
@@ -345,13 +353,13 @@ impl MigrationExecutor {
         &self,
         snapshot: &LegacyInstallSnapshot,
     ) -> Result<MigrationExecutionResult, String> {
-        self.record_session_retention(snapshot, false)
+        self.record_session_retention(snapshot, &[])
     }
 
     pub(crate) fn record_session_retention(
         &self,
         snapshot: &LegacyInstallSnapshot,
-        retain_vnc: bool,
+        retained_sessions: &[MigrationItem],
     ) -> Result<MigrationExecutionResult, String> {
         let mut journal = MigrationJournal::load(&self.journal_path)?;
         if journal.from_version.is_empty() {
@@ -364,7 +372,7 @@ impl MigrationExecutor {
             return Err("migration journal version does not match this executor".into());
         }
 
-        let result = reconcile_pending(&mut journal, snapshot, retain_vnc)?;
+        let result = reconcile_pending(&mut journal, snapshot, retained_sessions)?;
         journal.save_atomic(&self.journal_path)?;
         Ok(result)
     }
@@ -373,21 +381,14 @@ impl MigrationExecutor {
 fn reconcile_pending(
     journal: &mut MigrationJournal,
     snapshot: &LegacyInstallSnapshot,
-    retain_vnc: bool,
+    retained_sessions: &[MigrationItem],
 ) -> Result<MigrationExecutionResult, String> {
     let mut committed = Vec::new();
     for entry in &journal.entries {
         match entry.state {
             MigrationStepState::Pending if entry.target.as_os_str().is_empty() => (),
             MigrationStepState::Committed
-                if (valid_mfa_commit(entry)
-                    || valid_mail_commit(entry)
-                    || valid_vnc_retention(entry)
-                    || valid_rdp_pin_commit(entry)
-                    || super::migration_local_servers::valid_commit(entry)
-                    || super::migration_rdp_server::valid_commit(entry)
-                    || super::migration_vnc_server::valid_commit(entry))
-                    && !committed.contains(&entry.item) =>
+                if valid_commit(entry) && !committed.contains(&entry.item) =>
             {
                 committed.push(entry.item);
             }
@@ -425,12 +426,10 @@ fn reconcile_pending(
             source_path,
             target: PathBuf::new(),
         };
-        if retain_vnc && candidate.item == MigrationItem::VncSessions {
+        if retained_sessions.contains(&candidate.item) {
             entry.target = entry.source_path.clone();
-            if !valid_vnc_retention(&entry) {
-                return Err(
-                    "legacy VNC session source does not match the core-owned database".into(),
-                );
+            if !valid_session_retention(&entry) {
+                return Err("legacy session source does not match the core-owned database".into());
             }
             entry.state = MigrationStepState::Committed;
             committed.push(candidate.item);

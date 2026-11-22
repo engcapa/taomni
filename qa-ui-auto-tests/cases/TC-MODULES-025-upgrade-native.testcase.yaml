@@ -1,6 +1,6 @@
 id: TC-MODULES-025
 title: Native VNC-only legacy preflight preserves data and idempotent pending state through restart
-description: Seeds disposable SSH/VNC rows and two invalid SQLite LanChat files before startup. Real Settings preflight
+description: Seeds disposable SSH/VNC rows, an existing core Mobile desktop policy and two invalid SQLite LanChat files before startup. Real Settings preflight
   must recommend only vnc-client, read no removed chat database, write nothing before explicit migration, and keep a
   single pending VNC journal through repeat and normal restart. Press Enter on the focused migration button at both
   activations. TC-MODULES-027 covers the already installed 0.5.x app.

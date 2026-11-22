@@ -13,12 +13,30 @@ impl PluginRegistry {
         &self,
         executor: &super::migration::MigrationExecutor,
         snapshot: &super::migration::LegacyInstallSnapshot,
-        retain_vnc: bool,
     ) -> Result<super::migration::MigrationExecutionResult, String> {
+        use super::migration::MigrationItem;
+        let _lifecycle = self
+            .lifecycle
+            .lock()
+            .expect("plugin lifecycle lock poisoned");
         let _mutation = install::ModuleInstaller::new(&self.root)
             .lock_mutations()
             .map_err(|error| error.to_string())?;
-        executor.record_session_retention(snapshot, retain_vnc)
+        let mut retained = Vec::new();
+        for candidate in &snapshot.candidates {
+            let (slug, start, test) = match candidate.item {
+                MigrationItem::VncSessions => (crate::vnc::MODULE_SLUG, "vnc/start", "vnc/test"),
+                MigrationItem::RdpVncSessions => {
+                    use taomni_rdp_client_api::{SLUG, START, TEST};
+                    (SLUG, START, TEST)
+                }
+                _ => continue,
+            };
+            if self.has_verified_client_locked(slug, start, test) {
+                retained.push(candidate.item);
+            }
+        }
+        executor.record_session_retention(snapshot, &retained)
     }
 
     /// Retained IPC contract: arbitrary renderer directories are never trusted.
