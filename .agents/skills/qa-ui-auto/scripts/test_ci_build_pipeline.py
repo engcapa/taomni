@@ -73,6 +73,32 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertIn('tool-contracts', jobs['summarize']['needs'])
         self.assertNotIn('Validate QA tools', [s.get('name') for s in jobs['plan']['steps']])
 
+    def test_rust_cache_prunes_targets_reusable_runtime_cache_replaces_raw_target_and_windows_contracts_decouple(self):
+        entry = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
+        steps = entry['jobs']['entry']['steps']
+        names = [s.get('name') for s in steps]
+        self.assertNotIn('Native QA workspace cache', names)
+        self.assertNotIn('Native Rust contracts cache', names)
+        reusable = next(s for s in steps if s.get('name') == 'Native QA reusable runtime cache')
+        self.assertEqual(reusable['id'], 'reusable-runtime-cache')
+        rust_cache = next(s for s in steps if str(s.get('uses', '')).startswith('swatinem/rust-cache@'))
+        self.assertTrue(rust_cache['with']['cache-targets'])
+        self.assertIn('steps.reusable-runtime-cache.outputs.cache-hit', rust_cache['if'])
+        build_step = next(s for s in steps if s.get('name') == 'Build and export the verified native runtime')
+        self.assertIn('--reusable-archive qa-build-output/reusable-runtime/reusable.tar.gz', build_step['run'])
+        for contract_name in (
+            'Windows native session cleanup contracts',
+            'Windows atomic file replacement contracts',
+            'Windows backup journal reader contracts',
+            'Windows file observation contracts',
+            'Windows capture helper contracts',
+        ):
+            step = next(s for s in steps if s.get('name') == contract_name)
+            self.assertIn("inputs.operation == 'contracts'", step['if'])
+            self.assertNotIn("inputs.operation == 'build'", step['if'])
+        rust_contracts = next(s for s in steps if s.get('name') == 'Native Rust contracts')
+        self.assertIn("runner.os == 'Linux'", rust_contracts['if'])
+
     @unittest.skipUnless(os.name == 'posix' and shutil.which('bash'), 'POSIX shell contract')
     def test_rust_contracts_use_one_root_binary_with_all_selected_filters(self):
         script = ROOT / '.agents/skills/qa-ui-auto/scripts/ci_rust_contracts.sh'

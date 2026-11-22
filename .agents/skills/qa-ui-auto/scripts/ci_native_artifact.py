@@ -21,6 +21,7 @@ from qa_ui_auto.provenance import execution_identity
 
 ROOT = native_build.ROOT
 MANIFEST = 'qa-runtime.json'
+REUSABLE_MANIFEST = 'qa-reusable-runtime.json'
 
 
 def build_entry(selection, build_id):
@@ -37,13 +38,10 @@ def allowed(name, profile):
     return name.startswith(f'src-tauri/target/qa-ui-auto/{profile}/') or name.startswith('src-tauri/frameworks/')
 
 
-def export(archive, selection, entry):
-    if commit('HEAD') != selection['head'] or execution_identity(ROOT) != selection['identity']:
-        raise ValueError('build checkout differs from selection')
-    profile = entry['profile']
+def _collect_runtime_files(profile, selection_source_sha256):
     binary = native_build.qa_binary(release=profile == 'release')
     identity = native_build.verify_identity(binary)
-    if identity['source_sha256'] != selection['identity']['source_sha256']:
+    if identity['source_sha256'] != selection_source_sha256:
         raise ValueError('native build source differs')
     # Immediate runtime files and resource trees; never Cargo object caches.
     excluded = {'deps', 'build', 'incremental', '.fingerprint', 'examples', 'bundle'}
@@ -61,12 +59,12 @@ def export(archive, selection, entry):
     required = [binary.relative_to(ROOT).as_posix(), native_build.identity_path(binary).relative_to(ROOT).as_posix()]
     if not set(required) <= names.keys():
         raise ValueError('missing required runtime files')
-    record = {'schema': 1, 'build_id': entry['id'], 'head': selection['head'],
-              'selection_sha256': selection_digest(selection), 'platform': platform.system(),
-              'arch': entry['arch'], 'runner': entry['runner'], 'profile': profile,
-              'identity': selection['identity'], 'binary': required[0],
-              'files': {n: {'sha256': native_build.binary_digest(p), 'mode': p.stat().st_mode & 0o777}
-                        for n, p in sorted(names.items())}}
+    files = {n: {'sha256': native_build.binary_digest(p), 'mode': p.stat().st_mode & 0o777}
+             for n, p in sorted(names.items())}
+    return names, required[0], identity, files
+
+
+def _write_archive(archive, names, profile, manifest_name, record):
     archive.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(archive, 'w:gz', dereference=True) as tar:
         for name, path in sorted(names.items()):
@@ -74,14 +72,97 @@ def export(archive, selection, entry):
                 raise ValueError('invalid runtime path')
             tar.add(path, arcname=name, recursive=False)
         data = json.dumps(record, sort_keys=True).encode()
-        info = tarfile.TarInfo(MANIFEST); info.size = len(data)
+        info = tarfile.TarInfo(manifest_name)
+        info.size = len(data)
         tar.addfile(info, io.BytesIO(data))
+
+
+def _install_validated_archive(archive, profile, manifest_name, expected, *, expected_source_sha256, expected_recipe_sha256=None):
+    with tarfile.open(archive, 'r:gz') as tar, tempfile.TemporaryDirectory() as directory:
+        members = tar.getmembers()
+        names = [m.name for m in members]
+        if len(names) != len(set(names)) or manifest_name not in names:
+            raise ValueError('duplicate or missing runtime manifest')
+        record = json.load(tar.extractfile(manifest_name))
+        if any(record.get(k) != v for k, v in expected.items()):
+            raise ValueError('native artifact identity differs from selection/platform/profile')
+        if set(names) != set(record['files']) | {manifest_name}:
+            raise ValueError('runtime file list differs')
+        staged = Path(directory)
+        # Validate the entire archive before publishing anything. No tar path,
+        # link, device or unverified sidecar can escape the declared roots.
+        for m in members:
+            if not m.isfile():
+                raise ValueError('runtime archive must contain only regular files')
+            if m.name == manifest_name:
+                continue
+            if not allowed(m.name, profile):
+                raise ValueError('unsafe runtime path')
+            target = staged / m.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with tar.extractfile(m) as source, target.open('wb') as dest:
+                shutil.copyfileobj(source, dest)
+            if native_build.binary_digest(target) != record['files'][m.name]['sha256']:
+                raise ValueError('runtime checksum differs: ' + m.name)
+            target.chmod(record['files'][m.name]['mode'] & 0o777)
+        binary_name = record['binary']
+        expected_binary = native_build.qa_binary(release=profile == 'release').relative_to(ROOT).as_posix()
+        if binary_name != expected_binary:
+            raise ValueError('runtime binary path differs')
+        identity = native_build.verify_identity(staged / binary_name)
+        if identity['source_sha256'] != expected_source_sha256 or identity['profile'] != profile:
+            raise ValueError('original QA build record differs')
+        if expected_recipe_sha256 is not None:
+            if identity.get('build_inputs', {}).get('recipe_sha256') != expected_recipe_sha256:
+                raise ValueError('original QA build recipe differs')
+        for name in record['files']:
+            dest = ROOT / name
+            if dest.resolve() != dest.absolute():
+                raise ValueError('runtime destination must not be a symlink')
+        for name in record['files']:
+            dest = ROOT / name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(staged / name, dest)
+    return record
+
+
+def export(archive, selection, entry):
+    if commit('HEAD') != selection['head'] or execution_identity(ROOT) != selection['identity']:
+        raise ValueError('build checkout differs from selection')
+    profile = entry['profile']
+    names, binary_rel, _, files = _collect_runtime_files(profile, selection['identity']['source_sha256'])
+    record = {'schema': 1, 'build_id': entry['id'], 'head': selection['head'],
+              'selection_sha256': selection_digest(selection), 'platform': platform.system(),
+              'arch': entry['arch'], 'runner': entry['runner'], 'profile': profile,
+              'identity': selection['identity'], 'binary': binary_rel, 'files': files}
+    _write_archive(archive, names, profile, MANIFEST, record)
     print(f'Exported {len(names)} runtime files for {entry["id"]}: {archive}', flush=True)
+
+
+def export_reusable(archive, selection, entry):
+    """Export a cross-run reusable archive bound only to build invariants."""
+    if commit('HEAD') != selection['head'] or execution_identity(ROOT) != selection['identity']:
+        raise ValueError('build checkout differs from selection')
+    profile = entry['profile']
+    names, binary_rel, identity, files = _collect_runtime_files(profile, selection['identity']['source_sha256'])
+    recipe_sha256 = native_build.recipe_identity()
+    if identity.get('build_inputs', {}).get('recipe_sha256') != recipe_sha256:
+        raise ValueError('native build recipe differs')
+    record = {'schema': 1, 'platform': platform.system(), 'arch': entry['arch'],
+              'runner': entry['runner'], 'profile': profile,
+              'source_sha256': selection['identity']['source_sha256'],
+              'recipe_sha256': recipe_sha256, 'binary': binary_rel, 'files': files}
+    _write_archive(archive, names, profile, REUSABLE_MANIFEST, record)
+    print(f'Exported {len(names)} reusable runtime files for {entry["id"]}: {archive}', flush=True)
+
+
+def _host_arch():
+    return {'amd64': 'X64', 'x86_64': 'X64', 'arm64': 'ARM64', 'aarch64': 'ARM64'}.get(platform.machine().lower())
 
 
 def install(archive, selection, entry):
     build = build_entry(selection, entry['build_id'])
-    arch = {'amd64': 'X64', 'x86_64': 'X64', 'arm64': 'ARM64', 'aarch64': 'ARM64'}.get(platform.machine().lower())
+    arch = _host_arch()
     if entry['runner'] != build['runner']:
         # The release Linux baseline supports these explicitly planned hosts.
         # Preserve the producer's original identity; the receipt still records
@@ -92,54 +173,38 @@ def install(archive, selection, entry):
             raise ValueError('unsupported native build/execution runner combination')
     if build['arch'] != arch:
         raise ValueError('native build architecture differs from execution host')
-    with tarfile.open(archive, 'r:gz') as tar, tempfile.TemporaryDirectory() as directory:
-        members = tar.getmembers()
-        names = [m.name for m in members]
-        if len(names) != len(set(names)) or MANIFEST not in names:
-            raise ValueError('duplicate or missing runtime manifest')
-        record = json.load(tar.extractfile(MANIFEST))
-        expected = {'schema': 1, 'build_id': entry['build_id'], 'head': selection['head'],
-                    'selection_sha256': selection_digest(selection), 'platform': platform.system(),
-                    'arch': arch, 'runner': build['runner'], 'profile': build['profile'],
-                    'identity': selection['identity']}
-        if any(record.get(k) != v for k, v in expected.items()):
-            raise ValueError('native artifact identity differs from selection/platform/profile')
-        if commit('HEAD') != selection['head'] or execution_identity(ROOT) != selection['identity']:
-            raise ValueError('runtime checkout differs from selection')
-        if set(names) != set(record['files']) | {MANIFEST}:
-            raise ValueError('runtime file list differs')
-        staged = Path(directory)
-        # Validate the entire archive before publishing anything. No tar path,
-        # link, device or unverified sidecar can escape the declared roots.
-        for m in members:
-            if not m.isfile():
-                raise ValueError('runtime archive must contain only regular files')
-            if m.name == MANIFEST:
-                continue
-            if not allowed(m.name, build['profile']):
-                raise ValueError('unsafe runtime path')
-            target = staged / m.name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with tar.extractfile(m) as source, target.open('wb') as dest:
-                shutil.copyfileobj(source, dest)
-            if native_build.binary_digest(target) != record['files'][m.name]['sha256']:
-                raise ValueError('runtime checksum differs: ' + m.name)
-            target.chmod(record['files'][m.name]['mode'] & 0o777)
-        binary_name = record['binary']
-        expected_binary = native_build.qa_binary(release=build['profile'] == 'release').relative_to(ROOT).as_posix()
-        if binary_name != expected_binary:
-            raise ValueError('runtime binary path differs')
-        identity = native_build.verify_identity(staged / binary_name)
-        if identity['source_sha256'] != selection['identity']['source_sha256'] or identity['profile'] != build['profile']:
-            raise ValueError('original QA build record differs')
-        for name in record['files']:
-            dest = ROOT / name
-            if dest.resolve() != dest.absolute():
-                raise ValueError('runtime destination must not be a symlink')
-        for name in record['files']:
-            dest = ROOT / name; dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(staged / name, dest)
+    if commit('HEAD') != selection['head'] or execution_identity(ROOT) != selection['identity']:
+        raise ValueError('runtime checkout differs from selection')
+    expected = {'schema': 1, 'build_id': entry['build_id'], 'head': selection['head'],
+                'selection_sha256': selection_digest(selection), 'platform': platform.system(),
+                'arch': arch, 'runner': build['runner'], 'profile': build['profile'],
+                'identity': selection['identity']}
+    record = _install_validated_archive(
+        archive, build['profile'], MANIFEST, expected,
+        expected_source_sha256=selection['identity']['source_sha256'],
+    )
     print(f'Installed verified native build {entry["build_id"]}; no compilation', flush=True)
+    return record
+
+
+def install_reusable(archive, selection, entry):
+    """Install a cached reusable runtime archive after strict build verification."""
+    arch = _host_arch()
+    if entry['arch'] != arch:
+        raise ValueError('native build architecture differs from build host')
+    if commit('HEAD') != selection['head'] or execution_identity(ROOT) != selection['identity']:
+        raise ValueError('build checkout differs from selection')
+    recipe_sha256 = native_build.recipe_identity()
+    expected = {'schema': 1, 'platform': platform.system(), 'arch': arch,
+                'runner': entry['runner'], 'profile': entry['profile'],
+                'source_sha256': selection['identity']['source_sha256'],
+                'recipe_sha256': recipe_sha256}
+    record = _install_validated_archive(
+        archive, entry['profile'], REUSABLE_MANIFEST, expected,
+        expected_source_sha256=selection['identity']['source_sha256'],
+        expected_recipe_sha256=recipe_sha256,
+    )
+    print(f'Reused verified native build {entry["id"]}; skipped compilation', flush=True)
     return record
 
 
@@ -148,10 +213,18 @@ def main():
     ap.add_argument('--selection', type=Path, required=True)
     ap.add_argument('--build', required=True)
     ap.add_argument('--archive', type=Path, required=True)
+    ap.add_argument('--reusable-archive', type=Path, default=None)
     args = ap.parse_args()
     selection = json.loads(args.selection.read_text(encoding='utf-8'))
     entry = build_entry(selection, args.build)
-    native_build.build_qa(release=entry['profile'] == 'release')
+    reused = False
+    if args.reusable_archive and args.reusable_archive.is_file():
+        install_reusable(args.reusable_archive, selection, entry)
+        reused = True
+    if not reused:
+        native_build.build_qa(release=entry['profile'] == 'release')
+        if args.reusable_archive:
+            export_reusable(args.reusable_archive, selection, entry)
     export(args.archive, selection, entry)
 
 

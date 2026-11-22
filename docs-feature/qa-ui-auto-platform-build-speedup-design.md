@@ -7,7 +7,7 @@
 - 来源与修订记录：
   - 2026-11-21（基线 `e439e9d20`，origin/main，Merge PR #845）：用户要求调研 workflow 构建变慢的原因并给出更高效的方案，形成初版设计稿。
   - 2026-11-22（对照 `bf7ee6818`，origin/main，Merge PR #859 代码逐项评审修订）：对照现行 workflow、规划/分片/构建/收集脚本、Cargo 配置及 CI 合约单测修正初版误判与方案漏洞，补充本地 profiling 实测。
-- 设计状态：**设计定稿（评审修订版，O1–O6 已决议，见 §11），未实施**。本文只写方案，不改 workflow、脚本、case、policy 或文档门禁；实施按 §12 分批推进。
+- 设计状态：**已实施 P0 + P1 + P2-D8（分支 `ci/qa-build-speedup`，待托管 CI 实测验收）**；P2-D7 仍按 O5 决议待后续实测后再试点。
 - 范围：
   - Workflow 与 composite action：`.github/workflows/qa-ui-auto-platforms.yml`、`.github/workflows/qa-ui-auto-entry.yml`、`.github/actions/qa-runtime/action.yml`、`.github/actions/qa-download-artifact/action.yml`。
   - `qa_ui_auto` 规划/解析/分片/构建/产物/聚合脚本：`ci.py`、`ci_sharding.py`、`native_build.py`、`ci_native_artifact.py`、`provenance.py`、`ci_collect.py`、`audit.py`、`testcase.py`、`lint.py`、`control_coverage.py`。
@@ -207,10 +207,12 @@
 
 ### 7.2 P1-D5：10 GB 缓存治理与构建输入稳定化
 
-1. **先观测再治理（只读统计，连续 5 个 run）**：
-   - 在改动缓存前，拉取最近 5 个 run 的 step 日志与 GitHub Actions Cache API（`GET /actions/cache/usage`、`GET /actions/caches`），记录：
-     - `Native QA workspace cache`（`qa-native-v1-*`）与 `swatinem/rust-cache` 的 hit/miss 与恢复耗时；
-     - 仓库当前总缓存用量是否逼近 10 GB 配额、最老缓存的存活时间（是否数小时内即被 LRU 驱逐）。
+1. **先观测再治理（2026-11-22 实测基准）**：
+   - 已通过 GitHub Actions Cache API（`GET /actions/cache/usage`、`GET /actions/caches`）完成改前基线观测：
+     - 仓库活跃缓存共 21 个，总用量 **9,542,689,620 字节（约 9.54 GB / 10 GB 上限）**；
+     - 仅 macOS 的两份未裁剪 `qa-native-v1-macos-*` 快照即占 **1,330 MB 与 1,713 MB**；而 Linux/Windows 的 `qa-native-v1` 以及 `main` 分支的 Rust 缓存已全部被 LRU 驱逐（0 个存活，最老存活 `qa-native-v1` 仅约 20 分钟）；
+     - 相比之下 `swatinem/rust-cache` 仅占约 **241–560 MB**，证实 R5 驱逐由未裁剪 `actions/cache` 撑爆 10 GB 配额主导。
+   - 后续切换后继续按 5 个 run 记录命中率与缓存总量对比。
 2. **双层缓存重构（解除 10 GB 配额打爆）**：
    - **改变现状做法**：现状把 `swatinem/rust-cache@v2` 的 `cache-targets` 设成 `false`，同时又用裸 `actions/cache@v4` 分别缓存 `qa-native-v1` 和 `qa-contracts-v1` 两套完整、不裁剪的 `src-tauri/target/qa-ui-auto`（含巨大 `incremental/` 与旧版 `.rlib`），在跨平台+多分支下极易耗尽 10 GB 限额。
    - **治理方案**：将 `swatinem/rust-cache@v2` 的 `cache-targets` 改为 `true`（由 `rust-cache` 自动清理过期 crate 与无用中间产物，控制单平台缓存体积，并利用其 `shared-key` 跨分支共享 `main` 依赖基线），**移除**裸 `actions/cache@v4` 对整棵 `src-tauri/target/qa-ui-auto` 的全量快照（`qa-native-v1-*` / `qa-contracts-v1-*`）；成品复用改由轻量的 P1-D6 runtime tarball 承担。注：同步评估 `.github/workflows/qa-workspace-performance.yml` 第 85 行对其的引用兼容。
