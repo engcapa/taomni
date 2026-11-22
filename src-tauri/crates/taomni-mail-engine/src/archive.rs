@@ -1,5 +1,8 @@
 //! Streaming codec for immutable, content-addressed email archives.
+mod imap_chunks;
 mod metadata;
+
+pub use imap_chunks::{CHUNK, CONTENT_ERROR, fetch_imap_chunk};
 
 use std::io::{Read, Write};
 

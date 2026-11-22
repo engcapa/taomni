@@ -1,6 +1,5 @@
-pub(super) const CHUNK: usize = 256 * 1024;
+pub(super) use taomni_mail_engine::archive::{CHUNK, CONTENT_ERROR};
 pub(super) const ARCHIVE_BATCH: usize = 100;
-pub(super) const CONTENT_ERROR: &str = "MAIL_ARCHIVE_CONTENT: ";
 
 #[derive(Default)]
 pub(super) struct ContentFailures {

@@ -1,5 +1,4 @@
 use super::download::download_one;
-use super::download::parse_chunk;
 use super::lifetime::ArchiveJob;
 use super::lifetime::ArchiveStatus;
 use super::limits::CHUNK;
@@ -449,53 +448,4 @@ fn loopback_resume_saves_complete_mime_and_leaves_it_unread() {
     ))));
     job.pause.store(true, Ordering::Release);
     assert!(download_one(&mut imap, &account, &handle, "INBOX", uid, 1000, &job).is_err());
-}
-
-#[test]
-fn resumed_fetch_checks_origin_uid_size_and_literal() {
-    let ok = b"* 1 FETCH (UID 7 RFC822.SIZE 6 BODY[]<3> {3}\r\ndef)\r\n";
-    assert_eq!(parse_chunk(ok, 7, 3).unwrap(), (6, b"def".to_vec()));
-    assert!(parse_chunk(ok, 7, 0).is_err());
-    assert!(parse_chunk(ok, 8, 3).is_err());
-    assert!(
-        parse_chunk(
-            b"* 1 FETCH (UID 7 RFC822.SIZE 6 BODY[] {3}\r\nabc)\r\n",
-            7,
-            3
-        )
-        .is_err()
-    );
-    assert_eq!(
-        parse_chunk(
-            b"* 1 FETCH (UID 7 RFC822.SIZE 6 BODY[]<5> {3}\r\nabc)\r\n",
-            7,
-            5
-        )
-        .unwrap(),
-        (6, b"abc".to_vec())
-    );
-    assert_eq!(
-        parse_chunk(
-            b"* 1 FETCH (UID 7 RFC822.SIZE 6 BODY[]<6> {0}\r\n)\r\n",
-            7,
-            6
-        )
-        .unwrap(),
-        (6, vec![])
-    );
-    assert_eq!(parse_chunk(b"* 1 FETCH (UID 7 FLAGS (\\Seen))\r\n* 1 FETCH (UID 7 RFC822.SIZE 9)\r\n* 1 FETCH (UID 7 BODY[]<3> {3}\r\ndef)\r\n", 7, 3).unwrap(), (9, b"def".to_vec()));
-    assert_eq!(
-        parse_chunk(b"* 1 FETCH (UID 7 RFC822.SIZE 8 BODY[] NIL)\r\n", 7, 6).unwrap(),
-        (8, vec![])
-    );
-    assert!(
-        parse_chunk(
-            b"* 1 FETCH (UID 7 RFC822.SIZE 8 BODY[]<0> {0}\r\n)\r\n",
-            7,
-            0
-        )
-        .unwrap_err()
-        .contains("offset 0")
-    );
-    assert!(parse_chunk(b"* 1 FETCH (UID 7 RFC822.SIZE 0 BODY[] NIL)\r\n", 7, 0).is_err());
 }

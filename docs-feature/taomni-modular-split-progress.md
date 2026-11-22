@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- 邮件原件归档的 IMAP 分段读取迁入 `taomni-mail-engine`。保留 256 KiB 范围检查、UID 与邮箱身份校验、大小不一致后的续传恢复及实际文件发布。原范围单测随实现迁移并通过，核心编译通过。现有 TC-MAIL-STORAGE-02/03 覆盖保存、重试和完整原件，后台归档会话迁入签名宿主后继续用这两项验证。
 - Mail 0.1.17（`a192bde02`）将后台正文预取迁入签名宿主，每批读取同一文件夹最多四封。手动打开邮件使用单独的请求。缓存提交校验 UIDVALIDITY，保留已读标记和先完成的正文。77 项前端单测、15 项 Rust 单测、核心编译与用例审计通过。GitHub 正在执行签名 Native、Browser 和完整崩溃回归。 [Mail 三端回归](https://github.com/engcapa/taomni/actions/runs/44967113628)
 - `469de51f4` 的三端 Browser 分片已收齐，各 39/39，覆盖 Local Voice、Local servers、Notepad、Explorer 和 Markdown Live 表格。Linux Native 的流程断言漏列 Local Voice 签名任务，`3a5f37ff3` 修正后已开始复跑。Windows Native 为 29/32，TC-MODULES-066 切换面板时读到了 SSH 端口 28491，失败快照随后显示迁移后的 HTTP 端口 28489。用例现等待该值后核对连接、备份和清理。TC-MODULES-067 从设置打开新终端后显式打开该终端的聊天面板。TC-SERVERS-004 已收到退出码 0，输出标记仍需验证，复跑分片会保留原始输出并在去除终端控制序列后检查完整标记行。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44963910380) · [Linux 复验](https://github.com/engcapa/taomni/actions/runs/44965415995)
 - Local servers 0.1.1 收齐 18/18 分片。三端 Browser 各 24/24，Linux 与 macOS Native 各 31/31，Windows Native 27/30。Windows 已通过签名安装、真实鉴权和文件读取，两个 SSH 用例卡在 PTY 输出结束。0.1.2 在进程退出时释放 ConPTY，并继续转发剩余输出和退出码。第三个失败是 HTTP 停止后 TCP 连接超时，复验将同时核对 Windows 实际监听表。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44957237883)
