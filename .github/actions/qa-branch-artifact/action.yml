@@ -1,0 +1,44 @@
+name: Find a QA build artifact for this branch
+description: Look up an exact artifact from the same repository, workflow and dispatch branch
+inputs:
+  name:
+    description: Exact artifact name
+    required: true
+outputs:
+  run-id:
+    description: Completed producer run with a matching artifact
+    value: ${{ steps.find.outputs.run-id }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/github-script@v7
+      id: find
+      env:
+        QA_ARTIFACT_NAME: ${{ inputs.name }}
+        QA_BRANCH: ${{ github.ref_name }}
+        QA_REPO_ID: ${{ github.repository_id }}
+      with:
+        script: |
+          const { owner, repo } = context.repo;
+          const name = process.env.QA_ARTIFACT_NAME;
+          const branch = process.env.QA_BRANCH;
+          const repoId = Number(process.env.QA_REPO_ID);
+          try {
+            const { data } = await github.rest.actions.listArtifactsForRepo({ owner, repo, name, per_page: 30 });
+            for (const artifact of data.artifacts) {
+              const producer = artifact.workflow_run;
+              if (artifact.name !== name || artifact.expired || !producer ||
+                  producer.repository_id !== repoId || producer.head_repository_id !== repoId ||
+                  producer.head_branch !== branch || producer.id === context.runId) continue;
+              const { data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: producer.id });
+              if (run.path !== '.github/workflows/qa-ui-auto-platforms.yml' ||
+                  run.event !== 'workflow_dispatch' || run.status !== 'completed' ||
+                  run.head_branch !== branch || run.head_repository?.id !== repoId) continue;
+              core.setOutput('run-id', String(run.id));
+              core.info(`Found ${name} in workflow run ${run.id}`);
+              return;
+            }
+            core.info(`No retained artifact for ${name} on ${branch}`);
+          } catch (error) {
+            core.warning(`Unable to look up ${name}: ${error.message}`);
+          }

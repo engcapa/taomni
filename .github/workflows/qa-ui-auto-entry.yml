@@ -11,6 +11,7 @@ on:
       workspace_stage_trace: {type: boolean, default: false}
 permissions:
   contents: read
+  actions: read
 env:
   PYTHONPATH: .agents/skills/qa-ui-auto/scripts
   PYTHONUTF8: '1'
@@ -33,6 +34,10 @@ jobs:
       TAOMNI_QA_RDP_TRACE: ${{ contains(matrix.capabilities, 'xrdp') && '1' || '0' }}
       QA_NATIVE_ARTIFACT: ${{ inputs.operation == 'run' && matrix.mode == 'native' && 'qa-ui-auto-report/native-runtime/runtime.tar.gz' || '' }}
       QA_WORKSPACE_STAGE_TRACE: ${{ inputs.workspace_stage_trace && '1' || '0' }}
+      QA_BRANCH_ARTIFACTS: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && github.workflow_ref == format('{0}/.github/workflows/qa-ui-auto-platforms.yml@{1}', github.repository, github.ref) && inputs.head == github.sha }}
+      QA_CARGO_PROFILE: ${{ matrix.profile }}
+      QA_CARGO_RUNNER: ${{ matrix.runner }}
+      QA_CARGO_ARCHIVE: qa-build-output/cargo-dependencies
     steps:
       - uses: actions/checkout@v4
         with:
@@ -80,13 +85,46 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"key={key}\n")
           PYTHON
+      - name: Find a retained runtime on the dispatch branch
+        id: branch-runtime
+        if: inputs.operation == 'build' && env.QA_BRANCH_ARTIFACTS == 'true'
+        uses: ./.github/actions/qa-branch-artifact
+        with:
+          name: qa-branch-${{ steps.reusable-key.outputs.key }}
+      - name: Retrieve the branch runtime
+        id: branch-runtime-download
+        if: steps.branch-runtime.outputs.run-id != ''
+        continue-on-error: true
+        timeout-minutes: 3
+        uses: actions/download-artifact@v4
+        with:
+          name: qa-branch-${{ steps.reusable-key.outputs.key }}
+          path: qa-build-output/prior-runtime
+          run-id: ${{ steps.branch-runtime.outputs.run-id }}
+          github-token: ${{ github.token }}
       - name: Native QA reusable runtime cache
         id: reusable-runtime-cache
-        if: matrix.mode == 'native' && inputs.operation == 'build'
-        uses: actions/cache@v4
+        if: matrix.mode == 'native' && inputs.operation == 'build' && steps.branch-runtime-download.outcome != 'success'
+        uses: actions/cache/restore@v4
         with:
           path: qa-build-output/reusable-runtime
           key: ${{ steps.reusable-key.outputs.key }}
+      - name: Select the retained native runtime
+        id: reusable-runtime
+        if: inputs.operation == 'build'
+        env:
+          QA_BRANCH_RUNTIME_DOWNLOADED: ${{ steps.branch-runtime-download.outcome == 'success' }}
+        run: |
+          if [[ "$QA_BRANCH_RUNTIME_DOWNLOADED" == 'true' ]]; then
+            mkdir -p qa-build-output/reusable-runtime
+            mv qa-build-output/prior-runtime/reusable.tar.gz qa-build-output/reusable-runtime/
+          fi
+          if [[ -f qa-build-output/reusable-runtime/reusable.tar.gz ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Native runtime cache miss
+        if: inputs.operation == 'build' && steps.reusable-runtime.outputs.available != 'true'
+        run: echo 'No reusable runtime for this source and recipe.'
       - name: Mobile Chromium cache
         id: mobile-chromium-cache
         if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'mobile')
@@ -129,13 +167,13 @@ jobs:
         # formatting, so a rustfmt update must not fail them here.
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -p taomni -p sockscap-helper -- --check
       - name: Ubuntu 22.04 PipeWire build cache
-        if: runner.os == 'Linux' && matrix.mode == 'native' && startsWith(matrix.linux_profile, 'ubuntu-22.04') && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        if: runner.os == 'Linux' && matrix.mode == 'native' && startsWith(matrix.linux_profile, 'ubuntu-22.04') && (inputs.operation != 'build' || steps.reusable-runtime.outputs.available != 'true')
         uses: actions/cache@v4
         with:
           path: ~/.cache/taomni-qa/pipewire
           key: qa-pipewire-1.0.9-${{ runner.os }}-${{ runner.arch }}-ubuntu-22.04-${{ hashFiles('.agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh') }}
       - name: Linux native and service dependencies
-        if: runner.os == 'Linux' && matrix.mode == 'native' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        if: runner.os == 'Linux' && matrix.mode == 'native' && (inputs.operation != 'build' || steps.reusable-runtime.outputs.available != 'true')
         # Wayland provisioning installs the GNOME/portal stack on a fresh
         # runner. Azure mirrors can take more than twenty minutes for this
         # dependency set; keep setup bounded while allowing a cold install to
@@ -147,12 +185,12 @@ jobs:
           QA_CAPABILITIES: ${{ join(matrix.capabilities, ',') }}
         run: bash .agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh
       - uses: dtolnay/rust-toolchain@stable
-        if: matrix.mode == 'native' && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        if: matrix.mode == 'native' && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime.outputs.available != 'true')
       - name: Install verified fixed protoc
-        if: (matrix.mode == 'native') && inputs.operation != 'run' && !(runner.os == 'Windows' && inputs.operation == 'contracts') && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        if: (matrix.mode == 'native') && inputs.operation != 'run' && !(runner.os == 'Windows' && inputs.operation == 'contracts') && (inputs.operation != 'build' || steps.reusable-runtime.outputs.available != 'true')
         run: python .agents/skills/qa-ui-auto/scripts/ci_setup_protoc.py
       - name: Configure Linux fast linker (lld)
-        if: runner.os == 'Linux' && matrix.mode == 'native' && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        if: runner.os == 'Linux' && matrix.mode == 'native' && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime.outputs.available != 'true')
         run: |
           if ! command -v ld.lld >/dev/null 2>&1; then
             source .agents/skills/qa-ui-auto/scripts/ci_linux_apt.sh
@@ -160,29 +198,70 @@ jobs:
           fi
           ld.lld --version
           echo "RUSTFLAGS=${RUSTFLAGS:+$RUSTFLAGS }-C link-arg=-fuse-ld=lld" >> "$GITHUB_ENV"
+      - name: Cargo dependency archive key
+        id: branch-cargo-key
+        if: >-
+          env.QA_BRANCH_ARTIFACTS == 'true' && matrix.mode == 'native' &&
+          ((inputs.operation == 'build' && steps.reusable-runtime.outputs.available != 'true') ||
+          (inputs.operation == 'contracts' && runner.os == 'Linux'))
+        run: python .agents/skills/qa-ui-auto/scripts/ci_cargo_artifact.py key
+      - name: Find retained Cargo dependencies on the dispatch branch
+        id: branch-cargo
+        if: steps.branch-cargo-key.outputs.name != ''
+        uses: ./.github/actions/qa-branch-artifact
+        with:
+          name: ${{ steps.branch-cargo-key.outputs.name }}
+      - name: Retrieve the branch Cargo dependencies
+        id: branch-cargo-download
+        if: steps.branch-cargo.outputs.run-id != ''
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.branch-cargo-key.outputs.name }}
+          path: ${{ env.QA_CARGO_ARCHIVE }}
+          run-id: ${{ steps.branch-cargo.outputs.run-id }}
+          github-token: ${{ github.token }}
+      - name: Restore branch Cargo dependencies
+        id: branch-cargo-restore
+        if: steps.branch-cargo-download.outcome == 'success'
+        run: python .agents/skills/qa-ui-auto/scripts/ci_cargo_artifact.py restore
       - uses: swatinem/rust-cache@v2
-        if: (matrix.mode == 'native') && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        id: rust-cache
+        if: >-
+          matrix.mode == 'native' && inputs.operation != 'run' &&
+          (inputs.operation != 'build' || steps.reusable-runtime.outputs.available != 'true') &&
+          steps.branch-cargo-restore.outcome != 'success'
         with:
           workspaces: src-tauri -> target/qa-ui-auto
           shared-key: qa-platforms-${{ matrix.cache_key }}-${{ matrix.profile }}${{ runner.os == 'Windows' && inputs.operation == 'contracts' && '-sockscap' || '' }}
-          # Keep the shared dependency/tool cache pruned within the 10 GB repo
-          # quota; full runtime reuse is handled by the lightweight tarball above.
+          # Branch dispatches retain a separate dependency archive. Keep
+          # restoring shared Actions caches on a miss without duplicating writes.
           cache-targets: true
           # An interrupted build must not reserve the immutable dependency key.
           cache-on-failure: false
-          save-if: ${{ !(runner.os == 'Linux' && inputs.operation == 'contracts') }}
+          save-if: ${{ !(runner.os == 'Linux' && inputs.operation == 'contracts') && steps.branch-cargo-key.outputs.name == '' }}
+      - name: Rust dependency cache miss
+        if: >-
+          inputs.operation == 'build' && steps.reusable-runtime.outputs.available != 'true' &&
+          steps.branch-cargo-restore.outcome != 'success' && steps.rust-cache.outputs.cache-hit != 'true'
+        run: echo 'No exact Cargo dependency cache for this build.'
       - name: Sherpa-ONNX prebuilt cache
         id: sherpa-cache
-        if: (matrix.mode == 'native') && inputs.operation != 'run' && !(runner.os == 'Windows' && inputs.operation == 'contracts') && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        if: >-
+          matrix.mode == 'native' && inputs.operation != 'run' &&
+          !(runner.os == 'Windows' && inputs.operation == 'contracts') &&
+          (inputs.operation != 'build' || steps.reusable-runtime.outputs.available != 'true') &&
+          steps.branch-cargo-restore.outputs.sherpa-hit != 'true'
         uses: actions/cache@v4
         with:
           path: src-tauri/target/qa-ui-auto/sherpa-onnx-prebuilt
           key: qa-sherpa-onnx-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src-tauri/Cargo.lock') }}
       - name: Ensure Sherpa-ONNX build state and runtime DLLs
-        if: (matrix.mode == 'native') && inputs.operation != 'run' && !(runner.os == 'Windows' && inputs.operation == 'contracts') && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        if: (matrix.mode == 'native') && inputs.operation != 'run' && !(runner.os == 'Windows' && inputs.operation == 'contracts') && (inputs.operation != 'build' || steps.reusable-runtime.outputs.available != 'true')
         env:
           CARGO_TARGET_DIR: src-tauri/target/qa-ui-auto
-          SHERPA_CACHE_HIT: ${{ steps.sherpa-cache.outputs.cache-hit }}
+          SHERPA_CACHE_HIT: ${{ steps.branch-cargo-restore.outputs.sherpa-hit == 'true' || steps.sherpa-cache.outputs.cache-hit == 'true' }}
         run: |
           set -euo pipefail
           if [[ "${SHERPA_CACHE_HIT:-}" == "true" ]]; then
@@ -202,7 +281,7 @@ jobs:
         if: (runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'secret-service')) && inputs.operation == 'run'
         run: sudo apt-get update && sudo apt-get install -y gnome-keyring libsecret-tools libglib2.0-bin
       - name: Windows build tools (Perl)
-        if: runner.os == 'Windows' && matrix.mode == 'native' && inputs.operation == 'build' && steps.reusable-runtime-cache.outputs.cache-hit != 'true'
+        if: runner.os == 'Windows' && matrix.mode == 'native' && inputs.operation == 'build' && steps.reusable-runtime.outputs.available != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -283,7 +362,7 @@ jobs:
               time.sleep(0.5)
           PYTHON
       - name: macOS build dependencies (krb5)
-        if: runner.os == 'macOS' && matrix.mode == 'native' && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        if: runner.os == 'macOS' && matrix.mode == 'native' && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime.outputs.available != 'true')
         run: |
           brew install krb5
           echo "SHELL=/bin/zsh" >> "$GITHUB_ENV"
@@ -456,6 +535,40 @@ jobs:
           path: qa-build-output/runtime.tar.gz
           if-no-files-found: error
           retention-days: 3
+          compression-level: 0
+      - name: Retain the reusable runtime for this branch
+        id: publish-branch-runtime
+        if: inputs.operation == 'build' && env.QA_BRANCH_ARTIFACTS == 'true' && steps.branch-runtime.outputs.run-id == ''
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-branch-${{ steps.reusable-key.outputs.key }}
+          path: qa-build-output/reusable-runtime/reusable.tar.gz
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+      - name: Save the reusable runtime cache
+        if: >-
+          inputs.operation == 'build' && steps.reusable-runtime.outputs.available != 'true' &&
+          steps.publish-branch-runtime.outcome != 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: qa-build-output/reusable-runtime
+          key: ${{ steps.reusable-key.outputs.key }}
+      - name: Package Cargo dependencies for this branch
+        id: pack-branch-cargo
+        if: inputs.operation == 'build' && steps.branch-cargo-key.outputs.name != '' && steps.branch-cargo.outputs.run-id == ''
+        continue-on-error: true
+        run: python .agents/skills/qa-ui-auto/scripts/ci_cargo_artifact.py pack
+      - name: Retain Cargo dependencies for this branch
+        if: steps.pack-branch-cargo.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.branch-cargo-key.outputs.name }}
+          path: ${{ env.QA_CARGO_ARCHIVE }}
+          if-no-files-found: error
+          retention-days: 1
           compression-level: 0
       - name: Retain native build diagnostics
         if: always() && inputs.operation == 'build'

@@ -101,6 +101,7 @@ on:
       - '.agents/skills/qa-ui-auto/**'
       - '.github/workflows/qa-ui-auto-platforms.yml'
       - '.github/workflows/qa-ui-auto-entry.yml'
+      - '.github/actions/qa-branch-artifact/**'
       - '.github/actions/qa-runtime/**'
       - 'docs-feature/code-workspace-idea-parity/**'
   schedule:
@@ -108,6 +109,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 env:
   PYTHONPATH: .agents/skills/qa-ui-auto/scripts
@@ -194,7 +196,7 @@ jobs:
         if: inputs.scope != 'selected'
         run: python -m unittest test_language_startup_observer test_sdk_startup_probe test_workspace_slow_sdk test_sdk_editor_input test_sdk_action_trace test_file_open_probe test_workspace_stage_trace test_project_tree_reveal test_browser_tracing test_workspace_tab_reveal test_native_contenteditable test_native_paced_input test_rdp_deferred_clipboard
       - name: Linux package setup contracts
-        run: python -m unittest test_ci_linux_setup test_ci_setup_protoc
+        run: python -m unittest test_ci_linux_setup test_ci_setup_protoc test_ci_cargo_artifact
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

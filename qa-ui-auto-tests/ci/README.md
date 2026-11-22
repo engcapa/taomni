@@ -90,10 +90,13 @@ result, including when all UI cases passed.
 
 When the runtime misses, Cargo can still restore matching compiled dependencies.
 Linux contracts read the producer's Rust cache. The Windows helper contracts
-have their own cache. Successful writers publish dependency caches. A manual
-dispatch can restore caches from its workflow ref or the default branch. A new
-feature branch can therefore start warm when a compatible default-branch cache
-is available. Each platform falls back to a cold build after a miss.
+have their own cache. Direct manual runs against the selected branch's head
+retain the verified runtime for three days and Cargo dependencies for one day
+as workflow artifacts. Restore uses the same repository, branch and workflow.
+A dispatch can also restore compatible Actions caches from its workflow ref or
+the default branch. Each platform provisions a fresh build after a miss.
+Use the `Native runtime cache miss` and `Rust dependency cache miss` steps to
+identify a cold path before it starts compiling during cache measurements.
 
 Ubuntu 22.04 PipeWire, Sherpa native libraries, execution adapters and mobile
 Chromium have separate caches. Builds and contracts install their compilation
@@ -161,6 +164,7 @@ jobs:
   qa:
     permissions:
       contents: read
+      actions: read
       issues: write
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:

@@ -126,7 +126,6 @@
 
 ## 5. 托管验收
 
-
 计时取 GitHub Actions API 的 UTC 时间。墙钟从该 attempt 的 `run_started_at` 到 `updated_at`，包含等待 runner 的时间。job 用自己的开始和完成时间。不同任务可并行，耗时不可相加。A2、B 和 C 均使用 `scope=selected`、`tags=crash-regression`、三端、browser 与 native。每端分别计划 18 次 browser 和 22 次 native，共 120 次。
 
 | Run | 结论 | 墙钟 | plan | build Linux / Windows / macOS | native-contracts Linux / Windows | Windows browser 1 / 2 |
@@ -137,11 +136,13 @@
 | A `45005261996`，首次试验 | 取消 | 51:10 | 0:39 | 26:58 / 32:49 / 40:17 | 26:24 / 4:54 | 5:42 / 5:37 |
 | A2 `45009569101`，attempt 2，Rust 冷编 | 通过 | 58:45 | 0:41 | 25:25 / 34:17 / 35:30 | 25:34 / 2:25 | 5:44 / 7:39 |
 | B `45015104902`，一行 Rust 注释，实际冷编 | 通过 | 56:31 | 0:40 | 25:22 / 40:09 / 32:28 | 23:53 / 3:04 | 8:57 / 7:00 |
-| C，仅文档改动 | 待实测 | — | — | — | — | — |
+| C 首次 `45021757976`，仅文档改动 | 取消 | 31:23 | 0:38 | 25:35 / 27:50 / 取消 | 20:19 / 2:57 | 9:32 / 7:11 |
 
 - **A2**。第一次运行在 7:19 时取消。删除本分支由取消任务写入的 739,943,652 字节半成品缓存后，在同一提交 `25713d41f` 重跑所有 job。三端 Rust 生产者均冷编；Linux 和 macOS 恢复了 Sherpa，Windows 重新下载并成功写入。Linux 构建保存 1,254,467,486 字节 Rust 依赖，Linux contracts 日志为 `save-if: false`。Windows helper 的 26 项 Rust 测试通过，Windows native 四片均成功，第 4 片成功发布 Chromium 缓存。18 个执行分片及汇总全部通过。仓库缓存用量接口在 A2 结束后报告 12,317,326,792 字节。[A2 第 2 次运行](https://github.com/engcapa/taomni/actions/runs/45009569101/attempts/2)
 - **关键路径**。相对 PR #862，A2 的 Linux 和 Windows 冷构建各慢 7:56、7:06，macOS 快 1:27，Windows 合约快 30:36。macOS 构建结束后，四个分片从 10:42:06 到 10:58:17 UTC 陆续执行，每片实际用时 4:09–4:34。配置允许并发 4 片，当次 runner 分配未形成单波次。总墙钟较 PR #862 长 6:52。[PR #862 基线](https://github.com/engcapa/taomni/actions/runs/44998975532)
 - **B**。临时提交 `528cc9cdc` 相对 `b979ed0a2` 仅在 `src-tauri/src/lib.rs` 增加一行注释。源码摘要由 `6261fa3cb03a8406` 变为 `64e99b0ffa4eca09`，配方摘要仍以 `0de7ea9e8a1dcd24` 开头。三个生产者和 Linux 合约均打印 `No cache found.`，Sherpa 也全部未命中。Windows 第 4 片重新安装并保存 Chromium，耗时 9:47。并行前端检查 1:27 通过，120/120 次执行通过，零跳过、零基础设施错误。该样本验证了缓存被驱逐时的重建和执行，暖编耗时仍缺样本。同期缓存清单显示多个 worktree 分支合计超过 10 GB。[B](https://github.com/engcapa/taomni/actions/runs/45015104902)
+- **C 首次**。源码和构建配方摘要与 A2 完全相同。Linux、Windows 查找的程序归档键均已在 A2 成功写入，这次查找未命中并重新编译。确认冷编后取消当次运行。缓存用量接口随后报告 11,467,212,071 字节。[C 首次](https://github.com/engcapa/taomni/actions/runs/45021757976)
+- **同分支缓存修复**。直接在分支 HEAD 手工派发时，编译成功后保留 1 天的 Cargo 依赖归档和 3 天的完整程序归档。按同仓库、同一派发分支及同一 workflow 查找，独立于 Actions cache 配额。Cargo 键包含 runner、工具链、profile、Cargo manifests、锁文件和编译环境。完整程序沿用源码、配方和逐文件校验。普通运行出现 miss 时继续构建，暖编验证可在 miss 步骤出现时取消。
 - **全量范围**。本分支默认 `scope=all` 本地规划出 847 个不同用例、25 个执行分片、2,864 次执行及零能力缺口。最近可比的历史夜间全量墙钟为 128:28，汇总失败，Linux / Windows / macOS 的 build 分别为 52:21 / 64:47 / 28:15。A2/B/C 的墙钟只代表聚焦回归。本轮未测量新分支全量墙钟。[历史三端全量](https://github.com/engcapa/taomni/actions/runs/44963652702)
 
 ## 6. 试验取舍与待办
