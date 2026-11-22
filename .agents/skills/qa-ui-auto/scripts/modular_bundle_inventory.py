@@ -46,7 +46,17 @@ def digest(path: Path) -> str:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def validate_source(run: dict, artifacts: dict, *, repository: str, run_id: str,
+def artifact_rows(listing: dict | list) -> list[dict]:
+    # gh api --paginate --slurp retains the total reported on each page.
+    pages = listing if isinstance(listing, list) else [listing]
+    rows = [row for page in pages for row in page['artifacts']]
+    if (not pages or any(page.get('total_count') != len(rows) for page in pages)
+            or len({row['id'] for row in rows}) != len(rows)):
+        raise ValueError('artifact listing is incomplete or changed during pagination')
+    return rows
+
+
+def validate_source(run: dict, artifacts: dict | list, *, repository: str, run_id: str,
                     source: str, version: str, target: str) -> dict:
     if not re.fullmatch(r'[1-9][0-9]*', run_id):
         raise ValueError('bundle run must be a positive integer')
@@ -62,9 +72,7 @@ def validate_source(run: dict, artifacts: dict, *, repository: str, run_id: str,
             or run.get('repository', {}).get('full_name') != repository
             or run.get('head_repository', {}).get('full_name') != repository):
         raise ValueError('release producer identity differs from the requested sample')
-    rows = artifacts.get('artifacts', [])
-    if artifacts.get('total_count') != len(rows):
-        raise ValueError('artifact listing is incomplete; do not silently use its first page')
+    rows = artifact_rows(artifacts)
     name = f'taomni-{version}-{TARGETS[target][0]}'
     selected = [row for row in rows if row.get('name') == name]
     if len(selected) != 1:

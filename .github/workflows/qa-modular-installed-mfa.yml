@@ -43,7 +43,7 @@ jobs:
           mkdir -p installed-mfa-input
           [[ "$PACKAGE_RUN" =~ ^[1-9][0-9]*$ ]]
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN" > installed-mfa-input/producer.json
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN/artifacts?per_page=100" > installed-mfa-input/artifacts.json
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN/artifacts?per_page=100" > installed-mfa-input/artifacts.json
           python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py validate-source \
             --run installed-mfa-input/producer.json --artifacts installed-mfa-input/artifacts.json \
             --repository "$GITHUB_REPOSITORY" --run-id "$PACKAGE_RUN" --source "$PACKAGE_SOURCE" \

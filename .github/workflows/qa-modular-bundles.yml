@@ -145,12 +145,12 @@ jobs:
           root = Path('bundle-evidence')
           root.mkdir()
           repo = os.environ['GITHUB_REPOSITORY']
-          for name, endpoint in [
-              ('producer-run.json', f'repos/{repo}/actions/runs/{run_id}'),
-              ('producer-artifacts.json', f'repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100'),
+          for name, args in [
+              ('producer-run.json', [f'repos/{repo}/actions/runs/{run_id}']),
+              ('producer-artifacts.json', ['--paginate', '--slurp', f'repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100']),
           ]:
               with (root / name).open('wb') as stream:
-                  subprocess.run(['gh', 'api', endpoint], stdout=stream, check=True)
+                  subprocess.run(['gh', 'api', *args], stdout=stream, check=True)
           PY
           python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py validate-source \
             --run bundle-evidence/producer-run.json --artifacts bundle-evidence/producer-artifacts.json \

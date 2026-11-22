@@ -59,6 +59,16 @@ class BundleSourceTests(unittest.TestCase):
         self.assertIsNone(result['producerConclusionObserved'])
         self.assertEqual(result['artifact']['id'], 456)
 
+    def test_release_bundle_after_the_first_hundred_artifacts_can_be_selected(self):
+        run, artifacts = source_fixture()
+        first = [{'id': number, 'name': f'module-{number}'} for number in range(1, 101)]
+        pages = [{'total_count': 101, 'artifacts': first},
+                 {'total_count': 101, 'artifacts': artifacts['artifacts']}]
+        self.assertEqual(validate(run, pages)['artifact']['id'], 456)
+        for incomplete in [pages[:1], [*pages, pages[1]], [pages[0], {**pages[1], 'total_count': 102}]]:
+            with self.subTest(incomplete=len(incomplete)), self.assertRaisesRegex(ValueError, 'incomplete'):
+                validate(run, incomplete)
+
     def test_wrong_run_source_repository_workflow_and_fork_are_rejected(self):
         run, artifacts = source_fixture()
         for field, value in [('id', 999), ('head_sha', 'c' * 40), ('path', 'qa.yml'),
