@@ -272,11 +272,11 @@ class NativeIsolationTest(unittest.TestCase):
             self.assertFalse((root / "run").exists())
 
     def test_reset_clears_only_qa_state_for_supported_native_platforms(self):
+        qa_keys = {"NEWMOB_DATA_DIR", "NEWMOB_CONFIG_DIR", "NEWMOB_CACHE_DIR"}
         expected_keys = {
-            "Linux": {"XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"},
-            "Windows": {"APPDATA", "LOCALAPPDATA", "NEWMOB_DATA_DIR",
-                        "NEWMOB_CONFIG_DIR", "NEWMOB_CACHE_DIR"},
-            "Darwin": {"NEWMOB_DATA_DIR", "NEWMOB_CONFIG_DIR", "NEWMOB_CACHE_DIR"},
+            "Linux": qa_keys | {"XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"},
+            "Windows": qa_keys | {"APPDATA", "LOCALAPPDATA"},
+            "Darwin": qa_keys,
         }
         for system in ("Linux", "Windows", "Darwin"):
             with self.subTest(system=system), TemporaryDirectory() as directory:
@@ -284,6 +284,9 @@ class NativeIsolationTest(unittest.TestCase):
                 with patch.object(native.platform, "system", return_value=system):
                     env = native.native_isolation_env(root / "run")
                     self.assertEqual(set(env), expected_keys[system])
+                    if system == "Linux":
+                        for kind in ("DATA", "CONFIG", "CACHE"):
+                            self.assertEqual(env[f"NEWMOB_{kind}_DIR"], env[f"XDG_{kind}_HOME"])
                     run_root = (root / "run").resolve()
                     self.assertTrue(all(Path(value).is_relative_to(run_root)
                                         for value in env.values()))
@@ -396,10 +399,10 @@ class NativeIsolationTest(unittest.TestCase):
             outside.mkdir()
             (outside / "taomni.db").write_bytes(b"production")
             env = native.native_isolation_env(root / "run")
-            for key, value in env.items():
+            for value in set(env.values()):
                 profile = Path(value) / native_build.QA_APP_ID
                 profile.parent.mkdir(parents=True)
-                if key == "XDG_CACHE_HOME":
+                if value == env["XDG_CACHE_HOME"]:
                     profile.symlink_to(outside, target_is_directory=True)
                 else:
                     profile.mkdir()

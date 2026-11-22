@@ -7,9 +7,30 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import Mock, call, patch
+import xml.etree.ElementTree as ET
 
 from ci_live_monitor import discover_selection, main
-from ci_live_shards import GitHubArtifacts, collect
+from ci_live_shards import GitHubArtifacts, collect, report_shard
+from qa_ui_auto.reporter import write_junit
+
+
+class ShardReportTests(unittest.TestCase):
+    def test_terminal_escapes_do_not_break_junit_or_hide_the_case_failure(self):
+        message = "\x1b[31;1mPowerShell could not open a chooser\x1b[0m"
+        case = {"id": "TC-X", "title": "Save", "status": "failed", "failure": {"message": message}}
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root)
+            junit = write_junit(path, {"cases": [case]})
+            failure = ET.parse(junit).find(".//failure")
+            self.assertIn("PowerShell could not open a chooser", failure.text)
+            self.assertEqual(case["failure"]["message"], message)
+
+            junit.write_text(f'<testcase name="{message}"></testcase>', encoding="utf-8")
+            (path / "summary.json").write_text(json.dumps({"cases": [case]}), encoding="utf-8")
+            with redirect_stdout(io.StringIO()) as logs:
+                report_shard(path, None)
+            self.assertIn("TC-X Save: failed", logs.getvalue())
+            self.assertIn(message, junit.read_text(encoding="utf-8"))
 
 
 class Clock:

@@ -39,6 +39,7 @@ Stable JSON shape so Claude Code can parse failed cases reliably:
 from __future__ import annotations
 
 import json
+import re
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
@@ -46,6 +47,7 @@ from typing import Any
 
 
 SCHEMA_VERSION = "qa-ui-auto.summary.v1"
+INVALID_XML_TEXT = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
 
 
 def write_summary(report_root: Path, data: dict[str, Any]) -> Path:
@@ -142,19 +144,19 @@ def write_junit(report_root: Path, data: dict[str, Any]) -> Path:
         })
         if c["status"] == "skipped":
             ET.SubElement(case_el, "skipped", attrib={
-                "message": c.get("fixtures_skipped") or "skipped",
+                "message": INVALID_XML_TEXT.sub("\ufffd", c.get("fixtures_skipped") or "skipped"),
             })
         elif c["status"] == "failed":
             f = c.get("failure") or {}
             failure_el = ET.SubElement(case_el, "failure", attrib={
                 "type": "StepError",
-                "message": f.get("message", "failed")[:240],
+                "message": INVALID_XML_TEXT.sub("\ufffd", f.get("message", "failed")[:240]),
             })
-            failure_el.text = (
+            failure_el.text = INVALID_XML_TEXT.sub("\ufffd", (
                 f"step {f.get('step_index', '?')} verb={f.get('verb', '?')}\n"
                 f"args={json.dumps(f.get('args'), ensure_ascii=False)}\n"
                 f"{f.get('message', '')}"
-            )
+            ))
     out = report_root / "junit.xml"
     ET.ElementTree(suites).write(out, encoding="utf-8", xml_declaration=True)
     return out

@@ -557,14 +557,15 @@ class NativeSessionFillTest(TestCase):
         self.assertFalse(any(c.args[1].endswith('/value') for c in session.request.call_args_list))
         session.type_text.assert_not_called()
 
-    def test_macos_fill_replaces_value_without_synthetic_backspace(self) -> None:
-        for selector in ('input[type="text"]', 'input[type="search"]'):
-            with self.subTest(selector=selector):
+    def test_bridge_fill_replaces_value_without_driver_specific_requests(self) -> None:
+        for system in ("Darwin", "Windows", "Linux"):
+            with self.subTest(system=system), patch("tauri_webdriver.platform.system", return_value=system):
                 session = self.session(False)
-                with patch("tauri_webdriver.platform.system", return_value="Darwin"), \
-                        patch("qa_ui_auto.host_clipboard.get_text") as get_text, \
+                if system != "Darwin":
+                    session.transport = "Taomni QA WebView bridge"
+                with patch("qa_ui_auto.host_clipboard.get_text") as get_text, \
                         patch("qa_ui_auto.host_clipboard.set_text") as set_text:
-                    self.assertEqual(session.fill(selector, "QA-LEFT-GUTTER"), f"filled {selector}")
+                    self.assertEqual(session.fill("input", "QA-LEFT-GUTTER"), "filled input")
                 session.request.assert_called_once_with(
                     "POST", "/session/session-1/element/element-1/value", {"text": "QA-LEFT-GUTTER"})
                 self.assertEqual(session.execute.call_count, 1)

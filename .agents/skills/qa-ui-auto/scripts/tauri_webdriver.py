@@ -60,25 +60,21 @@ def native_isolation_env(report_root: Path) -> dict[str, str]:
     if any(path.resolve() != path for path in checked):
         raise WebDriverError("Native isolation directories must not be symlinks")
     system = platform.system()
+    qa_paths = {f"NEWMOB_{key.upper()}_DIR": str(path) for key, path in paths.items()}
     if system == "Linux":
-        return {f"XDG_{key.upper()}_HOME": str(path) for key, path in paths.items()}
+        # The restore bridge also checks the explicit QA roots before binding.
+        return {**qa_paths, **{f"XDG_{key.upper()}_HOME": str(path) for key, path in paths.items()}}
     if system == "Windows":
         return {
             "APPDATA": str(paths["data"]),
             "LOCALAPPDATA": str(paths["cache"]),
-            "NEWMOB_DATA_DIR": str(paths["data"]),
-            "NEWMOB_CONFIG_DIR": str(paths["config"]),
-            "NEWMOB_CACHE_DIR": str(paths["cache"]),
+            **qa_paths,
         }
     if system == "Darwin":
         # macOS `dirs` intentionally ignores XDG variables.  These explicit
         # QA-only overrides are consumed by Taomni's config/cache path helpers
         # while leaving the user's HOME and keychain untouched.
-        return {
-            "NEWMOB_DATA_DIR": str(paths["data"]),
-            "NEWMOB_CONFIG_DIR": str(paths["config"]),
-            "NEWMOB_CACHE_DIR": str(paths["cache"]),
-        }
+        return qa_paths
     raise WebDriverError("native isolation is unsupported on this OS")
 
 
@@ -395,6 +391,10 @@ class NativeSession(WebDriverTransport):
         self.transport = "macOS WKWebView bridge" if platform.system() == "Darwin" else "tauri-driver"
         self._window_focus = NativeWindowFocus(self, os.environ)
 
+    @property
+    def uses_bridge(self) -> bool:
+        return self.transport in {"macOS WKWebView bridge", "Taomni QA WebView bridge"}
+
     def start(self) -> None:
         payload = {
             "capabilities": {
@@ -405,7 +405,7 @@ class NativeSession(WebDriverTransport):
                 }
             }
         }
-        if platform.system() == "Windows":
+        if platform.system() == "Windows" and not self.uses_bridge:
             payload["capabilities"]["alwaysMatch"]["tauri:options"]["webviewOptions"] = windows_webview_options(os.environ, QA_APP_ID)
         value = self.request("POST", "/session", payload)
         sid = value.get("sessionId") if isinstance(value, dict) else None
@@ -432,7 +432,7 @@ class NativeSession(WebDriverTransport):
         """Wait until the QA WebView has a mounted application root."""
         end = time.monotonic() + timeout
         last_error = ""
-        navigation_checked = platform.system() != "Windows"
+        navigation_checked = platform.system() != "Windows" or self.uses_bridge
         while time.monotonic() < end:
             if self.deadline:
                 self.deadline.remaining()
@@ -648,7 +648,7 @@ class NativeSession(WebDriverTransport):
 
     def fill(self, selector: str, text: str) -> str:
         element = self.find(selector)
-        if platform.system() == "Windows" and self.request(
+        if platform.system() == "Windows" and not self.uses_bridge and self.request(
             "GET", self.element_path(element, "/property/type")
         ) == "date":
             # WebView2 date editors have localized, segmented keyboard fields;
@@ -698,8 +698,8 @@ class NativeSession(WebDriverTransport):
         if contenteditable is True:
             from native_contenteditable import fill_contenteditable
             return fill_contenteditable(self, element, selector, text, WebDriverError)
-        if platform.system() == "Darwin":
-            # The WKWebView bridge's value endpoint replaces the value using
+        if self.uses_bridge:
+            # The bridge's value endpoint replaces the value using
             # the native DOM setter and React input events without blurring.
             # Its synthetic keyboard adapter cannot perform OS select-all.
             self.request("POST", self.element_path(element, "/value"), {"text": text})

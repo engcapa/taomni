@@ -105,10 +105,12 @@ def run(ctx, phase):
                         and matching[0].get("parentPid") == host_pid):
                     journal = json.loads(journal_path.read_text(encoding="utf-8"))
                     port = journal.get("relayPort")
-                    if (journal.get("phase") != "active" or journal.get("clean") is not False
-                            or type(port) is not int or not 0 < port <= 65535 or not listening(port)):
+                    # Windows journals omit phase. RecoveryPhase defaults to Active.
+                    result.update(journalPhase=journal.get("phase", "active"), journalClean=journal.get("clean"),
+                                  relayPort=port, relayListening=type(port) is int and 0 < port <= 65535 and listening(port))
+                    if (result["journalPhase"] != "active" or result["journalClean"] is not False
+                            or not result["relayListening"]):
                         raise StepError("The active capture did not publish its listening relay")
-                    result.update(relayPort=port, relayListening=True)
                     result["ready"] = matching[0]
                     with zipfile.ZipFile(owner.sockscap_resource_restore[0]) as archive:
                         digests = {}

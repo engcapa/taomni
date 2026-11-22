@@ -131,7 +131,17 @@ def blocked_entries(entries: dict[str, dict], jobs: list[dict]) -> set[str]:
 def report_shard(path: Path, summary_path: Path | None) -> None:
     rows = []
     for junit in sorted(path.rglob("junit.xml")):
-        for case in ET.parse(junit).getroot().iter("testcase"):
+        try:
+            cases = ET.parse(junit).getroot().iter("testcase")
+        except ET.ParseError as error:
+            print(f"[{path.name}] Invalid JUnit at {junit.relative_to(path)}: {error}", flush=True)
+            try:
+                report = json.loads(junit.with_name("summary.json").read_text(encoding="utf-8"))
+                rows.extend(f"{case['id']} {case['title']}: {case['status']}" for case in report["cases"])
+            except (OSError, ValueError, KeyError, TypeError):
+                print(f"[{path.name}] Raw evidence retained, case summary unavailable", flush=True)
+            continue
+        for case in cases:
             outcome = next((status for tag, status in
                             (("failure", "failed"), ("error", "error"), ("skipped", "skipped"))
                             if case.find(tag) is not None), "passed")
@@ -179,7 +189,7 @@ def collect(client: GitHubArtifacts, destination: Path, run_id: str, artifact_ke
                             report_shard(target, summary_path)
                         seen.add(name)
                         print(f"Downloaded completed artifact {name}", flush=True)
-                    except (OSError, ValueError, subprocess.SubprocessError, zipfile.BadZipFile, ET.ParseError) as error:
+                    except (OSError, ValueError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
                         shutil.rmtree(destination / name, ignore_errors=True)
                         print(f"Retrying artifact {name}: {type(error).__name__}", flush=True)
 
