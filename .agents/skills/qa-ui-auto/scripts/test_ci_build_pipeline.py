@@ -98,6 +98,11 @@ class BuildPipelineTests(unittest.TestCase):
             self.assertNotIn("inputs.operation == 'build'", step['if'])
         rust_contracts = next(s for s in steps if s.get('name') == 'Native Rust contracts')
         self.assertIn("runner.os == 'Linux'", rust_contracts['if'])
+        sherpa_cache = next(s for s in steps if s.get('name') == 'Sherpa-ONNX prebuilt cache')
+        self.assertEqual(sherpa_cache['with']['path'], 'src-tauri/target/qa-ui-auto/sherpa-onnx-prebuilt')
+        sherpa_refresh = next(s for s in steps if s.get('name') == 'Ensure Sherpa-ONNX build state and runtime DLLs')
+        self.assertIn('scripts/refresh-sherpa-onnx-cache.mjs', sherpa_refresh['run'])
+        self.assertIn('cargo clean --manifest-path src-tauri/Cargo.toml --package sherpa-onnx-sys', sherpa_refresh['run'])
 
     @unittest.skipUnless(os.name == 'posix' and shutil.which('bash'), 'POSIX shell contract')
     def test_rust_contracts_use_one_root_binary_with_all_selected_filters(self):

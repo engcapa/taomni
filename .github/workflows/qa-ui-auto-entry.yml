@@ -134,11 +134,31 @@ jobs:
           cache-targets: true
           cache-on-failure: true
       - name: Sherpa-ONNX prebuilt cache
+        id: sherpa-cache
         if: (matrix.mode == 'native') && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
         uses: actions/cache@v4
         with:
-          path: src-tauri/target/sherpa-onnx-prebuilt
-          key: qa-sherpa-onnx-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          path: src-tauri/target/qa-ui-auto/sherpa-onnx-prebuilt
+          key: qa-sherpa-onnx-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+      - name: Ensure Sherpa-ONNX build state and runtime DLLs
+        if: (matrix.mode == 'native') && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
+        env:
+          CARGO_TARGET_DIR: src-tauri/target/qa-ui-auto
+          SHERPA_CACHE_HIT: ${{ steps.sherpa-cache.outputs.cache-hit }}
+        run: |
+          set -euo pipefail
+          if [[ "${SHERPA_CACHE_HIT:-}" == "true" ]]; then
+            # Prebuilt archives/libs were restored over rust-cache's pruned empty dirs.
+            # Clean only sherpa-onnx-sys fingerprints so Cargo re-runs its build script
+            # offline to copy runtime DLLs beside the executable and re-emit link dirs.
+            for profile in dev release; do
+              cargo clean --manifest-path src-tauri/Cargo.toml --package sherpa-onnx-sys --profile "$profile"
+            done
+          else
+            # Remove any empty pruned directories left by rust-cache and reset
+            # sherpa-onnx-sys so upstream extraction runs cleanly.
+            node scripts/refresh-sherpa-onnx-cache.mjs
+          fi
       # Exercise a real Secret Service in the disposable D-Bus session.
       - name: Linux backup credential service
         if: (runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'secret-service')) && inputs.operation == 'run'
