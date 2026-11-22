@@ -28,6 +28,14 @@ steps:
 - click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="chat-voice-button"]'
 - click: '[data-testid="chat-voice-button"]'
+- wait_for: '[data-testid="voice-settings-dialog"]'
+- assert_text: {selector: '[data-testid="asr-model-whisper-base"]', contains: Downloaded}
+- click: '[data-testid="asr-select-whisper-base"]:not([disabled])'
+- assert_text: {selector: '[data-testid="asr-model-whisper-base"]', contains: Selected}
+- select_option: {selector: '[data-testid="asr-language"]', value: en}
+- assert_text: {selector: '[data-testid="asr-settings"]', contains: 'Auto local language prior: en'}
+- click: '[data-testid="voice-settings-close"]'
+- click: '[data-testid="chat-voice-button"]'
 - wait_for: {selector: '[data-testid="chat-voice-button"][data-state="recording"]', timeout_sec: 40}
 - click: '[data-testid="chat-voice-button"]'
 - eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 45}
@@ -50,16 +58,20 @@ verification:
   requirements:
   - id: installed-decode
     requirement: A signed host and preserved model cache let the user decode speech into the editable draft after enable.
-    actions: [6, 9, 12, 15, 19, 21, 23, 28, 32, 34]
+    actions: [6, 9, 12, 15, 19, 21, 24, 26, 28, 29, 31, 36, 40, 42]
     checkpoints:
     - {step: 8, expectation: The local module is unavailable before installation.}
     - {step: 14, expectation: The installed native host matches the package fixture.}
-    - {step: 24, expectation: Local inference recognizes the expected phrase in the draft.}
-    - {step: 25, expectation: The transcript also includes the distinct reference word.}
-    - {step: 36, expectation: The alert names the now-disabled module.}
-    - {step: 37, expectation: Disabling the module disables inference in the same app process.}
-    - {step: 38, expectation: The renderer reports no runtime errors.}
-    results: [8, 14, 24, 25, 36, 37, 38]
+    - {step: 23, expectation: The real app recognizes the verified model in its existing cache.}
+    - {step: 25, expectation: The model selected in settings becomes active.}
+    - {step: 27, expectation: Settings confirm the selected English language.}
+    - {step: 30, expectation: The normal voice button starts recording.}
+    - {step: 32, expectation: Local inference recognizes the expected phrase in the draft.}
+    - {step: 33, expectation: The transcript also includes the distinct reference word.}
+    - {step: 44, expectation: The alert names the now-disabled module.}
+    - {step: 45, expectation: Disabling the module disables inference in the same app process.}
+    - {step: 46, expectation: The renderer reports no runtime errors.}
+    results: [8, 14, 23, 25, 27, 30, 32, 33, 44, 45, 46]
   visual:
   - check: The required or disabled module is visible in the recording status.
     method: automated

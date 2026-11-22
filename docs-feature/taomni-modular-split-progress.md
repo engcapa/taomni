@@ -3,6 +3,7 @@
 ## 2026-11-22 当前进展
 
 - 合入远程 `main` 的 `4e19707e4`（#855），合并提交为 `5a911b255`。记事本相关 36 项单测和 TypeScript 检查通过。
+- Windows 的本地 SSH/SFTP 分片复验通过，包含精确命令输出和端口释放。Local Voice 分片确认签名包已安装且应用检测到预置 Whisper 模型，原测试配置缺少必填字段，录音按钮打开了模型设置。TC-MODULES-067 现通过界面选用 Whisper Base 和英语，继续验证原录音路径、转写和停用。29 项相关前端单测及用例审计通过。 [原始分片](https://github.com/engcapa/taomni/actions/runs/44969347390)
 - Mail 预取的 Linux 和 macOS 原生分片记录了同一连接预取四封邮件。Linux 失败快照中的 HTML 阅读器已加载正确正文，并显示来自本地缓存。TC-MODULES-068 改为读取实际呈现的 HTML 或纯文本正文，继续核对缓存来源和模块停用。 [预取分片](https://github.com/engcapa/taomni/actions/runs/44967113628)
 - SocksCap 0.1.0 的签名宿主接管单条代理链接解析。核心继续管理密码入 Vault 和当前配置，超出控制帧容量的链接沿用本地解析。共享库包含恢复日志格式，30 项单测及宿主和核心编译通过。TC-MODULES-072 核对普通导入操作、签名工件和停用后写租约释放。
 - SocksCap 的存盘配置、链接解析和本地代理进程的配置生成迁入 `taomni-sockscap-api`，为核心与独立宿主共用。27 项契约单测和基座编译通过，包含旧配置默认值和原有序列化字段。TC-MODULES-071 在 Browser 与 Native 读取旧端点和 QUIC 默认值，再修改地址与端口并重开核对保存结果。宿主仍需接管驱动、子进程和恢复日志。

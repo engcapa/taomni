@@ -48,11 +48,6 @@ def setup(ctx):
     data.mkdir(parents=True, exist_ok=True)
     pcm = data / "qa-local-voice.f32le"
     shutil.copyfile(audio / "jfk.f32", pcm)
-    config = (Path(isolation["NEWMOB_CONFIG_DIR"]) / QA_APP_ID
-              if "NEWMOB_CONFIG_DIR" in isolation else Path(isolation["XDG_CONFIG_HOME"]))
-    config = config / "taomni/ai.json"
-    config.parent.mkdir(parents=True, exist_ok=True)
-    config.write_text(json.dumps({"asr": {"active": "whisper-base", "language": "en", "cleanup": "off"}}), encoding="utf-8")
 
     owned = Path(ctx.case_dir).resolve() / "signed-local-voice"
     owned.mkdir()
