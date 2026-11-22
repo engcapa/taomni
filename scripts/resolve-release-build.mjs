@@ -64,10 +64,18 @@ export function releaseBuildPlan(env, packageVersion) {
   };
 }
 
+function firstReleaseSlugs() {
+  const roster = JSON.parse(readFileSync(new URL("../src-tauri/plugins/legacy-upgrade.json", import.meta.url), "utf8"));
+  return roster.map((id) => id.replace(/^taomni-plugin-/, "")).sort();
+}
+
+export function rehearsesFirstUpgrade(plan) {
+  return !plan.tag && JSON.stringify(JSON.parse(plan.modules).sort()) === JSON.stringify(firstReleaseSlugs());
+}
+
 export function selectPublicationModules(plan, lookup = publishedModuleCatalogTag) {
   if (!plan.tag || lookup()) return plan;
-  const roster = JSON.parse(readFileSync(new URL("../src-tauri/plugins/legacy-upgrade.json", import.meta.url), "utf8"));
-  const slugs = roster.map((id) => id.replace(/^taomni-plugin-/, "")).sort();
+  const slugs = firstReleaseSlugs();
   const requested = JSON.parse(plan.modules);
   if (requested.length && JSON.stringify(requested.sort()) !== JSON.stringify(slugs)) {
     throw new Error(`The first core release must build all legacy-upgrade modules: ${slugs.join(", ")}`);
@@ -81,6 +89,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const plan = selectPublicationModules(releaseBuildPlan(process.env, packageVersion));
     if (!process.env.GITHUB_OUTPUT) throw new Error("GITHUB_OUTPUT is required.");
     appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(plan).map(([name, value]) => `${name}=${value}\n`).join(""));
+    appendFileSync(process.env.GITHUB_OUTPUT, `rehearse_first_upgrade=${rehearsesFirstUpgrade(plan)}\n`);
     console.log(`Build ${plan.version}; ${plan.tag ? `release ${plan.tag}` : "workflow artifacts only"}.`);
   } catch (error) {
     console.error(error.message);

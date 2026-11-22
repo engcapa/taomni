@@ -62,6 +62,7 @@ jobs:
       macos_architectures: ${{ steps.plan.outputs.macos_architectures }}
       macos_runner: ${{ steps.plan.outputs.macos_runner }}
       modules: ${{ steps.plan.outputs.modules }}
+      rehearse_first_upgrade: ${{ steps.plan.outputs.rehearse_first_upgrade }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -492,6 +493,41 @@ jobs:
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
+  verify-candidate-roster:
+    name: Verify first-upgrade catalog and signed business packages
+    needs: [plan, package-modules]
+    if: needs.plan.outputs.rehearse_first_upgrade == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build and test the catalog signer
+        run: |
+          cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
+          cargo build --manifest-path scripts/plugin-package/Cargo.toml --bin taomni-plugin-package --release --locked
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: module-signed-*-${{ github.run_id }}
+          path: signed-module-artifacts
+          merge-multiple: false
+      - name: Verify every package and sign the loopback install feed
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          export MODULE_UPDATED_AT
+          MODULE_UPDATED_AT="$(git show -s --format=%cI HEAD)"
+          scripts/plugin-package/target/release/taomni-plugin-package --qa-first-release-roster signed-module-artifacts candidate-roster
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modular-candidate-roster-${{ github.run_id }}
+          path: candidate-roster
+          if-no-files-found: error
 
   verify-candidate-updater:
     name: Verify four-target candidate updater

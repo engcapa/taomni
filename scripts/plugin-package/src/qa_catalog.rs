@@ -112,7 +112,7 @@ pub fn write(output: &Path, receipt: &Value, signer: &ReleaseSigner) -> Result<(
     Ok(())
 }
 
-fn sign_catalog(
+pub(super) fn sign_catalog(
     output: &Path,
     name: &str,
     catalog: &Value,

@@ -1,6 +1,7 @@
 //! Build one immutable official plugin ZIP and verify its detached signature.
 
 pub mod qa_catalog;
+pub mod qa_first_release;
 pub mod release_catalog;
 pub mod signing;
 

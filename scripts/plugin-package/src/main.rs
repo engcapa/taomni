@@ -16,6 +16,20 @@ fn run() -> Result<()> {
     let mut args = std::env::args().skip(1).peekable();
     if args
         .peek()
+        .is_some_and(|argument| argument == "--qa-first-release-roster")
+    {
+        args.next();
+        let directories: Vec<_> = args.collect();
+        let [artifacts, output] = directories.as_slice() else {
+            anyhow::bail!("expected --qa-first-release-roster SIGNED_ARTIFACTS OUTPUT");
+        };
+        return taomni_plugin_package::qa_first_release::write(
+            Path::new(artifacts),
+            Path::new(output),
+        );
+    }
+    if args
+        .peek()
         .is_some_and(|argument| argument == "--verify-release-roster")
     {
         args.next();

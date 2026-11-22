@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { releaseBuildPlan, selectPublicationModules, validateTestVersion } from "./resolve-release-build.mjs";
+import { releaseBuildPlan, rehearsesFirstUpgrade, selectPublicationModules, validateTestVersion } from "./resolve-release-build.mjs";
 
 const version = "0.4.30";
 const manual = { GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF_TYPE: "branch" };
@@ -82,6 +82,9 @@ test("manual joint builds select only the named module packages", () => {
 test("the first tagged build automatically selects the complete monolith upgrade roster", () => {
   const tagged = releaseBuildPlan({ ...manual, INPUT_RELEASE_TAG: `v${version}` }, version);
   const slugs = JSON.parse(selectPublicationModules(tagged, () => undefined).modules);
+  assert(!rehearsesFirstUpgrade({ ...tagged, modules: JSON.stringify(slugs) }));
+  assert(rehearsesFirstUpgrade({ tag: "", modules: JSON.stringify([...slugs].reverse()) }));
+  assert(!rehearsesFirstUpgrade({ tag: "", modules: JSON.stringify(slugs.slice(1)) }));
   assert.deepEqual(slugs, ["ai-voice-local", "mail", "mfa", "rdp-client", "rdp-server", "screenshot", "servers", "sockscap", "vnc-client", "vnc-server"]);
   for (const slug of slugs) {
     const manifest = JSON.parse(readFileSync(new URL(`../src-tauri/plugins/${slug}/module.json`, import.meta.url), "utf8"));
