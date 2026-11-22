@@ -34,6 +34,9 @@ export interface UseMainWindowLifecycleContext {
 export function useMainWindowLifecycle(context: UseMainWindowLifecycleContext) {
   useNotesWorkspaceNavigation();
   const { layout } = context;
+  // Used only to re-apply the sidebar collapse state when a rail-only surface
+  // (Explorer) unmounts the sidebar Panel and another mode mounts it again.
+  const activeSideTab = useAppStore((state) => state.activeSideTab);
 
   const openDetachedSftp = useCallback(createOpenDetachedSftp({
     setStatusMessage: layout.setStatusMessage,
@@ -138,17 +141,41 @@ export function useMainWindowLifecycle(context: UseMainWindowLifecycleContext) {
   }, [layout.tabs]);
 
   useLayoutEffect(() => {
-    const panel = layout.sidebarPanelRef.current;
-    if (!panel) return;
-
-    // The title bar belongs to the content panel. Apply its new position
-    // before paint so an immediate tab click cannot straddle two layouts.
-    if (layout.sidebarCollapsed) {
-      panel.collapse();
-    } else {
-      panel.resize(layout.lastSidebarSizeRef.current > 0 ? `${layout.lastSidebarSizeRef.current}%` : "260px");
+    let cancelled = false;
+    let frame = 0;
+    let attempts = 0;
+    // The sidebar Panel is unmounted entirely on rail-only surfaces (Explorer),
+    // and re-mounts when another mode returns. Apply the store's collapsed
+    // state once the group has actually registered the panel; the imperative
+    // handle throws while the re-mounted panel is not in the group layout yet.
+    const apply = (): boolean => {
+      const panel = layout.sidebarPanelRef.current;
+      if (!panel) return false;
+      try {
+        // The title bar belongs to the content panel. Apply its new position
+        // before paint so an immediate tab click cannot straddle two layouts.
+        if (layout.sidebarCollapsed) {
+          panel.collapse();
+        } else {
+          panel.resize(layout.lastSidebarSizeRef.current > 0 ? `${layout.lastSidebarSizeRef.current}%` : "260px");
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    if (!apply()) {
+      const retry = () => {
+        if (cancelled) return;
+        if (!apply() && attempts++ < 8) frame = requestAnimationFrame(retry);
+      };
+      frame = requestAnimationFrame(retry);
     }
-  }, [layout.sidebarCollapsed]);
+    return () => {
+      cancelled = true;
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [layout.sidebarCollapsed, layout.sidebarPanelRef, layout.lastSidebarSizeRef, activeSideTab]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {

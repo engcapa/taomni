@@ -327,6 +327,7 @@ TC-EXPLORER-008: []
 TC-EXPLORER-009: []
 TC-EXPLORER-010: []
 TC-EXPLORER-011: []
+TC-EXPLORER-012: []
 # Notepad browser workbench cases are self-contained: reset_db gives a fresh
 # context and file_open_files seeds the isolated VFS root when bytes matter.
 TC-NP-001: []
@@ -339,3 +340,4 @@ TC-NP-007: []
 TC-NP-101: []
 TC-NP-102: []
 TC-NP-103: []
+
