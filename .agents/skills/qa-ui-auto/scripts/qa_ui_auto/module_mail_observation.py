@@ -24,7 +24,8 @@ def run(ctx, args):
     active = {
         "folder-tree", "folder-changes", "running", "imap-delivery", "pop3-delivery",
         "attachment-saved", "attachment-reopened", "agenda-written", "filter-saved",
-        "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source", "imap-prefetch", "outbox-queued", "outbox-sent",
+        "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source",
+        "imap-prefetch", "imap-mutations", "outbox-queued", "outbox-sent",
     }
     retained = {"outbox-retained", "contact-retained", "agenda-retained", "filter-retained"}
     if phase not in active | retained | {"idle", "disabled"} or not signed or owner.case_id not in SIGNED_MAIL_CASES:
@@ -98,6 +99,11 @@ def run(ctx, args):
             raise StepError("Disabling Mail changed the saved filter")
     if phase == "imap-prefetch":
         report["prefetch"] = observe_prefetch(args)
+    if phase == "imap-mutations":
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        if owner.case_id != "TC-MAIL-BULK-03" or "mail/open-imap-mutations" not in manifest["commands"]:
+            raise StepError("The installed Mail version does not provide the signed mutation connection")
+        report["mutations"] = observe_mutations()
     if phase in {"outbox-queued", "outbox-retained", "outbox-sent"}:
         if owner.case_id != "TC-MODULES-077":
             raise StepError("Outbox storage requires the signed draft lifecycle case")
@@ -107,6 +113,18 @@ def run(ctx, args):
             signed["queuedDraft"] = observation
     (ctx.case_dir / f"signed-mail-{phase}.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return f"Mail {version} host lease verified ({phase})"
+
+
+def observe_mutations():
+    state = mail_fake_server.ACTIVE.state
+    with state.lock:
+        deleted = [command for command in state.log
+                   if command.startswith("UID STORE ") and r"\Deleted" in command]
+        expunged = [command for command in state.log if command.startswith("UID EXPUNGE ")]
+        copies = list(state.mutation_events)
+    if len(deleted) != 3 or len(expunged) != 2:
+        raise StepError(f"Expected three STORE attempts and two targeted EXPUNGE commands, got {deleted} and {expunged}")
+    return {"transfers": copies, "stores": deleted, "uidExpunges": expunged}
 
 
 def observe_responses():

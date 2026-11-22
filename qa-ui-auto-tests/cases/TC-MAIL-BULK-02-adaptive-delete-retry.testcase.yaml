@@ -97,6 +97,9 @@ steps:
 - assert_count:
     selector: '[data-testid="mail-message-row"]'
     equal: 0
+- assert_count: {selector: '[data-testid="mail-mutation-retry"]', equal: 0}
+- assert_count: {selector: '[data-testid="mail-mutation-details"]', equal: 0}
+- assert_no_runtime_errors: null
 - screenshot: mail-bulk-limit-complete.png
 verification:
   review: reviewed
@@ -168,12 +171,18 @@ verification:
         200/200 messages''}}'
     - step: 34
       expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-message-row"]'', ''equal'': 0}}'
+    - {step: 35, expectation: Retry is removed after every message is processed.}
+    - {step: 36, expectation: The previous failure details are cleared.}
+    - {step: 37, expectation: Retrying the operation completes without runtime errors.}
     results:
     - 30
     - 31
     - 32
     - 33
     - 34
+    - 35
+    - 36
+    - 37
   visual:
   - check: Progress, remaining selection, error, Retry and Details are legible without moving the toolbar.
     method: manual

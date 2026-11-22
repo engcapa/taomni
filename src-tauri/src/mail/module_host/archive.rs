@@ -1,8 +1,8 @@
-//! Client for the Mail host's dedicated archive IMAP session.
+//! Client for a dedicated IMAP connection in the signed Mail host.
 
 use std::sync::Arc;
 
-use serde::de::DeserializeOwned;
+use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     OPEN_IMAP_ARCHIVE,
     imap_exchange::{ImapExchange, read_frame, write_frame},
@@ -19,23 +19,24 @@ pub(in crate::mail) fn archives_imap(registry: &PluginRegistry) -> bool {
     supports(registry, OPEN_IMAP_ARCHIVE)
 }
 
-pub(in crate::mail) struct HostedArchive {
+pub(in crate::mail) struct HostedImap {
     _incoming: Route,
     _exchange: Route,
     peer: DuplexStream,
 }
 
-impl HostedArchive {
+impl HostedImap {
     pub(in crate::mail) async fn open(
         registry: Arc<PluginRegistry>,
         account: &ResolvedMailAccount,
+        method: &'static str,
     ) -> Result<Self, String> {
         let (_incoming, connection) = bind_incoming(account).await?;
         let (_exchange, exchange, mut peer) =
             Route::pair().await.map_err(|error| error.to_string())?;
         invoke::<(), _>(
             registry,
-            OPEN_IMAP_ARCHIVE,
+            method,
             ImapExchange {
                 connection,
                 exchange,
@@ -55,7 +56,7 @@ impl HostedArchive {
 
     pub(in crate::mail) async fn query<T: DeserializeOwned + Send + 'static>(
         &mut self,
-        query: ArchiveQuery,
+        query: impl Serialize,
     ) -> Result<T, String> {
         let bytes = serde_json::to_vec(&query).map_err(|error| error.to_string())?;
         write_frame(&mut self.peer, &bytes)

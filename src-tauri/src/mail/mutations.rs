@@ -2,7 +2,8 @@
 //! A lost COPY/MOVE response is never replayed. STORE and UID EXPUNGE can be
 //! resumed independently after a confirmed COPY; plain EXPUNGE is never used.
 use super::*;
-use crate::state::MailDbHandle;
+use crate::{plugin::PluginRegistry, state::MailDbHandle};
+use taomni_mail_api::imap_mutation::{MutationError, MutationReply, MutationRequest, Rejection};
 
 const INITIAL_BATCH: usize = 50;
 const COMMAND_BYTES: usize = 4096;
@@ -208,15 +209,8 @@ fn load(
     })
 }
 
-fn definitive(error: &imap::error::Error) -> bool {
-    matches!(
-        error,
-        imap::error::Error::No(_) | imap::error::Error::Bad(_)
-    )
-}
-
-fn count_limit(error: &imap::error::Error) -> bool {
-    if !definitive(error) {
+fn count_limit(error: &MutationError) -> bool {
+    if error.rejection.is_none() {
         return false;
     }
     let text = error.to_string().to_ascii_lowercase();
@@ -240,28 +234,33 @@ fn set_stage(job: &mut Job, uids: &[u32], stage: Stage) {
 
 /// Executes at most one bounded batch. Releasing the pool gate between calls
 /// lets reading mail proceed while a large filter/delete operation is running.
-fn step<T: Read + Write>(
-    session: &mut imap::Session<T>,
+fn step(
+    mut query: impl FnMut(MutationRequest) -> Result<MutationReply, MutationError>,
     db: &MailDbHandle,
     account: &str,
     job: &mut Job,
 ) -> Result<(), String> {
-    let mailbox = session
-        .select(&job.folder)
-        .map_err(|e| format!("IMAP SELECT failed: {e}"))?;
-    let validity = mailbox
-        .uid_validity
-        .ok_or("Server did not provide UIDVALIDITY; no messages were changed")?;
+    let capabilities = job.move_supported.is_none() || job.uidplus.is_none();
+    let selected = query(MutationRequest::Select {
+        folder: job.folder.clone(),
+        capabilities,
+    })
+    .map_err(|error| error.to_string())?;
+    let MutationReply::Selected {
+        validity,
+        move_supported,
+        uidplus,
+    } = selected
+    else {
+        return Err("Mail mutation session returned an invalid mailbox receipt".into());
+    };
     if job.validity.is_some_and(|old| old != validity) {
         return Err("Mailbox UIDVALIDITY changed. The saved operation cannot safely continue; synchronize the mailbox.".into());
     }
     job.validity = Some(validity);
-    if job.move_supported.is_none() || job.uidplus.is_none() {
-        let caps = session
-            .capabilities()
-            .map_err(|e| format!("IMAP CAPABILITY failed: {e}"))?;
-        job.move_supported = Some(caps.has_str("MOVE"));
-        job.uidplus = Some(caps.has_str("UIDPLUS"));
+    if capabilities {
+        job.move_supported = Some(move_supported);
+        job.uidplus = Some(uidplus);
     }
     let Some(stage) = job
         .items
@@ -287,16 +286,20 @@ fn step<T: Read + Write>(
     if batch.is_empty() {
         return Err("The destination folder name exceeds the IMAP command size limit.".into());
     }
-    let set = uid_set_string(&batch);
     if stage == Stage::CopyUncertain {
         return Err("The server may have copied these messages but its reply was lost. Check the destination before taking further action; automatic copying is stopped to prevent duplicates.".into());
     }
     if stage == Stage::MoveUncertain {
         // A missing source UID confirms MOVE completed. Existing UIDs cannot
         // prove that no destination copies were created; never replay those.
-        let present = session
-            .uid_search(format!("UID {set}"))
-            .map_err(|e| format!("Could not verify the previous MOVE: {e}"))?;
+        let found = query(MutationRequest::Find {
+            uids: batch.clone(),
+        })
+        .map_err(|error| format!("Could not verify the previous MOVE: {error}"))?;
+        let present: HashSet<_> = match found {
+            MutationReply::Uids(uids) => uids.into_iter().collect(),
+            _ => return Err("Mail mutation session returned invalid search results".into()),
+        };
         let done: Vec<_> = batch
             .iter()
             .filter(|uid| !present.contains(uid))
@@ -323,11 +326,14 @@ fn step<T: Read + Write>(
         // Write ahead: even a crash during the network request must not cause a
         // second COPY on restart. A failed receipt write prevents the command.
         save(db, account, job, &[])?;
-        let result = if moving {
-            session.uid_mv(&set, &job.target)
+        let target = job.target.clone();
+        let uids = batch.clone();
+        let request = if moving {
+            MutationRequest::Move { target, uids }
         } else {
-            session.uid_copy(&set, &job.target)
+            MutationRequest::Copy { target, uids }
         };
+        let result = apply(&mut query, request);
         match result {
             Ok(()) => {
                 let next = if moving || job.kind == Kind::Copy {
@@ -345,11 +351,11 @@ fn step<T: Read + Write>(
                 return Ok(());
             }
             Err(error) => {
-                if definitive(&error) {
+                if error.rejection.is_some() {
                     set_stage(job, &batch, Stage::Ready);
                     let text = error.to_string().to_ascii_lowercase();
                     if moving
-                        && matches!(error, imap::error::Error::Bad(_))
+                        && error.rejection == Some(Rejection::Bad)
                         && (text.contains("unknown command")
                             || text.contains("unsupported command")
                             || text.contains("unrecognized command"))
@@ -363,18 +369,24 @@ fn step<T: Read + Write>(
             }
         }
     } else if stage == Stage::Ready || stage == Stage::Copied {
-        session
-            .uid_store(&set, "+FLAGS.SILENT (\\Deleted)")
-            .map(|_| {
-                set_stage(job, &batch, Stage::Deleted);
-            })
+        apply(
+            &mut query,
+            MutationRequest::MarkDeleted {
+                uids: batch.clone(),
+            },
+        )
+        .map(|()| set_stage(job, &batch, Stage::Deleted))
     } else {
         if job.uidplus != Some(true) {
             return Err("Messages are marked for deletion, but this server cannot safely expunge only the selected messages (UIDPLUS unavailable). No other messages were expunged.".into());
         }
-        session.uid_expunge(&set).map(|_| {
-            set_stage(job, &batch, Stage::Complete);
-        })
+        apply(
+            &mut query,
+            MutationRequest::Expunge {
+                uids: batch.clone(),
+            },
+        )
+        .map(|()| set_stage(job, &batch, Stage::Complete))
     };
     match command {
         Ok(()) => save(
@@ -395,6 +407,29 @@ fn step<T: Read + Write>(
     }
 }
 
+fn apply(
+    query: &mut impl FnMut(MutationRequest) -> Result<MutationReply, MutationError>,
+    request: MutationRequest,
+) -> Result<(), MutationError> {
+    match query(request)? {
+        MutationReply::Applied => Ok(()),
+        _ => Err(MutationError::unavailable(
+            "Mail mutation session returned an invalid command receipt",
+        )),
+    }
+}
+
+fn legacy_query(
+    imap: &mut ActiveImapSession,
+    request: MutationRequest,
+) -> Result<MutationReply, MutationError> {
+    use taomni_mail_engine::mutation_transport::execute;
+    match imap {
+        ActiveImapSession::Tls { session, .. } => execute(session, request),
+        ActiveImapSession::Plain { session, .. } => execute(session, request),
+    }
+}
+
 pub(super) fn run_cached(
     pool: &MailImapPool,
     account: &ResolvedMailAccount,
@@ -406,6 +441,7 @@ pub(super) fn run_cached(
     kind: Kind,
     all: bool,
     operation_id: Option<String>,
+    registry: Option<&Arc<PluginRegistry>>,
 ) -> Result<Progress, String> {
     let account_id = &account.config.session_id;
     let gate = pool.mutation_gate(account_id);
@@ -426,11 +462,24 @@ pub(super) fn run_cached(
     } else {
         false
     };
+    let mut hosted = registry.and_then(|registry| {
+        module_host::HostedMutations::for_registry(registry, account, runtime)
+    });
     if all && !existing_request {
-        uids = with_imap_session(pool, account, runtime, opts, |imap| match imap {
-            ActiveImapSession::Tls { session, .. } => all_uids(session, folder),
-            ActiveImapSession::Plain { session, .. } => all_uids(session, folder),
-        })?;
+        let all = || MutationRequest::All {
+            folder: folder.into(),
+        };
+        let reply = if let Some(host) = &mut hosted {
+            host.query(all()).map_err(|error| error.to_string())?
+        } else {
+            with_imap_session(pool, account, runtime, opts, |imap| {
+                legacy_query(imap, all()).map_err(|error| error.to_string())
+            })?
+        };
+        let MutationReply::Uids(listed) = reply else {
+            return Err("Mail mutation session returned an invalid mailbox UID list".into());
+        };
+        uids = listed;
     }
     uids.retain(|uid| *uid > 0);
     uids.sort_unstable();
@@ -457,10 +506,18 @@ pub(super) fn run_cached(
     job.uidplus = None;
     save(db, account_id, &job, &[])?;
     while job.items.iter().any(|i| i.stage != Stage::Complete) {
-        let result = with_imap_session(pool, account, runtime, opts, |imap| match imap {
-            ActiveImapSession::Tls { session, .. } => step(session, db, account_id, &mut job),
-            ActiveImapSession::Plain { session, .. } => step(session, db, account_id, &mut job),
-        });
+        let result = if let Some(host) = &mut hosted {
+            step(|request| host.query(request), db, account_id, &mut job)
+        } else {
+            with_imap_session(pool, account, runtime, opts, |imap| {
+                step(
+                    |request| legacy_query(imap, request),
+                    db,
+                    account_id,
+                    &mut job,
+                )
+            })
+        };
         if let Err(detail) = result {
             let uncertain = job
                 .items
@@ -477,17 +534,6 @@ pub(super) fn run_cached(
         }
     }
     Ok(job.result(None, None))
-}
-
-fn all_uids<T: Read + Write>(
-    session: &mut imap::Session<T>,
-    folder: &str,
-) -> Result<Vec<u32>, String> {
-    session.select(folder).map_err(|e| e.to_string())?;
-    session
-        .uid_search("ALL")
-        .map(|uids| uids.into_iter().collect())
-        .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

@@ -12,17 +12,19 @@ mod downloads;
 mod local_mailbox;
 pub(super) use local_mailbox::local_mailbox;
 mod imap_outgoing;
+mod mutations;
 mod pop3;
 mod prefetch;
 mod responses;
 pub(super) use responses::send_response;
 
-pub(super) use archive::{HostedArchive, archives_imap};
+pub(super) use archive::{HostedImap, archives_imap};
 pub(super) use downloads::{fetch_imap_attachment, fetch_imap_body, fetch_imap_raw};
 pub(super) use imap_outgoing::{
     discard_remote_draft, discards_remote_drafts, store_remote_draft, store_sent_copy,
     stores_remote_drafts,
 };
+pub(super) use mutations::HostedMutations;
 pub(super) use pop3::{HostedPop3, syncs_pop3};
 pub(super) use prefetch::{prefetch_imap_bodies, prefetches_imap_bodies};
 

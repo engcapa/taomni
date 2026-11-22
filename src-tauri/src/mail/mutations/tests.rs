@@ -63,6 +63,7 @@ impl Harness {
             kind,
             false,
             id,
+            None,
         )
         .unwrap()
     }
@@ -272,6 +273,7 @@ fn empty_folder_captures_server_uids_even_with_a_client_request_id() {
         Kind::Delete,
         true,
         Some("empty-request".into()),
+        None,
     )
     .unwrap();
     assert_eq!(result.completed_uids, [1, 2, 3]);
@@ -287,6 +289,7 @@ fn empty_folder_captures_server_uids_even_with_a_client_request_id() {
         Kind::Delete,
         true,
         Some(result.operation_id),
+        None,
     )
     .unwrap();
     assert_eq!(repeat.completed_uids, [1, 2, 3]);

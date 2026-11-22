@@ -1005,7 +1005,7 @@
         },
         "assert_signed_mail_host": {
           "oneOf": [
-            {"enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "outbox-queued", "outbox-retained", "outbox-sent", "responses", "contact-saved", "contact-retained", "contact-deleted", "attachment-saved", "attachment-reopened", "agenda-written", "agenda-retained", "filter-saved", "filter-retained", "disabled"]},
+            {"enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "outbox-queued", "outbox-retained", "outbox-sent", "responses", "contact-saved", "contact-retained", "contact-deleted", "attachment-saved", "attachment-reopened", "agenda-written", "agenda-retained", "filter-saved", "filter-retained", "imap-mutations", "disabled"]},
             {
               "type": "object",
               "additionalProperties": false,

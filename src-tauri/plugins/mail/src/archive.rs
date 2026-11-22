@@ -1,9 +1,10 @@
-//! Keep one cancellable IMAP connection for a full-message storage scan.
+//! Serve cancellable IMAP sessions for archive scans and journaled mutations.
 
-use serde::Serialize;
+use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     IncomingTest, MailIncomingProtocol,
     imap_exchange::{ImapExchange, read_frame, write_frame},
+    imap_mutation::MutationRequest,
 };
 use taomni_mail_engine::{
     archive::{ArchiveChunk, ArchiveQuery},
@@ -23,6 +24,33 @@ pub(super) fn start(
     operation: &Operation,
     request: ImapExchange,
 ) -> Result<Result<(), String>, RpcError> {
+    start_session(runtime, operation, request, reply)
+}
+
+pub(super) fn start_mutations(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: ImapExchange,
+) -> Result<Result<(), String>, RpcError> {
+    start_session(
+        runtime,
+        operation,
+        request,
+        |session, request: MutationRequest| {
+            let result = imap_catch_result(|| Ok(session.mutate(request)));
+            Ok((encode(result)?, None))
+        },
+    )
+}
+
+type Reply = std::io::Result<(Vec<u8>, Option<Vec<u8>>)>;
+
+fn start_session<Query: DeserializeOwned + Send + 'static>(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: ImapExchange,
+    reply: fn(&mut ImapSession, Query) -> Reply,
+) -> Result<Result<(), String>, RpcError> {
     if request.connection.protocol != MailIncomingProtocol::Imap
         || request.connection.server_name.trim().is_empty()
         || request.connection.username.trim().is_empty()
@@ -36,12 +64,16 @@ pub(super) fn start(
         };
     operation.check_current()?;
     runtime.spawn(async move {
-        let _ = serve(exchange, request.connection).await;
+        let _ = serve(exchange, request.connection, reply).await;
     });
     Ok(Ok(()))
 }
 
-async fn serve(exchange: tokio::net::TcpStream, connection: IncomingTest) -> std::io::Result<()> {
+async fn serve<Query: DeserializeOwned + Send + 'static>(
+    exchange: tokio::net::TcpStream,
+    connection: IncomingTest,
+    reply: fn(&mut ImapSession, Query) -> Reply,
+) -> std::io::Result<()> {
     let (mut read, mut write) = exchange.into_split();
     let stream = tokio::select! {
         _ = read.read_u8() => return Ok(()),
@@ -53,7 +85,7 @@ async fn serve(exchange: tokio::net::TcpStream, connection: IncomingTest) -> std
     };
     let stream = stream.into_std()?;
     configure(&stream, MailIncomingProtocol::Imap)
-        .map_err(|_| std::io::Error::other("Mail archive socket setup failed"))?;
+        .map_err(|_| std::io::Error::other("Mail IMAP session socket setup failed"))?;
     let interrupt = stream.try_clone()?;
     let opening =
         tokio::task::spawn_blocking(move || imap_catch_result(|| open_imap(stream, &connection)));
@@ -68,8 +100,7 @@ async fn serve(exchange: tokio::net::TcpStream, connection: IncomingTest) -> std
 
     loop {
         let frame = read_frame(&mut read).await?;
-        let query =
-            serde_json::from_slice::<ArchiveQuery>(&frame).map_err(std::io::Error::other)?;
+        let query = serde_json::from_slice::<Query>(&frame).map_err(std::io::Error::other)?;
         let worker = tokio::task::spawn_blocking(move || {
             let result = reply(&mut session, query);
             (session, result)
@@ -92,10 +123,7 @@ fn encode<T: Serialize>(result: Result<T, String>) -> std::io::Result<Vec<u8>> {
     serde_json::to_vec(&result).map_err(std::io::Error::other)
 }
 
-fn reply(
-    session: &mut ImapSession,
-    query: ArchiveQuery,
-) -> std::io::Result<(Vec<u8>, Option<Vec<u8>>)> {
+fn reply(session: &mut ImapSession, query: ArchiveQuery) -> Reply {
     match query {
         ArchiveQuery::Folders { account_id } => Ok((
             encode(imap_catch_result(|| session.list_folders(&account_id)))?,

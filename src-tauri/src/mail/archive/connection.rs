@@ -2,7 +2,7 @@
 
 use std::{future::Future, time::Duration};
 
-use taomni_mail_api::HOST_REQUEST_TIMEOUT;
+use taomni_mail_api::{HOST_REQUEST_TIMEOUT, OPEN_IMAP_ARCHIVE};
 use taomni_mail_engine::{
     MailFolder,
     archive::{ArchiveQuery, fetch_imap_chunk, scanner::ArchiveConnection},
@@ -11,7 +11,7 @@ use taomni_mail_engine::{
 use tokio::runtime::Handle;
 
 use super::lifetime::ArchiveJob;
-use crate::mail::{ActiveImapSession, ResolvedMailAccount, module_host::HostedArchive};
+use crate::mail::{ActiveImapSession, ResolvedMailAccount, module_host::HostedImap};
 
 impl ArchiveConnection for ActiveImapSession {
     fn list(&mut self, account_id: &str) -> Result<Vec<MailFolder>, String> {
@@ -55,7 +55,7 @@ impl ArchiveConnection for ActiveImapSession {
 }
 
 pub(super) struct HostedConnection<'a> {
-    archive: HostedArchive,
+    archive: HostedImap,
     runtime: &'a Handle,
     job: &'a ArchiveJob,
 }
@@ -67,8 +67,10 @@ impl<'a> HostedConnection<'a> {
         runtime: &'a Handle,
         job: &'a ArchiveJob,
     ) -> Result<Self, String> {
-        let archive =
-            runtime.block_on(while_running(job, HostedArchive::open(registry, account)))?;
+        let archive = runtime.block_on(while_running(
+            job,
+            HostedImap::open(registry, account, OPEN_IMAP_ARCHIVE),
+        ))?;
         Ok(Self {
             archive,
             runtime,

@@ -28,6 +28,7 @@ fn moving_200_messages_adapts_to_provider_copy_count_limit() {
         mutations::Kind::Move,
         false,
         None,
+        None,
     )
     .unwrap();
     assert_eq!(result.error, None);

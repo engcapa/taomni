@@ -28,6 +28,7 @@ pub mod migration;
 mod mime;
 pub mod mime_sections;
 mod models;
+pub mod mutation_transport;
 pub mod pop3;
 pub mod responses;
 pub mod search;

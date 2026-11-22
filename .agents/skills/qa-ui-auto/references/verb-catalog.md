@@ -576,6 +576,10 @@ Native-only protocol oracle. Optional `no_move`, `count_rejected`, and `copied`
 assert capability routing, a real provider count rejection, and unique COPY count.
 Always rejects duplicate source copies or mailbox-wide EXPUNGE.
 
+`TC-MAIL-BULK-03` also uses `assert_signed_mail_host: imap-mutations` to record the
+installed package identity, writer lease, COPY attempts, STORE commands and
+targeted expunges in the signed Mail report.
+
 ### `mail_server_deliver`
 
 Deliver `{count, folder?: INBOX, prefix?: QA, body?: string}` to the disposable
