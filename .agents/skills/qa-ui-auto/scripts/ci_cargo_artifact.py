@@ -71,25 +71,35 @@ def _is_local_unit(filename: str, units: set[str]) -> bool:
     return unit in units
 
 
-def _plain_member(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
-    return member if member.isfile() or member.isdir() else None
+def _profile_dirs(profile_dir: Path) -> tuple[str, ...]:
+    # Modern Cargo stores each unit's fingerprint and output together in
+    # build/<package>/<hash>. Older versions have separate profile directories.
+    if any(path.is_dir() and re.fullmatch(r"[a-f0-9]{16}", path.parent.name)
+           for path in (profile_dir / "build").glob("*/*/fingerprint")):
+        return ("build",)
+    if all((profile_dir / directory).is_dir() for directory in PROFILE_DIRS):
+        return PROFILE_DIRS
+    raise ValueError(f"unrecognized Cargo build layout in {profile_dir}")
+
+
+def _archive_member(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
+    return member if member.isfile() or member.isdir() or member.islnk() else None
 
 
 def pack(destination: Path, profile: str, *, target: Path, cargo_home: Path, units: set[str]) -> None:
-    if not all((target / profile / directory).is_dir() for directory in PROFILE_DIRS):
-        raise ValueError(f"missing Cargo output for {profile}")
+    directories = _profile_dirs(target / profile)
     destination.mkdir(parents=True, exist_ok=True)
     archive = destination / ARCHIVE_NAME
     with tarfile.open(archive, "w:gz", compresslevel=1) as stream:
-        for directory in PROFILE_DIRS:
+        for directory in directories:
             base = target / profile / directory
             prefix = f"target/{profile}/{directory}"
             stream.add(base, prefix, recursive=False)
             for path in sorted(base.iterdir()):
                 if not _is_local_unit(path.name, units):
-                    stream.add(path, f"{prefix}/{path.name}", filter=_plain_member)
+                    stream.add(path, f"{prefix}/{path.name}", filter=_archive_member)
         if (target / SHERPA).is_dir():
-            stream.add(target / SHERPA, f"target/{SHERPA}", filter=_plain_member)
+            stream.add(target / SHERPA, f"target/{SHERPA}", filter=_archive_member)
         # Build scripts of *-sys crates can depend on the source mtimes. Cargo
         # can recreate the other unpacked registries from their .crate files.
         registry = cargo_home / "registry"
@@ -99,18 +109,23 @@ def pack(destination: Path, profile: str, *, target: Path, cargo_home: Path, uni
         for directory, names in (("cache", {f"{name}.crate" for name in packages}), ("src", sys_packages)):
             for path in sorted((registry / directory).glob("*/*")):
                 if path.name in names:
-                    stream.add(path, path.relative_to(cargo_home).as_posix(), filter=_plain_member)
+                    stream.add(path, path.relative_to(cargo_home).as_posix(), filter=_archive_member)
     destination.joinpath("sha256").write_text(digest_file(archive) + "\n", encoding="ascii")
 
 
-def _allowed(member: tarfile.TarInfo, profile: str) -> bool:
-    name = PurePosixPath(member.name)
+def _allowed_path(path: str, profile: str) -> bool:
+    name = PurePosixPath(path)
     parts = name.parts
-    if not _plain_member(member) or name.is_absolute() or ".." in parts or "\\" in member.name or ":" in member.name:
+    if name.is_absolute() or ".." in parts or "\\" in path or ":" in path:
         return False
     return (parts[:2] == ("target", SHERPA)
             or parts[:2] == ("target", profile) and len(parts) >= 3 and parts[2] in PROFILE_DIRS
             or parts[:2] in (("registry", "cache"), ("registry", "src")) and len(parts) >= 4)
+
+
+def _allowed(member: tarfile.TarInfo, profile: str) -> bool:
+    return bool(_archive_member(member) and _allowed_path(member.name, profile)
+                and (not member.islnk() or _allowed_path(member.linkname, profile)))
 
 
 def restore(source: Path, profile: str, *, target: Path, cargo_home: Path) -> bool:
@@ -125,9 +140,7 @@ def restore(source: Path, profile: str, *, target: Path, cargo_home: Path) -> bo
         if not members or len(names) != len(members) or any(not _allowed(member, profile) for member in members):
             raise ValueError("unexpected Cargo dependency archive contents")
         stream.extractall(staging, members=members, filter="data")
-        for directory in PROFILE_DIRS:
-            if not (staging / "target" / profile / directory).is_dir():
-                raise ValueError(f"missing Cargo archive directory {directory}")
+        _profile_dirs(staging / "target" / profile)
         for path in (staging / "target").iterdir():
             destination = target / path.name
             if destination.exists():

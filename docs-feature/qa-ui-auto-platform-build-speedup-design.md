@@ -145,7 +145,27 @@
 - **同分支缓存修复**。直接在分支 HEAD 手工派发时，编译成功后保留 1 天的 Cargo 依赖归档和 3 天的完整程序归档。按同仓库、同一派发分支及同一 workflow 查找，独立于 Actions cache 配额。Cargo 键包含 runner、工具链、profile、Cargo manifests、锁文件和编译环境。完整程序沿用源码、配方和逐文件校验。普通运行出现 miss 时继续构建，暖编验证可在 miss 步骤出现时取消。
 - **全量范围**。本分支默认 `scope=all` 本地规划出 847 个不同用例、25 个执行分片、2,864 次执行及零能力缺口。最近可比的历史夜间全量墙钟为 128:28，汇总失败，Linux / Windows / macOS 的 build 分别为 52:21 / 64:47 / 28:15。A2/B/C 的墙钟只代表聚焦回归。本轮未测量新分支全量墙钟。[历史三端全量](https://github.com/engcapa/taomni/actions/runs/44963652702)
 
-## 6. 试验取舍与待办
+## 6. 缓存容量
+
+验收期间，缓存清单的 38 个条目合计 12.053 GB。相近时间查询用量接口返回 10.413 GB 和 26 个条目。两次读取之间有并行运行持续写入和触发驱逐。GitHub 默认包含每仓库 10 GB 的 Actions cache 配额，满额后按最近访问时间腾出空间。此仓库的配额设置接口返回 HTTP 402，以上数字是实际用量采样。[GitHub 缓存配额和驱逐策略](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#usage-limits-and-eviction-policy)
+
+| 缓存类别 | 条目 | GB |
+| --- | ---: | ---: |
+| Platforms Rust 依赖 | 4 | 5.112 |
+| 其他工作流的 Rust | 14 | 4.954 |
+| Windows helper Rust | 1 | 0.275 |
+| pnpm | 6 | 0.964 |
+| pip | 8 | 0.485 |
+| 完整 QA 程序 | 3 | 0.258 |
+| 其他 | 2 | 0.003 |
+
+Rust 合计 10.341 GB，占约 86%。`refactor/modules-arch` 的独立分支缓存占 9.656 GB，同一 Windows runner 下两份依赖缓存分别为 1.418 GB 和 1.417 GB。两者依赖指纹不同。每个平台、编译环境和 GitHub ref 都能产生独立缓存，多个并行分支和临时验证 ref 会累加体积。
+
+- **优先减 Rust 重复写入**。在各工作流内统一同一依赖图的缓存键，让成功构建负责写入。同一分支保留仍在使用的依赖版本。Windows helper 的独立缓存约 275 MB，可以对比只保留 registry 或关闭此缓存后的实际合约耗时。pnpm 和 pip 合计 1.449 GB，可在确认重复后再细化。
+- **Actions Artifact**。与 Actions cache 配额分开。适合短期保留同分支的编译依赖和 QA 程序，可通过保留天数约束占用。归档上传、提取和存储仍有开销。[GitHub Actions 存储计费](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
+- **对象存储与自托管 runner**。S3 兼容存储配合 `sccache` 可跨分支共享编译结果，并设置生命周期。对象存储需要凭据、访问边界和容量管理。持久 SSD 的自托管 runner 可保留本机 Cargo 目录，维护成本取决于三端 runner 数量。[sccache S3 后端](https://github.com/mozilla/sccache/blob/main/docs/S3.md)
+
+## 7. 试验取舍与待办
 
 - Run A 同时启用 `codegen-units=64` 和 Windows `lld-link`。与 PR #862 对照，Cargo 的 Linux / Windows 编译从 13:21 / 23:28 变为 22:44 / 28:36，Windows 四片原生启动报 `WinError 14001`。A2 使用默认 codegen units 和 MSVC 的 manifest 嵌入链路。Linux 恢复与保存分离，build/contracts 只安装编译所需的 apt 包与 lld。Run A 的 Windows / Linux 双归档导出从 38 / 37 秒降至 14 / 12 秒。[Run A](https://github.com/engcapa/taomni/actions/runs/45005261996)
 - 本仓库归个人账户所有，评估时 8 核 Larger Runner 需要组织方案。GHA 后端的 `sccache` 会与依赖和 runtime 争用仓库缓存配额。降低 release `opt-level` 会改变 `qa-workspace-performance.yml` 的性能对照环境。本轮沿用标准 hosted runner、完整 release 优化及裁剪过的 Rust 依赖缓存。

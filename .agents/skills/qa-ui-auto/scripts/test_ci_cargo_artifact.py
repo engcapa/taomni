@@ -9,6 +9,26 @@ from qa_ui_auto.provenance import digest_file
 
 
 class CargoArtifactTests(unittest.TestCase):
+    def test_modern_cargo_preserves_build_units_and_omits_workspace_packages(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "src-target"
+            for package in ("taomni", "serde"):
+                unit = target / "release" / "build" / package / "0123456789abcdef"
+                unit.joinpath("out").mkdir(parents=True)
+                unit.joinpath("fingerprint").mkdir()
+                unit.joinpath("out", "artifact").write_text(package)
+                unit.joinpath("fingerprint", "lib").write_text("fingerprint")
+            artifact, restored = root / "artifact", root / "restored"
+            pack(artifact, "release", target=target, cargo_home=root / "cargo", units={"taomni"})
+
+            self.assertFalse(restore(artifact, "release", target=restored, cargo_home=root / "cargo"))
+            build = restored / "release" / "build"
+            self.assertEqual([path.name for path in build.iterdir()], ["serde"])
+            unit = build / "serde" / "0123456789abcdef"
+            self.assertEqual(unit.joinpath("out", "artifact").read_text(), "serde")
+            self.assertEqual(unit.joinpath("fingerprint", "lib").read_text(), "fingerprint")
+
     def test_preserves_third_party_dependencies_and_sherpa_without_local_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
