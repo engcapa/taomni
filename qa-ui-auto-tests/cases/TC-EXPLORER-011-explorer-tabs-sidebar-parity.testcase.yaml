@@ -1,0 +1,289 @@
+id: TC-EXPLORER-011
+title: Explorer rail-only sidebar, navigation icon toggle, Sessions-parity tabs and blank-dismiss menus
+description: >-
+  AC-5/AC-6/AC-7/AC-8 browser slice of the Explorer UX fixes (U4/U5/U6/U7). Activating the Explorer rail must
+  remove the duplicated Explorer side panel and its left-sidebar control while keeping the rail, and switching
+  back to Sessions must restore the per-mode sidebar control. The command-bar navigation toggle must expose the
+  distinct panel-left-close/panel-left-open icon and still hide/restore the navigation tree. Explorer tabs must
+  use the Sessions tab style marker, a type icon and a close control, and their right-click menu must follow the
+  shared Sessions order with Explorer-specific item ids; inline rename and move-to-first must work. A blank
+  pointer press outside a file-list menu must dismiss it (the rubber-band pointerdown regression), while a menu
+  item click still executes and closes. Renderer/VFS evidence only; native disk, OS input and pointer delivery are
+  covered by the native Explorer cases and are not claimed here.
+modes:
+- browser
+covers:
+- F-EXPLORER-1
+tags:
+- p1
+- explorer
+- regression
+fixtures:
+- reset_db
+- explorer_files
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+# AC-7: Explorer is a rail-only surface. The legacy side panel and the generic
+# left-sidebar toggle are gone while the rail itself stays usable.
+- assert_count:
+    selector: '[data-testid="explorer-sidebar-panel"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="toggle-left-sidebar"]'
+    equal: 0
+- assert_visible: '[data-testid="sidebar-rail"]'
+- assert_visible: '[data-testid="explorer-tab-new-home"]'
+# Switching to Sessions restores that mode's own sidebar control.
+- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="toggle-left-sidebar"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
+# AC-8: the navigation-tree toggle has its own close/open icon and still
+# collapses and restores the tree.
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+    name: data-icon
+    equals: panel-left-close
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+    name: data-icon
+    equals: panel-left-open
+- assert_not_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-tree"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+    name: data-icon
+    equals: panel-left-close
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-tree"]'
+# AC-5: open a Notepad viewer tab plus a second Explorer directory tab and check
+# the Sessions-parity tab chrome.
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="notepad-workbench"]'
+- click: '[data-testid="explorer-tab-new-home"]'
+- wait_for: ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 2)'
+- assert_count:
+    selector: '[data-testid="explorer-workspace-tab"]'
+    min: 3
+- assert_count:
+    selector: '[data-testid="explorer-workspace-tab"]:not([data-tab-style="session"])'
+    equal: 0
+# The shared TabIcon renders ExplorerFileIcon (explicit size class) for viewer
+# tabs, so the stable anchor is the SVG icon inside the viewer tab.
+- assert_count:
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"] svg'
+    min: 1
+- assert_count:
+    selector: '[data-testid="explorer-workspace-tab"] [data-testid="tab-close"]'
+    equal: 3
+# The tab context menu follows the Sessions order; Explorer adds dedicated ids.
+- right_click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_menu_items:
+  - Close
+  - Close others
+  - Close all
+  - Rename
+  - Duplicate
+  - Copy path
+  - Move to first
+  - Move left
+  - Move right
+  - Move to last
+  - Pin tab
+- assert_visible: '[data-testid="explorer-tab-context-duplicate"]'
+- assert_visible: '[data-testid="explorer-tab-context-copy-path"]'
+- assert_visible: '[data-testid="explorer-tab-context-move-last"]'
+- click: '[data-testid="explorer-tab-context-rename"]'
+- wait_for: '[data-testid="explorer-tab-rename-input"]'
+- fill:
+    selector: '[data-testid="explorer-tab-rename-input"]'
+    value: renamed-note
+- press:
+    selector: '[data-testid="explorer-tab-rename-input"]'
+    key: Enter
+- wait_for:
+    selector: '[data-testid="explorer-tab-rename-input"]'
+    state: detached
+- assert_attribute:
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
+    name: data-tab-title
+    equals: renamed-note
+# The viewer tab is the second tab, so Move to first must reorder it to position 1.
+- right_click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="explorer-tab-context-move-first"]'
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: detached
+- assert_attribute:
+    selector: ':nth-match([data-testid="explorer-workspace-tab"], 1)'
+    name: data-tab-title
+    equals: renamed-note
+# AC-6: activating a directory tab makes its file list visible for the
+# blank-dismiss regression (a rubber-band pointerdown used to swallow mousedown).
+- click: ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 1)'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="README.md"]'
+- right_click:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-list"]'
+    position:
+      x: 200
+      y: 400
+- wait_for: '[data-testid="context-menu"]'
+- assert_visible: '[data-testid="explorer-context-refresh"]'
+- click:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-list"]'
+    # The opened menu covers the upper-left area; press a blank point well away
+    # from it so Playwright's actionability check is not blocked by the menu.
+    position:
+      x: 520
+      y: 700
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: detached
+# A row context menu must also dismiss on a blank press, while clicking a menu
+# item still executes the command and closes the menu.
+- right_click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="README.md"]'
+- wait_for: '[data-testid="context-menu"]'
+- click:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-list"]'
+    # The opened menu covers the upper-left area; press a blank point well away
+    # from it so Playwright's actionability check is not blocked by the menu.
+    position:
+      x: 520
+      y: 700
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: detached
+- right_click:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-list"]'
+    position:
+      x: 200
+      y: 400
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="explorer-context-refresh"]'
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: detached
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="README.md"]'
+- assert_no_runtime_errors: null
+- screenshot: explorer-tabs-sidebar-parity.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: >-
+      Explorer is rail-only: the legacy Explorer side panel and the generic left-sidebar toggle are absent while the rail
+      stays usable, and switching to Sessions restores that mode's sidebar control.
+    actions:
+    - 3
+    - 10
+    - 12
+    checkpoints:
+    - {step: 5, expectation: The dedicated Explorer surface mounted an active directory tab.}
+    - {step: 6, expectation: The removed Explorer side panel is not rendered.}
+    - {step: 7, expectation: The generic left-sidebar toggle is not rendered in Explorer mode.}
+    - {step: 8, expectation: The primary rail remains visible.}
+    - {step: 9, expectation: The Explorer tab strip remains operable from the rail surface.}
+    - {step: 11, expectation: Sessions mode restores its left-sidebar control.}
+    - {step: 13, expectation: Returning to the Explorer rail remounts the Explorer surface.}
+    results:
+    - 6
+    - 7
+    - 11
+    - 13
+  - id: R2
+    requirement: >-
+      The Explorer navigation-tree toggle uses the distinct panel-left-close/panel-left-open icon and still hides and
+      restores the navigation tree.
+    actions:
+    - 15
+    - 18
+    checkpoints:
+    - {step: 14, expectation: The expanded tree exposes the panel-left-close icon state.}
+    - {step: 16, expectation: Collapsing the tree switches the icon to panel-left-open.}
+    - {step: 17, expectation: The navigation tree is hidden while collapsed.}
+    - {step: 19, expectation: Restoring the tree switches the icon back to panel-left-close.}
+    - {step: 20, expectation: The navigation tree is visible again.}
+    results:
+    - 16
+    - 17
+    - 19
+    - 20
+  - id: R3
+    requirement: >-
+      Explorer tabs use the Sessions tab style marker with a type icon and close control, and the tab context menu follows
+      the shared Sessions order with working Rename and Move to first actions.
+    actions:
+    - 21
+    - 23
+    - 29
+    - 35
+    - 37
+    - 38
+    - 41
+    - 43
+    checkpoints:
+    - {step: 22, expectation: The Notepad document opened inside the Explorer tab host.}
+    - {step: 24, expectation: A second Explorer directory tab exists.}
+    - {step: 25, expectation: At least two Explorer tabs plus the viewer tab are present.}
+    - {step: 26, expectation: Every Explorer tab carries the Sessions style marker.}
+    - {step: 27, expectation: The viewer tab renders its file-type icon.}
+    - {step: 28, expectation: Every Explorer tab carries a close control.}
+    - {step: 30, expectation: The tab context menu is open.}
+    - {step: 31, expectation: The required menu labels are present in Sessions order.}
+    - {step: 32, expectation: The Duplicate item has its Explorer test id.}
+    - {step: 33, expectation: The Copy path item has its Explorer test id.}
+    - {step: 34, expectation: The Move to last item has its Explorer test id.}
+    - {step: 36, expectation: Rename starts the inline rename input.}
+    - {step: 39, expectation: Pressing Enter commits and closes the rename input.}
+    - {step: 40, expectation: The viewer tab title becomes the new name.}
+    - {step: 42, expectation: The tab context menu reopens for the moved tab.}
+    - {step: 44, expectation: Choosing Move to first closes the menu.}
+    - {step: 45, expectation: The renamed tab is the first tab in the strip.}
+    results:
+    - 26
+    - 28
+    - 31
+    - 40
+    - 45
+  - id: R4
+    requirement: >-
+      Blank and row file-list context menus dismiss on an outside pointer press after the rubber-band pointerdown path, a
+      menu item click still executes and closes, and the workflow raises no uncaught runtime errors.
+    actions:
+    - 48
+    - 51
+    - 53
+    - 55
+    - 57
+    - 59
+    checkpoints:
+    - {step: 49, expectation: The blank-area right click opens the context menu.}
+    - {step: 50, expectation: The menu offers its executable Refresh item.}
+    - {step: 52, expectation: A blank pointer press dismisses the blank-area menu.}
+    - {step: 54, expectation: The row right click opens the item context menu.}
+    - {step: 56, expectation: A blank pointer press dismisses the row menu.}
+    - {step: 58, expectation: The blank-area menu opens again for the item-click path.}
+    - {step: 60, expectation: Clicking Refresh executes and closes the menu.}
+    - {step: 61, expectation: The file list survives the refresh action.}
+    - {step: 62, expectation: The whole workflow raises no uncaught runtime errors.}
+    results:
+    - 52
+    - 56
+    - 60
+    - 62
+  visual:
+  - check: Explorer tab strip style parity and the rail-only layout screenshot.
+    method: manual
+    reason: DOM markers and menu labels are asserted automatically; visual parity needs human review.
+  native:
+  - check: Real disk bytes, OS input and physical pointer delivery.
+    method: external
+    reason: This case is renderer/VFS only; native Explorer cases own the host boundary.
+

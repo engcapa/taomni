@@ -1114,6 +1114,27 @@
 - `[data-testid="notepad-save-as-dialog"]` — display — F-NOTEPAD-1.notepad-save-as-dialog
 - `[data-testid="notepad-save-as-input"]` — interactive — F-NOTEPAD-1.notepad-save-as-input
 - `[data-testid="notepad-save-as-confirm"]` — interactive — F-NOTEPAD-1.notepad-save-as-confirm
+- `[data-testid="file-viewer"][data-active="true"] [data-testid="viewer-editor"]` — interactive — F-NOTEPAD-1.notepad-active-editor
+- `[data-testid="notepad-context-undo"]` — display — F-NOTEPAD-1.notepad-context-undo
+- `[data-testid="notepad-context-redo"]` — display — F-NOTEPAD-1.notepad-context-redo
+- `[data-testid="notepad-context-cut"]` — display — F-NOTEPAD-1.notepad-context-cut
+- `[data-testid="notepad-context-copy"]` — display — F-NOTEPAD-1.notepad-context-copy
+- `[data-testid="notepad-context-paste"]` — display — F-NOTEPAD-1.notepad-context-paste
+- `[data-testid="notepad-context-paste-special"]` — display — F-NOTEPAD-1.notepad-context-paste-special
+- `[data-testid="notepad-context-delete"]` — display — F-NOTEPAD-1.notepad-context-delete
+- `[data-testid="notepad-context-select-all"]` — display — F-NOTEPAD-1.notepad-context-select-all
+- `[data-testid="notepad-context-duplicate-line"]` — display — F-NOTEPAD-1.notepad-context-duplicate-line
+- `[data-testid="notepad-context-delete-line"]` — display — F-NOTEPAD-1.notepad-context-delete-line
+- `[data-testid="notepad-context-move-line-up"]` — display — F-NOTEPAD-1.notepad-context-move-line-up
+- `[data-testid="notepad-context-move-line-down"]` — display — F-NOTEPAD-1.notepad-context-move-line-down
+- `[data-testid="notepad-context-find"]` — display — F-NOTEPAD-1.notepad-context-find
+- `[data-testid="notepad-context-find-next"]` — display — F-NOTEPAD-1.notepad-context-find-next
+- `[data-testid="notepad-context-replace"]` — display — F-NOTEPAD-1.notepad-context-replace
+- `[data-testid="notepad-context-go-to"]` — display — F-NOTEPAD-1.notepad-context-go-to
+- `[data-testid="notepad-context-toggle-bookmark"]` — display — F-NOTEPAD-1.notepad-context-toggle-bookmark
+- `[data-testid="notepad-context-copy-path"]` — display — F-NOTEPAD-1.notepad-context-copy-path
+- `[data-testid="notepad-context-save"]` — interactive — F-NOTEPAD-1.notepad-context-save
+- `[data-testid="notepad-context-save-as"]` — display — F-NOTEPAD-1.notepad-context-save-as
 - `[data-testid="notepad-menu-edit"]` — interactive — F-NOTEPAD-1.notepad-menu-edit
 - `[data-testid="notepad-menu-item-file.toggleReadonly"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-toggle-readonly
 - `[data-testid="notepad-status-readonly"]` — interactive — F-NOTEPAD-1.notepad-status-readonly
@@ -1263,10 +1284,25 @@
 - `[data-testid="explorer-platform-view"]` — display — F-EXPLORER-1.explorer-platform-view
 - `[data-testid="sidebar-tool-file-explorer"]` — display [optional] — F-EXPLORER-1.explorer-tools-entry-removed
 - `[data-testid="explorer-workspace-tab"]` — interactive — F-EXPLORER-1.explorer-workspace-tab-ready
+  ↳ `:nth-match([data-testid="explorer-workspace-tab"], 1)` — alias
   ↳ `:nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 1)` — alias
   ↳ `:nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 2)` — alias
   ↳ `:nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 5)` — alias
   ↳ `xpath=(//*[@data-testid="explorer-workspace-tab"][@data-tab-type="file-browser"])[2]` — alias
+- `[data-testid="explorer-tab-new-home"]` — interactive — F-EXPLORER-1.explorer-tab-new-home
+- `[data-testid="explorer-tab-rename-input"]` — interactive — F-EXPLORER-1.explorer-tab-rename-input
+- `[data-testid="explorer-tab-context-close"]` — interactive — F-EXPLORER-1.explorer-tab-context-close
+- `[data-testid="explorer-tab-context-close-others"]` — display — F-EXPLORER-1.explorer-tab-context-close-others
+- `[data-testid="explorer-tab-context-close-all"]` — display — F-EXPLORER-1.explorer-tab-context-close-all
+- `[data-testid="explorer-tab-context-rename"]` — interactive — F-EXPLORER-1.explorer-tab-context-rename
+- `[data-testid="explorer-tab-context-duplicate"]` — display — F-EXPLORER-1.explorer-tab-context-duplicate
+- `[data-testid="explorer-tab-context-copy-path"]` — display — F-EXPLORER-1.explorer-tab-context-copy-path
+- `[data-testid="explorer-tab-context-move-first"]` — interactive — F-EXPLORER-1.explorer-tab-context-move-first
+- `[data-testid="explorer-tab-context-move-left"]` — display — F-EXPLORER-1.explorer-tab-context-move-left
+- `[data-testid="explorer-tab-context-move-right"]` — display — F-EXPLORER-1.explorer-tab-context-move-right
+- `[data-testid="explorer-tab-context-move-last"]` — display — F-EXPLORER-1.explorer-tab-context-move-last
+- `[data-testid="explorer-tab-context-pin"]` — display — F-EXPLORER-1.explorer-tab-context-pin
+- `[data-testid="explorer-sidebar-panel"]` — display [optional] — F-EXPLORER-1.explorer-sidebar-panel-removed
 - `[data-testid="code-workspace-tool-rail-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tool-rail-explorer
 - `[data-testid="code-workspace-tree-open-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer
 - `[data-testid="code-workspace-tree-open-explorer-new"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer-new
