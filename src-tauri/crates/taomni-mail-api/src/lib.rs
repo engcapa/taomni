@@ -29,6 +29,7 @@ pub const ENCODE_ARCHIVE_ORIGINAL: &str = "mail/encode-archive-original";
 pub const OPEN_IMAP_ARCHIVE: &str = "mail/open-imap-archive";
 pub const OPEN_POP3_SYNC: &str = "mail/open-pop3-sync";
 pub const FETCH_IMAP_ATTACHMENT: &str = "mail/fetch-imap-attachment";
+pub const SEND_RESPONSE: &str = "mail/send-response";
 pub const SEND_SMTP: &str = "mail/send-smtp";
 pub const STORE_IMAP_SENT: &str = "mail/store-imap-sent";
 pub const STORE_IMAP_DRAFT: &str = "mail/store-imap-draft";
@@ -125,6 +126,13 @@ pub struct SmtpDelivery {
 pub struct RemoteDraftLocation {
     pub folder: String,
     pub uid: u32,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SmtpResponse {
+    pub connection: SmtpConnection,
+    pub content: MimeUpload,
 }
 
 #[derive(Serialize, Deserialize)]

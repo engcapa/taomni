@@ -45,6 +45,7 @@ fn host_config() -> HostConfig {
                 IMAP_FOLDER_TREE,
                 MUTATE_IMAP_FOLDER,
                 SEND_SMTP,
+                taomni_mail_api::SEND_RESPONSE,
                 STORE_IMAP_SENT,
                 STORE_IMAP_DRAFT,
                 DISCARD_IMAP_DRAFT,
@@ -133,6 +134,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(outgoing::send(&self.io, operation, input)?)
+            }
+            taomni_mail_api::SEND_RESPONSE => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(outgoing::respond(&self.io, operation, input)?)
             }
             STORE_IMAP_SENT => {
                 let input = serde_json::from_value(params.unwrap_or_default())

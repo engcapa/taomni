@@ -69,11 +69,26 @@ pub async fn send_routed_message(request: SmtpDelivery) -> Result<Response, Stri
     if mime.len() as u64 != request.mime_length {
         return Err("Outgoing message length did not match the authorized MIME source".into());
     }
-    let (stream, _) = request.connection.route.connect().await?;
-    let mut client = connect(stream, &request.connection)
+    deliver(&request.connection, &envelope, &mime).await
+}
+
+pub async fn send_prepared_response(
+    connection: &SmtpConnection,
+    message: &crate::delivery::PreparedMail,
+) -> Result<Response, String> {
+    deliver(connection, &message.envelope, &message.bytes).await
+}
+
+async fn deliver(
+    connection: &SmtpConnection,
+    envelope: &Envelope,
+    mime: &[u8],
+) -> Result<Response, String> {
+    let (stream, _) = connection.route.connect().await?;
+    let mut client = connect(stream, connection)
         .await
         .map_err(|error| super::send_error(&error))?;
-    let result = client.send(&envelope, &mime).await.map_err(|error| {
+    let result = client.send(envelope, mime).await.map_err(|error| {
         if error.status().is_none() && !error.is_client() {
             format!("{SMTP_DELIVERY_UNKNOWN}: {error}. Verify delivery before resending.")
         } else {

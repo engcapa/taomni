@@ -3,11 +3,11 @@
 #[cfg(feature = "routed-smtp")]
 mod routed;
 #[cfg(feature = "routed-smtp")]
-pub use routed::{check_routed_connection, send_routed_message};
+pub use routed::{check_routed_connection, send_prepared_response, send_routed_message};
 
 use std::time::Duration;
 
-use lettre::address::Envelope;
+use crate::delivery::PreparedMail;
 use lettre::transport::smtp::{
     authentication::{Credentials, Mechanism},
     client::Tls,
@@ -64,9 +64,9 @@ impl SmtpClient {
             .map_err(|error| send_error(&error.to_string()))
     }
 
-    pub fn send_raw(&self, envelope: &Envelope, raw: &[u8]) -> Result<Response, String> {
+    pub fn send_prepared(&self, message: &PreparedMail) -> Result<Response, String> {
         self.0
-            .send_raw(envelope, raw)
+            .send_raw(&message.envelope, &message.bytes)
             .map_err(|error| send_error(&error.to_string()))
     }
 

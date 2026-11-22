@@ -73,6 +73,7 @@ steps:
     timeout_sec: 20
 - assert_no_runtime_errors: null
 - screenshot: mail-invite-01-accepted.png
+- mail_server_assert_smtp_contains: {text: "METHOD:REPLY", timeout_sec: 20}
 verification:
   review: reviewed
   requirements:
@@ -111,10 +112,13 @@ verification:
       expectation: '{"mail_server_assert_smtp_contains": {"text": "PARTSTAT=ACCEPTED", "timeout_sec": 20}}'
     - step: 19
       expectation: Sending the invitation reply leaves no runtime errors.
+    - step: 21
+      expectation: The server receives the reply field "METHOD:REPLY".
     results:
     - 17
     - 18
     - 19
+    - 21
   visual:
   - check: 截图中邀请卡片显示标题、时间、地点、组织者，Accept 高亮并显示 “Reply sent (accepted)”。
     method: manual

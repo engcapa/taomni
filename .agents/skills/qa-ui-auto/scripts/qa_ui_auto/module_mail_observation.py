@@ -1,6 +1,8 @@
 """Observe the real signed Mail host and its data lease in an isolated profile."""
 
 from contextlib import closing
+from email import policy
+from email.parser import BytesParser
 import hashlib
 import json
 import sqlite3
@@ -21,7 +23,7 @@ def run(ctx, args):
     phase = args.get("phase") if isinstance(args, dict) else args
     active = {
         "folder-tree", "folder-changes", "running", "imap-delivery", "pop3-delivery",
-        "imap-search", "imap-flags", "imap-source", "imap-prefetch", "outbox-queued", "outbox-sent",
+        "responses", "imap-search", "imap-flags", "imap-source", "imap-prefetch", "outbox-queued", "outbox-sent",
     }
     if phase not in active | {"idle", "disabled", "outbox-retained"} or not signed or owner.case_id not in SIGNED_MAIL_CASES:
         raise StepError("The Mail host observation requires the registered signed native case")
@@ -51,6 +53,11 @@ def run(ctx, args):
     report = {"phase": phase, "sourceSha": receipt["sourceSha"], "platform": receipt["platform"],
               "packageSha256": receipt["sha256"], "hostSha256": digest,
               "frontendSha256": frontend_digest, "writerLease": observed}
+    if phase == "responses":
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        if "mail/send-response" not in manifest["commands"]:
+            raise StepError("The installed Mail version does not implement reply delivery")
+        report["responses"] = observe_responses()
     if phase == "imap-prefetch":
         report["prefetch"] = observe_prefetch(args)
     if phase in {"outbox-queued", "outbox-retained", "outbox-sent"}:
@@ -62,6 +69,38 @@ def run(ctx, args):
             signed["queuedDraft"] = observation
     (ctx.case_dir / f"signed-mail-{phase}.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return f"Mail {version} host lease verified ({phase})"
+
+
+def observe_responses():
+    state = mail_fake_server.ACTIVE.state
+    parser = BytesParser(policy=policy.default)
+    with state.lock:
+        sent = list(state.smtp_messages)
+        originals = [(parser.parsebytes(message.raw), set(message.flags))
+                     for message in state.folders["INBOX"].messages.values()]
+    fixture = {message["Subject"]: (message, flags) for message, flags in originals}
+    original, flags = fixture["Signed receipt 0001"]
+    invite, _ = fixture["Signed calendar 0001"]
+    event = next(part for part in invite.walk() if part.get_content_type() == "text/calendar")
+    event_uid = next(line for line in event.get_content().splitlines() if line.startswith("UID:"))
+    if "$mdnsent" not in {flag.lower() for flag in flags}:
+        raise StepError("The IMAP server has no handled-receipt flag on the original message")
+    if len(sent) != 2 or any(message["to"] != ["qa-sender@example.com"] for message in sent):
+        raise StepError("The SMTP server must receive exactly one invitation reply and one receipt for the requesting sender")
+    meeting, receipt = (parser.parsebytes(message["raw"]) for message in sent)
+    calendar = next((part for part in meeting.walk() if part.get_content_type() == "text/calendar"), None)
+    if calendar is None or calendar.get_param("method", "").upper() != "REPLY":
+        raise StepError("The SMTP reply has no calendar REPLY part")
+    lines = calendar.get_content().splitlines()
+    if event_uid not in lines or "METHOD:REPLY" not in lines or not any("PARTSTAT=TENTATIVE" in line for line in lines):
+        raise StepError("The SMTP reply does not reference the selected event and attendance")
+    mdn = next((part for part in receipt.walk() if part.get_content_type() == "message/disposition-notification"), None)
+    fields = mdn.get_payload(0) if mdn is not None else None
+    if (fields is None or fields["Original-Message-ID"] != original["Message-ID"]
+            or fields["Disposition"] != "manual-action/MDN-sent-manually; displayed"):
+        raise StepError("The read receipt does not identify the original message and manual response")
+    return {"calendarUid": event_uid[4:], "messageId": str(original["Message-ID"]),
+            "smtpRecipients": [message["to"] for message in sent], "handledFlags": sorted(flags)}
 
 
 def observe_outbox(module_data, legacy_cache, phase, previous):

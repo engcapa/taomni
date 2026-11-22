@@ -17,8 +17,7 @@ fn build_send_message_threads_replies_and_keeps_bcc_for_copies() {
         request_read_receipt: false,
     };
     let account = sample_resolved_account();
-    let raw =
-        String::from_utf8(build_send_message(&account, &request).unwrap().formatted()).unwrap();
+    let raw = String::from_utf8(build_send_message(&account, &request).unwrap().bytes).unwrap();
     assert!(raw.contains("In-Reply-To: <parent@example.com>"), "{raw}");
     assert!(
         raw.contains("References: <root@example.com> <parent@example.com>"),
@@ -33,8 +32,7 @@ fn build_send_message_threads_replies_and_keeps_bcc_for_copies() {
         request_read_receipt: true,
         ..request.clone()
     };
-    let raw =
-        String::from_utf8(build_send_message(&account, &receipt).unwrap().formatted()).unwrap();
+    let raw = String::from_utf8(build_send_message(&account, &receipt).unwrap().bytes).unwrap();
     assert!(
         raw.contains("Disposition-Notification-To: <sender@example.com>"),
         "{raw}"
@@ -50,7 +48,7 @@ fn build_send_message_threads_replies_and_keeps_bcc_for_copies() {
         },
     )
     .unwrap();
-    let raw = String::from_utf8(copy.formatted()).unwrap();
+    let raw = String::from_utf8(copy.bytes).unwrap();
     assert!(raw.contains("hidden@example.com"), "Sent copy keeps Bcc");
     assert!(raw.contains("Message-ID: <fixed@example.com>"), "{raw}");
 }
@@ -73,13 +71,10 @@ fn identity_overrides_from_and_reply_to() {
         request_read_receipt: false,
     };
     let message = build_send_message(&sample_resolved_account(), &request).unwrap();
-    let raw = String::from_utf8(message.formatted()).unwrap();
+    assert_eq!(message.sender().unwrap(), "support@example.com");
+    let raw = String::from_utf8(message.bytes).unwrap();
     assert!(raw.contains("From: Support <support@example.com>"), "{raw}");
     assert!(raw.contains("Reply-To: help@example.com"), "{raw}");
-    assert_eq!(
-        message.envelope().from().unwrap().to_string(),
-        "support@example.com"
-    );
 }
 
 #[test]
@@ -105,7 +100,7 @@ fn draft_envelope_allows_messages_without_recipients() {
     };
     let raw = build_send_message_with(&sample_resolved_account(), &request, &options)
         .unwrap()
-        .formatted();
+        .bytes;
     assert!(String::from_utf8(raw).unwrap().contains("half written"));
 }
 
@@ -157,7 +152,7 @@ fn build_send_message_wraps_attachments_in_mixed_mime() {
     };
 
     let message = build_send_message(&sample_resolved_account(), &request).unwrap();
-    let raw = String::from_utf8(message.formatted()).unwrap();
+    let raw = String::from_utf8(message.bytes).unwrap();
 
     assert!(raw.contains("multipart/mixed"));
     assert!(raw.contains("multipart/alternative"));
@@ -192,7 +187,7 @@ fn build_send_message_embeds_inline_images_in_related_mime() {
     };
 
     let message = build_send_message(&sample_resolved_account(), &request).unwrap();
-    let raw = String::from_utf8(message.formatted()).unwrap();
+    let raw = String::from_utf8(message.bytes).unwrap();
 
     assert!(raw.contains("multipart/related"));
     assert!(raw.contains("multipart/alternative"));
@@ -239,7 +234,7 @@ fn build_send_message_nests_related_body_inside_mixed() {
     };
 
     let message = build_send_message(&sample_resolved_account(), &request).unwrap();
-    let raw = String::from_utf8(message.formatted()).unwrap();
+    let raw = String::from_utf8(message.bytes).unwrap();
 
     assert!(raw.contains("multipart/mixed"));
     assert!(raw.contains("multipart/related"));

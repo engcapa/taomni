@@ -348,7 +348,7 @@ pub(super) async fn send(
     let account = resolve_config(state, config)?;
     let account_id = account.config.session_id.clone();
     let request_for_task = request.clone();
-    let (envelope, mime, copy, account) = tokio::task::spawn_blocking(move || {
+    let (message, copy, account) = tokio::task::spawn_blocking(move || {
         let message_id = super::outgoing::new_message_id(&account.config.email_address);
         let message = build_send_message_with(
             &account,
@@ -367,18 +367,12 @@ pub(super) async fn send(
                 self_envelope: false,
             },
         )
-        .map(|message| message.formatted());
-        Ok::<_, String>((
-            message.envelope().clone(),
-            message.formatted(),
-            copy,
-            account,
-        ))
+        .map(|message| message.bytes);
+        Ok::<_, String>((message, copy, account))
     })
     .await
     .map_err(|e| format!("mail send task failed: {e}"))??;
-    let response =
-        super::module_host::send_smtp(state.plugins.clone(), &account, envelope, mime).await?;
+    let response = super::module_host::send_smtp(state.plugins.clone(), &account, message).await?;
     let mut result = MailSendResult {
         accepted: true,
         response,

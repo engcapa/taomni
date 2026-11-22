@@ -65,6 +65,13 @@ pub(super) fn check_routed_smtp(host: &mut MailHost) {
     ] {
         check_delivery(host, &runtime, scenario);
     }
+    for scenario in [
+        Scenario::AcceptData,
+        Scenario::RejectData,
+        Scenario::LoseDataReply,
+    ] {
+        check_response(host, &runtime, scenario);
+    }
 }
 
 fn check_delivery(host: &mut MailHost, runtime: &Runtime, scenario: Scenario) {
@@ -104,6 +111,68 @@ fn check_delivery(host: &mut MailHost, runtime: &Runtime, scenario: Scenario) {
     assert_eq!(transcript.data, [mime.as_slice(), b"\r\n"].concat());
     match scenario {
         Scenario::AcceptData => assert!(result.unwrap().contains("accepted")),
+        Scenario::RejectData => assert!(result.unwrap_err().contains("SIZE limit")),
+        Scenario::LoseDataReply => assert!(result.unwrap_err().starts_with(SMTP_DELIVERY_UNKNOWN)),
+        _ => unreachable!(),
+    }
+}
+
+fn check_response(host: &mut MailHost, runtime: &Runtime, scenario: Scenario) {
+    use taomni_mail_api::{MimeUpload, SEND_RESPONSE, SmtpResponse};
+    use taomni_mail_engine::responses::{MailResponse, Receipt, ResponseRequest};
+
+    let (listener, _route, connection) = runtime.block_on(setup());
+    let bytes = serde_json::to_vec(&ResponseRequest {
+        email_address: "sender@example.test".into(),
+        display_name: Some("Reader".into()),
+        stamp: 1_700_000_000,
+        response: MailResponse::Receipt(Receipt {
+            uid: 17,
+            message_id: Some("original@example.test".into()),
+            subject: "Quarterly report".into(),
+            recipient: "writer@example.test".into(),
+            automatic: false,
+        }),
+    })
+    .unwrap();
+    let length = bytes.len() as u64;
+    let (_offer, source) = runtime.block_on(Route::offer_bytes(bytes)).unwrap();
+    let request = SmtpResponse {
+        connection,
+        content: MimeUpload { source, length },
+    };
+    let (result, transcript) = exchange(
+        host,
+        runtime,
+        SEND_RESPONSE,
+        serde_json::to_value(request).unwrap(),
+        listener,
+        scenario,
+    );
+    assert!(
+        transcript
+            .commands
+            .contains(&"MAIL FROM:<sender@example.test>".to_owned())
+    );
+    assert!(
+        transcript
+            .commands
+            .contains(&"RCPT TO:<writer@example.test>".to_owned())
+    );
+    assert_eq!(
+        transcript
+            .commands
+            .iter()
+            .filter(|verb| *verb == "DATA")
+            .count(),
+        1
+    );
+    let body = String::from_utf8(transcript.data).unwrap();
+    assert!(body.contains("Original-Message-ID: <original@example.test>"));
+    assert!(body.contains("manual-action/MDN-sent-manually; displayed"));
+    let result: Result<(), String> = serde_json::from_value(result).unwrap();
+    match scenario {
+        Scenario::AcceptData => result.unwrap(),
         Scenario::RejectData => assert!(result.unwrap_err().contains("SIZE limit")),
         Scenario::LoseDataReply => assert!(result.unwrap_err().starts_with(SMTP_DELIVERY_UNKNOWN)),
         _ => unreachable!(),

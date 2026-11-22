@@ -1,23 +1,16 @@
 //! Mail calendar commands over the desktop account, proxy and storage adapters.
 
-use std::sync::Arc;
-
-use lettre::Message;
-use lettre::message::header::ContentType;
-use lettre::message::{Mailbox, MultiPart, SinglePart};
 use serde::Serialize;
 use tauri::State;
 
-use super::{
-    ImapSessionOpts, MailAccountConfig, now_ts, parse_mailbox, resolve_config, with_imap_session,
-};
+use super::{MailAccountConfig, resolve_config};
 use crate::state::AppState;
 
 pub use taomni_mail_engine::calendar::{MailInvite, MailInviteAttendee, MailInviteTime};
-use taomni_mail_engine::calendar::{build_reply_ics, invite_from_message, partstat_of};
 pub(super) use taomni_mail_engine::calendar::{
     fold, param, parse_time, split_property, unescape, unfold,
 };
+use taomni_mail_engine::calendar::{invite_from_message, partstat_of};
 
 /// Invite of a message, parsed from the raw message (local store for POP3).
 /// The reader only asks when the body lists a calendar part, and invitations
@@ -37,20 +30,11 @@ pub async fn mail_get_invite(
         let raw = super::local_cmds::raw(&state, &config.session_id, &folder, uid)?;
         return Ok(invite_from_message(&raw));
     }
-    let account = resolve_config(&state, config)?;
-    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            ImapSessionOpts::default(),
-            |imap| Ok(invite_from_message(&imap.fetch_raw(&folder, uid)?)),
-        )
-    })
-    .await
-    .map_err(|e| format!("invite task failed: {e}"))?
+    let raw =
+        super::message_source::fetch_original_from_server(&state, config, &folder, uid).await?;
+    tokio::task::spawn_blocking(move || invite_from_message(&raw))
+        .await
+        .map_err(|e| format!("invite task failed: {e}"))
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -81,50 +65,11 @@ pub async fn mail_respond_invite(
         .clone()
         .ok_or_else(|| "the invitation has no organizer".to_string())?;
     let account = resolve_config(&state, config)?;
-    let me = account.config.email_address.trim().to_string();
-    let my_name = account.config.display_name.clone();
-    let ics = build_reply_ics(&invite, &me, my_name.as_deref(), partstat, now_ts());
-    let verb = match partstat {
-        "ACCEPTED" => "Accepted",
-        "TENTATIVE" => "Tentative",
-        _ => "Declined",
+    let response = taomni_mail_engine::responses::MailResponse::Invitation {
+        invite: Box::new(invite),
+        response,
     };
-    let subject = format!("{verb}: {}", invite.summary);
-    let from = Mailbox::new(
-        my_name.clone(),
-        me.parse()
-            .map_err(|e| format!("invalid from address: {e}"))?,
-    );
-    let to = parse_mailbox(&organizer.email)?;
-    let text = format!(
-        "{} has {} this invitation.",
-        my_name.as_deref().unwrap_or(&me),
-        verb.to_lowercase()
-    );
-    let message = Message::builder()
-        .from(from)
-        .to(to)
-        .subject(subject)
-        .multipart(
-            MultiPart::alternative()
-                .singlepart(SinglePart::plain(text))
-                .singlepart(
-                    SinglePart::builder()
-                        .header(
-                            ContentType::parse("text/calendar; method=REPLY; charset=UTF-8")
-                                .map_err(|e| format!("calendar content type: {e}"))?,
-                        )
-                        .body(ics),
-                ),
-        )
-        .map_err(|e| format!("failed to build invitation reply: {e}"))?;
-    super::module_host::send_smtp(
-        state.plugins.clone(),
-        &account,
-        message.envelope().clone(),
-        message.formatted(),
-    )
-    .await?;
+    super::module_host::send_response(state.plugins.clone(), &account, response).await?;
     Ok(MailInviteResponse {
         partstat: partstat.to_string(),
         sent_to: organizer.email,

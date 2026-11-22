@@ -9,6 +9,8 @@ pub(super) use local_drafts::local_drafts;
 mod imap_outgoing;
 mod pop3;
 mod prefetch;
+mod responses;
+pub(super) use responses::send_response;
 
 pub(super) use archive::{HostedArchive, archives_imap};
 pub(super) use downloads::{fetch_imap_attachment, fetch_imap_body, fetch_imap_raw};
@@ -28,7 +30,6 @@ use std::{
     time::Duration,
 };
 
-use lettre::address::Envelope;
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, FETCH_IMAP_RAW,
@@ -38,6 +39,7 @@ use taomni_mail_api::{
     SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
     imap_exchange::{ImapExchange, read_frame, write_frame},
 };
+use taomni_mail_engine::delivery::PreparedMail;
 use taomni_mail_engine::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome, HeaderStepRequest,
 };
@@ -232,29 +234,30 @@ pub(super) async fn test_smtp(
 pub(super) async fn send_smtp(
     registry: Arc<PluginRegistry>,
     account: &ResolvedMailAccount,
-    envelope: Envelope,
-    mime: Vec<u8>,
+    message: PreparedMail,
 ) -> Result<String, String> {
     if !supports(&registry, SEND_SMTP) {
         let account = account.clone();
         let runtime = tokio::runtime::Handle::current();
         return tokio::task::spawn_blocking(move || {
             let transport = super::smtp::build_smtp_transport(&account, &runtime)?;
-            let response = transport.mailer.send_raw(&envelope, &mime)?;
+            let response = transport.mailer.send_prepared(&message)?;
             Ok(format!("{response:?}"))
         })
         .await
         .map_err(|error| format!("SMTP send task failed: {error}"))?;
     }
     let (_route, connection) = bind_smtp(account).await?;
-    let mime_length = mime.len() as u64;
-    let (_offer, mime_source) = Route::offer_bytes(mime)
+    let sender = message.sender();
+    let recipients = message.recipients();
+    let mime_length = message.bytes.len() as u64;
+    let (_offer, mime_source) = Route::offer_bytes(message.bytes)
         .await
         .map_err(|error| format!("Prepare outgoing message: {error}"))?;
     let request = SmtpDelivery {
         connection,
-        sender: envelope.from().map(ToString::to_string),
-        recipients: envelope.to().iter().map(ToString::to_string).collect(),
+        sender,
+        recipients,
         mime_source,
         mime_length,
     };

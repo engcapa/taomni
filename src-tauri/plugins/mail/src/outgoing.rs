@@ -1,6 +1,6 @@
 use taomni_mail_api::{
     ImapDraftDiscard, ImapDraftStore, ImapSentCopy, MailIncomingProtocol, MimeUpload,
-    RemoteDraftLocation, SmtpConnection, SmtpDelivery,
+    RemoteDraftLocation, SmtpConnection, SmtpDelivery, SmtpResponse,
 };
 use taomni_mail_engine::imap_transport::imap_catch_result;
 use taomni_mail_engine::smtp::{check_routed_connection, send_routed_message};
@@ -36,6 +36,31 @@ pub(super) fn send(
         send_routed_message(request),
     ))?;
     Ok(result.map(|response| format!("{response:?}")))
+}
+
+pub(super) fn respond(
+    runtime: &Runtime,
+    operation: &Operation,
+    request: SmtpResponse,
+) -> Result<Result<(), String>, RpcError> {
+    validate_connection(&request.connection)?;
+    let bytes = match receive_mime(runtime, operation, request.content)? {
+        Ok(bytes) => bytes,
+        Err(error) => return Ok(Err(error)),
+    };
+    let response: taomni_mail_engine::responses::ResponseRequest =
+        serde_json::from_slice(&bytes)
+            .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+    let message = match response.prepare() {
+        Ok(message) => message,
+        Err(error) => return Ok(Err(error)),
+    };
+    operation.check_current()?;
+    runtime.block_on(while_current(operation, async {
+        taomni_mail_engine::smtp::send_prepared_response(&request.connection, &message)
+            .await
+            .map(drop)
+    }))
 }
 
 fn validate_connection(request: &SmtpConnection) -> Result<(), RpcError> {

@@ -103,19 +103,14 @@ pub(super) async fn send_message(
     };
     let db = state.mail_db(&account_id)?;
     let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let (envelope, mime, pending, account) = tokio::task::spawn_blocking(move || {
+    let (message, pending, account) = tokio::task::spawn_blocking(move || {
         let (message, pending) = outgoing::prepare_send(&account, &request, remote_draft)?;
-        Ok::<_, String>((
-            message.envelope().clone(),
-            message.formatted(),
-            pending,
-            account,
-        ))
+        Ok::<_, String>((message, pending, account))
     })
     .await
     .map_err(|e| format!("mail send task failed: {e}"))??;
     let registry = state.plugins.clone();
-    let response = module_host::send_smtp(registry.clone(), &account, envelope, mime).await?;
+    let response = module_host::send_smtp(registry.clone(), &account, message).await?;
     let result = MailSendResult {
         accepted: true,
         response,

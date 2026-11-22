@@ -122,7 +122,7 @@ def setup_rdp(ctx):
     setup_desktop_client(ctx, "rdp")
 
 
-SIGNED_MAIL_CASES = {"TC-MODULES-059", "TC-MODULES-068", "TC-MODULES-070", "TC-MODULES-076", "TC-MODULES-077"}
+SIGNED_MAIL_CASES = {"TC-MODULES-059", "TC-MODULES-068", "TC-MODULES-070", "TC-MODULES-076", "TC-MODULES-077", "TC-MODULES-079"}
 
 
 def setup_mail(ctx):

@@ -437,12 +437,7 @@ fn smtp_acceptance_does_not_wait_for_or_retry_a_failed_sent_copy() {
     let registry = Arc::new(crate::plugin::PluginRegistry::new(directory.path()));
     let (message, pending) = outgoing::prepare_send(&account, &request, None).unwrap();
     let response = runtime
-        .block_on(super::module_host::send_smtp(
-            registry,
-            &account,
-            message.envelope().clone(),
-            message.formatted(),
-        ))
+        .block_on(super::module_host::send_smtp(registry, &account, message))
         .unwrap();
     assert!(response.contains("accepted"));
     assert!(

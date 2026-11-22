@@ -10,7 +10,7 @@ description: 'TASK-17 (docs-feature/mail-thunderbird-parity-design.md, read rece
 
   and the banner must not come back. The "always"/"never" policies and the
 
-  MDN format are covered by Vitest and the Rust test (mail::receipts).
+  MDN format are covered by Vitest and the Mail engine tests.
 
   The toolbar search control must retain a usable width and stay within the
 
@@ -75,6 +75,7 @@ steps:
 - assert_not_visible: '[data-testid="mail-receipt-banner"]'
 - assert_no_runtime_errors: null
 - screenshot: mail-receipt-01.png
+- mail_server_assert_smtp_contains: {text: "Disposition: manual-action", timeout_sec: 20}
 verification:
   review: reviewed
   requirements:
@@ -113,10 +114,13 @@ verification:
       expectation: '{"assert_not_visible": "[data-testid=\"mail-receipt-banner\"]"}'
     - step: 19
       expectation: Sending the receipt leaves no runtime errors.
+    - step: 21
+      expectation: The server receives the manual disposition field.
     results:
     - 17
     - 18
     - 19
+    - 21
   visual:
   - check: 截图中阅读区不再显示回执提示，状态栏显示回执已发送。
     method: manual

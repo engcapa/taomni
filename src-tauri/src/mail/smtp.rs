@@ -3,10 +3,9 @@ use super::*;
 use taomni_mail_engine::compose::{
     MailSender, ResolvedSendAttachment, attachment_content_type, build_message,
 };
-pub(super) use taomni_mail_engine::compose::{
-    MessageBuildOptions, parse_mailbox, validate_send_request,
-};
+pub(super) use taomni_mail_engine::compose::{MessageBuildOptions, validate_send_request};
 
+use taomni_mail_engine::delivery::PreparedMail;
 use taomni_mail_engine::smtp::{SmtpClient, SmtpEndpoint};
 
 pub(super) struct MailSmtpTransport {
@@ -49,7 +48,7 @@ pub(super) fn build_smtp_transport(
 pub(super) fn build_send_message(
     account: &ResolvedMailAccount,
     request: &MailSendRequest,
-) -> Result<Message, String> {
+) -> Result<PreparedMail, String> {
     build_send_message_with(account, request, &MessageBuildOptions::default())
 }
 
@@ -57,13 +56,13 @@ pub(super) fn build_send_message_with(
     account: &ResolvedMailAccount,
     request: &MailSendRequest,
     options: &MessageBuildOptions,
-) -> Result<Message, String> {
+) -> Result<PreparedMail, String> {
     let sender = MailSender {
         email_address: &account.config.email_address,
         display_name: account.config.display_name.as_deref(),
         reply_to: account.config.reply_to.as_deref(),
     };
-    build_message(sender, request, options, read_send_attachments)
+    build_message(sender, request, options, read_send_attachments).map(PreparedMail::from)
 }
 
 pub(super) fn read_send_attachments(

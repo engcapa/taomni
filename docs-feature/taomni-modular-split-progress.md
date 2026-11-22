@@ -2,6 +2,9 @@
 
 ## 2026-11-22 当前进展
 
+- Mail 0.1.23 的签名宿主接管 iTIP 邀请回复与 RFC 8098 已读回执的 MIME 组装和 SMTP 投递。普通写信、密送与旧模块沿用已准备好的 SMTP 信封。核心 Cargo 清单已移除对 `lettre` 的直接依赖，过渡期 Mail 引擎仍间接链接该库。TC-MODULES-079 比对两份真实服务器回信与原件、去重标志和宿主身份。TC-MAIL-INVITE-01 与 TC-MAIL-RECEIPT-01 补充 Browser/Native 断言。7 项协议、78 项引擎、12 项宿主及 9 项桌面单测通过，三端 UI 和新协议实跑待收证。
+- 在 `bc19f8dc3` 的 Mail 归档批次中，三端 Browser 各通过 25/25，Linux Native 通过 34/34，均已在运行期间取得分片。其三端真实宿主协议验证通过。候选 `647fec73c` 正在四平台打包并验证 SocksCap、升级与崩溃回归。 [Mail 分片](https://github.com/engcapa/taomni/actions/runs/45003592759) · [宿主协议](https://github.com/engcapa/taomni/actions/runs/45003911729) · [候选打包](https://github.com/engcapa/taomni/actions/runs/45005581790) · [升级分片](https://github.com/engcapa/taomni/actions/runs/45005586816)
+
 - 候选 `645b7291e` 的 Intel 和 ARM64 DMG 均已完成从 0.5.12 实装升级、十模块首装、卸载 Mail、重开及回退。Linux deb 通过首装和卸载重开后，在 MFA 数据迁移处遇到目录签名与原件末尾换行不同。修复 `05b9c10eb` 的 17 项验签单测通过，真实 deb 需要包含修复的新安装件。Windows 已验证原 MSI 安装，旧版 WebView2 自动化仍待接通。 [Intel](https://github.com/engcapa/taomni/actions/runs/45003587566) · [ARM64 和 Windows](https://github.com/engcapa/taomni/actions/runs/45004885811) · [Linux](https://github.com/engcapa/taomni/actions/runs/45003581530)
 - SocksCap 0.1.3 的签名宿主接管配置的首次导入、写入、重新打开和备份快照。旧版模块仍可使用原配置，用户启用新版后再导入。TC-MODULES-071/072/073 覆盖重开后再次编辑、旧文件摘要、模块内保存的端点与 Vault 引用，以及停用再启用。驱动、提权及恢复日志仍在核心过渡层。
 

@@ -62,7 +62,13 @@ pub(super) fn prepare_send(
     account: &ResolvedMailAccount,
     request: &MailSendRequest,
     remote_draft: Option<RemoteDraftLocation>,
-) -> Result<(lettre::Message, Option<PendingSentCopy>), String> {
+) -> Result<
+    (
+        taomni_mail_engine::delivery::PreparedMail,
+        Option<PendingSentCopy>,
+    ),
+    String,
+> {
     let message_id = new_message_id(&account.config.email_address);
     let save_copy = save_sent_copy_enabled(&account.config);
     let copy = if save_copy {
@@ -76,7 +82,7 @@ pub(super) fn prepare_send(
                     self_envelope: false,
                 },
             )?
-            .formatted(),
+            .bytes,
         )
     } else {
         None
@@ -192,7 +198,7 @@ pub async fn mail_store_remote_draft(
             self_envelope: true,
         },
     )?
-    .formatted();
+    .bytes;
     let location = if module_host::stores_remote_drafts(&state.plugins) {
         module_host::store_remote_draft(
             state.plugins.clone(),

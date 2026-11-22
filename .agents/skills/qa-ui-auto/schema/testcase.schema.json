@@ -997,7 +997,7 @@
         },
         "assert_signed_mail_host": {
           "oneOf": [
-            {"enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "outbox-queued", "outbox-retained", "outbox-sent", "disabled"]},
+            {"enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "outbox-queued", "outbox-retained", "outbox-sent", "responses", "disabled"]},
             {
               "type": "object",
               "additionalProperties": false,

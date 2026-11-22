@@ -78,7 +78,7 @@ pub async fn mail_save_raw(
         .map_err(|error| format!("mail save raw task failed: {error}"))?
 }
 
-async fn fetch_original_from_server(
+pub(super) async fn fetch_original_from_server(
     state: &State<'_, AppState>,
     config: MailAccountConfig,
     folder: &str,
