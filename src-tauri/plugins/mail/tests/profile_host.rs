@@ -336,6 +336,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     imap::check_routed_prefetch(&mut host);
     imap::check_routed_archive(&mut host);
     archive_encoding::check(&mut host);
+    archive_encoding::check_decoding(&mut host);
     imap::check_routed_attachment(&mut host);
     attachment_cache::check(&mut host, &root, &old_storage, &attachment);
     imap::check_routed_sent_copy(&mut host);

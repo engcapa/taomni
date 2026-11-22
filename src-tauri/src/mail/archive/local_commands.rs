@@ -2,8 +2,8 @@ use crate::mail::MailMessageBody;
 use crate::mail::archive_query;
 use crate::mail::storage;
 use crate::mail::{
-    cached_to_body, decode_mail_original, extract_attachment, parse_body_message,
-    with_mail_db_async, with_mail_original, write_attachment_file,
+    decode_mail_original, extract_attachment, module_host, with_mail_db_async, with_mail_original,
+    write_attachment_file,
 };
 use crate::state::AppState;
 use std::io::Read;
@@ -76,21 +76,8 @@ pub async fn mail_archive_read(
         storage::open_entry(db, account, &entry)
     })
     .await?;
-    decode_mail_original(move || {
-        let raw = original.read()?;
-        Ok(cached_to_body(
-            parse_body_message(
-                &account_id,
-                &folder,
-                uid,
-                Some(raw.len() as u32),
-                &raw,
-                raw.len(),
-            ),
-            "archive",
-        ))
-    })
-    .await
+    module_host::decode_archive_original(state.plugins.clone(), original, account_id, folder, uid)
+        .await
 }
 
 #[tauri::command]

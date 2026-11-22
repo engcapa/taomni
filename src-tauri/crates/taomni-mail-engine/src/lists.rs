@@ -1,15 +1,4 @@
-use serde::{Deserialize, Serialize};
-
-/// Parsed `List-Unsubscribe` of a message.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct MailListUnsubscribe {
-    /// `https:`/`http:`/`mailto:` URIs in header order.
-    pub uris: Vec<String>,
-    /// `List-Unsubscribe-Post: List-Unsubscribe=One-Click` with an https URI.
-    #[serde(default)]
-    pub one_click: bool,
-}
+pub use taomni_mail_api::message::MailListUnsubscribe;
 
 /// Parse the `<uri>, <uri>` list; `None` when no usable URI is present.
 pub fn parse_list_unsubscribe(

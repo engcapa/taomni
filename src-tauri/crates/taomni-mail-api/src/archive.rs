@@ -14,6 +14,15 @@ pub struct ArchiveEncoding {
     pub raw_size: u64,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ArchiveDecoding {
+    pub exchange: Endpoint,
+    pub account_id: String,
+    pub folder: String,
+    pub uid: u32,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MessageObject {

@@ -117,6 +117,7 @@ steps:
     full: {INBOX: 2}
     headers: {INBOX: 0, Archive: 2}
 - assert_no_runtime_errors: null
+- assert_signed_mail_host: running
 verification:
   review: reviewed
   requirements:
@@ -140,7 +141,8 @@ verification:
     - {step: 55, expectation: The saved plaintext body identifies the expunged fixture message.}
     - {step: 57, expectation: Both originals and attachments still match the fixture digests after their live headers disappear.}
     - {step: 58, expectation: The workflow finishes without runtime errors.}
-    results: [48, 51, 53, 55, 57, 58]
+    - {step: 59, expectation: The signed host still owns the mailbox after decoding the original.}
+    results: [48, 51, 53, 55, 57, 58, 59]
   visual:
   - check: The Mail pane displays downloading, paused and completed as the scan runs.
     method: automated

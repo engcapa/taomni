@@ -10,6 +10,7 @@ use zeroize::Zeroizing;
 pub mod archive;
 pub mod attachment_cache;
 pub mod imap_exchange;
+pub mod message;
 pub mod pop3_exchange;
 
 pub const SLUG: &str = "mail";
@@ -28,6 +29,7 @@ pub const LIST_IMAP_UNREAD: &str = "mail/list-imap-unread";
 pub const FETCH_IMAP_RAW: &str = "mail/fetch-imap-raw";
 pub const FETCH_IMAP_BODY: &str = "mail/fetch-imap-body";
 pub const PREFETCH_IMAP_BODIES: &str = "mail/prefetch-imap-bodies";
+pub const DECODE_ARCHIVE_ORIGINAL: &str = "mail/decode-archive-original";
 pub const ENCODE_ARCHIVE_ORIGINAL: &str = "mail/encode-archive-original";
 pub const OPEN_IMAP_ARCHIVE: &str = "mail/open-imap-archive";
 pub const OPEN_POP3_SYNC: &str = "mail/open-pop3-sync";

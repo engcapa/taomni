@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- Mail 0.1.26 从普通邮件阅读和归档管理器打开原件时，由签名宿主解析正文和附件清单。桌面在选定的邮箱路径读取已核验的原件，宿主只接收本次读取的 MIME 字节，桌面复核返回的账号、文件夹和 UID。旧模块继续使用兼容读取。Mail API、引擎和宿主共 102 项单测通过，原生协议用例已编译。现有缓存与归档索引的写入归属继续迁移。
 - SocksCap 0.1.7 的签名包携带 Xray 和 MPL-2.0 许可证。宿主以固定摘要核对上游资源，每次启动核对实际字节，配置经 stdin 传给子进程。模块宿主管理退出和崩溃重启，基座只保留流量转发和系统捕获的进程排除。四个目标的核心打包规则已排除 Xray，WinDivert 与其他旧捕获桥接继续迁移。Browser 074 核对预览提示，Native 084 核对实际 Xray 错误输出、资源摘要及损坏拒绝。模块备份仍只包含 SocksCap 配置，重启后可从签名包重新准备运行文件。
 - `c0a64b5c0` 的四目标候选安装包与合入 main 后的三端回归已启动。Windows 和 macOS 已完成的分片确认主线 Explorer 侧栏和本分支的新建类型用例均通过。 [候选构建](https://github.com/engcapa/taomni/actions/runs/45024083491) · [三端回归](https://github.com/engcapa/taomni/actions/runs/45024092869)
 - 首发十模块升级已经在四个发布目标完成实装演练。Windows 最新的 `b7725bfb6` 工具回执确认正式 0.5.12 原 profile 升至候选 `647fec73c` 的 0.6.0，在商店逐项核对十个签名模块，卸载 Mail 后正常退出，重开核对九个活动模块，再回退并重开旧版。Linux deb、Intel DMG 和 ARM64 DMG 也已完成同一候选的这条路径。Windows 安装件 Authenticode 为 `NotSigned`，两个 DMG 的 Gatekeeper 评估均未接受。 [Windows 实装](https://github.com/engcapa/taomni/actions/runs/45022319884) · [Linux](https://github.com/engcapa/taomni/actions/runs/45016606951) · [双架构 macOS](https://github.com/engcapa/taomni/actions/runs/45016613506)

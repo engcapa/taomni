@@ -87,20 +87,13 @@ async fn get_message_body(
     })
     .await?;
     if let Some(original) = original {
-        return decode_mail_original(move || {
-            let raw = original.read()?;
-            Ok(cached_to_body(
-                parse_body_message(
-                    &account_id,
-                    &folder,
-                    uid,
-                    Some(raw.len() as u32),
-                    &raw,
-                    raw.len(),
-                ),
-                "archive",
-            ))
-        })
+        return module_host::decode_archive_original(
+            state.plugins.clone(),
+            original,
+            account_id,
+            folder,
+            uid,
+        )
         .await;
     }
     if let Some(body) = cached {

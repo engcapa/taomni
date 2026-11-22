@@ -3,6 +3,7 @@
 
 mod address_book;
 mod archive;
+mod archive_decoding;
 mod archive_encoding;
 mod attachment_cache;
 mod commands;
@@ -63,6 +64,7 @@ fn host_config() -> HostConfig {
                 FETCH_IMAP_BODY,
                 PREFETCH_IMAP_BODIES,
                 taomni_mail_api::ENCODE_ARCHIVE_ORIGINAL,
+                taomni_mail_api::DECODE_ARCHIVE_ORIGINAL,
                 OPEN_IMAP_ARCHIVE,
                 OPEN_POP3_SYNC,
                 FETCH_IMAP_ATTACHMENT,
@@ -115,6 +117,11 @@ impl PluginHandler for Handler {
     ) -> Result<Value, RpcError> {
         operation.check_current()?;
         let result = match method {
+            taomni_mail_api::DECODE_ARCHIVE_ORIGINAL => {
+                let request = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(archive_decoding::decode(&self.io, operation, request)?)
+            }
             taomni_mail_api::ATTACHMENT_CACHE => {
                 let request = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;

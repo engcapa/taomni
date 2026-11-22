@@ -436,7 +436,7 @@ steps:
     contains: of 1 messages
     timeout_sec: 60
 - click: '[data-testid="mail-archive-read"]'
-- assert_text: {selector: '[data-testid="mail-archive-preview"]', contains: Manager 0}
+- assert_text: {selector: '[data-testid="mail-archive-preview"]', contains: 'Subject: Manager 0'}
 - assert_visible: '[data-testid="mail-archive-export"]'
 - click: '[data-testid="mail-archive-close"]'
 - assert_not_visible: '[data-testid="mail-archive-dialog"]'
@@ -632,7 +632,7 @@ verification:
     - step: 151
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 1 messages", "timeout_sec": 60}}'
     - step: 153
-      expectation: The surviving archived Manager message opens after the scan resumes.
+      expectation: The surviving archived Manager message shows its saved body after the scan resumes.
     - step: 154
       expectation: Its original EML is available to export.
     - step: 156
