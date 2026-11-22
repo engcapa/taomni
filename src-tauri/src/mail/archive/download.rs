@@ -1,8 +1,27 @@
 use super::connection::ArchiveConnection;
 use super::lifetime::{ArchiveJob, update};
-use super::sync::check_publication;
 use crate::mail::{ResolvedMailAccount, storage};
-use taomni_mail_engine::{archive::download_imap_original, storage::query::ArchiveKey};
+use crate::state::MailDbHandle;
+use std::sync::atomic::Ordering;
+use taomni_mail_engine::{
+    archive::download_imap_original,
+    storage::{query::ArchiveKey, scan},
+};
+
+pub(super) fn publish_original(
+    handle: &MailDbHandle,
+    account: &str,
+    key: &ArchiveKey,
+    prepared: storage::PreparedMessage,
+    job: &ArchiveJob,
+) -> Result<(), String> {
+    let db = handle.lock().map_err(|error| error.to_string())?;
+    let published = scan::publish_original(&db, account, key, prepared, || update(job, |_| {}));
+    if published.as_ref().is_err_and(|error| error == scan::PAUSED) {
+        job.pause.store(true, Ordering::Release);
+    }
+    published.map(drop)
+}
 
 pub(super) fn download_one(
     imap: &mut dyn ArchiveConnection,
@@ -42,12 +61,7 @@ pub(super) fn download_one(
                 status.total_bytes = Some(size);
             })?;
             let prepared = storage::prepare(&root, raw, || update(job, |_| {}))?;
-            let db = handle.lock().map_err(|e| e.to_string())?;
-            // Cleanup sets pause before acquiring this same lock. No publication
-            // can resurrect a reference deleted by explicit cleanup.
-            check_publication(&db, id, folder, uid, validity, job)?;
-            storage::publish(&db, id, folder, uid, validity, prepared)?;
-            Ok(())
+            publish_original(handle, id, &message, prepared, job)
         },
     )
 }

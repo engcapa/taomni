@@ -1,8 +1,8 @@
 use super::index::account_root;
 use super::index::object_path;
 use super::model::ArchiveEntry;
-use rusqlite::Connection;
 use rusqlite::params;
+use rusqlite::{Connection, Transaction, TransactionBehavior};
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -24,7 +24,11 @@ pub fn remove_entries(
 
 /// Only an unreferenced object is removed. A backup's hard link remains valid.
 pub fn collect_garbage(db: &Connection, account: &str) -> Result<usize, String> {
-    let hashes: Vec<String> = db
+    // Keep the existence check and unlink under the same writer lock as
+    // publication so a new reference cannot race with object removal.
+    let tx = Transaction::new_unchecked(db, TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    let hashes: Vec<String> = tx
         .prepare("SELECT sha256 FROM mail_archive_gc")
         .map_err(|e| e.to_string())?
         .query_map([], |row| row.get(0))
@@ -33,7 +37,7 @@ pub fn collect_garbage(db: &Connection, account: &str) -> Result<usize, String> 
         .map_err(|e| e.to_string())?;
     let mut removed = 0;
     for hash in hashes {
-        let used: bool = db
+        let used: bool = tx
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM mail_full_messages WHERE sha256=?1)",
                 [&hash],
@@ -41,7 +45,7 @@ pub fn collect_garbage(db: &Connection, account: &str) -> Result<usize, String> 
             )
             .map_err(|e| e.to_string())?;
         if !used {
-            let path = object_path(&account_root(db, account)?, &hash)?;
+            let path = object_path(&account_root(&tx, account)?, &hash)?;
             match fs::remove_file(path) {
                 Ok(()) => {
                     removed += 1;
@@ -50,9 +54,10 @@ pub fn collect_garbage(db: &Connection, account: &str) -> Result<usize, String> 
                 Err(e) => return Err(format!("Remove saved email: {e}")),
             }
         }
-        db.execute("DELETE FROM mail_archive_gc WHERE sha256=?1", [hash])
+        tx.execute("DELETE FROM mail_archive_gc WHERE sha256=?1", [hash])
             .map_err(|e| e.to_string())?;
     }
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(removed)
 }
 

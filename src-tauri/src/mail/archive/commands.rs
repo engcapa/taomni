@@ -15,6 +15,7 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
+use taomni_mail_engine::storage::scan;
 use tauri::AppHandle;
 use tauri::Manager;
 use tauri::State;
@@ -40,11 +41,7 @@ pub async fn mail_archive_status(
         }
     }
     let (paused, shared) = with_mail_db_async(&state, &account_id, |db, account| {
-        let paused = db.query_row(
-            "SELECT COALESCE((SELECT paused FROM mail_archive_preferences WHERE account_id=?1),0)",
-            [account],
-            |row| row.get::<_, bool>(0),
-        )?;
+        let paused = scan::is_paused(db, account)?;
         let shared = coordination::ProcessLock::try_at(Path::new(db.path().unwrap()), "archive")
             .map_err(storage::as_sql_error)?
             .is_none();
@@ -94,15 +91,7 @@ pub async fn mail_archive_pause(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state.legacy.mail.mail_archive.pause_account(&account_id)?;
-    with_mail_db_async(&state, &account_id, |db, account| {
-        db.execute(
-            "INSERT INTO mail_archive_preferences(account_id,paused) VALUES(?1,1)
-            ON CONFLICT(account_id) DO UPDATE SET paused=1",
-            [account],
-        )?;
-        Ok(())
-    })
-    .await
+    with_mail_db_async(&state, &account_id, scan::pause).await
 }
 
 #[tauri::command]
@@ -115,21 +104,7 @@ pub async fn mail_archive_start(
     let id = config.session_id.clone();
     let resume = resume.unwrap_or(false);
     let paused = with_mail_db_async(&state, &id, move |db, account| {
-        db.execute(
-            "INSERT OR IGNORE INTO mail_archive_preferences(account_id,paused) VALUES(?1,0)",
-            [account],
-        )?;
-        if resume {
-            db.execute(
-                "UPDATE mail_archive_preferences SET paused=0 WHERE account_id=?1",
-                [account],
-            )?;
-        }
-        db.query_row(
-            "SELECT COALESCE((SELECT paused FROM mail_archive_preferences WHERE account_id=?1),0)",
-            [account],
-            |row| row.get::<_, bool>(0),
-        )
+        scan::begin(db, account, resume)
     })
     .await?;
     if paused {
@@ -187,9 +162,8 @@ pub async fn mail_archive_start(
     tokio::spawn(async move {
         while monitor_job.running.load(Ordering::Acquire) {
             tokio::time::sleep(Duration::from_millis(250)).await;
-            let paused = mail_db_task(Arc::clone(&monitor_db), monitor_id.clone(), |db, account| {
-                db.query_row("SELECT COALESCE((SELECT paused FROM mail_archive_preferences WHERE account_id=?1),0)", [account], |row| row.get::<_, bool>(0))
-            }).await;
+            let paused =
+                mail_db_task(Arc::clone(&monitor_db), monitor_id.clone(), scan::is_paused).await;
             if matches!(paused, Ok(true)) {
                 monitor_job.pause.store(true, Ordering::Release);
                 if let Ok(socket) = monitor_job.socket.lock() {

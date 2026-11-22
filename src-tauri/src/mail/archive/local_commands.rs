@@ -8,6 +8,7 @@ use crate::mail::{
 use crate::state::AppState;
 use std::io::Read;
 use std::path::Path;
+use taomni_mail_engine::storage::scan;
 use tauri::State;
 
 #[tauri::command]
@@ -134,8 +135,9 @@ pub async fn mail_archive_remove(
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
     state.legacy.mail.mail_archive.pause_account(&account_id)?;
-    with_mail_db_async(&state,&account_id,move |db,account| {
-        db.execute("INSERT INTO mail_archive_preferences(account_id,paused) VALUES(?1,1) ON CONFLICT(account_id) DO UPDATE SET paused=1",[account])?;
-        storage::remove_entries(db,account,&entries).map_err(storage::as_sql_error)
-    }).await
+    with_mail_db_async(&state, &account_id, move |db, account| {
+        scan::pause(db, account)?;
+        storage::remove_entries(db, account, &entries).map_err(storage::as_sql_error)
+    })
+    .await
 }

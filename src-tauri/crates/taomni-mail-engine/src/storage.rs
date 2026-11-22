@@ -6,6 +6,7 @@ mod model;
 mod publication;
 pub mod query;
 mod reading;
+pub mod scan;
 
 #[cfg(test)]
 mod tests;

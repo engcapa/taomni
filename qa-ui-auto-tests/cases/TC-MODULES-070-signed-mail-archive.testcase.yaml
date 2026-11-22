@@ -91,6 +91,7 @@ steps:
     root: ${fixture.mail_storage_a}
     expected: ${fixture.mail_expected}
     partial_files: 0
+    paused: false
     full:
       INBOX: 2
     headers:
@@ -108,7 +109,7 @@ verification:
     - {step: 39, expectation: The initial scan reaches the downloading phase before it is paused.}
     - {step: 41, expectation: The scan reports that it paused.}
     - {step: 43, expectation: The resumed transfer finishes the scan.}
-    - {step: 44, expectation: Gzip originals and SQLite metadata match the fixture. The archive removes the partial bytes and resume metadata.}
+    - {step: 44, expectation: Gzip originals and SQLite metadata match the fixture. Resume clears the persisted pause and removes partial transfer files.}
     - {step: 45, expectation: The verified Mail host and renderer own the enabled module.}
     - {step: 46, expectation: The storage workflow produces no runtime errors.}
     results: [39, 41, 43, 44, 45, 46]

@@ -31,6 +31,10 @@ class MailStorageOracleTest(unittest.TestCase):
             self.assertEqual(observe(root, expected, {'INBOX':1}, {'Archive':1})['objects'], 1)
             with closing(sqlite3.connect(root / 'qa.db')) as db, db:
                 db.executescript("CREATE TABLE mail_folders(name,total,sync_complete); INSERT INTO mail_folders VALUES('INBOX',350,0);")
+                db.executescript("CREATE TABLE mail_archive_preferences(paused); INSERT INTO mail_archive_preferences VALUES(0);")
+            self.assertFalse(observe(root, expected, {'INBOX': 1}, {}, paused=False)['paused'])
+            with self.assertRaisesRegex(AssertionError, 'Archive pause state in SQLite'):
+                observe(root, expected, {'INBOX': 1}, {}, paused=True)
             self.assertEqual(observe_incremental(root, expected)['full'], 1)
             with closing(sqlite3.connect(root / 'qa.db')) as db, db:
                 db.execute('UPDATE mail_folders SET sync_complete=1')

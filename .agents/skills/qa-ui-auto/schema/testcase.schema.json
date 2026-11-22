@@ -483,6 +483,9 @@
               "type": "integer",
               "minimum": 0
             },
+            "paused": {
+              "type": "boolean"
+            },
             "objects": {
               "type": "integer",
               "minimum": 0

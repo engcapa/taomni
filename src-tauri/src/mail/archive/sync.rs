@@ -1,5 +1,5 @@
 use super::connection::{ArchiveConnection, HostedConnection};
-use super::download::download_one;
+use super::download::{download_one, publish_original};
 use super::lifetime::ArchiveJob;
 use super::lifetime::update;
 use super::limits::ARCHIVE_BATCH;
@@ -13,63 +13,34 @@ use crate::mail::storage;
 use crate::mail::sync;
 use crate::mail::{connect_imap_with_socket, folder_is_noselect, module_host};
 use crate::state::AppState;
-use rusqlite::Connection;
-use rusqlite::Result as SqlResult;
 use rusqlite::params;
 use std::collections::HashSet;
-use std::sync::atomic::Ordering;
 use sync::MailSyncRequestMode;
 use sync::StepParams;
-
-pub(super) fn check_publication(
-    db: &Connection,
-    account: &str,
-    folder: &str,
-    uid: u32,
-    validity: u32,
-    job: &ArchiveJob,
-) -> Result<(), String> {
-    let paused: bool = db
-        .query_row(
-            "SELECT COALESCE((SELECT paused FROM mail_archive_preferences WHERE account_id=?1),0)",
-            [account],
-            |row| row.get(0),
-        )
-        .map_err(|e| e.to_string())?;
-    if paused {
-        job.pause.store(true, Ordering::Release);
-    }
-    let skipped: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM mail_archive_skipped WHERE account_id=?1 AND folder=?2 AND uid=?3 AND uid_validity=?4)", params![account,folder,uid,validity], |row| row.get(0)).map_err(|e| e.to_string())?;
-    if skipped {
-        return Err("This local original was cleaned up in another instance; scan again to continue with other messages".into());
-    }
-    update(job, |_| {})
-}
+use taomni_mail_engine::storage::{query::ArchiveKey, scan};
 
 pub(super) fn run_local(state: &AppState, id: &str, job: &ArchiveJob) -> Result<(), String> {
     let handle = state.mail_db(id)?;
-    let targets: Vec<(String, u32)> = {
+    let targets = {
         let db = handle.lock().map_err(|e| e.to_string())?;
-        db.prepare("SELECT r.folder,r.uid FROM mail_local_raw r WHERE r.account_id=?1 AND NOT EXISTS(SELECT 1 FROM mail_full_messages a WHERE a.account_id=r.account_id AND a.folder=r.folder AND a.uid=r.uid AND a.uid_validity=1) AND NOT EXISTS(SELECT 1 FROM mail_archive_skipped s WHERE s.account_id=r.account_id AND s.folder=r.folder AND s.uid=r.uid AND s.uid_validity=1)").map_err(|e|e.to_string())?.query_map([id],|row|Ok((row.get(0)?,row.get(1)?))).map_err(|e|e.to_string())?.collect::<SqlResult<_>>().map_err(|e|e.to_string())?
+        scan::pending_local(&db, id).map_err(|error| error.to_string())?
     };
     update(job, |status| status.total = targets.len())?;
-    for (folder, uid) in targets {
+    for target in targets {
         update(job, |status| {
-            status.folder = Some(folder.clone());
+            status.folder = Some(target.folder.clone());
             status.phase = "verifying".into();
         })?;
         let (root, raw) = {
             let db = handle.lock().map_err(|e| e.to_string())?;
             (
                 storage::account_root(&db, id)?,
-                pop3::local_raw(&db, id, &folder, uid).map_err(|e| e.to_string())?,
+                pop3::local_raw(&db, id, &target.folder, target.uid).map_err(|e| e.to_string())?,
             )
         };
         let Some(raw) = raw else { continue };
         let prepared = storage::prepare(&root, raw.as_slice(), || update(job, |_| {}))?;
-        let db = handle.lock().map_err(|e| e.to_string())?;
-        check_publication(&db, id, &folder, uid, 1, job)?;
-        storage::publish(&db, id, &folder, uid, 1, prepared)?;
+        publish_original(&handle, id, &target, prepared, job)?;
         update(job, |status| status.saved += 1)?;
     }
     Ok(())
@@ -206,12 +177,7 @@ pub(super) fn run_folder(
         }
         let (validity, targets) = {
             let db = handle.lock().map_err(|e| e.to_string())?;
-            let validity:u32=db.query_row("SELECT COALESCE(uid_validity,0) FROM mail_folders WHERE account_id=?1 AND name=?2",params![id,folder],|row|row.get(0)).map_err(|e|e.to_string())?;
-            let targets:Vec<u32>=db.prepare("SELECT m.uid FROM mail_messages m WHERE m.account_id=?1 AND m.folder=?2 AND NOT EXISTS
-                (SELECT 1 FROM mail_full_messages a WHERE a.account_id=m.account_id AND a.folder=m.folder AND a.uid=m.uid AND a.uid_validity=?3)
-                AND NOT EXISTS(SELECT 1 FROM mail_archive_skipped s WHERE s.account_id=m.account_id AND s.folder=m.folder AND s.uid=m.uid AND s.uid_validity=?3)
-                ORDER BY m.uid DESC").map_err(|e|e.to_string())?.query_map(params![id,folder,validity],|row|row.get(0)).map_err(|e|e.to_string())?.collect::<SqlResult<_>>().map_err(|e|e.to_string())?;
-            (validity, targets)
+            scan::pending_imap(&db, id, folder).map_err(|error| error.to_string())?
         };
         let newly_discovered = targets
             .iter()
@@ -254,7 +220,12 @@ pub(super) fn download_targets(
             Ok(()) => update(job, |status| status.saved += 1)?,
             Err(error) if error.starts_with("MAIL_ARCHIVE_GONE:") => {
                 let db = handle.lock().map_err(|e| e.to_string())?;
-                db.execute("INSERT OR IGNORE INTO mail_archive_skipped(account_id,folder,uid_validity,uid) VALUES(?1,?2,?3,?4)",params![id,folder,validity,uid]).map_err(|e|e.to_string())?;
+                let key = ArchiveKey {
+                    folder: folder.into(),
+                    uid,
+                    uid_validity: validity,
+                };
+                scan::skip(&db, id, &key).map_err(|error| error.to_string())?;
                 update(job, |status| status.total = status.total.saturating_sub(1))?;
             }
             Err(error) if error.starts_with(CONTENT_ERROR) => {

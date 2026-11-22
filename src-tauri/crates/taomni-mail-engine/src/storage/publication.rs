@@ -2,9 +2,10 @@ use super::index::account_root;
 use super::index::object_path;
 use super::model::FullMessage;
 use super::model::PreparedMessage;
+use super::query::ArchiveKey;
 use crate::archive::{MessageObject, compress_message, verify_message};
-use rusqlite::Connection;
 use rusqlite::params;
+use rusqlite::{Connection, Transaction, TransactionBehavior};
 use std::fs;
 use std::fs::File;
 use std::io::Read;
@@ -65,13 +66,38 @@ pub fn publish(
     uid_validity: u32,
     prepared: PreparedMessage,
 ) -> Result<FullMessage, String> {
+    let target = ArchiveKey {
+        folder: folder.into(),
+        uid,
+        uid_validity,
+    };
+    publish_checked(db, account, &target, prepared, |_| Ok(()))
+}
+
+pub(super) fn publish_checked(
+    db: &Connection,
+    account: &str,
+    target: &ArchiveKey,
+    prepared: PreparedMessage,
+    check: impl FnOnce(&Connection) -> Result<(), String>,
+) -> Result<FullMessage, String> {
+    // Reserve the writer lock before reading pause and skip markers. A cleanup
+    // must finish before that check or wait for this publication to commit.
+    let tx = Transaction::new_unchecked(db, TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    check(&tx)?;
+    let ArchiveKey {
+        folder,
+        uid,
+        uid_validity,
+    } = target;
     let PreparedMessage {
         temp,
         hash,
         raw_size,
         has_attachments,
     } = prepared;
-    let root = account_root(db, account)?;
+    let root = account_root(&tx, account)?;
     let path = object_path(&root, &hash)?;
     fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
     if !path.exists() {
@@ -79,9 +105,8 @@ pub fn publish(
             .map_err(|e| format!("Publish full email: {}", e.error))?;
     } // Existing immutable content was verified during preparation.
     let stored_size = fs::metadata(&path).map_err(|e| e.to_string())?.len();
-    let tx = db.unchecked_transaction().map_err(|e| e.to_string())?;
     let mut header =
-        crate::cache::cached_header(&tx, account, folder, uid).map_err(|e| e.to_string())?;
+        crate::cache::cached_header(&tx, account, folder, *uid).map_err(|e| e.to_string())?;
     if let Some(header) = &mut header {
         header.has_attachments = has_attachments;
     }

@@ -10,7 +10,7 @@ pub use relocation::{configured_directory, save_mail_session};
 
 pub use taomni_mail_engine::storage::{
     ArchiveEntry, FullMessage, FullMessageMode, OpenMessage, PreparedMessage, account_root,
-    as_sql_error, collect_garbage, init_tables, list, lookup, open, open_entry, prepare, publish,
+    as_sql_error, collect_garbage, init_tables, list, lookup, open, open_entry, prepare,
     remove_entries, snapshot_objects, snapshot_objects_with, store,
 };
 

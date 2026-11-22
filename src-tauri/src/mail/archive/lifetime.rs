@@ -78,7 +78,7 @@ impl ArchiveManager {
 
 pub(super) fn update(job: &ArchiveJob, f: impl FnOnce(&mut ArchiveStatus)) -> Result<(), String> {
     if job.pause.load(Ordering::Acquire) {
-        return Err("Full-message storage paused".into());
+        return Err(taomni_mail_engine::storage::scan::PAUSED.into());
     }
     let mut status = job.status.lock().map_err(|e| e.to_string())?;
     f(&mut status);

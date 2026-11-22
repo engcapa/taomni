@@ -12,13 +12,16 @@ from pathlib import Path
 from typing import Any
 
 
-def observe(root: Path, expected: dict, full: dict, headers: dict) -> dict:
+def observe(root: Path, expected: dict, full: dict, headers: dict, paused: bool | None = None) -> dict:
     dbs = list(root.glob("*.db"))
     if len(dbs) != 1:
         raise AssertionError(f"Expected one mailbox DB in {root}, got {len(dbs)}")
     with closing(sqlite3.connect(dbs[0].as_uri() + "?mode=ro", uri=True)) as db:
         rows = db.execute("SELECT folder,uid,sha256,raw_size FROM mail_full_messages").fetchall()
         summary = dict(db.execute("SELECT folder,count(*) FROM mail_messages GROUP BY folder"))
+        if paused is not None:
+            preferences = db.execute("SELECT paused FROM mail_archive_preferences").fetchall()
+            assert preferences == [(int(paused),)], f"Archive pause state in SQLite: {preferences}"
     actual = {}
     for folder, uid, digest, size in rows:
         actual[folder] = actual.get(folder, 0) + 1
@@ -38,7 +41,10 @@ def observe(root: Path, expected: dict, full: dict, headers: dict) -> dict:
         assert summary.get(folder, 0) == count, f"Summary count {folder}: {summary}"
     objects = list(root.glob("*.mail/objects/*/*.eml.gz"))
     assert len(objects) == len({row[2] for row in rows}), "Unreferenced objects remain after explicit cleanup"
-    return {"full": actual, "headers": summary, "objects": len(objects)}
+    result = {"full": actual, "headers": summary, "objects": len(objects)}
+    if paused is not None:
+        result["paused"] = paused
+    return result
 
 
 def observe_incremental(root: Path, expected: dict) -> dict:
@@ -90,7 +96,7 @@ def check(ctx: Any, args: dict) -> str:
                         assert archive.getinfo(name).compress_type == zipfile.ZIP_STORED, "Compressed MIME was recompressed"
                 result = {"archive": str(archives[-1]), "mail": mail}
             else:
-                result = observe(root, expected, args.get("full", {}), args.get("headers", {}))
+                result = observe(root, expected, args.get("full", {}), args.get("headers", {}), args.get("paused"))
                 if "partial_files" in args:
                     partials = sorted(path.name for path in root.glob("*.mail/partial/*"))
                     assert len(partials) == args["partial_files"], f"Transfer files remaining: {partials}"
