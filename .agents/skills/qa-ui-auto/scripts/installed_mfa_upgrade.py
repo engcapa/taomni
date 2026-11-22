@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import ExitStack, closing
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,7 @@ import platform
 from types import SimpleNamespace
 
 from ci_desktop import Desktop
+import installed_first_release
 from installed_linux_formats import appimage_binary, install_rpm, prepare_appimage
 from installed_mfa_crash import abrupt_exit
 from installed_mfa_profile import copy_profile
@@ -21,7 +23,7 @@ from qa_ui_auto.fixtures.module_legacy_mfa import (
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact
 from qa_ui_auto.legacy_install import linux_install
 from qa_ui_auto.legacy_process import MODE_LEASE_DENIAL, headless_command, initialize_profile, observe_same_profile_contender
-from qa_ui_auto.legacy_release import RELEASE_VERSION, selected_asset, verify_asset
+from qa_ui_auto.legacy_release import FIRST_UPGRADE_VERSION, RELEASE_VERSION, selected_asset, verify_asset
 
 def inspect_accounts(ctx, executable, work, evidence, phase, code, *, next_code=None):
     with installed_desktop(ctx, executable, work / "desktop", evidence, phase) as (driver, session):
@@ -201,14 +203,13 @@ def execute(args):
             or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"):
         raise RuntimeError("Installed Linux replacement requires the owned GitHub-hosted runner")
     target = json.loads(args.identity.read_text(encoding="utf-8"))
-    if target["target"] != "linux-x86_64" or target["version"] == RELEASE_VERSION:
+    old_version = FIRST_UPGRADE_VERSION if args.first_release else RELEASE_VERSION
+    if target["target"] != "linux-x86_64" or target["version"] == old_version:
         raise RuntimeError("Choose a Linux candidate with a distinct installer version")
     bundled = inventory(args.candidate.resolve(strict=True), target)
     package = args.candidate.resolve() / next(file["name"] for file in bundled["files"]
                                                if file["name"].endswith(".deb"))
-    receipt, archive, _, _ = load_artifact(args.signed, target["producerSource"], "linux-x86_64", "mfa")
-    signature = archive.with_name(receipt["signature"])
-    pinned = selected_asset()
+    pinned = selected_asset(version=old_version)
     old_package = args.legacy.resolve(strict=True) / pinned.name
     verify_asset(old_package, pinned)
     report = args.evidence.resolve()
@@ -216,31 +217,44 @@ def execute(args):
     work.mkdir(parents=True)
     report.mkdir(parents=True, exist_ok=True)
     write_json(report, "bundle-inventory.json", bundled)
-    write_json(report, "signed-mfa-input.json", receipt)
     result = {"schema": "taomni.qa.installed-mfa-upgrade.v1", "passed": False,
-              "oldVersion": RELEASE_VERSION, "candidateVersion": target["version"],
+              "oldVersion": old_version, "candidateVersion": target["version"],
               "candidateSource": target["producerSource"], "stages": {}}
     stages = result["stages"]
     ctx = SimpleNamespace(cfg={"webdriver": {"startup_timeout": 45}})
     try:
-        with Desktop(report / "desktop", ["display", "x11"]):
+        with ExitStack() as resources, Desktop(report / "desktop", ["display", "x11"]):
+            origin = None
+            if args.first_release:
+                origin = resources.enter_context(closing(installed_first_release.open_release(
+                    args.first_release.resolve(strict=True), target, report,
+                )))
+                receipt = origin.roster["taomni-plugin-mfa"]
+                archive = origin.files["/" + receipt["archive"]]
+            else:
+                receipt, archive, _, _ = load_artifact(args.signed, target["producerSource"], "linux-x86_64", "mfa")
+            signature = archive.with_name(receipt["signature"])
+            write_json(report, "signed-mfa-input.json", receipt)
             legacy_install = report / "original-install"
             legacy_install.mkdir()
             old_executable, legacy = replace_package(old_package, work, legacy_install / "deb",
-                                                    version=RELEASE_VERSION)
+                                                    version=old_version)
             stages["originalInstall"] = legacy
-            profile = run_legacy_desktop(ctx, old_executable, work, legacy_install)
+            catalog_source = f"{installed_first_release.ORIGIN}/{origin.start_catalog}" if origin else None
+            profile = run_legacy_desktop(ctx, old_executable, work, legacy_install, catalog_source=catalog_source)
             result["profile"] = str(profile)
             candidate, replacement = replace_package(package, work, report / "candidate-install",
                                                      version=target["version"])
             stages["replacement"] = replacement
             if candidate != old_executable or replacement["binarySha256"] == legacy["binarySha256"]:
                 raise RuntimeError("The deb did not replace the original installed executable")
+            if origin:
+                stages["firstBusinessInstall"] = installed_first_release.exercise(ctx, candidate, work, profile, report, origin)
             commit_mfa_upgrade(candidate, profile, archive, signature, report)
             stages["candidate"] = inspect_accounts(ctx, candidate, work, report, "candidate-window",
                                                     "287 082", next_code="359 152")
             old_executable, rollback = replace_package(old_package, work, report / "rollback-install",
-                                                       version=RELEASE_VERSION, allow_downgrade=True)
+                                                       version=old_version, allow_downgrade=True)
             stages["rollbackInstall"] = rollback
             if rollback["binarySha256"] != legacy["binarySha256"]:
                 raise RuntimeError("The rollback did not restore the verified old executable")
@@ -269,8 +283,11 @@ def execute(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    for argument in ("identity", "legacy", "candidate", "signed", "evidence", "work"):
+    for argument in ("identity", "legacy", "candidate", "evidence", "work"):
         parser.add_argument("--" + argument, required=True, type=Path)
+    signed = parser.add_mutually_exclusive_group(required=True)
+    signed.add_argument("--signed", type=Path)
+    signed.add_argument("--first-release", type=Path)
     parser.add_argument("--verify-relocation", action="store_true")
     parser.add_argument("--rdp-probe", type=Path)
     execute(parser.parse_args())

@@ -27,6 +27,10 @@ on:
         description: Validate Linux deb replacement and rollback with the installed MFA account
         type: boolean
         default: false
+      package_first_release_linux:
+        description: Replace 0.5.12 with the candidate deb and verify its signed business roster
+        type: boolean
+        default: false
       package_relocation_linux:
         description: Exercise noexec profile recovery through the Linux deb, RPM and AppImage
         type: boolean
@@ -115,6 +119,9 @@ on:
       package_upgrade_linux:
         type: boolean
         default: false
+      package_first_release_linux:
+        type: boolean
+        default: false
       package_relocation_linux:
         type: boolean
         default: false
@@ -172,7 +179,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: modular-upgrade-${{ github.ref }}-${{ inputs.signed_mfa_only && format('signed-{0}', inputs.signed_migration_module || 'mfa') || (inputs.package_run && format('packages-{0}-{1}-{2}', inputs.package_run, inputs.package_targets, inputs.package_rdp_perf && 'rdp-perf-linux' || inputs.package_relocation_linux && 'relocate-linux' || inputs.package_upgrade_linux && 'upgrade-linux' || inputs.package_upgrade_desktop && 'upgrade-desktop' || 'inventory') || inputs.protocol_only && 'protocol' || (inputs.host_only && 'host' || (inputs.system_execution_only && 'system-execution' || (inputs.network_only && 'network' || (inputs.download_only || false))))) }}
+  group: modular-upgrade-${{ github.ref }}-${{ inputs.signed_mfa_only && format('signed-{0}', inputs.signed_migration_module || 'mfa') || (inputs.package_run && format('packages-{0}-{1}-{2}', inputs.package_run, inputs.package_targets, inputs.package_first_release_linux && 'first-release-linux' || inputs.package_rdp_perf && 'rdp-perf-linux' || inputs.package_relocation_linux && 'relocate-linux' || inputs.package_upgrade_linux && 'upgrade-linux' || inputs.package_upgrade_desktop && 'upgrade-desktop' || 'inventory') || inputs.protocol_only && 'protocol' || (inputs.host_only && 'host' || (inputs.system_execution_only && 'system-execution' || (inputs.network_only && 'network' || (inputs.download_only || false))))) }}
   cancel-in-progress: true
 
 env:
@@ -183,13 +190,14 @@ env:
 
 jobs:
   installed-linux-mfa:
-    if: ${{ !inputs.signed_mfa_only && inputs.package_run != '' && (inputs.package_upgrade_linux || inputs.package_relocation_linux || inputs.package_rdp_perf) }}
+    if: ${{ !inputs.signed_mfa_only && inputs.package_run != '' && (inputs.package_first_release_linux || inputs.package_upgrade_linux || inputs.package_relocation_linux || inputs.package_rdp_perf) }}
     uses: ./.github/workflows/qa-modular-installed-mfa.yml
     with:
       head: ${{ inputs.head || github.sha }}
       package_run: ${{ inputs.package_run }}
       package_source: ${{ inputs.package_source }}
       package_version: ${{ inputs.package_version }}
+      first_release: ${{ inputs.package_first_release_linux }}
       verify_relocation: ${{ inputs.package_relocation_linux }}
       verify_rdp_perf: ${{ inputs.package_rdp_perf }}
       signed_run: ${{ inputs.package_signed_run }}
@@ -198,7 +206,7 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   release-bundle-samples:
-    if: ${{ !inputs.signed_mfa_only && inputs.package_run != '' && !inputs.package_upgrade_linux && !inputs.package_relocation_linux && !inputs.package_rdp_perf }}
+    if: ${{ !inputs.signed_mfa_only && inputs.package_run != '' && !inputs.package_first_release_linux && !inputs.package_upgrade_linux && !inputs.package_relocation_linux && !inputs.package_rdp_perf }}
     uses: ./.github/workflows/qa-modular-bundles.yml
     with:
       head: ${{ inputs.head || github.sha }}

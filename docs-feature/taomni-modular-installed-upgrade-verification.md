@@ -65,6 +65,8 @@ macOS 保留原始 `codesign` 与 `spctl` 结果。直接 CLI 启动、没有浏
 
 ## Linux 安装件替换与回滚
 
+十模块演练在 `qa-modular-upgrade.yml` 选择 `package_first_release_linux=true`，传入生成签名目录的联合构建 run、源码和版本。runner 通过 apt 安装固定的 0.5.12 deb，用旧桌面创建 Vault 和 HOTP 账户，再用同一安装位置的候选 deb 打开原 profile。第一次打开会从已签名目录安装全部本平台业务模块。在设置卸载 Mail 后正常退出并重启，核对其余模块的版本指针、签名包摘要、下载次数和商店状态。随后使用这次业务发布的 MFA 包迁移原账户，降级后核对原计数器，再升回候选核对迁移后的计数器。结果保存在 `installed-linux-mfa-upgrade-<run-id>/installed-mfa-evidence/` 的 `first-release-build.json`、`installed-first-release.json` 和 `installed-mfa-upgrade.json`。
+
 使用 Release Bundle 的仅产出 artifacts 模式生成 QA 版本 `0.5.11`。在 QA Modular Upgrade Contracts 设置 `package_upgrade_linux=true`，传入构建 run ID、完整源码 SHA 和包版本。工作流按上传的资产 ID 下载真实 deb，用同一源码为 Linux 生成签名 MFA 包。 [候选包构建 #44243313388](https://github.com/engcapa/taomni/actions/runs/44243313388)
 
 GitHub Linux runner 从已安装的 `0.5.10` 界面创建合成 MFA 账户，经正常退出后在同一 XDG profile 上更换安装件。候选通过离线维护迁移，实际 UI 解锁并推进计数。降级到原 deb 时核对旧二进制指纹及旧库验证码，再装候选时核对候选指纹及模块中的新验证码。安装命令、源码和包 receipt、界面关闭及逐阶段结果归档在 `installed-linux-mfa-upgrade-<run-id>`。

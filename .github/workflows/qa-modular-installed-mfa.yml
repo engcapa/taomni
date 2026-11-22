@@ -7,6 +7,7 @@ on:
       package_run: {type: string, required: true}
       package_source: {type: string, required: true}
       package_version: {type: string, required: true}
+      first_release: {type: boolean, default: false}
       verify_relocation: {type: boolean, default: false}
       verify_rdp_perf: {type: boolean, default: false}
       signed_run: {type: string, default: ''}
@@ -50,7 +51,7 @@ jobs:
             --version "$PACKAGE_VERSION" --target linux-x86_64 \
             --out installed-mfa-input/bundle-source.json --github-output "$GITHUB_OUTPUT"
       - name: Verify the source of an existing signed MFA artifact
-        if: inputs.signed_run != ''
+        if: inputs.signed_run != '' && !inputs.first_release
         env:
           GH_TOKEN: ${{ github.token }}
           SIGNED_RUN: ${{ inputs.signed_run }}
@@ -70,7 +71,7 @@ jobs:
 
   signed-mfa:
     needs: package
-    if: inputs.signed_run == ''
+    if: inputs.signed_run == '' && !inputs.first_release
     uses: ./.github/workflows/qa-modular-packages.yml
     with:
       head: ${{ inputs.package_source }}
@@ -115,15 +116,39 @@ jobs:
           merge-multiple: true
           path: candidate-input
       - uses: actions/download-artifact@v4
+        if: ${{ !inputs.first_release }}
         with:
           name: qa-modular-package-linux-x86_64-${{ inputs.signed_run || github.run_id }}
           path: signed-input
           run-id: ${{ inputs.signed_run || github.run_id }}
           github-token: ${{ github.token }}
+      - uses: actions/checkout@v4
+        if: inputs.first_release
+        with:
+          ref: ${{ inputs.package_source }}
+          path: first-release-input/source
+          sparse-checkout: src-tauri/plugins
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        if: inputs.first_release
+        with:
+          name: modular-candidate-roster-${{ inputs.package_run }}
+          run-id: ${{ inputs.package_run }}
+          github-token: ${{ github.token }}
+          path: first-release-input/catalog
+      - uses: actions/download-artifact@v4
+        if: inputs.first_release
+        with:
+          pattern: module-signed-*-linux-x86_64-${{ inputs.package_run }}
+          run-id: ${{ inputs.package_run }}
+          github-token: ${{ github.token }}
+          path: first-release-input/packages
+          merge-multiple: false
       - name: Stage the pinned legacy deb
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python -m qa_ui_auto.legacy_release legacy-input
+          OLD_VERSION: ${{ inputs.first_release && '0.5.12' || '0.5.10' }}
+        run: python -m qa_ui_auto.legacy_release legacy-input --version "$OLD_VERSION"
       - name: Build the standalone release RDP probe
         if: inputs.verify_rdp_perf
         run: |
@@ -135,10 +160,15 @@ jobs:
           sha256sum src-tauri/target/release/rdp-probe > installed-mfa-evidence/rdp-probe/sha256.txt
       - name: Exercise apt replacement, signed MFA migration and rollback
         env:
+          FIRST_RELEASE: ${{ inputs.first_release }}
           VERIFY_RELOCATION: ${{ inputs.verify_relocation }}
           VERIFY_RDP_PERF: ${{ inputs.verify_rdp_perf }}
         run: |
-          extra=()
+          extra=(--signed signed-input)
+          if [[ "$FIRST_RELEASE" == true ]]; then
+            python -m unittest test_module_first_release test_installed_first_release
+            extra=(--first-release first-release-input)
+          fi
           python -m unittest test_installed_mfa_crash test_installed_mfa_mode_lease
           if [[ "$VERIFY_RDP_PERF" == true ]]; then
             python -m unittest test_installed_rdp_baseline
@@ -152,7 +182,7 @@ jobs:
           dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1080x24 -nolisten tcp -noreset' \
             python .agents/skills/qa-ui-auto/scripts/installed_mfa_upgrade.py \
             --identity installed-mfa-input/bundle-source.json --legacy legacy-input \
-            --candidate candidate-input --signed signed-input \
+            --candidate candidate-input \
             --evidence installed-mfa-evidence --work installed-mfa-work "${extra[@]}"
       - uses: actions/upload-artifact@v4
         if: always()

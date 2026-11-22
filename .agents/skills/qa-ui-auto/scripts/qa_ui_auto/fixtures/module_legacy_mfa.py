@@ -71,7 +71,7 @@ def open_mfa(steps):
     desktop_action(steps, "click", element("sidebar-tool-mfa"))
 
 
-def open_unlocked_mfa(ctx, session, evidence):
+def unlock_vault(ctx, session, evidence):
     steps = NativeStepContext(session, evidence, ctx.cfg)
     desktop_action(steps, "wait_for", element("vault-unlock-dialog"))
     desktop_action(steps, "fill", {"selector": element("vault-unlock-pw"), "value": PASSWORD})
@@ -79,6 +79,11 @@ def open_unlocked_mfa(ctx, session, evidence):
     desktop_action(steps, "wait_for", {
         "selector": element("vault-unlock-dialog"), "state": "detached", "timeout_sec": 30,
     })
+    return steps
+
+
+def open_unlocked_mfa(ctx, session, evidence):
+    steps = unlock_vault(ctx, session, evidence)
     open_mfa(steps)
     return steps
 
@@ -126,13 +131,13 @@ def desktop_environment(desktop):
 
 
 @contextmanager
-def installed_desktop(ctx, executable, desktop, evidence, label, *, environment=None):
+def installed_desktop(ctx, executable, desktop, evidence, label, *, environment=None, timeout=120):
     if environment is None:
         environment, _ = desktop_environment(desktop)
     driver = legacy_driver(ctx, executable, evidence / label)
     with isolated_desktop(environment), ExitStack() as cleanup:
         session = NativeSession(driver.url, executable)
-        session.deadline = Deadline(120)
+        session.deadline = Deadline(timeout)
         session.pointer_observations_path = evidence / f"{label}-pointer-clicks.jsonl"
         cleanup.callback(driver.stop)
         cleanup.callback(session.close)
@@ -155,17 +160,22 @@ def close_installed_desktop(driver, session, executable):
             "confirmation": session.application_restart_observation["exit_confirmation"]}
 
 
-def run_legacy_desktop(ctx, executable, work, evidence):
+def run_legacy_desktop(ctx, executable, work, evidence, *, catalog_source=None):
     desktop = work / "desktop"
     _, profile = desktop_environment(desktop)
     if profile.exists() or profile.is_symlink():
         raise RuntimeError("The installed desktop requires a fresh isolated profile")
     with installed_desktop(ctx, executable, desktop, evidence, "legacy-window") as (driver, session):
         create_account(session, ctx, evidence)
+        if catalog_source:
+            # Persist only the mirror preference in the original WebView. The
+            # replacement core must discover its first catalog on normal start.
+            session.execute("localStorage.setItem('taomni.module-catalog-source.v1', "
+                            + json.dumps(catalog_source) + "); return true;")
         close = close_installed_desktop(driver, session, executable)
         write_json(evidence, "legacy-desktop.json", {
             "appId": APP_ID, "profile": str(profile), "executable": str(executable),
-            "uiHotpCodes": ["755 224", "287 082"], **close,
+            "uiHotpCodes": ["755 224", "287 082"], "catalogSource": catalog_source, **close,
         })
     return profile
 

@@ -58,6 +58,17 @@ def observe_legacy_roster(root, origin, removed):
     return pointers
 
 
+def current_roster_modules(session, roster, removed=None):
+    current = session.execute("""
+      return Array.from(document.querySelectorAll('[data-testid="module-marketplace-current"]'),
+        node => node.closest('[data-module-id]').getAttribute('data-module-id')).sort();
+    """)
+    expected = sorted(module_id for module_id, row in roster.items() if row["slug"] != removed)
+    if current != expected:
+        raise StepError(f"Store shows current modules {current!r}, expected {expected!r}")
+    return current
+
+
 def run(ctx, args):
     if not isinstance(args, dict) or set(args) != {"phase"} or args["phase"] not in PHASES | VERSION_STATES.keys():
         raise StepError("module_marketplace_probe requires a registered fixed phase")
@@ -137,12 +148,7 @@ def run(ctx, args):
                     if first_upgrade and (set(enrollment["seen"]) != set(origin.roster) or enrollment["newModules"]):
                         raise StepError("First installation did not acknowledge exactly the compatible roster")
                     if first_upgrade and phase == "legacy-uninstalled":
-                        current = ctx.session.execute("""
-                          return Array.from(document.querySelectorAll('[data-testid="module-marketplace-current"]'),
-                            node => node.closest('[data-module-id]').getAttribute('data-module-id')).sort();
-                        """)
-                        if current != sorted(set(origin.roster) - {receipt["id"]}):
-                            raise StepError("Restart did not restore exactly the remaining modules in the store")
+                        current = current_roster_modules(ctx.session, origin.roster, receipt["slug"])
                         legacy = owner.module_upgrade
                         if (session_rows(legacy["root"]) != legacy["full_sessions"]
                                 or retained_manifest(legacy["root"]) != legacy["retained"]):
