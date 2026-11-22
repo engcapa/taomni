@@ -77,10 +77,12 @@ steps:
     selector: '[data-testid="session-editor"]'
     state: detached
     timeout_sec: 60
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA uncached mail"]'
+- wait_for: '[data-testid="mail-message-row"]'
 - mail_server_deliver:
     count: 61
     prefix: Live mail page
-- dblclick: '[data-testid="session-tree-item"][data-session-name="QA uncached mail"]'
+- click: '[data-testid="mail-sync-button"]:enabled'
 - wait_for:
     selector: '[data-testid="mail-message-row"][data-subject="Live mail page 0061"]'
     timeout_sec: 35
@@ -112,49 +114,52 @@ verification:
   review: reviewed
   requirements:
   - id: first-live-page
-    requirement: Opening an account with caching disabled shows the newest page and makes older messages available.
+    requirement: Refreshing an open account with caching disabled shows the newest page and makes older messages available.
     actions:
     - 22
     - 29
-    - 30
-    checkpoints:
-    - step: 31
-      expectation: The newest delivered message is visible.
-    - step: 32
-      expectation: Only the first 50 headers are shown, with a continuation.
-    - step: 33
-      expectation: The oldest delivered header is outside the first page.
-    - step: 34
-      expectation: The server folder list is populated.
-    results:
     - 31
     - 32
+    checkpoints:
+    - step: 30
+      expectation: The preview has opened the account before the fixture delivers additional mail.
+    - step: 33
+      expectation: The newest delivered message is visible.
+    - step: 34
+      expectation: Only the first 50 headers are shown, with a continuation.
+    - step: 35
+      expectation: The oldest delivered header is outside the first page.
+    - step: 36
+      expectation: The server folder list is populated.
+    results:
     - 33
     - 34
+    - 35
+    - 36
   - id: older-live-headers
     requirement: Load older messages appends the remaining server headers and exhausts the mailbox without duplicates.
     actions:
-    - 35
+    - 37
     checkpoints:
-    - step: 36
-      expectation: The previously absent older header is visible.
-    - step: 37
-      expectation: The loaded count matches all messages in the server fixture.
     - step: 38
-      expectation: The newest header still appears once.
+      expectation: The previously absent older header is visible.
     - step: 39
-      expectation: The rest of the folder tree remains available.
+      expectation: The loaded count matches all messages in the server fixture.
     - step: 40
-      expectation: No older page remains.
+      expectation: The newest header still appears once.
     - step: 41
+      expectation: The rest of the folder tree remains available.
+    - step: 42
+      expectation: No older page remains.
+    - step: 43
       expectation: The renderer reports no runtime errors.
     results:
-    - 36
-    - 37
     - 38
     - 39
     - 40
     - 41
+    - 42
+    - 43
   visual:
   - check: The first page, Load older messages action and retained folder tree are visible.
     method: automated
