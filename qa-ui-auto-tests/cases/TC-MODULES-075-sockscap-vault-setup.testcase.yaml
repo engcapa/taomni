@@ -1,0 +1,58 @@
+id: TC-MODULES-075
+title: SocksCap saves an upstream UUID after first-time Vault setup
+description: Cancel setup once and keep the current profile. Retry, set the master password and confirm the configuration contains a Vault reference.
+covers: [F-Sockscap-1, F12.1]
+tags: [modules, sockscap, p1]
+modes: [browser]
+fixtures: [reset_db, sockscap_legacy_config]
+timeout_sec: 100
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.sockscap.config.v1, value: '${fixture.sockscap_legacy_config}'}
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-testid="sockscap-panel"]'
+- show_sockscap_upstream: null
+- fill: {selector: '[data-testid="sockscap-upstream-host"]', value: '127.0.0.2'}
+- wait_for: '[data-testid="sockscap-upstream-host"][value="127.0.0.2"]'
+- fill: {selector: '[data-testid="sockscap-upstream-port"]', value: '19392'}
+- wait_for: '[data-testid="sockscap-upstream-port"][value="19392"]'
+- select_option: {selector: '[data-testid="sockscap-upstream-kind"]', value: vless}
+- fill: {selector: '[data-testid="sockscap-upstream-uuid"]', value: '11111111-2222-3333-4444-555555555555'}
+- click: '[data-testid="sockscap-upstream-uuid-store"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- click: '[data-testid="vault-setup-cancel"]'
+- wait_for: {selector: '[data-testid="vault-setup-dialog"]', state: detached}
+- eval_readonly:
+    expression: "!JSON.parse(localStorage.getItem('taomni.sockscap.config.v1')).profiles[0].upstream.params?.uuidRef"
+    expect_truthy: true
+- click: '[data-testid="sockscap-upstream-uuid-store"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-sockscap-vault-setup
+- eval_readonly:
+    expression: "JSON.parse(localStorage.getItem('taomni.sockscap.config.v1')).profiles[0].upstream.params.uuidRef.startsWith('vault:') && !localStorage.getItem('taomni.sockscap.config.v1').includes('11111111-2222-3333-4444-555555555555')"
+    expect_truthy: true
+    timeout_sec: 15
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: vault-setup
+    requirement: The user can edit the legacy endpoint. Saving the upstream UUID waits for Vault setup. Cancellation preserves the profile, and successful setup stores a reference automatically.
+    actions: [4, 6, 7, 9, 11, 12, 13, 15, 18, 20]
+    checkpoints:
+    - {step: 8, expectation: The profile shows the edited host.}
+    - {step: 10, expectation: The profile shows the edited port.}
+    - {step: 14, expectation: Saving a UUID from an empty profile asks the user to set up Vault.}
+    - {step: 17, expectation: Cancelling setup leaves the saved profile without a new UUID reference.}
+    - {step: 21, expectation: Completing setup saves only a Vault reference to the profile.}
+    - {step: 22, expectation: The flow produces no runtime errors.}
+    results: [8, 10, 14, 17, 21, 22]
+  visual:
+  - check: The Vault setup dialog opens when SocksCap requests a credential.
+    method: automated
+    reason: The case checks the dialog during both attempts and confirms dismissal on cancel.
+  native:
+  - check: The native signed parser uses the same Vault flow.
+    method: manual
+    reason: TC-MODULES-072 drives the installed signed module through Vault setup and verifies the native endpoint and lease.

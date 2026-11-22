@@ -2956,6 +2956,8 @@
 - `[data-testid="sockscap-section-scope-toggle"]` — interactive — F-Sockscap-1.scope-section-toggle
 - `[data-testid="sockscap-section-upstream-toggle"]` — interactive — F-Sockscap-1.upstream-section-toggle
 - `[data-testid="sockscap-upstream-kind"]` — interactive — F-Sockscap-1.upstream-kind
+- `[data-testid="sockscap-upstream-uuid"]` — interactive — F-Sockscap-1.upstream-uuid
+- `[data-testid="sockscap-upstream-uuid-store"]` — interactive — F-Sockscap-1.upstream-uuid-store
 - `[data-testid="sockscap-upstream-host"]` — interactive — F-Sockscap-1.upstream-host
 - `[data-testid="sockscap-upstream-port"]` — interactive — F-Sockscap-1.upstream-port
 - `[data-testid="sockscap-sharelink-input"]` — interactive [optional] — F-Sockscap-1.share-link

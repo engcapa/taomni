@@ -7,7 +7,8 @@ import {
   type UpstreamKind,
   type UpstreamParams,
 } from "../../../lib/sockscap";
-import { vaultPut, vaultStatus, VAULT_LOCKED_EVENT } from "../../../lib/ipc";
+import { vaultPut } from "../../../lib/ipc";
+import { ensureVaultReady } from "../../../lib/vaultGate";
 
 
 export interface CreateUpstreamActionsContext {
@@ -100,23 +101,12 @@ export function createUpstreamActions(context: CreateUpstreamActionsContext) {
     });
   };
 
-  /** Store a plaintext secret in the vault, returning its `vault:<id>` ref.
-   *  Returns null (and surfaces a message) if the vault is locked. */
   const vaultStore = async (
     name: string,
     label: string,
     value: string,
   ): Promise<string | null> => {
-    const status = await vaultStatus().catch(() => null);
-    if (!status || status.state !== "unlocked") {
-      window.dispatchEvent(
-        new CustomEvent(VAULT_LOCKED_EVENT, {
-          detail: { reason: t("sockscap.vaultLocked") },
-        }),
-      );
-      report(t("sockscap.vaultLocked"), false);
-      return null;
-    }
+    if (!(await ensureVaultReady(t("sockscap.vaultLocked")))) return null;
     const res = await vaultPut(name, label, value);
     return res.reference;
   };

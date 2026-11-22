@@ -9,6 +9,10 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: dialogOpenMock,
 }));
 
+vi.mock("../../../../lib/vaultGate", () => ({
+  ensureVaultReady: vi.fn(async () => true),
+}));
+
 export const defaultTestCfg: SocksCapConfig = {
   enabled: false,
   activeProfileIds: ["default"],

@@ -37,6 +37,7 @@ export function createCoreParamsView(context: CreateCoreParamsViewContext) {
         <div className="flex gap-1.5">
           <input
             type="password"
+            data-testid="sockscap-upstream-uuid"
             className={"flex-1 " + cls}
             placeholder={p.uuidRef ? t("sockscap.passwordStored") : "UUID"}
             value={uuidInput}
@@ -44,6 +45,7 @@ export function createCoreParamsView(context: CreateCoreParamsViewContext) {
           />
           <button
             type="button"
+            data-testid="sockscap-upstream-uuid-store"
             className="px-2 py-1.5 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] shrink-0"
             onClick={() => void storeUuid()}
             disabled={busy || !uuidInput}

@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import { listSessions, vaultPut, vaultStatus, type SessionConfig } from "../../../../lib/ipc";
+import { listSessions, vaultPut, type SessionConfig } from "../../../../lib/ipc";
+import { ensureVaultReady } from "../../../../lib/vaultGate";
 import {
   sockscapDetectTunConflicts,
   sockscapImportSubscription,
@@ -211,7 +212,10 @@ export function registerSocksCapPanelClipboard1Cases() {
     });
   });
 
-  it("imports a VLESS share link, vaulting uuid and populating params", async () => {
+  it("resumes VLESS import after the Vault gate and saves only its UUID reference", async () => {
+    let unlock!: (ready: boolean) => void;
+    vi.mocked(ensureVaultReady).mockReturnValueOnce(new Promise((resolve) => { unlock = resolve; }));
+    vi.mocked(vaultPut).mockClear();
     vi.mocked(sockscapParseShareLink).mockResolvedValue({
       kindTag: "vless",
       name: "My VLESS",
@@ -238,6 +242,11 @@ export function registerSocksCapPanelClipboard1Cases() {
     });
     fireEvent.click(screen.getByTestId("sockscap-sharelink-import"));
 
+    await waitFor(() => expect(ensureVaultReady).toHaveBeenCalled());
+    expect(vaultPut).not.toHaveBeenCalled();
+    expect(fixtureState.currentCfg.profiles[0].upstream.host).toBe("127.0.0.1");
+    await act(async () => { unlock(true); });
+
     await waitFor(() => {
       const up = fixtureState.currentCfg.profiles[0].upstream;
       expect(up.kind).toBe("vless");
@@ -250,7 +259,6 @@ export function registerSocksCapPanelClipboard1Cases() {
     });
     // The uuid was sent to the vault, not written to config plaintext.
     expect(vi.mocked(vaultPut)).toHaveBeenCalled();
-    expect(vi.mocked(vaultStatus)).toHaveBeenCalled();
   });
 
   it("imports a subscription into one profile per node, vaulting secrets", async () => {

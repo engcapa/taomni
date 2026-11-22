@@ -8,6 +8,7 @@ fixtures: [reset_db, sockscap_legacy_config, module_signed_sockscap_archive]
 timeout_sec: 175
 steps:
 - open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.sockscap.macosSetupGuide.v1, value: complete}
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
 - fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.sockscap_signed_archive}'}
@@ -30,7 +31,6 @@ steps:
 - click: '[data-testid="sockscap-sharelink-import"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
 - vault_first_run: qa-sockscap-parser-vault
-- click: '[data-testid="sockscap-sharelink-import"]:not([disabled])'
 - wait_for: '[data-testid="sockscap-upstream-host"][value="127.0.0.2"]'
 - assert_attribute: {selector: '[data-testid="sockscap-upstream-port"]', name: value, equals: '19392'}
 - assert_signed_sockscap_host: running
@@ -44,17 +44,18 @@ verification:
   review: reviewed
   requirements:
   - id: signed-parser
-    requirement: A signed parser supplies the upstream endpoint and releases its host when disabled.
-    actions: [6, 10, 16, 18, 21, 23, 24, 30]
+    requirement: A signed parser resumes the import after first-time Vault setup, supplies the endpoint and releases its host when disabled.
+    actions: [7, 11, 17, 19, 22, 24, 30]
     checkpoints:
-    - {step: 8, expectation: The installed executable matches the verified package.}
-    - {step: 9, expectation: The installed host is idle before its first request.}
+    - {step: 9, expectation: The installed executable matches the verified package.}
+    - {step: 10, expectation: The installed host is idle before its first request.}
+    - {step: 23, expectation: An import into a fresh profile offers Vault setup.}
     - {step: 25, expectation: The original profile shows the exact host parsed from the link.}
     - {step: 26, expectation: The profile also shows the parsed port.}
     - {step: 27, expectation: The signed parser owns a live writer lease during use.}
     - {step: 32, expectation: Module disable releases the lease.}
     - {step: 33, expectation: Import and disable complete without runtime errors.}
-    results: [8, 9, 25, 26, 27, 32, 33]
+    results: [9, 10, 23, 25, 26, 27, 32, 33]
   visual:
   - check: The upstream settings reflect the imported proxy link.
     method: automated

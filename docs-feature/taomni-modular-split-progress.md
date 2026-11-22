@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- GitHub 原生分片发现 SocksCap 从空 Vault 导入链接时打开了解锁窗口。上游凭据改用统一 Vault 流程，首次设置完成后继续当前导入。TC-MODULES-075 验证 Browser 的取消、续办和 UUID 引用，TC-MODULES-072 核对签名宿主及实际端点。SocksCap 配置用例预置 macOS 引导偏好，分别覆盖旧配置保存、签名链接和路由试算。Local Voice 复跑在设置页选预置模型，回到打开的聊天窗口验证实际录音。 [失败分片](https://github.com/engcapa/taomni/actions/runs/44975396751)
 - Mail 0.1.19 将归档暂停状态、待归档索引和原件发布检查迁入邮件引擎。发布与清理使用同一 SQLite 写锁。两个连接的单测核对暂停、跳过旧 UIDVALIDITY 和删除时序。69 项引擎单测、10 项宿主单测及核心编译通过。TC-MODULES-070 核对续传后的持久化状态，TC-MAIL-STORAGE-06 核对主动清理后暂停。签名宿主接管归档索引和缓存写入仍待完成。
 - 合入远程 `main` 的 `bf7ee6818`（#859）。Explorer 保留新建可编辑文件、标签过滤与回收站删除选择。新建类型用例改为 TC-EXPLORER-012，主线的标签与删除用例使用 TC-EXPLORER-010，历史运行保留原编号。202 项相关前端单测、TypeScript、模块边界和 QA 静态审计通过。合并源码的三端 Browser、Native 和完整崩溃回归待执行。
 - SocksCap 0.1.1 的签名宿主接管目标规则试算。中转请求只传该目标需要的路由规则，用户凭据留在原有 Vault 路径。原生流量路由复用拆出的策略和规则编译器。48 项 Rust 单测、核心和宿主编译通过。TC-MODULES-073 验证 Windows 和 macOS 的旧规则决策及签名宿主，TC-MODULES-074 验证 Browser 展示。Linux 启动模式原本没有目标试算面板，该平台仍验签名解析和旧配置。
