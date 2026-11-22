@@ -1,16 +1,17 @@
 //! Select the legacy store or the signed host while preserving each profile's data owner.
+#[cfg(any(test, feature = "legacy-mfa"))]
+use std::sync::{
+    Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 use std::{
     path::Path,
-    sync::{
-        Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
     time::{Duration, Instant},
 };
 
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
-use taomni_mfa_engine::INITIALIZATION_REQUIRED;
+use taomni_mfa_api::INITIALIZATION_REQUIRED;
 use taomni_plugin_api::services::CAPTURE_SCREEN_PERMISSION;
 use taomni_plugin_services::OperationKind;
 
@@ -19,25 +20,42 @@ use crate::{
     state::AppState,
 };
 
-use super::{access, crypto::DataKey, store::MfaStore};
+use super::store::MfaStore;
+#[cfg(any(test, feature = "legacy-mfa"))]
+use super::{access, crypto::DataKey};
 
 pub(crate) struct MfaBackend {
     legacy: Result<Option<MfaStore>, String>,
+    #[cfg(any(test, feature = "legacy-mfa"))]
     selected_module: AtomicBool,
+    #[cfg(any(test, feature = "legacy-mfa"))]
     legacy_dispatch: Mutex<()>,
+    #[cfg(not(any(test, feature = "legacy-mfa")))]
+    migration_required: Result<bool, String>,
 }
 
 impl MfaBackend {
     pub(crate) fn load(profile: &Path) -> Self {
+        let owner = super::ownership::uses_module_data(profile);
         Self {
-            legacy: super::ownership::uses_module_data(profile)
-                .map(|owned| (!owned).then(|| MfaStore::new(profile.join("mfa.db")))),
+            #[cfg(not(any(test, feature = "legacy-mfa")))]
+            migration_required: owner.clone().and_then(|owned| {
+                if owned {
+                    Ok(false)
+                } else {
+                    super::ownership::legacy_has_accounts(profile)
+                }
+            }),
+            legacy: owner.map(|owned| (!owned).then(|| MfaStore::new(profile.join("mfa.db")))),
+            #[cfg(any(test, feature = "legacy-mfa"))]
             selected_module: AtomicBool::new(false),
+            #[cfg(any(test, feature = "legacy-mfa"))]
             legacy_dispatch: Mutex::new(()),
         }
     }
 
     pub(crate) fn legacy_store(&self) -> Result<Option<&MfaStore>, String> {
+        #[cfg(any(test, feature = "legacy-mfa"))]
         if self.selected_module.load(Ordering::Acquire) {
             return Ok(None);
         }
@@ -49,6 +67,7 @@ impl MfaBackend {
 
     /// The dispatch lock also covers each legacy operation, so a concurrent
     /// legacy add cannot race the decision that the profile has no accounts.
+    #[cfg(any(test, feature = "legacy-mfa"))]
     fn with_legacy<T>(
         &self,
         registry: &PluginRegistry,
@@ -60,14 +79,27 @@ impl MfaBackend {
             return Ok(None);
         };
         if let Some(record) = registry.get("mfa") {
+            let enabled = record.state == LifecycleState::Enabled && record.reason.is_none();
             if !super::ownership::legacy_has_accounts(profile)? {
-                if record.state == LifecycleState::Enabled && record.reason.is_none() {
+                if enabled {
                     self.selected_module.store(true, Ordering::Release);
                 }
                 return Ok(None);
             }
+            // The signed renderer uses the release migration boundary in QA.
+            if enabled && record.manifest.entry.frontend.is_some() {
+                return Err(taomni_mfa_api::LEGACY_MIGRATION_REQUIRED.into());
+            }
         }
         operation(store).map(Some)
+    }
+
+    #[cfg(not(any(test, feature = "legacy-mfa")))]
+    fn require_module_owner(&self) -> Result<(), String> {
+        if self.migration_required.clone()? {
+            return Err(taomni_mfa_api::LEGACY_MIGRATION_REQUIRED.into());
+        }
+        Ok(())
     }
 }
 
@@ -77,26 +109,37 @@ pub(crate) async fn run<T: DeserializeOwned + Send + 'static, A: Send + 'static>
     kind: OperationKind,
     args: A,
     wire: impl Fn(&A) -> Value + Send + 'static,
-    legacy: impl FnOnce(&mut rusqlite::Connection, &DataKey, A) -> Result<T, String>,
+    #[cfg(any(test, feature = "legacy-mfa"))] legacy: impl FnOnce(
+        &mut rusqlite::Connection,
+        &DataKey,
+        A,
+    ) -> Result<T, String>,
 ) -> Result<T, String> {
-    let mut args = Some(args);
-    if let Some(result) =
-        state
-            .legacy
-            .mfa
-            .with_legacy(&state.plugins, &state.core.paths.data, |store| {
-                access::with_key(
-                    &state.plugins,
-                    &state.core.vault,
-                    store,
-                    kind,
-                    |conn, key| legacy(conn, key, args.take().expect("legacy operation runs once")),
-                )
-            })?
-    {
-        return Ok(result);
-    }
-    let args = args.expect("module operation retains its arguments");
+    #[cfg(not(any(test, feature = "legacy-mfa")))]
+    state.legacy.mfa.require_module_owner()?;
+    #[cfg(any(test, feature = "legacy-mfa"))]
+    let args = {
+        let mut args = Some(args);
+        if let Some(result) =
+            state
+                .legacy
+                .mfa
+                .with_legacy(&state.plugins, &state.core.paths.data, |store| {
+                    access::with_key(
+                        &state.plugins,
+                        &state.core.vault,
+                        store,
+                        kind,
+                        |conn, key| {
+                            legacy(conn, key, args.take().expect("legacy operation runs once"))
+                        },
+                    )
+                })?
+        {
+            return Ok(result);
+        }
+        args.expect("module operation retains its arguments")
+    };
     on_host(state, move |registry| {
         call(registry, method, kind, || wire(&args), deadline()).and_then(decode)
     })
@@ -108,6 +151,9 @@ pub(crate) async fn export(
     id: String,
     password: zeroize::Zeroizing<String>,
 ) -> Result<String, String> {
+    #[cfg(not(any(test, feature = "legacy-mfa")))]
+    state.legacy.mfa.require_module_owner()?;
+    #[cfg(any(test, feature = "legacy-mfa"))]
     if let Some(result) =
         state
             .legacy
@@ -134,6 +180,9 @@ pub(crate) async fn export(
 }
 
 pub(crate) async fn reset(state: &AppState) -> Result<(), String> {
+    #[cfg(not(any(test, feature = "legacy-mfa")))]
+    state.legacy.mfa.require_module_owner()?;
+    #[cfg(any(test, feature = "legacy-mfa"))]
     if state
         .legacy
         .mfa

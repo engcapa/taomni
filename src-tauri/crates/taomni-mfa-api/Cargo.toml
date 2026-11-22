@@ -1,0 +1,16 @@
+[package]
+name = "taomni-mfa-api"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "MFA wire types and read-only migration validation"
+license = "MIT"
+
+[features]
+legacy-snapshot = ["dep:aes-gcm", "dep:rusqlite", "dep:zeroize"]
+
+[dependencies]
+aes-gcm = { version = "0.10", optional = true }
+rusqlite = { version = "0.40", features = ["bundled"], optional = true }
+serde = { version = "1", features = ["derive"] }
+zeroize = { version = "1", optional = true }

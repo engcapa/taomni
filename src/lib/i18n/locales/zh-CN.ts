@@ -3655,6 +3655,7 @@ export const zhCN: DeepPartial<typeof en> = {
     keyErrorTitle: "无法解密 MFA 数据",
     keyMissing: "凭据保险库中已没有这些 MFA 账户的密钥。请用与 mfa.db 同一份备份恢复 vault.db，或清空 MFA 数据。",
     keyMismatch: "凭据保险库的密钥与这些 MFA 账户不匹配。请用与 mfa.db 同一份备份恢复 vault.db，或清空 MFA 数据。",
+    legacyMigrationRequired: "请在设置的模块商店中迁移原有 MFA 账户，再使用 MFA。",
     resetStore: "清空 MFA 数据…",
     confirmReset: "删除 Taomni 中保存的全部 MFA 账户？此操作无法撤销。",
     confirmResetAgain: "确定删除全部 MFA 账户吗？请确认各网站仍有其他登录方式。",

@@ -124,38 +124,6 @@ pub fn first_secret_opens(conn: &Connection, key: &DataKey) -> Result<bool, Stri
     Ok(first.is_none_or(|sealed| open_secret(key, &sealed).is_ok()))
 }
 
-/// Stream legacy verification without retaining account metadata or plaintext.
-/// The caller owns an immutable snapshot and the operation-scoped key.
-pub(crate) fn verify_all_secrets(
-    conn: &Connection,
-    key: &DataKey,
-    check: &dyn Fn() -> Result<(), String>,
-) -> Result<u64, String> {
-    let mut statement = conn
-        .prepare("SELECT id, secret_ct, secret_nonce FROM mfa_accounts ORDER BY id")
-        .map_err(sql_err)?;
-    let mut rows = statement.query([]).map_err(sql_err)?;
-    let mut count = 0_u64;
-    loop {
-        check()?;
-        let Some(row) = rows.next().map_err(sql_err)? else {
-            break;
-        };
-        let id: String = row.get(0).map_err(sql_err)?;
-        let ciphertext: Vec<u8> = row.get(1).map_err(sql_err)?;
-        let nonce: Vec<u8> = row.get(2).map_err(sql_err)?;
-        drop(crypto::open(
-            key,
-            &crypto::account_aad(&id),
-            &ciphertext,
-            &nonce,
-        )?);
-        check()?;
-        count = count.checked_add(1).ok_or("MFA account count overflow")?;
-    }
-    Ok(count)
-}
-
 pub fn find_duplicate(conn: &Connection, fingerprint: &str) -> Result<Option<String>, String> {
     conn.query_row(
         "SELECT id FROM mfa_accounts WHERE fingerprint = ?1 ORDER BY created_at LIMIT 1",

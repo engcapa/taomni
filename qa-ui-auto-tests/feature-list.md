@@ -12413,6 +12413,8 @@ files:
   - src-tauri/src/mfa/crypto.rs
   - src-tauri/src/mfa/store.rs
   - src-tauri/src/mfa/commands.rs
+  - src-tauri/src/mfa/backend.rs
+  - src-tauri/crates/taomni-mfa-api/src/
   - src-tauri/crates/taomni-mfa-engine/src/
   - src/lib/mfa/types.ts
   - src/lib/mfa/ipc.ts
@@ -12617,6 +12619,7 @@ controls:
     optional: true       # first load only
   - id: load-error
     selector: '[data-testid="mfa-load-error"]'
+    # MFA_LEGACY_MIGRATION_REQUIRED directs the signed view to the module store.
     kind: display
     optional: true       # unreadable mfa.db
   - id: retry

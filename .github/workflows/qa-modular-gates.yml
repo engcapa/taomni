@@ -139,6 +139,8 @@ jobs:
               assert not packages.intersection({
                   "taomni-plugin-screenshot", "taomni-screenshot-ocr", "taomni-screenshot-recording",
               }), f"{target}: the core still depends on a screenshot module engine"
+              assert "taomni-mfa-api" in packages, f"{target}: missing the shared MFA contract"
+              assert not packages.intersection({"taomni-mfa-engine", "taomni-plugin-mfa", "quircs"}), f"{target}: the core depends on the MFA engine or decoder"
           resources = json.loads(Path("src-tauri/tauri.windows.conf.json").read_text())["bundle"]["resources"]
           assert all("resources/vnc/" not in entry for entry in resources), "Core declares VNC module resources"
           PY

@@ -7,6 +7,7 @@ description = "MFA account, OTP and encrypted storage engine independent of the 
 license = "MIT"
 
 [dependencies]
+taomni-mfa-api = { path = "../taomni-mfa-api", features = ["legacy-snapshot"] }
 aes-gcm = "0.10"
 chrono = "0.4"
 hex = "0.4"

@@ -279,11 +279,17 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
             </button>
           </div>
         ) : status === "error" ? (
-          <div data-testid="mfa-load-error" role="alert" className="mx-auto mt-10 max-w-[520px] space-y-3 px-6 text-center text-[12px]">
-            <div style={{ color: "var(--taomni-error, #c33)" }}>{t("mfa.errorPrefix", { error: error ?? "" })}</div>
-            <button type="button" data-testid="mfa-retry" className="rounded border px-3 py-1 hover:bg-[var(--taomni-hover)]" style={{ borderColor: "var(--taomni-input-border)" }} onClick={() => void store().load()}>
-              {t("mfa.retry")}
-            </button>
+          <div data-testid="mfa-load-error" data-code={errorCode} role="alert" className="mx-auto mt-10 max-w-[520px] space-y-3 px-6 text-center text-[12px]">
+            {errorCode === "MFA_LEGACY_MIGRATION_REQUIRED" ? (
+              <div>{t("mfa.legacyMigrationRequired")}</div>
+            ) : (
+              <>
+                <div style={{ color: "var(--taomni-error, #c33)" }}>{t("mfa.errorPrefix", { error: error ?? "" })}</div>
+                <button type="button" data-testid="mfa-retry" className="rounded border px-3 py-1 hover:bg-[var(--taomni-hover)]" style={{ borderColor: "var(--taomni-input-border)" }} onClick={() => void store().load()}>
+                  {t("mfa.retry")}
+                </button>
+              </>
+            )}
           </div>
         ) : status !== "ready" && accounts.length === 0 ? (
           <div data-testid="mfa-loading" className="mt-10 text-center text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>

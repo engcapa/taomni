@@ -10944,6 +10944,7 @@ dependencies = [
  "taomni-local-voice-engine",
  "taomni-mail-api",
  "taomni-mail-engine",
+ "taomni-mfa-api",
  "taomni-mfa-engine",
  "taomni-plugin-api",
  "taomni-plugin-services",
@@ -11194,6 +11195,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-mfa-api"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm 0.10.3",
+ "rusqlite",
+ "serde",
+ "zeroize",
+]
+
+[[package]]
 name = "taomni-mfa-engine"
 version = "0.1.0"
 dependencies = [
@@ -11207,6 +11218,7 @@ dependencies = [
  "serde_json",
  "sha1 0.11.0",
  "sha2 0.11.0",
+ "taomni-mfa-api",
  "uuid",
  "zeroize",
 ]
@@ -11265,7 +11277,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-mfa"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "png 0.18.1",
  "quircs",

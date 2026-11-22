@@ -2,7 +2,6 @@
 //! Base32 alphabet used by `otpauth://` secrets.
 
 use hmac::{Hmac, KeyInit, Mac};
-use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
 
@@ -14,58 +13,7 @@ pub const MAX_PERIOD: u32 = 300;
 /// certainly a typo rather than a real enrollment secret.
 pub const MIN_SECRET_BYTES: usize = 10;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum OtpAlgorithm {
-    #[serde(rename = "SHA1")]
-    Sha1,
-    #[serde(rename = "SHA256")]
-    Sha256,
-    #[serde(rename = "SHA512")]
-    Sha512,
-}
-
-impl OtpAlgorithm {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            OtpAlgorithm::Sha1 => "SHA1",
-            OtpAlgorithm::Sha256 => "SHA256",
-            OtpAlgorithm::Sha512 => "SHA512",
-        }
-    }
-
-    pub fn parse(value: &str) -> Option<Self> {
-        match value {
-            "SHA1" => Some(OtpAlgorithm::Sha1),
-            "SHA256" => Some(OtpAlgorithm::Sha256),
-            "SHA512" => Some(OtpAlgorithm::Sha512),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum OtpKind {
-    Totp,
-    Hotp,
-}
-
-impl OtpKind {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            OtpKind::Totp => "totp",
-            OtpKind::Hotp => "hotp",
-        }
-    }
-
-    pub fn parse(value: &str) -> Option<Self> {
-        match value {
-            "totp" => Some(OtpKind::Totp),
-            "hotp" => Some(OtpKind::Hotp),
-            _ => None,
-        }
-    }
-}
+pub use taomni_mfa_api::{OtpAlgorithm, OtpKind};
 
 /// Decode a Base32 secret. Case-insensitive; spaces, hyphens and `=` padding
 /// are ignored because users paste secrets grouped like `JBSW Y3DP …`.

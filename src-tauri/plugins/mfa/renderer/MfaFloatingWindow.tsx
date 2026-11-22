@@ -33,6 +33,7 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
   const codes = useMfaStore((s) => s.codes);
   const status = useMfaStore((s) => s.status);
   const mfaError = useMfaStore((s) => s.error);
+  const errorCode = useMfaStore((s) => s.errorCode);
   const [now, setNow] = useState(() => Date.now());
   const [unlockOpen, setUnlockOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
@@ -280,7 +281,9 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
           </div>
           <div className="min-h-0 flex-1 overflow-auto p-2" data-testid="mfa-floating-list">
             {status === "error" && (
-              <div className="px-1 py-2 text-[11px]" style={{ color: "var(--taomni-danger)" }}>{mfaError ?? "MFA error"}</div>
+              <div className="px-1 py-2 text-[11px]" style={{ color: "var(--taomni-danger)" }}>
+                {errorCode === "MFA_LEGACY_MIGRATION_REQUIRED" ? t("mfa.legacyMigrationRequired") : mfaError ?? "MFA error"}
+              </div>
             )}
             {status !== "error" && visibleAccounts.length === 0 && (
               <div className="px-1 py-2 text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.mfaNoAccounts")}</div>

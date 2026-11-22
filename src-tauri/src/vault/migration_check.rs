@@ -1,10 +1,10 @@
 //! Offline, load-only MFA validation under the exporter's maintenance scope.
 //! No key/root is returned; no live Vault is unlocked or initialized.
-use taomni_mfa_engine::{
-    crypto::DataKey,
-    keys::{ExistingKeyCheck, KeyProvider},
+use taomni_mfa_api::{
+    ERR_KEY_MISSING,
+    legacy::{ExistingKeyCheck, verify_existing_key},
 };
-use taomni_plugin_api::services::{MFA_DATA_KEY_ID, SecretKey32};
+use taomni_plugin_api::services::MFA_DATA_KEY_ID;
 use zeroize::Zeroizing;
 
 use super::{db, fixed_key_read, password_key};
@@ -14,22 +14,6 @@ use crate::plugin::migration::export::MfaKeySources;
 pub(crate) enum MfaMigrationKeyCheck {
     Database(ExistingKeyCheck),
     VaultKeyOnly,
-}
-
-struct LoadOnly(Option<SecretKey32>);
-
-impl KeyProvider for LoadOnly {
-    fn load(&self) -> Result<Option<DataKey>, String> {
-        Ok(self.0.as_ref().map(|key| Zeroizing::new(*key.as_bytes())))
-    }
-
-    fn initialize_empty(&self) -> Result<DataKey, String> {
-        Err("PERMISSION_DENIED".into())
-    }
-
-    fn repair_after_reset(&self) -> Result<DataKey, String> {
-        Err("PERMISSION_DENIED".into())
-    }
 }
 
 pub(crate) fn verify(
@@ -77,13 +61,15 @@ pub(crate) fn verify(
     } else {
         None
     };
-    let keys = LoadOnly(key);
+    let key = key.map(|key| Zeroizing::new(*key.as_bytes()));
     let result = match sources.database() {
-        Some(database) => MfaMigrationKeyCheck::Database(
-            taomni_mfa_engine::keys::verify_existing_key(database, &keys, &|| sources.check())?,
-        ),
-        None if keys.0.is_some() => MfaMigrationKeyCheck::VaultKeyOnly,
-        None => return Err(taomni_mfa_engine::ERR_KEY_MISSING.into()),
+        Some(database) => {
+            MfaMigrationKeyCheck::Database(verify_existing_key(database, key.as_ref(), &|| {
+                sources.check()
+            })?)
+        }
+        None if key.is_some() => MfaMigrationKeyCheck::VaultKeyOnly,
+        None => return Err(ERR_KEY_MISSING.into()),
     };
     sources.check()?;
     Ok(result)

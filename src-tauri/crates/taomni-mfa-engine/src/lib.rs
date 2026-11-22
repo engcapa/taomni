@@ -14,11 +14,9 @@ pub mod otp;
 pub mod store;
 mod validation;
 
-pub const ERR_KEY_MISSING: &str = "MFA_KEY_MISSING";
-pub const ERR_KEY_MISMATCH: &str = "MFA_KEY_MISMATCH";
-pub const ERR_INVALID_INPUT: &str = "MFA_INVALID_INPUT";
-pub const ERR_NOT_FOUND: &str = "MFA_NOT_FOUND";
-pub const INITIALIZATION_REQUIRED: &str = "MFA_INITIALIZATION_REQUIRED";
+pub use taomni_mfa_api::{
+    ERR_INVALID_INPUT, ERR_KEY_MISMATCH, ERR_KEY_MISSING, ERR_NOT_FOUND, INITIALIZATION_REQUIRED,
+};
 
 /// Current Unix time in milliseconds; the existing schema uses this unit.
 pub fn now_ms() -> i64 {

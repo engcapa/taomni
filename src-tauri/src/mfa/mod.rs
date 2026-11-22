@@ -6,13 +6,17 @@
 //! unlocked and the renderer only ever receives codes, never stored secrets.
 //! See `docs-feature/mfa-authenticator-design.md`.
 
+#[cfg(any(test, feature = "legacy-mfa"))]
 mod access;
 pub(crate) mod backend;
 pub mod capture;
 pub mod commands;
+#[cfg(any(test, feature = "legacy-mfa"))]
 pub mod crypto;
+#[cfg(any(test, feature = "legacy-mfa"))]
 mod key_provider;
 pub(crate) mod ownership;
+#[cfg(any(test, feature = "legacy-mfa"))]
 pub use taomni_mfa_engine::otp;
 pub mod store;
 
@@ -23,10 +27,9 @@ mod test_keys;
 #[cfg(test)]
 mod tests;
 
-/// Stable business errors are shared with the standalone engine.
-pub use taomni_mfa_engine::{
-    ERR_INVALID_INPUT, ERR_KEY_MISMATCH, ERR_KEY_MISSING, ERR_NOT_FOUND, now_ms,
-};
+pub use taomni_mfa_api::{ERR_INVALID_INPUT, ERR_KEY_MISMATCH, ERR_KEY_MISSING, ERR_NOT_FOUND};
+#[cfg(any(test, feature = "legacy-mfa"))]
+pub use taomni_mfa_engine::now_ms;
 pub const ERR_CLIPBOARD_NO_IMAGE: &str = "MFA_CLIPBOARD_NO_IMAGE";
 /// Only macOS gates screen capture behind a preflightable permission.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]

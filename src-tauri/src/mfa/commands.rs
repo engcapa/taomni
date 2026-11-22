@@ -6,16 +6,19 @@
 //! the MFA connection, then Vault; Vault never calls back into MFA.
 
 use serde_json::json;
+#[cfg(any(test, feature = "legacy-mfa"))]
 use taomni_mfa_engine::operations;
 use tauri::State;
 use tauri::ipc::Response;
 
-use super::store::{MfaAccount, MfaAccountInput, MfaAccountPatch, MfaCode, MfaPrefs};
-use super::{backend, capture, now_ms};
+#[cfg(any(test, feature = "legacy-mfa"))]
+use super::now_ms;
+use super::{backend, capture};
 use crate::state::AppState;
+use taomni_mfa_api::models::{MfaAccount, MfaAccountInput, MfaAccountPatch, MfaCode, MfaPrefs};
 use taomni_plugin_services::OperationKind;
 
-pub use taomni_mfa_engine::models::{MfaAddResult, MfaInspectItem, MfaSnapshot};
+pub use taomni_mfa_api::models::{MfaAddResult, MfaInspectItem, MfaSnapshot};
 
 #[tauri::command]
 pub async fn mfa_list(state: State<'_, AppState>) -> Result<MfaSnapshot, String> {
@@ -25,6 +28,7 @@ pub async fn mfa_list(state: State<'_, AppState>) -> Result<MfaSnapshot, String>
         OperationKind::ReadData,
         (),
         |_| json!({}),
+        #[cfg(any(test, feature = "legacy-mfa"))]
         |conn, _, ()| operations::list(conn),
     )
     .await
@@ -35,6 +39,7 @@ pub async fn mfa_codes(
     ids: Option<Vec<String>>,
     state: State<'_, AppState>,
 ) -> Result<Vec<MfaCode>, String> {
+    #[cfg(any(test, feature = "legacy-mfa"))]
     let now = now_ms();
     backend::run(
         &state,
@@ -42,6 +47,7 @@ pub async fn mfa_codes(
         OperationKind::ReadData,
         ids,
         |ids| json!({"ids": ids}),
+        #[cfg(any(test, feature = "legacy-mfa"))]
         |conn, key, ids| operations::codes(conn, key, ids.as_deref(), now),
     )
     .await
@@ -58,6 +64,7 @@ pub async fn mfa_inspect(
         OperationKind::ReadData,
         inputs,
         |inputs| json!({"inputs": inputs}),
+        #[cfg(any(test, feature = "legacy-mfa"))]
         |conn, key, inputs| operations::inspect(conn, key, &inputs),
     )
     .await
@@ -76,6 +83,7 @@ pub async fn mfa_add(
         OperationKind::WriteData,
         (inputs, skip_duplicates),
         |(inputs, skip)| json!({"inputs": inputs, "skipDuplicates": skip}),
+        #[cfg(any(test, feature = "legacy-mfa"))]
         |conn, key, (inputs, skip)| operations::add(conn, key, &inputs, skip),
     )
     .await
@@ -93,6 +101,7 @@ pub async fn mfa_update(
         OperationKind::WriteData,
         (id, patch),
         |(id, patch)| json!({"id": id, "patch": patch}),
+        #[cfg(any(test, feature = "legacy-mfa"))]
         |conn, _, (id, patch)| operations::update(conn, &id, &patch),
     )
     .await
@@ -106,6 +115,7 @@ pub async fn mfa_delete(id: String, state: State<'_, AppState>) -> Result<(), St
         OperationKind::WriteData,
         id,
         |id| json!({"id": id}),
+        #[cfg(any(test, feature = "legacy-mfa"))]
         |conn, _, id| operations::delete(conn, &id),
     )
     .await
@@ -119,6 +129,7 @@ pub async fn mfa_reorder(ids: Vec<String>, state: State<'_, AppState>) -> Result
         OperationKind::WriteData,
         ids,
         |ids| json!({"ids": ids}),
+        #[cfg(any(test, feature = "legacy-mfa"))]
         |conn, _, ids| operations::reorder(conn, &ids),
     )
     .await
@@ -132,6 +143,7 @@ pub async fn mfa_hotp_next(id: String, state: State<'_, AppState>) -> Result<Mfa
         OperationKind::WriteData,
         id,
         |id| json!({"id": id}),
+        #[cfg(any(test, feature = "legacy-mfa"))]
         |conn, key, id| operations::hotp_next(conn, key, &id),
     )
     .await
@@ -145,6 +157,7 @@ pub async fn mfa_mark_used(id: String, state: State<'_, AppState>) -> Result<Mfa
         OperationKind::WriteData,
         id,
         |id| json!({"id": id}),
+        #[cfg(any(test, feature = "legacy-mfa"))]
         |conn, _, id| operations::mark_used(conn, &id),
     )
     .await
@@ -158,6 +171,7 @@ pub async fn mfa_set_prefs(prefs: MfaPrefs, state: State<'_, AppState>) -> Resul
         OperationKind::WriteData,
         prefs,
         |prefs| json!({"prefs": prefs}),
+        #[cfg(any(test, feature = "legacy-mfa"))]
         |conn, _, prefs| operations::set_prefs(conn, &prefs),
     )
     .await
@@ -176,6 +190,7 @@ pub async fn mfa_export_uri(
     backend::export(&state, id, zeroize::Zeroizing::new(master_password)).await
 }
 
+#[cfg(any(test, feature = "legacy-mfa"))]
 pub(crate) use super::access::export_with_password;
 
 /// Destructive recovery when the vault no longer holds the key for `mfa.db`:

@@ -27,6 +27,7 @@ members = [
     "crates/taomni-file-uri",
     "crates/taomni-mail-api",
     "crates/taomni-mail-engine",
+    "crates/taomni-mfa-api",
     "crates/taomni-mfa-engine",
     "crates/taomni-module-settings",
     "crates/taomni-plugin-api",
@@ -125,7 +126,8 @@ taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-rdp-client-api = { path = "crates/taomni-rdp-client-api" }
 taomni-rdp-client-engine = { path = "crates/taomni-rdp-client-engine", optional = true }
 taomni-file-uri = { path = "crates/taomni-file-uri" }
-taomni-mfa-engine = { path = "crates/taomni-mfa-engine" }
+taomni-mfa-api = { path = "crates/taomni-mfa-api", features = ["legacy-snapshot"] }
+taomni-mfa-engine = { path = "crates/taomni-mfa-engine", optional = true }
 taomni-vnc-api = { path = "crates/taomni-vnc-api" }
 taomni-vnc-engine = { path = "crates/taomni-vnc-engine", optional = true }
 toml = "0.9"
@@ -329,6 +331,7 @@ legacy-rdp-client = ["dep:taomni-rdp-client-engine"]
 legacy-rdp-server = ["dep:taomni-rdp-server-engine", "rdp-server-audio"]
 legacy-local-servers = ["dep:taomni-local-servers-engine"]
 legacy-screenshot-media = ["dep:taomni-screenshot-ocr", "dep:taomni-screenshot-recording"]
+legacy-mfa = ["dep:taomni-mfa-engine"]
 # Dedicated hosted test harness: use the production pinned key on every thread
 # instead of the normal unit-fixture key. Production verification is unchanged.
 qa-release-trust-gates = []
@@ -442,6 +445,7 @@ webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 gtk = "0.18.2"
 
 [dev-dependencies]
+taomni-mfa-engine = { path = "crates/taomni-mfa-engine" }
 # Cargo enables the helper when building integration tests. Tauri enumerates
 # only enabled binary targets when it assembles a desktop installer.
 taomni = { path = ".", default-features = false, features = ["acp-test-fixture"] }

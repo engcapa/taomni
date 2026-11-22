@@ -54,7 +54,11 @@ steps:
 - click: '[data-testid="rail-mfa-button"]'
 - assert_text_equals: {selector: '[data-testid="mfa-floating-code"]', equals: 287 082}
 - assert_file_exists: '${fixture.mfa_module_database}'
-- native_restart_app: null
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
 - wait_for: {selector: '[data-testid="status-bar"]', timeout_sec: 60}
 - wait_for: '[data-testid="vault-unlock-dialog"]'
 - fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-mfa-renderer-native}

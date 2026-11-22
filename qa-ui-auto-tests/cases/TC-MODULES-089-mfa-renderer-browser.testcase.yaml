@@ -51,6 +51,7 @@ steps:
 - click: '[data-testid="mfa-floating-expand-tab"]'
 - assert_visible: '[data-testid="mfa-account-row"][data-issuer="Module HOTP"]'
 - assert_no_runtime_errors: null
+- assert_count: {selector: '[data-testid="mfa-load-error"][data-code="MFA_LEGACY_MIGRATION_REQUIRED"]', equal: 0}
 verification:
   review: reviewed
   requirements:
@@ -74,7 +75,8 @@ verification:
     - {step: 39, expectation: The floating panel reloads the saved counter.}
     - {step: 41, expectation: The manager displays the saved account.}
     - {step: 42, expectation: Opening and revoking the module produced no renderer runtime errors.}
-    results: [33, 34, 39, 41, 42]
+    - {step: 43, expectation: A newly created account opens without a legacy migration prompt.}
+    results: [33, 34, 39, 41, 42, 43]
   visual:
   - check: Both entry points show the HOTP and the disabled floating panel shows the module state.
     method: automated

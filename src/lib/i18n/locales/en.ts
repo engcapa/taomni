@@ -3678,6 +3678,7 @@ const dict = {
     keyErrorTitle: "MFA data cannot be decrypted",
     keyMissing: "The credential vault no longer holds the key for these MFA accounts. Restore vault.db from the same backup as mfa.db, or clear the MFA data.",
     keyMismatch: "The credential vault key does not match these MFA accounts. Restore vault.db from the same backup as mfa.db, or clear the MFA data.",
+    legacyMigrationRequired: "Migrate your existing MFA accounts from the Module Store in Settings before using MFA.",
     resetStore: "Clear MFA data…",
     confirmReset: "Delete every MFA account stored in Taomni? This cannot be undone.",
     confirmResetAgain: "Really delete all MFA accounts? Make sure every site still has another way to sign in.",

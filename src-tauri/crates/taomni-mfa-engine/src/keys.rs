@@ -6,10 +6,10 @@ use crate::{
 };
 use rusqlite::Connection;
 
-const NONCE_LEN: usize = 12;
-const KEY_CHECK_META: &str = "key_check";
-const KEY_CHECK_AAD: &[u8] = b"taomni-mfa:key-check";
-const KEY_CHECK_PLAINTEXT: &[u8] = b"taomni-mfa-key-check-v1";
+pub use taomni_mfa_api::legacy::ExistingKeyCheck;
+use taomni_mfa_api::legacy::{
+    self, KEY_CHECK_AAD, KEY_CHECK_META, KEY_CHECK_PLAINTEXT, key_matches_check,
+};
 
 /// Operation-scoped access to the protected MFA data key.
 ///
@@ -31,65 +31,15 @@ fn write_key_check(conn: &Connection, key: &DataKey) -> Result<(), String> {
     store::meta_set(conn, KEY_CHECK_META, &record)
 }
 
-fn key_matches_check(key: &DataKey, record: &[u8]) -> bool {
-    if record.len() <= NONCE_LEN {
-        return false;
-    }
-    let (nonce, ciphertext) = record.split_at(NONCE_LEN);
-    crypto::open(key, KEY_CHECK_AAD, ciphertext, nonce)
-        .map(|plain| plain.as_slice() == KEY_CHECK_PLAINTEXT)
-        .unwrap_or(false)
-}
-
-/// Non-secret observations, never an authorization or an activation permit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ExistingKeyCheck {
-    /// An unused database without a fixed key or key-check record.
-    Unused,
-    Verified {
-        accounts: u64,
-        key_check_present: bool,
-    },
-}
-
-/// Check a stable existing snapshot without binding, initializing or repairing
-/// it. Unlike `prepare_key`, an older database without key_check stays unchanged.
-/// Every sealed row must open, including when a valid key_check already exists.
-///
-/// The owner supplies an admitted, load-only key provider and a cancellation /
-/// deadline check, keeps the snapshot stable and binds the key to its original
-/// Vault generation. This helper grants no access to Vault or plugin activation.
+/// Read the key under the caller's permit before checking the immutable snapshot.
 pub fn verify_existing_key(
     conn: &Connection,
     keys: &dyn KeyProvider,
     check: &dyn Fn() -> Result<(), String>,
 ) -> Result<ExistingKeyCheck, String> {
     check()?;
-    let stored = keys.load()?;
-    check()?;
-    let record = store::meta_get(conn, KEY_CHECK_META)?;
-    let Some(key) = stored else {
-        let accounts = store::count_accounts(conn)?;
-        check()?;
-        return if record.is_none() && accounts == 0 {
-            Ok(ExistingKeyCheck::Unused)
-        } else {
-            Err(ERR_KEY_MISSING.to_string())
-        };
-    };
-    check()?;
-    if record
-        .as_ref()
-        .is_some_and(|record| !key_matches_check(&key, record))
-    {
-        return Err(ERR_KEY_MISMATCH.to_string());
-    }
-    let accounts = store::verify_all_secrets(conn, &key, check)?;
-    check()?;
-    Ok(ExistingKeyCheck::Verified {
-        accounts,
-        key_check_present: record.is_some(),
-    })
+    let key = keys.load()?;
+    legacy::verify_existing_key(conn, key.as_ref(), check)
 }
 
 /// Return the data key for `conn`, creating it on first use.
