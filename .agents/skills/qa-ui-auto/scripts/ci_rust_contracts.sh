@@ -9,13 +9,13 @@ fi
 if [[ "${QA_MOBILE_CONTRACTS:-false}" == true ]]; then
   pnpm exec vitest run mobile-web/src src/components/settings/FeishuAdapterSettings.test.tsx src/stores/chatStore.test.ts
 fi
-pnpm build --mode qa
+pnpm build:mobile && pnpm exec vite build --mode qa
 cd src-tauri
 profile=()
 if [[ "${QA_RELEASE:-false}" == true ]]; then
   profile=(--release)
   export CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS=true
-  export CARGO_PROFILE_RELEASE_INCREMENTAL=true
+  export CARGO_PROFILE_RELEASE_CODEGEN_UNITS="${CARGO_PROFILE_RELEASE_CODEGEN_UNITS:-64}"
 fi
 filters=(lsp::tests::workspace_watch_lifetime commands::workspace_reads::tests
   workspace::tests::text_and_encoding workspace::tests::encoding_matrix)

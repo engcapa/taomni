@@ -161,6 +161,8 @@ def reusable_cache_key(*, platform_key: str, arch: str, runner: str, profile: st
 
 def build_inputs(*, release: bool = False, env: dict[str, str] | None = None) -> dict:
     effective_env = configured_environment(env)
+    if release:
+        effective_env.setdefault("CARGO_PROFILE_RELEASE_CODEGEN_UNITS", "64")
     return {
         "source_sha256": source_identity(ROOT),
         "recipe_sha256": recipe_identity(),
@@ -172,7 +174,9 @@ def build_inputs(*, release: bool = False, env: dict[str, str] | None = None) ->
         "environment": {key: effective_env.get(key) for key in (
             "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET", "RUSTUP_TOOLCHAIN",
             "CARGO_BUILD_JOBS", "CARGO_PROFILE_DEV_DEBUG", "CC", "CXX", "CFLAGS",
-            "CARGO_PROFILE_DEV_INCREMENTAL", "CXXFLAGS", "BINDGEN_EXTRA_CLANG_ARGS",
+            "CARGO_PROFILE_DEV_INCREMENTAL", "CARGO_PROFILE_RELEASE_CODEGEN_UNITS",
+            "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER",
+            "CXXFLAGS", "BINDGEN_EXTRA_CLANG_ARGS",
             "CMAKE_C_FLAGS_RELEASE", "CMAKE_CXX_FLAGS_RELEASE",
             "BINDGEN_EXTRA_CLANG_ARGS_x86_64-unknown-linux-gnu",
             "BINDGEN_EXTRA_CLANG_ARGS_x86_64_unknown_linux_gnu",
@@ -220,6 +224,8 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     binary = qa_binary(release=release)
     record_path = identity_path(binary)
     env = configured_environment()
+    if release:
+        env.setdefault("CARGO_PROFILE_RELEASE_CODEGEN_UNITS", "64")
     inputs = build_inputs(release=release, env=env)
     if not force:
         reuse = check_build(release=release, inputs=inputs)

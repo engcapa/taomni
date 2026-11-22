@@ -36,6 +36,20 @@ class CheckoutIdentityTest(unittest.TestCase):
             (root / "src/new.ts").write_text("export const changed = true;\n")
             self.assertNotEqual(before, source_identity(root))
 
+    def test_frontend_unit_tests_do_not_invalidate_native_source_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            (root / "src").mkdir()
+            (root / "mobile-web/src").mkdir(parents=True)
+            (root / "src/app.ts").write_text("export const v = 1;\n")
+            before = source_identity(root)
+            for rel in ("src/app.test.ts", "src/View.test.tsx", "src/a.spec.ts", "mobile-web/src/m.test.ts"):
+                (root / rel).write_text("test('unit', () => {});\n")
+            self.assertEqual(before, source_identity(root))
+            (root / "src/app.ts").write_text("export const v = 2;\n")
+            self.assertNotEqual(before, source_identity(root))
+
     def test_dependency_patch_and_workspace_configuration_invalidate_identity(self):
         for name in ("patches/@codemirror__view@6.43.11.patch", "pnpm-workspace.yaml"):
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
