@@ -130,7 +130,7 @@ jobs:
           if not package:
               raise SystemExit('module Cargo.toml has no package name')
           targets = [
-              {'os': 'ubuntu-24.04', 'target': 'x86_64-unknown-linux-gnu', 'platform': 'linux-x86_64'},
+              {'os': 'ubuntu-22.04', 'target': 'x86_64-unknown-linux-gnu', 'platform': 'linux-x86_64'},
               {'os': 'windows-latest', 'target': 'x86_64-pc-windows-msvc', 'platform': 'windows-x86_64'},
               {'os': macos_runner, 'target': 'aarch64-apple-darwin', 'platform': 'darwin-aarch64'},
               {'os': macos_runner, 'target': 'x86_64-apple-darwin', 'platform': 'darwin-x86_64'},
@@ -176,7 +176,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
-          shared-key: module-release-${{ needs.source.outputs.slug }}-${{ matrix.target }}
+          shared-key: module-release-${{ needs.source.outputs.slug }}-${{ matrix.target }}-${{ matrix.os }}
       - name: Prepare complete Perl for the Windows desktop client TLS build
         if: (needs.source.outputs.slug == 'vnc-client' || needs.source.outputs.slug == 'rdp-client' || needs.source.outputs.slug == 'rdp-server') && runner.os == 'Windows'
         shell: pwsh
@@ -190,7 +190,10 @@ jobs:
           'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
       - name: Install Linux dependencies for the RDP Server host
         if: needs.source.outputs.slug == 'rdp-server' && runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev libasound2-dev libxkbcommon-dev
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y libpipewire-0.3-dev libasound2-dev libxkbcommon-dev libclang-dev libdbus-1-dev libudev-dev meson ninja-build pkg-config
+          bash scripts/install-release-pipewire.sh
       - name: Refresh cached Local Voice runtime
         if: needs.source.outputs.slug == 'ai-voice-local'
         run: node scripts/refresh-sherpa-onnx-cache.mjs src-tauri/Cargo.toml '${{ matrix.target }}'
@@ -325,6 +328,16 @@ jobs:
           FRONTEND_TOOLING: ${{ github.workflow_sha }}
           MODULE_SLUG: ${{ needs.source.outputs.slug }}
         run: python scripts/stage-vnc-frontend.py trusted-desktop-frontend candidate/unsigned-module "$MODULE_SOURCE" "$FRONTEND_TOOLING" "$MODULE_SLUG"
+      - name: Check Linux module ABI against the core baseline
+        if: matrix.platform == 'linux-x86_64'
+        env:
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: python scripts/check_linux_module_abi.py --source "$MODULE_SOURCE_SHA" --output linux-abi.json candidate/unsigned-module/module.json
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.platform == 'linux-x86_64' && hashFiles('linux-abi.json') != ''
+        with:
+          name: module-linux-abi-${{ needs.source.outputs.slug }}-${{ github.run_id }}
+          path: linux-abi.json
       - uses: actions/setup-node@v4
         if: startsWith(matrix.platform, 'darwin-') && steps.candidate.outputs.host != ''
         with:

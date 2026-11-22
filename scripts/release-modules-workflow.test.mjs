@@ -29,6 +29,19 @@ test("reusable packaging keeps independent artifact names and skips standalone p
   assert.match(workflow, /rehearsal = os\.environ\['PACKAGE_ONLY'\] == 'true' and not os\.environ\['RELEASE_TAG'\]\.strip\(\)/);
 });
 
+test("QA and release build Linux modules on the core glibc baseline and check the staged binaries", () => {
+  const qa = readFileSync(new URL("../.github/workflows/qa-modular-packages.yml", import.meta.url), "utf8");
+  for (const source of [qa, workflow]) {
+    assert.match(source, /'os': 'ubuntu-22\.04', 'target': 'x86_64-unknown-linux-gnu', 'platform': 'linux-x86_64'/);
+    assert.match(source, /bash scripts\/install-release-pipewire\.sh/);
+    const signer = source.split("\n  sign:\n")[1];
+    const baseline = signer.indexOf("python scripts/check_linux_module_abi.py");
+    const key = signer.indexOf("TAURI_SIGNING_PRIVATE_KEY:");
+    assert(baseline > 0 && baseline < key);
+    assert.match(signer.slice(baseline, key), /path: linux-abi\.json/);
+  }
+});
+
 test("module-only publication uploads immutable packages before the signed catalog", () => {
   const packages = workflow.indexOf("Upload changed packages before the signed catalog");
   const signature = workflow.indexOf("gh release upload \"$TAG\" next-catalog/modules.json.minisig");
