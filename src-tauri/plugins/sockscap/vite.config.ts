@@ -7,7 +7,11 @@ import type { SocksCapRendererHost } from "../../../src/lib/sockscap/rendererHos
 
 const coreRoot = fileURLToPath(new URL("../../../src/", import.meta.url));
 const prefix = "\0sockscap-renderer-host:";
-const sharedSources = new Set(["lib/sessionPaths.ts", "lib/sockscapPreflight.ts"]);
+const sharedSources = new Set([
+  "lib/sessionPaths.ts",
+  "lib/sockscapPreflight.ts",
+  "lib/sockscap/recoveryErrors.ts",
+]);
 
 function service<Key extends keyof SocksCapRendererHost>(key: Key, names: (keyof SocksCapRendererHost[Key])[]) {
   return { object: `__taomniSocksCapRendererHost.${key}`, names };
