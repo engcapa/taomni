@@ -15979,11 +15979,14 @@ id: F-EXPLORER-1
 title: Local File Explorer
 status: implemented
 area: files/explorer
-components: [ExplorerPlatformView, ExplorerSidebarPanel, ExplorerTabStrip, ExplorerShell, ExplorerNavTree, ExplorerFileList, ExplorerPreviewPane]
+components: [ExplorerPlatformView, ExplorerTabStrip, ExplorerTabIcon, ExplorerFileIcon, ExplorerShell, ExplorerNavTree, ExplorerFileList, ExplorerPreviewPane]
 files:
   - src/components/explorer/ExplorerPlatformView.tsx
-  - src/components/explorer/ExplorerSidebarPanel.tsx
   - src/components/explorer/ExplorerTabStrip.tsx
+  - src/components/explorer/ExplorerTabIcon.tsx
+  - src/components/explorer/ExplorerFileIcon.tsx
+  - src/components/explorer/explorerTabIcon.css
+  - src/components/tabbar/tabs/tabContextMenu.ts
   - src/components/explorer/ExplorerTabsFilter.tsx
   - src/components/explorer/ExplorerShell.tsx
   - src/components/explorer/ExplorerNewFileDialog.tsx
@@ -16036,11 +16039,55 @@ controls:
   - id: explorer-workspace-tab-ready
     selector: '[data-testid="explorer-workspace-tab"]'
     aliases:
+    - ':nth-match([data-testid="explorer-workspace-tab"], 1)'
     - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 1)'
     - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 2)'
     - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 5)'
     - 'xpath=(//*[@data-testid="explorer-workspace-tab"][@data-tab-type="file-browser"])[2]'
     kind: interactive
+  - id: explorer-tab-new-home
+    selector: '[data-testid="explorer-tab-new-home"]'
+    kind: interactive
+  - id: explorer-tab-rename-input
+    selector: '[data-testid="explorer-tab-rename-input"]'
+    kind: interactive
+  - id: explorer-tab-context-close
+    selector: '[data-testid="explorer-tab-context-close"]'
+    kind: interactive
+  - id: explorer-tab-context-close-others
+    selector: '[data-testid="explorer-tab-context-close-others"]'
+    kind: display
+  - id: explorer-tab-context-close-all
+    selector: '[data-testid="explorer-tab-context-close-all"]'
+    kind: display
+  - id: explorer-tab-context-rename
+    selector: '[data-testid="explorer-tab-context-rename"]'
+    kind: interactive
+  - id: explorer-tab-context-duplicate
+    selector: '[data-testid="explorer-tab-context-duplicate"]'
+    kind: display
+  - id: explorer-tab-context-copy-path
+    selector: '[data-testid="explorer-tab-context-copy-path"]'
+    kind: display
+  - id: explorer-tab-context-move-first
+    selector: '[data-testid="explorer-tab-context-move-first"]'
+    kind: interactive
+  - id: explorer-tab-context-move-left
+    selector: '[data-testid="explorer-tab-context-move-left"]'
+    kind: display
+  - id: explorer-tab-context-move-right
+    selector: '[data-testid="explorer-tab-context-move-right"]'
+    kind: display
+  - id: explorer-tab-context-move-last
+    selector: '[data-testid="explorer-tab-context-move-last"]'
+    kind: display
+  - id: explorer-tab-context-pin
+    selector: '[data-testid="explorer-tab-context-pin"]'
+    kind: display
+  - id: explorer-sidebar-panel-removed
+    selector: '[data-testid="explorer-sidebar-panel"]'
+    kind: display
+    optional: true   # removed UI; only negative regression assertions remain
   - id: code-workspace-tool-rail-explorer
     selector: '[data-testid="code-workspace-tool-rail-explorer"]'
     kind: interactive
@@ -16457,7 +16504,7 @@ controls:
     kind: interactive
 -->
 
-File Explorer 是 Sessions 下方的独立工作区，Tools 面板不再提供入口；主菜单、工作区导航、项目树、本地终端、Home 与历史恢复统一跳转到这里。目录与支持内部查看的文件共用独立标签，只有显式选择 Code Workspace 或系统应用才离开。新建支持 TXT、MD、HTML、CSS、JS、TS、JSON；搜索支持普通文本、递归、`*`/`?`/`**`/字符类、两种路径分隔符、相对路径、错误重试、进度与取消。TC-EXPLORER-001..010 覆盖导航、预览、选择、文件操作、恢复、多类型新建、真实磁盘搜索、标签溢出分页/过滤、Overview 纳入与删除方式选择；当前执行证据见 `docs-feature/file-explorer/implementation.md`，不以静态清单宣称原生通过。
+File Explorer 是 Sessions 下方的独立工作区，Tools 面板不再提供入口；主菜单、工作区导航、项目树、本地终端、Home 与历史恢复统一跳转到这里。目录与支持内部查看的文件共用独立标签，只有显式选择 Code Workspace 或系统应用才离开。新建支持 TXT、MD、HTML、CSS、JS、TS、JSON；搜索支持普通文本、递归、`*`/`?`/`**`/字符类、两种路径分隔符、相对路径、错误重试、进度与取消。Explorer 激活后是 rail-only 表面：左侧重复的 Explorer 边栏与 `toggle-left-sidebar` 不再渲染，切回 Sessions/Workspaces 后各模式的侧栏控件恢复；标签使用 Sessions 同款 `.taomni-tab` 样式、类型图标与共享顺序右键菜单，空白处按下即关闭菜单。TC-EXPLORER-001..011 覆盖导航、预览、选择、文件操作、恢复、多类型新建、真实磁盘搜索、标签溢出分页/过滤、Overview 纳入与删除方式选择、rail-only 侧栏与 Sessions 对齐标签/菜单空白关闭；当前执行证据见 `docs-feature/file-explorer/implementation.md`，不以静态清单宣称原生通过。
 
 ## 全局文件打开 / 预览 / 编辑
 
@@ -17301,17 +17348,22 @@ id: F-NOTEPAD-1
 title: Notepad Workbench Shell and File Lifecycle
 status: implemented
 area: editor/notepad
-components: [NotepadEditor, NotepadToolbar, NotepadMenuBar, NotepadStatusBar, NotepadCodeMirrorPane, FileLifecycleDialogs]
+components: [NotepadEditor, NotepadToolbar, NotepadMenuBar, NotepadStatusBar, NotepadCodeMirrorPane, NotepadContextMenu, FileLifecycleDialogs]
 files:
   - src/components/notepad/NotepadEditor.tsx
   - src/components/notepad/NotepadToolbar.tsx
   - src/components/notepad/NotepadMenuBar.tsx
   - src/components/notepad/NotepadStatusBar.tsx
   - src/components/notepad/NotepadCodeMirrorPane.tsx
+  - src/components/notepad/NotepadContextMenu.tsx
+  - src/components/notepad/notepad.css
   - src/components/notepad/dialogs/FileLifecycleDialogs.tsx
   - src/components/notepad/useNotepadActions.ts
   - src/components/notepad/actions/coreCommands.ts
   - src/components/notepad/actions/extraCommands.ts
+  - src/components/notepad/actions/saveDefaults.ts
+  - src/lib/notepad/persistence/savePath.ts
+  - src/lib/notepad/commands/labels.ts
   - src/components/viewer/ViewerShell.tsx
   - src/components/viewer/ViewerDirtyIndicator.tsx
   - src/components/explorer/ExplorerTabStrip.tsx
@@ -17403,6 +17455,70 @@ controls:
   - id: notepad-save-as-confirm
     selector: '[data-testid="notepad-save-as-confirm"]'
     kind: interactive
+  - id: notepad-active-editor
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="viewer-editor"]'
+    kind: interactive
+  - id: notepad-context-undo
+    selector: '[data-testid="notepad-context-undo"]'
+    kind: display
+    note: Row presence is asserted; the Undo action itself is exercised through toolbar/menu cases.
+  - id: notepad-context-redo
+    selector: '[data-testid="notepad-context-redo"]'
+    kind: display
+  - id: notepad-context-cut
+    selector: '[data-testid="notepad-context-cut"]'
+    kind: display
+  - id: notepad-context-copy
+    selector: '[data-testid="notepad-context-copy"]'
+    kind: display
+  - id: notepad-context-paste
+    selector: '[data-testid="notepad-context-paste"]'
+    kind: display
+  - id: notepad-context-paste-special
+    selector: '[data-testid="notepad-context-paste-special"]'
+    kind: display
+  - id: notepad-context-delete
+    selector: '[data-testid="notepad-context-delete"]'
+    kind: display
+  - id: notepad-context-select-all
+    selector: '[data-testid="notepad-context-select-all"]'
+    kind: display
+  - id: notepad-context-duplicate-line
+    selector: '[data-testid="notepad-context-duplicate-line"]'
+    kind: display
+  - id: notepad-context-delete-line
+    selector: '[data-testid="notepad-context-delete-line"]'
+    kind: display
+  - id: notepad-context-move-line-up
+    selector: '[data-testid="notepad-context-move-line-up"]'
+    kind: display
+  - id: notepad-context-move-line-down
+    selector: '[data-testid="notepad-context-move-line-down"]'
+    kind: display
+  - id: notepad-context-find
+    selector: '[data-testid="notepad-context-find"]'
+    kind: display
+  - id: notepad-context-find-next
+    selector: '[data-testid="notepad-context-find-next"]'
+    kind: display
+  - id: notepad-context-replace
+    selector: '[data-testid="notepad-context-replace"]'
+    kind: display
+  - id: notepad-context-go-to
+    selector: '[data-testid="notepad-context-go-to"]'
+    kind: display
+  - id: notepad-context-toggle-bookmark
+    selector: '[data-testid="notepad-context-toggle-bookmark"]'
+    kind: display
+  - id: notepad-context-copy-path
+    selector: '[data-testid="notepad-context-copy-path"]'
+    kind: display
+  - id: notepad-context-save
+    selector: '[data-testid="notepad-context-save"]'
+    kind: interactive
+  - id: notepad-context-save-as
+    selector: '[data-testid="notepad-context-save-as"]'
+    kind: display
   - id: notepad-menu-edit
     selector: '[data-testid="notepad-menu-edit"]'
     kind: interactive
@@ -17780,3 +17896,8 @@ TC-NP-101/102 在 Linux/Windows/macOS 的 native 模式下用 `file_open_files` 
 Ctrl/Cmd+S 通过 `viewer_write_text` 写出真实字节；外部进程改写后保存出现冲突横幅，重新加载应用磁盘内容；另存为把文档重键到
 新路径并更新标签，保存副本写出第二个真实文件而当前文档仍指向另存为目标。浏览器 VFS 无法证明这些主机侧效果，因此这两个用例
 只登记 native；真机平台结果以各次托管运行的 shard 报告为准，未执行平台保持未验证。
+
+TC-NP-103 在同一 native 边界验证 U2 的 Save As 默认目录：未命名文档的默认路径必须是真实 `get_home_dir` 下的绝对 `.txt` 路径，
+确认后由 `assert_file_open_bytes` 独立读取宿主机字节；随后新未命名文档的默认目录必须复用真实 localStorage 记住的上次保存目录。
+TC-NP-007 在浏览器补齐 AC-1..AC-4 的渲染层断言：深浅主题下 Save As 弹窗计算背景/文字色、`/preview` HOME 默认路径与上次目录记忆、
+编辑器右键应用菜单（行 testid、命令执行与外点关闭）。原生 OS HOME、文件对话框与物理快捷输入不由这些浏览器断言证明。

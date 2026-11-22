@@ -1,4 +1,4 @@
-import { ArrowDownWideNarrow, ChevronDown, ClipboardPaste, Copy, ExternalLink, FolderPlus, LayoutGrid, List, MoreHorizontal, PanelLeft, PanelRight, Pencil, Plus, Scissors, Terminal, Trash2 } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ClipboardPaste, Copy, ExternalLink, FolderPlus, LayoutGrid, List, MoreHorizontal, PanelLeftClose, PanelLeftOpen, PanelRight, Pencil, Plus, Scissors, Terminal, Trash2 } from "lucide-react";
 import type { FileEntry } from "../../lib/sftp";
 import { readExplorerRestoreEnabled, setExplorerRestoreEnabled } from "../../lib/explorer/tabRecovery";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
@@ -49,7 +49,6 @@ export function ExplorerCommandBar({ path, workspaceId, selected, operations, on
   const moreMenu: MenuItem[] = [
     { label: label("复制当前路径", "Copy current path"), onClick: () => void operations.copyPath([path]) },
     { label: label("在系统文件管理器中显示", "Show in system file manager"), onClick: () => void operations.reveal(path) },
-    { label: label("将此目录固定到快速访问", "Pin current folder to Quick access"), checked: preferences.pinnedPaths.includes(path), onClick: () => setExplorerPreferences({ pinnedPaths: preferences.pinnedPaths.includes(path) ? preferences.pinnedPaths.filter((value) => value !== path) : [...preferences.pinnedPaths, path] }) },
     { label: "", separator: true },
     { label: label("启动时恢复 Explorer 标签", "Restore Explorer tabs on startup"), checked: readExplorerRestoreEnabled(), testId: "explorer-restore-tabs", onClick: () => setExplorerRestoreEnabled(!readExplorerRestoreEnabled()) },
   ];
@@ -57,9 +56,12 @@ export function ExplorerCommandBar({ path, workspaceId, selected, operations, on
     <div className="ex-cmd" data-testid="explorer-command-bar">
       <button type="button" className={`ex-cbtn icon ${preferences.navVisible ? "on" : ""}`}
         data-testid="explorer-cmd-navigation" aria-label={label("文件夹导航", "Folder navigation")}
+        data-icon={preferences.navVisible ? "panel-left-close" : "panel-left-open"}
         aria-controls={navigationId} aria-expanded={preferences.navVisible}
         title={preferences.navVisible ? label("收起目录树", "Collapse folder tree") : label("展开目录树", "Expand folder tree")}
-        onClick={(event) => { event.currentTarget.focus(); onToggleNavigation(); }}><PanelLeft aria-hidden="true" /></button>
+        onClick={(event) => { event.currentTarget.focus(); onToggleNavigation(); }}>
+        {preferences.navVisible ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />}
+      </button>
       <button className="ex-cbtn pri" data-testid="explorer-cmd-new" disabled={operations.busy || !path} onClick={(event) => show(event, newMenu)}><Plus />{label("新建", "New")}<ChevronDown className="ex-car" /></button>
       <span className="ex-vsep" />
       <button className="ex-cbtn icon" data-testid="explorer-cmd-cut" title={label("剪切", "Cut")} disabled={operations.busy || !selected.length} onClick={() => void operations.copy(selected, true)}><Scissors /></button>

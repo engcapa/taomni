@@ -57,16 +57,28 @@ export function ContextMenu({ items, x, y, onClose, appearance, testId }: Contex
   }, [x, y, items]);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    // A blank press in a file list calls preventDefault() on its pointerdown to
+    // start rubber-band selection; the browser then never dispatches the
+    // compatibility mousedown. Listen to both events so an outside press always
+    // dismisses the menu, and make the handler idempotent because a regular
+    // gesture dispatches both.
+    let closed = false;
+    const handler = (e: Event) => {
+      if (closed) return;
       const target = e.target as HTMLElement | null;
       // Submenus and custom panels render in a portal outside `ref`, so test
       // against the shared marker attribute instead of DOM containment.
       if (!target || !target.closest("[data-taomni-context-menu]")) {
+        closed = true;
         onClose("outside");
       }
     };
+    document.addEventListener("pointerdown", handler);
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    return () => {
+      document.removeEventListener("pointerdown", handler);
+      document.removeEventListener("mousedown", handler);
+    };
   }, [onClose]);
 
   const style: CSSProperties = {

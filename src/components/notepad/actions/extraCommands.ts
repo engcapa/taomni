@@ -16,6 +16,7 @@ import { setNotepadPreferences, useNotepadPreferences } from "../../../stores/no
 import { useNotepadStore } from "../../../stores/notepadStore";
 import type { NotepadCommandHandler } from "../../../lib/notepad/commands/types";
 import type { NotepadActionContext } from "./context";
+import { resolveNotepadSaveAsDefaults } from "./saveDefaults";
 
 /**
  * Extended Notepad command handlers for the prototype-parity menu: file
@@ -104,9 +105,9 @@ async function copySelectionOr(_ctx: NotepadActionContext, compute: () => string
 export function createExtraCommandMap(ctx: NotepadActionContext): Record<string, NotepadCommandHandler> {
   return {
     // ── File lifecycle extras ────────────────────────────────────────────────
-    "file.saveCopy": () => {
-      const name = ctx.document.path.split(/[\\/]/).pop() || ctx.docState.titleHint || "untitled.txt";
-      ctx.setLifecycleModal({ kind: "saveAs", defaultPath: name, initialPath: isUntitledKey(ctx.document.path) ? "" : ctx.document.path, copy: true });
+    "file.saveCopy": async () => {
+      const defaults = await resolveNotepadSaveAsDefaults(ctx.document.path, ctx.docState.titleHint || "");
+      ctx.setLifecycleModal({ kind: "saveAs", ...defaults, copy: true });
     },
     "file.openWith": () => ctx.setPickerModal({ kind: "openWith", path: ctx.document.path }),
     "file.openExternalDefault": async () => {

@@ -195,6 +195,9 @@ describe("Explorer preferences and responsive preview", () => {
     const toggle = screen.getByRole("button", { name: "Folder navigation" });
     const separator = screen.getByTestId("explorer-nav-resize");
     expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveAttribute("data-icon", "panel-left-close");
+    expect(toggle.querySelector("svg.lucide-panel-left-close")).toBeTruthy();
+    expect(toggle.querySelector("svg.lucide-panel-left")).toBeNull();
     expect(toggle).toHaveAttribute("aria-controls", tree.id);
 
     fireEvent.click(row("alpha.txt"));
@@ -207,6 +210,8 @@ describe("Explorer preferences and responsive preview", () => {
 
     expect(toggle).toHaveFocus();
     expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("data-icon", "panel-left-open");
+    expect(toggle.querySelector("svg.lucide-panel-left-open")).toBeTruthy();
     expect(tree).not.toBeVisible();
     expect(screen.queryByTestId("explorer-nav-resize")).toBeNull();
     expect(screen.getByTestId("explorer-file-list")).toBe(list);
@@ -217,6 +222,7 @@ describe("Explorer preferences and responsive preview", () => {
 
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveAttribute("data-icon", "panel-left-close");
     expect(tree).toBeVisible();
     expect(screen.getByTestId("explorer-nav-tree")).toBe(tree);
     expect(getExplorerPreferences().navWidth).toBe(260);

@@ -1,0 +1,241 @@
+id: TC-NP-007
+title: Notepad dark Save As theme, HOME/last-directory default path and editor context menu
+description: >-
+  AC-1/AC-2/AC-3/AC-4 browser slice (U1/U2/U3). The rail theme button pins the light theme, where a new
+  untitled Save As dialog must still render the light main-window panel surface, then the dark theme, where
+  the modal resolves the dark platform panel background and the dark text token. The untitled default path
+  must be the absolute browser-stub HOME path ending in .txt, and a second untitled document opened after a
+  successful save must default to the remembered directory. Right-clicking the editor suppresses the WebView
+  menu and opens the Notepad command menu: item ids are asserted, Save executes the real command (Save As
+  opens) and an outside pointer press dismisses the menu. Bytes are read through the independent file-open
+  VFS oracle. Browser stubs cannot prove a real OS HOME, native save dialogs, OS clipboard or physical
+  menus; TC-NP-103 and the native Notepad cases own those boundaries.
+modes:
+- browser
+covers:
+- F-NOTEPAD-1
+tags:
+- p1
+- notepad
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+# reset_db leaves the stored app theme at "system", so one theme-cycle press always
+# pins light and the next one always pins dark, independent of the host color scheme.
+- click: '[data-testid="theme-cycle"]'
+- eval_readonly:
+    expression: document.documentElement.getAttribute('data-app-theme')==='light'
+    expect_truthy: true
+    timeout_sec: 5
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab-new-notepad"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="notepad-workbench"]'
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="viewer-editor"]'
+- type: theme probe
+- press: Mod+s
+- wait_for: '[data-testid="notepad-save-as-dialog"]'
+# AC-1 light branch: the modal uses the main-window light panel token (#f1f5f9).
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.np-modal')).backgroundColor
+    contains: rgb(241, 245, 249)
+# AC-2: the untitled default is the absolute browser VFS HOME (/preview) plus a
+# .txt file name. The untitled name pattern is Chinese regardless of locale, so
+# only the absolute directory prefix and extension are asserted.
+- eval_readonly:
+    expression: document.querySelector('.np-modal .np-input').value
+    contains: /preview/
+- eval_readonly:
+    expression: document.querySelector('.np-modal .np-input').value
+    contains: .txt
+- screenshot: np-007-save-as-light.png
+- press: Escape
+- wait_for:
+    selector: '[data-testid="notepad-save-as-dialog"]'
+    state: detached
+- click: '[data-testid="theme-cycle"]'
+- eval_readonly:
+    expression: document.documentElement.getAttribute('data-app-theme')==='dark'
+    expect_truthy: true
+    timeout_sec: 5
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="viewer-editor"]'
+- press: Mod+s
+- wait_for: '[data-testid="notepad-save-as-dialog"]'
+# AC-1 dark branch: platform dark panel #23252a and the dark text token #e6eaf0.
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.np-modal')).backgroundColor
+    contains: rgb(35, 37, 42)
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.np-modal')).color
+    contains: rgb(230, 234, 240)
+- screenshot: np-007-save-as-dark.png
+- fill:
+    selector: '[data-testid="notepad-save-as-input"]'
+    value: ${fixture.file_open_root}/np-default.txt
+- click: '[data-testid="notepad-save-as-confirm"]'
+- wait_for:
+    selector: '[data-testid="notepad-save-as-dialog"]'
+    state: detached
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/np-default.txt
+    equals: theme probe
+# AC-3: a brand-new untitled document seeds Save As with the directory of the
+# last successful save instead of $HOME.
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="file-viewer"][data-path^="untitled:"]'
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="viewer-editor"]'
+- press: Mod+s
+- wait_for: '[data-testid="notepad-save-as-dialog"]'
+- eval_readonly:
+    expression: document.querySelector('.np-modal .np-input').value
+    contains: ${fixture.file_open_root}/
+- press: Escape
+- wait_for:
+    selector: '[data-testid="notepad-save-as-dialog"]'
+    state: detached
+# AC-4: the Editor right-click menu replaces the WebView menu, exposes the
+# Notepad command rows, executes a command through the real registry and an
+# outside pointer press dismisses it.
+- right_click: '[data-testid="file-viewer"][data-active="true"] [data-testid="viewer-editor"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_menu_items:
+  - Undo
+  - Redo
+  - Cut
+  - Copy
+  - Paste
+  - Select All
+  - Find
+  - Replace
+  - Save
+- assert_visible: '[data-testid="notepad-context-undo"]'
+- assert_visible: '[data-testid="notepad-context-copy"]'
+- assert_visible: '[data-testid="notepad-context-find"]'
+- assert_visible: '[data-testid="notepad-context-save-as"]'
+- click: '[data-testid="notepad-context-save"]'
+- wait_for: '[data-testid="notepad-save-as-dialog"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="notepad-save-as-dialog"]'
+    state: detached
+- right_click: '[data-testid="file-viewer"][data-active="true"] [data-testid="viewer-editor"]'
+- wait_for: '[data-testid="context-menu"]'
+# The status statistics chip is presentation-only, so this press only exercises
+# the shared outside-pointer dismissal path. Scope it to the active viewer: the
+# other open Notepad tabs keep hidden workbenches in the DOM.
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="notepad-status-stats"]'
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: detached
+- assert_no_runtime_errors: null
+- screenshot: np-007-context-menu-dismissed.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: >-
+      The Save As modal stays on the light main-window panel in the light theme and resolves the dark platform
+      panel background plus the dark text token in the dark theme.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 17
+    - 19
+    - 21
+    - 22
+    checkpoints:
+    - {step: 4, expectation: The theme button pinned the light application theme.}
+    - {step: 12, expectation: The untitled Save As modal is mounted.}
+    - {step: 13, expectation: The modal background computes to the light main-window panel color.}
+    - {step: 18, expectation: Escape closes the light Save As modal.}
+    - {step: 20, expectation: The theme button pinned the dark application theme.}
+    - {step: 23, expectation: The Save As modal is mounted again.}
+    - {step: 24, expectation: The modal background computes to the dark platform panel color.}
+    - {step: 25, expectation: The modal text resolves to the dark text token.}
+    results:
+    - 13
+    - 24
+    - 25
+  - id: R2
+    requirement: >-
+      A new untitled document defaults Save As to an absolute .txt path under the browser-stub HOME, and confirming the
+      dialog writes exactly the typed bytes to that VFS path.
+    actions:
+    - 9
+    - 10
+    - 11
+    - 14
+    - 15
+    - 27
+    - 28
+    checkpoints:
+    - {step: 12, expectation: The Save As dialog is shown for the untitled document.}
+    - {step: 14, expectation: The default path is under the absolute /preview HOME.}
+    - {step: 15, expectation: The default path ends in .txt.}
+    - {step: 29, expectation: Confirming Save closes the dialog.}
+    - {step: 30, expectation: The independent VFS byte read matches the typed document exactly.}
+    results:
+    - 14
+    - 15
+    - 30
+  - id: R3
+    requirement: >-
+      A new untitled document opened after a successful save seeds Save As with the remembered directory rather than the
+      default HOME.
+    actions:
+    - 27
+    - 28
+    - 31
+    - 33
+    - 34
+    checkpoints:
+    - {step: 32, expectation: The new untitled document is the active viewer.}
+    - {step: 35, expectation: Its Save As dialog is mounted.}
+    - {step: 36, expectation: The default path contains the directory of the previous save.}
+    - {step: 38, expectation: Escape closes the dialog without writing.}
+    results:
+    - 32
+    - 36
+  - id: R4
+    requirement: >-
+      Right-clicking the editor opens the Notepad command menu with the required rows and item ids, Save executes the real
+      command by opening Save As, and an outside pointer press dismisses the menu; no uncaught runtime errors occur.
+    actions:
+    - 39
+    - 46
+    - 48
+    - 50
+    - 52
+    checkpoints:
+    - {step: 40, expectation: The shared application context menu replaces the WebView menu.}
+    - {step: 41, expectation: The required English Notepad command labels are visible.}
+    - {step: 42, expectation: The Undo command row has its dedicated test id.}
+    - {step: 43, expectation: The Copy command row has its dedicated test id.}
+    - {step: 44, expectation: The Find command row has its dedicated test id.}
+    - {step: 45, expectation: The Save As command row has its dedicated test id.}
+    - {step: 47, expectation: The Save command opened the real Save As dialog.}
+    - {step: 49, expectation: Escape closes the dialog after the menu command.}
+    - {step: 51, expectation: A second right click reopens the command menu.}
+    - {step: 53, expectation: The outside pointer press dismisses the context menu.}
+    - {step: 54, expectation: The workflow raises no uncaught runtime errors.}
+    results:
+    - 41
+    - 47
+    - 53
+    - 54
+  visual:
+  - check: Light and dark Save As modal surfaces plus the dismissed context-menu state are retained as screenshots.
+    method: manual
+    reason: Computed background/text colors are asserted automatically; pixel fidelity needs human review.
+  native:
+  - check: Real OS HOME, native save dialogs and the WebView default menu boundary.
+    method: external
+    reason: This case uses the browser stub home and IndexedDB VFS; TC-NP-103 covers the native HOME/last-directory flow.

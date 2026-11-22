@@ -188,6 +188,9 @@ describe("ControlBar settings button", () => {
     renderControlBar(vi.fn());
     expect(screen.getByTestId("explorer-workspace-tab")).toBeInTheDocument();
     expect(screen.getByTestId("explorer-tabs-filter-trigger")).toBeInTheDocument();
+    // U7: Explorer has no expandable left sidebar content, so its collapse
+    // toggle is removed from the title bar in that mode.
+    expect(screen.queryByTestId("toggle-left-sidebar")).not.toBeInTheDocument();
     expect(screen.queryByTestId("tab-more")).not.toBeInTheDocument();
     expect(screen.queryByTestId("workspace-tabs-filter-trigger")).not.toBeInTheDocument();
     expect(screen.queryByTestId("tab-bar")).not.toBeInTheDocument();
@@ -201,6 +204,8 @@ describe("ControlBar settings button", () => {
     expect(screen.queryByTestId("explorer-tabs-filter-trigger")).not.toBeInTheDocument();
     expect(screen.getByTestId("platform-mode-title")).toHaveTextContent("Tools");
     expect(screen.queryByTestId("explorer-tab-strip")).not.toBeInTheDocument();
+    // Leaving Explorer restores the sidebar collapse affordance.
+    expect(screen.getByTestId("toggle-left-sidebar")).toBeInTheDocument();
   });
 
   it("keeps the tab strip visible in Tools mode while the Local servers tab is open", () => {

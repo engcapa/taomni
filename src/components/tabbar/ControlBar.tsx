@@ -238,7 +238,7 @@ export function ControlBar({
       {ctx.render}
       {previewNode}
       <div className="flex items-center gap-1 px-1.5 shrink-0">
-        {activeSideTab !== "home" && <BarButton
+        {activeSideTab !== "home" && activeSideTab !== "explorer" && <BarButton
           testId="toggle-left-sidebar"
           title={`${t("platform.toggleLeftSidebar")} (${IS_MAC ? "Cmd+B" : "Ctrl+B"})`}
           icon={leftSidebarCollapsed ? <PanelRight className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}

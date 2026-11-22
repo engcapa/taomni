@@ -31,7 +31,7 @@ function activateExplorer(id: string): void {
   const app = useAppStore.getState();
   app.clearTabFilter();
   app.setActiveSideTab("explorer");
-  app.setSidebarCollapsed(false);
+  // Explorer is rail-only (U6): never expand the left navigator for it.
   useExplorerStore.getState().setActiveTab(id);
 }
 

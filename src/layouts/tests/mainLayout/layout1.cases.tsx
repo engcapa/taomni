@@ -59,6 +59,25 @@ export function registerMainLayoutLayout1Cases() {
       expect(useAppStore.getState().sidebarCollapsedByGroup.other).toBe(false);
     });
 
+    it("keeps the rail-only Explorer surface collapsed and its sidebar toggles inert (U6/U7)", async () => {
+      render(<MainLayout />);
+      act(() => useAppStore.getState().setActiveSideTab("explorer"));
+      await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
+      // The title-bar/View-menu toggle (the mocked ControlBar button) and Ctrl+B
+      // must not expand an empty explorer panel.
+      fireEvent.click(screen.getByTestId("mock-sidebar-toggle"));
+      expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+      fireEvent.keyDown(document.body, { ctrlKey: true, key: "b", code: "KeyB" });
+      expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+      // Returning to a mode with real sidebar content restores the toggle: the
+      // terminal group's own ED-PARITY-027 preference applies again and the
+      // title-bar/View-menu toggle expands the panel.
+      act(() => useAppStore.getState().setActiveSideTab("sessions"));
+      expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+      fireEvent.click(screen.getByTestId("mock-sidebar-toggle"));
+      expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    });
+
     it("keeps the store's state over a restored collapsed layout and syncs later drags", async () => {
       render(<MainLayout />);
       const onResize = panelResizeMock.handlers.get("sidebar");

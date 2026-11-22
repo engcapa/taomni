@@ -29,6 +29,23 @@ it("publishes current command ownership without rendering the main shell", async
   expect(renders).toBe(settled);
 });
 
+it("keeps Explorer rail-only for the View-menu sidebar toggle", async () => {
+  localStorage.clear();
+  useAppStore.setState({ mergeToolWindowRail: false, activeSideTab: "sessions", sidebarCollapsed: false, tabs: [], activeTabId: null });
+  const { result } = renderHook(() => useMainLayoutState({}));
+  await act(async () => {});
+
+  act(() => useAppStore.setState({ activeSideTab: "explorer", sidebarCollapsed: true }));
+  act(() => result.current.toggleSidebar());
+  expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+
+  // The guarded action is only inert for Explorer; real modes still toggle.
+  act(() => useAppStore.getState().setActiveSideTab("sessions"));
+  expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+  act(() => result.current.toggleSidebar());
+  expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+});
+
 it("reads active platform menu ownership without rendering the shell on file activation", async () => {
   localStorage.clear();
   useWorkspacePlatformStore.getState().reloadFromStorage();

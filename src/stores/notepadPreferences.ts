@@ -19,6 +19,8 @@ export interface NotepadPreferences {
   backupSec: number;
   backupMode: NotepadBackupMode;
   backupDir: string;
+  /** Directory of the last successful Save As; seeds Save As defaults (U2). */
+  lastSaveDir: string;
   restoreSessionOnStartup: boolean;
   autoReloadCleanExternal: boolean;
   recentMax: number;
@@ -47,6 +49,7 @@ export const DEFAULT_NOTEPAD_PREFERENCES: NotepadPreferences = {
   backupSec: 30,
   backupMode: "none",
   backupDir: "",
+  lastSaveDir: "",
   restoreSessionOnStartup: true,
   autoReloadCleanExternal: true,
   recentMax: 50,
@@ -89,6 +92,7 @@ function validatePreferences(raw: Partial<NotepadPreferences>): NotepadPreferenc
     backupSec: clampInt(raw.backupSec, 5, 300, d.backupSec),
     backupMode: raw.backupMode === "simple" || raw.backupMode === "verbose" ? raw.backupMode : "none",
     backupDir: typeof raw.backupDir === "string" ? raw.backupDir.trim() : d.backupDir,
+    lastSaveDir: typeof raw.lastSaveDir === "string" ? raw.lastSaveDir.trim() : d.lastSaveDir,
     restoreSessionOnStartup: raw.restoreSessionOnStartup !== false,
     autoReloadCleanExternal: raw.autoReloadCleanExternal !== false,
     recentMax: clampInt(raw.recentMax, 5, 200, d.recentMax),
