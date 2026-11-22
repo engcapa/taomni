@@ -66,7 +66,7 @@ def _collect_runtime_files(profile, selection_source_sha256):
 
 def _write_archive(archive, names, profile, manifest_name, record):
     archive.parent.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(archive, 'w:gz', dereference=True) as tar:
+    with tarfile.open(archive, 'w:gz', compresslevel=1, dereference=True) as tar:
         for name, path in sorted(names.items()):
             if not allowed(name, profile):
                 raise ValueError('invalid runtime path')

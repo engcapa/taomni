@@ -15,17 +15,13 @@ on:
         description: Explicit base commit/ref for impacted scope
         type: string
       platforms:
-        description: Comma-separated linux,windows,macos (empty = default; linux when quick)
+        description: Comma-separated linux,windows,macos
         type: string
-        default: ''
+        default: linux,windows,macos
       modes:
-        description: Comma-separated browser,native (empty = default; native when quick)
+        description: Comma-separated browser,native
         type: string
-        default: ''
-      quick:
-        description: Single-platform fast dispatch (defaults to linux/native, retains crash-regression, non-merge-eligible)
-        type: boolean
-        default: false
+        default: browser,native
       linux_profiles:
         description: 'Linux native profiles (CSV): ubuntu-24.04-xvfb,ubuntu-22.04-x11,ubuntu-22.04-vnc,ubuntu-26.04-wayland'
         type: string
@@ -81,9 +77,8 @@ on:
       scope: {type: string, default: smoke}
       head: {type: string, default: ''}
       base: {type: string, default: ''}
-      platforms: {type: string, default: ''}
-      modes: {type: string, default: ''}
-      quick: {type: boolean, default: false}
+      platforms: {type: string, default: 'linux,windows,macos'}
+      modes: {type: string, default: 'browser,native'}
       linux_profiles: {type: string, default: 'ubuntu-24.04-xvfb'}
       macos_runner: {type: string, default: macos-15}
       shards: {type: string, default: auto}
@@ -123,6 +118,7 @@ on:
       - '.agents/skills/qa-ui-auto/**'
       - '.github/workflows/qa-ui-auto-platforms.yml'
       - '.github/workflows/qa-ui-auto-entry.yml'
+      - '.github/actions/qa-branch-artifact/**'
       - '.github/actions/qa-runtime/**'
       - 'docs-feature/code-workspace-idea-parity/**'
   schedule:
@@ -131,13 +127,6 @@ on:
 permissions:
   contents: read
   actions: read
-
-concurrency:
-  group: >-
-    ${{ github.event_name == 'workflow_dispatch' && inputs.quick &&
-    format('qa-quick-{0}-{1}-{2}-{3}-{4}', github.ref_name, inputs.head, inputs.platforms, inputs.modes, inputs.case_ids) ||
-    format('qa-ui-auto-{0}', github.run_id) }}
-  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' && inputs.quick }}
 
 env:
   PYTHONPATH: .agents/skills/qa-ui-auto/scripts
@@ -201,7 +190,7 @@ jobs:
         run: python .agents/skills/qa-ui-auto/scripts/qa_ui_auto/dev_contract.py --base "$QA_BASE" --head "$QA_HEAD"
 
   tool-contracts:
-    if: (github.event_name != 'pull_request' || inputs.scope != '') && inputs.scope != 'selected' && !inputs.quick
+    if: (github.event_name != 'pull_request' || inputs.scope != '') && inputs.scope != 'selected'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -224,7 +213,7 @@ jobs:
         if: inputs.scope != 'selected'
         run: python -m unittest test_language_startup_observer test_sdk_startup_probe test_workspace_slow_sdk test_sdk_editor_input test_sdk_action_trace test_file_open_probe test_workspace_stage_trace test_project_tree_reveal test_browser_tracing test_workspace_tab_reveal test_native_contenteditable test_native_paced_input test_rdp_deferred_clipboard
       - name: Linux package setup contracts
-        run: python -m unittest test_ci_linux_setup test_ci_setup_protoc
+        run: python -m unittest test_ci_linux_setup test_ci_setup_protoc test_ci_cargo_artifact
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -294,8 +283,7 @@ jobs:
       - name: Plan exact cases and dependencies
         id: plan
         env:
-          QA_QUICK: ${{ inputs.quick && 'true' || 'false' }}
-          QA_SCOPE: ${{ inputs.quick && (inputs.scope == '' || inputs.scope == 'smoke') && (inputs.case_ids != '' || inputs.features != '' || inputs.tags != '') && 'selected' || inputs.scope || github.event_name == 'pull_request' && 'selected' || github.event_name == 'schedule' && 'all' || 'smoke' }}
+          QA_SCOPE: ${{ inputs.scope || github.event_name == 'pull_request' && 'selected' || github.event_name == 'schedule' && 'all' || 'smoke' }}
           QA_BASE: ${{ inputs.base }}
           QA_PLATFORMS: ${{ inputs.platforms }}
           QA_MODES: ${{ inputs.modes }}
@@ -308,9 +296,9 @@ jobs:
           QA_CASE_IDS: ${{ inputs.case_ids }}
           QA_FIRST_RELEASE_RUN: ${{ inputs.first_release_run }}
           QA_FEATURES: ${{ inputs.features }}
-          # New feature PRs always run the packaged crash suite. Focused manual
-          # selections and quick runs also retain it, even when their feature selectors differ.
-          QA_TAGS: ${{ inputs.scope == '' && github.event_name == 'pull_request' && 'crash-regression' || (inputs.scope == 'selected' || inputs.scope == 'impacted' || (inputs.quick && (inputs.case_ids != '' || inputs.features != '' || inputs.tags != ''))) && format('{0},crash-regression', inputs.tags) || inputs.tags }}
+          # New feature PRs and focused runs always include the packaged crash
+          # suite, even when their feature selectors differ.
+          QA_TAGS: ${{ inputs.scope == '' && github.event_name == 'pull_request' && 'crash-regression' || (inputs.scope == 'selected' || inputs.scope == 'impacted') && format('{0},crash-regression', inputs.tags) || inputs.tags }}
         run: python -m qa_ui_auto.ci plan
       - uses: actions/upload-artifact@v4
         with:
@@ -636,8 +624,8 @@ jobs:
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-macos.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && (needs.signed-mfa-macos.result == 'success' || needs.signed-mfa-macos.result == 'skipped') && (needs.signed-vnc-macos.result == 'success' || needs.signed-vnc-macos.result == 'skipped') && (needs.signed-rdp-macos.result == 'success' || needs.signed-rdp-macos.result == 'skipped') && (needs.signed-mail.result == 'success' || needs.signed-mail.result == 'skipped') && (needs.signed-screenshot.result == 'success' || needs.signed-screenshot.result == 'skipped') && (needs.signed-vnc-server.result == 'success' || needs.signed-vnc-server.result == 'skipped') && (needs.signed-servers.result == 'success' || needs.signed-servers.result == 'skipped') && (needs.signed-voice.result == 'success' || needs.signed-voice.result == 'skipped') && (needs.signed-sockscap.result == 'success' || needs.signed-sockscap.result == 'skipped') && (needs.signed-rdp-server-macos.result == 'success' || needs.signed-rdp-server-macos.result == 'skipped') && needs.plan.outputs.has_macos_native == 'true' }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
-      # Bound the burst on hosted ARM runners; retain every planned shard.
-      max_parallel: 2
+      # Run all 4 planned shards in one wave within GitHub's hosted macOS limit.
+      max_parallel: 4
       matrix: ${{ needs.plan.outputs.macos_native_matrix }}
       first_release_run: ${{ inputs.first_release_run }}
       head: ${{ needs.plan.outputs.head }}
@@ -694,10 +682,29 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  # The native packaging hook bundles the frontend on each OS. Check its TS
+  # and source contracts once, including focused runs that omit Vitest.
+  selected-build-checks:
+    name: Selected native frontend build checks
+    needs: plan
+    if: >-
+      inputs.scope == 'selected' && needs.plan.outputs.has_native == 'true' &&
+      github.event_name != 'pull_request' && github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.head }}
+          persist-credentials: false
+      - uses: ./.github/actions/qa-runtime
+        with:
+          mode: contracts
+      - run: pnpm exec tsc -b && pnpm check:refactor
+
   frontend-contracts:
     name: Frontend contracts (shard ${{ matrix.shard }}/4)
     needs: plan
-    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || (inputs.scope != 'selected' && !inputs.quick)
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || inputs.scope != 'selected'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -720,6 +727,7 @@ jobs:
             python -m unittest test_browser_vault_first_run test_tao_provider_observation test_tao_messages_fixture test_tao_real_scenarios test_tao_real_documents test_tao_handoff_persistence test_markdown_docx_quality test_markdown_testing_quality test_export_quality_native
             node --test .agents/skills/qa-ui-auto/scripts/test_native_paced_input.mjs .agents/skills/qa-ui-auto/scripts/test_native_pointer_activation.mjs
             python -m unittest test_ci_ssh_features test_ci_x11_session test_ci_build_pipeline test_native_windows_integrity test_native_frame_errors test_native_pointer test_native_element_query test_ci_file_manager test_native_application_restart test_native_application_shutdown test_native_window_close_x11 test_native_external_browser test_native_authorization_route test_backup_cloud test_ci_selection test_terminal_rendering_probe qa_ui_auto.test_mobile_native test_native_drag test_tauri_webdriver.NativeSessionFillTest qa_ui_auto.test_mobile_case_readiness qa_ui_auto.test_mobile_openssh_readiness
+            pnpm exec tsc -b
             pnpm check:refactor
             node --test scripts/terminal-webgl-backport.test.mjs
           } 2>&1 | tee qa-build-output/frontend-unit-contracts.log
@@ -738,9 +746,9 @@ jobs:
           retention-days: 14
 
   summarize:
-    name: qa-ui-auto-platforms-result${{ inputs.quick && '-quick' || '' }}
+    name: qa-ui-auto-platforms-result
     if: always() && needs.plan.result != 'skipped'
-    needs: [plan, tool-contracts, sftp-contracts, frontend-contracts, signed-modular-packages, signed-mfa-linux, signed-mfa-macos, signed-vnc-linux, signed-vnc-windows, signed-vnc-macos, signed-rdp-linux, signed-rdp-windows, signed-rdp-macos, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-rdp-server-linux, signed-rdp-server-windows, signed-rdp-server-macos, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
+    needs: [plan, tool-contracts, sftp-contracts, selected-build-checks, frontend-contracts, signed-modular-packages, signed-mfa-linux, signed-mfa-macos, signed-vnc-linux, signed-vnc-windows, signed-vnc-macos, signed-rdp-linux, signed-rdp-windows, signed-rdp-macos, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-rdp-server-linux, signed-rdp-server-windows, signed-rdp-server-macos, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -797,7 +805,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: qa-summary${{ inputs.quick && '-quick' || '' }}-${{ needs.plan.outputs.artifact_key }}
+          name: qa-summary-${{ needs.plan.outputs.artifact_key }}
           path: |
             qa-ui-auto-report/ci-summary.json
             qa-ui-auto-report/summary.md
@@ -806,7 +814,7 @@ jobs:
 
   publish-issues:
     if: >-
-      always() && needs.plan.result == 'success' && !inputs.quick && (inputs.publish_issues ||
+      always() && needs.plan.result == 'success' && (inputs.publish_issues ||
       (github.event_name == 'schedule' && vars.QA_UI_AUTO_PUBLISH_ISSUES == 'true')) &&
       github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
     needs: [plan, summarize]

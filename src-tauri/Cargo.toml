@@ -71,7 +71,10 @@ resolver = "2"
 
 [lib]
 name = "taomni_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# Desktop targets (binary, unit tests, and integration tests) link against
+# the Rust library directly; `staticlib`/`cdylib` are mobile-only defaults that
+# otherwise trigger redundant static archiving and a full extra dynamic link.
+crate-type = ["rlib"]
 
 [[bin]]
 name = "acp-fake-agent"

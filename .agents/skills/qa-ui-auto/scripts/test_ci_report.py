@@ -114,22 +114,3 @@ class ReportTests(unittest.TestCase):
             result = aggregate(manifest, root)
             self.assertFalse(result['report_ok'])
             self.assertTrue(any('desktop profile/session differs' in error for error in result['entries'][0]['errors']))
-
-    def test_quick_manifest_marks_non_merge_eligible_and_adds_summary_banner(self):
-        from qa_ui_auto import ci
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            manifest, run = self.example(root)
-            manifest['quick'] = True
-            manifest['merge_eligible'] = False
-            outcome = json.loads((run.parent / 'ci-outcome.json').read_text())
-            outcome['selection_sha256'] = selection_digest(manifest)
-            write_json(run.parent / 'ci-outcome.json', outcome)
-            selection = root / 'selection.json'
-            write_json(selection, manifest)
-            result = aggregate(manifest, root)
-            self.assertTrue(result['quick'])
-            self.assertFalse(result['merge_eligible'])
-            self.assertEqual(ci.main(['report', '--selection', str(selection), '--reports', str(root)]), 0)
-            summary_text = (root / 'summary.md').read_text(encoding='utf-8')
-            self.assertIn('Quick run (`merge_eligible: false`)', summary_text)

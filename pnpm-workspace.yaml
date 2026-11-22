@@ -2,9 +2,9 @@ packages:
   - .
 
 allowBuilds:
-  cpu-features: true
+  cpu-features: false
   esbuild: true
-  ssh2: true
+  ssh2: false
   tesseract.js: false
 
 minimumReleaseAge: 0

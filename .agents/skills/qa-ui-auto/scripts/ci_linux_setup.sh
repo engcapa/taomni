@@ -11,18 +11,20 @@ esac
 source "$(dirname "${BASH_SOURCE[0]}")/ci_linux_apt.sh"
 prepare_apt_mirrors "$profile"
 update_package_index
-webdriver_package=webkit2gtk-driver
-if [[ "$profile" == ubuntu-26.04-wayland ]]; then
-  webdriver_package=webkitgtk-webdriver
-fi
 install_packages \
-  libwebkit2gtk-4.1-dev "$webdriver_package" libappindicator3-dev librsvg2-dev \
+  libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
   patchelf libkrb5-dev libasound2-dev libv4l-dev libpipewire-0.3-dev libclang-dev \
-  libdbus-1-dev libudev-dev libgbm-dev nasm python3-tk python3-gi python3-cairo python3-gi-cairo gir1.2-gtk-3.0 \
-  fonts-noto-cjk tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim \
-  gstreamer1.0-libav gstreamer1.0-plugins-good gstreamer1.0-plugins-bad dbus-x11
+  libdbus-1-dev libudev-dev libgbm-dev nasm
 
 if [[ "${QA_OPERATION:-run}" == run ]]; then
+  webdriver_package=webkit2gtk-driver
+  if [[ "$profile" == ubuntu-26.04-wayland ]]; then
+    webdriver_package=webkitgtk-webdriver
+  fi
+  install_packages \
+    "$webdriver_package" python3-tk python3-gi python3-cairo python3-gi-cairo gir1.2-gtk-3.0 \
+    fonts-noto-cjk tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim \
+    gstreamer1.0-libav gstreamer1.0-plugins-good gstreamer1.0-plugins-bad dbus-x11
   if [[ "$profile" == *wayland ]]; then
     # Prepare the actual Ubuntu GNOME session and portals with a bounded
     # package set; the desktop application metapackage pulls in hundreds of
@@ -83,6 +85,8 @@ if [[ "${QA_OPERATION:-run}" == run ]]; then
     fi
   fi
 
+else
+  install_packages lld
 fi # execution-only desktop and audio services
 
 # pipewire-rs v0_3_49 needs pw_buffer.requested, absent in Jammy's headers.

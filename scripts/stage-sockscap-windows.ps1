@@ -1,4 +1,4 @@
-# Stage sockscap-helper + WinDivert next to the built taomni binary (dev/release).
+﻿# Stage sockscap-helper + WinDivert next to the built taomni binary (dev/release).
 # Usage (from repo root):
 #   pwsh scripts/stage-sockscap-windows.ps1
 #   pwsh scripts/stage-sockscap-windows.ps1 -Configuration release

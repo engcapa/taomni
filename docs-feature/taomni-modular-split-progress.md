@@ -2,6 +2,7 @@
 
 ## 2026-11-22 当前进展
 
+- 合入 `main` 的 #866。Browser 和 Native 工作流使用同分支的 Cargo 依赖与原生运行时工件，Linux 构建使用 lld。Windows 运行时缓存按 runner 镜像区分，SocksCap 辅助程序继续由模块工具包构建，签名包与即时分片采集保留。
 - Windows `fe80e85b9` 的 MSI 已在 GitHub runner 解包。负载只有 `taomni.exe` 和 Lark CLI 许可证，构建的 MSI 与 NSIS 内容检查均通过。原始安装包资产 ID 为 `14759987159`。这份回执覆盖 Windows G9 安装载荷，最终候选仍需核对四个目标的 Cargo 树、前端和实际安装件。 [构建](https://github.com/engcapa/taomni/actions/runs/45033601048) · [载荷回执](https://github.com/engcapa/taomni/actions/runs/45038315601)
 - `fe80e85b9` 的 18 个分片已即时收齐。三端 Browser 各 28/28，Linux Native 33/33，Windows Native 32/35，macOS Native 35/36。Windows 的 TC-MODULES-085 确认宿主和辅助程序退出。`WinDivert64.sys` 随后拒绝删除，引发同片 TC-WS-039/052/056 的夹具清理失败。macOS TC-FILE-OPEN-009 缺少 HTML 沙箱的路径越界观察，保留原始失败。 [分片](https://github.com/engcapa/taomni/actions/runs/45032759747)
 - SocksCap 0.1.9 的 Windows 辅助程序持有自己创建的驱动服务句柄，关闭捕获后通过该句柄确认服务停止。基座在停用、换版和卸载前释放实际转发和系统捕获，清理完成后再变更模块状态。TC-MODULES-085 追加实际监听端口和恢复日志检查，并保留卸载时验证驱动文件删除。Windows 辅助程序已通过编译检查，原生分片待执行。
