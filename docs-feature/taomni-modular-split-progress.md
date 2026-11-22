@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- 远程 `main` 的 #861 已合入 `9e0d9fb8d`，包含单体应用版本 `0.5.12`。在 `a1b8995a5` 上，四目标 Cargo 依赖树和生产 Vite 清单已验证 SocksCap 面板与样式从基座移出。十个业务模块仍声明为 `provisional`。正式首发目录、同一候选的全部业务升级、仅核心与全模块两套回归以及 G1–G11 发行回执仍待完成。 [四目标清单](https://github.com/engcapa/taomni/actions/runs/44987147927)
+- 在 `a1b8995a5` 的 18 个计划分片中，先收到的 Linux 与 Windows Browser 各通过 26/27。TC-MODULES-074 已完成启用、目标试算、停用与占位展示，最后在 Tools 视图查询了仅在 Sessions 展示的标签条。复验改从标签概览核对原 `sockscap-main` 唯一存在，再返回该标签检验停用占位和 Sessions 标签条。另在上一轮 Linux Native 编译日志中确认跨源码恢复了 Cargo 工作目录，邮件库缺少当前提交声明的 POP3 接口。`d8574f95d` 限定完整工作目录的复用输入，并跨源码复用外部依赖。 [分片与原始回执](https://github.com/engcapa/taomni/actions/runs/44987145412) · [Linux 编译日志](https://github.com/engcapa/taomni/actions/runs/44983227602/job/137089125019)
 - Mail 0.1.20 的 POP3 进程复验在 Linux x64、Windows x64 和 macOS ARM64 全部通过。三个原始回执绑定 `4ed8042bf`，记录了宿主摘要和 runner 镜像。另一个应用运行在 `5a6e98c61` 上的三端 Browser 各通过 34/34。Windows Native 通过 42/44，其中 TC-MODULES-076 在桌面应用完成真实收信和去重。两个失败均为 SocksCap 宿主已返回结果后核心多解一层 Rust `Result`。 [POP3 宿主回执](https://github.com/engcapa/taomni/actions/runs/44985590659) · [应用分片](https://github.com/engcapa/taomni/actions/runs/44983227602)
 - SocksCap 0.1.2 将面板和样式放入签名包的 `frontend/index.js`。核心的系统更新仍可单独请求恢复授权。TC-MODULES-072 核对安装的前端摘要、Vault 导入和停用，TC-MODULES-073 核对实际规则响应，TC-MODULES-074 验证打开的标签经过启停后仍可继续使用。驱动、提权 helper、配置和恢复日志仍待迁出。正式发布须补齐同一候选的核心包、首发全模块包及 G1–G11 回执。
 - 合入远程 `main` 的 `ab6c4831a`（#860）。标签概览与工具栏相关 44 项单测、TypeScript、重构边界和 QA 静态审计通过。`5a6e98c61` 三端 Browser 各通过 34/34。POP3 进程测试的三端原始回执均显示测试服务器漏答登录后的 `STAT`，夹具已补齐并通过编译检查。 [Browser 与 Native](https://github.com/engcapa/taomni/actions/runs/44983227602) · [POP3 进程回执](https://github.com/engcapa/taomni/actions/runs/44983222465)
@@ -616,14 +618,14 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-016 RDP/VNC 客户端 | 独立宿主、签名前端与核心依赖裁剪已接入 | VNC 的 Windows 按键辅助进程已有回执。RDP 签名包验证原会话、实际输入、证书迁移与读取旧备份，三端阶段性 p95 均低于 130 ms。最终安装包、新旧版本连续升级和同一候选的三端生命周期继续验收。 |
 | TASK-017 RDP/VNC 服务端 | 已接入签名宿主与配置迁移，原生验收进行中 | 完成签名包的真实连接、停用和备份验收，并补 macOS 系统权限、Windows 和 macOS 的 VNC 系统服务以及正式安装件升级结果。 |
 | TASK-018 Servers | 签名宿主、配置迁移和默认依赖裁剪已接入 | 多端签名包、原配置与身份恢复、全部服务等价和运行中清理回执待验收。 |
-| TASK-019 SocksCap | 配置契约、桥接工具和签名链接解析已拆出 | 驱动、提权、辅助进程的生命周期，配置与恢复日志的读写归属，以及升级和卸载清理继续迁移。 |
+| TASK-019 SocksCap | 签名宿主已接管链接解析、规则试算，面板和样式已移入签名包 | 驱动、提权、辅助进程的生命周期，配置与恢复日志的读写归属，以及升级和卸载清理继续迁移。 |
 | TASK-020 截图 OCR/录制 | OCR 与录制已接入签名宿主和前端，待候选验收 | 原生离线 OCR、遮挡坐标、视频内容与时间轴继续核对。截图、滚动截图与采集归核心。 |
 | TASK-021 本地语音 | ASR 签名宿主已接入，待三端复验 | Whisper、SenseVoice、Zipformer 推理迁出。继续验收真实语音、模型目录、FIM、云 ASR 和麦克风保留路径。 [三端回归](https://github.com/engcapa/taomni/actions/runs/44963910380) |
 | TASK-022 Mobile | 首发按 DEC-2 留在核心 | 已将决定写入设计、签名目录生成器和 Release 说明。核心回归保留 Mobile，待正式候选回执。 |
 | TASK-023 发布验收 | 目录签名、首装名单和独立模块发布准备已验证 | 发布工具覆盖已暂存模块的签名、声明平台、描述和摘要。核心发布继承签名目录，独立发布保留原模块的资产地址。正式模块构建矩阵、系统签名、首批目录及最终两种安装集合的回归和性能仍待交付。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
 | TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
-| TASK-026 Mail | 签名前端、主要 IMAP 读写和归档连接已接入独立宿主 | 签名宿主负责连接测试、SMTP 发送、IMAP 文件夹、邮件头、搜索、标记、原文、正文预取、归档网络请求和附件读取。归档和过渡缓存的数据归属仍需迁移，接着验证正式安装升级、数据接管及回滚。 |
+| TASK-026 Mail | 签名前端、主要 IMAP 读写、POP3 收信和归档连接已接入独立宿主 | POP3 真实进程收信和中断处理已在三端通过。归档索引与过渡缓存的数据写入仍需迁移，接着验证正式安装升级、数据接管及回滚。 |
 | TASK-027 G1–G11 全门禁收口 | 新增任务，未闭合 | G1–G11 的当前证据仍存在正式发行包、业务模块、核心依赖闭包、系统信任和完整入口矩阵缺口；必须用匹配源码的 GitHub runner receipt 逐项闭合后才能进入生产发布。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。
