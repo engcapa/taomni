@@ -8484,6 +8484,7 @@ files:
   - src-tauri/src/mail/filters.rs
   - src-tauri/src/mail/filters/execution.rs
   - src-tauri/src/mail/filters/store.rs
+  - src-tauri/src/mail/filters/actions.rs
   - src-tauri/crates/taomni-mail-engine/src/filters/imap.rs
   - src-tauri/plugins/mail/src/imap_exchange.rs
 controls:

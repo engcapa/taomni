@@ -1,6 +1,7 @@
 """Observe the real signed Mail host and its data lease in an isolated profile."""
 
 from contextlib import closing
+import base64
 from email import policy
 from email.parser import BytesParser
 import hashlib
@@ -25,7 +26,7 @@ def run(ctx, args):
         "folder-tree", "folder-changes", "running", "imap-delivery", "pop3-delivery",
         "attachment-saved", "attachment-reopened", "agenda-written", "filter-saved",
         "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source",
-        "imap-prefetch", "imap-mutations", "imap-mbox", "outbox-queued", "outbox-sent",
+        "imap-prefetch", "imap-mutations", "imap-mbox", "imap-forward", "outbox-queued", "outbox-sent",
     }
     retained = {"outbox-retained", "contact-retained", "agenda-retained", "filter-retained"}
     if phase not in active | retained | {"idle", "disabled"} or not signed or owner.case_id not in SIGNED_MAIL_CASES:
@@ -111,6 +112,12 @@ def run(ctx, args):
             raise StepError("The installed Mail version does not provide signed mbox transfer")
         report["imports"] = observe_imports()
         report["export"] = observe_export(owner.values["mail_export_mbox"])
+    if phase == "imap-forward":
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        commands = {"mail/fetch-imap-raw", "mail/send-smtp"}
+        if owner.case_id != "TC-MODULES-096" or not commands.issubset(manifest["commands"]):
+            raise StepError("The installed Mail version does not provide signed forwarding")
+        report["forward"] = observe_forward()
     if phase in {"outbox-queued", "outbox-retained", "outbox-sent"}:
         if owner.case_id != "TC-MODULES-077":
             raise StepError("Outbox storage requires the signed draft lifecycle case")
@@ -163,6 +170,37 @@ def observe_export(path):
     if sum(line.startswith(b"From - ") for line in data.splitlines()) != 3 or len(fetches) != 1:
         raise StepError("The exported mailbox must contain three separators and one batched IMAP FETCH")
     return {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), "fetches": fetches}
+
+
+def observe_forward():
+    state = mail_fake_server.ACTIVE.state
+    parser = BytesParser(policy=policy.default)
+    subject = "Forward sample 0001"
+    with state.lock:
+        inbox = [(uid, parser.parsebytes(message.raw)) for uid, message in state.folders["INBOX"].messages.items()]
+        sent = list(state.smtp_messages)
+        fetches = list(state.fetch_events)
+    originals = [(uid, message) for uid, message in inbox if message["Subject"] == subject]
+    if len(originals) != 1 or len(sent) != 1 or sent[0]["to"] != ["forward-target@example.com"]:
+        raise StepError("The matching original must remain in INBOX and reach only the configured SMTP recipient")
+    uid, original = originals[0]
+    forwarded = parser.parsebytes(sent[0]["raw"])
+    attachments = [part for part in forwarded.iter_attachments() if part.get_content_type() == "message/rfc822"]
+    if forwarded["Subject"] != f"Fwd: {subject}" or len(attachments) != 1:
+        raise StepError("The forward requires one original message attachment and the original subject")
+    part = attachments[0]
+    attached = part.get_payload(0)
+    if part.get("Content-Transfer-Encoding", "").lower() == "base64":
+        attached = parser.parsebytes(base64.b64decode(attached.get_payload()))
+    for field in ("Message-ID", "Subject", "From"):
+        if attached[field] != original[field]:
+            raise StepError(f"Forwarded original changed {field}")
+    if attached.get_body().get_content().strip() != original.get_body().get_content().strip():
+        raise StepError("Forwarded original changed the message body")
+    raw_fetches = [event for event in fetches if event["command"] == f"UID FETCH {uid} (UID BODY.PEEK[])" and event["bytes"] > 0]
+    if not raw_fetches:
+        raise StepError("The IMAP server recorded no complete raw fetch of the forwarded original")
+    return {"messageId": str(original["Message-ID"]), "smtpRecipients": sent[0]["to"], "rawFetches": raw_fetches}
 
 
 def observe_responses():

@@ -2,9 +2,10 @@
 
 ## 2026-11-23 当前进展
 
+- Mail 过滤规则匹配后经签名宿主读取原始 MIME 并发送。基座每次使用独立临时文件保存附件，发送返回后释放临时文件。TC-MODULES-096 核对实际 IMAP 原件读取、SMTP 收件人、原件标识及正文。TC-MAIL-FILTER-01 补充转发规则的保存断言。
 - Mail 0.1.36 的签名宿主接管 mbox/EML 导入和 mbox 导出的 IMAP 操作。导入继续显示成功和失败数量，连接中断时只为下一封邮件重建连接。导出按批读取原件，完成回执到达后再替换目标文件。TC-MAIL-IMPORT-01 核对启用模块后取消两个选择器，TC-MODULES-095 核对原生选择路径及导入、导出的内容。
 - `90770d5f8` 的四目标 Cargo 清单均已排除 SMTP 传输，并保留 Mail 的过渡引擎。已收取四份依赖树、Cargo 特性和前端构建摘要，G9 仍待邮件引擎迁出和最新实装载荷。 [核心清单](https://github.com/engcapa/taomni/actions/runs/45084264148)
-- `45081853166` 的九个 Browser 分片已收齐，三端 SocksCap 恢复入口通过。该版 SocksCap 的签名前端构建把共用的恢复错误判断误识别为核心实现，阻止了三端 Native 作业。已在模块前端构建中声明这个无依赖的共享文件，单入口生产构建通过，签名包和原生用例待复跑。 [仓库 QA 作业](https://github.com/engcapa/taomni/actions/runs/45081853166/job/137391955646)
+- `45081853166` 的九个 Browser 分片已收齐，三端 SocksCap 恢复入口通过。该版 SocksCap 的签名前端构建把共用的恢复错误判断误识别为核心实现，阻止了三端 Native 作业。`0b858899b` 声明此共享文件后，GitHub 签名前端构建通过，三端原生分片继续执行。 [原构建](https://github.com/engcapa/taomni/actions/runs/45081853166/job/137391955646) · [复跑](https://github.com/engcapa/taomni/actions/runs/45084535419)
 - Mail 0.1.35 的签名宿主执行批量复制、移动、标记删除和 UID EXPUNGE。基座继续用现有 SQLite 日志记账，确认 COPY 成功后只续做 STORE 和清理，回执丢失时阻止再次 COPY。TC-MAIL-BULK-03 从设置安装签名包并保留实际协议回执，TC-MAIL-BULK-02 补充续做成功后清除错误操作的断言。邮件缓存库和归档索引的迁出仍在进行。
 - macOS 的 TC-MODULES-080 回执显示，审批等待占用捕获锁时点击停用会收到繁忙错误。模块商店停用现在先取消审批等待，再等待捕获任务释放操作锁。已开始应用捕获配置的任务继续确认状态，由现有清理路径停止。原生用例继续核对三个进程和两个套接字释放。 [失败分片](https://github.com/engcapa/taomni/actions/runs/45075409694)
 - SocksCap 0.1.11 的签名宿主接管 GFWList 缓存。首次读取把旧规则和刷新记录原子保存至 `plugins/sockscap/data/rules.json`，保留旧文件供回退。备份声明涵盖规则缓存。停用或换版会释放内存中的规则，重新启用时从模块库读取。TC-MODULES-073 核对磁盘、规则结果和启停，TC-MODULES-074 补充重新启用后试算。
