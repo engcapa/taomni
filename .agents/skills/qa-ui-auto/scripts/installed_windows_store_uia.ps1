@@ -13,7 +13,8 @@ trap {
                              'This version is installed', 'Install', 'Uninstall', 'Mail')) {
             try {
                 $items = @(Named $window $label)
-                $observed += [pscustomobject]@{ label = $label; count = $items.Count }
+                $kinds = @($items | ForEach-Object { $_.Current.ControlType.ProgrammaticName } | Sort-Object -Unique)
+                $observed += [pscustomobject]@{ label = $label; count = $items.Count; types = $kinds }
             } catch {}
         }
     }
@@ -32,6 +33,14 @@ $fixture = [Console]::In.ReadToEnd() | ConvertFrom-Json
 function Named($Root, [string]$Name) {
     $condition = [System.Windows.Automation.PropertyCondition]::new($automation::NameProperty, $Name)
     return $Root.FindAll($scope, $condition)
+}
+
+function Search-Field {
+    foreach ($item in (Named $window 'Search modules')) {
+        [object]$value = $null
+        if (-not $item.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$value)) { continue }
+        if ($item.Current.IsEnabled -and -not $value.Current.IsReadOnly) { return $item }
+    }
 }
 
 function Scoped-Control([string]$Label, [string]$ControlName, $Type, [string[]]$Exclude) {
@@ -98,7 +107,9 @@ switch ($Phase) {
     }
     'roster' {
         $names = @()
-        $search = Wait-Element { Find-Control $window $types::Edit 'Search modules' } 'market-search'
+        # Selecting the catalog mirror can leave the search field scrolled above
+        # the viewport. Its UIA ValuePattern still accepts normal input.
+        $search = Wait-Element { Search-Field } 'market-search'
         foreach ($entry in $fixture.modules) {
             $script:checkingModule = $entry.id
             # WebView2 can flatten an article's static text into its document.
