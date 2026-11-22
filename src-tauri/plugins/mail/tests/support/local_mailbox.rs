@@ -44,13 +44,18 @@ pub(super) fn check_agenda(host: &mut MailHost) {
         }).to_string()],
         )
         .unwrap();
-    let snapshot = taomni_mail_engine::agenda::handoff::read_account(&legacy, account).unwrap();
+    use taomni_mail_engine::agenda::handoff::{AgendaImport, read_account};
+
+    let import = AgendaImport {
+        replace_staged: false,
+        snapshot: read_account(&legacy, account).unwrap(),
+    };
     let imported = transfer(
         host,
         CALDAV_AGENDA,
         account,
         json!({"type":"list","days":14}),
-        Some(json!({"replaceStaged":false,"snapshot":snapshot})),
+        Some(serde_json::to_value(import).unwrap()),
     );
     assert_eq!(imported[0]["summary"], "Legacy standup");
 
