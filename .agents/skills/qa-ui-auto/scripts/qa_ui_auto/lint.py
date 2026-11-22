@@ -35,6 +35,7 @@ except ImportError:
     )
     sys.exit(2)
 
+YAML_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 HERE = Path(__file__).resolve().parent
 SCHEMA_DIR = HERE.parent.parent / "schema"
 TESTCASE_SCHEMA = SCHEMA_DIR / "testcase.schema.json"
@@ -43,8 +44,8 @@ TESTCASE_SCHEMA = SCHEMA_DIR / "testcase.schema.json"
 def _validate(doc: object, schema_path: Path, source: str) -> list[str]:
     if not schema_path.exists():
         return [f"{source}: schema not found at {schema_path}"]
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    validator = jsonschema.Draft202012Validator(schema)
+    from .testcase import cached_validator
+    validator = cached_validator(schema_path)
     errors: list[str] = []
     for err in validator.iter_errors(doc):
         path = "/".join(str(p) for p in err.absolute_path) or "<root>"
@@ -58,7 +59,7 @@ def lint_cases(cases_dir: Path) -> tuple[int, int, list[str]]:
     seen_ids: dict[str, str] = {}
     for path in files:
         try:
-            doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+            doc = yaml.load(path.read_text(encoding="utf-8"), Loader=YAML_LOADER)
         except yaml.YAMLError as e:
             all_errors.append(f"{path}: YAML parse error: {e}")
             continue
@@ -69,6 +70,9 @@ def lint_cases(cases_dir: Path) -> tuple[int, int, list[str]]:
         all_errors.extend(errs)
         if errs:
             continue
+        if isinstance(doc, dict):
+            from .testcase import cache_validated_doc
+            cache_validated_doc(path, doc)
         case_id = doc.get("id") if isinstance(doc, dict) else None
         if case_id:
             if case_id in seen_ids:
@@ -148,7 +152,11 @@ def lint_features(features_path: Path) -> tuple[list[str], dict[str, int]]:
 
 
 def warn_selector_orphans(
-    features_path: Path, cases_dir: Path
+    features_path: Path,
+    cases_dir: Path,
+    *,
+    features=None,
+    cases=None,
 ) -> list[str]:
     """Compute selector orphans: case-step selectors not in any feature.controls.
 
@@ -160,7 +168,9 @@ def warn_selector_orphans(
     except Exception as e:  # noqa: BLE001
         return [f"warn: control_coverage import failed: {e}"]
     try:
-        _, orphans = build_coverage(features_path, cases_dir)
+        _, orphans = build_coverage(
+            features_path, cases_dir, features=features, cases=cases,
+        )
     except Exception as e:  # noqa: BLE001
         return [f"warn: control_coverage build failed: {e}"]
     return orphans

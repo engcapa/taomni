@@ -4,25 +4,36 @@ inputs:
   mode:
     required: true
     description: browser or native
+  install_node_deps:
+    required: false
+    default: 'true'
+    description: Install Node.js and pnpm dependencies
 runs:
   using: composite
   steps:
-    - uses: pnpm/action-setup@v4
+    - if: inputs.install_node_deps == 'true'
+      uses: pnpm/action-setup@v4
       with:
         version: 10
-    - uses: actions/setup-node@v4
+    - if: inputs.install_node_deps == 'true'
+      uses: actions/setup-node@v4
       with:
         node-version: 22
         cache: pnpm
+    - if: inputs.install_node_deps != 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
         cache: pip
         cache-dependency-path: .agents/skills/qa-ui-auto/requirements-ci.txt
+    - if: inputs.install_node_deps == 'true'
+      shell: bash
+      run: pnpm install --frozen-lockfile
     - shell: bash
-      run: |
-        pnpm install --frozen-lockfile
-        python -m pip install -r .agents/skills/qa-ui-auto/requirements-ci.txt
+      run: python -m pip install -r .agents/skills/qa-ui-auto/requirements-ci.txt
     - if: inputs.mode == 'browser'
       shell: bash
       run: python -m playwright install --with-deps chromium

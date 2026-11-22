@@ -145,8 +145,8 @@ def capabilities(cases, mode: str) -> list[str]:
     return sorted(result)
 
 
-def make_plan(args) -> dict:
-    cases = discover(Path("qa-ui-auto-tests/cases"))
+def make_plan(args, *, cases=None, features=None) -> dict:
+    cases = discover(Path("qa-ui-auto-tests/cases")) if cases is None else cases
     by_id = {case.id: case for case in cases}
     if len(by_id) != len(cases):
         raise ValueError("duplicate case IDs")
@@ -158,7 +158,9 @@ def make_plan(args) -> dict:
         raise ValueError(f"CI policy catalog differs: new={sorted(known-registered)}, removed={sorted(registered-known)}")
     # Validate the entire DAG, including currently unselected cases.
     dependency_order(set(dependencies), dependencies, known)
-    platforms, modes = csv(args.platforms), csv(args.modes)
+    quick = bool(getattr(args, "quick", False))
+    platforms = csv(args.platforms or ("linux" if quick else "linux,windows,macos"))
+    modes = csv(args.modes or ("native" if quick else "browser,native"))
     if not platforms or set(platforms) - PLATFORMS.keys():
         raise ValueError("platforms must contain linux, windows and/or macos")
     if not modes or set(modes) - {"browser", "native"}:
@@ -166,7 +168,7 @@ def make_plan(args) -> dict:
     linux_profiles = csv(getattr(args, "linux_profiles", "") or DEFAULT_LINUX_PROFILE)
     if not linux_profiles or set(linux_profiles) - LINUX_PROFILES.keys():
         raise ValueError("linux_profiles must contain: " + ", ".join(LINUX_PROFILES))
-    features = load_features()
+    features = load_features() if features is None else list(features)
     feature_ids = {f.id for f in features}
     tags = {tag for case in cases for tag in case.tags}
     requested, wanted_features, wanted_tags = set(csv(args.case_ids)), set(csv(args.features)), set(csv(args.tags))
@@ -174,18 +176,22 @@ def make_plan(args) -> dict:
                                         ("tags", wanted_tags, tags)]:
         if supplied - available:
             raise ValueError(f"unknown {label}: {sorted(supplied-available)}")
+    scope = args.scope
+    if quick and scope in {"smoke", "selected"} and (requested or wanted_features or wanted_tags):
+        scope = "selected"
+        wanted_tags.add("crash-regression")
     explicit = requested | {c.id for c in cases if wanted_features.intersection(c.covers)
                             or wanted_tags.intersection(c.tags)}
-    if args.scope in {"all", "smoke"} and explicit:
+    if scope in {"all", "smoke"} and explicit:
         raise ValueError("all/smoke cannot be combined with selectors; use selected or impacted")
-    if args.scope == "selected" and not explicit:
+    if scope == "selected" and not explicit:
         raise ValueError("selected scope requires case_ids, features or tags")
     head = commit(args.head or "HEAD")
     if head != commit("HEAD"):
         raise ValueError("checkout the requested head before planning")
     changed, base, ancestor, impact = [], None, None, None
     reasons = {cid: ["explicit selector"] for cid in explicit}
-    if args.scope == "impacted":
+    if scope == "impacted":
         if not args.base:
             raise ValueError("impacted requires an explicit base")
         base = commit(args.base)
@@ -203,12 +209,12 @@ def make_plan(args) -> dict:
             impact["selection_reason"] = "shared CI execution/configuration changes"
         for cid in selected:
             reasons.setdefault(cid, []).append(impact["selection_reason"])
-    elif args.scope == "selected":
+    elif scope == "selected":
         selected = explicit
     else:
-        selected = known if args.scope == "all" else set(policy["smoke"])
+        selected = known if scope == "all" else set(policy["smoke"])
         for cid in selected:
-            reasons[cid] = [args.scope]
+            reasons[cid] = [scope]
     ordered = dependency_order(selected | explicit, dependencies, known)
     for cid in ordered:
         reasons.setdefault(cid, ["prerequisite"])
@@ -305,14 +311,15 @@ def make_plan(args) -> dict:
     unreachable = explicit - reachable - mode_inapplicable
     if unreachable:
         raise ValueError(f"explicit cases unavailable in requested combinations: {sorted(unreachable)}")
-    if not entries and args.scope != "impacted":
+    if not entries and scope != "impacted":
         raise ValueError("selection contains no runnable cases")
     from .ci_sharding import schedule
-    entries, groups, builds = schedule(entries, by_id, dependencies, scope=args.scope,
+    entries, groups, builds = schedule(entries, by_id, dependencies, scope=scope,
         shards=getattr(args, "shards", "auto"), browser_workers=getattr(args, "browser_workers", 2))
     return {"schema": "qa-ui-auto.ci-selection.v1", "groups": groups, "builds": builds, "head": head, "base": base,
             "linux_profiles": linux_profiles, "native_release": bool(getattr(args, "native_release", False)),
-            "merge_base": ancestor, "scope": args.scope, "changed_paths": changed,
+            "quick": quick, "merge_eligible": not quick,
+            "merge_base": ancestor, "scope": scope, "changed_paths": changed,
             "identity": execution_identity(Path.cwd()), "reasons": reasons, "impact": impact,
             "entries": entries, "gaps": gaps, "no_relevant_changes": not entries,
             "not_applicable": not_applicable,
@@ -453,7 +460,10 @@ def aggregate(manifest: dict, root: Path) -> dict:
         for entry in entries
         for error in entry["errors"]
     ]
+    quick = bool(manifest.get("quick", False))
+    merge_eligible = bool(manifest.get("merge_eligible", not quick))
     return {"head": manifest["head"], "run_id": manifest.get("run_id"), "attempt": manifest.get("attempt"),
+            "quick": quick, "merge_eligible": merge_eligible,
             "entries": entries, "groups": list(groups.values()), "build_hashes": build_hashes, "failures": failures, "gaps": manifest["gaps"],
             "not_applicable": manifest.get("not_applicable", []),
             "unreviewed": manifest["unreviewed"],
@@ -470,13 +480,15 @@ def main(argv=None):
     subs = parser.add_subparsers(dest="command", required=True)
     plan = subs.add_parser("plan")
     for name, default in [("scope", "smoke"), ("head", ""), ("base", ""),
-                          ("platforms", "linux,windows,macos"), ("modes", "browser,native"),
+                          ("platforms", ""), ("modes", ""),
                           ("linux_profiles", DEFAULT_LINUX_PROFILE), ("shards", "auto"),
                           ("case_ids", ""), ("features", ""), ("tags", "")]:
         plan.add_argument("--" + name.replace("_", "-"), default=os.environ.get("QA_" + name.upper()) or default)
     plan.add_argument("--browser-workers", type=int, default=int(os.environ.get("QA_BROWSER_WORKERS") or 2))
     plan.add_argument("--native-release", action="store_true",
                       default=os.environ.get("QA_NATIVE_RELEASE", "").lower() in {"true", "1"})
+    plan.add_argument("--quick", action="store_true",
+                      default=os.environ.get("QA_QUICK", "").lower() in {"true", "1"})
     plan.add_argument("--output", type=Path, default=Path("qa-ui-auto-report/selection.json"))
     report = subs.add_parser("report")
     report.add_argument("--selection", type=Path, required=True)
@@ -506,8 +518,9 @@ def main(argv=None):
                 github_output(f'{platform_key}_build_matrix', json.dumps({'include': builds}, separators=(',', ':')))
                 github_output(f'has_{platform_key}_native', str(bool(native)).lower())
             contracts = [{k: v for k, v in b.items() if k not in {'selected_ids', 'case_digests'}}
-                         for b in result['builds'] if b['platform_key'] == 'linux'
-                         and (b['rdp_unit_contracts'] or 'dual-display' in b['capabilities'] or 'mobile' in b['capabilities'])]
+                         for b in result['builds'] if (b['platform_key'] == 'linux'
+                         and (b['rdp_unit_contracts'] or 'dual-display' in b['capabilities'] or 'mobile' in b['capabilities']))
+                         or b['platform_key'] == 'windows']
             github_output('contracts_matrix', json.dumps({'include': contracts}, separators=(',', ':')))
             github_output('has_contracts', str(bool(contracts)).lower())
             github_output("has_cases", str(bool(result["entries"])).lower())
@@ -531,9 +544,15 @@ def main(argv=None):
         manifest = json.loads(args.selection.read_text(encoding="utf-8"))
         result = aggregate(manifest, args.reports)
         write_json(args.reports / "ci-summary.json", result)
-        lines = ["# QA platform results", "", f"Commit: `{result['head']}`", "",
+        lines = ["# QA platform results", "", f"Commit: `{result['head']}`", ""]
+        if result.get("quick"):
+            lines.extend([
+                "> **Quick run (`merge_eligible: false`):** single-platform/focused dispatch retaining `crash-regression` on the selected target(s); does not replace full cross-platform PR gates.",
+                "",
+            ])
+        lines.extend([
                  "| Combination | Selected | Passed | Failed | Skipped | Infrastructure errors |",
-                 "|---|---:|---:|---:|---:|---:|"]
+                 "|---|---:|---:|---:|---:|---:|"])
         for entry in result["groups"]:
             c = entry["counts"]
             lines.append(f"| {entry['id']} | {entry['selected']} | {c.get('passed',0)} | {c.get('failed',0)} | {c.get('skipped',0)} | {len(entry['errors'])} |")

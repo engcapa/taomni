@@ -28,7 +28,10 @@ class ShardingTests(unittest.TestCase):
             entries.append(item)
         entries[-1]['capabilities'] = ['release']
         entries[-1]['rdp_unit_contracts'] = True
-        shards, groups, builds = schedule(entries, cases(['A', 'B']), {}, scope='selected', costs={})
+        shards, groups, builds = schedule(
+            entries, cases(['A', 'B']), {}, scope='selected',
+            costs={e['id']: {'A': 120, 'B': 120} for e in entries},
+        )
         self.assertEqual(len(shards), 8)
         self.assertEqual(len(builds), 1)
         build = builds[0]
@@ -45,7 +48,10 @@ class ShardingTests(unittest.TestCase):
     def test_selected_native_fans_out_on_every_platform_without_splitting_dependency(self):
         for platform in ('linux', 'windows', 'macos'):
             base = entry(['A', 'B', 'C', 'D'], platform=platform)
-            shards, groups, builds = schedule([base], cases(base['selected_ids']), {'B': ['A']}, scope='selected', costs={})
+            shards, groups, builds = schedule(
+                [base], cases(base['selected_ids']), {'B': ['A']}, scope='selected',
+                costs={base['id']: {cid: 120 for cid in base['selected_ids']}},
+            )
             self.assertEqual(len(shards), 3)
             self.assertEqual(len(builds), 1)
             self.assertTrue(all(s['workers'] == 1 for s in shards))
@@ -53,6 +59,17 @@ class ShardingTests(unittest.TestCase):
             self.assertEqual(dependent['selected_ids'], ['A', 'B'])
             self.assertEqual(len({s['build_id'] for s in shards}), 1)
             validate_partition(groups, shards)
+
+    def test_short_selected_native_avoids_multi_vm_fanout(self):
+        ids = ['A', 'B', 'C', 'D']
+        base = entry(ids, platform='linux')
+        short_shards, _, _ = schedule([base], cases(ids), {}, scope='selected',
+                                      costs={base['id']: {cid: 30 for cid in ids}})
+        self.assertEqual(len(short_shards), 1)
+        self.assertEqual(short_shards[0]['selected_ids'], ids)
+        long_shards, _, _ = schedule([base], cases(ids), {}, scope='selected',
+                                     costs={base['id']: {cid: 120 for cid in ids}})
+        self.assertEqual(len(long_shards), 3)
 
     def test_browser_shared_cases_do_not_serialize_independent_cases(self):
         ids = ['A', 'B', 'C', 'D', 'E']

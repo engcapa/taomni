@@ -61,6 +61,25 @@ class BuildCheckTest(unittest.TestCase):
             self.assertFalse(result["reusable"])
             self.assertEqual(result["changed_inputs"], ["optional"])
 
+    def test_stable_platform_and_reusable_cache_key_exclude_kernel_patch_and_include_recipe(self):
+        with patch.object(native_build, "source_identity", return_value="a" * 64), \
+             patch.object(native_build, "recipe_identity", return_value="b" * 64):
+            key = native_build.reusable_cache_key(
+                platform_key="linux", arch="X64", runner="ubuntu-22.04", profile="release",
+            )
+            self.assertEqual(
+                key,
+                f"runtime-reuse-v1-linux-x64-ubuntu-22.04-release-{'a' * 16}-{'b' * 16}",
+            )
+            other = native_build.reusable_cache_key(
+                platform_key="linux", arch="X64", runner="ubuntu-22.04", profile="release",
+            )
+            self.assertEqual(key, other)
+        with patch.object(native_build.platform, "platform", return_value="Linux-6.8.0-999-azure"), \
+             patch.object(native_build.platform, "system", return_value="Windows"), \
+             patch.object(native_build.platform, "machine", return_value="AMD64"):
+            self.assertEqual(native_build.stable_platform(), "Windows-amd64")
+
 
 if __name__ == "__main__":
     unittest.main()
