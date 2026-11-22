@@ -4,12 +4,12 @@ description: >-
   Enable the preview Mail module from an open account tab. View and save the
   original of a newly received message. Refresh Unified Mail after delivering
   a separate message. Disable the module and check both retained tabs show the
-  disabled state.
+  disabled state. Re-enable Mail and open the archive in the same account tab.
 covers: [F-Modules-1, F-MAIL-3, F-MAIL-11, F-MAIL-15, F-MAIL-20, F-MAIL-23, F-FILEOPEN-1]
 tags: [modules, mail, p1]
 modes: [browser]
 fixtures: [reset_db, module_mail_preview, file_open_mail, file_open_files]
-timeout_sec: 120
+timeout_sec: 150
 steps:
 - open: ${cfg.app.base_url}
 - seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
@@ -102,6 +102,18 @@ steps:
 - wait_for: '[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail-unified"]', equal: 1}
 - assert_no_runtime_errors: null
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- assert_count: {selector: '[data-testid="mail-archive-open"]', equal: 0}
+- click: '[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]'
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-toolbar-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: '[data-testid="mail-archive-open"]'
+- click: '[data-testid="mail-archive-open"]'
+- wait_for: '[data-testid="mail-archive-dialog"]'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -160,6 +172,14 @@ verification:
     - {step: 40, expectation: Cancelling deletion leaves the folder visible.}
     - {step: 44, expectation: Confirmed deletion removes the folder and keeps its parent.}
     results: [30, 35, 40, 44]
+  - id: archive-module-lifecycle
+    requirement: Mail exposes the archive only when the module is enabled and restores access in the same account tab.
+    actions: [82, 84, 85, 89, 91]
+    checkpoints:
+    - {step: 83, expectation: The disabled account has no Local Archive control.}
+    - {step: 92, expectation: The Local Archive opens in the retained account tab.}
+    - {step: 93, expectation: The module transition and archive reopen produce no runtime errors.}
+    results: [83, 92, 93]
   visual:
   - check: The account and unified panes each show content when enabled and a status when disabled.
     method: automated

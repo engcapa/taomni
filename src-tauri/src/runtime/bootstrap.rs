@@ -83,6 +83,9 @@ fn construct(
             .with_module_cleanup(crate::sockscap::ModuleCleanup::new(
                 &legacy.sockscap,
                 &paths.data,
+            ))
+            .with_module_cleanup(crate::mail::archive::ModuleCleanup::new(
+                &legacy.mail.mail_archive,
             )),
     );
     // Optional malformed packages are disabled records, never startup failures.

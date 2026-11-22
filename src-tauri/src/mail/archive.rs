@@ -8,10 +8,12 @@ mod connection;
 mod sync;
 
 mod local_commands;
+mod worker;
 
 #[cfg(test)]
 mod tests;
 
+pub(crate) use lifetime::ModuleCleanup;
 pub use lifetime::{ArchiveManager, ArchiveStatus};
 
 pub use commands::{mail_archive_pause, mail_archive_start, mail_archive_status};

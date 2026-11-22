@@ -450,6 +450,11 @@
             "root",
             "expected"
           ],
+          "if": {
+            "required": ["kind"],
+            "properties": {"kind": {"const": "worker"}}
+          },
+          "then": {"required": ["active"]},
           "properties": {
             "root": {
               "type": "string"
@@ -461,9 +466,11 @@
               "enum": [
                 "storage",
                 "backup",
-                "incremental"
+                "incremental",
+                "worker"
               ]
             },
+            "active": {"type": "boolean"},
             "full": {
               "type": "object",
               "additionalProperties": {

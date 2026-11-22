@@ -11,7 +11,7 @@ pub(crate) struct MailRuntime {
     pub(crate) migrated: Result<bool, String>,
     // The pool also owns each connection's account-level proxy forwarder.
     pub(crate) mail_imap_pool: Arc<crate::mail::MailImapPool>,
-    pub(crate) mail_archive: crate::mail::archive::ArchiveManager,
+    pub(crate) mail_archive: Arc<crate::mail::archive::ArchiveManager>,
 }
 
 impl MailRuntime {
@@ -22,7 +22,7 @@ impl MailRuntime {
             databases: Mutex::new(HashMap::new()),
             migrated: crate::plugin::migration_mail::profile_committed(profile),
             mail_imap_pool: Arc::new(crate::mail::MailImapPool::new()),
-            mail_archive: crate::mail::archive::ArchiveManager::default(),
+            mail_archive: Arc::default(),
         }
     }
 

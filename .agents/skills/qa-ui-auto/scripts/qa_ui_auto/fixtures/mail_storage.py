@@ -26,7 +26,8 @@ def setup(ctx: Any) -> None:
     server = mail_fake_server.ACTIVE
     if server is None:
         raise RuntimeError("mail_storage requires mail_server first")
-    server.state.archive_chunk_delay = 1
+    # Leave time to open the module store while the signed archive is active.
+    server.state.archive_chunk_delay = 2 if ctx.case_id == "TC-MODULES-070" else 1
     expected = {}
     attachment = bytes(range(256)) * 2400
     attachment_digest = hashlib.sha256(attachment).hexdigest()

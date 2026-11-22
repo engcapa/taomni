@@ -1,11 +1,11 @@
 id: TC-MODULES-070
 title: Signed Mail archives complete originals after pausing and resuming
-description: Pause and resume complete storage through signed Mail, then read the local archive and export the selected attachment after deleting the messages on the server. Compare the original and exported bytes with the fixture.
+description: Disable Mail during a live archive scan, re-enable it and pause and resume complete storage, then read the local archive and export the selected attachment after deleting the messages on the server. Compare the original and exported bytes with the fixture.
 covers: [F-Modules-1, F-MAIL-23]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
 fixtures: [reset_db, mail_server, mail_storage, module_signed_mail_archive]
-timeout_sec: 210
+timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="ribbon-settings"]'
@@ -77,6 +77,24 @@ steps:
 - dblclick: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
 - wait_for: '[data-testid="mail-storage-pause"]'
 - assert_text: {selector: '[data-testid="mail-storage-progress"]', contains: downloading, timeout_sec: 40}
+- mail_storage_assert: {kind: worker, root: '${fixture.mail_storage_a}', expected: '${fixture.mail_expected}', active: true, timeout_sec: 10}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-mail"]'
+- wait_for: '[data-testid="module-action-enable-mail"]'
+- assert_signed_mail_host: disabled
+- mail_storage_assert: {kind: worker, root: '${fixture.mail_storage_a}', expected: '${fixture.mail_expected}', active: false, timeout_sec: 10}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-toolbar-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- click: '[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]'
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-toolbar-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- assert_text: {selector: '[data-testid="mail-storage-progress"]', contains: downloading, timeout_sec: 40}
 - click: '[data-testid="mail-storage-pause"]'
 - assert_text:
     selector: '[data-testid="mail-storage-progress"]'
@@ -131,28 +149,39 @@ verification:
   requirements:
   - id: archive-pause-resume
     requirement: The installed Mail module preserves complete originals after interrupting and resuming a live archive scan.
-    actions: [6, 8, 40, 42]
+    actions: [6, 8, 58, 60]
     checkpoints:
     - {step: 39, expectation: The initial scan reaches the downloading phase before it is paused.}
-    - {step: 41, expectation: The scan reports that it paused.}
-    - {step: 43, expectation: The resumed transfer finishes the scan.}
-    - {step: 44, expectation: Gzip originals and SQLite metadata match the fixture. Resume clears the persisted pause and removes partial transfer files.}
-    - {step: 45, expectation: The verified Mail host and renderer own the enabled module.}
-    results: [39, 41, 43, 44, 45]
+    - {step: 59, expectation: The scan reports that it paused.}
+    - {step: 61, expectation: The resumed transfer finishes the scan.}
+    - {step: 62, expectation: Gzip originals and SQLite metadata match the fixture. Resume clears the persisted pause and removes partial transfer files.}
+    - {step: 63, expectation: The verified Mail host and renderer own the enabled module.}
+    results: [39, 59, 61, 62, 63]
   - id: read-after-server-removal
     requirement: Local originals and their attachments remain readable after both messages have been removed from IMAP.
-    actions: [46, 47, 49, 52, 54, 57, 60]
+    actions: [64, 65, 67, 70, 72, 75, 78]
     checkpoints:
-    - {step: 48, expectation: The synced inbox matches the now-empty server inbox.}
-    - {step: 51, expectation: The local archive still lists both originals.}
-    - {step: 53, expectation: The saved MIME exposes the original attachment.}
-    - {step: 55, expectation: The saved plaintext body identifies the expunged fixture message.}
-    - {step: 58, expectation: The archive manager reports saving the selected attachment.}
-    - {step: 59, expectation: The exported file matches the original attachment digest.}
-    - {step: 61, expectation: Both originals and attachments still match the fixture digests after their live headers disappear.}
-    - {step: 62, expectation: The workflow finishes without runtime errors.}
-    - {step: 63, expectation: The signed host still owns the mailbox after decoding the original.}
-    results: [48, 51, 53, 55, 58, 59, 61, 62, 63]
+    - {step: 66, expectation: The synced inbox matches the now-empty server inbox.}
+    - {step: 69, expectation: The local archive still lists both originals.}
+    - {step: 71, expectation: The saved MIME exposes the original attachment.}
+    - {step: 73, expectation: The saved plaintext body identifies the expunged fixture message.}
+    - {step: 76, expectation: The archive manager reports saving the selected attachment.}
+    - {step: 77, expectation: The exported file matches the original attachment digest.}
+    - {step: 79, expectation: Both originals and attachments still match the fixture digests after their live headers disappear.}
+    - {step: 80, expectation: The workflow finishes without runtime errors.}
+    - {step: 81, expectation: The signed host still owns the mailbox after decoding the original.}
+    results: [66, 69, 71, 73, 76, 77, 79, 80, 81]
+  - id: archive-module-lifecycle
+    requirement: Disabling Mail releases the active archive worker and retains its tab for automatic resume after re-enabling.
+    actions: [43, 49, 51, 52, 54, 56]
+    checkpoints:
+    - {step: 40, expectation: The archive worker holds the account's native lock before disabling.}
+    - {step: 45, expectation: The disabled Mail host has released its writer lease.}
+    - {step: 46, expectation: The account's archive worker has released its native lock.}
+    - {step: 50, expectation: The existing Mail tab shows the disabled module.}
+    - {step: 57, expectation: The same tab again downloads the originals without a manual resume.}
+    - {step: 62, expectation: The final archived bytes and metadata match the server fixture.}
+    results: [40, 45, 46, 50, 57, 62]
   visual:
   - check: The Mail pane displays downloading, paused and completed as the scan runs.
     method: automated

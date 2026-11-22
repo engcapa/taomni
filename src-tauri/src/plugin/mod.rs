@@ -209,7 +209,7 @@ pub struct PluginRegistry {
     pending_requests: Arc<Mutex<HashMap<(String, String), dispatch::PendingRequest>>>,
     frontend_trust: Arc<RwLock<HashMap<PathBuf, Arc<verify::InstalledTrust>>>>,
     services: Option<Arc<services::PluginCoreServices>>,
-    module_cleanup: Option<Arc<dyn stopping::ModuleCleanup>>,
+    module_cleanup: Vec<Arc<dyn stopping::ModuleCleanup>>,
 }
 
 impl PluginRegistry {
@@ -226,7 +226,7 @@ impl PluginRegistry {
             pending_requests: Arc::new(Mutex::new(HashMap::new())),
             frontend_trust: Arc::new(RwLock::new(HashMap::new())),
             services: None,
-            module_cleanup: None,
+            module_cleanup: Vec::new(),
         }
     }
 

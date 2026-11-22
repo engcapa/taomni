@@ -15,7 +15,7 @@ pub(crate) trait ModuleCleanup: std::fmt::Debug + Send + Sync {
 
 impl PluginRegistry {
     pub(crate) fn with_module_cleanup(mut self, cleanup: impl ModuleCleanup + 'static) -> Self {
-        self.module_cleanup = Some(Arc::new(cleanup));
+        self.module_cleanup.push(Arc::new(cleanup));
         self
     }
 
@@ -87,7 +87,7 @@ impl PluginRegistry {
     }
 
     pub(super) fn stop_host(&self, slug: &str) -> Result<(), PluginError> {
-        if let Some(cleanup) = &self.module_cleanup {
+        for cleanup in &self.module_cleanup {
             cleanup
                 .prepare_stop(slug)
                 .map_err(PluginError::HostRequest)?;
