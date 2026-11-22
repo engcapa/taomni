@@ -24,7 +24,7 @@ export function explorerItemMenu(entries: FileEntry[], path: string, operations:
     { label: label("复制路径", "Copy path"), testId: "explorer-context-copy-path", icon: <Link />, onClick: () => void operations.copyPath(entries.map((entry) => entry.path)) },
     { label: "", separator: true },
     { label: label("重命名", "Rename"), testId: "explorer-context-rename", icon: <Pencil />, shortcut: "F2", disabled: multi || operations.busy, onClick: () => operations.setRenamePath(first.path) },
-    { label: label("删除（移到回收站）", "Delete (move to Trash)"), testId: "explorer-context-delete", icon: <Trash2 />, shortcut: "Del", danger: true, disabled: operations.busy, onClick: () => operations.remove(entries) },
+    { label: label("删除…", "Delete…"), testId: "explorer-context-delete", icon: <Trash2 />, shortcut: "Del", danger: true, disabled: operations.busy, onClick: () => operations.remove(entries) },
     { label: "", separator: true },
     { label: label("属性", "Properties"), testId: "explorer-context-properties", icon: <Info />, shortcut: "Alt+Enter", onClick: () => operations.setProperties(entries) },
   ];

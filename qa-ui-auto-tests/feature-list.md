@@ -15983,6 +15983,7 @@ files:
   - src/components/explorer/ExplorerPlatformView.tsx
   - src/components/explorer/ExplorerSidebarPanel.tsx
   - src/components/explorer/ExplorerTabStrip.tsx
+  - src/components/explorer/ExplorerTabsFilter.tsx
   - src/components/explorer/ExplorerShell.tsx
   - src/components/explorer/ExplorerNewFileDialog.tsx
   - src/components/explorer/useExplorerOperations.ts
@@ -15999,7 +16000,10 @@ files:
   - src/lib/explorer.ts
   - src/lib/explorer/openExplorer.ts
   - src/lib/explorer/tabRecovery.ts
+  - src/lib/explorerTabFilter.ts
+  - src/components/tabbar/tabs/useTabStripScroll.ts
   - src/stores/explorerStore.ts
+  - src/stores/explorerUiStore.ts
   - src/stores/sftp/navigation.ts
   - src/stores/workspaceExplorerActions.ts
   - src/stubs/explorerSearch.ts
@@ -16034,6 +16038,7 @@ controls:
     - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 1)'
     - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 2)'
     - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 5)'
+    - 'xpath=(//*[@data-testid="explorer-workspace-tab"][@data-tab-type="file-browser"])[2]'
     kind: interactive
   - id: code-workspace-tool-rail-explorer
     selector: '[data-testid="code-workspace-tool-rail-explorer"]'
@@ -16180,6 +16185,9 @@ controls:
     kind: interactive
   - id: explorer-delete-confirm
     selector: '[data-testid="explorer-delete-confirm"]'
+    kind: interactive
+  - id: explorer-delete-trash
+    selector: '[data-testid="explorer-delete-trash"]'
     kind: interactive
   - id: explorer-file-list
     selector: '[data-testid="explorer-file-list"]'
@@ -16383,6 +16391,39 @@ controls:
     aliases:
     - '[data-testid="explorer-tab"]${fixture.explorer_previews_match}'
     kind: interactive
+  - id: explorer-tab-filter-chip
+    selector: '[data-testid="explorer-tab-filter-chip"]'
+    kind: interactive
+  - id: explorer-tab-filter-empty
+    selector: '[data-testid="explorer-tab-filter-empty"]'
+    kind: display
+  - id: explorer-tab-filter-files
+    selector: '[data-testid="explorer-tab-filter-files"]'
+    kind: interactive
+  - id: explorer-tab-filter-folders
+    selector: '[data-testid="explorer-tab-filter-folders"]'
+    kind: interactive
+  - id: explorer-tab-scroll-left
+    selector: '[data-testid="explorer-tab-scroll-left"]'
+    kind: interactive
+  - id: explorer-tab-scroll-right
+    selector: '[data-testid="explorer-tab-scroll-right"]'
+    kind: interactive
+  - id: explorer-tabs-filter-clear
+    selector: '[data-testid="explorer-tabs-filter-clear"]'
+    kind: interactive
+  - id: explorer-tabs-filter-menu
+    selector: '[data-testid="explorer-tabs-filter-menu"]'
+    kind: display
+  - id: explorer-tabs-filter-row
+    selector: '[data-testid="explorer-tabs-filter-row"]'
+    kind: interactive
+  - id: explorer-tabs-filter-search
+    selector: '[data-testid="explorer-tabs-filter-search"]'
+    kind: interactive
+  - id: explorer-tabs-filter-trigger
+    selector: '[data-testid="explorer-tabs-filter-trigger"]'
+    kind: interactive
   - id: explorer-toast
     selector: '[data-testid="explorer-toast"]'
     kind: display
@@ -16415,7 +16456,7 @@ controls:
     kind: interactive
 -->
 
-File Explorer 是 Sessions 下方的独立工作区，Tools 面板不再提供入口；主菜单、工作区导航、项目树、本地终端、Home 与历史恢复统一跳转到这里。目录与支持内部查看的文件共用独立标签，只有显式选择 Code Workspace 或系统应用才离开。新建支持 TXT、MD、HTML、CSS、JS、TS、JSON；搜索支持普通文本、递归、`*`/`?`/`**`/字符类、两种路径分隔符、相对路径、错误重试、进度与取消。TC-EXPLORER-001..009 覆盖导航、预览、选择、文件操作、恢复、多类型新建及真实磁盘搜索；当前执行证据见 `docs-feature/file-explorer/implementation.md`，不以静态清单宣称原生通过。
+File Explorer 是 Sessions 下方的独立工作区，Tools 面板不再提供入口；主菜单、工作区导航、项目树、本地终端、Home 与历史恢复统一跳转到这里。目录与支持内部查看的文件共用独立标签，只有显式选择 Code Workspace 或系统应用才离开。新建支持 TXT、MD、HTML、CSS、JS、TS、JSON；搜索支持普通文本、递归、`*`/`?`/`**`/字符类、两种路径分隔符、相对路径、错误重试、进度与取消。TC-EXPLORER-001..010 覆盖导航、预览、选择、文件操作、恢复、多类型新建、真实磁盘搜索、标签溢出分页/过滤、Overview 纳入与删除方式选择；当前执行证据见 `docs-feature/file-explorer/implementation.md`，不以静态清单宣称原生通过。
 
 ## 全局文件打开 / 预览 / 编辑
 

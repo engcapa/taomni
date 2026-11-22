@@ -146,6 +146,7 @@ steps:
 - seed_storage: {key: taomni.explorer.stubTrashUnavailable, value: 'true'}
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-delete"]'
+- click: '[data-testid="explorer-delete-trash"]'
 - wait_for: '[data-testid="explorer-trash-unavailable"]'
 - assert_text: {selector: '[data-testid="explorer-trash-unavailable"]', contains: Trash unavailable}
 - click: '[data-testid="explorer-delete-cancel"]'
@@ -153,7 +154,6 @@ steps:
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-delete"]'
 - click: '[data-testid="explorer-delete-confirm"]'
 - wait_for: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]', state: detached}
-- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created - 副本.txt"]'
 - seed_storage: {key: taomni.explorer.stubTrashUnavailable, value: 'false'}
 - file_clipboard:
     action: seed
@@ -347,62 +347,20 @@ verification:
     - 79
     - 80
   - id: R4
-    requirement: New file and folder use inline rename; same-volume drag moves into a folder; same-directory copy gets a suffix; unavailable trash
-      requires explicit confirm and cancellation preserves the original.
-    actions:
-    - 99
-    - 100
-    - 101
-    - 103
-    - 104
-    - 106
-    - 107
-    - 108
-    - 109
-    - 111
-    - 113
-    - 115
-    - 116
-    - 117
-    - 119
-    - 120
-    - 121
-    - 124
-    - 126
-    - 127
-    - 130
+    requirement: New files and folders use inline rename. Drag and copy preserve the expected files. Delete offers Trash and permanent deletion and permits cancellation when Trash is unavailable.
+    actions: [99, 100, 101, 103, 104, 106, 107, 108, 109, 111, 113, 115, 116, 117, 120, 121, 122, 125, 127, 128, 132]
     checkpoints:
-    - step: 105
-      expectation: Created folder uses the entered inline name.
-    - step: 110
-      expectation: Created text document uses the entered inline name.
-    - step: 112
-      expectation: Drag moves file out of the source listing.
-    - step: 114
-      expectation: The moved file is visible inside the target folder.
-    - step: 118
-      expectation: Same-directory Paste copies with documented suffix.
-    - step: 123
-      expectation: Trash-unavailable reason explicitly states confirmation is required.
-    - step: 125
-      expectation: Cancelling fallback preserves the original.
-    - step: 128
-      expectation: Confirming fallback removes only the original.
-    - step: 129
-      expectation: Independent copy remains present.
-    - step: 137
-      expectation: No runtime error after fallback and partial-batch recovery.
-    results:
-    - 105
-    - 110
-    - 112
-    - 114
-    - 118
-    - 123
-    - 125
-    - 128
-    - 129
-    - 137
+    - {step: 105, expectation: The folder uses the entered name.}
+    - {step: 110, expectation: The text document uses the entered name.}
+    - {step: 112, expectation: Drag moves the file out of the source listing.}
+    - {step: 114, expectation: The moved file appears inside the target folder.}
+    - {step: 118, expectation: Same-directory paste gives the copy a distinct name.}
+    - {step: 124, expectation: Unavailable Trash reports the reason and requires confirmation.}
+    - {step: 126, expectation: Cancellation preserves the original.}
+    - {step: 129, expectation: Confirmed permanent deletion removes the original.}
+    - {step: 135, expectation: The earlier copy remains present.}
+    - {step: 137, expectation: Deletion and partial-batch recovery produce no runtime errors.}
+    results: [105, 110, 112, 114, 118, 124, 126, 129, 135, 137]
   - id: R5
     requirement: A manually expanded narrow bottom preview stays at the bottom with the prototype 190px height, leaving the file list above it usable.
     actions: [138, 139, 140, 142, 144, 145, 146, 148]

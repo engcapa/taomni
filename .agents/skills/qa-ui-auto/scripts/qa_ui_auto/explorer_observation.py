@@ -14,7 +14,7 @@ from .deadline import budget_time as time
 from .steps import StepError
 from .workspace_drop_observation import READ_VFS, host_snapshot
 
-STATES = {"seeded", "copied", "moved", "renamed", "trashed", "restored", "permanent", "external", "recursive", "drag-folder", "drag-breadcrumb", "drag-tree", "partial"}
+STATES = {"seeded", "trash-seeded", "copied", "moved", "renamed", "trashed", "restored", "permanent", "external", "recursive", "drag-folder", "drag-breadcrumb", "drag-tree", "partial"}
 
 
 def linux_trash(ctx: Any, original: str, expected_sha256: str) -> dict:

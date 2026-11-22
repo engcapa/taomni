@@ -151,6 +151,8 @@ html[data-app-theme="dark"] .taomni-main-window {
 }
 .taomni-workspace-tab-scroll { scrollbar-width: none; }
 .taomni-workspace-tab-scroll::-webkit-scrollbar { display: none; }
+.taomni-explorer-tab-scroll { scrollbar-width: none; }
+.taomni-explorer-tab-scroll::-webkit-scrollbar { display: none; }
 .taomni-workspace-tab-drag-region {
   cursor: grab;
   user-select: none;

@@ -4,6 +4,7 @@ import { openExplorer } from "../../lib/explorer/openExplorer";
 import { useAppStore } from "../../stores/appStore";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { useTabOverviewStore } from "../../stores/tabOverviewStore";
+import type { Tab } from "../../types";
 import { ControlBar } from "./ControlBar";
 import type { AppCommand } from "../menubar/commands";
 import type { WorkspaceCommandRegistration } from "../editor/workspace/workspaceCommands";
@@ -170,6 +171,30 @@ describe("ControlBar settings button", () => {
     expect(screen.queryByTestId("tab-bar")).not.toBeInTheDocument();
     expect(screen.queryByTestId("platform-mode-title")).not.toBeInTheDocument();
     act(() => useAppStore.getState().setActiveSideTab("tools"));
+    expect(screen.getByTestId("platform-mode-title")).toHaveTextContent("Tools");
+    expect(screen.queryByTestId("explorer-tab-strip")).not.toBeInTheDocument();
+  });
+
+  it("shows the dedicated Explorer strip and its tab filter when the Explorer rail is active", () => {
+    useAppStore.setState({ activeSideTab: "explorer", tabs: [], activeTabId: null });
+    useExplorerStore.setState({
+      tabs: [{ id: "e1", type: "file-browser", title: "Documents", closable: true, fileBrowser: { initialPath: "/docs", explorer: true } } as Tab],
+      activeTabId: "e1",
+    });
+    renderControlBar(vi.fn());
+    expect(screen.getByTestId("explorer-workspace-tab")).toBeInTheDocument();
+    expect(screen.getByTestId("explorer-tabs-filter-trigger")).toBeInTheDocument();
+    expect(screen.queryByTestId("tab-more")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-tabs-filter-trigger")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tab-bar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("platform-mode-title")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("explorer-tabs-filter-trigger"));
+    expect(screen.getByTestId("explorer-tabs-filter-menu")).toBeInTheDocument();
+    act(() => {
+      useExplorerStore.setState({ tabs: [], activeTabId: null });
+      useAppStore.setState({ activeSideTab: "tools", tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }], activeTabId: "welcome" });
+    });
+    expect(screen.queryByTestId("explorer-tabs-filter-trigger")).not.toBeInTheDocument();
     expect(screen.getByTestId("platform-mode-title")).toHaveTextContent("Tools");
     expect(screen.queryByTestId("explorer-tab-strip")).not.toBeInTheDocument();
   });

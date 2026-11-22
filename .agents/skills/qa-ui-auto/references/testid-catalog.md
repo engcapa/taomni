@@ -1268,6 +1268,7 @@
   ↳ `:nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 1)` — alias
   ↳ `:nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 2)` — alias
   ↳ `:nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 5)` — alias
+  ↳ `xpath=(//*[@data-testid="explorer-workspace-tab"][@data-tab-type="file-browser"])[2]` — alias
 - `[data-testid="code-workspace-tool-rail-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tool-rail-explorer
 - `[data-testid="code-workspace-tree-open-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer
 - `[data-testid="code-workspace-tree-open-explorer-new"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer-new
@@ -1317,6 +1318,7 @@
   ↳ `[data-testid="explorer-crumb"]${fixture.explorer_crumb_folder_match}` — alias
 - `[data-testid="explorer-delete-cancel"]` — interactive — F-EXPLORER-1.explorer-delete-cancel
 - `[data-testid="explorer-delete-confirm"]` — interactive — F-EXPLORER-1.explorer-delete-confirm
+- `[data-testid="explorer-delete-trash"]` — interactive — F-EXPLORER-1.explorer-delete-trash
 - `[data-testid="explorer-file-list"]` — interactive — F-EXPLORER-1.explorer-file-list
 - `[data-testid="explorer-file-row"]` — interactive — F-EXPLORER-1.explorer-file-row
   ↳ `[data-testid="explorer-file-row"] .ex-name` — alias
@@ -1386,6 +1388,17 @@
 - `[data-testid="explorer-status"]` — display — F-EXPLORER-1.explorer-status
 - `[data-testid="explorer-tab"]` — interactive — F-EXPLORER-1.explorer-tab
   ↳ `[data-testid="explorer-tab"]${fixture.explorer_previews_match}` — alias
+- `[data-testid="explorer-tab-filter-chip"]` — interactive — F-EXPLORER-1.explorer-tab-filter-chip
+- `[data-testid="explorer-tab-filter-empty"]` — display — F-EXPLORER-1.explorer-tab-filter-empty
+- `[data-testid="explorer-tab-filter-files"]` — interactive — F-EXPLORER-1.explorer-tab-filter-files
+- `[data-testid="explorer-tab-filter-folders"]` — interactive — F-EXPLORER-1.explorer-tab-filter-folders
+- `[data-testid="explorer-tab-scroll-left"]` — interactive — F-EXPLORER-1.explorer-tab-scroll-left
+- `[data-testid="explorer-tab-scroll-right"]` — interactive — F-EXPLORER-1.explorer-tab-scroll-right
+- `[data-testid="explorer-tabs-filter-clear"]` — interactive — F-EXPLORER-1.explorer-tabs-filter-clear
+- `[data-testid="explorer-tabs-filter-menu"]` — display — F-EXPLORER-1.explorer-tabs-filter-menu
+- `[data-testid="explorer-tabs-filter-row"]` — interactive — F-EXPLORER-1.explorer-tabs-filter-row
+- `[data-testid="explorer-tabs-filter-search"]` — interactive — F-EXPLORER-1.explorer-tabs-filter-search
+- `[data-testid="explorer-tabs-filter-trigger"]` — interactive — F-EXPLORER-1.explorer-tabs-filter-trigger
 - `[data-testid="explorer-toast"]` — display — F-EXPLORER-1.explorer-toast
 - `[data-testid="explorer-trash-unavailable"]` — display — F-EXPLORER-1.explorer-trash-unavailable
 - `[data-testid="explorer-undo"]` — interactive — F-EXPLORER-1.explorer-undo

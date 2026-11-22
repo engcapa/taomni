@@ -39,6 +39,7 @@ import { startWindowDrag } from "../../lib/windowDrag";
 import { PlatformToolbarActions } from "./PlatformToolbarActions";
 import { WorkspaceTabStrip } from "../workspace/WorkspaceTabStrip";
 import { ExplorerTabStrip } from "../explorer/ExplorerTabStrip";
+import { ExplorerTabsFilter } from "../explorer/ExplorerTabsFilter";
 import { activeExplorerTab } from "../../stores/explorerStore";
 import { WorkspaceTabsFilter } from "../workspace/WorkspaceTabsFilter";
 import { useAppStore } from "../../stores/appStore";
@@ -278,6 +279,7 @@ export function ControlBar({
       <PlatformToolbarActions onOpenSearch={onOpenGlobalSearch} slotRef={slotRef} onDetachActiveTab={onDetachActiveTab}>
         {activeSideTab === "sessions" && <TabMore onDetachActiveTab={onDetachActiveTab} />}
         {activeSideTab === "workspaces" && <WorkspaceTabsFilter />}
+        {activeSideTab === "explorer" && <ExplorerTabsFilter />}
       </PlatformToolbarActions>
       {!IS_MAC && <WindowControls onClose={onCloseWindow} />}
     </div>

@@ -16,7 +16,7 @@ import { EXPLORER_TEXT_FILE_TYPES, newFileNameError, uniqueNewFileName, type Exp
 import { setExplorerPreferences } from "./explorerPreferences";
 
 export interface ExplorerToast { message: string; error?: boolean; undo?: () => void }
-export interface DeletePrompt { entries: FileEntry[]; reason?: string }
+export interface DeletePrompt { entries: FileEntry[]; reason?: string; defaultIntent?: "trash" | "permanent" }
 export interface UnavailableHandlerPrompt { path: string; handlerLabel: string; message: string }
 export function useExplorerOperations(tabId: string, workspaceId?: string) {
   const label = useExplorerLabels();
@@ -150,15 +150,25 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
     }
     await refreshAll(); summarize(done, failures);
   }), [refreshAll, run, summarize, tabId]);
+  /** Del/Shift+Del and every menu entry first ask whether to use Trash or delete for good. */
   const remove = useCallback((entries: FileEntry[], permanent = false) => {
     if (!entries.length) return;
-    if (permanent) { setDeletePrompt({ entries }); return; }
+    setDeletePrompt({ entries, defaultIntent: permanent ? "permanent" : "trash" });
+  }, []);
+  /** Confirmed Trash choice. Only failed items fall back to an explicit permanent prompt. */
+  const trash = useCallback((entries: FileEntry[]) => {
+    if (!entries.length) return;
+    setDeletePrompt(null);
     void run(async () => {
       const result = await localTrashEntries(entries.map((entry) => entry.path));
       await refreshAll();
       if (result.failed.length) {
         const failedPaths = new Set(result.failed.map((failure) => failure.path));
-        setDeletePrompt({ entries: entries.filter((entry) => failedPaths.has(entry.path)), reason: result.failed.map((failure) => `${failure.path}: ${failure.message}`).join("\n") });
+        setDeletePrompt({
+          entries: entries.filter((entry) => failedPaths.has(entry.path)),
+          reason: result.failed.map((failure) => `${failure.path}: ${failure.message}`).join("\n"),
+          defaultIntent: "permanent",
+        });
       }
       if (result.trashed.length) {
         const items: TrashRef[] = result.trashed;
@@ -226,7 +236,7 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
     cancelled.current = true;
     if (operation.current) void explorerCancelOperation(operation.current).catch((error) => notify(String(error), true));
   }, [notify]);
-  return { toast, notify, busy, progress, cancel, open, openWithSystemFallback, copy, paste, drop, transfer, remove, permanentDelete,
+  return { toast, notify, busy, progress, cancel, open, openWithSystemFallback, copy, paste, drop, transfer, remove, trash, permanentDelete,
     rename, renamePath, setRenamePath, create, createFile, suggestFileName, newFile, setNewFile, startNewFile,
     copyPath, reveal, deletePrompt, setDeletePrompt, unavailablePrompt, setUnavailablePrompt, properties, setProperties };
 }

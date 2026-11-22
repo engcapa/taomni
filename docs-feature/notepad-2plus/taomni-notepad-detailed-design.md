@@ -777,20 +777,20 @@ F 编号按 decisions 文件中**支持与待定条目**的出现顺序编号；
 
 **现在可开始的任务：** TASK-NP-00、TASK-NP-02、TASK-NP-26（注册表/设置/菜单部分，需先与 file explorer 分支对齐）；S-1 完成后 TASK-NP-01，进而 TASK-NP-03～09、10～14、15～17、18～20、21。**必须等待：** TASK-NP-23（S-4、S-5）；TASK-NP-25 须等 NP-15/04/06/07/09/23/26 全部完成。**待用户确认：** DEC-22（不阻塞开工）。
 
-### 9.4 本轮执行记录（2026-11-21 接续开发，实施后回填）
+### 9.4 本轮执行记录（2026-11-21～2026-11-22 接续开发与 Review 全量修复后回填）
 
-> 本节只记录实际执行过的验证。未列出的 V-* 仍未执行；Windows / macOS 真机项保持“未验证”。命令均在本仓库根目录执行。
+> 本节只记录实际执行过的验证。未列出的 V-* 仍未执行；物理真机 OS 级快捷键 / 系统打印对话框 / 提权等项仍需手工真机确认。命令均在本仓库根目录执行。
 
 | V | 结果 | 命令与证据 |
 |---|---|---|
-| V-01～V-08、V-22～V-29、V-34、V-38、V-39、V-46～V-49（单测层） | **通过** | `pnpm exec vitest run src/lib/notepad src/components/notepad src/lib/openFile src/components/viewer` → 63 files / 402 tests passed（2026-11-21）。关键文件：`transforms.test.ts`（21）、`commands.test.ts`、`menus.test.ts`（新增，5）、`search.test.ts`、`cm6.test.ts`、`persistence.test.ts`、`macro.test.ts`、`ipc.test.ts`、`viewerTabHost.test.ts`、`ViewerShell.test.tsx`、`openFile/__tests__/handlers.test.tsx` |
-| V-37 | **部分通过** | 上述 vitest 全绿；`pnpm check:refactor` 通过（4989 files，0 超限）；`pnpm exec tsc -b` 通过 |
-| V-30～V-33、V-49/V-50（browser，托管三端） | **通过** | 最终托管 run `44951373132`（conclusion=success）：Linux/Windows/macOS browser 各 22+1 全部通过；TC-NP-001..005 三端绿；累计 129 用例 0 失败 | 
-| V-30～V-33、V-49/V-50（browser 本机） | **通过（本机）** | 新增 `qa-ui-auto-tests/cases/TC-NP-001..005`；`python -m qa_ui_auto run --mode browser --filter TC-NP-001..005 --require-pass --config .agents/skills/qa-ui-auto/assets/qa-ui-auto.config.browser.yaml` → 5 passed / 0 failed；证据 `qa-ui-auto-report/browser/run-20261122-004206-322632473/`（summary.json、runner_receipt.json、截图、runtime-errors 为空） |
-| V-40（native 三端，真实磁盘） | **通过（托管+本机）** | 最终托管 run `44951373132`：Linux/Windows/macOS native 各 4 shards × 6 cases 全部通过（TC-NP-101/102 三端绿，crash-regression 三端绿）；本机隔离 Xvfb/DBus 会话同样通过（含 `TC-FILE-OPEN-002` 草稿恢复） |
-| V-40（Linux native，真实磁盘，本机） | **通过（本机）** | `TC-NP-101`/`TC-NP-102` 在独立 Xvfb `:137`（1600×1000×24）+ `dbus-run-session` + 私有 XDG data/config/cache 下执行 → 各 1 passed；证据 `qa-ui-auto-report/run-20261122-004304-429435665/`、`qa-ui-auto-report/run-20261122-0048*/`。QA 二进制身份 `src-tauri/target/qa-ui-auto/debug/taomni.qa-identity.json` |
-| V-41 | **通过（托管）** | 最终 run `44951373132` scope=selected 自动并入 `crash-regression` 标签用例，三端 browser+native 全绿（129 cases / 0 failed） |
-| V-42 | **托管通过** | 托管 run `44931303328` 在 Linux/Windows/macOS 三端完成 release QA 构建与 native 执行；本机同时通过 `pnpm exec tsc -b`、`pnpm check:refactor` |
-| V-43～V-45、V-51 | **未执行** | 真机手册 §8 项目；打印/提权/回收站/远程副本/大文件 5/12/35 MB/遗留草稿迁移等仍需真机逐项执行 |
+| V-01～V-08、V-22～V-29、V-34、V-38、V-39、V-46～V-49（单测层） | **通过** | `pnpm exec vitest run src/lib/notepad src/components/notepad src/lib/openFile src/components/viewer src/stores/documentStore.test.ts src/stores/explorerStore.test.ts src/stores/explorerPinning.test.ts src/components/settings/FileOpenSettings.test.tsx` → 71 files / 441 tests passed（2026-11-22）。新增/扩充：`commandsRegression.test.ts`、`DialogsRegression.test.tsx`、`PickerDialogs.test.tsx`、`NotepadEditor.test.tsx`、`documentStore.test.ts`、`viewerTabHost.test.ts`、`cm6.test.ts`、`macro.test.ts` |
+| V-37 | **部分通过** | 上述 vitest 全绿；`pnpm check:refactor` 通过（884 native commands / 328 facade exports / 951 modules / 4994 files，全部 ≤ 800 行）；`./node_modules/.bin/tsc --noEmit` 与 `tsc -b` 通过；`python3 -m qa_ui_auto.audit --gate` 通过（844 cases，0 新增孤儿，0 回归） |
+| V-30～V-33、V-49/V-50（browser，托管三端） | **通过** | 托管 run `44969769671`（head `4c3cf006fb77e19ab67615392cc31d2a55d14a5e`，conclusion=`success`）：Linux/Windows/macOS browser 各 24/24（23+1）全部通过（72/72，含 `TC-NP-001..006`、`TC-FILE-OPEN-*` 与 browser `crash-regression`，0 失败，0 runtime errors） |
+| V-30～V-33、V-49/V-50（browser 本机） | **通过（本机）** | 新增 `qa-ui-auto-tests/cases/TC-NP-006-advanced-macro-readonly-focus-dialogs.testcase.yaml` 并同步 `feature-list.md` / `testid-catalog.md`；`python3 -m qa_ui_auto run --mode browser --filter TC-NP-001,TC-NP-002,TC-NP-003,TC-NP-004,TC-NP-005,TC-NP-006,TC-FILE-OPEN-001,TC-FILE-OPEN-006 --require-pass --workers 2 --config .agents/skills/qa-ui-auto/assets/qa-ui-auto.config.browser.yaml` → 8 passed / 0 failed（0 runtime errors；检查后已清理报告目录以节省磁盘空间） |
+| V-40（native 三端，真实磁盘） | **通过（托管+本机）** | 托管 run `44969769671`：Linux/Windows/macOS native release 各 4 shards × 6 cases = 24/24（共 72/72）全部通过（`TC-NP-101`/`102` 三端通过，`TC-FILE-OPEN-002` 与 `crash-regression` 三端通过，0 runtime errors） |
+| V-40（Linux native，真实磁盘，本机） | **通过（本机）** | `TC-NP-101`、`TC-NP-102`、`TC-FILE-OPEN-002` 在独立 `Xvfb :139`（1600×1000×24）+ `openbox` + `dbus-run-session` + 私有 `/tmp` XDG data/config/cache 下使用最新 `com.taomni.app.qa` debug 二进制执行 → 3 passed / 0 failed（0 runtime errors；检查后已清理临时报告目录及 QA target 缓存） |
+| V-41 | **通过（托管）** | 托管 run `44969769671` `scope=selected` 自动并入完整 `crash-regression` 标签用例，三端 browser + native release 18 shards 共 144/144 用例执行通过，0 失败，0 跳过 |
+| V-42 | **托管通过** | 托管 run `44969769671` 在 Linux/Windows/macOS 三端完成 release QA 构建、native 契约与执行；本机同时通过 `pnpm exec tsc -b`、`./node_modules/.bin/tsc --noEmit`、`pnpm check:refactor` |
+| V-43～V-45、V-51 | **未执行** | 物理真机手册 §8 项目；真实系统打印/提权/OS 回收站/远程副本/5/12/35 MB 大文件真机实测与物理 macOS AppKit 系统菜单/快捷键仍待真机执行 |
 
 实现范围与有意偏差见 [taomni-notepad-implementation-notes.md](taomni-notepad-implementation-notes.md)。

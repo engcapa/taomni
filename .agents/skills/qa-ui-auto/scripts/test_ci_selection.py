@@ -28,7 +28,8 @@ def args(**overrides):
 class MacosRunnerSelectionTests(unittest.TestCase):
     def test_macos_26_arm64_recovery_keeps_cases_crash_selection_and_release_architecture(self):
         selected = dict(scope="selected", platforms="macos", modes="native",
-                        case_ids="TC-EXPLORER-006,TC-EXPLORER-011,TC-EXPLORER-010,TC-FILE-OPEN-041,TC-MODULES-033,TC-MODULES-034,TC-MODULES-035",
+                        case_ids="TC-EXPLORER-006,TC-EXPLORER-010,TC-EXPLORER-011,TC-EXPLORER-012,"
+                                 "TC-FILE-OPEN-041,TC-MODULES-033,TC-MODULES-034,TC-MODULES-035",
                         tags="crash-regression", native_release=True, shards="4")
         original = make_plan(args(**selected))
         recovery = make_plan(args(**selected, macos_runner="macos-26"))
