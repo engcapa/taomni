@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDocumentStore } from "./documentStore";
-import { VIEWER_DRAFTS_KEY } from "./viewerDrafts";
+import { MAX_LOCALSTORAGE_DRAFT_CHARS, VIEWER_DRAFTS_KEY } from "./viewerDrafts";
+import { resetNotepadPreferences, setNotepadPreferences } from "./notepadPreferences";
 import { viewerReadText, viewerReleaseTemp, viewerStat, viewerWriteText, type ViewerTextData, type ViewerWriteAck } from "../lib/viewer";
 vi.mock("../lib/viewer", async (original) => ({ ...await original<typeof import("../lib/viewer")>(), viewerStat: vi.fn(), viewerReadText: vi.fn(), viewerReadTextChunk: vi.fn(), viewerWriteText: vi.fn(), viewerReleaseTemp: vi.fn() }));
 const disk = (content = "original", hash = "old"): ViewerTextData => ({ path: "/docs/note.txt", content, hash, encoding: "UTF-8", bom: false, eol: "LF", mtime: 1, size: content.length, truncated: false });
@@ -9,6 +10,7 @@ const get = () => useDocumentStore.getState();
 const document = () => get().documents[path];
 beforeEach(() => {
   localStorage.clear(); vi.clearAllMocks();
+  resetNotepadPreferences();
   useDocumentStore.setState({ documents: {}, closeRequest: undefined, draftError: undefined });
   vi.mocked(viewerStat).mockResolvedValue({ path, size: 8, mtime: 1, mime: "text/plain", isFile: true });
   vi.mocked(viewerReadText).mockResolvedValue(disk());
@@ -124,5 +126,21 @@ describe("shared document owner", () => {
     get().edit(path, "a\nb\nc\n"); await get().save(path);
     expect(viewerWriteText).toHaveBeenCalledWith(expect.objectContaining({ encoding: "UTF-16LE", bom: true, eol: "CRLF" }));
     get().configure(path, { eol: "LF" }); expect(document().dirty).toBe(true);
+  });
+
+  it("shows conflict banner instead of auto-reloading clean file when autoReloadCleanExternal is false", async () => {
+    setNotepadPreferences({ autoReloadCleanExternal: false });
+    await get().open(path);
+    vi.mocked(viewerReadText).mockResolvedValue(disk("external", "new-hash"));
+    await get().checkExternal(path);
+    expect(document().content).toBe("original");
+    expect(document().external?.content).toBe("external");
+  });
+
+  it("skips oversized drafts in localStorage while keeping small drafts", async () => {
+    await get().open(path);
+    get().edit(path, "x".repeat(MAX_LOCALSTORAGE_DRAFT_CHARS + 10));
+    const stored = JSON.parse(localStorage.getItem(VIEWER_DRAFTS_KEY) ?? "{}") as Record<string, unknown>;
+    expect(stored[path]).toBeUndefined();
   });
 });

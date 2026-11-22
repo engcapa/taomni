@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Copy, X } from "lucide-react";
 import { notepadHash } from "../../../lib/notepad/ipc";
 import { runMimeTransform } from "../../../lib/notepad/transforms/mime";
@@ -29,6 +29,21 @@ export function ToolboxDialogs({
 
   const [workText, setWorkText] = useState(selectionText || documentText);
   const [mimeErr, setMimeErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (kind === "mime") {
+      setWorkText(selectionText || documentText);
+      setMimeErr(null);
+    } else if (kind === "hash") {
+      setHashHex("");
+      setHashErr(null);
+      setHashSource((prev) => {
+        if (prev === "sel" && !selectionText) return "doc";
+        if (prev === "file" && !filePath) return "doc";
+        return prev;
+      });
+    }
+  }, [kind, selectionText, documentText, filePath]);
 
   if (!kind) return null;
 

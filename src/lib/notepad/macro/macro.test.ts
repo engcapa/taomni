@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterRecordableSteps,
+  normalizeMacroSteps,
   runMacroMultipleTimes,
   runMacroUntilEndOfFile,
   type MacroPlaybackHost,
@@ -64,5 +65,14 @@ describe("notepad macro manager (V-34..V-36)", () => {
     );
     expect(stallRes.stoppedReason).toBe("no_progress");
     expect(stallRes.iterations).toBe(2);
+
+    const normalized = normalizeMacroSteps([
+      { commandId: "edit.toUpper" },
+      { type: "insertText", text: "ok" },
+    ]);
+    expect(normalized).toEqual([
+      { type: "command", commandId: "edit.toUpper", args: undefined },
+      { type: "insertText", text: "ok" },
+    ]);
   });
 });

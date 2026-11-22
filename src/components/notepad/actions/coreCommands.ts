@@ -2,7 +2,7 @@ import { redo, selectAll, undo } from "@codemirror/commands";
 import { applyBookmarkLinesOp, nextBookmarkPos } from "../../../lib/notepad/cm6/bookmarksAndHistory";
 import { viewerTabHost } from "../../../lib/notepad/host/viewerTabHost";
 import { parentPath } from "../../../lib/sftp";
-import { notepadOpenTerminalDir, viewerSetReadonlyAttr } from "../../../lib/notepad/ipc";
+import { notepadOpenTerminalDir } from "../../../lib/notepad/ipc";
 import { runMacroOnce } from "../../../lib/notepad/macro/macroManager";
 import { dedupeAdjacentLines, dedupeLines, duplicateLine, joinLines, moveSelectedLines, removeBlankLines, removeEmptyLines, resolveLineSpan, reverseLines, splitLinesAtColumn } from "../../../lib/notepad/transforms/lines";
 import { runMimeTransform } from "../../../lib/notepad/transforms/mime";
@@ -77,12 +77,9 @@ export function createCoreCommandMap(ctx: NotepadActionContext): Record<string, 
         name: ctx.document.path.split(/[\\/]/).pop() || ctx.document.path,
       });
     },
-    "file.toggleReadonly": async () => {
-      const next = !ctx.document.readOnly;
-      if (!isUntitledKey(ctx.document.path)) {
-        await viewerSetReadonlyAttr(ctx.document.path, next).catch((e) => ctx.onError(String(e)));
-      }
-      useDocumentStore.getState().setEditorReadOnly(ctx.document.path, next);
+    "file.toggleReadonly": () => {
+      const liveDoc = useDocumentStore.getState().documents[ctx.docKey] ?? ctx.document;
+      useDocumentStore.getState().setEditorReadOnly(ctx.document.path, !liveDoc.readOnly);
     },
     "file.openTerminalDir": async () => {
       if (isUntitledKey(ctx.document.path)) return;
@@ -151,26 +148,26 @@ export function createCoreCommandMap(ctx: NotepadActionContext): Record<string, 
     "edit.joinLines": () => ctx.applyTransform(joinLines),
     "edit.moveLineUp": () => ctx.applyTransform((t, r) => moveSelectedLines(t, r, -1)),
     "edit.moveLineDown": () => ctx.applyTransform((t, r) => moveSelectedLines(t, r, 1)),
-    "edit.removeEmptyLines": () => ctx.applyTransform((t, r) => removeEmptyLines(t, r, true)),
-    "edit.removeBlankLines": () => ctx.applyTransform((t, r) => removeBlankLines(t, r, true)),
-    "edit.removeDuplicateLines": () => ctx.applyTransform((t, r) => dedupeLines(t, r, true)),
-    "edit.removeConsecutiveDuplicates": () => ctx.applyTransform((t, r) => dedupeAdjacentLines(t, r, true)),
-    "edit.reverseLines": () => ctx.applyTransform((t, r) => reverseLines(t, r, true)),
-    "edit.sortAsc": () => ctx.applySort({ kind: "lex", descending: false }),
-    "edit.sortDesc": () => ctx.applySort({ kind: "lex", descending: true }),
-    "edit.sortCaseInsensitiveAsc": () => ctx.applySort({ kind: "ci", descending: false }),
-    "edit.sortNumAsc": () => ctx.applySort({ kind: "int", descending: false }),
-    "edit.sortLenAsc": () => ctx.applySort({ kind: "len", descending: false }),
+    "edit.removeEmptyLines": () => ctx.applyTransform((t, r) => removeEmptyLines(t, r, true), { wholeDocLabel: "Remove Empty Lines" }),
+    "edit.removeBlankLines": () => ctx.applyTransform((t, r) => removeBlankLines(t, r, true), { wholeDocLabel: "Remove Blank Lines" }),
+    "edit.removeDuplicateLines": () => ctx.applyTransform((t, r) => dedupeLines(t, r, true), { wholeDocLabel: "Remove Duplicate Lines" }),
+    "edit.removeConsecutiveDuplicates": () => ctx.applyTransform((t, r) => dedupeAdjacentLines(t, r, true), { wholeDocLabel: "Remove Consecutive Duplicate Lines" }),
+    "edit.reverseLines": () => ctx.applyTransform((t, r) => reverseLines(t, r, true), { wholeDocLabel: "Reverse Line Order" }),
+    "edit.sortAsc": () => ctx.applySort({ kind: "lex", descending: false }, "Sort Lines Ascending"),
+    "edit.sortDesc": () => ctx.applySort({ kind: "lex", descending: true }, "Sort Lines Descending"),
+    "edit.sortCaseInsensitiveAsc": () => ctx.applySort({ kind: "ci", descending: false }, "Sort Lines Ignoring Case Ascending"),
+    "edit.sortNumAsc": () => ctx.applySort({ kind: "int", descending: false }, "Sort Lines as Integers Ascending"),
+    "edit.sortLenAsc": () => ctx.applySort({ kind: "len", descending: false }, "Sort Lines by Length Ascending"),
     "edit.toUpperCase": () => ctx.applyCaseOp("upper"),
     "edit.toLowerCase": () => ctx.applyCaseOp("lower"),
     "edit.toTitleCase": () => ctx.applyCaseOp("proper"),
     "edit.invertCase": () => ctx.applyCaseOp("invert"),
-    "edit.trimTrailing": () => ctx.applyTransform((t, r) => trimTrailingSpaces(t, r, true)),
-    "edit.trimLeading": () => ctx.applyTransform((t, r) => trimLeadingSpaces(t, r, true)),
-    "edit.trimBoth": () => ctx.applyTransform((t, r) => trimBothSpaces(t, r, true)),
-    "edit.tabsToSpaces": () => ctx.applyTransform((t, r) => tabsToSpaces(t, r, 4, true)),
-    "edit.spacesToLeadingTabs": () => ctx.applyTransform((t, r) => spacesToTabsLeading(t, r, 4, true)),
-    "edit.eolCollapseToSpace": () => ctx.applyTransform((t, r) => eolToSpace(t, r, true)),
+    "edit.trimTrailing": () => ctx.applyTransform((t, r) => trimTrailingSpaces(t, r, true), { wholeDocLabel: "Trim Trailing Space" }),
+    "edit.trimLeading": () => ctx.applyTransform((t, r) => trimLeadingSpaces(t, r, true), { wholeDocLabel: "Trim Leading Space" }),
+    "edit.trimBoth": () => ctx.applyTransform((t, r) => trimBothSpaces(t, r, true), { wholeDocLabel: "Trim Leading and Trailing Space" }),
+    "edit.tabsToSpaces": () => ctx.applyTransform((t, r) => tabsToSpaces(t, r, 4, true), { wholeDocLabel: "TAB to Space" }),
+    "edit.spacesToLeadingTabs": () => ctx.applyTransform((t, r) => spacesToTabsLeading(t, r, 4, true), { wholeDocLabel: "Space to TAB (Leading)" }),
+    "edit.eolCollapseToSpace": () => ctx.applyTransform((t, r) => eolToSpace(t, r, true), { wholeDocLabel: "EOL to Space" }),
     "edit.columnEditor": () => ctx.setEditModal("columnEditor"),
     "edit.insertDateTimeShort": () => ctx.replaceViewSelection(ctx.getActiveView(), new Date().toLocaleString(), true),
     "edit.insertDateTimeLong": () => ctx.replaceViewSelection(ctx.getActiveView(), new Date().toISOString(), true),
@@ -277,8 +274,8 @@ export function createCoreCommandMap(ctx: NotepadActionContext): Record<string, 
     "view.zoomOut": () => { const s = useNotepadStore.getState(); s.setZoomDelta(s.zoomDelta - 1); },
     "view.zoomReset": () => useNotepadStore.getState().setZoomDelta(0),
     "view.toggleSplit": () => useNotepadStore.getState().patchDoc(ctx.docKey, { split: !ctx.docState.split }),
-    "view.toggleSyncV": () => useNotepadStore.getState().patchDoc(ctx.docKey, { syncScroll: !ctx.docState.syncScroll }),
-    "view.toggleSyncH": () => useNotepadStore.getState().patchDoc(ctx.docKey, { syncScroll: !ctx.docState.syncScroll }),
+    "view.toggleSyncV": () => useNotepadStore.getState().patchDoc(ctx.docKey, { syncScrollV: !ctx.docState.syncScrollV }),
+    "view.toggleSyncH": () => useNotepadStore.getState().patchDoc(ctx.docKey, { syncScrollH: !ctx.docState.syncScrollH }),
     ...([
       ["view.toggleDocMap", "minimap"],
       ["view.toggleDocList", "doclist"],
@@ -290,7 +287,7 @@ export function createCoreCommandMap(ctx: NotepadActionContext): Record<string, 
     }, {}),
     "view.distractionFree": () => {
       const s = useNotepadStore.getState();
-      s.setViewMode(s.viewMode === "fullscreen" ? "" : "fullscreen");
+      s.setViewMode(s.viewMode === "focus" ? "" : "focus");
     },
 
     // Encoding, Macro, Tools, Window, Help

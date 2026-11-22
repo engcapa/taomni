@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { EditorView } from "@codemirror/view";
+import type { FindHighlightSpec } from "../../lib/notepad/cm6/marksAndTokens";
 import { createSplitScrollCoordinator } from "../../lib/notepad/cm6/splitSync";
 import type { SymbolRenderConfig } from "../../lib/notepad/cm6/symbols";
 import type { NotepadMarkRule, NotepadSplitOrient } from "../../stores/notepadStore";
@@ -9,6 +10,8 @@ export function NotepadSplitPanes({
   split,
   orient,
   syncScroll,
+  syncScrollV,
+  syncScrollH,
   activePane,
   content,
   savedLines,
@@ -23,7 +26,13 @@ export function NotepadSplitPanes({
   bookmarks,
   marks,
   activeMatch,
+  findHighlight = null,
+  historyResetNonce = 0,
+  paneSelections,
+  paneScrolls,
   onChange,
+  onUserTextInsert,
+  onScrollPosition,
   onCursorMetrics,
   onToggleBookmark,
   onToggleInsertMode,
@@ -33,6 +42,8 @@ export function NotepadSplitPanes({
   split: boolean;
   orient: NotepadSplitOrient;
   syncScroll: boolean;
+  syncScrollV?: boolean;
+  syncScrollH?: boolean;
   activePane: 0 | 1;
   content: string;
   savedLines: string[];
@@ -47,7 +58,13 @@ export function NotepadSplitPanes({
   bookmarks: number[];
   marks: NotepadMarkRule[];
   activeMatch: { from: number; to: number } | null;
+  findHighlight?: FindHighlightSpec | null;
+  historyResetNonce?: number;
+  paneSelections?: [{ from: number; to: number }, { from: number; to: number }];
+  paneScrolls?: [{ top: number; left: number }, { top: number; left: number }];
   onChange: (nextText: string) => void;
+  onUserTextInsert?: (text: string) => void;
+  onScrollPosition?: (paneIndex: 0 | 1, top: number, left: number) => void;
   onCursorMetrics: (paneIndex: 0 | 1, metrics: CursorMetrics) => void;
   onToggleBookmark: (lineZeroBased: number) => void;
   onToggleInsertMode: (insertMode: boolean) => void;
@@ -56,6 +73,8 @@ export function NotepadSplitPanes({
 }) {
   const viewsRef = useRef<[EditorView | null, EditorView | null]>([null, null]);
   const coord = useMemo(() => createSplitScrollCoordinator(), []);
+  const vSync = syncScrollV ?? syncScroll;
+  const hSync = syncScrollH ?? syncScroll;
 
   const handleViewReady = (idx: 0 | 1, view: EditorView | null) => {
     viewsRef.current[idx] = view;
@@ -63,20 +82,20 @@ export function NotepadSplitPanes({
   };
 
   useEffect(() => {
-    if (!split || !syncScroll) return;
+    if (!split || (!vSync && !hSync)) return;
     const scroller0 = viewsRef.current[0]?.scrollDOM ?? null;
     const scroller1 = viewsRef.current[1]?.scrollDOM ?? null;
     if (!scroller0 || !scroller1) return;
 
-    const onScroll0 = () => coord.sync(scroller0, scroller1, true, true);
-    const onScroll1 = () => coord.sync(scroller1, scroller0, true, true);
+    const onScroll0 = () => coord.sync(scroller0, scroller1, vSync, hSync);
+    const onScroll1 = () => coord.sync(scroller1, scroller0, vSync, hSync);
     scroller0.addEventListener("scroll", onScroll0, { passive: true });
     scroller1.addEventListener("scroll", onScroll1, { passive: true });
     return () => {
       scroller0.removeEventListener("scroll", onScroll0);
       scroller1.removeEventListener("scroll", onScroll1);
     };
-  }, [split, syncScroll, coord]);
+  }, [split, vSync, hSync, coord]);
 
   return (
     <div className={`np-panes ${orient === "h" ? "orient-h" : "orient-v"}`}>
@@ -97,7 +116,13 @@ export function NotepadSplitPanes({
           bookmarks={bookmarks}
           marks={marks}
           activeMatch={activeMatch}
+          findHighlight={findHighlight}
+          historyResetNonce={historyResetNonce}
+          initialSelection={paneSelections?.[0]}
+          initialScroll={paneScrolls?.[0]}
           onChange={onChange}
+          onUserTextInsert={onUserTextInsert}
+          onScrollPosition={(top, left) => onScrollPosition?.(0, top, left)}
           onCursorMetrics={(m) => onCursorMetrics(0, m)}
           onToggleBookmark={onToggleBookmark}
           onToggleInsertMode={onToggleInsertMode}
@@ -125,7 +150,13 @@ export function NotepadSplitPanes({
               bookmarks={bookmarks}
               marks={marks}
               activeMatch={activeMatch}
+              findHighlight={findHighlight}
+              historyResetNonce={historyResetNonce}
+              initialSelection={paneSelections?.[1]}
+              initialScroll={paneScrolls?.[1]}
               onChange={onChange}
+              onUserTextInsert={onUserTextInsert}
+              onScrollPosition={(top, left) => onScrollPosition?.(1, top, left)}
               onCursorMetrics={(m) => onCursorMetrics(1, m)}
               onToggleBookmark={onToggleBookmark}
               onToggleInsertMode={onToggleInsertMode}

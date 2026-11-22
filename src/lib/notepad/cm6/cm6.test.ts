@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   applyBookmarkLinesOp,
   bookmarkStateField,
+  changeHistoryField,
+  clearChangeHistoryEffect,
   markHistoryBaselineEffect,
   nextBookmarkPos,
   setBookmarksEffect,
@@ -121,6 +123,9 @@ describe("notepad cm6 extensions (V-12..V-17)", () => {
       expect([...view.state.field(bookmarkStateField)]).toEqual([2, 4]);
 
       view.dispatch({ effects: [setBookmarksEffect.of([0, 2]), markHistoryBaselineEffect.of(["x"])] });
+      expect(view.state.field(changeHistoryField).savedTouched.size).toBeGreaterThan(0);
+      view.dispatch({ effects: clearChangeHistoryEffect.of(view.state.doc.toString().split("\n")) });
+      expect(view.state.field(changeHistoryField).savedTouched.size).toBe(0);
       const cut = applyBookmarkLinesOp("A\nB\nC", [0, 2], "cut");
       expect(cut.extractedText).toBe("A\nC");
       expect(cut.nextText).toBe("B");
@@ -142,6 +147,12 @@ describe("notepad cm6 extensions (V-12..V-17)", () => {
       view.dispatch({ effects: setMarkHighlightsEffect.of({ rules, activeMatch: { from: 6, to: 10 } }) });
       const spans = computeMarkSpans(view.state.doc.toString(), { rules });
       expect(spans).toHaveLength(4);
+      const findHighlightSpans = computeMarkSpans(view.state.doc.toString(), {
+        rules: [],
+        findHighlight: { query: "alpha", mode: "normal", caseSensitive: false, wholeWord: true, dotAll: false },
+      });
+      expect(findHighlightSpans).toHaveLength(3);
+      expect(findHighlightSpans[0].className).toBe("np-search-all-match");
       expect(extractMarkedMatchesText(view.state.doc.toString(), rules, 1)).toBe("alpha\nalpha\nalpha");
       expect(jumpMarkSpan(view.state.doc.toString(), rules, 1, 2, false)).toEqual({ from: 11, to: 16, className: "np-mark-style-1" });
 

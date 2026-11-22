@@ -154,8 +154,8 @@ export const NOTEPAD_COMMAND_CATALOG: readonly NotepadCommandDefinition[] = [
   { id: "search.styleTokenClear3", titleKey: "notepad.cmd.styleClear3", defaultLabel: "Clear Style 3", zhLabel: "清除样式 3", category: "search", recordable: true },
   { id: "search.styleTokenClear4", titleKey: "notepad.cmd.styleClear4", defaultLabel: "Clear Style 4", zhLabel: "清除样式 4", category: "search", recordable: true },
   { id: "search.styleTokenClear5", titleKey: "notepad.cmd.styleClear5", defaultLabel: "Clear Style 5", zhLabel: "清除样式 5", category: "search", recordable: true },
-  { id: "search.nextChange", titleKey: "notepad.cmd.nextChange", defaultLabel: "Next Change", zhLabel: "下一处变更", category: "search", defaultShortcut: "Alt+Shift+ArrowDown", recordable: false },
-  { id: "search.prevChange", titleKey: "notepad.cmd.prevChange", defaultLabel: "Previous Change", zhLabel: "上一处变更", category: "search", defaultShortcut: "Alt+Shift+ArrowUp", recordable: false },
+  { id: "search.nextChange", titleKey: "notepad.cmd.nextChange", defaultLabel: "Next Change", zhLabel: "下一处变更", category: "search", defaultShortcut: "Alt+F5", recordable: false },
+  { id: "search.prevChange", titleKey: "notepad.cmd.prevChange", defaultLabel: "Previous Change", zhLabel: "上一处变更", category: "search", defaultShortcut: "Alt+Shift+F5", recordable: false },
   { id: "search.clearChangeHistory", titleKey: "notepad.cmd.clearChangeHistory", defaultLabel: "Clear Change History", zhLabel: "清除变更历史", category: "search", recordable: false },
 
   // View

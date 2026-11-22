@@ -8,6 +8,7 @@ import {
 } from "../lib/viewer";
 import { readViewerDrafts, writeViewerDrafts } from "./viewerDrafts";
 import { notepadBackupList, notepadBackupPrune, notepadBackupRead } from "../lib/notepad/ipc";
+import { useNotepadPreferences } from "./notepadPreferences";
 import { useNotepadStore } from "./notepadStore";
 
 export interface ViewerCloseRequest { paths: string[]; proceed: () => void; cancel?: () => void }
@@ -128,11 +129,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
           document = { ...document, large: (large || data.truncated) && !forceEdit, readOnly: !!readOnlyReason || data.truncated || (large && !forceEdit), readOnlyReason,
             nextOffset: data.nextOffset ?? (data.truncated ? VIEWER_TEXT_CHUNK_SIZE : stat.size) };
           let draft = !readOnlyReason && !document.large ? readViewerDrafts()[key] : undefined;
-          // The legacy draft is the freshest buffer across a renderer reload
-          // (flushDrafts rewrites it on every flush), so it wins over a periodic
-          // Notepad disk snapshot. Disk backups only fill the gap when there is
-          // no draft at all (crash after a large-file or migrated document).
-          if (!draft && !readOnlyReason && !document.large && document.kind === "text") {
+          let backupDoc: ViewerDocument | null = null;
+          let backupUpdatedAtMs = 0;
+          if (!readOnlyReason && !document.large && document.kind === "text") {
             try {
               const backups = await notepadBackupList();
               const match = backups.find((b) => b.docId === key || (b.path && documentPathKey(b.path) === key));
@@ -140,7 +139,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
                 const loaded = await notepadBackupRead(match.id);
                 if (generations.get(key) !== generation) return;
                 const eol = loaded.entry.eol === "CRLF" || loaded.entry.eol === "CR" ? loaded.entry.eol : "LF";
-                document = {
+                backupUpdatedAtMs = loaded.entry.updatedAt * 1000;
+                backupDoc = {
                   ...document,
                   content: normalizeViewerText(loaded.content),
                   savedHash: loaded.entry.savedHash || data.hash,
@@ -151,12 +151,16 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
                   restored: true,
                   external: loaded.entry.savedHash && loaded.entry.savedHash !== data.hash ? data : undefined,
                 };
-                useNotepadStore.getState().patchDoc(key, { backupState: "saved", lastBackupAt: loaded.entry.updatedAt * 1000 });
-                draft = undefined;
               }
             } catch {
               // Fallback to localStorage draft if backup IPC is unavailable
             }
+          }
+          // Prefer whichever recovery snapshot is newer: disk backup or localStorage draft.
+          if (backupDoc && (!draft || (draft.updatedAt !== undefined && backupUpdatedAtMs > draft.updatedAt))) {
+            document = backupDoc;
+            useNotepadStore.getState().patchDoc(key, { backupState: "saved", lastBackupAt: backupUpdatedAtMs });
+            draft = undefined;
           }
           if (draft) {
             document = { ...document, ...draft, key, path, dirty: true, restored: true,
@@ -340,7 +344,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
         if (generations.get(key) !== generation) return;
         update(path, (document) => {
           if (document.savedHash === data.hash || document.saving) return document;
-          return document.dirty ? { ...document, external: data } : fromDisk(document, data);
+          const autoReload = useNotepadPreferences.getState().autoReloadCleanExternal;
+          if (!document.dirty && autoReload) return fromDisk(document, data);
+          return { ...document, external: data };
         });
       } catch (error) {
         if (generations.get(key) === generation) update(path, (document) => ({ ...document, error: message(error) }));

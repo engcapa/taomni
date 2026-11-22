@@ -6,10 +6,13 @@ import type { RecordedMacroStep } from "../../lib/notepad/commands/types";
 import { viewerTabHost } from "../../lib/notepad/host/viewerTabHost";
 import { viewerRename, viewerSaveAs, viewerTrash, viewerWriteTextElevated } from "../../lib/notepad/ipc";
 import {
+  normalizeMacroSteps,
   runMacroMultipleTimes,
+  runMacroOnce,
   runMacroUntilEndOfFile,
   saveMacrosList,
   type MacroPlaybackHost,
+  type SavedMacroEntry,
 } from "../../lib/notepad/macro/macroManager";
 import { loadSessionFromDisk, saveSessionToDisk, type SessionTabEntry } from "../../lib/notepad/persistence/sessionManager";
 import { findAllMatches, findNextMatch, replaceAllInText, toSearchResultHits } from "../../lib/notepad/search/engine";
@@ -17,14 +20,14 @@ import { cancelActiveFindInFiles, replaceInDiskFiles, runFindInFiles } from "../
 import { convertCaseRange, type NotepadCaseKind } from "../../lib/notepad/transforms/case";
 import type { ColumnInsertSpec } from "../../lib/notepad/transforms/column";
 import { sortLines, type SortOptions } from "../../lib/notepad/transforms/sort";
-import type { TextRange, TextTransformResult } from "../../lib/notepad/transforms/lines";
-import { isUntitledKey } from "../../lib/openFile/pathIdentity";
+import { getLineStarts, lineIndexAt, type TextRange, type TextTransformResult } from "../../lib/notepad/transforms/lines";
+import { documentPathKey, isUntitledKey } from "../../lib/openFile/pathIdentity";
 import type { ViewerEol } from "../../lib/viewer";
 import { useRecentFilesStore } from "../../stores/app/recentFiles";
 import { useDocumentStore } from "../../stores/documentStore";
-import { useNotepadPreferences } from "../../stores/notepadPreferences";
+import { setNotepadPreferences, useNotepadPreferences } from "../../stores/notepadPreferences";
 import { applyColumnEditorToView } from "../../lib/notepad/cm6/columnSelection";
-import { useNotepadStore } from "../../stores/notepadStore";
+import { useNotepadStore, type NotepadMacroStep } from "../../stores/notepadStore";
 import { createCoreCommandMap } from "./actions/coreCommands";
 import { createExtraCommandMap } from "./actions/extraCommands";
 import type { NotepadActionContext, NotepadActionDeps } from "./actions/context";
@@ -94,15 +97,37 @@ export function useNotepadActions(deps: NotepadActionDeps) {
     }
   };
 
-  const applyTransform = (fn: (text: string, range: TextRange) => TextTransformResult) => {
+  const applyTransform = (
+    fn: (text: string, range: TextRange) => TextTransformResult,
+    options?: { wholeDocLabel?: string },
+  ) => {
     if (deps.effectiveReadOnly) return;
     const view = deps.getActiveView();
-    const res = fn(deps.document.content, activeSelection(view));
-    applyTextResult(view, deps.document.path, res);
+    const sel = activeSelection(view);
+    const execute = () => {
+      const currentView = deps.getActiveView();
+      const latestText = useDocumentStore.getState().documents[deps.docKey]?.content ?? deps.document.content;
+      const res = fn(latestText, activeSelection(currentView));
+      applyTextResult(currentView, deps.document.path, res);
+    };
+    if (
+      options?.wholeDocLabel &&
+      sel.from === sel.to &&
+      deps.document.content.includes("\n") &&
+      useNotepadPreferences.getState().askWholeDocLineOp
+    ) {
+      deps.setLifecycleModal({
+        kind: "wholeDocConfirm",
+        actionLabel: options.wholeDocLabel,
+        onConfirm: execute,
+      });
+      return;
+    }
+    execute();
   };
 
-  const applySort = (opts: SortOptions) =>
-    applyTransform((t, r) => sortLines(t, r, opts, true));
+  const applySort = (opts: SortOptions, actionLabel = "Sort Lines") =>
+    applyTransform((t, r) => sortLines(t, r, opts, true), { wholeDocLabel: actionLabel });
 
   const applyCaseOp = (kind: NotepadCaseKind) => {
     if (deps.effectiveReadOnly) return;
@@ -113,8 +138,7 @@ export function useNotepadActions(deps: NotepadActionDeps) {
     applyTextResult(view, deps.document.path, res);
   };
 
-  const toRecordedSteps = (steps: Array<{ commandId: string; args?: Record<string, unknown> }>): RecordedMacroStep[] =>
-    steps.map((s) => ({ type: "command" as const, commandId: s.commandId, args: s.args }));
+  const toRecordedSteps = (steps: NotepadMacroStep[]): RecordedMacroStep[] => normalizeMacroSteps(steps);
 
   const macroHost: MacroPlaybackHost = {
     async executeCommand(id, args) {
@@ -132,7 +156,7 @@ export function useNotepadActions(deps: NotepadActionDeps) {
     },
   };
 
-  const jumpToOffset = (from: number, to = from) => {
+  const jumpToOffset = (from: number, to = from, options?: { preserveFocus?: boolean }) => {
     const view = deps.getActiveView();
     if (!view) return;
     const clampedFrom = Math.max(0, Math.min(from, view.state.doc.length));
@@ -141,18 +165,24 @@ export function useNotepadActions(deps: NotepadActionDeps) {
     useNotepadStore.getState().patchDoc(deps.docKey, {
       activeMatch: clampedTo > clampedFrom ? { from: clampedFrom, to: clampedTo } : null,
     });
-    view.focus();
+    if (!options?.preserveFocus) view.focus();
   };
 
-  const runFindDirection = (backward: boolean) => {
+  const runFindDirection = (
+    backward: boolean,
+    overrideQuery?: string,
+    options?: { preserveFocus?: boolean },
+  ) => {
     const view = deps.getActiveView();
     const sel = activeSelection(view);
+    const searchCursor = options?.preserveFocus ? { from: sel.from, to: sel.from } : sel;
     const q = deps.docState.find;
+    const queryText = overrideQuery !== undefined ? overrideQuery : q.query;
     const res = findNextMatch(
       deps.document.content,
-      { ...q, backward },
-      sel,
-      sel.to > sel.from ? sel : undefined,
+      { ...q, query: queryText, backward },
+      searchCursor,
+      sel.to > sel.from && overrideQuery === undefined ? sel : undefined,
     );
     if (res.error) {
       deps.setFindStatus(res.error);
@@ -162,8 +192,20 @@ export function useNotepadActions(deps: NotepadActionDeps) {
       deps.setFindStatus("No matches found.");
       return;
     }
-    jumpToOffset(res.match.from, res.match.to);
+    jumpToOffset(res.match.from, res.match.to, options);
     deps.setFindStatus(res.wrapped ? "Wrapped search." : null);
+  };
+
+  const editContent = (text: string) => {
+    const view = deps.getActiveView();
+    if (view) {
+      const current = view.state.doc.toString();
+      if (current !== text) {
+        view.dispatch({ changes: { from: 0, to: current.length, insert: text } });
+      }
+      return;
+    }
+    useDocumentStore.getState().edit(deps.document.path, text);
   };
 
   const ctx: NotepadActionContext = {
@@ -178,7 +220,7 @@ export function useNotepadActions(deps: NotepadActionDeps) {
     performSave,
     macroHost,
     toRecordedSteps,
-    editContent: (text: string) => useDocumentStore.getState().edit(deps.document.path, text),
+    editContent,
   };
 
   registry.registerMany(createCoreCommandMap(ctx));
@@ -255,6 +297,7 @@ export function useNotepadActions(deps: NotepadActionDeps) {
     searchActions: {
       findNext: () => runFindDirection(false),
       findPrev: () => runFindDirection(true),
+      incrementalSearch: (query: string) => runFindDirection(false, query, { preserveFocus: true }),
       count: () => {
         const res = findAllMatches(deps.document.content, deps.docState.find);
         deps.setFindStatus(res.error ?? `${res.matches.length} match(es).`);
@@ -312,7 +355,8 @@ export function useNotepadActions(deps: NotepadActionDeps) {
           if (!d || d.readOnly || d.large) continue;
           const res = replaceAllInText(d.content, deps.docState.find);
           if (res.count > 0) {
-            useDocumentStore.getState().edit(d.path, res.text);
+            if (ref.docKey === deps.docKey) editContent(res.text);
+            else useDocumentStore.getState().edit(d.path, res.text);
             count += res.count;
           }
         }
@@ -380,9 +424,28 @@ export function useNotepadActions(deps: NotepadActionDeps) {
         const openDocs = viewerTabHost.listOpenDocs();
         const docs = useDocumentStore.getState().documents;
         const npDocs = useNotepadStore.getState().docs;
+        const activeView = deps.getActiveView();
         const tabs: SessionTabEntry[] = openDocs.map((ref) => {
           const d = docs[ref.docKey];
           const nd = npDocs[ref.docKey];
+          const content = d?.content ?? "";
+          let cursorLine = 1;
+          let cursorCol = 1;
+          let scrollTop = nd?.paneScrolls[nd?.activePane ?? 0]?.top ?? 0;
+          if (ref.docKey === deps.docKey && activeView) {
+            const head = activeView.state.selection.main.head;
+            const ln = activeView.state.doc.lineAt(head);
+            cursorLine = ln.number;
+            cursorCol = head - ln.from + 1;
+            scrollTop = Math.round(activeView.scrollDOM.scrollTop);
+          } else if (nd) {
+            const sel = nd.paneSelections[nd.activePane];
+            const pos = Math.max(0, Math.min(sel.to, content.length));
+            const lnIdx = lineIndexAt(content, pos);
+            const starts = getLineStarts(content);
+            cursorLine = lnIdx + 1;
+            cursorCol = pos - (starts[lnIdx] ?? 0) + 1;
+          }
           return {
             docKey: ref.docKey,
             path: ref.untitled ? null : ref.path,
@@ -392,14 +455,14 @@ export function useNotepadActions(deps: NotepadActionDeps) {
             encoding: d?.encoding ?? "UTF-8",
             bom: d?.bom ?? false,
             eol: d?.eol === "CRLF" || d?.eol === "CR" ? d.eol : "LF",
-            cursorLine: 1,
-            cursorCol: 1,
-            scrollTop: nd?.paneScrolls[0].top ?? 0,
+            cursorLine,
+            cursorCol,
+            scrollTop,
             bookmarks: nd?.bookmarks ?? [],
             wrap: useNotepadPreferences.getState().wrap,
             readOnly: Boolean(d?.readOnly),
             split: Boolean(nd?.split),
-            untitledContent: ref.untitled ? d?.content ?? "" : undefined,
+            untitledContent: ref.untitled ? content : undefined,
           };
         });
         return saveSessionToDisk(tabs, deps.docKey, filePath);
@@ -407,13 +470,59 @@ export function useNotepadActions(deps: NotepadActionDeps) {
       async loadSession(filePath?: string | null) {
         const loaded = await loadSessionFromDisk(filePath);
         if (!loaded) return;
+        const keyMap = new Map<string, string>();
         for (const tab of loaded.tabs) {
+          let targetKey: string | null = null;
           if (tab.untitled) {
-            viewerTabHost.openUntitled(deps.hostCtx, tab.untitledContent ?? "");
+            targetKey = viewerTabHost.openUntitled(deps.hostCtx, tab.untitledContent ?? "", {
+              title: tab.name,
+              encoding: tab.encoding,
+              bom: tab.bom,
+              eol: tab.eol,
+            });
           } else if (tab.path) {
             await viewerTabHost.openFile(tab.path, deps.hostCtx);
+            targetKey = documentPathKey(tab.path);
           }
-          useNotepadStore.getState().setBookmarks(tab.docKey, tab.bookmarks);
+          if (!targetKey) continue;
+          keyMap.set(tab.docKey, targetKey);
+          const docStore = useDocumentStore.getState();
+          const openedDoc = docStore.documents[targetKey];
+          if (openedDoc) {
+            const formatDiffers =
+              openedDoc.encoding !== tab.encoding ||
+              openedDoc.bom !== tab.bom ||
+              openedDoc.eol !== tab.eol;
+            if (formatDiffers) {
+              docStore.configure(openedDoc.path, {
+                encoding: tab.encoding,
+                bom: tab.bom,
+                eol: tab.eol,
+              });
+            }
+            if (tab.readOnly) docStore.setEditorReadOnly(openedDoc.path, true);
+          }
+          if (tab.pinned) viewerTabHost.pinDoc(targetKey, true);
+          const np = useNotepadStore.getState();
+          np.setBookmarks(targetKey, tab.bookmarks);
+          const restoredText = docStore.documents[targetKey]?.content ?? tab.untitledContent ?? "";
+          const starts = getLineStarts(restoredText);
+          const line0 = Math.max(0, Math.min(tab.cursorLine - 1, starts.length - 1));
+          const lineEnd = restoredText.indexOf("\n", starts[line0]);
+          const lineLen = (lineEnd === -1 ? restoredText.length : lineEnd) - starts[line0];
+          const offset = starts[line0] + Math.max(0, Math.min(tab.cursorCol - 1, lineLen));
+          np.patchDoc(targetKey, {
+            split: tab.split,
+            paneSelections: [{ from: offset, to: offset }, { from: offset, to: offset }],
+            paneScrolls: [{ top: tab.scrollTop, left: 0 }, { top: tab.scrollTop, left: 0 }],
+          });
+          if (loaded.activeDocKey === tab.docKey) {
+            setNotepadPreferences({ wrap: tab.wrap });
+          }
+        }
+        if (loaded.activeDocKey) {
+          const activeTarget = keyMap.get(loaded.activeDocKey) ?? loaded.activeDocKey;
+          viewerTabHost.activateDoc(activeTarget, deps.hostCtx);
         }
       },
       async runMulti(mode: "times" | "eof", count: number) {
@@ -421,20 +530,25 @@ export function useNotepadActions(deps: NotepadActionDeps) {
         if (mode === "eof") await runMacroUntilEndOfFile(steps, macroHost);
         else await runMacroMultipleTimes(steps, count, macroHost);
       },
+      async runSavedMacro(macro: SavedMacroEntry | { steps: NotepadMacroStep[] }) {
+        const steps = toRecordedSteps(macro.steps);
+        await runMacroOnce(steps, macroHost);
+      },
       async saveNamedMacro(name: string, shortcut?: string) {
         const macro = useNotepadStore.getState().macro;
-        const next = [...macro.saved.filter((m) => m.name !== name), { name, key: shortcut, steps: macro.buffer }];
-        const res = await saveMacrosList(next.map((m) => ({ name: m.name, shortcut: m.key, steps: m.steps.map((s) => ({ type: "command" as const, commandId: s.commandId, args: s.args })) })));
+        const normalizedSteps = normalizeMacroSteps(macro.buffer);
+        const next = [...macro.saved.filter((m) => m.name !== name), { name, key: shortcut, steps: normalizedSteps }];
+        const res = await saveMacrosList(next.map((m) => ({ name: m.name, shortcut: m.key, steps: normalizeMacroSteps(m.steps) })));
         useNotepadStore.getState().patchMacro({ saved: next, hash: res.actualHash, tampered: false });
       },
       async deleteMacro(name: string) {
         const next = useNotepadStore.getState().macro.saved.filter((m) => m.name !== name);
-        const res = await saveMacrosList(next.map((m) => ({ name: m.name, shortcut: m.key, steps: m.steps.map((s) => ({ type: "command" as const, commandId: s.commandId, args: s.args })) })));
+        const res = await saveMacrosList(next.map((m) => ({ name: m.name, shortcut: m.key, steps: normalizeMacroSteps(m.steps) })));
         useNotepadStore.getState().patchMacro({ saved: next, hash: res.actualHash });
       },
       async renameMacro(oldName: string, newName: string) {
         const next = useNotepadStore.getState().macro.saved.map((m) => (m.name === oldName ? { ...m, name: newName } : m));
-        const res = await saveMacrosList(next.map((m) => ({ name: m.name, shortcut: m.key, steps: m.steps.map((s) => ({ type: "command" as const, commandId: s.commandId, args: s.args })) })));
+        const res = await saveMacrosList(next.map((m) => ({ name: m.name, shortcut: m.key, steps: normalizeMacroSteps(m.steps) })));
         useNotepadStore.getState().patchMacro({ saved: next, hash: res.actualHash });
       },
       async insertChar(ch: string) {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClipboardCopy, FileText, MonitorUp, Search, X } from "lucide-react";
 import type { OpenFileMode } from "../../../lib/openFile";
-import { isHandlerAvailable } from "../../../lib/openFile/handlers";
+import { isHandlerAvailable, isOfficeExtension } from "../../../lib/openFile/handlers";
 import type { FileHandler } from "../../../lib/openFile/preferences";
 import type { HostedDocRef } from "../../../lib/notepad/host/types";
 import { useDocumentStore } from "../../../stores/documentStore";
@@ -51,6 +51,15 @@ export function PickerDialogs({
 }) {
   const label = useViewerLabels();
   const clipboardHistory = useNotepadStore((state) => state.clipboardHistory);
+  const [rememberFor, setRememberFor] = useState<Partial<Record<OpenFileMode, boolean>>>({});
+
+  useEffect(() => {
+    setRememberFor({});
+  }, [modal]);
+
+  const openWithOptions = modal?.kind === "openWith"
+    ? OPEN_WITH_OPTIONS.filter((opt) => opt.mode !== "taoffice" || isOfficeExtension(modal.path))
+    : [];
 
   return (
     <>
@@ -63,9 +72,10 @@ export function PickerDialogs({
             </div>
             <p className="np-dialog-hint">{label("选择打开此文件的应用；可勾选“记住”把选择保存为该扩展名的默认打开方式。", "Choose the application for this file. Check Remember to store the choice for this extension.")}</p>
             <div className="np-pick-list">
-              {OPEN_WITH_OPTIONS.map((option) => {
+              {openWithOptions.map((option) => {
                 const handlerId = (option.mode === "taomni" ? "taomni" : option.mode) as FileHandler;
                 const disabled = option.disabled ?? !isHandlerAvailable(handlerId);
+                const remembered = Boolean(rememberFor[option.mode]);
                 return (
                   <div key={option.mode} className="np-pick-row" data-disabled={disabled || undefined}>
                     <button
@@ -73,7 +83,10 @@ export function PickerDialogs({
                       className="np-pick-main"
                       data-testid={`notepad-open-with-${option.mode}`}
                       disabled={disabled}
-                      onClick={() => onOpenWith(option.mode)}
+                      onClick={() => {
+                        if (remembered) onRememberHandler(option.mode as Exclude<OpenFileMode, "source">);
+                        onOpenWith(option.mode);
+                      }}
                     >
                       {option.icon}
                       <span>{label(option.zh, option.en)}</span>
@@ -84,7 +97,11 @@ export function PickerDialogs({
                         type="checkbox"
                         data-testid={`notepad-open-with-remember-${option.mode}`}
                         disabled={disabled}
-                        onChange={(event) => { if (event.target.checked) onRememberHandler(option.mode as Exclude<OpenFileMode, "source">); }}
+                        checked={remembered}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setRememberFor((prev) => ({ ...prev, [option.mode]: checked }));
+                        }}
                       />
                       {label("记住", "Remember")}
                     </label>
