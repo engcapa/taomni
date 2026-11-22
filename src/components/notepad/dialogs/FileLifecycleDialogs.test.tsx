@@ -22,12 +22,11 @@ function saveAsModal(overrides: Partial<SaveAsModal> = {}): SaveAsModal {
   };
 }
 
-function renderDialog(modal: NotepadLifecycleModal, handlers: {
+function dialogProps(modal: NotepadLifecycleModal | null, handlers: {
   onClose?: () => void;
   onSaveAs?: (path: string, overwrite: boolean, copy?: boolean) => Promise<void>;
 } = {}) {
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  const props = {
+  return {
     modal,
     onClose: handlers.onClose ?? vi.fn(),
     onSaveAs: handlers.onSaveAs ?? vi.fn(async () => undefined),
@@ -36,6 +35,13 @@ function renderDialog(modal: NotepadLifecycleModal, handlers: {
     onElevatedSave: vi.fn(async () => undefined),
     onOpenFolderFiles: vi.fn(async () => undefined),
   };
+}
+
+function renderDialog(modal: NotepadLifecycleModal, handlers: {
+  onClose?: () => void;
+  onSaveAs?: (path: string, overwrite: boolean, copy?: boolean) => Promise<void>;
+} = {}) {
+  const props = dialogProps(modal, handlers);
   return { ...render(<FileLifecycleDialogs {...props} />), props };
 }
 
@@ -46,6 +52,15 @@ afterEach(() => {
 });
 
 describe("FileLifecycleDialogs Save As (U2)", () => {
+  it("prefills the absolute default path on the very first render after opening", () => {
+    // The host stays mounted with modal=null between opens; the Save As dialog
+    // must own its initial state so no empty controlled input is ever painted
+    // before a passive effect runs (macOS browser QA caught that race).
+    const { rerender } = render(<FileLifecycleDialogs {...dialogProps(null)} />);
+    rerender(<FileLifecycleDialogs {...dialogProps(saveAsModal())} />);
+    expect(screen.getByTestId("notepad-save-as-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("notepad-save-as-input")).toHaveValue("C:\\Users\\qa\\新建 1.txt");
+  });
   it("prefills the absolute default path and renders the themed np-modal surface", () => {
     renderDialog(saveAsModal());
     expect(screen.getByTestId("notepad-save-as-dialog")).toBeInTheDocument();

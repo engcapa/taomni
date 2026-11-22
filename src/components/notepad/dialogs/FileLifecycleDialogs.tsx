@@ -21,6 +21,100 @@ export type NotepadLifecycleModal =
       bytes: number;
     };
 
+export type NotepadSaveAsModal = Extract<NotepadLifecycleModal, { kind: "saveAs" }>;
+
+/**
+ * Save As is its own component so its editable path state is initialized by the
+ * mount that first shows the dialog. The host `FileLifecycleDialogs` stays
+ * mounted with `modal = null` between opens; keeping Save As state there left a
+ * first-render window where the input was still empty before a passive effect
+ * copied `initialPath` in (observed on macOS browser QA as a transient empty
+ * controlled value). Mounting on open removes that race and re-initializes
+ * cleanly for every open.
+ */
+function NotepadSaveAsDialog({
+  modal,
+  onClose,
+  onSaveAs,
+}: {
+  modal: NotepadSaveAsModal;
+  onClose: () => void;
+  onSaveAs: (path: string, overwrite: boolean, copy?: boolean) => Promise<void>;
+}) {
+  const label = useViewerLabels();
+  const [pathInput, setPathInput] = useState(modal.initialPath || modal.defaultPath);
+  const [overwrite, setOverwrite] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const submitSaveAs = async (forceOverwrite: boolean) => {
+    setErr(null);
+    setBusy(true);
+    try {
+      await onSaveAs(pathInput.trim(), forceOverwrite, modal.copy);
+      onClose();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.startsWith("exists:")) {
+        setOverwrite(true);
+        setErr(label("目标文件已存在，请确认是否覆盖。", "Target file already exists. Confirm overwrite to replace it."));
+      } else {
+        setErr(msg);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="np-modal-backdrop" role="dialog" aria-modal="true" data-testid="notepad-save-as-dialog">
+      <div className="np-modal">
+        <div className="np-modal-header">
+          <span>{modal.copy ? label("保存副本", "Save a Copy") : label("另存为", "Save As")}</span>
+          <button type="button" className="np-btn" onClick={onClose} aria-label="Close"><X size={14} /></button>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            className="np-input flex-1"
+            data-testid="notepad-save-as-input"
+            placeholder="/path/to/file.txt"
+            value={pathInput}
+            onChange={(e) => { setPathInput(e.target.value); setOverwrite(false); }}
+          />
+          <button
+            type="button"
+            className="np-btn"
+            data-testid="notepad-save-as-browse"
+            title={modal.defaultDir}
+            onClick={async () => {
+              // U2: the native picker opens in the resolved default directory.
+              const picked = await selectSaveFilePath(
+                modal.defaultPath.split(/[\\/]/).pop(),
+                notepadDialogDirectory(modal.defaultDir),
+              );
+              if (picked) setPathInput(picked);
+            }}
+          >
+            <FolderOpen size={13} />
+          </button>
+        </div>
+        {err && <div className="text-[12px] text-red-500" data-testid="notepad-dialog-error">{err}</div>}
+        <div className="flex justify-end gap-2">
+          <button type="button" className="np-btn" onClick={onClose}>{label("取消", "Cancel")}</button>
+          <button
+            type="button"
+            className="np-btn primary"
+            data-testid="notepad-save-as-confirm"
+            disabled={busy || !pathInput.trim()}
+            onClick={() => void submitSaveAs(overwrite)}
+          >
+            {overwrite ? label("覆盖保存", "Overwrite") : label("保存", "Save")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function FileLifecycleDialogs({
   modal,
   onClose,
@@ -41,97 +135,31 @@ export function FileLifecycleDialogs({
   onDisableWholeDocPrompt?: () => void;
 }) {
   const label = useViewerLabels();
-  const [pathInput, setPathInput] = useState(
-    modal?.kind === "saveAs" ? modal.initialPath || modal.defaultPath : "",
-  );
-  const [overwrite, setOverwrite] = useState(false);
   const [nameInput, setNameInput] = useState(modal?.kind === "rename" ? modal.currentName : "");
   const [dontAskAgain, setDontAskAgain] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const lastModalRef = useRef<NotepadLifecycleModal | null>(null);
   // Re-initialize the editable fields whenever a new modal opens so a stale
-  // value from the previous open cannot leak into the next Save As/Rename.
+  // value from the previous open cannot leak into the next Rename.
   useEffect(() => {
     if (modal === lastModalRef.current) return;
     lastModalRef.current = modal;
-    setOverwrite(false);
     setErr(null);
     setDontAskAgain(false);
-    if (modal?.kind === "saveAs") setPathInput(modal.initialPath || modal.defaultPath);
     if (modal?.kind === "rename") setNameInput(modal.currentName);
   }, [modal]);
 
   if (!modal) return null;
 
-  const submitSaveAs = async (forceOverwrite: boolean) => {
-    setErr(null);
-    setBusy(true);
-    try {
-      await onSaveAs(pathInput.trim(), forceOverwrite, modal.kind === "saveAs" ? modal.copy : false);
-      onClose();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.startsWith("exists:")) {
-        setOverwrite(true);
-        setErr(label("目标文件已存在，请确认是否覆盖。", "Target file already exists. Confirm overwrite to replace it."));
-      } else {
-        setErr(msg);
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
   if (modal.kind === "saveAs") {
     return (
-      <div className="np-modal-backdrop" role="dialog" aria-modal="true" data-testid="notepad-save-as-dialog">
-        <div className="np-modal">
-          <div className="np-modal-header">
-            <span>{modal.copy ? label("保存副本", "Save a Copy") : label("另存为", "Save As")}</span>
-            <button type="button" className="np-btn" onClick={onClose} aria-label="Close"><X size={14} /></button>
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              className="np-input flex-1"
-              data-testid="notepad-save-as-input"
-              placeholder="/path/to/file.txt"
-              value={pathInput}
-              onChange={(e) => { setPathInput(e.target.value); setOverwrite(false); }}
-            />
-            <button
-              type="button"
-              className="np-btn"
-              data-testid="notepad-save-as-browse"
-              title={modal.defaultDir}
-              onClick={async () => {
-                // U2: the native picker opens in the resolved default directory.
-                const picked = await selectSaveFilePath(
-                  modal.defaultPath.split(/[\\/]/).pop(),
-                  notepadDialogDirectory(modal.defaultDir),
-                );
-                if (picked) setPathInput(picked);
-              }}
-            >
-              <FolderOpen size={13} />
-            </button>
-          </div>
-          {err && <div className="text-[12px] text-red-500" data-testid="notepad-dialog-error">{err}</div>}
-          <div className="flex justify-end gap-2">
-            <button type="button" className="np-btn" onClick={onClose}>{label("取消", "Cancel")}</button>
-            <button
-              type="button"
-              className="np-btn primary"
-              data-testid="notepad-save-as-confirm"
-              disabled={busy || !pathInput.trim()}
-              onClick={() => void submitSaveAs(overwrite)}
-            >
-              {overwrite ? label("覆盖保存", "Overwrite") : label("保存", "Save")}
-            </button>
-          </div>
-        </div>
-      </div>
+      <NotepadSaveAsDialog
+        key={`${modal.copy ? "copy" : "save"}:${modal.initialPath || modal.defaultPath}`}
+        modal={modal}
+        onClose={onClose}
+        onSaveAs={onSaveAs}
+      />
     );
   }
 
