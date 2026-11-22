@@ -194,7 +194,8 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     locked,
     report,
     t,
-    setCfg: runtime.setCfg,
+    select: runtime.select,
+    save: runtime.save,
     cfg: cfg,
     priorityOrderedProfiles,
     subInput,
@@ -239,6 +240,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     setMacosSetupCompleted: runtime.setMacosSetupCompleted,
     setMacosSetupGuideMode: runtime.setMacosSetupGuideMode,
     refresh: runtime.refresh,
+    save: runtime.save,
     startButtonRef,
   });
   const { onRefreshGfw, onImportGfw } = createGfwActions({

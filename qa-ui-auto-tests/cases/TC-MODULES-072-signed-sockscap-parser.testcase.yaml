@@ -58,6 +58,13 @@ steps:
 - wait_for: '[data-testid="sockscap-upstream-host"][value="127.0.0.2"]'
 - assert_attribute: {selector: '[data-testid="sockscap-upstream-port"]', name: value, equals: '19392'}
 - assert_no_runtime_errors: null
+- fill: {selector: '[data-testid="sockscap-upstream-port"]', value: '19397'}
+- eval_readonly:
+    expression: "document.getElementsByName('upstreamPort')[0]?.value === '19397' && document.querySelector('.sockscap-panel')?.getAttribute('aria-busy') === 'false'"
+    expect_truthy: true
+    timeout_sec: 10
+- assert_file_contains: {path: '${fixture.sockscap_module_config}', contains: '"port":19397'}
+- assert_file_sha256: {path: '${fixture.sockscap_original_file}', equals: '${fixture.sockscap_original_sha256}'}
 verification:
   review: reviewed
   requirements:
@@ -79,7 +86,7 @@ verification:
     results: [8, 9, 22, 24, 25, 26, 31, 32, 36, 37, 38]
   - id: module-owned-settings
     requirement: Save the edited endpoint and Vault reference in the module data directory and use that copy after enabling again.
-    actions: [23, 29, 42, 43, 45, 46, 47, 48]
+    actions: [23, 29, 42, 43, 45, 46, 47, 48, 52]
     checkpoints:
     - {step: 39, expectation: The original monolithic configuration retains its initial digest.}
     - {step: 40, expectation: The retained module file contains the new upstream host.}
@@ -87,7 +94,10 @@ verification:
     - {step: 49, expectation: The re-enabled panel reads the edited host.}
     - {step: 50, expectation: The re-enabled panel reads the edited port.}
     - {step: 51, expectation: Reopening completes without runtime errors.}
-    results: [39, 40, 41, 49, 50, 51]
+    - {step: 53, expectation: The re-enabled module finishes saving the edited port while its field is still focused.}
+    - {step: 54, expectation: The signed host has written port 19397 into its own configuration on disk.}
+    - {step: 55, expectation: Editing the imported profile leaves the original file at its recorded digest.}
+    results: [39, 40, 41, 49, 50, 51, 53, 54, 55]
   visual:
   - check: The upstream settings reflect the imported proxy link.
     method: automated

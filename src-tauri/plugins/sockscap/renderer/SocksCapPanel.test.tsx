@@ -19,6 +19,7 @@ import { registerSocksCapPanelClipboard1Cases } from "./tests/socksCapPanel/clip
 import { defaultTestCfg, dialogOpenMock, fixtureState } from "./tests/socksCapPanel/harness";
 import { registerSocksCapPanelHistory2Cases } from "./tests/socksCapPanel/history2.cases";
 import { registerSocksCapPanelNavigation3Cases } from "./tests/socksCapPanel/navigation3.cases";
+import { registerProfileEditCases } from "./tests/socksCapPanel/profileEdits.cases";
 
 describe("SocksCapPanel Multi-Profile UI", () => {
   beforeEach(() => {
@@ -94,4 +95,5 @@ describe("SocksCapPanel Multi-Profile UI", () => {
   registerSocksCapPanelClipboard1Cases();
   registerSocksCapPanelHistory2Cases();
   registerSocksCapPanelNavigation3Cases();
+  registerProfileEditCases();
 });

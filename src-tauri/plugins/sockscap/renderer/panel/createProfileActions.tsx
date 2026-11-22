@@ -1,4 +1,4 @@
-import { sockscapSetConfig, sockscapImportSubscription, type SocksCapConfig, type SocksCapProfile, type UpstreamKind, type UpstreamParams } from "../../../../../src/lib/sockscap";
+import { sockscapImportSubscription, type SocksCapConfig, type SocksCapProfile, type UpstreamKind, type UpstreamParams } from "../../../../../src/lib/sockscap";
 import { vaultPut, vaultStatus, VAULT_LOCKED_EVENT } from "../../../../../src/lib/ipc";
 import { MIN_PROFILE_PRIORITY, MAX_PROFILE_PRIORITY } from "./configuration";
 
@@ -7,7 +7,8 @@ export interface CreateProfileActionsContext {
   locked: boolean;
   report: (text: string, ok?: boolean) => void;
   t: import("../../../../../src/lib/i18n").TranslateFn;
-  setCfg: import("react").Dispatch<import("react").SetStateAction<SocksCapConfig | null>>;
+  select: (config: SocksCapConfig) => void;
+  save: (config: SocksCapConfig) => Promise<void>;
   cfg: SocksCapConfig | null;
   priorityOrderedProfiles: import("./configuration").IndexedProfile[];
   subInput: string;
@@ -17,7 +18,7 @@ export interface CreateProfileActionsContext {
 }
 
 export function createProfileActions(context: CreateProfileActionsContext) {
-  const { locked, report, t, setCfg, cfg, priorityOrderedProfiles, subInput, setBusy, setSubInput, setShowSubImport } = context;
+  const { locked, report, t, select, save, cfg, priorityOrderedProfiles, subInput, setBusy, setSubInput, setShowSubImport } = context;
 
   const persistConfig = async (next: SocksCapConfig) => {
     if (locked) {
@@ -25,8 +26,7 @@ export function createProfileActions(context: CreateProfileActionsContext) {
       return false;
     }
     try {
-      await sockscapSetConfig(next);
-      setCfg(next);
+      await save(next);
       report(t("sockscap.saved"));
       return true;
     } catch (e) {
@@ -125,7 +125,7 @@ export function createProfileActions(context: CreateProfileActionsContext) {
       userRules: prof.userRules,
       defaultAction: prof.defaultAction,
     };
-    setCfg(nextCfg);
+    select(nextCfg);
   };
 
   const addProfile = async () => {

@@ -221,6 +221,7 @@ export function SocksCapView(props: SocksCapViewProps) {
     <div
       className="sockscap-panel relative h-full flex flex-col bg-[var(--taomni-panel-bg)] text-[var(--taomni-text)]"
       data-testid="sockscap-panel"
+      aria-busy={runtime.saving}
     >
       {/* Header */}
       <SocksCapHeader

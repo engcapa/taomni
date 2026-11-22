@@ -2,6 +2,9 @@
 
 ## 2026-11-22 当前进展
 
+- SocksCap 0.1.5 修复 Windows Native 在重开旧配置后编辑端口的问题。清空后键入 `19397` 时，原生失败现场保留了 `10801`。现在焦点内保留未输完的值，有效配置按输入顺序持久化，写入失败回到最后成功值。TC-MODULES-071 验证重开，072 从模块配置文件读回端口并复核原文件摘要，075 覆盖浏览器写入。55 项组件单测通过，修复后的桌面结果待收取。[Windows 原始分片](https://github.com/engcapa/taomni/actions/runs/45005586816)
+- Mail 的 `bc19f8dc3` 三端 Browser、Native 共 18 个分片已在执行期间全部下载。Browser 各 25/25，Linux 与 Windows Native 各 34/34，macOS Native 33/34。Mac 的 TC-FILE-OPEN-007 在系统导出目录选择面板超时。后续地址簿与 SocksCap 批次正在 `8b2526b30` 收取分片。[Mail 回执](https://github.com/engcapa/taomni/actions/runs/45003592759) · [地址簿与 SocksCap](https://github.com/engcapa/taomni/actions/runs/45011830158)
+
 - Mail 0.1.24 的签名宿主接管桌面地址簿、vCard 导入导出和 CardDAV 的本地写入。首次实装从旧邮箱库保留联系人、未同步编辑、待删除记录和远端 ETag。单独升级核心时按当前 Mail 版本确定归属，从备份恢复的模块邮箱优先使用自己的数据。写信时仍可同时搜索地址簿和历史收件人。TC-MODULES-081 逐步核对真实写锁、联系人 UID、旧库、停用后保留及重开后删除。TC-MAIL-CONTACTS-01 增加编辑后重新搜索。邮件正文缓存与归档索引仍在迁出，三端签名宿主和桌面验收待 GitHub 回执。
 - 候选 `647fec73c` 的三端 Browser 九个分片均已在运行期间下载，每端 24/24。四目标核心的 `latest.json` 和验签回执已从构建作业下载。Mail 上一批 `bc19f8dc3` 的 macOS Native 已收到 Live 表格、Explorer 新建文件、Outbox 和邮件服务器用例。TC-FILE-OPEN-007 的三个系统保存面板通过，接着在导出目录选择面板超时。 [升级分片](https://github.com/engcapa/taomni/actions/runs/45005586816) · [构建](https://github.com/engcapa/taomni/actions/runs/45005581790) · [Mail 分片](https://github.com/engcapa/taomni/actions/runs/45003592759)
 

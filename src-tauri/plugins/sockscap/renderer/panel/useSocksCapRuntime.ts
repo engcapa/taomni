@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   sockscapCapabilities,
-  sockscapGetConfig,
   sockscapGfwlistStatus,
   sockscapLaunchedApps,
   sockscapStatsSnapshot,
@@ -18,12 +17,12 @@ import {
   type LaunchedAppInfo,
   type RedirectorInstallStatus,
   type SocksCapCapabilities,
-  type SocksCapConfig,
   type SocksCapStatus,
   type StatsSnapshot,
 } from "../../../../../src/lib/sockscap";
 import { listSessions } from "../../../../../src/lib/ipc";
-import { type MacosSetupGuideMode, hasCompletedMacosSetup, type SessionOpt, normalizeFrontendConfig, DEFAULT_CFG } from "./configuration";
+import { type MacosSetupGuideMode, hasCompletedMacosSetup, type SessionOpt } from "./configuration";
+import { useProfileConfig } from "./useProfileConfig";
 
 export interface UseSocksCapRuntimeContext {
   report: (text: string, ok?: boolean) => void;
@@ -31,7 +30,7 @@ export interface UseSocksCapRuntimeContext {
 
 export function useSocksCapRuntime(context: UseSocksCapRuntimeContext) {
   const { report } = context;
-  const [cfg, setCfg] = useState<SocksCapConfig | null>(null);
+  const { cfg, saving, load, select, save } = useProfileConfig();
   const [caps, setCaps] = useState<SocksCapCapabilities | null>(null);
   const [status, setStatus] = useState<SocksCapStatus | null>(null);
   const [gfw, setGfw] = useState<GfwListStatus | null>(null);
@@ -69,8 +68,8 @@ export function useSocksCapRuntime(context: UseSocksCapRuntimeContext) {
 
   const refresh = useCallback(async () => {
     try {
-      const [c, cp, st, gf, sn, hp, drs, ri, launched] = await Promise.all([
-        sockscapGetConfig().then(normalizeFrontendConfig).catch(() => DEFAULT_CFG),
+      const [applyConfig, cp, st, gf, sn, hp, drs, ri, launched] = await Promise.all([
+        load(),
         sockscapCapabilities().catch(() => null),
         sockscapStatus().catch(() => null),
         sockscapGfwlistStatus().catch(() => null),
@@ -80,7 +79,7 @@ export function useSocksCapRuntime(context: UseSocksCapRuntimeContext) {
         sockscapRedirectorInstallStatus().catch(() => null),
         sockscapLaunchedApps().catch(() => []),
       ]);
-      setCfg(c);
+      applyConfig();
       setCaps(cp);
       setStatus(st);
       setGfw(gf);
@@ -92,7 +91,7 @@ export function useSocksCapRuntime(context: UseSocksCapRuntimeContext) {
     } catch (e) {
       report(String(e), false);
     }
-  }, [report]);
+  }, [load, report]);
 
   useEffect(() => {
     void refresh();
@@ -180,5 +179,5 @@ export function useSocksCapRuntime(context: UseSocksCapRuntimeContext) {
     }, 1500);
     return () => clearInterval(timer);
   }, [status]);
-  return { status, caps, redirectorInstall, cfg, setCfg, setStatus, setStats, setHelper, setGfw, setDomainRecords, setRedirectorInstall, setLaunchedApps, setMacosSetupError, setMacosSetupCompleted, setMacosSetupGuideMode, refresh, launchedApps, domainRecords, stats, helper, upSpeed, downSpeed, tunConflicts, setTunWarningOpen, detectedProxies, sessions, rescanLocalProxies, gfw, macosSetupGuideMode, macosSetupCompleted, macosSetupError, tunWarningOpen };
+  return { status, caps, redirectorInstall, cfg, saving, select, save, setStatus, setStats, setHelper, setGfw, setDomainRecords, setRedirectorInstall, setLaunchedApps, setMacosSetupError, setMacosSetupCompleted, setMacosSetupGuideMode, refresh, launchedApps, domainRecords, stats, helper, upSpeed, downSpeed, tunConflicts, setTunWarningOpen, detectedProxies, sessions, rescanLocalProxies, gfw, macosSetupGuideMode, macosSetupCompleted, macosSetupError, tunWarningOpen };
 }

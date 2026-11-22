@@ -2983,6 +2983,7 @@
 - `[data-testid="sockscap-panel"]` — display — F-Sockscap-1.panel
   ↳ `[data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]` — alias
   ↳ `[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]` — alias
+  ↳ `[data-testid="sockscap-panel"][aria-busy="false"]` — alias
 - `[data-testid="sockscap-locked-banner"]` — display [optional] — F-Sockscap-1.locked-banner
 - `[data-testid="sockscap-add-profile"]` — interactive — F-Sockscap-1.add-profile
 - `[data-testid="sockscap-start"]` — interactive — F-Sockscap-1.start

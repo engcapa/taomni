@@ -21,7 +21,7 @@ steps:
     expect_truthy: true
 - select_option: {selector: '[data-testid="sockscap-upstream-kind"]', value: http}
 - eval_readonly:
-    expression: "document.getElementById('sockscap-section-upstream-content')?.querySelector('select')?.value === 'http'"
+    expression: "document.getElementById('sockscap-section-upstream-content')?.querySelector('select')?.value === 'http' && document.querySelector('.sockscap-panel')?.getAttribute('aria-busy') === 'false'"
     expect_truthy: true
     timeout_sec: 10
 - reload_window: null
@@ -36,7 +36,10 @@ steps:
     expect_truthy: true
 - assert_no_runtime_errors: null
 - fill: {selector: '[data-testid="sockscap-upstream-port"]', value: '19397'}
-- wait_for: '[data-testid="sockscap-upstream-port"][value="19397"]'
+- eval_readonly:
+    expression: "document.getElementsByName('upstreamPort')[0]?.value === '19397' && document.querySelector('.sockscap-panel')?.getAttribute('aria-busy') === 'false'"
+    expect_truthy: true
+    timeout_sec: 10
 - reload_window: null
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-sockscap"]'
@@ -65,7 +68,7 @@ verification:
     requirement: A second edit to the restored profile persists with the previously retained host.
     actions: [22, 24, 25, 26, 27]
     checkpoints:
-    - {step: 23, expectation: The port field shows the second edit.}
+    - {step: 23, expectation: The focused port field shows the second edit and the profile write is complete.}
     - {step: 28, expectation: Reopening the tool restores the new port.}
     - {step: 29, expectation: The original host is retained.}
     - {step: 30, expectation: The second edit and reopen produce no runtime errors.}

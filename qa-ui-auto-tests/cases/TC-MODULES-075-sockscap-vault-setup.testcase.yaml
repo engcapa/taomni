@@ -16,7 +16,10 @@ steps:
 - fill: {selector: '[data-testid="sockscap-upstream-host"]', value: '127.0.0.2'}
 - wait_for: '[data-testid="sockscap-upstream-host"][value="127.0.0.2"]'
 - fill: {selector: '[data-testid="sockscap-upstream-port"]', value: '19392'}
-- wait_for: '[data-testid="sockscap-upstream-port"][value="19392"]'
+- eval_readonly:
+    expression: "document.getElementsByName('upstreamPort')[0]?.value === '19392' && document.querySelector('.sockscap-panel')?.getAttribute('aria-busy') === 'false'"
+    expect_truthy: true
+    timeout_sec: 10
 - select_option: {selector: '[data-testid="sockscap-upstream-kind"]', value: vless}
 - fill: {selector: '[data-testid="sockscap-upstream-uuid"]', value: '11111111-2222-3333-4444-555555555555'}
 - click: '[data-testid="sockscap-upstream-uuid-store"]'

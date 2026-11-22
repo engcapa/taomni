@@ -1,4 +1,4 @@
-import { sockscapGfwlistStatus, sockscapRecover, sockscapSetConfig, sockscapStart, sockscapLaunchedApps, sockscapStatsSnapshot, sockscapStatus, sockscapStop, sockscapGetDomainRecords, sockscapHelperStatus, sockscapTestUpstream, sockscapTestCoreUpstream, sockscapDiagnostics, sockscapInstallRedirector, sockscapRedirectorInstallStatus, upstreamRequiresCore, type DomainRecord, type GfwListStatus, type HelperStatus, type LaunchedAppInfo, type RedirectorInstallStatus, type SocksCapCapabilities, type SocksCapConfig, type SocksCapStatus, type StatsSnapshot } from "../../../../../src/lib/sockscap";
+import { sockscapGfwlistStatus, sockscapRecover, sockscapStart, sockscapLaunchedApps, sockscapStatsSnapshot, sockscapStatus, sockscapStop, sockscapGetDomainRecords, sockscapHelperStatus, sockscapTestUpstream, sockscapTestCoreUpstream, sockscapDiagnostics, sockscapInstallRedirector, sockscapRedirectorInstallStatus, upstreamRequiresCore, type DomainRecord, type GfwListStatus, type HelperStatus, type LaunchedAppInfo, type RedirectorInstallStatus, type SocksCapCapabilities, type SocksCapConfig, type SocksCapStatus, type StatsSnapshot } from "../../../../../src/lib/sockscap";
 import { collectProbeTargets, collectUpstreamConfigIssues, type ProbeTarget, type UpstreamConfigIssue } from "../../../../../src/lib/sockscapPreflight";
 import { writeText } from "../../../../../src/lib/clipboard";
 import { type MacosSetupGuideMode, needsStartElevation, SOCKSCAP_MACOS_SETUP_STORAGE_KEY, isRootRequiredError, isSudoAuthenticationError, needsRecoveryElevation } from "./configuration";
@@ -31,6 +31,7 @@ export interface CreateSocksCapLifecycleActionsContext {
   setMacosSetupCompleted: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setMacosSetupGuideMode: import("react").Dispatch<import("react").SetStateAction<MacosSetupGuideMode | null>>;
   refresh: () => Promise<void>;
+  save: (config: SocksCapConfig) => Promise<void>;
   startButtonRef: import("react").RefObject<HTMLButtonElement | null>;
 }
 
@@ -164,7 +165,7 @@ export function createSocksCapLifecycleActions(context: CreateSocksCapLifecycleA
       setBusy(true);
     }
     try {
-      await sockscapSetConfig(startConfig);
+      await context.save(startConfig);
       const st = await sockscapStart(sudoPassword);
       setStatus(st);
       setRootPromptIntent(null);

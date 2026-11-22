@@ -9065,6 +9065,7 @@ controls:
     aliases:
       - '[data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]'
       - '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]'
+      - '[data-testid="sockscap-panel"][aria-busy="false"]'
     kind: display
   - id: locked-banner
     selector: '[data-testid="sockscap-locked-banner"]'

@@ -4,6 +4,7 @@ import { UpstreamSourcePicker, type UpstreamChoice } from "../UpstreamSourcePick
 import { type SessionOpt } from "./configuration";
 import { Field } from "./Field";
 import { Section } from "./Section";
+import { UpstreamPortInput } from "./UpstreamPortInput";
 
 export interface UpstreamSectionProps {
   t: import("../../../../../src/lib/i18n").TranslateFn;
@@ -143,19 +144,14 @@ export function UpstreamSection(viewProps: UpstreamSectionProps) {
         />
       </Field>
       <Field label={viewProps.t("sockscap.port")}>
-        <input
-          data-testid="sockscap-upstream-port"
-          type="number"
-          className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
-          value={viewProps.selectedProf.upstream.port}
+        <UpstreamPortInput
+          key={viewProps.selectedProf.id}
+          port={viewProps.selectedProf.upstream.port}
           disabled={viewProps.locked}
           title={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
-          onChange={(e) =>
+          onPortChange={(port) =>
             void viewProps.patchSelectedProfile({
-              upstream: {
-                ...viewProps.selectedProf.upstream,
-                port: parseInt(e.target.value, 10) || 1080,
-              },
+              upstream: { ...viewProps.selectedProf.upstream, port },
             })
           }
         />
