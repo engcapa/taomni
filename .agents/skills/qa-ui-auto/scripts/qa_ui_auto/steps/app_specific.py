@@ -369,8 +369,8 @@ def step_servers_multi_instance_probe(ctx: StepContext, args: Any) -> None:
     browser_run(ctx, args)
 
 
-@verb("show_sockscap_upstream")
-def step_show_sockscap_upstream(ctx: StepContext, args: Any) -> None:
-    from ..module_sockscap_observation import show_upstream
+@verb("show_sockscap_section")
+def step_show_sockscap_section(ctx: StepContext, args: Any) -> None:
+    from ..module_sockscap_observation import show_section
 
-    show_upstream(ctx, args, mode="browser")
+    show_section(ctx, args, mode="browser")

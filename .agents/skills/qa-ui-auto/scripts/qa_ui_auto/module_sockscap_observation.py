@@ -1,20 +1,30 @@
 """Record the isolated writer lease across signed SocksCap parser calls."""
 
 import json
+import platform
 
-from .fixtures.backup_policy import isolated_data_root
-from .fixtures.sockscap_legacy import SIGNED_CASES
-from .module_profile_observation import writer_lease
+from tauri_webdriver import WebDriverError
+
 from .steps import StepError
 
 
-def show_upstream(ctx, args, *, mode):
-    if args is not None:
-        raise StepError("show_sockscap_upstream: expected null")
+def show_section(ctx, section, *, mode):
+    if section not in ("upstream", "test"):
+        raise StepError("show_sockscap_section: expected upstream or test")
     if getattr(ctx, "dry_run", False):
         return "dry-run; no SocksCap toggle action"
-    selector = '[data-testid="sockscap-section-upstream-toggle"]'
+    selector = f'[data-testid="sockscap-section-{section}-toggle"]'
     if mode == "native":
+        ctx.session.find('[data-testid="sockscap-capability-notes"]')
+        if platform.system() == "Darwin":
+            close = '[data-testid="sockscap-macos-setup-close"]'
+            try:
+                ctx.session.find(close, timeout=3)
+            except WebDriverError:
+                pass  # A profile with a ready Redirector does not show onboarding.
+            else:
+                ctx.session.click(close)
+                ctx.session.wait_absent(close)
         expanded = ctx.session.execute(
             f"return document.querySelector({json.dumps(selector)})?.getAttribute('aria-expanded');",
         )
@@ -26,11 +36,15 @@ def show_upstream(ctx, args, *, mode):
         if expanded == "false":
             button.click()
     if expanded not in {"false", "true"}:
-        raise StepError("SocksCap upstream settings are unavailable")
-    return "SocksCap upstream settings are open"
+        raise StepError(f"SocksCap {section} section is unavailable")
+    return f"SocksCap {section} section is open"
 
 
 def run(ctx, phase):
+    from .fixtures.backup_policy import isolated_data_root
+    from .fixtures.sockscap_legacy import SIGNED_CASES
+    from .module_profile_observation import writer_lease
+
     owner = ctx.fixture_context
     receipt = getattr(owner, "signed_sockscap", None)
     if owner.case_id not in SIGNED_CASES or not receipt or phase not in {"idle", "running", "disabled"}:

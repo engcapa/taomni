@@ -1014,9 +1014,9 @@
           "enum": ["idle", "running", "disabled"],
           "description": "Observe the signed SocksCap host's writer lease as the case imports a link and disables the host."
         },
-        "show_sockscap_upstream": {
-          "type": "null",
-          "description": "Open the real upstream settings section if its platform default leaves it collapsed."
+        "show_sockscap_section": {
+          "enum": ["upstream", "test"],
+          "description": "Open a SocksCap section. On macOS, close the optional setup guide through its button when it appears."
         },
         "assert_signed_rdp_latency": {
           "type": "null",

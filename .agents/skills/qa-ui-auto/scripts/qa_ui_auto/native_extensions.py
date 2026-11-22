@@ -35,9 +35,9 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     from .module_mail_observation import run as assert_signed_mail_host
     register_verb("assert_signed_mail_host")(assert_signed_mail_host)
     from .module_sockscap_observation import run as assert_signed_sockscap_host
-    from .module_sockscap_observation import show_upstream
+    from .module_sockscap_observation import show_section
     register_verb("assert_signed_sockscap_host")(assert_signed_sockscap_host)
-    register_verb("show_sockscap_upstream")(lambda ctx, args: show_upstream(ctx, args, mode="native"))
+    register_verb("show_sockscap_section")(lambda ctx, args: show_section(ctx, args, mode="native"))
     from .module_screenshot_observation import run as assert_signed_screenshot_host
     register_verb("assert_signed_screenshot_host")(assert_signed_screenshot_host)
     from .module_vnc_server_observation import run as assert_signed_vnc_daemon

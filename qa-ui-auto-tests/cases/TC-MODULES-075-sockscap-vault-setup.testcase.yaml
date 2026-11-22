@@ -12,7 +12,7 @@ steps:
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-sockscap"]'
 - wait_for: '[data-testid="sockscap-panel"]'
-- show_sockscap_upstream: null
+- show_sockscap_section: upstream
 - fill: {selector: '[data-testid="sockscap-upstream-host"]', value: '127.0.0.2'}
 - wait_for: '[data-testid="sockscap-upstream-host"][value="127.0.0.2"]'
 - fill: {selector: '[data-testid="sockscap-upstream-port"]', value: '19392'}
