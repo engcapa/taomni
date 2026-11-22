@@ -15,7 +15,6 @@ profile=()
 if [[ "${QA_RELEASE:-false}" == true ]]; then
   profile=(--release)
   export CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS=true
-  export CARGO_PROFILE_RELEASE_CODEGEN_UNITS="${CARGO_PROFILE_RELEASE_CODEGEN_UNITS:-64}"
 fi
 filters=(lsp::tests::workspace_watch_lifetime commands::workspace_reads::tests
   workspace::tests::text_and_encoding workspace::tests::encoding_matrix)

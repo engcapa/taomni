@@ -87,6 +87,32 @@ raise SystemExit(int(os.environ.get('QA_APT_EXIT_CODE', '0')))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(list(self.apt.iterdir()), [])
 
+    def test_setup_skips_runtime_packages_and_installs_lld_on_build(self):
+        setup_script = Path(__file__).with_name("ci_linux_setup.sh")
+        cases = {}
+        for operation in ("build", "run"):
+            self.log.unlink(missing_ok=True)
+            env = {
+                **self.env,
+                "GITHUB_ACTIONS": "false",
+                "QA_OPERATION": operation,
+                "QA_LINUX_PROFILE": "ubuntu-24.04-xvfb",
+                "QA_CAPABILITIES": "",
+            }
+            result = subprocess.run(["bash", str(setup_script)], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            installed = []
+            for cmd in self.commands():
+                if "install" in cmd:
+                    installed.extend(cmd[cmd.index("--no-install-recommends") + 1:])
+            cases[operation] = set(installed)
+        self.assertIn("libwebkit2gtk-4.1-dev", cases["build"])
+        self.assertIn("lld", cases["build"])
+        for runtime_only in ("fonts-noto-cjk", "gstreamer1.0-libav", "tesseract-ocr", "webkit2gtk-driver", "dbus-x11"):
+            self.assertNotIn(runtime_only, cases["build"])
+            self.assertIn(runtime_only, cases["run"])
+        self.assertNotIn("lld", cases["run"])
+
 
 if __name__ == "__main__":
     unittest.main()

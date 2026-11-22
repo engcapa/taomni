@@ -160,33 +160,6 @@ jobs:
           fi
           ld.lld --version
           echo "RUSTFLAGS=${RUSTFLAGS:+$RUSTFLAGS }-C link-arg=-fuse-ld=lld" >> "$GITHUB_ENV"
-      - name: Configure Windows fast linker (lld-link)
-        if: runner.os == 'Windows' && matrix.mode == 'native' && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $llvmBin = 'C:\Program Files\LLVM\bin'
-          $lld = Join-Path $llvmBin 'lld-link.exe'
-          if (-not (Test-Path -LiteralPath $lld)) {
-            $cmd = Get-Command lld-link -ErrorAction SilentlyContinue
-            if ($cmd) { $lld = $cmd.Source }
-          }
-          if ($lld -and (Test-Path -LiteralPath $lld)) {
-            $dir = Split-Path -Parent $lld
-            $dir >> $env:GITHUB_PATH
-            $kitsRoot = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
-            if (Test-Path -LiteralPath $kitsRoot) {
-              $mtDir = Get-ChildItem -LiteralPath $kitsRoot -Directory |
-                Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' -and (Test-Path -LiteralPath (Join-Path $_.FullName 'x64\mt.exe')) } |
-                Sort-Object { [version]$_.Name } -Descending |
-                Select-Object -First 1
-              if ($mtDir) { (Join-Path $mtDir.FullName 'x64') >> $env:GITHUB_PATH }
-            }
-            "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=$lld" >> $env:GITHUB_ENV
-            & $lld --version
-          } else {
-            Write-Host 'lld-link not found; falling back to default MSVC link.exe'
-          }
       - uses: swatinem/rust-cache@v2
         if: (matrix.mode == 'native') && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')
         with:
@@ -196,7 +169,7 @@ jobs:
           # quota; full runtime reuse is handled by the lightweight tarball above.
           cache-targets: true
           cache-on-failure: true
-          lookup-only: ${{ runner.os == 'Linux' && inputs.operation == 'contracts' }}
+          save-if: ${{ !(runner.os == 'Linux' && inputs.operation == 'contracts') }}
       - name: Sherpa-ONNX prebuilt cache
         id: sherpa-cache
         if: (matrix.mode == 'native') && inputs.operation != 'run' && !(runner.os == 'Windows' && inputs.operation == 'contracts') && (inputs.operation != 'build' || steps.reusable-runtime-cache.outputs.cache-hit != 'true')

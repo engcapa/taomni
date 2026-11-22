@@ -87,7 +87,10 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertTrue(rust_cache['with']['cache-targets'])
         self.assertIn('steps.reusable-runtime-cache.outputs.cache-hit', rust_cache['if'])
         self.assertIn('-sockscap', rust_cache['with']['shared-key'])
-        self.assertIn("runner.os == 'Linux' && inputs.operation == 'contracts'", str(rust_cache['with']['lookup-only']))
+        self.assertIn("!(runner.os == 'Linux' && inputs.operation == 'contracts')", str(rust_cache['with']['save-if']))
+        self.assertNotIn('lookup-only', rust_cache['with'])
+        self.assertNotIn('Configure Windows fast linker (lld-link)', names)
+        self.assertIn('Configure Linux fast linker (lld)', names)
         build_step = next(s for s in steps if s.get('name') == 'Build and export the verified native runtime')
         self.assertIn('--reusable-archive qa-build-output/reusable-runtime/reusable.tar.gz', build_step['run'])
         for contract_name in (
@@ -141,19 +144,21 @@ class BuildPipelineTests(unittest.TestCase):
                 self.assertEqual(any('profile_photo_encoder_costs' in c for c in commands), rdp)
         script_text = script.read_text(encoding='utf-8')
         self.assertNotIn('CARGO_PROFILE_RELEASE_INCREMENTAL=true', script_text)
-        self.assertIn('CARGO_PROFILE_RELEASE_CODEGEN_UNITS', script_text)
+        self.assertNotIn('CARGO_PROFILE_RELEASE_CODEGEN_UNITS', script_text)
 
-    def test_release_build_qa_keeps_consistent_codegen_units_in_build_inputs(self):
+    def test_release_build_qa_keeps_default_codegen_units_in_build_inputs(self):
         from unittest.mock import patch
         import native_build
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             binary = root / 'src-tauri/target/qa-ui-auto/release' / ('taomni.exe' if os.name == 'nt' else 'taomni')
             def fake_run(cmd, cwd, env, check):
-                self.assertEqual(env.get('CARGO_PROFILE_RELEASE_CODEGEN_UNITS'), '64')
+                self.assertIsNone(env.get('CARGO_PROFILE_RELEASE_CODEGEN_UNITS'))
                 binary.parent.mkdir(parents=True, exist_ok=True)
                 binary.write_bytes(b'release-qa-binary')
-            with patch.object(native_build, 'ROOT', root), \
+            clean_env = {k: v for k, v in os.environ.items() if k != 'CARGO_PROFILE_RELEASE_CODEGEN_UNITS'}
+            with patch.dict(os.environ, clean_env, clear=True), \
+                 patch.object(native_build, 'ROOT', root), \
                  patch.object(native_build.shutil, 'which', return_value='pnpm'), \
                  patch.object(native_build, 'ensure_linux_link_deps'), \
                  patch.object(native_build, 'source_identity', return_value='src-sha'), \
