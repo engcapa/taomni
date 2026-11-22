@@ -197,28 +197,7 @@ pub async fn plugin_invoke(
             && taomni_local_voice_api::COMMANDS.contains(&command.as_str()))
         || (slug == taomni_sockscap_api::SLUG
             && taomni_sockscap_api::COMMANDS.contains(&command.as_str()))
-        || (slug == taomni_mail_api::SLUG
-            && matches!(
-                command.as_str(),
-                taomni_mail_api::CHECK_INCOMING
-                    | taomni_mail_api::CHECK_OUTGOING
-                    | taomni_mail_api::IMAP_FOLDER_TREE
-                    | taomni_mail_api::MUTATE_IMAP_FOLDER
-                    | taomni_mail_api::SEND_SMTP
-                    | taomni_mail_api::STORE_IMAP_SENT
-                    | taomni_mail_api::STORE_IMAP_DRAFT
-                    | taomni_mail_api::DISCARD_IMAP_DRAFT
-                    | taomni_mail_api::SYNC_IMAP_HEADERS
-                    | taomni_mail_api::SYNC_IMAP_ROUND
-                    | taomni_mail_api::SEARCH_IMAP
-                    | taomni_mail_api::SET_IMAP_FLAGS
-                    | taomni_mail_api::LIST_IMAP_UNREAD
-                    | taomni_mail_api::FETCH_IMAP_RAW
-                    | taomni_mail_api::FETCH_IMAP_BODY
-                    | taomni_mail_api::PREFETCH_IMAP_BODIES
-                    | taomni_mail_api::OPEN_IMAP_ARCHIVE
-                    | taomni_mail_api::FETCH_IMAP_ATTACHMENT
-            ))
+        || (slug == taomni_mail_api::SLUG && command.starts_with("mail/"))
     {
         // The desktop commands resolve these routes and credentials.
         return Err(taomni_plugin_api::RpcError::from_code(

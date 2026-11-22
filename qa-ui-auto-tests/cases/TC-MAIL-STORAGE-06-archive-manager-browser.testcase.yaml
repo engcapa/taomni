@@ -435,6 +435,9 @@ steps:
     selector: '[data-testid="mail-archive-results"]'
     contains: of 1 messages
     timeout_sec: 60
+- click: '[data-testid="mail-archive-read"]'
+- assert_text: {selector: '[data-testid="mail-archive-preview"]', contains: Manager 0}
+- assert_visible: '[data-testid="mail-archive-export"]'
 - click: '[data-testid="mail-archive-close"]'
 - assert_not_visible: '[data-testid="mail-archive-dialog"]'
 verification:
@@ -524,6 +527,7 @@ verification:
     - 149
     - 150
     - 152
+    - 155
     checkpoints:
     - step: 23
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains": "completed", "timeout_sec": 60}}'
@@ -628,6 +632,10 @@ verification:
     - step: 151
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 1 messages", "timeout_sec": 60}}'
     - step: 153
+      expectation: The surviving archived Manager message opens after the scan resumes.
+    - step: 154
+      expectation: Its original EML is available to export.
+    - step: 156
       expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
     results:
     - 23
@@ -682,6 +690,8 @@ verification:
     - 144
     - 151
     - 153
+    - 154
+    - 156
   visual:
   - check: Archive manager layout, readable results, selection and cleanup estimate
     method: manual

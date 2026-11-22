@@ -26,19 +26,5 @@ pub fn read(
         .transpose()
 }
 
-pub fn stores_full(settings: &super::MailCacheSettings, folder: &str) -> bool {
-    // Keep old exact server keys working, and accept the full readable path
-    // entered before the account has ever connected or cached its folders.
-    let readable_folder = super::decode_imap_modified_utf7(folder);
-    let selected = settings.full_message_folders.iter().any(|name| {
-        let name = name.trim();
-        name == folder
-            || name == readable_folder
-            || (name.eq_ignore_ascii_case("INBOX") && folder.eq_ignore_ascii_case("INBOX"))
-    });
-    match settings.full_message_mode {
-        FullMessageMode::All => true,
-        FullMessageMode::Include => selected,
-        FullMessageMode::Exclude => !selected,
-    }
-}
+#[cfg(test)]
+pub(super) use taomni_mail_engine::archive::scanner::stores_full;

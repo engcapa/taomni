@@ -29,6 +29,8 @@ use taomni_plugin_api::{
 };
 use taomni_sqlite_snapshot::SnapshotControl;
 
+#[path = "support/archive_encoding.rs"]
+mod archive_encoding;
 #[path = "support/imap.rs"]
 mod imap;
 #[path = "support/local_drafts.rs"]
@@ -326,6 +328,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     imap::check_routed_body(&mut host);
     imap::check_routed_prefetch(&mut host);
     imap::check_routed_archive(&mut host);
+    archive_encoding::check(&mut host);
     imap::check_routed_attachment(&mut host);
     imap::check_routed_sent_copy(&mut host);
     imap::check_routed_draft(&mut host);

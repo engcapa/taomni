@@ -5,26 +5,13 @@ use std::{future::Future, time::Duration};
 use taomni_mail_api::HOST_REQUEST_TIMEOUT;
 use taomni_mail_engine::{
     MailFolder,
-    archive::{ArchiveQuery, fetch_imap_chunk},
+    archive::{ArchiveQuery, fetch_imap_chunk, scanner::ArchiveConnection},
     imap_sync::{FolderStepOutcome, FolderSyncState, HeaderStepRequest, StepParams},
 };
 use tokio::runtime::Handle;
 
-use super::lifetime::{ArchiveJob, update};
+use super::lifetime::ArchiveJob;
 use crate::mail::{ActiveImapSession, ResolvedMailAccount, module_host::HostedArchive};
-
-pub(super) trait ArchiveConnection {
-    fn list(&mut self, account_id: &str) -> Result<Vec<MailFolder>, String>;
-    fn headers(
-        &mut self,
-        account: &ResolvedMailAccount,
-        folder: &str,
-        state: &FolderSyncState,
-        step: &StepParams,
-    ) -> Result<FolderStepOutcome, String>;
-    fn chunk(&mut self, folder: &str, uid: u32, offset: u64)
-    -> Result<(u32, u64, Vec<u8>), String>;
-}
 
 impl ArchiveConnection for ActiveImapSession {
     fn list(&mut self, account_id: &str) -> Result<Vec<MailFolder>, String> {
@@ -33,12 +20,25 @@ impl ArchiveConnection for ActiveImapSession {
 
     fn headers(
         &mut self,
-        account: &ResolvedMailAccount,
+        account: &str,
         folder: &str,
         state: &FolderSyncState,
         step: &StepParams,
     ) -> Result<FolderStepOutcome, String> {
-        self.sync_folder_step(account, folder, state, step)
+        let cache = taomni_mail_engine::cache::MailCacheSettings::default();
+        let mut mailbox = taomni_mail_engine::imap_messages::Mailbox {
+            account_id: account,
+            name: folder,
+            cache: &cache,
+            save_original: |_, _: &[u8]| Ok(()),
+        };
+        use taomni_mail_engine::imap_sync::imap_sync_folder_step;
+        match self {
+            Self::Tls { session, .. } => imap_sync_folder_step(session, &mut mailbox, state, step),
+            Self::Plain { session, .. } => {
+                imap_sync_folder_step(session, &mut mailbox, state, step)
+            }
+        }
     }
 
     fn chunk(
@@ -88,13 +88,13 @@ impl ArchiveConnection for HostedConnection<'_> {
 
     fn headers(
         &mut self,
-        account: &ResolvedMailAccount,
+        account: &str,
         folder: &str,
         state: &FolderSyncState,
         step: &StepParams,
     ) -> Result<FolderStepOutcome, String> {
         let query = ArchiveQuery::Headers(HeaderStepRequest {
-            account_id: account.config.session_id.clone(),
+            account_id: account.to_owned(),
             folder: folder.into(),
             state: state.clone(),
             mode: step.request,
@@ -128,7 +128,7 @@ async fn while_running<T>(
         let mut interval = tokio::time::interval(Duration::from_millis(25));
         loop {
             interval.tick().await;
-            update(job, |_| {})?;
+            job.progress.update(|_| {})?;
         }
     };
     tokio::select! {

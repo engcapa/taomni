@@ -98,6 +98,24 @@ steps:
       INBOX: 2
       Archive: 2
 - assert_signed_mail_host: running
+- mail_server_expunge_newest: {folder: INBOX, count: 2}
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 60}
+- click: '[data-testid="mail-archive-open"]'
+- wait_for: '[data-testid="mail-archive-row"]'
+- assert_count: {selector: '[data-testid="mail-archive-row"]', equal: 2}
+- click: '[data-testid="mail-archive-row"]:first-child [data-testid="mail-archive-read"]'
+- assert_text: {selector: '[data-testid="mail-archive-preview"]', contains: complete.bin}
+- click: '[data-testid="mail-archive-preview"] [data-testid="mail-body-mode-plain"]'
+- assert_text: {selector: '[data-testid="mail-archive-preview"]', contains: Offline body Complete INBOX}
+- click: '[data-testid="mail-archive-close"]'
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    partial_files: 0
+    paused: false
+    full: {INBOX: 2}
+    headers: {INBOX: 0, Archive: 2}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -111,8 +129,18 @@ verification:
     - {step: 43, expectation: The resumed transfer finishes the scan.}
     - {step: 44, expectation: Gzip originals and SQLite metadata match the fixture. Resume clears the persisted pause and removes partial transfer files.}
     - {step: 45, expectation: The verified Mail host and renderer own the enabled module.}
-    - {step: 46, expectation: The storage workflow produces no runtime errors.}
-    results: [39, 41, 43, 44, 45, 46]
+    results: [39, 41, 43, 44, 45]
+  - id: read-after-server-removal
+    requirement: Local originals remain readable after both messages have been removed from IMAP.
+    actions: [46, 47, 49, 52, 54, 56]
+    checkpoints:
+    - {step: 48, expectation: The synced inbox matches the now-empty server inbox.}
+    - {step: 51, expectation: The local archive still lists both originals.}
+    - {step: 53, expectation: The saved MIME exposes the original attachment.}
+    - {step: 55, expectation: The saved plaintext body identifies the expunged fixture message.}
+    - {step: 57, expectation: Both originals and attachments still match the fixture digests after their live headers disappear.}
+    - {step: 58, expectation: The workflow finishes without runtime errors.}
+    results: [48, 51, 53, 55, 57, 58]
   visual:
   - check: The Mail pane displays downloading, paused and completed as the scan runs.
     method: automated

@@ -36,6 +36,13 @@ pub fn prepare(
     raw: impl Read,
     check: impl Fn() -> Result<(), String>,
 ) -> Result<PreparedMessage, String> {
+    prepare_with(root, |file| compress_message(raw, file, check))
+}
+
+pub fn prepare_with(
+    root: &Path,
+    encode: impl FnOnce(&mut File) -> Result<MessageObject, String>,
+) -> Result<PreparedMessage, String> {
     fs::create_dir_all(root.join("objects")).map_err(|e| e.to_string())?;
     let mut temp =
         tempfile::NamedTempFile::new_in(root.join("objects")).map_err(|e| e.to_string())?;
@@ -43,7 +50,7 @@ pub fn prepare(
         hash,
         raw_size,
         has_attachments,
-    } = compress_message(raw, temp.as_file_mut(), check)?;
+    } = encode(temp.as_file_mut())?;
     temp.as_file().sync_all().map_err(|e| e.to_string())?;
     let existing = object_path(root, &hash)?;
     if existing.exists() {

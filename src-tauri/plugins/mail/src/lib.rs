@@ -2,6 +2,7 @@
 //! mailbox store uses only paths derived from that profile and account IDs.
 
 mod archive;
+mod archive_encoding;
 mod commands;
 mod imap_exchange;
 mod incoming;
@@ -55,6 +56,7 @@ fn host_config() -> HostConfig {
                 FETCH_IMAP_RAW,
                 FETCH_IMAP_BODY,
                 PREFETCH_IMAP_BODIES,
+                taomni_mail_api::ENCODE_ARCHIVE_ORIGINAL,
                 OPEN_IMAP_ARCHIVE,
                 OPEN_POP3_SYNC,
                 FETCH_IMAP_ATTACHMENT,
@@ -81,6 +83,7 @@ pub fn serve_stdio() -> io::Result<()> {
                 .worker_threads(2)
                 .enable_all()
                 .build()?,
+            encoders: Arc::new(tokio::sync::Semaphore::new(2)),
             prefetch: Arc::new(tokio::sync::Semaphore::new(2)),
         }))
     })
@@ -89,6 +92,7 @@ pub fn serve_stdio() -> io::Result<()> {
 struct Handler {
     store: Arc<store::Store>,
     io: tokio::runtime::Runtime,
+    encoders: Arc<tokio::sync::Semaphore>,
     prefetch: Arc<tokio::sync::Semaphore>,
 }
 
@@ -194,6 +198,16 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(prefetch::start(&self.io, operation, input, &self.prefetch)?)
+            }
+            taomni_mail_api::ENCODE_ARCHIVE_ORIGINAL => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(archive_encoding::start(
+                    &self.io,
+                    operation,
+                    input,
+                    &self.encoders,
+                )?)
             }
             OPEN_IMAP_ARCHIVE => {
                 let input = serde_json::from_value(params.unwrap_or_default())

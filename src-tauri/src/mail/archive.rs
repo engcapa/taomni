@@ -1,7 +1,5 @@
 //! Account-owned, resumable full-MIME storage. The renderer only starts or pauses it.
 
-mod limits;
-
 mod lifetime;
 
 mod commands;
@@ -10,8 +8,6 @@ mod connection;
 mod sync;
 
 mod local_commands;
-
-mod download;
 
 #[cfg(test)]
 mod tests;

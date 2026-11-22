@@ -1,7 +1,10 @@
 //! Streaming codec for immutable, content-addressed email archives.
 mod imap_chunks;
 mod metadata;
+pub mod progress;
+pub mod scanner;
 mod transfer;
+pub mod writer;
 
 pub use imap_chunks::{CHUNK, CONTENT_ERROR, fetch_imap_chunk};
 pub use transfer::download_imap_original;
@@ -28,18 +31,14 @@ pub struct ArchiveChunk {
     pub length: usize,
 }
 
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 
 use flate2::{Compression, read::GzDecoder, write::GzEncoder};
 use sha2::{Digest, Sha256};
 
 use metadata::AttachmentScan;
 
-pub struct MessageObject {
-    pub hash: String,
-    pub raw_size: u64,
-    pub has_attachments: bool,
-}
+pub use taomni_mail_api::archive::MessageObject;
 
 /// Encode into a staging writer. The archive owner handles publication.
 pub fn compress_message(
@@ -105,10 +104,44 @@ pub(crate) fn verify_message_with(
     source: impl Read,
     hash: &str,
     expected: u64,
+    destination: impl Write,
+    check: impl Fn() -> Result<(), String>,
+) -> Result<(), String> {
+    verify_decoded(GzDecoder::new(source), hash, expected, destination, check)
+}
+
+/// Accept a host-produced object only when it contains exactly one gzip member
+/// for the selected MIME. Previously stored objects retain their reader semantics.
+pub fn verify_encoded_original(
+    source: impl Read,
+    receipt: &MessageObject,
+    hash: &str,
+    size: u64,
+    check: impl Fn() -> Result<(), String>,
+) -> Result<(), String> {
+    if receipt.raw_size != size || receipt.hash != hash {
+        return Err("Mail archive encoding does not match the selected original".into());
+    }
+    let mut member = flate2::bufread::GzDecoder::new(BufReader::new(source));
+    verify_decoded(&mut member, hash, size, std::io::sink(), check)?;
+    if !member
+        .into_inner()
+        .fill_buf()
+        .map_err(|e| e.to_string())?
+        .is_empty()
+    {
+        return Err("Unexpected data after the compressed Mail original".into());
+    }
+    Ok(())
+}
+
+fn verify_decoded(
+    mut decoder: impl Read,
+    hash: &str,
+    expected: u64,
     mut destination: impl Write,
     check: impl Fn() -> Result<(), String>,
 ) -> Result<(), String> {
-    let mut decoder = GzDecoder::new(source);
     let mut digest = Sha256::new();
     let mut size = 0u64;
     let mut buffer = [0u8; 128 * 1024];
@@ -133,4 +166,49 @@ pub(crate) fn verify_message_with(
         return Err("Saved email checksum verification failed".into());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod encoding_tests {
+    use super::*;
+    use std::io::Seek;
+
+    #[test]
+    fn only_the_exact_original_can_leave_staging() {
+        let root = tempfile::tempdir().unwrap();
+        let raw = b"Subject: Selected original\r\n\r\nLocal body";
+        let mut gzip = Vec::new();
+        let receipt = compress_message(raw.as_slice(), &mut gzip, || Ok(())).unwrap();
+        let mut appended = gzip.clone();
+        appended.extend_from_slice(&gzip);
+        let mut different = Vec::new();
+        compress_message(&b"x".repeat(raw.len())[..], &mut different, || Ok(())).unwrap();
+        let truncated = &gzip[..gzip.len() - 1];
+        for (bytes, checksum, paused) in [
+            (gzip.as_slice(), "wrong receipt", false),
+            (gzip.as_slice(), receipt.hash.as_str(), true),
+            (truncated, receipt.hash.as_str(), false),
+            (appended.as_slice(), receipt.hash.as_str(), false),
+            (different.as_slice(), receipt.hash.as_str(), false),
+        ] {
+            let staged = crate::storage::prepare_with(root.path(), |file| {
+                file.write_all(bytes).unwrap();
+                file.rewind().unwrap();
+                verify_encoded_original(file, &receipt, checksum, raw.len() as u64, || {
+                    if paused { Err("paused".into()) } else { Ok(()) }
+                })?;
+                unreachable!("An invalid or cancelled encoding passed verification")
+            });
+            assert!(staged.is_err());
+            assert_eq!(root.path().join("objects").read_dir().unwrap().count(), 0);
+        }
+        verify_encoded_original(
+            gzip.as_slice(),
+            &receipt,
+            &receipt.hash,
+            raw.len() as u64,
+            || Ok(()),
+        )
+        .unwrap();
+    }
 }

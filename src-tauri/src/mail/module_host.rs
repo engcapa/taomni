@@ -1,6 +1,8 @@
 //! Bind the session's resolved mail route and grant it only to the verified host.
 
 mod archive;
+mod archive_encoding;
+pub(super) use archive_encoding::ArchiveEncoder;
 mod downloads;
 mod local_drafts;
 pub(super) use local_drafts::local_drafts;

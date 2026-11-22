@@ -1,7 +1,6 @@
 use super::lifetime::ArchiveJob;
 use super::lifetime::ArchiveStatus;
 use super::sync::run;
-use super::sync::run_local;
 use crate::mail::MailAccountConfig;
 use crate::mail::coordination;
 use crate::mail::pop3;
@@ -15,6 +14,10 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
+use taomni_mail_engine::archive::{
+    progress::ScanProgress,
+    writer::{ArchiveMailbox, LocalEncoder, OriginalEncoder},
+};
 use taomni_mail_engine::storage::scan;
 use tauri::AppHandle;
 use tauri::Manager;
@@ -37,7 +40,12 @@ pub async fn mail_archive_status(
             .get(&account_id)
             .filter(|job| job.running.load(Ordering::Acquire))
         {
-            return Ok(job.status.lock().map_err(|e| e.to_string())?.clone());
+            return Ok(job
+                .progress
+                .status
+                .lock()
+                .map_err(|e| e.to_string())?
+                .clone());
         }
     }
     let (paused, shared) = with_mail_db_async(&state, &account_id, |db, account| {
@@ -58,12 +66,18 @@ pub async fn mail_archive_status(
             .map_err(|e| e.to_string())?
             .get(&account_id)
             .filter(|job| {
-                job.status
+                job.progress
+                    .status
                     .lock()
                     .is_ok_and(|status| status.phase != "shared")
             })
         {
-            let mut status = job.status.lock().map_err(|e| e.to_string())?.clone();
+            let mut status = job
+                .progress
+                .status
+                .lock()
+                .map_err(|e| e.to_string())?
+                .clone();
             // Keep the current scan's folder and counters when a persisted
             // pause stops the worker, including after the mail tab reopens.
             if paused {
@@ -110,6 +124,7 @@ pub async fn mail_archive_start(
     if paused {
         return Ok(());
     }
+    let monitor_db = state.mail_db(&id)?;
     let job =
         {
             let _changes =
@@ -127,7 +142,7 @@ pub async fn mail_archive_start(
                 .get(&id)
                 .filter(|job| job.running.load(Ordering::Acquire))
             {
-                return if resume && job.pause.load(Ordering::Acquire) {
+                return if resume && job.progress.pause.load(Ordering::Acquire) {
                     Err("Storage is pausing; resume when it has stopped".into())
                 } else {
                     Ok(())
@@ -135,7 +150,8 @@ pub async fn mail_archive_start(
             }
             if !resume
                 && jobs.get(&id).is_some_and(|job| {
-                    job.status
+                    job.progress
+                        .status
                         .lock()
                         .is_ok_and(|status| status.phase == "failed")
                 })
@@ -143,13 +159,15 @@ pub async fn mail_archive_start(
                 return Ok(());
             }
             let job = Arc::new(ArchiveJob {
-                pause: AtomicBool::new(false),
                 running: AtomicBool::new(true),
                 socket: Mutex::new(None),
-                status: Mutex::new(ArchiveStatus {
-                    phase: "connecting".into(),
+                progress: ScanProgress {
+                    status: Mutex::new(ArchiveStatus {
+                        phase: "connecting".into(),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
+                },
             });
             jobs.insert(id.clone(), Arc::clone(&job));
             job
@@ -157,7 +175,6 @@ pub async fn mail_archive_start(
     // A pause from another process closes this worker's socket as well. The
     // poll uses blocking DB work and ends with the job; no task is tied to a tab.
     let monitor_job = Arc::clone(&job);
-    let monitor_db = state.mail_db(&id)?;
     let monitor_id = id.clone();
     tokio::spawn(async move {
         while monitor_job.running.load(Ordering::Acquire) {
@@ -165,7 +182,7 @@ pub async fn mail_archive_start(
             let paused =
                 mail_db_task(Arc::clone(&monitor_db), monitor_id.clone(), scan::is_paused).await;
             if matches!(paused, Ok(true)) {
-                monitor_job.pause.store(true, Ordering::Release);
+                monitor_job.progress.pause.store(true, Ordering::Release);
                 if let Ok(socket) = monitor_job.socket.lock() {
                     if let Some(socket) = socket.as_ref() {
                         let _ = socket.shutdown(Shutdown::Both);
@@ -186,7 +203,7 @@ pub async fn mail_archive_start(
                 coordination::ProcessLock::try_at(Path::new(db.path().unwrap()), "archive")?
             };
             let Some(_lease) = lease else {
-                job.status.lock().map_err(|e| e.to_string())?.phase = "shared".into();
+                job.progress.status.lock().map_err(|e| e.to_string())?.phase = "shared".into();
                 return Ok(());
             };
             let mut config = config;
@@ -214,18 +231,30 @@ pub async fn mail_archive_start(
                 )
                 .map_err(|e| e.to_string())?;
             }
+            let encoder =
+                crate::mail::module_host::ArchiveEncoder::for_registry(&runtime, &state.plugins);
+            let encoder: &dyn OriginalEncoder = match &encoder {
+                Some(host) => host,
+                None => &LocalEncoder,
+            };
+            let mailbox = ArchiveMailbox {
+                account: &id,
+                database: &handle,
+                progress: &job.progress,
+                encoder,
+            };
             if pop3::is_pop3(&config) {
-                run_local(&state, &id, &job)
+                mailbox.run_local()
             } else {
                 resolve_config(&state, config)
-                    .and_then(|account| run(&state, &account, &runtime, &job))
+                    .and_then(|account| run(&state, &account, &runtime, &job, &mailbox))
             }
         });
         if let Ok(mut socket) = job.socket.lock() {
             *socket = None;
         }
-        if let Ok(mut status) = job.status.lock() {
-            if job.pause.load(Ordering::Acquire) {
+        if let Ok(mut status) = job.progress.status.lock() {
+            if job.progress.pause.load(Ordering::Acquire) {
                 status.phase = "paused".into();
             } else if let Err(error) = result {
                 status.phase = "failed".into();

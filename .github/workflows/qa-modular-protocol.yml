@@ -95,6 +95,7 @@ jobs:
       - name: Verify independent Mail storage and message codecs
         run: |
           set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-api --lib --locked 2>&1 | tee modular-protocol-evidence/mail-api-unit.log
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-engine --lib --locked 2>&1 | tee modular-protocol-evidence/mail-engine-unit.log
       - name: Prepare Perl for the Windows VNC TLS build
         if: runner.os == 'Windows'
