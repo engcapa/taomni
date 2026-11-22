@@ -321,11 +321,17 @@ pub(super) async fn test_smtp(
     account: &ResolvedMailAccount,
 ) -> Result<(), String> {
     if !supports(&registry, CHECK_OUTGOING) {
-        let account = account.clone();
-        let runtime = tokio::runtime::Handle::current();
-        return tokio::task::spawn_blocking(move || super::smtp::test_smtp(&account, &runtime))
-            .await
-            .map_err(|error| format!("SMTP test task failed: {error}"))?;
+        #[cfg(feature = "legacy-mail-smtp")]
+        if use_legacy_smtp(&registry) {
+            let account = account.clone();
+            let runtime = tokio::runtime::Handle::current();
+            return tokio::task::spawn_blocking(move || super::smtp::test_smtp(&account, &runtime))
+                .await
+                .map_err(|error| format!("SMTP test task failed: {error}"))?;
+        }
+        return Err(
+            "Enable or update Mail in the module store to check the SMTP connection".into(),
+        );
     }
     let (_route, request) = bind_smtp(account).await?;
     invoke(registry, CHECK_OUTGOING, request).await
@@ -337,15 +343,19 @@ pub(super) async fn send_smtp(
     message: PreparedMail,
 ) -> Result<String, String> {
     if !supports(&registry, SEND_SMTP) {
-        let account = account.clone();
-        let runtime = tokio::runtime::Handle::current();
-        return tokio::task::spawn_blocking(move || {
-            let transport = super::smtp::build_smtp_transport(&account, &runtime)?;
-            let response = transport.mailer.send_prepared(&message)?;
-            Ok(format!("{response:?}"))
-        })
-        .await
-        .map_err(|error| format!("SMTP send task failed: {error}"))?;
+        #[cfg(feature = "legacy-mail-smtp")]
+        if use_legacy_smtp(&registry) {
+            let account = account.clone();
+            let runtime = tokio::runtime::Handle::current();
+            return tokio::task::spawn_blocking(move || {
+                let transport = super::smtp::build_smtp_transport(&account, &runtime)?;
+                let response = transport.mailer.send_prepared(&message)?;
+                Ok(format!("{response:?}"))
+            })
+            .await
+            .map_err(|error| format!("SMTP send task failed: {error}"))?;
+        }
+        return Err("Enable or update Mail in the module store to send mail".into());
     }
     let (_route, connection) = bind_smtp(account).await?;
     let sender = message.sender();
@@ -367,6 +377,13 @@ pub(super) async fn send_smtp(
         .map_err(|error| {
             format!("{SMTP_DELIVERY_UNKNOWN}: {error}. Verify delivery before resending.")
         })?
+}
+
+#[cfg(feature = "legacy-mail-smtp")]
+fn use_legacy_smtp(registry: &PluginRegistry) -> bool {
+    registry
+        .get(SLUG)
+        .is_none_or(|record| record.state == LifecycleState::Enabled && record.reason.is_none())
 }
 
 async fn bind_smtp(account: &ResolvedMailAccount) -> Result<(Route, SmtpConnection), String> {

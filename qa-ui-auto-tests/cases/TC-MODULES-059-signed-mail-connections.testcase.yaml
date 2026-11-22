@@ -196,6 +196,8 @@ steps:
 - assert_signed_mail_host: disabled
 - wait_for: {selector: '[data-plugin-slug="mail"] [data-testid="mail-client-tab"]', state: detached}
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 2}
+- assert_count: {selector: '[data-testid="mail-test-connection"]', equal: 0}
+- assert_count: {selector: '[data-testid="mail-compose-open"]', equal: 0}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -245,8 +247,10 @@ verification:
     - {step: 167, expectation: The verified module is still installed and the host released its writer lease.}
     - {step: 168, expectation: Disabling unmounts both Mail account panes.}
     - {step: 169, expectation: Both tabs remain open for reactivation.}
-    - {step: 170, expectation: The remaining application runs without uncaught errors.}
-    results: [166, 167, 168, 169, 170]
+    - {step: 170, expectation: The stopped module exposes no connection-test control.}
+    - {step: 171, expectation: The stopped module exposes no compose control.}
+    - {step: 172, expectation: The remaining application runs without uncaught errors.}
+    results: [166, 167, 168, 169, 170, 171, 172]
   - id: R5
     requirement: The signed Mail host catches up the selected inbox after messages arrive while another folder is open.
     actions: [29, 40, 41]

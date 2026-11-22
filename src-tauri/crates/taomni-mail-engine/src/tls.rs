@@ -31,6 +31,7 @@ pub fn tls_connector(trusted: Option<&str>) -> Result<TlsConnector, String> {
 }
 
 /// lettre TLS parameters with the same pinning rules.
+#[cfg(any(feature = "legacy-smtp", feature = "routed-smtp"))]
 pub(super) fn smtp_tls_parameters(
     host: &str,
     trusted: Option<&str>,

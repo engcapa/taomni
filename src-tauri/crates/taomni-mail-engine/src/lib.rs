@@ -31,6 +31,7 @@ mod models;
 pub mod pop3;
 pub mod responses;
 pub mod search;
+#[cfg(any(feature = "legacy-smtp", feature = "routed-smtp", test))]
 pub mod smtp;
 pub mod storage;
 #[cfg(test)]

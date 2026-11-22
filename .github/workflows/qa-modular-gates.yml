@@ -104,6 +104,8 @@ jobs:
           for target in x86_64-unknown-linux-gnu x86_64-pc-windows-msvc aarch64-apple-darwin x86_64-apple-darwin; do
             cargo tree --manifest-path src-tauri/Cargo.toml --locked -p taomni --edges normal,build --prefix none \
               --target "$target" > "gate-inventory/cargo-tree-$target.txt"
+            cargo tree --manifest-path src-tauri/Cargo.toml --locked -p taomni --edges normal,build --prefix none \
+              --target "$target" --invert lettre --format '{p} {f}' > "gate-inventory/mail-compose-features-$target.txt"
           done
           git ls-files src-tauri/resources > gate-inventory/resource-sources.txt
           git ls-files src-tauri/tauri.conf.json 'src-tauri/tauri.*.conf.json' > gate-inventory/bundle-configs.txt
@@ -141,6 +143,9 @@ jobs:
               }), f"{target}: the core still depends on a screenshot module engine"
               assert "taomni-mfa-api" in packages, f"{target}: missing the shared MFA contract"
               assert not packages.intersection({"taomni-mfa-engine", "taomni-plugin-mfa", "quircs"}), f"{target}: the core depends on the MFA engine or decoder"
+              mail_features = Path(f"gate-inventory/mail-compose-features-{target}.txt").read_text()
+              lettre = [line.split()[2:] for line in mail_features.splitlines() if line.startswith("lettre ")]
+              assert all("smtp-transport" not in ",".join(features).split(",") for features in lettre), f"{target}: the core includes the desktop SMTP transport"
           resources = json.loads(Path("src-tauri/tauri.windows.conf.json").read_text())["bundle"]["resources"]
           assert all("resources/vnc/" not in entry for entry in resources), "Core declares VNC module resources"
           PY

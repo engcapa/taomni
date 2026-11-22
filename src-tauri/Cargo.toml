@@ -332,6 +332,7 @@ legacy-rdp-server = ["dep:taomni-rdp-server-engine", "rdp-server-audio"]
 legacy-local-servers = ["dep:taomni-local-servers-engine"]
 legacy-screenshot-media = ["dep:taomni-screenshot-ocr", "dep:taomni-screenshot-recording"]
 legacy-mfa = ["dep:taomni-mfa-engine"]
+legacy-mail-smtp = ["taomni-mail-engine/legacy-smtp"]
 # Dedicated hosted test harness: use the production pinned key on every thread
 # instead of the normal unit-fixture key. Production verification is unchanged.
 qa-release-trust-gates = []

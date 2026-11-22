@@ -1,4 +1,8 @@
-use super::*;
+use super::{MailSendAttachment, MailSendRequest, ResolvedMailAccount};
+use std::path::Path;
+
+#[cfg(feature = "legacy-mail-smtp")]
+use super::{DEFAULT_TIMEOUT_SECS, Duration, ProxyForward, mail_effective_endpoint};
 
 use taomni_mail_engine::compose::{
     MailSender, ResolvedSendAttachment, attachment_content_type, build_message,
@@ -6,13 +10,16 @@ use taomni_mail_engine::compose::{
 pub(super) use taomni_mail_engine::compose::{MessageBuildOptions, validate_send_request};
 
 use taomni_mail_engine::delivery::PreparedMail;
+#[cfg(feature = "legacy-mail-smtp")]
 use taomni_mail_engine::smtp::{SmtpClient, SmtpEndpoint};
 
+#[cfg(feature = "legacy-mail-smtp")]
 pub(super) struct MailSmtpTransport {
     pub(super) mailer: SmtpClient,
     _forward: Option<ProxyForward>,
 }
 
+#[cfg(feature = "legacy-mail-smtp")]
 pub(super) fn test_smtp(
     account: &ResolvedMailAccount,
     runtime: &tokio::runtime::Handle,
@@ -21,6 +28,7 @@ pub(super) fn test_smtp(
     transport.mailer.test_connection()
 }
 
+#[cfg(feature = "legacy-mail-smtp")]
 pub(super) fn build_smtp_transport(
     account: &ResolvedMailAccount,
     runtime: &tokio::runtime::Handle,
