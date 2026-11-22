@@ -13325,7 +13325,7 @@ TC-WS-075 keeps the real native execution scan under the same Home responsivenes
 
 ### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与左栏收纳
 
-> 2026-11-22：右侧上下文面板（Structure/Tao 助手）及其右上角收缩按钮已从全部主视图移除；Home 视图按钮不变，`TC-WS-099` 验证五视图右上角仅保留模式操作、全局搜索与大预览，原 `TC-WS-001/020/050` 同步收缩断言。
+> 2026-11-22：右侧上下文面板（Structure/Tao 助手）及其右上角收缩按钮已从全部主视图移除；Home 视图按钮不变，`TC-WS-099` 验证五视图右上角仅保留模式操作、全局搜索与大预览，`TC-WS-100`（browser）验证 0.5-1s 悬停放大边界（不立即放大、离开清除、重新计时），原 `TC-WS-001/020/050` 同步收缩断言。
 
 Issue #797：`TC-WS-091/092` 保护左栏 Terminal 在数据库/shell 画布上只切换 workspace 底部工具窗，不改变当前标签或重建 Code Workspace。底部复用编辑器同一个终端 owner，隐藏/重开及跨模式恢复保留输出；native 额外验证上下 PTY 独立执行及工作区隔离。`TC-IDE-PARITY-010-01/04` 和 `024-03` 保护编辑器工具窗与移动行为。
 
