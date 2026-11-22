@@ -14,18 +14,32 @@ ROOT = Path(__file__).resolve().parents[4]
 
 
 class BuildPipelineTests(unittest.TestCase):
-    def test_frontend_regressions_run_once_on_linux_producer_and_keep_original_log(self):
-        workflow = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
-        steps = workflow['jobs']['entry']['steps']
-        step = next(s for s in steps if s.get('name') == 'Frontend behavior unit regressions')
-        self.assertEqual(step['if'], "runner.os == 'Linux' && inputs.operation == 'build'")
-        self.assertIn('pnpm check:refactor', step['run'])
-        self.assertIn('pnpm exec vitest run 2>&1 | tee qa-build-output/frontend-unit-contracts.log', step['run'])
+    def test_frontend_regressions_run_in_parallel_sharded_job_and_keep_original_log(self):
+        entry = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
+        entry_steps = entry['jobs']['entry']['steps']
+        self.assertIsNone(
+            next((s for s in entry_steps if s.get('name') == 'Frontend behavior unit regressions'), None)
+        )
+        platforms = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())
+        job = platforms['jobs']['frontend-contracts']
+        self.assertEqual(job['needs'], 'plan')
+        self.assertEqual(job['strategy']['matrix']['shard'], [1, 2, 3, 4])
+        self.assertIn("github.event_name == 'pull_request'", job['if'])
+        self.assertIn("github.event_name == 'schedule'", job['if'])
+        steps = job['steps']
+        refactor_step = next(s for s in steps if s.get('name') == 'Frontend refactor and QA script unit contracts')
+        self.assertEqual(refactor_step['if'], 'matrix.shard == 1')
+        self.assertIn('pnpm check:refactor', refactor_step['run'])
+        vitest_step = next(s for s in steps if s.get('name') == 'Frontend Vitest unit regressions')
+        self.assertIn('pnpm exec vitest run --shard=${{ matrix.shard }}/4', vitest_step['run'])
         # No path filters: the final candidate must retain the complete frontend
-        # unit suite, including the newly merged mail/editor lifecycle tests.
-        self.assertEqual(step['run'].count('pnpm exec vitest run'), 1)
-        upload = next(s for s in steps if s.get('name') == 'Retain native build diagnostics')
+        # unit suite across shards, including the newly merged mail/editor lifecycle tests.
+        self.assertEqual(vitest_step['run'].count('pnpm exec vitest run'), 1)
+        upload = next(s for s in steps if s.get('name') == 'Retain frontend contract logs')
         self.assertIn('qa-build-output/frontend-unit-contracts.log', upload['with']['path'])
+        self.assertIn('frontend-contracts', platforms['jobs']['summarize']['needs'])
+        for platform in ('linux', 'windows', 'macos'):
+            self.assertNotIn('frontend-contracts', platforms['jobs'][f'execute-{platform}-native']['needs'])
 
     def test_failed_contracts_cannot_leave_a_passing_aggregate(self):
         jobs = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']

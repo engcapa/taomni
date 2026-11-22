@@ -364,10 +364,53 @@ jobs:
       operation: contracts
       run_rdp_unit_contracts: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts }}
 
+  frontend-contracts:
+    name: Frontend contracts (shard ${{ matrix.shard }}/4)
+    needs: plan
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || inputs.scope != 'selected'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.head }}
+          persist-credentials: false
+      - uses: ./.github/actions/qa-runtime
+        with:
+          mode: contracts
+      - name: Frontend refactor and QA script unit contracts
+        if: matrix.shard == 1
+        run: |
+          set -o pipefail
+          mkdir -p qa-build-output
+          {
+            python -m unittest test_browser_vault_first_run test_tao_provider_observation test_tao_messages_fixture test_tao_real_scenarios test_tao_real_documents test_tao_handoff_persistence test_markdown_docx_quality test_markdown_testing_quality test_export_quality_native
+            node --test .agents/skills/qa-ui-auto/scripts/test_native_paced_input.mjs .agents/skills/qa-ui-auto/scripts/test_native_pointer_activation.mjs
+            python -m unittest test_ci_ssh_features test_ci_x11_session test_ci_build_pipeline test_native_windows_integrity test_native_frame_errors test_native_pointer test_native_element_query test_ci_file_manager test_native_application_restart test_native_application_shutdown test_native_window_close_x11 test_native_external_browser test_native_authorization_route test_backup_cloud test_ci_selection test_terminal_rendering_probe qa_ui_auto.test_mobile_native test_native_drag test_tauri_webdriver.NativeSessionFillTest qa_ui_auto.test_mobile_case_readiness qa_ui_auto.test_mobile_openssh_readiness
+            pnpm check:refactor
+            node --test scripts/terminal-webgl-backport.test.mjs
+          } 2>&1 | tee qa-build-output/frontend-unit-contracts.log
+      - name: Frontend Vitest unit regressions
+        run: |
+          set -o pipefail
+          mkdir -p qa-build-output
+          pnpm exec vitest run --shard=${{ matrix.shard }}/4 2>&1 | tee -a qa-build-output/frontend-unit-contracts.log
+      - name: Retain frontend contract logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-unit-contracts-shard-${{ matrix.shard }}-${{ needs.plan.outputs.artifact_key }}
+          path: qa-build-output/frontend-unit-contracts.log
+          if-no-files-found: warn
+          retention-days: 14
+
   summarize:
     name: qa-ui-auto-platforms-result
     if: always() && needs.plan.result != 'skipped'
-    needs: [plan, tool-contracts, sftp-contracts, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
+    needs: [plan, tool-contracts, sftp-contracts, frontend-contracts, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
