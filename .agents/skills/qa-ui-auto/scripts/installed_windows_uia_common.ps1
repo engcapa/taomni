@@ -1,4 +1,5 @@
 # UI Automation for the window of one installed executable on the Windows runner.
+param([int]$PhaseTimeoutSeconds = 75)
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Windows.Forms, WindowsBase
 Add-Type @'
 using System;
@@ -42,9 +43,9 @@ $types = [System.Windows.Automation.ControlType]
 $clock = [Diagnostics.Stopwatch]::StartNew()
 
 
-function Wait-Element([scriptblock]$Find, [string]$Stage) {
+function Wait-Element([scriptblock]$Find, [string]$Stage, [int]$TimeoutSeconds = 25) {
     $script:diagnosticStage = $Stage
-    $end = [Math]::Min($clock.Elapsed.TotalSeconds + 25, 75)
+    $end = [Math]::Min($clock.Elapsed.TotalSeconds + $TimeoutSeconds, $PhaseTimeoutSeconds)
     do {
         try {
             $element = & $Find

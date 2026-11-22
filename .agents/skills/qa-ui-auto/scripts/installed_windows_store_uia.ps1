@@ -23,12 +23,14 @@ trap {
         line = $failure.InvocationInfo.ScriptLineNumber
         exception = $failure.Exception.GetBaseException().GetType().Name
         module = $script:checkingModule
+        windowHandle = if ($windowHandle) { $windowHandle.ToInt64() } else { 0 }
         observed = $observed
     } | ConvertTo-Json -Depth 3 -Compress))
     exit 1
 }
 $fixture = [Console]::In.ReadToEnd() | ConvertFrom-Json
-. (Join-Path $PSScriptRoot 'installed_windows_uia_common.ps1')
+$phaseTimeout = if ($Phase -eq 'open-store') { 300 } else { 75 }
+. (Join-Path $PSScriptRoot 'installed_windows_uia_common.ps1') -PhaseTimeoutSeconds $phaseTimeout
 
 function Named($Root, [string]$Name) {
     $condition = [System.Windows.Automation.PropertyCondition]::new($automation::NameProperty, $Name)
@@ -87,7 +89,18 @@ function Dialog-Button([string]$Message, [string]$Button) {
 $result = [ordered]@{ ownerPid = $OwnerId; phase = $Phase }
 switch ($Phase) {
     'open-store' {
-        $passwords = Wait-Element { Find-Passwords 1 } 'vault-unlock-field'
+        # A cold reopen loads the installed business modules before showing the
+        # Vault dialog. Re-resolve the window in case its initial HWND changes.
+        $passwords = Wait-Element {
+            $handle = (Get-Process -Id $OwnerId).MainWindowHandle
+            if ($handle -eq [IntPtr]::Zero) { return }
+            $current = $automation::FromHandle($handle)
+            if ($current.Current.ProcessId -ne $OwnerId) { return }
+            $script:windowHandle = $handle
+            $script:window = $current
+            Find-Passwords 1
+        } 'vault-unlock-field' 225
+        $result.unlockControlWaitMs = $clock.ElapsedMilliseconds
         Set-Value $passwords[0] $fixture.password
         Invoke-Button $window 'Unlock' 'unlock-vault' -Physical
         $null = Wait-Element { if (@(Get-VisiblePasswords).Count -eq 0) { return $true } } 'unlock-vault'

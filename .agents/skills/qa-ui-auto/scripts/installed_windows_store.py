@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import subprocess
 
-from installed_windows_mfa import installed_windows_desktop, verify_mfa_controls
+from installed_windows_mfa import capture_window, installed_windows_desktop, verify_mfa_controls
 from modular_bundle_inventory import write_json
 from qa_ui_auto.fixtures.module_legacy_mfa import APP_ID, PASSWORD
 from qa_ui_auto.fixtures.module_marketplace import ORIGIN
@@ -15,9 +15,18 @@ def controls(owner, phase, evidence, **inputs):
     result = subprocess.run([
         "powershell.exe", "-NoProfile", "-NonInteractive", "-Sta", "-File", str(script),
         "-OwnerId", str(owner.pid), "-Phase", phase,
-    ], input=json.dumps(inputs), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=90)
+    ], input=json.dumps(inputs), capture_output=True, text=True, encoding="utf-8", errors="replace",
+       timeout=315 if phase == "open-store" else 90)
     if result.returncode:
         (evidence / f"{phase}-error.log").write_text(result.stderr, encoding="utf-8")
+        if phase == "open-store" and owner.poll() is None:
+            try:
+                diagnostic = json.loads(result.stderr)
+            except ValueError:
+                diagnostic = {}
+            handle = diagnostic.get("windowHandle")
+            if diagnostic.get("stage") == "vault-unlock-field" and type(handle) is int and 0 < handle < 2**63:
+                capture_window(handle, evidence, "startup-before-unlock.png")
         raise RuntimeError(f"Installed app UI Automation failed during {phase}: {result.stderr.strip()}")
     seen = json.loads(result.stdout)
     if seen.get("ownerPid") != owner.pid or seen.get("phase") != phase:
