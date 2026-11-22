@@ -185,6 +185,7 @@ export function SocksCapMacosSetupGuide({
         <div className="flex-1 overflow-auto px-4 py-3">
           <div
             data-testid="sockscap-macos-setup-status"
+            data-installer-source={installStatus?.resourceSource ?? undefined}
             className="mb-3 flex items-start gap-2 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-[11px] text-sky-800 dark:text-sky-300"
           >
             {busy ? (

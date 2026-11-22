@@ -14,7 +14,7 @@ from . import sockscap_redirector
 from .backup_policy import isolated_data_root
 from .module_signed_archive import load_artifact, platform_key
 
-SIGNED_CASES = {"TC-MODULES-072", "TC-MODULES-073", sockscap_redirector.CASE_ID}
+SIGNED_CASES = {"TC-MODULES-072", "TC-MODULES-073", sockscap_redirector.CASE_ID, sockscap_redirector.INSTALLER_CASE}
 
 
 def setup(ctx):
@@ -78,5 +78,5 @@ def setup_signed(ctx):
         sockscap_signed_frontend_sha256=receipt["frontendSha256"],
     )
 
-    if ctx.case_id == sockscap_redirector.CASE_ID:
-        sockscap_redirector.prepare(ctx)
+    if ctx.case_id in (sockscap_redirector.CASE_ID, sockscap_redirector.INSTALLER_CASE):
+        sockscap_redirector.prepare(ctx, destination, installed)

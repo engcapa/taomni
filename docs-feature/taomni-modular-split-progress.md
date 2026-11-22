@@ -2,6 +2,8 @@
 
 ## 2026-11-22 当前进展
 
+- SocksCap 0.1.6 把 macOS Redirector 的上游安装包、清单和许可证从基座移到双架构的签名模块。安装按钮从已启用模块取出验签字节，在私有暂存目录复核摘要后才申请系统安装授权。核心安装件和 updater 检查排除这份资源。TC-MODULES-074、080、082 覆盖设置页、宿主停用和安装包损坏后拒绝安装。082 尚待 GitHub macOS Native 实跑。Xray 和旧桥接 helper 仍有核心过渡路径。
+- `8b2526b30` 的三端 Browser 各 35/35。已下载的 Linux Native 第二分片中，旧 SocksCap 重开后也读出 `10801`，预期为 `19397`，与 Windows 已修复的问题一致。该分片的邮件邀请、已读回执、Markdown Live 表格和 Explorer 编辑重开均通过。0.1.6 的 43 项发布脚本、55 项组件、2 项资源打包和 1 项核心验签单元通过。仓库 Rust 包格式、QA 用例审计和含完整崩溃回归的三端静态选集通过。[执行中取得的分片](https://github.com/engcapa/taomni/actions/runs/45011830158)
 - SocksCap 0.1.5 修复 Windows Native 在重开旧配置后编辑端口的问题。清空后键入 `19397` 时，原生失败现场保留了 `10801`。现在焦点内保留未输完的值，有效配置按输入顺序持久化，写入失败回到最后成功值。TC-MODULES-071 验证重开，072 从模块配置文件读回端口并复核原文件摘要，075 覆盖浏览器写入。55 项组件单测通过，修复后的桌面结果待收取。[Windows 原始分片](https://github.com/engcapa/taomni/actions/runs/45005586816)
 - Mail 的 `bc19f8dc3` 三端 Browser、Native 共 18 个分片已在执行期间全部下载。Browser 各 25/25，Linux 与 Windows Native 各 34/34，macOS Native 33/34。Mac 的 TC-FILE-OPEN-007 在系统导出目录选择面板超时。后续地址簿与 SocksCap 批次正在 `8b2526b30` 收取分片。[Mail 回执](https://github.com/engcapa/taomni/actions/runs/45003592759) · [地址簿与 SocksCap](https://github.com/engcapa/taomni/actions/runs/45011830158)
 

@@ -39,6 +39,11 @@ impl InstalledTrust {
         &self.manifest
     }
 
+    #[cfg(target_os = "macos")]
+    pub(crate) fn contains_file(&self, relative: &str) -> bool {
+        self.checksums.contains_key(relative)
+    }
+
     /// `relative` is relative to the version directory, e.g.
     /// `frontend/index.js`. The returned bytes are exactly those hashed here;
     /// callers must not reopen the file after this method succeeds.

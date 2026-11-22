@@ -2985,6 +2985,12 @@
   ↳ `[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]` — alias
   ↳ `[data-testid="sockscap-panel"][aria-busy="false"]` — alias
 - `[data-testid="sockscap-locked-banner"]` — display [optional] — F-Sockscap-1.locked-banner
+- `[data-testid="sockscap-macos-setup-help"]` — interactive [optional] — F-Sockscap-1.macos-setup-help
+- `[data-testid="sockscap-macos-setup-status"]` — display [optional] — F-Sockscap-1.macos-setup-status
+  ↳ `[data-testid="sockscap-macos-setup-status"][data-installer-source="module"]` — alias
+- `[data-testid="sockscap-macos-setup-close"]` — interactive [optional] — F-Sockscap-1.macos-setup-close
+- `[data-testid="sockscap-macos-setup-install"]` — interactive [optional] — F-Sockscap-1.macos-setup-install
+- `[data-testid="sockscap-macos-setup-error"]` — display [optional] — F-Sockscap-1.macos-setup-error
 - `[data-testid="sockscap-add-profile"]` — interactive — F-Sockscap-1.add-profile
 - `[data-testid="sockscap-start"]` — interactive — F-Sockscap-1.start
 - `[data-testid="sockscap-stop"]` — interactive [optional] — F-Sockscap-1.stop

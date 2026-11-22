@@ -1,0 +1,61 @@
+id: TC-MODULES-082
+title: macOS SocksCap refuses an altered module installer before requesting installation
+description: Open the signed module on a fresh Mac, change the installed archive after its setup guide has loaded, and try the ordinary installation action.
+covers: [F-Modules-1, F-Sockscap-1]
+tags: [modules, sockscap, macos, native-boundary, p0]
+modes: [native]
+native_platforms: [macOS]
+fixtures: [reset_db, sockscap_legacy_config, module_signed_sockscap_archive]
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.sockscap_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.sockscap_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-sockscap"]'
+- wait_for: '[data-testid="module-action-disable-sockscap"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-testid="sockscap-macos-setup-status"][data-installer-source="module"]'
+- assert_file_sha256: {path: '${fixture.sockscap_redirector_archive}', equals: '${fixture.sockscap_redirector_sha256}'}
+- redirector_installer_fixture: change
+- click: '[data-testid="sockscap-macos-setup-install"]'
+- wait_for: '[data-testid="sockscap-macos-setup-error"]'
+- assert_text: {selector: '[data-testid="sockscap-macos-setup-error"]', contains: asset bytes differ from the signed package}
+- redirector_installer_fixture: restore
+- assert_file_sha256: {path: '${fixture.sockscap_redirector_archive}', equals: '${fixture.sockscap_redirector_sha256}'}
+- assert_json_file: {path: redirector-installer-restore.json, expect: {systemAppPresent: false, phase: restore}}
+- click: '[data-testid="sockscap-macos-setup-close"]'
+- click: '[data-testid="sockscap-macos-setup-help"]'
+- wait_for: '[data-testid="sockscap-macos-setup-status"][data-installer-source="module"]'
+- assert_count: {selector: '[data-testid="sockscap-macos-setup-error"]', equal: 0}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: verify-installer-before-use
+    requirement: The installed module supplies the pinned installer and checks its actual bytes on each use.
+    actions: [6, 8, 12, 15, 16, 19, 22, 23]
+    checkpoints:
+    - {step: 7, expectation: The module store completes installation of the signed package.}
+    - {step: 13, expectation: The setup guide selects the active module on a machine without Redirector.}
+    - {step: 14, expectation: The newly installed archive matches the pinned upstream hash.}
+    - {step: 18, expectation: The installer action reports the signed package byte mismatch.}
+    - {step: 20, expectation: The restored file again has the pinned digest.}
+    - {step: 21, expectation: The on-disk observation records that the system app is still absent after rejection.}
+    - {step: 24, expectation: The reopened guide identifies the signed module resource.}
+    - {step: 25, expectation: A new attempt has no stale installation error.}
+    - {step: 26, expectation: The handled integrity error leaves the renderer running normally.}
+    results: [7, 13, 14, 18, 20, 21, 24, 25, 26]
+  visual:
+  - check: The installer error is visible in the setup guide.
+    method: automated
+    reason: The case reads the error surfaced by the normal installation action.
+  native:
+  - check: The installed archive is rechecked before any system modification.
+    method: automated
+    reason: The runner records the archive digest before and after the change and checks the real system app path after refusal.

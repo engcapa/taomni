@@ -12,6 +12,8 @@ pub mod app_identity;
 #[cfg(target_os = "macos")]
 pub mod installer;
 #[cfg(target_os = "macos")]
+mod installer_source;
+#[cfg(target_os = "macos")]
 pub mod runtime;
 
 use std::path::{Path, PathBuf};

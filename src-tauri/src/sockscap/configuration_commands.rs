@@ -11,7 +11,10 @@ pub async fn sockscap_redirector_install_status(
 ) -> Result<serde_json::Value, String> {
     #[cfg(target_os = "macos")]
     {
-        serde_json::to_value(redirector::installer::status(&app))
+        let status = tokio::task::spawn_blocking(move || redirector::installer::status(&app))
+            .await
+            .map_err(|error| format!("Redirector status task failed: {error}"))??;
+        serde_json::to_value(status)
             .map_err(|error| format!("serialize Redirector install status: {error}"))
     }
     #[cfg(not(target_os = "macos"))]

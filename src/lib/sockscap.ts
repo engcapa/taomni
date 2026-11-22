@@ -201,6 +201,7 @@ export interface RedirectorInstallStatus {
     | "resourceMissing";
   packageVersion: string;
   resourceAvailable: boolean;
+  resourceSource?: "module" | "legacyBundle" | null;
   systemExtensionState:
     | "enabled"
     | "waitingForUser"

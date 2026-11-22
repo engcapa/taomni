@@ -394,6 +394,7 @@ export function registerSocksCapPanelHistory2Cases() {
       state: "missing",
       packageVersion: "0.12.11",
       resourceAvailable: true,
+      resourceSource: "module",
       systemExtensionState: "notRegistered",
       message: "Mitmproxy Redirector is not installed.",
     });
@@ -401,6 +402,7 @@ export function registerSocksCapPanelHistory2Cases() {
     render(<SocksCapPanel />);
 
     const guide = await screen.findByTestId("sockscap-macos-setup-dialog");
+    expect(within(guide).getByTestId("sockscap-macos-setup-status")).toHaveAttribute("data-installer-source", "module");
     expect(within(guide).getByTestId("sockscap-macos-setup-step-1")).toHaveTextContent(
       "Install Mitmproxy Redirector",
     );

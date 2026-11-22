@@ -351,11 +351,6 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      # Keep Redirector v0.12.11 as an opaque, upstream-signed universal app
-      # archive. Taomni never rebuilds or re-signs its nested System Extension.
-      - name: Stage and verify signed Mitmproxy Redirector v0.12.11
-        run: bash scripts/stage-mitmproxy-redirector-macos.sh --stage
-
       - name: Verify macOS Redirector protocol and recovery gates
         env:
           LIBGSSAPI_IMPL: mit

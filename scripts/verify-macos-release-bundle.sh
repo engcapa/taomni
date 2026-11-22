@@ -22,9 +22,6 @@ bundle_root="$repo_root/src-tauri/target/$target_triple/release/bundle"
 app="$bundle_root/macos/Taomni.app"
 main_executable="$app/Contents/MacOS/taomni"
 resource_root="$app/Contents/Resources"
-pinned_redirector="$repo_root/src-tauri/resources/sockscap/macos/redirector/0.12.11/Mitmproxy Redirector.app.tar"
-pinned_manifest="$repo_root/src-tauri/resources/sockscap/macos/redirector/0.12.11/manifest.json"
-pinned_license="$repo_root/src-tauri/resources/sockscap/macos/redirector/0.12.11/LICENSE"
 
 test -d "$app" || {
   echo "Taomni app bundle is missing: $app" >&2
@@ -160,25 +157,25 @@ test "$xray_architectures" = "$expected_arch" || {
   exit 1
 }
 
-redirector_count="$(find "$resource_root" -type f -path '*/sockscap/macos/redirector/0.12.11/Mitmproxy Redirector.app.tar' | wc -l | tr -d ' ')"
-test "$redirector_count" = "1" || {
-  echo "Expected one bundled Redirector v0.12.11 archive, found $redirector_count" >&2
-  exit 1
+verify_separate_installer() {
+  local misplaced
+  misplaced="$(find "$1" \( -name 'Mitmproxy Redirector.app.tar' -o -path '*/macos/redirector' \) -print -quit)"
+  if [ -n "$misplaced" ]; then
+    echo "The SocksCap module installer was included in the core bundle: $misplaced" >&2
+    return 1
+  fi
 }
-bundled_redirector="$(find "$resource_root" -type f -path '*/sockscap/macos/redirector/0.12.11/Mitmproxy Redirector.app.tar' -print -quit)"
-cmp "$pinned_redirector" "$bundled_redirector"
-
-bundled_manifest="$(find "$resource_root" -type f -path '*/sockscap/macos/redirector/0.12.11/manifest.json' -print -quit)"
-bundled_license="$(find "$resource_root" -type f -path '*/sockscap/macos/redirector/0.12.11/LICENSE' -print -quit)"
-test -n "$bundled_manifest" && cmp "$pinned_manifest" "$bundled_manifest"
-test -n "$bundled_license" && cmp "$pinned_license" "$bundled_license"
+verify_separate_installer "$resource_root"
+if [ -n "${updater_app:-}" ]; then
+  verify_separate_installer "$updater_app/Contents/Resources"
+fi
 
 if [ "$notarize" = true ]; then
   test "$signing_mode" = developer-id && test -n "$expected_team_id"
   gatekeeper="$(spctl --assess --type execute --verbose=4 "$app" 2>&1)"
   grep -Fq 'source=Notarized Developer ID' <<<"$gatekeeper"
   xcrun stapler validate "$app"
-  echo "Taomni macOS $expected_arch verified: fixed Developer ID certificate, updater app, notarization, architecture, Xray and Redirector v0.12.11."
+  echo "Taomni macOS $expected_arch verified with fixed Developer ID, updater identity, notarization and separate SocksCap installer."
 else
-  echo "Taomni macOS $expected_arch verified: $signing_mode, architecture, Xray and Redirector v0.12.11 (unnotarized build)."
+  echo "Taomni macOS $expected_arch verified with $signing_mode signing and separate SocksCap installer (unnotarized build)."
 fi

@@ -1552,7 +1552,7 @@ const dict = {
     macosSetupStatusChecking: "Checking Redirector installation…",
     macosSetupStatusMissing: "Redirector is not installed.",
     macosSetupStatusUpgrade: "The installed Redirector needs to be upgraded.",
-    macosSetupStatusResourceMissing: "The Redirector package is missing from this build.",
+    macosSetupStatusResourceMissing: "Install or update SocksCap in the Module Store to get the macOS Redirector installer.",
     macosSetupStatusConflict: "Another Redirector installation conflicts with this package.",
     macosSetupStatusWaiting: "Waiting for approval in System Settings.",
     macosSetupStatusNotRegistered: "Installed; click Start once to request approval.",

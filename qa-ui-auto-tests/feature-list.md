@@ -9071,6 +9071,28 @@ controls:
     selector: '[data-testid="sockscap-locked-banner"]'
     kind: display
     optional: true       # shown only while capture is preparing/running/stopping
+  - id: macos-setup-help
+    selector: '[data-testid="sockscap-macos-setup-help"]'
+    kind: interactive
+    optional: true
+  - id: macos-setup-status
+    selector: '[data-testid="sockscap-macos-setup-status"]'
+    aliases:
+      - '[data-testid="sockscap-macos-setup-status"][data-installer-source="module"]'
+    kind: display
+    optional: true
+  - id: macos-setup-close
+    selector: '[data-testid="sockscap-macos-setup-close"]'
+    kind: interactive
+    optional: true
+  - id: macos-setup-install
+    selector: '[data-testid="sockscap-macos-setup-install"]'
+    kind: interactive
+    optional: true
+  - id: macos-setup-error
+    selector: '[data-testid="sockscap-macos-setup-error"]'
+    kind: display
+    optional: true
   - id: add-profile
     selector: '[data-testid="sockscap-add-profile"]'
     kind: interactive

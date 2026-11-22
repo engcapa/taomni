@@ -14,7 +14,7 @@ wheel_sha256="63349d9b46514ca679547651f7c0548f9222892edfbcba087b82b3244fbae859"
 app_tar_sha256="b8ea49940489560bb76b231a064aa823cf3d3e8a0787eac4a456611f26c96a7f"
 app_executable_sha256="fb154632717ac7780c2706757573f2352a769e07fef7db1e4ae22027d2e4bc7a"
 extension_executable_sha256="0785d00082db59543c093fe63581d31060f5fdc9677dbf2796bf6ac473f6087a"
-resource_dir="$repo_root/src-tauri/resources/sockscap/macos/redirector/$version"
+resource_dir="$repo_root/src-tauri/plugins/sockscap/resources/macos/redirector/$version"
 app_tar="$resource_dir/Mitmproxy Redirector.app.tar"
 manifest="$resource_dir/manifest.json"
 

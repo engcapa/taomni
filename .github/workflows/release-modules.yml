@@ -202,6 +202,9 @@ jobs:
       - name: Build the Windows VNC key helper
         if: needs.source.outputs.slug == 'vnc-client' && runner.os == 'Windows'
         run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-vnc-key-helper --bin taomni-vnc-key-helper --release --target '${{ matrix.target }}' --locked
+      - name: Verify the upstream-signed macOS SocksCap installer
+        if: needs.source.outputs.slug == 'sockscap' && runner.os == 'macOS'
+        run: bash scripts/stage-mitmproxy-redirector-macos.sh --stage
       - name: Stage the exact package payload
         env:
           MODULE_TARGET: ${{ matrix.target }}
@@ -213,6 +216,7 @@ jobs:
           import json, os, pathlib, shutil, sys
           sys.path.insert(0, 'scripts')
           from local_voice_runtime import stage_runtime
+          import sockscap_redirector_resource as redirector
           slug = os.environ['MODULE_SLUG']
           source = pathlib.Path('src-tauri/plugins') / slug
           manifest = json.loads((source / 'module.json').read_text(encoding='utf-8'))
@@ -227,6 +231,7 @@ jobs:
           if host:
               shutil.copyfile(binaries / host, payload / host)
           stage_runtime(slug, os.environ['MODULE_PLATFORM'], binaries, payload)
+          redirector.stage(slug, os.environ['MODULE_PLATFORM'], source, payload)
           if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
               helper = 'taomni-vnc-key-helper.exe'
               shutil.copyfile(binaries / helper, payload / helper)
@@ -286,6 +291,7 @@ jobs:
           import json, os, pathlib, re, sys
           sys.path.insert(0, 'scripts')
           from local_voice_runtime import verify_runtime
+          import sockscap_redirector_resource as redirector
           root = pathlib.Path('candidate')
           observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
           expected_observed = {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': os.environ['MODULE_SLUG']}
@@ -293,6 +299,7 @@ jobs:
               raise SystemExit('candidate source identity does not match the selected commit')
           trusted = json.loads((pathlib.Path('src-tauri/plugins') / os.environ['MODULE_SLUG'] / 'module.json').read_text(encoding='utf-8'))
           candidate = json.loads((root / 'unsigned-module/module.json').read_text(encoding='utf-8'))
+          redirector.verify(os.environ['MODULE_SLUG'], os.environ['MODULE_PLATFORM'], pathlib.Path('src-tauri/plugins') / os.environ['MODULE_SLUG'], root / 'unsigned-module')
           host = trusted.get('entry', {}).get('host')
           if host and os.environ['MODULE_PLATFORM'].startswith('windows-') and not host.endswith('.exe'):
               host += '.exe'

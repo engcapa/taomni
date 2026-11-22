@@ -11,7 +11,7 @@
   "bundle": {
     "resources": [
       "resources/licenses/*",
-      "resources/sockscap/macos/**/*"
+      "resources/sockscap/macos/*"
     ]
   }
 }

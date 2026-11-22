@@ -21,10 +21,10 @@ the app resource dir; the runtime resolves it via
 
 ## Mitmproxy Redirector
 
-macOS transparent capture uses the separately installed, upstream-signed
-Mitmproxy Redirector. The release bundle carries the original pinned app tar
-and its MIT notice; Taomni never rebuilds or re-signs the nested System
-Extension:
+The signed macOS SocksCap module carries the original Mitmproxy Redirector
+app archive, its upstream manifest and MIT notice under
+`src-tauri/plugins/sockscap/resources/macos/redirector/0.12.11/`.
+Stage the archive before building the macOS module.
 
 ```bash
 SOCKSCAP_DOWNLOAD_PROXY=http://127.0.0.1:8080 \
@@ -34,8 +34,10 @@ SOCKSCAP_DOWNLOAD_PROXY=http://127.0.0.1:8080 \
 The proxy variable is optional. The script fixes version `0.12.11`, verifies
 the wheel and app-tar SHA-256 values, checks both bundle identities and Team ID
 `S8XHQB96PW`, validates the nested signature, and requires both `arm64` and
-`x86_64` slices. `--check` performs the offline bundle preflight.
+`x86_64` slices. `--check` verifies an already staged archive on macOS.
 
-The runtime currently requires the verified app to be installed at
-`/Applications/Mitmproxy Redirector.app`. Installation/upgrade UI remains a
-separate production gate; there is no system-proxy fallback.
+The setup guide checks the installed app at
+`/Applications/Mitmproxy Redirector.app`. When installation is needed, the
+core reads the resource from the enabled, signed module and rechecks the
+upstream digest in a private staging directory before requesting macOS
+authorization. The core installer and updater exclude the Redirector archive.

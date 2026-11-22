@@ -22,16 +22,25 @@ impl PluginRegistry {
         version: &str,
         relative: &str,
     ) -> Result<Vec<u8>, PluginError> {
-        let _lifecycle = self
-            .lifecycle
-            .lock()
-            .expect("plugin lifecycle lock poisoned");
         validate_relative_path(relative)?;
         if !relative.starts_with("frontend/") {
             return Err(PluginError::InvalidManifest(
                 "only frontend assets can be served".into(),
             ));
         }
+        self.with_active_package(slug, version, |trusted| trusted.read_file(relative))
+    }
+
+    pub(crate) fn with_active_package<T>(
+        &self,
+        slug: &str,
+        version: &str,
+        inspect: impl FnOnce(&verify::InstalledTrust) -> Result<T, verify::TrustError>,
+    ) -> Result<T, PluginError> {
+        let _lifecycle = self
+            .lifecycle
+            .lock()
+            .expect("plugin lifecycle lock poisoned");
         let record = self.enabled_record(slug)?;
         if record.manifest.version != version {
             return Err(PluginError::InvalidManifest(
@@ -69,6 +78,6 @@ impl PluginRegistry {
                 "cached frontend manifest differs from registry".into(),
             ));
         }
-        Ok(trusted.read_file(relative)?)
+        Ok(inspect(&trusted)?)
     }
 }

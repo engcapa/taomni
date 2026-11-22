@@ -22,6 +22,10 @@ steps:
 - click: '[data-testid="sidebar-tool-sockscap"]'
 - show_sockscap_section: upstream
 - wait_for: '[data-testid="sockscap-upstream-port"][value="19391"]'
+- assert_file_sha256: {path: '${fixture.sockscap_redirector_archive}', equals: '${fixture.sockscap_redirector_sha256}'}
+- click: '[data-testid="sockscap-macos-setup-help"]'
+- wait_for: '[data-testid="sockscap-macos-setup-status"][data-installer-source="module"]'
+- click: '[data-testid="sockscap-macos-setup-close"]'
 - click: '[data-testid="sockscap-start"]'
 - wait_for: '[data-testid="sockscap-probe-fail-dialog"]'
 - click: '[data-testid="sockscap-probe-fail-force"]'
@@ -41,16 +45,18 @@ verification:
   requirements:
   - id: approval-lifecycle
     requirement: Disabling the installed module during activation reaps its launcher and bridge and clears the pre-activation journal with the same desktop still running.
-    actions: [6, 8, 12, 15, 17, 19, 21, 24, 26]
+    actions: [6, 8, 12, 16, 18, 19, 21, 23, 25, 28, 30]
     checkpoints:
     - {step: 7, expectation: The signed module installs through the store.}
     - {step: 14, expectation: The retained loopback profile is loaded.}
-    - {step: 16, expectation: The closed loopback upstream prompts before starting anyway.}
-    - {step: 18, expectation: The real desktop owns the signed host and bridge. The bridge owns the upstream launcher during preparation and both sockets are private.}
-    - {step: 23, expectation: Disabling releases the writer lease and removes both sockets and the preparing journal. All three processes exit while the core remains live.}
-    - {step: 27, expectation: The original tool opens with its disabled placeholder.}
-    - {step: 28, expectation: Disabling during first-use approval completes without a renderer exception.}
-    results: [7, 14, 16, 18, 23, 27, 28]
+    - {step: 15, expectation: The version installed through the store contains the exact pinned upstream installer.}
+    - {step: 17, expectation: The setup guide resolves the installer from the active signed module even when the system app already exists.}
+    - {step: 20, expectation: The closed loopback upstream prompts before starting anyway.}
+    - {step: 22, expectation: The real desktop owns the signed host and bridge. The bridge owns the upstream launcher during preparation and both sockets are private.}
+    - {step: 27, expectation: Disabling releases the writer lease and removes both sockets and the preparing journal. All three processes exit while the core remains live.}
+    - {step: 31, expectation: The original tool opens with its disabled placeholder.}
+    - {step: 32, expectation: Disabling during first-use approval completes without a renderer exception.}
+    results: [7, 14, 15, 17, 20, 22, 27, 31, 32]
   visual:
   - check: The store and original tool reflect the disabled module.
     method: automated

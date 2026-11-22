@@ -13,13 +13,17 @@ const coreScript = coreAction.split("      run: |\n")[1];
 test("desktop bundles stage only their own SocksCap runtime resources and include shared licenses", () => {
   const config = (target = "") => JSON.parse(readFileSync(new URL(`../src-tauri/tauri${target}.conf.json`, import.meta.url), "utf8"));
   assert.deepEqual(config().bundle.resources, ["resources/licenses/*"]);
-  for (const platform of ["linux", "macos", "windows"]) {
+  for (const platform of ["linux", "windows"]) {
     // Tauri applies RFC 7396, replacing the base resource array.
     assert.deepEqual(config(`.${platform}`).bundle.resources, [
       "resources/licenses/*",
       `resources/sockscap/${platform}/**/*`,
     ]);
   }
+  assert.deepEqual(config(".macos").bundle.resources, [
+    "resources/licenses/*",
+    "resources/sockscap/macos/*",
+  ]);
 });
 test("macOS native tests and bundles share a deployment target supporting Whisper filesystem APIs", () => {
   const config = JSON.parse(readFileSync(fileURLToPath(new URL("../src-tauri/tauri.conf.json", import.meta.url)), "utf8"));

@@ -1550,7 +1550,7 @@ export const zhCN: DeepPartial<typeof en> = {
     macosSetupStatusChecking: "正在检查 Redirector 安装状态…",
     macosSetupStatusMissing: "尚未安装 Redirector。",
     macosSetupStatusUpgrade: "已安装的 Redirector 需要升级。",
-    macosSetupStatusResourceMissing: "当前构建中缺少 Redirector 安装包。",
+    macosSetupStatusResourceMissing: "请在模块商店安装或更新 SocksCap，以获取 macOS Redirector 安装包。",
     macosSetupStatusConflict: "另一个 Redirector 安装与当前安装包冲突。",
     macosSetupStatusWaiting: "正在等待你在系统设置中批准。",
     macosSetupStatusNotRegistered: "已安装；请先点击一次“启动”以请求授权。",

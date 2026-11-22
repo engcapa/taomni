@@ -27,11 +27,6 @@ function fixture(t) {
   const bridge = "sockscap/macos/sockscap-redirector-bridge";
   put(join(root, "src-tauri/resources", bridge), "bridge executable", true);
   put(join(app, "Contents/Resources", bridge), "bridge executable", true);
-  for (const name of ["Mitmproxy Redirector.app.tar", "manifest.json", "LICENSE"]) {
-    const relative = `sockscap/macos/redirector/0.12.11/${name}`;
-    put(join(root, "src-tauri/resources", relative), `pinned ${name}`);
-    put(join(app, "Contents/Resources", relative), `pinned ${name}`);
-  }
   const pack = () => execFileSync("tar", ["-czf", `${app}.tar.gz`, "-C", bundle, "Taomni.app"], { env: { ...process.env, LC_ALL: "C", LANG: "C" }, stdio: "ignore" });
   pack();
   put(`${app}.tar.gz.sig`, "fixture signature");
@@ -92,6 +87,16 @@ test("macOS release rejects SocksCap resources from another desktop platform", (
   const result = f.run();
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Unexpected SocksCap resources in the macOS bundle/);
+});
+
+test("core and archived updater each exclude the module-owned Redirector installer", (t) => {
+  const f = fixture(t);
+  const archive = join(f.app, "Contents/Resources/Mitmproxy Redirector.app.tar");
+  writeFileSync(archive, "installer fixture");
+  assert.match(f.run().stderr, /SocksCap module installer was included/);
+  f.pack();
+  rmSync(archive);
+  assert.match(f.run().stderr, /SocksCap module installer was included/);
 });
 
 for (const failure of ["TEST_INVALID_SIGNATURE", "TEST_DIFFERENT_CERTIFICATE", "TEST_CDHASH", "TEST_DIFFERENT_REQUIREMENT", "TEST_WRONG_ARCH", "TEST_HARDENED_RUNTIME", "TEST_BOTTLE_PATH"]) {
