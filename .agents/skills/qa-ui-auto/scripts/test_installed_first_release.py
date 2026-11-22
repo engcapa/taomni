@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from installed_first_release import enrollment
+from installed_windows_webview import owned_listener
 from native_driver_lifecycle import windows_webview_options
 from native_webdriver_transport import WebDriverError
 from qa_ui_auto.fixtures.module_legacy_mfa import close_installed_desktop
@@ -62,11 +63,10 @@ class InstalledFirstReleaseTests(unittest.TestCase):
         app = Mock(pid=42)
         app.exe.return_value = str(exe)
         app.wait.return_value = 0
-        driver = SimpleNamespace(proc=SimpleNamespace(pid=7))
+        driver = SimpleNamespace(application_process=app)
         session = SimpleNamespace(session_id="old", application_restart_observation={"exit_confirmation": {"status": "closed"}})
-        with patch("platform.system", return_value="Windows"), patch("psutil.Process") as process, \
+        with patch("platform.system", return_value="Windows"), \
                 patch("qa_ui_auto.fixtures.module_legacy_mfa.close_application_window") as close:
-            process.return_value.children.return_value = [app]
             report = close_installed_desktop(driver, session, exe)
             self.assertEqual(report["shutdown"], {"pid": 42, "exitCode": 0})
             self.assertIsNone(session.session_id)
@@ -75,3 +75,15 @@ class InstalledFirstReleaseTests(unittest.TestCase):
             app.wait.return_value = 1
             with self.assertRaisesRegex(RuntimeError, "exited with 1"):
                 close_installed_desktop(driver, session, exe)
+
+    def test_attach_requires_a_loopback_listener_on_the_port_of_an_owned_process(self):
+        process = Mock(pid=48)
+        def connection(address, port, status="LISTEN"):
+            return SimpleNamespace(laddr=(address, port), status=status)
+        process.net_connections.return_value = [
+            connection("0.0.0.0", 9222), connection("127.0.0.1", 9223),
+            connection("127.0.0.1", 9222, "ESTABLISHED"),
+        ]
+        self.assertIsNone(owned_listener([process], 9222))
+        process.net_connections.return_value.append(connection("127.0.0.1", 9222))
+        self.assertEqual(owned_listener([process], 9222), 48)

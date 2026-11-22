@@ -132,6 +132,11 @@ def desktop_environment(desktop):
 
 @contextmanager
 def installed_desktop(ctx, executable, desktop, evidence, label, *, environment=None, timeout=120):
+    if platform.system() == "Windows":
+        from installed_windows_webview import installed_webview
+        with installed_webview(executable, environment["WEBVIEW2_USER_DATA_FOLDER"], evidence / label, timeout) as attached:
+            yield attached
+        return
     if environment is None:
         environment, _ = desktop_environment(desktop)
     driver = legacy_driver(ctx, executable, evidence / label)
@@ -150,17 +155,7 @@ def close_installed_desktop(driver, session, executable):
     system = platform.system()
     windows_owner = None
     if system == "Windows":
-        import psutil
-        applications = []
-        for process in psutil.Process(driver.proc.pid).children(recursive=True):
-            try:
-                if Path(process.exe()).resolve() == executable.resolve():
-                    applications.append(process)
-            except psutil.NoSuchProcess:
-                continue
-        if len(applications) != 1:
-            raise RuntimeError("The installed Windows driver must own one matching application")
-        windows_owner = applications[0]
+        windows_owner = driver.application_process
     processes = linux_storage_processes(driver, executable) if system == "Linux" else {}
     close = close_application_window(session, processes=processes, expect_exit_confirmation={
         "title": "Exit", "message": "There is 1 open tab. Exit Taomni and close it?",

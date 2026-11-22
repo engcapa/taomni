@@ -5,7 +5,13 @@ app="${1:?Usage: verify-macos-runtime-paths.sh <Taomni.app>}"
 main="$app/Contents/MacOS/taomni"
 frameworks="$app/Contents/Frameworks"
 test -f "$main"
-if [ "${MACOS_STATIC_KRB5:-false}" = true ]; then
+linkage="${MACOS_STATIC_KRB5:-false}"
+# An external bundle can come from either build configuration. A missing
+# shared library must still fail the static symbol and load-command checks.
+if [ "$linkage" = auto ] && ! compgen -G "$frameworks/*.dylib" >/dev/null; then
+  linkage=true
+fi
+if [ "$linkage" = true ]; then
   dependencies="$(otool -L "$main")"
   while IFS= read -r dependency; do
     case "$dependency" in

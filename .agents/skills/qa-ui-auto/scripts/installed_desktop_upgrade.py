@@ -138,7 +138,7 @@ def execute(args):
             origin = installed_first_release.open_release(args.first_release.resolve(strict=True), identity, report)
             if system == "Windows":
                 webview = str(work / "webview")
-                environment = {"WEBVIEW2_USER_DATA_FOLDER": webview, "TAOMNI_QA_WEBVIEW_DIR": webview}
+                environment = {"WEBVIEW2_USER_DATA_FOLDER": webview}
         old_binary, stages["original"] = install(old_package, slot, report / "original", old_version)
         initialize_profile(old_binary, profile, work, report, "original-start")
         insert_business_rows(profile, input_sessions(True))

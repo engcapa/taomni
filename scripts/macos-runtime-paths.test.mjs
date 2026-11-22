@@ -74,6 +74,8 @@ for (const prefix of ["/opt/homebrew/opt/krb5/lib", "/usr/local/Cellar/krb5/1.22
     f.package();
     const verification = f.run("verify-macos-runtime-paths.sh", [f.app]);
     assert.equal(verification.status, 0, verification.stderr + verification.stdout);
+    const inspected = f.run("verify-macos-runtime-paths.sh", [f.app], { MACOS_STATIC_KRB5: "auto" });
+    assert.equal(inspected.status, 0, inspected.stderr + inspected.stdout);
   });
 }
 
@@ -110,8 +112,11 @@ test("static Kerberos artifact requires GSSAPI code defined in the executable an
   writeFileSync(executable, JSON.stringify(staticBinary));
   const verification = f.run("verify-macos-runtime-paths.sh", [f.app], env);
   assert.equal(verification.status, 0, verification.stderr + verification.stdout);
+  const inspected = f.run("verify-macos-runtime-paths.sh", [f.app], { MACOS_STATIC_KRB5: "auto" });
+  assert.equal(inspected.status, 0, inspected.stderr + inspected.stdout);
   writeFileSync(executable, JSON.stringify({ ...staticBinary, staticGss: false }));
   assert.match(f.run("verify-macos-runtime-paths.sh", [f.app], env).stderr, /does not contain MIT GSSAPI code/);
+  assert.match(f.run("verify-macos-runtime-paths.sh", [f.app], { MACOS_STATIC_KRB5: "auto" }).stderr, /does not contain MIT GSSAPI code/);
   writeFileSync(executable, JSON.stringify({ ...staticBinary, deps: ["/opt/homebrew/opt/krb5/lib/libkrb5.3.dylib"] }));
   assert.match(f.run("verify-macos-runtime-paths.sh", [f.app], env).stderr, /Unexpected non-system load command/);
 });

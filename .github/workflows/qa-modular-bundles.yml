@@ -198,7 +198,7 @@ jobs:
       - name: Inspect the real DMG, updater app, signatures and quarantine assessment
         if: runner.os == 'macOS'
         env:
-          MACOS_STATIC_KRB5: ${{ inputs.macos_hardened_mfa }}
+          MACOS_STATIC_KRB5: ${{ inputs.macos_hardened_mfa && 'true' || 'auto' }}
         run: |
           sw_vers > bundle-evidence/macos-version.txt
           uname -m > bundle-evidence/runner-architecture.txt
@@ -242,9 +242,6 @@ jobs:
           Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
           Expand-Archive -LiteralPath $zip -DestinationPath $driver
           $driver >> $env:GITHUB_PATH
-      - name: Install the Windows Tauri adapter
-        if: inputs.first_release && runner.os == 'Windows'
-        run: cargo install tauri-driver --version 2.0.4 --locked
       - name: Fetch the platform's pinned legacy installer
         if: inputs.upgrade_desktop
         env:
