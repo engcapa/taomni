@@ -202,6 +202,9 @@ jobs:
       - name: Build the Windows VNC key helper
         if: needs.source.outputs.slug == 'vnc-client' && runner.os == 'Windows'
         run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-vnc-key-helper --bin taomni-vnc-key-helper --release --target '${{ matrix.target }}' --locked
+      - name: Build the Windows SocksCap capture helper
+        if: needs.source.outputs.slug == 'sockscap' && runner.os == 'Windows'
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-sockscap-tools --bin sockscap-helper --release --target '${{ matrix.target }}' --locked
       - name: Verify the upstream-signed macOS SocksCap installer
         if: needs.source.outputs.slug == 'sockscap' && runner.os == 'macOS'
         run: bash scripts/stage-mitmproxy-redirector-macos.sh --stage
@@ -252,6 +255,11 @@ jobs:
         run: |
           python -m unittest discover -s scripts -p test_sockscap_xray_resource.py
           python scripts/sockscap_xray_resource.py stage src-tauri/plugins/sockscap "$MODULE_PLATFORM" unsigned-module
+      - name: Stage pinned WinDivert and the module capture helper
+        if: needs.source.outputs.slug == 'sockscap' && runner.os == 'Windows'
+        env:
+          MODULE_TARGET: ${{ matrix.target }}
+        run: python scripts/sockscap_windows_resource.py src-tauri/plugins/sockscap unsigned-module --helper "src-tauri/target/$MODULE_TARGET/release/sockscap-helper.exe"
       - uses: actions/upload-artifact@v4
         with:
           name: module-unsigned-${{ needs.source.outputs.slug }}-${{ matrix.platform }}-${{ github.run_id }}
@@ -347,6 +355,9 @@ jobs:
         env:
           MODULE_PLATFORM: ${{ matrix.platform }}
         run: python scripts/sockscap_xray_resource.py verify src-tauri/plugins/sockscap "$MODULE_PLATFORM" candidate/unsigned-module
+      - name: Verify the module-owned Windows capture files
+        if: needs.source.outputs.slug == 'sockscap' && matrix.platform == 'windows-x86_64'
+        run: python scripts/sockscap_windows_resource.py src-tauri/plugins/sockscap candidate/unsigned-module
       - name: Check Linux module ABI against the core baseline
         if: matrix.platform == 'linux-x86_64'
         env:

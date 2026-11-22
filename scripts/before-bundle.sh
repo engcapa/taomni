@@ -21,9 +21,7 @@ case "$(uname -s)" in
   Linux)
     bash scripts/stage-sockscap-linux.sh --check
     ;;
-  MINGW* | MSYS* | CYGWIN* | Windows_NT)
-    pwsh -File scripts/stage-sockscap-windows.ps1 --check
-    ;;
+  MINGW* | MSYS* | CYGWIN* | Windows_NT) ;;
   *)
     echo "before-bundle: no bundle preflight for $(uname -s), skipping."
     ;;

@@ -30,6 +30,30 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
         (payload / manifest["entry"]["host"]).write_bytes(b"inert unit host; never executed")
         if module == "vnc-client" and platform == "windows-x86_64":
             (payload / "taomni-vnc-key-helper.exe").write_bytes(b"inert unit helper")
+        if module == "sockscap":
+            xray = Path("resources/xray")
+            pinned = trusted / xray
+            pinned.mkdir(parents=True)
+            (payload / xray).mkdir(parents=True)
+            binary = "xray.exe" if platform.startswith("windows-") else "xray"
+            (payload / xray / binary).write_bytes(b"inert Xray")
+            (payload / xray / "LICENSE").write_bytes(b"Xray license")
+            (pinned / "release.json").write_text(json.dumps({
+                "licenseSha256": hashlib.sha256(b"Xray license").hexdigest(),
+                "platforms": {platform: {"binarySha256": hashlib.sha256(b"inert Xray").hexdigest()}},
+            }))
+            if platform == "windows-x86_64":
+                capture = Path("resources/windows")
+                (trusted / capture).mkdir(parents=True)
+                (payload / capture).mkdir(parents=True)
+                assets = {"WinDivert.dll": b"DLL", "WinDivert64.sys": b"SYS", "LICENSE": b"license"}
+                for name, content in assets.items():
+                    (payload / capture / name).write_bytes(content)
+                (payload / capture / "sockscap-helper.exe").write_bytes(b"MZ inert unit helper")
+                (trusted / capture / "windivert-release.json").write_text(json.dumps({
+                    "files": {name: {"sha256": hashlib.sha256(content).hexdigest()}
+                              for name, content in assets.items()},
+                }))
         frontend = manifest["entry"].get("frontend")
         if frontend and module not in {"vnc-client", "rdp-client", "mail", "screenshot", "sockscap"}:
             shutil.copytree(ROOT / "src-tauri/plugins" / module / "frontend", trusted / "frontend")
@@ -56,7 +80,8 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
         source = guard.split("\n", 1)[1].rsplit("\nPY", 1)[0]
         scripts = root / "scripts"
         scripts.mkdir(exist_ok=True)
-        for helper in ("local_voice_runtime.py", "sockscap_redirector_resource.py"):
+        for helper in ("local_voice_runtime.py", "sockscap_redirector_resource.py",
+                       "sockscap_windows_resource.py", "sockscap_xray_resource.py"):
             shutil.copyfile(ROOT / "scripts" / helper, scripts / helper)
         with chdir(root), patch.object(sys, "path", list(sys.path)), patch.dict(os.environ, {
             "QA_MODULE": module, "MODULE_PLATFORM": platform, "MODULE_SOURCE_SHA": "a" * 40,
@@ -82,6 +107,22 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
                 target.write_bytes(archive + b"altered")
                 with self.assertRaisesRegex(ValueError, "differs from the pinned release"):
                     self.guard(root, "sockscap", platform)
+
+    def test_sockscap_rejects_changed_windows_driver_and_xray_before_signing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            platform = "windows-x86_64"
+            payload = self.seed(root, "sockscap", platform)
+            self.guard(root, "sockscap", platform)
+            driver = payload / "resources/windows/WinDivert64.sys"
+            original = driver.read_bytes()
+            driver.write_bytes(b"altered")
+            with self.assertRaisesRegex(ValueError, "WinDivert64.sys differs"):
+                self.guard(root, "sockscap", platform)
+            driver.write_bytes(original)
+            (payload / "resources/xray/xray.exe").write_bytes(b"altered")
+            with self.assertRaisesRegex(ValueError, "Xray xray.exe differs"):
+                self.guard(root, "sockscap", platform)
 
     def test_local_voice_requires_its_windows_runtime_in_the_signed_payload(self):
         runtime = runpy.run_path(str(ROOT / "scripts/local_voice_runtime.py"))["WINDOWS_RUNTIME"]

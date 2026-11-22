@@ -14,12 +14,10 @@ pub fn helper_exe_name() -> &'static str {
 
 /// All candidate paths for the elevated helper binary (first existing wins).
 ///
-/// `scripts/stage-sockscap-windows.ps1` stages the helper into
-/// `src-tauri/resources/sockscap/windows/`, and `tauri.windows.conf.json`
-/// includes that directory, so an installed build has it at
-/// `<install dir>\resources\sockscap\windows\sockscap-helper.exe`. Note that on
-/// Windows `resource_dir()` *is* the exe directory, so the `resources/` segment
-/// is part of the path and must be searched explicitly.
+/// Development and QA builds can stage the helper with
+/// `scripts/stage-sockscap-windows.ps1`. Legacy recovery also searches the
+/// original installer layout. Current production capture resolves its helper
+/// from the verified module package.
 pub fn helper_exe_candidates(app: &AppHandle) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let mut push = |p: PathBuf| {

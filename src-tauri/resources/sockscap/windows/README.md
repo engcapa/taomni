@@ -1,5 +1,9 @@
 # WinDivert binaries for SocksCap (Windows)
 
+The signed SocksCap module provides the helper, WinDivert and its license on
+Windows. The core validates those files and requests Windows elevation for
+the staged helper. The helper stops when its matching signed module host exits.
+
 Place the official WinDivert redistributable files here:
 
 - `WinDivert.dll`

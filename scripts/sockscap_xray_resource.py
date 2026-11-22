@@ -21,6 +21,11 @@ def pin(source: Path, platform: str):
     return release, release["platforms"][platform], binary
 
 
+def files(platform: str):
+    binary = "xray.exe" if platform.startswith("windows-") else "xray"
+    return {(RESOURCE / name).as_posix() for name in (binary, "LICENSE")}
+
+
 def digest(path: Path):
     sha256 = hashlib.sha256()
     with path.open("rb") as stream:

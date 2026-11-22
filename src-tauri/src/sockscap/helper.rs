@@ -6,6 +6,12 @@ mod registry;
 
 mod startup;
 
+#[cfg(windows)]
+mod package;
+
+#[cfg(any(windows, test))]
+mod command_line;
+
 mod status;
 
 mod requests;

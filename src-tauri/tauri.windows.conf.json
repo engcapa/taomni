@@ -1,8 +1,5 @@
 {
   "bundle": {
-    "resources": [
-      "resources/licenses/*",
-      "resources/sockscap/windows/[RWs]*"
-    ]
+    "resources": ["resources/licenses/*"]
   }
 }

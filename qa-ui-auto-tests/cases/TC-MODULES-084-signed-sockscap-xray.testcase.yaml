@@ -29,12 +29,12 @@ steps:
 - assert_file_sha256: {path: '${fixture.sockscap_xray_staged}', equals: '${fixture.sockscap_xray_sha256}'}
 - assert_signed_sockscap_host: running
 - click: '[data-testid="sockscap-test-detail-close"]'
-- sockscap_xray_fixture: alter
+- sockscap_resource_fixture: alter
 - click: '[data-testid="sockscap-test-upstream"]'
 - wait_for: '[data-testid="sockscap-test-detail"]'
 - assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: Xray bytes differ from the signed SocksCap release}
 - assert_file_sha256: {path: '${fixture.sockscap_xray_staged}', equals: '${fixture.sockscap_xray_sha256}'}
-- sockscap_xray_fixture: restore
+- sockscap_resource_fixture: restore
 - assert_no_runtime_errors: null
 verification:
   review: reviewed

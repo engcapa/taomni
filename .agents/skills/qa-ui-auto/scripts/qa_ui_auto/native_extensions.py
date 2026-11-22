@@ -34,14 +34,16 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("assert_vnc_key_helper")(assert_vnc_key_helper)
     from .module_mail_observation import run as assert_signed_mail_host
     register_verb("assert_signed_mail_host")(assert_signed_mail_host)
-    from .module_sockscap_observation import run as assert_signed_sockscap_host, xray_fixture
+    from .module_sockscap_observation import run as assert_signed_sockscap_host, resource_fixture
     from .sockscap_redirector_observation import run as assert_signed_redirector_bridge
     register_verb("assert_signed_redirector_bridge")(assert_signed_redirector_bridge)
     from .fixtures.sockscap_redirector import check_archive
     register_verb("redirector_installer_fixture")(check_archive)
     from .module_sockscap_observation import show_section
     register_verb("assert_signed_sockscap_host")(assert_signed_sockscap_host)
-    register_verb("sockscap_xray_fixture")(xray_fixture)
+    register_verb("sockscap_resource_fixture")(resource_fixture)
+    from .sockscap_windows_observation import run as assert_signed_windows_capture
+    register_verb("assert_signed_windows_capture")(assert_signed_windows_capture)
     register_verb("show_sockscap_section")(lambda ctx, args: show_section(ctx, args, mode="native"))
     from .module_screenshot_observation import run as assert_signed_screenshot_host
     register_verb("assert_signed_screenshot_host")(assert_signed_screenshot_host)

@@ -7,8 +7,6 @@ param(
 $ErrorActionPreference = "Stop"
 $ReleaseDir = (Resolve-Path -LiteralPath $ReleaseDir).Path
 $dlls = @("sherpa-onnx-c-api.dll", "sherpa-onnx-cxx-api.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll")
-$sockscapStaging = Join-Path $PSScriptRoot "../src-tauri/resources/sockscap/windows"
-$sockscapRuntime = @("sockscap-helper.exe", "WinDivert.dll", "WinDivert64.sys")
 $nsis = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseDir "bundle/nsis") -Filter '*-setup.exe')
 $msi = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseDir "bundle/msi") -Filter '*.msi')
 if ($nsis.Count -ne 1 -or $msi.Count -ne 1) {
@@ -31,7 +29,6 @@ try {
   foreach ($directory in @($nsisDir, $msiDir)) {
     $executables = @(Get-ChildItem -LiteralPath $directory -Recurse -File -Filter taomni.exe)
     if ($executables.Count -ne 1) { throw "Expected one taomni.exe in $directory" }
-    $appDir = $executables[0].DirectoryName
     if (Get-ChildItem -LiteralPath $directory -Recurse -File -Filter acp-fake-agent.exe) {
       throw "The Windows installer contains the ACP integration test fixture"
     }
@@ -41,20 +38,9 @@ try {
     if (Get-ChildItem -LiteralPath $directory -Recurse -File -Filter taomni-vnc-key-helper.exe) {
       throw "The Windows installer contains the independently shipped VNC key helper"
     }
-    $sockscapDir = Join-Path $appDir "resources/sockscap"
-    foreach ($platform in @("linux", "macos")) {
-      if (Test-Path -LiteralPath (Join-Path $sockscapDir $platform)) {
-        throw "Unexpected SocksCap $platform resources in the Windows installer"
-      }
-    }
-    foreach ($name in $sockscapRuntime) {
-      $staged = Join-Path $sockscapStaging $name
-      $bundled = Join-Path $sockscapDir "windows/$name"
-      if (-not (Test-Path -LiteralPath $bundled -PathType Leaf)) {
-        throw "Missing SocksCap resource in the Windows installer: $name"
-      }
-      if ((Get-FileHash -LiteralPath $bundled).Hash -ne (Get-FileHash -LiteralPath $staged).Hash) {
-        throw "Bundled SocksCap resource differs from staging: $name"
+    foreach ($name in @("sockscap-helper.exe", "WinDivert.dll", "WinDivert64.sys")) {
+      if (Get-ChildItem -LiteralPath $directory -Recurse -File -Filter $name) {
+        throw "The Windows core installer contains a module-owned SocksCap file: $name"
       }
     }
     foreach ($name in $dlls) {

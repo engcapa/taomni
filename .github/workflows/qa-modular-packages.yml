@@ -198,6 +198,9 @@ jobs:
       - name: Build the Windows VNC key helper
         if: env.QA_MODULE == 'vnc-client' && runner.os == 'Windows'
         run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-vnc-key-helper --bin taomni-vnc-key-helper --release --target '${{ matrix.target }}' --locked
+      - name: Build the Windows SocksCap capture helper
+        if: env.QA_MODULE == 'sockscap' && runner.os == 'Windows'
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-sockscap-tools --bin sockscap-helper --release --target '${{ matrix.target }}' --locked
       - name: Build the second first-upgrade module
         if: matrix.legacy_roster
         run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mfa --bin taomni-plugin-mfa --release --target '${{ matrix.target }}' --locked
@@ -239,6 +242,16 @@ jobs:
               stage('mfa', 'unsigned-roster-mfa')
           pathlib.Path('candidate-source.json').write_text(json.dumps({'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': os.environ['QA_MODULE']}), encoding='utf-8')
           PY
+      - name: Stage pinned SocksCap Xray payload
+        if: env.QA_MODULE == 'sockscap'
+        env:
+          MODULE_PLATFORM: ${{ matrix.platform }}
+        run: python scripts/sockscap_xray_resource.py stage src-tauri/plugins/sockscap "$MODULE_PLATFORM" unsigned-module
+      - name: Stage pinned WinDivert and the module capture helper
+        if: env.QA_MODULE == 'sockscap' && runner.os == 'Windows'
+        env:
+          MODULE_TARGET: ${{ matrix.target }}
+        run: python scripts/sockscap_windows_resource.py src-tauri/plugins/sockscap unsigned-module --helper "src-tauri/target/$MODULE_TARGET/release/sockscap-helper.exe"
       - name: Build the previous hello protocol version for the lifecycle test
         if: env.QA_MODULE == 'hello-plugin'
         env:
@@ -317,6 +330,8 @@ jobs:
           sys.path.insert(0, 'scripts')
           from local_voice_runtime import runtime_files, verify_runtime
           import sockscap_redirector_resource as redirector
+          import sockscap_windows_resource as windows_capture
+          import sockscap_xray_resource as xray
           root = pathlib.Path('candidate')
           module = os.environ['QA_MODULE']
           assert module in {'hello-plugin', 'mfa', 'mail', 'vnc-client', 'vnc-server', 'rdp-client', 'rdp-server', 'screenshot', 'servers', 'ai-voice-local', 'sockscap'}, 'Unknown official QA module'
@@ -327,13 +342,21 @@ jobs:
           def check_payload(slug, folder, version=None):
               trusted_source = pathlib.Path('src-tauri/plugins') / slug
               expected = json.loads((trusted_source / 'module.json').read_text(encoding='utf-8'))
-              if os.environ['MODULE_PLATFORM'].startswith('windows'):
+              platform = os.environ['MODULE_PLATFORM']
+              if platform.startswith('windows'):
                   expected['entry']['host'] += '.exe'
               assert expected['id'] == 'taomni-plugin-' + slug
-              binaries = {expected['entry']['host'], *runtime_files(slug, os.environ['MODULE_PLATFORM'])}
-              if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
+              binaries = {expected['entry']['host'], *runtime_files(slug, platform)}
+              if slug == 'vnc-client' and platform == 'windows-x86_64':
                   binaries.add('taomni-vnc-key-helper.exe')
-              resources = set(redirector.files(slug, os.environ['MODULE_PLATFORM']))
+              payload = root / folder
+              resources = set(redirector.files(slug, platform))
+              if slug == 'sockscap':
+                  resources.update(xray.files(platform))
+                  xray.verify(trusted_source, platform, payload)
+                  if platform == 'windows-x86_64':
+                      resources.update(windows_capture.files(trusted_source))
+                      windows_capture.verify(trusted_source, payload)
               allowed = {'module.json', *binaries, *resources}
               frontend = expected['entry'].get('frontend')
               if frontend and slug not in {'vnc-client', 'rdp-client', 'mail', 'screenshot', 'sockscap'}:
@@ -342,9 +365,8 @@ jobs:
                       assert not source.is_symlink()
                       if source.is_file():
                           allowed.add(source.relative_to(trusted_source).as_posix())
-              payload = root / folder
-              verify_runtime(slug, os.environ['MODULE_PLATFORM'], payload)
-              redirector.verify(slug, os.environ['MODULE_PLATFORM'], trusted_source, payload)
+              verify_runtime(slug, platform, payload)
+              redirector.verify(slug, platform, trusted_source, payload)
               manifest = json.loads((payload / 'module.json').read_text(encoding='utf-8'))
               expected_version = expected['version'] if version is None else version
               assert manifest == {**expected, 'version': expected_version}, 'Candidate metadata differs from the trusted official contract'

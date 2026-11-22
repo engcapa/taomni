@@ -1019,9 +1019,13 @@
           "enum": ["change", "restore"],
           "description": "Change or restore one byte in the isolated installed macOS module resource and record both digests."
         },
-        "sockscap_xray_fixture": {
+        "sockscap_resource_fixture": {
           "enum": ["alter", "restore"],
-          "description": "Alter or restore the isolated signed SocksCap Xray resource and record both digests."
+          "description": "Change or restore a SocksCap resource in an isolated profile and record its signed and observed digests."
+        },
+        "assert_signed_windows_capture": {
+          "type": "string",
+          "enum": ["unstaged", "running", "disabled"]
         },
         "assert_signed_sockscap_host": {
           "enum": ["idle", "running", "disabled"],

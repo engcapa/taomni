@@ -47,7 +47,7 @@ pub const CONFIG_PATH: &str = "plugins/sockscap/data/config.json";
 pub const RUNTIME_INFO: &str = "sockscap/runtime-info";
 pub const XRAY: &str = "sockscap/xray";
 pub const XRAY_FILE: &str = if cfg!(windows) { "xray.exe" } else { "xray" };
-pub const XRAY_RUN_DIR: &str = "plugins/sockscap/data/xray";
+pub const XRAY_RUN_DIR: &str = "plugins/sockscap/runtime/xray";
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

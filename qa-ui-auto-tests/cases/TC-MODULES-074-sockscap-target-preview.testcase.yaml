@@ -58,6 +58,7 @@ steps:
 - assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: Upstream test is only available in the desktop build.}
 - click: '[data-testid="sockscap-test-detail-close"]'
 - assert_no_runtime_errors: null
+- assert_count: {selector: '[data-testid="sockscap-stop"]', equal: 0}
 verification:
   review: reviewed
   requirements:
@@ -93,7 +94,8 @@ verification:
     - {step: 45, expectation: The browser preview exposes no macOS system installer action.}
     - {step: 49, expectation: The Shadowsocks probe explains its desktop requirement.}
     - {step: 51, expectation: Closing the result leaves the preview usable.}
-    results: [35, 42, 43, 44, 45, 49, 51]
+    - {step: 52, expectation: The preview still shows capture as stopped after the lifecycle change and probe.}
+    results: [35, 42, 43, 44, 45, 49, 51, 52]
   visual:
   - check: The detail displays the requested host alongside the decision and rule.
     method: automated

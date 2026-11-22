@@ -1,0 +1,18 @@
+{
+  "url": "https://github.com/basil00/WinDivert/releases/download/v2.2.2/WinDivert-2.2.2-A.zip",
+  "archiveSha256": "63cb41763bb4b20f600b6de04e991a9c2be73279e317d4d82f237b150c5f3f15",
+  "files": {
+    "WinDivert.dll": {
+      "member": "WinDivert-2.2.2-A/x64/WinDivert.dll",
+      "sha256": "c1e060ee19444a259b2162f8af0f3fe8c4428a1c6f694dce20de194ac8d7d9a2"
+    },
+    "WinDivert64.sys": {
+      "member": "WinDivert-2.2.2-A/x64/WinDivert64.sys",
+      "sha256": "8da085332782708d8767bcace5327a6ec7283c17cfb85e40b03cd2323a90ddc2"
+    },
+    "LICENSE": {
+      "member": "WinDivert-2.2.2-A/LICENSE",
+      "sha256": "14a0cb5214d536e4fdae6aa3f5696f981eeda106cd026e9794bba489ee79d628"
+    }
+  }
+}

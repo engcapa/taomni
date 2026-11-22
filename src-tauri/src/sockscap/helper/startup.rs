@@ -3,8 +3,6 @@ use super::registry::HelperSession;
 use super::registry::discard_helper_session;
 use super::requests::send_cmd;
 use super::status::request_status;
-use crate::sockscap::paths::resolve_helper_exe;
-use crate::sockscap::paths::resolve_windivert_dir;
 use crate::sockscap::paths::windivert_missing_hint;
 use crate::state::AppState;
 use std::net::TcpStream;
@@ -22,12 +20,7 @@ pub(super) fn pick_free_port() -> Result<u16, String> {
 }
 
 pub(super) fn random_token() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let n = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    format!("sc-{:x}-{:x}", n, std::process::id())
+    uuid::Uuid::new_v4().to_string()
 }
 
 /// Probe a session already held in the registry.
@@ -39,6 +32,13 @@ pub(super) fn probe_existing_helper(
     app: &AppHandle,
     sess: &HelperSession,
 ) -> Result<Option<HelperStatus>, String> {
+    #[cfg(windows)]
+    if let Some((pid, started)) = sess.owner
+        && process_start_filetime(pid) != Some(started)
+    {
+        let _ = send_cmd(sess, "shutdown", None);
+        return Ok(None);
+    }
     let Ok(mut st) = request_status(sess) else {
         return Ok(None);
     };
@@ -80,6 +80,8 @@ pub async fn sockscap_helper_start(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<HelperStatus, String> {
+    #[cfg(windows)]
+    let _start = state.legacy.sockscap.helper.start.lock().await;
     // Snapshot the registered session and release the lock before any blocking
     // helper RPC — holding it across the network round-trips below would stall
     // every other caller (relay lookups included) for the RPC timeout.
@@ -119,18 +121,8 @@ pub async fn sockscap_helper_start(
 
     #[cfg(windows)]
     {
-        // Run the privileged binaries from a per-version app-data copy rather
-        // than the install directory, so a live helper and a loaded WinDivert
-        // driver never hold install-directory files open against an upgrade.
-        // Falling back to running in place is no worse than before.
-        let staged = crate::sockscap::paths::stage_privileged_runtime(&app);
-        if let Err(e) = &staged {
-            tracing::warn!("sockscap: staging privileged runtime failed ({e}); running in place");
-        }
-        let helper = match &staged {
-            Ok((exe, _)) => exe.clone(),
-            Err(_) => resolve_helper_exe(&app)?,
-        };
+        let runtime = super::package::prepare(&app, &state.plugins).await?;
+        let helper = runtime.exe;
         let token = random_token();
         let port = pick_free_port()?;
         let ready_dir = crate::resolved_app_data_dir(&app)?.join("sockscap");
@@ -148,16 +140,11 @@ pub async fn sockscap_helper_start(
             port.to_string(),
             "--ready-file".into(),
             ready_file.display().to_string(),
-            // Parent-death watchdog: helper self-terminates (and unloads
-            // WinDivert) if this process dies without a clean shutdown RPC.
+            // The elevated helper unloads the driver when its owner exits.
             "--parent-pid".into(),
-            std::process::id().to_string(),
+            runtime.owner.to_string(),
         ];
-        // The pid alone is not a stable identity across the UAC prompt, which
-        // the user may leave open for minutes. Pair it with this process's
-        // creation time so the helper can tell "my parent" from "whatever now
-        // holds that pid".
-        if let Some(start) = current_process_start_filetime() {
+        if let Some(start) = runtime.owner_start {
             args.push("--parent-start".into());
             args.push(start.to_string());
         }
@@ -182,13 +169,7 @@ pub async fn sockscap_helper_start(
                     .join(","),
             );
         }
-        let wd = match &staged {
-            Ok((_, dir)) => dir.clone(),
-            Err(_) => match resolve_windivert_dir(&app) {
-                Some(d) => d,
-                None => return Err(windivert_missing_hint(&app)),
-            },
-        };
+        let wd = runtime.directory;
         // Absolute path required: elevated process cwd is typically System32.
         args.push("--windivert-dir".into());
         args.push(wd.display().to_string());
@@ -245,6 +226,7 @@ pub async fn sockscap_helper_start(
             port,
             pid,
             ready_file,
+            owner: runtime.owner_start.map(|start| (runtime.owner, start)),
         };
         let mut st = request_status(&sess).unwrap_or(HelperStatus {
             running: true,
@@ -299,27 +281,28 @@ pub async fn sockscap_helper_start(
     }
 }
 
-/// This process's creation time as a 64-bit FILETIME. Combined with the pid it
+/// An owned runtime process creation time as a 64-bit FILETIME. Combined with the pid it
 /// identifies the process uniquely, which a pid alone does not once the pid can
 /// be recycled.
 #[cfg(windows)]
-pub(super) fn current_process_start_filetime() -> Option<u64> {
+pub(super) fn process_start_filetime(pid: u32) -> Option<u64> {
     use winapi::shared::minwindef::FILETIME;
-    use winapi::um::processthreadsapi::{GetCurrentProcess, GetProcessTimes};
+    use winapi::um::handleapi::CloseHandle;
+    use winapi::um::processthreadsapi::{GetProcessTimes, OpenProcess};
+    use winapi::um::winnt::PROCESS_QUERY_LIMITED_INFORMATION;
 
     unsafe {
         let mut created: FILETIME = std::mem::zeroed();
         let mut exited: FILETIME = std::mem::zeroed();
         let mut kernel: FILETIME = std::mem::zeroed();
         let mut user: FILETIME = std::mem::zeroed();
-        if GetProcessTimes(
-            GetCurrentProcess(),
-            &mut created,
-            &mut exited,
-            &mut kernel,
-            &mut user,
-        ) == 0
-        {
+        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if process.is_null() {
+            return None;
+        }
+        let ok = GetProcessTimes(process, &mut created, &mut exited, &mut kernel, &mut user);
+        CloseHandle(process);
+        if ok == 0 {
             return None;
         }
         Some(((created.dwHighDateTime as u64) << 32) | created.dwLowDateTime as u64)
@@ -334,11 +317,12 @@ pub(super) fn elevate_and_spawn(helper: &Path, args: &[String]) -> Result<(), St
     let helper_s = helper.display().to_string().replace('\'', "''");
     let arg_list = args
         .iter()
-        .map(|a| format!("'{}'", a.replace('\'', "''")))
+        .map(|arg| super::command_line::quote(arg))
         .collect::<Vec<_>>()
-        .join(",");
+        .join(" ")
+        .replace('\'', "''");
     let script = format!(
-        "Start-Process -FilePath '{}' -ArgumentList @({}) -Verb RunAs -WindowStyle Hidden",
+        "Start-Process -FilePath '{}' -ArgumentList '{}' -Verb RunAs -WindowStyle Hidden",
         helper_s, arg_list
     );
 

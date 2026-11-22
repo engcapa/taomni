@@ -61,31 +61,31 @@ def run(ctx, phase):
     return f"SocksCap host writer lease verified ({phase})"
 
 
-def xray_fixture(ctx, action):
+def resource_fixture(ctx, action):
     import hashlib
     import shutil
     import zipfile
 
-    from .fixtures.sockscap_legacy import XRAY_CASE_ID
+    from .fixtures.sockscap_legacy import WINDOWS_CAPTURE_CASE_ID, XRAY_CASE_ID
 
     owner = ctx.fixture_context
-    if owner.case_id != XRAY_CASE_ID or action not in {"alter", "restore"}:
-        raise StepError("The Xray fixture requires its signed native case")
-    path = owner.sockscap_xray_resource
+    if owner.case_id not in {XRAY_CASE_ID, WINDOWS_CAPTURE_CASE_ID} or action not in {"alter", "restore"}:
+        raise StepError("The SocksCap resource fixture requires its signed native case")
+    path = owner.sockscap_resource
     receipt = owner.signed_sockscap
     if action == "alter":
         with path.open("rb") as stream:
-            if hashlib.file_digest(stream, "sha256").hexdigest() != receipt["xraySha256"]:
-                raise StepError("Installed Xray differs from the signed artifact before alteration")
-        path.write_bytes(b"changed Xray case fixture")
-    else:
-        archive_path, resource = owner.sockscap_xray_restore
+            if hashlib.file_digest(stream, "sha256").hexdigest() != receipt["resourceSha256"]:
+                raise StepError("Installed module resource differs from the signed artifact before alteration")
+        path.write_bytes(b"altered module resource fixture")
+    elif action == "restore":
+        archive_path, resource = owner.sockscap_resource_restore
         with zipfile.ZipFile(archive_path) as archive, archive.open(resource) as stream, path.open("wb") as current:
             shutil.copyfileobj(stream, current)
     with path.open("rb") as stream:
         sha = hashlib.file_digest(stream, "sha256").hexdigest()
-    (ctx.case_dir / f"xray-{action}.json").write_text(json.dumps({
+    (ctx.case_dir / f"sockscap-resource-{action}.json").write_text(json.dumps({
         "sourceSha": receipt["sourceSha"], "packageSha256": receipt["sha256"],
-        "signedSha256": receipt["xraySha256"], "resourceSha256": sha,
+        "stagedFilePresent": owner.sockscap_staged_resource.is_file(), "signedSha256": receipt["resourceSha256"], "resourceSha256": sha,
     }) + "\n", encoding="utf-8")
-    return f"Xray resource {action} recorded"
+    return f"SocksCap resource {action} recorded"

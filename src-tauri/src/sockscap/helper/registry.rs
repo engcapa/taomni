@@ -9,6 +9,8 @@ pub struct HelperSession {
     pub port: u16,
     pub pid: Option<u32>,
     pub(super) ready_file: PathBuf,
+    #[cfg(windows)]
+    pub(super) owner: Option<(u32, u64)>,
 }
 
 impl HelperSession {
@@ -25,12 +27,16 @@ impl HelperSession {
 /// In-process registry of the active helper session (if any).
 pub struct HelperRegistry {
     pub(crate) inner: Mutex<Option<HelperSession>>,
+    #[cfg(windows)]
+    pub(super) start: tokio::sync::Mutex<()>,
 }
 
 impl HelperRegistry {
     pub fn new() -> Self {
         Self {
             inner: Mutex::new(None),
+            #[cfg(windows)]
+            start: tokio::sync::Mutex::new(()),
         }
     }
 }

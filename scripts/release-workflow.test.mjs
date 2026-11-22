@@ -10,7 +10,7 @@ import { test } from "node:test";
 const workflow = readFileSync(fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)), "utf8").replace(/\r\n/g, "\n");
 const coreAction = readFileSync(new URL("../.github/actions/stage-core-updater/action.yml", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const coreScript = coreAction.split("      run: |\n")[1];
-test("desktop bundles stage only their own SocksCap runtime resources and include shared licenses", () => {
+test("the Windows base excludes SocksCap and desktop installers retain their platform resources", () => {
   const config = (target = "") => JSON.parse(readFileSync(new URL(`../src-tauri/tauri${target}.conf.json`, import.meta.url), "utf8"));
   assert.deepEqual(config().bundle.resources, ["resources/licenses/*"]);
   // README keeps the globs nonempty before optional development staging.
@@ -20,7 +20,6 @@ test("desktop bundles stage only their own SocksCap runtime resources and includ
   ]);
   assert.deepEqual(config(".windows").bundle.resources, [
     "resources/licenses/*",
-    "resources/sockscap/windows/[RWs]*",
   ]);
   assert.deepEqual(config(".macos").bundle.resources, [
     "resources/licenses/*",
