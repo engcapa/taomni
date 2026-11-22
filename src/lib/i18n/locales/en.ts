@@ -2718,6 +2718,7 @@ const dict = {
     groupNetwork: "Network",
     groupAi: "AI",
     moduleStoreTitle: "Module Store",
+    moduleStoreSocksCapRecovery: "SocksCap recovery required",
     moduleStoreSubtitle: "Install and manage signed Taomni modules without changing the core application.",
     moduleStoreCoreApi: "Core API {version}",
     moduleOfflineTitle: "Install a module from a file",

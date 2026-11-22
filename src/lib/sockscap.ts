@@ -44,6 +44,8 @@ export type EnginePhase =
   | "stopping"
   | "recoveryRequired";
 
+export const SOCKSCAP_RECOVERY_STATUS_EVENT = "sockscap-recovery-status";
+
 export interface LaunchPreparation {
   workingDirectory?: string;
   environment?: Record<string, string>;

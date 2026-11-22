@@ -8,6 +8,9 @@ components: [PluginRegistry, MigrationJournal]
 files:
   - src/lib/pluginRegistry.ts
   - src/components/settings/ModuleMarketplace.tsx
+  - src/components/settings/ModuleSocksCapRecovery.tsx
+  - src/components/statusbar/SocksCapRecoveryStatus.tsx
+  - src/lib/sockscap/useRecoveryStatus.ts
   - src/components/plugins/ModuleReleaseNotice.tsx
   - src/stores/moduleMarketplaceStore.ts
   - src/lib/ipc/plugin.ts
@@ -219,6 +222,18 @@ controls:
   - id: module-store-panel
     selector: '[data-testid="module-store-panel"]'
     kind: display
+  - id: status-sockscap-recovery
+    selector: '[data-testid="status-sockscap-recovery"]'
+    kind: interactive
+    optional: true
+  - id: module-sockscap-recovery
+    selector: '[data-testid="module-sockscap-recovery"]'
+    kind: display
+    optional: true
+  - id: module-sockscap-recover
+    selector: '[data-testid="module-sockscap-recover"]'
+    kind: interactive
+    optional: true
   - id: module-store-core-api
     selector: '[data-testid="module-store-core-api"]'
     kind: display

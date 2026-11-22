@@ -2695,6 +2695,7 @@ export const zhCN: DeepPartial<typeof en> = {
     groupNetwork: "网络",
     groupAi: "AI",
     moduleStoreTitle: "模块商店",
+    moduleStoreSocksCapRecovery: "SocksCap 需要恢复网络",
     moduleStoreSubtitle: "安装和管理已签名的 Taomni 模块，不改变核心应用。",
     moduleStoreCoreApi: "核心 API {version}",
     moduleOfflineTitle: "从文件安装模块",

@@ -7,6 +7,7 @@ import { useModuleStore } from "../../stores/moduleStore";
 import { ConfirmDialog } from "../sidebar/ConfirmDialog";
 import { ModuleTabActions } from "../plugins/ModuleTabActions";
 import { ModuleMfaUpgrade } from "./ModuleMfaUpgrade";
+import { ModuleSocksCapRecovery } from "./ModuleSocksCapRecovery";
 
 /**
  * The settings surface deliberately owns no catalog or native IPC concerns.
@@ -181,6 +182,7 @@ export function ModuleStorePanel({
         eligible={migrationSnapshot?.candidates.some((item) => item.item === "mfa" && item.evidence.includes("mfa.db")) === true}
         installed={!!records.mfa?.activeVersion}
       />
+      <ModuleSocksCapRecovery />
       {migrationSnapshot && (
         <div
           data-testid="module-upgrade-status"

@@ -71,7 +71,7 @@ use zeroize::Zeroizing;
 use crate::module_lock::ModuleLock;
 use crate::state::AppState;
 
-pub(crate) use recovery_service::ModuleCleanup;
+pub(crate) use recovery_service::{ModuleCleanup, publish_recovery_status};
 
 /* ---------------------------- runtime handle ---------------------------- */
 

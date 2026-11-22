@@ -231,7 +231,6 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
             // declaring potentially-live nftables/cgroup state recovered.
             tracing::warn!("sockscap: boot recover failed; leaving journal dirty: {e}");
             queue_reap(state, &orphans);
-            #[cfg(target_os = "macos")]
             state
                 .legacy
                 .sockscap
@@ -239,8 +238,8 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
                 .write()
                 .await
                 .set_recovery_required(
-                    "mitmproxy-redirector",
-                    format!("macOS Redirector recovery failed: {e}"),
+                    &capture::capabilities().capture_backend,
+                    format!("SocksCap recovery failed: {e}"),
                 );
             return;
         }

@@ -11393,7 +11393,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-sockscap"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "serde_json",
  "taomni-module-settings",

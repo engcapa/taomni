@@ -15,18 +15,27 @@ pub async fn sockscap_recover(
     state: State<'_, AppState>,
     sudo_password: Option<String>,
 ) -> Result<(), String> {
+    let result = recover(&app, &state, sudo_password).await;
+    super::publish_recovery_status(&app);
+    result
+}
+
+async fn recover(
+    app: &AppHandle,
+    state: &State<'_, AppState>,
+    sudo_password: Option<String>,
+) -> Result<(), String> {
     let _operation = state.legacy.sockscap.operation.lock().await;
     let mut acquired_recovery_lock = false;
     if !state.legacy.sockscap.has_activation_lock() {
-        let lock =
-            ModuleLock::try_acquire_for_app(&app, "sockscap", "global", "SocksCap recovery")?;
+        let lock = ModuleLock::try_acquire_for_app(app, "sockscap", "global", "SocksCap recovery")?;
         state.legacy.sockscap.install_activation_lock(lock);
         acquired_recovery_lock = true;
     }
 
     // Even if stopping the active session was incomplete, recovery gets one
     // more independent chance to remove the platform-owned state.
-    let teardown_error = full_teardown(&app, &state, false).await.err();
+    let teardown_error = full_teardown(app, state, false).await.err();
     let journals = recovery::JournalLocations::load(&state.core.paths.data);
     #[cfg(target_os = "macos")]
     let stale_runtime_clean = {
@@ -97,7 +106,7 @@ pub async fn sockscap_recover(
         Ok(needs_elevation) => {
             // Queue anything only an elevated process can kill; the next Start
             // hands the list to the helper it launches under UAC.
-            queue_reap(&state, &needs_elevation);
+            queue_reap(state, &needs_elevation);
             if let Err(error) = journals.and_then(|paths| paths.clear_after_repair()) {
                 let message = format!(
                     "network recovery succeeded, but the recovery journal could not be cleared: {error}"

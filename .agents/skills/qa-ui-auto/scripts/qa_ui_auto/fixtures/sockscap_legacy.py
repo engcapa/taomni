@@ -88,6 +88,21 @@ def setup_signed(ctx):
         sockscap_signed_frontend_sha256=receipt["frontendSha256"],
     )
 
+
+def setup_pending_recovery(ctx):
+    if ctx.case_id != "TC-MODULES-094":
+        raise RuntimeError("The SocksCap recovery error fixture is reserved for its native case")
+    root = isolated_data_root(ctx)
+    # An unreadable journal type forces startup to report the condition before
+    # attempting OS cleanup. The case never changes any network settings.
+    path = root / "sockscap/recovery.json"
+    path.mkdir(parents=True)
+    marker = path / "keep.txt"
+    contents = b"QA retained recovery input"
+    marker.write_bytes(contents)
+    ctx.values.update(sockscap_recovery_marker=marker.as_posix(),
+                      sockscap_recovery_marker_sha256=hashlib.sha256(contents).hexdigest())
+
     if ctx.case_id in {XRAY_CASE_ID, WINDOWS_CAPTURE_CASE_ID}:
         if ctx.case_id == XRAY_CASE_ID:
             name = "xray.exe" if platform.startswith("windows-") else "xray"

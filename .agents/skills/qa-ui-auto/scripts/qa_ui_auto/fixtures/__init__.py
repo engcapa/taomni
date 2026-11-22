@@ -149,6 +149,7 @@ REGISTRY: dict[str, Fixture] = {
     "module_mail_preview": Fixture("module_mail_preview", module_preview.setup_mail),
     "module_sockscap_preview": Fixture("module_sockscap_preview", module_preview.setup_sockscap),
     "sockscap_legacy_config": Fixture("sockscap_legacy_config", sockscap_legacy.setup),
+    "sockscap_pending_recovery": Fixture("sockscap_pending_recovery", sockscap_legacy.setup_pending_recovery),
     "module_signed_sockscap_archive": Fixture("module_signed_sockscap_archive", sockscap_legacy.setup_signed, sockscap_redirector.teardown),
     "module_upgrade": Fixture("module_upgrade", module_upgrade.setup, module_upgrade.teardown),
     "module_legacy_install": Fixture("module_legacy_install", module_legacy_install.setup),

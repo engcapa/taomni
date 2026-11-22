@@ -93,6 +93,7 @@
           "module_mail_preview",
           "module_sockscap_preview",
           "sockscap_legacy_config",
+          "sockscap_pending_recovery",
           "module_signed_sockscap_archive",
           "module_upgrade",
           "module_legacy_install",

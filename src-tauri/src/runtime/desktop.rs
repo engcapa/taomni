@@ -41,6 +41,7 @@ pub(crate) fn start(app: &tauri::AppHandle) {
     runtime.tasks.spawn("sockscap-boot-repair", async move {
         crate::sockscap::boot_repair(&app_for_sockscap, &app_for_sockscap.state::<AppState>())
             .await;
+        crate::sockscap::publish_recovery_status(&app_for_sockscap);
     });
     let app_for_servers = app.clone();
     runtime.tasks.spawn("server-autostart", async move {
