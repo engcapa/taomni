@@ -2,6 +2,7 @@
 //! mailbox store uses only paths derived from that profile and account IDs.
 
 mod address_book;
+mod agenda;
 mod archive;
 mod archive_decoding;
 mod archive_encoding;
@@ -48,6 +49,7 @@ fn host_config() -> HostConfig {
             .chain([
                 taomni_mail_api::LOCAL_DRAFTS,
                 taomni_mail_api::ADDRESS_BOOK,
+                taomni_mail_api::CALDAV_AGENDA,
                 taomni_mail_api::ATTACHMENT_CACHE,
                 CHECK_INCOMING,
                 CHECK_OUTGOING,
@@ -142,6 +144,20 @@ impl PluginHandler for Handler {
                     &self.store,
                     operation,
                     request,
+                )?)
+            }
+            taomni_mail_api::CALDAV_AGENDA => {
+                use taomni_mail_engine::agenda::handoff;
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(mailbox::serve(
+                    &self.io,
+                    &self.store,
+                    operation,
+                    endpoint,
+                    handoff::is_owned,
+                    handoff::adopt,
+                    agenda::execute,
                 )?)
             }
             taomni_mail_api::LOCAL_DRAFTS | taomni_mail_api::ADDRESS_BOOK => {

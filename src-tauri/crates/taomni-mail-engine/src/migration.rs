@@ -28,12 +28,14 @@ pub struct LegacyMailbox {
 pub struct HostedMailboxData {
     pub drafts: bool,
     pub address_book: bool,
+    pub agenda: bool,
 }
 
 impl HostedMailboxData {
     pub const ALL: Self = Self {
         drafts: true,
         address_book: true,
+        agenda: true,
     };
 }
 
@@ -138,6 +140,9 @@ fn stage_account(
     }
     if hosted.address_book {
         crate::contacts::handoff::mark_owned(&db, &mailbox.account_id).map_err(string_error)?;
+    }
+    if hosted.agenda {
+        crate::agenda::handoff::mark_owned(&db, &mailbox.account_id).map_err(string_error)?;
     }
     db.close().map_err(|(_, error)| string_error(error))?;
     OpenOptions::new()

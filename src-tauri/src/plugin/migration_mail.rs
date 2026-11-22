@@ -184,6 +184,7 @@ pub(super) fn execute_under_maintenance(
             HostedMailboxData {
                 drafts: manifest.commands.contains(taomni_mail_api::LOCAL_DRAFTS),
                 address_book: manifest.commands.contains(taomni_mail_api::ADDRESS_BOOK),
+                agenda: manifest.commands.contains(taomni_mail_api::CALDAV_AGENDA),
             },
             control,
         )?

@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 use taomni_mail_api::{
-    ADDRESS_BOOK, LOCAL_DRAFTS,
+    ADDRESS_BOOK, CALDAV_AGENDA, LOCAL_DRAFTS,
     imap_exchange::{read_body_frame, write_body_frame},
 };
 use taomni_plugin_stream::routed_tcp::Route;
@@ -30,6 +30,64 @@ pub(super) fn book(
     serde_json::from_value::<Result<Value, String>>(reply)
         .unwrap()
         .unwrap()
+}
+
+pub(super) fn check_agenda(host: &mut MailHost) {
+    let account = "caldav-qa-account";
+    let legacy = rusqlite::Connection::open_in_memory().unwrap();
+    taomni_mail_engine::cache::init_mail_tables(&legacy).unwrap();
+    legacy
+        .execute(
+            "INSERT INTO mail_calendar_events VALUES (?1,'/calendar/standup.ics','',?2,NULL,7)",
+            rusqlite::params![account, json!({
+            "uid":"standup","summary":"Legacy standup","startLocal":"2035-01-01","allDay":true
+        }).to_string()],
+        )
+        .unwrap();
+    let snapshot = taomni_mail_engine::agenda::handoff::read_account(&legacy, account).unwrap();
+    let imported = transfer(
+        host,
+        CALDAV_AGENDA,
+        account,
+        json!({"type":"list","days":14}),
+        Some(json!({"replaceStaged":false,"snapshot":snapshot})),
+    );
+    assert_eq!(imported[0]["summary"], "Legacy standup");
+
+    let state = json!({"baseUrl":"https://example.invalid/dav/","collectionUrl":"https://example.invalid/calendar/","lastSync":11,"lastError":null});
+    let updated = transfer(
+        host,
+        CALDAV_AGENDA,
+        account,
+        json!({
+            "type":"commit","state":state,"events":{"replaceAll":true,"resources":[["/calendar/review.ics",[
+                {"uid":"review","summary":"Hosted review","startLocal":"2035-01-02","allDay":true}
+            ]]]}
+        }),
+        None,
+    );
+    assert_eq!(updated, 1);
+    assert_eq!(
+        transfer(
+            host,
+            CALDAV_AGENDA,
+            account,
+            json!({"type":"readState"}),
+            None
+        ),
+        state
+    );
+    let listed = transfer(
+        host,
+        CALDAV_AGENDA,
+        account,
+        json!({"type":"list","days":14}),
+        None,
+    );
+    assert_eq!(listed.as_array().unwrap().len(), 1);
+    assert_eq!(listed[0]["uid"], "review");
+    let source = taomni_mail_engine::agenda::agenda(&legacy, account, 0, 14).unwrap();
+    assert_eq!(source[0].uid, "standup");
 }
 
 fn transfer(

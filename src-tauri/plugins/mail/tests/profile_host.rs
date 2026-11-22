@@ -341,6 +341,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     imap::check_routed_header_pages(&mut host);
     imap_body_sync::check_routed_body_sync(&mut host);
     imap_idle::check_routed_idle(&mut host);
+    local_mailbox::check_agenda(&mut host);
     imap::check_routed_archive(&mut host);
     archive_encoding::check(&mut host);
     archive_encoding::check_decoding(&mut host);

@@ -74,6 +74,15 @@ steps:
     selector: '[data-testid="mail-agenda-event"][data-summary="QA planning"]'
     timeout_sec: 20
 - screenshot: mail-agenda-01.png
+- click: '[data-testid="mail-agenda-close"]'
+- click: '[data-testid="mail-agenda-open"]'
+- wait_for:
+    selector: '[data-testid="mail-agenda-event"][data-summary="QA planning"]'
+    timeout_sec: 20
+- assert_count:
+    selector: '[data-testid="mail-agenda-event"][data-summary="QA planning"]'
+    equal: 1
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -111,11 +120,19 @@ verification:
     requirement: 邮件标签内的 Agenda 列出该事件（不提供日历网格，DEC-14）。
     actions:
     - 19
+    - 22
+    - 23
     checkpoints:
     - step: 20
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-agenda-event\"][data-summary=\"QA planning\"]", "timeout_sec": 20}}'
+    - step: 24
+      expectation: 关闭后再次打开议程仍可读取已接受的会议。
+    - step: 25
+      expectation: 同一会议只出现一次。
     results:
     - 20
+    - 24
+    - 25
   visual:
   - check: 截图中 Agenda 按日期分组显示 “QA planning”，时间与地点正确。
     method: manual

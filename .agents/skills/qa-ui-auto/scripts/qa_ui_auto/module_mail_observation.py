@@ -23,10 +23,10 @@ def run(ctx, args):
     phase = args.get("phase") if isinstance(args, dict) else args
     active = {
         "folder-tree", "folder-changes", "running", "imap-delivery", "pop3-delivery",
-        "attachment-saved", "attachment-reopened",
+        "attachment-saved", "attachment-reopened", "agenda-written",
         "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source", "imap-prefetch", "outbox-queued", "outbox-sent",
     }
-    if phase not in active | {"idle", "disabled", "outbox-retained", "contact-retained"} or not signed or owner.case_id not in SIGNED_MAIL_CASES:
+    if phase not in active | {"idle", "disabled", "outbox-retained", "contact-retained", "agenda-retained"} or not signed or owner.case_id not in SIGNED_MAIL_CASES:
         raise StepError("The Mail host observation requires the registered signed native case")
     plugins = isolated_data_root(owner) / "plugins"
     receipt = signed["receipt"]
@@ -71,6 +71,15 @@ def run(ctx, args):
         report["contact"] = observe(module / "data", plugins.parent / "mail-cache", phase, signed.get("contact"))
         if phase == "contact-saved":
             signed["contact"] = report["contact"]
+    if phase in {"agenda-written", "agenda-retained"}:
+        from .module_mail_agenda import observe
+        if owner.case_id != "TC-MODULES-091":
+            raise StepError("Agenda storage requires the signed calendar case")
+        report["agenda"] = observe(module / "data", plugins.parent / "mail-cache")
+        if phase == "agenda-written":
+            signed["agenda"] = report["agenda"]
+        elif report["agenda"] != signed.get("agenda"):
+            raise StepError("Disabling Mail changed the stored agenda event")
     if phase == "responses":
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
         if "mail/send-response" not in manifest["commands"]:

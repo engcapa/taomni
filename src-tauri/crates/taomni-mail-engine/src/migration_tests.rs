@@ -289,6 +289,7 @@ fn only_staging_for_a_host_that_takes_draft_ownership_marks_the_mailbox() {
         super::HostedMailboxData {
             drafts: true,
             address_book: false,
+            agenda: false,
         },
         super::HostedMailboxData::ALL,
     ] {
