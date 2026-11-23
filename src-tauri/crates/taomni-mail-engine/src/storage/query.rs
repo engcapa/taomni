@@ -3,86 +3,11 @@ use super::cleanup::collect_garbage;
 use super::index::legacy_attachment_flag;
 use super::model::ArchiveEntry;
 use rusqlite::{Connection, params, params_from_iter, types::Value};
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", default)]
-pub struct ArchiveQuery {
-    pub text: String,
-    pub field: SearchField,
-    pub folder: Option<String>,
-    pub has_attachments: Option<bool>,
-    pub date_from: Option<i64>,
-    pub date_before: Option<i64>,
-    pub stored_from: Option<i64>,
-    pub stored_before: Option<i64>,
-    pub min_size: Option<i64>,
-    pub max_size: Option<i64>,
-    pub sort: ArchiveSort,
-}
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum SearchField {
-    #[default]
-    All,
-    Subject,
-    From,
-    To,
-}
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ArchiveSort {
-    #[default]
-    SavedNewest,
-    SavedOldest,
-    DateNewest,
-    DateOldest,
-    Largest,
-    Smallest,
-}
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ArchiveKey {
-    pub folder: String,
-    pub uid: u32,
-    pub uid_validity: u32,
-}
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ArchiveSelection {
-    pub query: Option<ArchiveQuery>,
-    #[serde(default)]
-    pub keys: Vec<ArchiveKey>,
-    #[serde(default)]
-    pub excluded: Vec<ArchiveKey>,
-}
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ArchiveRow {
-    #[serde(flatten)]
-    pub entry: ArchiveEntry,
-    pub from: String,
-    pub to: String,
-    pub date_ts: Option<i64>,
-    pub has_attachments: bool,
-}
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ArchivePage {
-    pub entries: Vec<ArchiveRow>,
-    pub total: u64,
-    pub stored_bytes: u64,
-    pub folders: Vec<String>,
-    pub offset: u32,
-}
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CleanupPreview {
-    pub token: String,
-    pub count: u64,
-    pub stored_bytes: u64,
-    pub reclaimable_bytes: u64,
-}
+pub use taomni_mail_api::archive_index::{
+    ArchiveKey, ArchivePage, ArchiveQuery, ArchiveRow, ArchiveSelection, ArchiveSort,
+    CleanupPreview, SearchField,
+};
 
 /// Materialized metadata keeps filters/sorts off JSON and compressed MIME.
 /// FTS5 trigram indexes substring searches of three or more characters.

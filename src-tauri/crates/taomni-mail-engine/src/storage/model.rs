@@ -25,14 +25,4 @@ pub struct PreparedMessage {
     pub(super) has_attachments: bool,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ArchiveEntry {
-    pub folder: String,
-    pub uid: u32,
-    pub uid_validity: u32,
-    pub subject: String,
-    pub raw_size: u64,
-    pub stored_size: u64,
-    pub stored_at: i64,
-}
+pub use taomni_mail_api::archive_index::ArchiveEntry;

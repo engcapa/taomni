@@ -2,9 +2,13 @@
 
 ## 2026-11-23 当前进展
 
+- 用 `21752fbb0` 的联合构建重新验证 Linux deb 和 Windows MSI。两端从正式 0.5.12 升至 0.6.0，并在首装十模块后卸载 Mail。重启仍保留九个活跃模块和 Mail 的卸载记录。Linux 同批验证了原 MFA 数据、回退及强退后恢复。两个 macOS 目标继续收取。 [Linux](https://github.com/engcapa/taomni/actions/runs/45091470510) · [Windows 与 macOS](https://github.com/engcapa/taomni/actions/runs/45092445084)
+- 默认基座也移出 POP3 协议和认证运行组件。已验证的 Mail 宿主负责连接，离线邮件、UIDL 记录和归档索引目前仍由原缓存路径持有。归档分页、筛选和清理回执移入共享 IPC 类型。精简版邮件引擎 75 项及完整版 83 项单测通过，默认和兼容基座编译通过。
+- `2a05b4dc7` 的三端 Native 各 28 项通过，含 TC-MODULES-095 的实际 EML 和 mbox 导入导出。`30b8d8528` 修正取消后原有邮件数量的核对，三端 Browser 各 26 项通过。 [实装导入导出](https://github.com/engcapa/taomni/actions/runs/45085885699) · [浏览器复跑](https://github.com/engcapa/taomni/actions/runs/45089950565)
+- Windows 签名 Mail 的 QA 构建日志显示 `pnpm.cmd` 将 Tauri 配置 JSON 在构建命令的 `&&` 处截断。改用临时配置文件，并将实际 Rust 特性记录在 QA 构建身份中。 [构建日志](https://github.com/engcapa/taomni/actions/runs/45092502660/job/137425376419)
 - 默认基座编译移出 IMAP 客户端和协议解析，连接、同步、检索、旗标、IDLE、归档读取、草稿及 mbox 经已验证的 Mail 宿主执行。四目标本地 Cargo 树均没有 `imap`、`imap-proto` 和 Mail 宿主。默认和兼容构建检查通过。基座的过渡 SQLite 缓存和归档索引继续迁移。
 - 针对签名 Mail 的三端 Native 回归使用关闭旧 IMAP/SMTP 传输的 QA 构建。仍需要单体实现的崩溃回归用例使用兼容 QA 构建，两套构建按配方摘要验证归档。TC-MODULES-059/060 在停用后注入邮件并核对重新启用时原标签补齐。GitHub 复验由限流队列派发。
-- SocksCap 复跑的 18 个分片已收齐，Windows TC-MODULES-085、macOS TC-MODULES-080 和 Linux MFA 重启用例通过。Windows TC-FILE-OPEN-003 在文档根节点加载阶段超时，后续回归继续保留该项。 [原始分片](https://github.com/engcapa/taomni/actions/runs/45084535419)
+- SocksCap 复跑的 18 个分片已收齐，Windows TC-MODULES-085、macOS TC-MODULES-080 和 Linux MFA 重启用例通过。Windows TC-FILE-OPEN-003 在任何 SVG 步骤执行前出现文档根节点加载超时，与前序运行的错误和步骤位置一致，按既有失败记录。 [原始分片](https://github.com/engcapa/taomni/actions/runs/45084535419) · [前序运行](https://github.com/engcapa/taomni/actions/runs/45005586816)
 - `21752fbb0` 的 GitHub 发布演练完成，产出四目标基座、40 个签名模块包及含十个首装模块的签名目录。两个 macOS 架构各十份宿主回执使用同一固定证书，均带 hardened runtime，保存了 Gatekeeper 的返回值 3。安装和实际权限继续由四目标验收核对。 [发布演练](https://github.com/engcapa/taomni/actions/runs/45076694848)
 - `356021e10` 的 18 个分片在运行中收齐。Linux、Windows 和 macOS 每端各通过 27 项 Browser 和 33 项 Native，覆盖完整崩溃回归及签名包批量操作 TC-MAIL-BULK-03。 [批量操作回执](https://github.com/engcapa/taomni/actions/runs/45084427032)
 - 批量 IMAP 的写前日志、回执和缓存清除事务移至共享邮件引擎，基座提供连接适配和每账户串行锁。现有日志表、状态序列化和 IPC 响应字段延续。11 项 Rust 单测与模块边界检查通过。保留 TC-MAIL-BULK-01/02/03，通过原入口覆盖首次操作、续做和丢失回执后的恢复。

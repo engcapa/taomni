@@ -8,6 +8,7 @@ use taomni_plugin_stream::routed_tcp::Endpoint;
 use zeroize::Zeroizing;
 
 pub mod archive;
+pub mod archive_index;
 pub mod attachment_cache;
 pub mod imap_exchange;
 pub mod imap_mutation;
