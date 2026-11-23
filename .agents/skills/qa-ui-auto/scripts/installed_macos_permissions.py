@@ -5,8 +5,10 @@ import plistlib
 import time
 from types import SimpleNamespace
 
+from installed_desktop_mfa_crash import select_owned_process
+from installed_macos_store import compile_driver, controls, installed_macos_desktop
 from modular_bundle_inventory import digest, write_json
-from qa_ui_auto.fixtures.module_legacy_mfa import desktop_action, element, installed_desktop, open_unlocked_mfa
+from qa_ui_auto.fixtures.module_legacy_mfa import ISSUER, PASSWORD, desktop_action, element, installed_desktop, open_unlocked_mfa
 from qa_ui_auto.legacy_install import command
 from qa_ui_auto.native_steps import NativeStepContext
 
@@ -47,7 +49,7 @@ def read_core_permissions(session):
     return observed
 
 
-def observe_permissions(executable, evidence, phase):
+def observe_permissions(executable, evidence, phase, *, work=None):
     app = executable.parents[2]
     info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
     if info.get("CFBundleIdentifier") != "com.taomni.app":
@@ -60,14 +62,25 @@ def observe_permissions(executable, evidence, phase):
         raise RuntimeError("Could not identify the installed application's designated requirement")
     ctx = SimpleNamespace(cfg={"webdriver": {"startup_timeout": 60}})
     label = f"macos-permissions-{phase}"
-    with installed_desktop(ctx, executable, evidence, evidence, label, environment={}) as (driver, session):
-        desktop_action(NativeStepContext(session, evidence, ctx.cfg), "wait_for", element("welcome-panel"))
-        observations = read_core_permissions(session)
-        record = {
-            **observations, "pid": driver.proc.pid, "bundleIdentifier": info["CFBundleIdentifier"],
-            "bundleVersion": info["CFBundleShortVersionString"], "requirement": requirement[0],
-            "executable": str(executable), "binarySha256": digest(executable),
-        }
+    if work is None:
+        with installed_desktop(ctx, executable, evidence, evidence, label, environment={}) as (driver, session):
+            desktop_action(NativeStepContext(session, evidence, ctx.cfg), "wait_for", element("welcome-panel"))
+            observations = read_core_permissions(session)
+            pid = driver.proc.pid
+    else:
+        folder = evidence / label
+        with installed_macos_desktop(executable, work, folder) as owner:
+            receipt = controls(compile_driver(work), owner, executable, "permissions", folder, password=PASSWORD)
+            observations = receipt["permissions"]
+            if (observations.get("screenRecording") != "granted" or observations.get("accessibility") != "granted"
+                    or owner.poll() is not None):
+                raise RuntimeError("Installed macOS permission controls did not report both grants")
+            pid = owner.pid
+    record = {
+        **observations, "pid": pid, "bundleIdentifier": info["CFBundleIdentifier"],
+        "bundleVersion": info["CFBundleShortVersionString"], "requirement": requirement[0],
+        "executable": str(executable), "binarySha256": digest(executable),
+    }
     write_json(Path(evidence) / f"{label}.json", record)
     return record
 
@@ -85,12 +98,50 @@ def compare_permissions(previous, candidate):
     }
 
 
-def observe_hosted_screen_scan(executable, evidence, recovery):
+def observe_appkit_screen_scan(executable, evidence, recovery, work, result):
+    import psutil
+
+    steps = NativeStepContext(None, evidence, {})
+    folder = evidence / "mfa-screen-scan"
+    module = Path(recovery["host"]["executable"])
+    manifest = json.loads(module.with_name("module.json").read_text(encoding="utf-8"))
+    if (manifest.get("id") != "taomni-plugin-mfa" or digest(module) != recovery["moduleBinarySha256"]
+            or "mfa_scan_screen_codes" not in manifest["commands"]
+            or "capture.screen" not in manifest["permissions"]):
+        raise RuntimeError("The installed signed MFA module does not provide the expected screen decoder")
+    with installed_macos_desktop(executable, work, folder) as owner:
+        result["corePid"] = owner.pid
+        try:
+            desktop_action(steps, "native_show_image_window", {
+                "path": "qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png", "x": 16, "y": 60,
+            })
+            result["imageWindow"] = json.loads((evidence / "native-image-window.json").read_text(encoding="utf-8"))
+            expected = [recovery["nextHotp"].replace(" ", "")]
+            receipt = controls(compile_driver(work), owner, executable, "screen-scan", folder,
+                               password=PASSWORD, issuer=ISSUER, codes=expected)
+            if receipt.get("scannedIssuer") != "QA Bank" or receipt.get("codes") != expected:
+                raise RuntimeError("Installed macOS MFA did not preview the external QR account and retain the original HOTP")
+            host = select_owned_process(psutil.Process(owner.pid).children(), module,
+                                        (psutil.NoSuchProcess, psutil.AccessDenied), direct_child_command=True)
+            if owner.poll() is not None:
+                raise RuntimeError("The installed macOS app exited during screen scan")
+            result.update(hostPid=host.pid, transport=receipt["transport"])
+        finally:
+            desktop_action(steps, "native_show_image_window", {"action": "close"})
+
+
+def observe_hosted_screen_scan(executable, evidence, recovery, *, work=None):
     """Capture an external AppKit window using the installed core and MFA host."""
     result = {key: recovery[key] for key in ("sourceSha", "installedBinarySha256", "modulePackageSha256", "moduleBinarySha256")}
     result["passed"] = False
     ctx = SimpleNamespace(cfg={"webdriver": {"startup_timeout": 60}})
     try:
+        if work is not None:
+            observe_appkit_screen_scan(executable, evidence, recovery, work, result)
+            result.update(passed=True, captureService="capture.still", decoder="module",
+                          decoderEvidence="Verified installed manifest, owned host process and AppKit import preview",
+                          issuers=["QA Bank"])
+            return result
         with installed_desktop(ctx, executable, evidence, evidence, "mfa-screen-scan", environment={}) as (driver, session):
             result["corePid"] = driver.proc.pid
             steps = open_unlocked_mfa(ctx, session, evidence)

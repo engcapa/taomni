@@ -1,5 +1,6 @@
 """Drive the installed macOS release through AppKit accessibility."""
 
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import subprocess
@@ -36,36 +37,14 @@ def controls(driver, owner, executable, phase, evidence, **inputs):
     return receipt
 
 
-def exercise_stage(executable, work, profile, evidence, origin, label, removed, stage, enrollment, environment):
-    folder = evidence / label
-    folder.mkdir()
-    driver = compile_driver(work)
-    catalog = json.loads(origin.current_catalog)["plugins"]
-    modules = [
-        {"id": module_id, "name": catalog[module_id]["name"], "removed": pack["slug"] == removed}
-        for module_id, pack in sorted(origin.roster.items())
-    ]
-    with (folder / "app.stdout.txt").open("wb") as stdout, (folder / "app.stderr.txt").open("wb") as stderr:
-        with isolated_desktop(environment):
+@contextmanager
+def installed_macos_desktop(executable, work, evidence, environment=None):
+    evidence.mkdir()
+    with (evidence / "app.stdout.txt").open("wb") as stdout, (evidence / "app.stderr.txt").open("wb") as stderr:
+        with isolated_desktop(environment or {}):
             owner = subprocess.Popen([str(executable)], cwd=work, stdout=stdout, stderr=stderr)
         try:
-            controls(driver, owner, executable, "unlock-store", folder, password=PASSWORD)
-            stage["enrollment"] = enrollment(profile, origin)
-            stage["activePointers"] = observe_legacy_roster(profile / "plugins", origin, removed)
-            roster = controls(driver, owner, executable, "roster", folder, modules=modules)
-            expected = [module["id"] for module in modules if not module["removed"]]
-            if roster["currentModules"] != expected:
-                raise RuntimeError("The installed macOS store shows different current modules")
-            stage["currentModules"] = roster["currentModules"]
-            if removed is None:
-                controls(driver, owner, executable, "remove-mail", folder, modules=modules)
-            else:
-                stage["desktopModeLease"] = observe_desktop_owner(executable, profile, evidence, owner)
-            closed = controls(driver, owner, executable, "confirm-close", folder)
-            code = owner.wait(timeout=30)
-            if code != 0:
-                raise RuntimeError(f"Installed macOS app exited with {code}")
-            stage["shutdown"] = {"close": closed, "shutdown": {"pid": owner.pid, "exitCode": code}}
+            yield owner
         finally:
             if owner.poll() is None:
                 owner.terminate()
@@ -74,3 +53,31 @@ def exercise_stage(executable, work, profile, evidence, origin, label, removed, 
                 except subprocess.TimeoutExpired:
                     owner.kill()
                     owner.wait(timeout=10)
+
+
+def exercise_stage(executable, work, profile, evidence, origin, label, removed, stage, enrollment, environment):
+    folder = evidence / label
+    driver = compile_driver(work)
+    catalog = json.loads(origin.current_catalog)["plugins"]
+    modules = [
+        {"id": module_id, "name": catalog[module_id]["name"], "removed": pack["slug"] == removed}
+        for module_id, pack in sorted(origin.roster.items())
+    ]
+    with installed_macos_desktop(executable, work, folder, environment) as owner:
+        controls(driver, owner, executable, "unlock-store", folder, password=PASSWORD)
+        stage["enrollment"] = enrollment(profile, origin)
+        stage["activePointers"] = observe_legacy_roster(profile / "plugins", origin, removed)
+        roster = controls(driver, owner, executable, "roster", folder, modules=modules)
+        expected = [module["id"] for module in modules if not module["removed"]]
+        if roster["currentModules"] != expected:
+            raise RuntimeError("The installed macOS store shows different current modules")
+        stage["currentModules"] = roster["currentModules"]
+        if removed is None:
+            controls(driver, owner, executable, "remove-mail", folder, modules=modules)
+        else:
+            stage["desktopModeLease"] = observe_desktop_owner(executable, profile, evidence, owner)
+        closed = controls(driver, owner, executable, "confirm-close", folder)
+        code = owner.wait(timeout=30)
+        if code != 0:
+            raise RuntimeError(f"Installed macOS app exited with {code}")
+        stage["shutdown"] = {"close": closed, "shutdown": {"pid": owner.pid, "exitCode": code}}

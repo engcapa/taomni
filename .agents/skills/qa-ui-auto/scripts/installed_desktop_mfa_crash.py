@@ -10,11 +10,12 @@ import re
 from types import SimpleNamespace
 
 from installed_macos_host_signature import observe_installed_host
+from installed_macos_store import compile_driver, controls, installed_macos_desktop
 from installed_windows_host_security import mark_download, observe_downloaded_host
 from installed_windows_mfa import installed_windows_desktop, verify_mfa_controls
 from modular_bundle_inventory import digest, write_json
 from qa_ui_auto.fixtures.module_legacy_mfa import (
-    commit_mfa_upgrade, create_account, desktop_action, element, installed_desktop, open_unlocked_mfa,
+    ISSUER, PASSWORD, commit_mfa_upgrade, create_account, desktop_action, element, installed_desktop, open_unlocked_mfa,
 )
 from qa_ui_auto.fixtures.module_marketplace import ORIGIN
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_key
@@ -38,7 +39,7 @@ def select_owned_process(processes, executable, process_errors, *, direct_child_
     return matching[0]
 
 
-def observe_abrupt_exit(launcher, executable, module, observation):
+def observe_abrupt_exit(launcher, executable, module, observation, *, appkit=False):
     import psutil
 
     if launcher.args != [str(executable.resolve(strict=True))] or launcher.poll() is not None:
@@ -51,7 +52,7 @@ def observe_abrupt_exit(launcher, executable, module, observation):
         core={"pid": core.pid, "createdAt": core.create_time(), "executable": str(executable)},
         host={"pid": host.pid, "createdAt": host.create_time(), "executable": str(module), "parent": core.pid},
         termination="TerminateProcess" if windows else "SIGKILL",
-        coreIdentity="owned-windows-launch" if windows else "owned-wkwebview-launch",
+        coreIdentity="owned-windows-launch" if windows else ("owned-appkit-launch" if appkit else "owned-wkwebview-launch"),
     )
     if "macosHostExecution" in observation:
         observation["macosHostExecution"]["launched"] = True
@@ -67,13 +68,36 @@ def observe_abrupt_exit(launcher, executable, module, observation):
 
 
 @contextmanager
-def open_desktop(ctx, executable, work, evidence, label):
+def open_desktop(ctx, executable, work, evidence, label, *, appkit=False):
     if platform.system() == "Windows":
         with installed_windows_desktop(executable, work, evidence, label) as owner:
+            yield owner, None
+    elif appkit:
+        with installed_macos_desktop(executable, work, evidence / label) as owner:
             yield owner, None
     else:
         with installed_desktop(ctx, executable, work, evidence, label, environment={}) as (driver, session):
             yield driver.proc, session
+
+
+def verify_open_mfa(owner, session, executable, work, evidence, ctx, *, phase, appkit):
+    expected = ["287082", "359152"] if phase == "after" else ["287082"]
+    if appkit:
+        folder = evidence / ("mfa-before-kill" if phase == "before" else "mfa-after-kill")
+        receipt = controls(compile_driver(work), owner, executable, f"mfa-{phase}", folder,
+                           password=PASSWORD, issuer=ISSUER, codes=expected)
+        if receipt.get("codes") != expected or owner.poll() is not None:
+            raise RuntimeError("Installed macOS MFA did not return the expected HOTP values")
+    elif session is None:
+        verify_mfa_controls(owner, phase, evidence)
+    else:
+        steps = open_unlocked_mfa(ctx, session, evidence)
+        account = {"selector": element("mfa-account-code"), "equals": "287 082"}
+        desktop_action(steps, "assert_text_equals", account)
+        if phase == "after":
+            desktop_action(steps, "click", element("mfa-account-hotp-next"))
+            desktop_action(steps, "assert_text_equals", {**account, "equals": "359 152"})
+            desktop_action(steps, "assert_no_runtime_errors", None)
 
 
 def installed_mfa(profile, receipt):
@@ -111,7 +135,7 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, work, *
         "passed": False,
     }
     ctx = SimpleNamespace(cfg={"webdriver": {"startup_timeout": 60}})
-    account = {"selector": element("mfa-account-code"), "equals": "287 082"}
+    appkit = first_release is not None and platform.system() == "Darwin"
     try:
         downloaded_pointer = None
         if first_release is None:
@@ -139,32 +163,21 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, work, *
             result["windowsHostExecution"] = {
                 "before": observe_downloaded_host(evidence, "before", module, zone), "launched": False,
             }
-        with open_desktop(ctx, executable, work, evidence, "mfa-before-kill") as (launcher, session):
-            if session is None:
-                verify_mfa_controls(launcher, "before", evidence)
-            else:
-                steps = open_unlocked_mfa(ctx, session, evidence)
-                desktop_action(steps, "assert_text_equals", account)
+        with open_desktop(ctx, executable, work, evidence, "mfa-before-kill", appkit=appkit) as (launcher, session):
+            verify_open_mfa(launcher, session, executable, work, evidence, ctx, phase="before", appkit=appkit)
             if installed_mfa(profile, receipt) != (installed, module):
                 raise RuntimeError("Opening MFA selected a different installed version")
-            result.update(moduleBinarySha256=digest(module), hotpBeforeExit=account["equals"])
-            observe_abrupt_exit(launcher, executable, module, result)
+            result.update(moduleBinarySha256=digest(module), hotpBeforeExit="287 082")
+            observe_abrupt_exit(launcher, executable, module, result, appkit=appkit)
             if session is not None:
                 session.session_id = None
-        with open_desktop(ctx, executable, work, evidence, "mfa-after-kill") as (launcher, session):
-            if session is None:
-                verify_mfa_controls(launcher, "after", evidence)
-            else:
-                steps = open_unlocked_mfa(ctx, session, evidence)
-                desktop_action(steps, "assert_text_equals", account)
-                desktop_action(steps, "click", element("mfa-account-hotp-next"))
-                desktop_action(steps, "assert_text_equals", {**account, "equals": "359 152"})
-                desktop_action(steps, "assert_no_runtime_errors", None)
+        with open_desktop(ctx, executable, work, evidence, "mfa-after-kill", appkit=appkit) as (launcher, session):
+            verify_open_mfa(launcher, session, executable, work, evidence, ctx, phase="after", appkit=appkit)
         if installed_mfa(profile, receipt) != (installed, module) or digest(module) != result["moduleBinarySha256"]:
             raise RuntimeError("Recovery changed the active MFA version or module binary")
         if zone is not None:
             result["windowsHostExecution"]["after"] = observe_downloaded_host(evidence, "after", module, zone)
-        result.update(passed=True, hotpAfterReopen=account["equals"], nextHotp="359 152")
+        result.update(passed=True, hotpAfterReopen="287 082", nextHotp="359 152")
         return result
     finally:
         write_json(evidence / "installed-desktop-mfa-crash.json", result)

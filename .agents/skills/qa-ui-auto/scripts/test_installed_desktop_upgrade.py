@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import MagicMock, Mock, patch
 
 from installed_desktop_mode_lease import check_mode_lease, reserve_default_profile
-from installed_desktop_mfa_crash import observe_abrupt_exit, verify_crash_recovery
+from installed_desktop_mfa_crash import observe_abrupt_exit, verify_crash_recovery, verify_open_mfa
 from installed_desktop_upgrade import exercise_desktop_contracts, require_registration, select_candidate, start_profile
 from installed_macos_host_signature import require_fixed_signature
 from installed_macos_permissions import compare_permissions, observe_hosted_screen_scan
@@ -82,7 +82,7 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
             "installed_desktop_upgrade.finish_first_release_mode_lease", return_value=receipt,
         ) as mode, patch("installed_desktop_upgrade.check_mode_lease") as fresh_mode, patch(
             "installed_desktop_upgrade.observe_permissions", return_value=permission,
-        ), patch("installed_desktop_upgrade.verify_crash_recovery", return_value=recovered) as crash, patch(
+        ) as permission_probe, patch("installed_desktop_upgrade.verify_crash_recovery", return_value=recovered) as crash, patch(
             "installed_desktop_upgrade.observe_hosted_screen_scan", return_value={"passed": True},
         ) as screen:
             recovery_error, permission_error = exercise_desktop_contracts(
@@ -96,7 +96,8 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
         crash.assert_called_once_with(
             "app", profile, None, "source", "evidence", "work", macos_hardened_mfa=False, first_release=roster,
         )
-        screen.assert_called_once_with("app", "evidence", recovered)
+        permission_probe.assert_called_once_with("app", "evidence", "candidate", work="work")
+        screen.assert_called_once_with("app", "evidence", recovered, work="work")
         self.assertTrue(stages["permissionContinuity"]["retainedBothGrants"])
 
     def test_windows_retries_inspection_after_timeout_with_one_msi_install(self):
@@ -228,6 +229,25 @@ class InstalledDesktopModeLeaseTests(unittest.TestCase):
 
 
 class InstalledDesktopMfaCrashTests(unittest.TestCase):
+    def test_first_release_macos_reads_the_current_and_advanced_hotp_over_appkit(self):
+        owner = Mock()
+        owner.poll.return_value = None
+        expected = ["287082", "359152"]
+        with patch("installed_desktop_mfa_crash.compile_driver", return_value="appkit") as compile_controls, patch(
+            "installed_desktop_mfa_crash.controls", return_value={"codes": expected},
+        ) as appkit, patch("installed_desktop_mfa_crash.open_unlocked_mfa") as bridge:
+            verify_open_mfa(owner, None, "installed-app", Path("work"), Path("evidence"), None,
+                            phase="after", appkit=True)
+            compile_controls.assert_called_once_with(Path("work"))
+            self.assertEqual(appkit.call_args.args,
+                             ("appkit", owner, "installed-app", "mfa-after", Path("evidence/mfa-after-kill")))
+            self.assertEqual(appkit.call_args.kwargs["codes"], expected)
+            bridge.assert_not_called()
+            appkit.return_value = {"codes": ["287082"]}
+            with self.assertRaisesRegex(RuntimeError, "expected HOTP"):
+                verify_open_mfa(owner, None, "installed-app", Path("work"), Path("evidence"), None,
+                                phase="after", appkit=True)
+
     def test_first_release_reuses_the_downloaded_package_and_protected_host(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -375,6 +395,32 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
 
 
 class InstalledMacPermissionsTests(unittest.TestCase):
+    def test_first_release_scan_preserves_partial_appkit_evidence_when_the_ui_fails(self):
+        with TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            module = evidence / "taomni-plugin-mfa"
+            module.write_bytes(b"host")
+            (evidence / "module.json").write_text(json.dumps({
+                "id": "taomni-plugin-mfa", "commands": ["mfa_scan_screen_codes"], "permissions": ["capture.screen"],
+            }))
+            (evidence / "native-image-window.json").write_text('{"pid": 42}')
+            recovery = dict(sourceSha="source", installedBinarySha256="core", modulePackageSha256="package",
+                            moduleBinarySha256=hashlib.sha256(b"host").hexdigest(), nextHotp="359 152",
+                            host={"executable": str(module)})
+            owner = Mock(pid=17)
+            with patch("installed_macos_permissions.installed_macos_desktop", return_value=nullcontext(owner)), patch(
+                "installed_macos_permissions.desktop_action",
+            ) as action, patch("installed_macos_permissions.compile_driver"), patch(
+                "installed_macos_permissions.controls", side_effect=RuntimeError("preview missing"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "preview missing"):
+                    observe_hosted_screen_scan(evidence / "taomni", evidence, recovery, work=evidence)
+            self.assertEqual(action.call_args.args[1:], ("native_show_image_window", {"action": "close"}))
+            result = json.loads((evidence / "installed-macos-mfa-screen-scan.json").read_text())
+            self.assertFalse(result["passed"])
+            self.assertEqual(result["corePid"], 17)
+            self.assertEqual(result["imageWindow"], {"pid": 42})
+
     def test_failed_capture_closes_the_fixture_and_records_incomplete_evidence(self):
         recovery = dict(sourceSha="source", installedBinarySha256="core", modulePackageSha256="package",
                         moduleBinarySha256="host", nextHotp="359 152")

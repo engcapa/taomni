@@ -14,6 +14,8 @@ struct Request: Decodable {
     let phase: String
     let password: String?
     let modules: [Module]?
+    let issuer: String?
+    let codes: [String]?
 }
 
 struct Observation: Encodable {
@@ -21,6 +23,9 @@ struct Observation: Encodable {
     let phase: String
     var currentModules: [String]?
     var confirmation: String?
+    var permissions: [String: String]?
+    var codes: [String]?
+    var scannedIssuer: String?
     let transport = "macOS AppKit accessibility"
 }
 
@@ -179,8 +184,7 @@ func observe(_ request: Request) throws -> Observation {
     func contents() -> [AXUIElement] { window().map(nodes) ?? [] }
     var result = Observation(ownerPid: request.pid, phase: request.phase)
 
-    switch request.phase {
-    case "unlock-store":
+    func unlockVault() throws {
         guard let password = request.password else { throw CheckFailure("Missing the fixture password") }
         defer { NSPasteboard.general.clearContents() }
         let field = try wait("vault unlock field") {
@@ -199,7 +203,8 @@ func observe(_ request: Request) throws -> Observation {
                 .contains { attribute($0, kAXSubroleAttribute) as? String == "AXSecureTextField" }
                 ? nil : true
         }
-        NSPasteboard.general.clearContents()
+    }
+    func openSettings(_ query: String) throws {
         // AppKit's Settings shortcut uses Command and the comma key.
         try postKey(pid: request.pid, code: 43, flags: .maskCommand)
         let search = try wait("Settings search field") {
@@ -208,7 +213,114 @@ func observe(_ request: Request) throws -> Observation {
                     && labels($0).contains { $0.hasPrefix("Search settings") }
             }
         }
-        try pasteText("module store", into: search, pid: request.pid)
+        try pasteText(query, into: search, pid: request.pid)
+    }
+    func openTool(_ name: String) throws {
+        func menuItem(_ root: AXUIElement?, role: String, label: String) -> AXUIElement? {
+            guard let root = root else { return nil }
+            return nodes(root).first { attribute($0, kAXRoleAttribute) as? String == role && labels($0).contains(label) }
+        }
+        let tools = try wait("Tools menu") {
+            menuItem(elementAttribute(app, kAXMenuBarAttribute), role: kAXMenuBarItemRole, label: "Tools")
+        }
+        try press(tools)
+        try press(try wait(name) { menuItem(tools, role: kAXMenuItemRole, label: name) })
+    }
+    func readHOTP(_ expected: String) throws -> String {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        defer { pasteboard.clearContents() }
+        // Both the displayed code and its icon have the same accessible name.
+        // Either button writes the current code to the native pasteboard.
+        let copyName = "Copy code for \(request.issuer ?? "")"
+        let copy = try wait("MFA copy control") {
+            contents().first {
+                attribute($0, kAXRoleAttribute) as? String == kAXButtonRole
+                    && attribute($0, kAXEnabledAttribute) as? Bool == true
+                    && labels($0).contains(copyName)
+            }
+        }
+        try press(copy)
+        return try wait("expected HOTP on the pasteboard") {
+            let actual = pasteboard.string(forType: .string)
+            return actual == expected ? actual : nil
+        }
+    }
+
+    switch request.phase {
+    case "permissions":
+        defer { NSPasteboard.general.clearContents() }
+        try unlockVault()
+        try openTool("Local servers")
+        try press(try wait("RDP settings") { button(contents(), "Settings RDP") })
+        _ = try wait("RDP Screen Recording and Accessibility grants") {
+            let visible = contents().flatMap(labels)
+            return visible.contains("Permission granted")
+                && visible.contains("Keyboard and mouse control enabled") ? true : nil
+        }
+        try openSettings("screenshot")
+        let summary = try wait("Screenshot Screen Recording grant") {
+            contents().flatMap(labels).first {
+                $0.hasPrefix("Screen Recording permission granted; native display capture is available")
+            }
+        }
+        result.permissions = ["screenRecording": "granted", "accessibility": "granted", "screenshotSummary": summary]
+    case "mfa-before", "mfa-after":
+        let expectedCount = request.phase == "mfa-before" ? 1 : 2
+        guard let issuer = request.issuer, let expected = request.codes, expected.count == expectedCount else {
+            throw CheckFailure("Missing the MFA fixture or expected HOTP values")
+        }
+        try unlockVault()
+        try openTool("MFA authenticator")
+        var codes = [try readHOTP(expected[0])]
+        if expected.count == 2 {
+            try press(try wait("advance HOTP") { button(contents(), "Generate the next code for \(issuer)") })
+            codes.append(try readHOTP(expected[1]))
+        }
+        result.codes = codes
+    case "screen-scan":
+        guard request.issuer != nil, let codes = request.codes, codes.count == 1 else {
+            throw CheckFailure("Missing the MFA fixture or expected HOTP value")
+        }
+        try unlockVault()
+        try openTool("MFA authenticator")
+        try press(try wait("Add MFA account") { button(contents(), "Add MFA account") })
+        try press(try wait("Scan screen tab") {
+            contents().first {
+                let role = attribute($0, kAXRoleAttribute) as? String
+                return ["AXRadioButton", "AXTab", "AXButton"].contains(role ?? "") && labels($0).contains("Scan screen")
+            }
+        })
+        // The active tab can share the action's AX label and button role.
+        // The actual scan button is in the pane following the screen hint.
+        let scanHint = "Show the QR code on screen, then scan."
+        try press(try wait("Scan screen button") {
+            let elements = contents()
+            guard let index = elements.firstIndex(where: { labels($0).contains(where: { $0.hasPrefix(scanHint) }) })
+            else { return nil }
+            return button(Array(elements.dropFirst(index + 1)), "Scan screen")
+        })
+        _ = try wait("one external QR account in the import preview") {
+            let elements = contents()
+            guard elements.flatMap(labels).contains("1 account(s) found"), button(elements, "Import 1") != nil
+            else { return nil as Bool? }
+            return elements.contains {
+                attribute($0, kAXRoleAttribute) as? String == kAXTextFieldRole
+                    && attribute($0, kAXValueAttribute) as? String == "QA Bank"
+            } ? true : nil
+        }
+        result.scannedIssuer = "QA Bank"
+        try postKey(pid: request.pid, code: 53)
+        _ = try wait("import preview to close") {
+            let elements = contents()
+            return button(elements, "Add MFA account") != nil
+                && !elements.flatMap(labels).contains("1 account(s) found") ? true : nil
+        }
+        result.codes = [try readHOTP(codes[0])]
+    case "unlock-store":
+        defer { NSPasteboard.general.clearContents() }
+        try unlockVault()
+        try openSettings("module store")
         _ = try wait("Module Store") {
             contents().first { labels($0).contains("Module Store") }
         }

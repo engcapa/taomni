@@ -79,7 +79,9 @@ def exercise_desktop_contracts(candidate, desktop_profile, stages, args, identit
     stages["desktopAndHeadlessModeLease"] = mode_lease
     if system == "Darwin":
         try:
-            stages["candidatePermissions"] = observe_permissions(candidate, report, "candidate")
+            stages["candidatePermissions"] = observe_permissions(
+                candidate, report, "candidate", work=work if first_release is not None else None,
+            )
             if permission_failure is None:
                 stages["permissionContinuity"] = compare_permissions(
                     stages["originalPermissions"], stages["candidatePermissions"],
@@ -101,7 +103,9 @@ def exercise_desktop_contracts(candidate, desktop_profile, stages, args, identit
 
     if system == "Darwin" and (args.macos_hardened_mfa or first_release is not None) and recovery_failure is None:
         try:
-            stages["mfaScreenScan"] = observe_hosted_screen_scan(candidate, report, stages["crashRecovery"])
+            stages["mfaScreenScan"] = observe_hosted_screen_scan(
+                candidate, report, stages["crashRecovery"], work=work if first_release is not None else None,
+            )
         except Exception as error:
             permission_failure = permission_failure or error
             stages["mfaScreenScan"] = {"passed": False, "error": str(error)}
