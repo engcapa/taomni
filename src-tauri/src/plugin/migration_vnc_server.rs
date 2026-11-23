@@ -10,18 +10,11 @@ use taomni_server_process::vnc;
 use super::{
     CORE_API_VERSION, ModuleManifest, SnapshotMode,
     migration::{
-        LEGACY_SOURCE_VERSION, MigrationItem, MigrationJournal, MigrationJournalEntry,
-        MigrationRunState, MigrationStepState, paths, source,
+        LEGACY_SOURCE_VERSION, MigrationItem, MigrationJournal, MigrationRunState,
+        MigrationStepState, paths, source, valid_server_commit,
     },
     migration_server_config::{self, LEGACY_DATABASE, TABLE},
 };
-
-pub(super) fn valid_commit(entry: &MigrationJournalEntry) -> bool {
-    entry.item == MigrationItem::VncServerConfigs
-        && entry.source_path == Path::new(LEGACY_DATABASE)
-        && entry.target == Path::new(vnc::CONFIG_PATH)
-        && source::valid_fingerprint(&entry.source_fingerprint)
-}
 
 pub(super) fn prepare(plugins: &Path, manifest: &ModuleManifest) -> Result<(), String> {
     if manifest.slug != vnc::SLUG || !manifest.commands.contains(vnc::SAVE_SETTINGS) {
@@ -62,7 +55,7 @@ fn import(profile: &Path) -> Result<(), String> {
         .filter(|entry| entry.item == MigrationItem::VncServerConfigs);
     match (entries.next(), entries.next()) {
         (Some(entry), None)
-            if entry.state == MigrationStepState::Committed && valid_commit(entry) =>
+            if entry.state == MigrationStepState::Committed && valid_server_commit(entry) =>
         {
             return Ok(());
         }
@@ -176,7 +169,7 @@ mod tests {
         import(root).unwrap();
         let journal = MigrationJournal::load(&journal_path).unwrap();
         assert_eq!(journal.entries.len(), 1);
-        assert!(valid_commit(&journal.entries[0]));
+        assert!(journal.has_valid_commit(MigrationItem::VncServerConfigs));
         assert_eq!(
             record.legacy_source.as_deref(),
             Some(journal.entries[0].source_fingerprint.as_str())

@@ -9,20 +9,13 @@ use taomni_server_process::{ServerConfig, rdp};
 use super::{
     CORE_API_VERSION, ModuleManifest, SnapshotMode,
     migration::{
-        LEGACY_SOURCE_VERSION, MigrationItem, MigrationJournal, MigrationJournalEntry,
-        MigrationRunState, MigrationStepState, paths, source,
+        LEGACY_SOURCE_VERSION, MigrationItem, MigrationJournal, MigrationRunState,
+        MigrationStepState, paths, source, valid_server_commit,
     },
     migration_server_config::{self, LEGACY_DATABASE, TABLE},
 };
 
 const ITEM: MigrationItem = MigrationItem::RdpServerConfigs;
-
-pub(super) fn valid_commit(entry: &MigrationJournalEntry) -> bool {
-    entry.item == ITEM
-        && entry.source_path == Path::new(LEGACY_DATABASE)
-        && entry.target == Path::new(rdp::CONFIG_PATH)
-        && source::valid_fingerprint(&entry.source_fingerprint)
-}
 
 pub(super) fn prepare(plugins: &Path, manifest: &ModuleManifest) -> Result<(), String> {
     if manifest.slug != rdp::SLUG || !manifest.commands.contains(rdp::SAVE_SETTINGS) {
@@ -63,7 +56,7 @@ fn import(profile: &Path) -> Result<(), String> {
     let mut entries = journal.entries.iter().filter(|entry| entry.item == ITEM);
     match (entries.next(), entries.next()) {
         (Some(entry), None)
-            if entry.state == MigrationStepState::Committed && valid_commit(entry) =>
+            if entry.state == MigrationStepState::Committed && valid_server_commit(entry) =>
         {
             return Ok(());
         }
@@ -201,7 +194,7 @@ mod tests {
         assert_eq!(file.load().unwrap().unwrap().settings.port, 3396);
         let journal = MigrationJournal::load(&journal_path).unwrap();
         assert_eq!(journal.entries.len(), 1);
-        assert!(valid_commit(&journal.entries[0]));
+        assert!(journal.has_valid_commit(ITEM));
         std::fs::remove_file(root.join(rdp::CONFIG_PATH)).unwrap();
         import(root).unwrap();
         assert!(file.load().unwrap().is_none());

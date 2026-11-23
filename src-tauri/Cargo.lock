@@ -11108,6 +11108,8 @@ dependencies = [
  "taomni-plugin-services",
  "taomni-plugin-stream",
  "taomni-profile-locks",
+ "taomni-rdp-client-api",
+ "taomni-server-process",
  "taomni-sqlite-snapshot",
  "tempfile",
  "thiserror 2.0.20",

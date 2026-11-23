@@ -253,9 +253,21 @@ fn valid_commit(entry: &MigrationJournalEntry) -> bool {
         || valid_mfa_commit(entry)
         || valid_mail_commit(entry)
         || valid_rdp_pin_commit(entry)
-        || super::migration_local_servers::valid_commit(entry)
-        || super::migration_rdp_server::valid_commit(entry)
-        || super::migration_vnc_server::valid_commit(entry)
+        || valid_server_commit(entry)
+}
+
+pub(super) fn valid_server_commit(entry: &MigrationJournalEntry) -> bool {
+    use taomni_server_process::{local, rdp, vnc};
+
+    let target = match entry.item {
+        MigrationItem::ServerConfigs => local::CONFIG_PATH,
+        MigrationItem::RdpServerConfigs => rdp::CONFIG_PATH,
+        MigrationItem::VncServerConfigs => vnc::CONFIG_PATH,
+        _ => return false,
+    };
+    entry.source_path == Path::new("taomni.db")
+        && entry.target == Path::new(target)
+        && source::valid_fingerprint(&entry.source_fingerprint)
 }
 
 fn valid_rdp_pin_commit(entry: &MigrationJournalEntry) -> bool {

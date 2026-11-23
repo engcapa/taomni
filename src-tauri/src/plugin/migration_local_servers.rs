@@ -9,20 +9,13 @@ use taomni_server_process::{ServerConfig, local};
 use super::{
     CORE_API_VERSION, ModuleManifest, SnapshotMode,
     migration::{
-        LEGACY_SOURCE_VERSION, MigrationItem, MigrationJournal, MigrationJournalEntry,
-        MigrationRunState, MigrationStepState, paths, source,
+        LEGACY_SOURCE_VERSION, MigrationItem, MigrationJournal, MigrationRunState,
+        MigrationStepState, paths, source, valid_server_commit,
     },
     migration_server_config::{self, LEGACY_DATABASE, TABLE},
 };
 
 const ITEM: MigrationItem = MigrationItem::ServerConfigs;
-
-pub(super) fn valid_commit(entry: &MigrationJournalEntry) -> bool {
-    entry.item == ITEM
-        && entry.source_path == Path::new(LEGACY_DATABASE)
-        && entry.target == Path::new(local::CONFIG_PATH)
-        && source::valid_fingerprint(&entry.source_fingerprint)
-}
 
 pub(super) fn prepare(plugins: &Path, manifest: &ModuleManifest) -> Result<(), String> {
     if manifest.slug != local::SLUG || !manifest.commands.contains(local::SAVE_SETTINGS) {
@@ -59,7 +52,7 @@ fn import(profile: &Path) -> Result<(), String> {
     let mut entries = journal.entries.iter().filter(|entry| entry.item == ITEM);
     match (entries.next(), entries.next()) {
         (Some(entry), None)
-            if entry.state == MigrationStepState::Committed && valid_commit(entry) =>
+            if entry.state == MigrationStepState::Committed && valid_server_commit(entry) =>
         {
             return Ok(());
         }
@@ -181,9 +174,11 @@ mod tests {
         record.settings.get_mut(&local::Kind::Http).unwrap().port = 8081;
         file.save(&record).unwrap();
         import(root).unwrap();
-        assert!(valid_commit(
-            &MigrationJournal::load(&journal).unwrap().entries[0]
-        ));
+        assert!(
+            MigrationJournal::load(&journal)
+                .unwrap()
+                .has_valid_commit(ITEM)
+        );
         assert_eq!(
             file.load().unwrap().unwrap().settings[&local::Kind::Http].port,
             8081

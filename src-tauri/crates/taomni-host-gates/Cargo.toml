@@ -26,6 +26,8 @@ tempfile = "3"
 rusqlite = { version = "0.40", features = ["bundled"] }
 taomni-plugin-mfa = { path = "../../plugins/mfa" }
 taomni-mfa-engine = { path = "../taomni-mfa-engine" }
+taomni-rdp-client-api = { path = "../taomni-rdp-client-api" }
+taomni-server-process = { path = "../taomni-server-process" }
 taomni-sqlite-snapshot = { path = "../taomni-sqlite-snapshot" }
 zeroize = "1"
 taomni-plugin-stream = { path = "../taomni-plugin-stream" }
