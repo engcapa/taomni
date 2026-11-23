@@ -11,6 +11,20 @@ import native_build
 
 
 class BuildCheckTest(unittest.TestCase):
+    def test_signed_mail_overlay_stays_in_a_file_for_windows_command_shims(self):
+        original = json.loads(native_build.QA_CONFIG.read_text(encoding="utf-8"))
+        with native_build.tauri_config_path(signed_mail=True) as (path, features):
+            overlay = json.loads(path.read_text(encoding="utf-8"))
+            self.assertNotEqual(path, native_build.QA_CONFIG)
+            self.assertEqual(overlay["build"]["features"], features)
+            self.assertEqual(
+                features,
+                [feature for feature in original["build"]["features"] if not feature.startswith("legacy-mail-")],
+            )
+            self.assertEqual(overlay["build"]["beforeBuildCommand"], original["build"]["beforeBuildCommand"])
+        self.assertFalse(path.exists())
+        self.assertEqual(json.loads(native_build.QA_CONFIG.read_text(encoding="utf-8")), original)
+
     def test_check_never_builds_and_reports_changed_inputs_without_values(self):
         with tempfile.TemporaryDirectory() as directory:
             binary = Path(directory) / "taomni.exe"

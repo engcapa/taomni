@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -11,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 from qa_ui_auto.provenance import fingerprint, source_identity
@@ -234,17 +236,28 @@ def check_build(*, release: bool = False, inputs: dict | None = None) -> dict:
                 recorded_build_duration_sec=previous.get("build_duration_sec"))
 
 
-def build_qa(*, release: bool = False, force: bool = False, signed_mail: bool = False) -> Path:
+@contextmanager
+def tauri_config_path(*, signed_mail: bool):
     overlay = json.loads(QA_CONFIG.read_text(encoding="utf-8"))
     if overlay.get("identifier") != QA_APP_ID or overlay.get("mainBinaryName") != "taomni":
         raise ValueError("QA overlay must declare the independent QA ID and taomni binary name")
-    config_arg = str(QA_CONFIG)
-    if signed_mail:
-        overlay["build"]["features"] = [
-            feature for feature in overlay["build"]["features"]
-            if feature not in {"legacy-mail-imap", "legacy-mail-smtp"}
-        ]
-        config_arg = json.dumps(overlay)
+    if not signed_mail:
+        yield QA_CONFIG, overlay["build"].get("features", [])
+        return
+    features = [
+        feature for feature in overlay["build"]["features"]
+        if feature not in {"legacy-mail-imap", "legacy-mail-pop3", "legacy-mail-smtp"}
+    ]
+    overlay["build"]["features"] = features
+    # pnpm.cmd forwards the config argument through cmd.exe on Windows.
+    # A file path keeps the build command in the JSON out of that shell.
+    with tempfile.TemporaryDirectory(prefix="taomni-qa-config-") as directory:
+        path = Path(directory) / QA_CONFIG.name
+        path.write_text(json.dumps(overlay), encoding="utf-8")
+        yield path, features
+
+
+def build_qa(*, release: bool = False, force: bool = False, signed_mail: bool = False) -> Path:
     pnpm = shutil.which("pnpm")
     if not pnpm:
         raise ValueError("pnpm not found on PATH")
@@ -269,18 +282,7 @@ def build_qa(*, release: bool = False, force: bool = False, signed_mail: bool = 
     # Rust toolchain available in the verification container. Cargo's
     # ignore-rust-version flag lets the build reach actual compiler/system
     # compatibility checks instead of stopping on metadata alone.
-    command = [
-        pnpm,
-        "tauri",
-        "build",
-        "--no-bundle",
-        "--config",
-        config_arg,
-        "--ignore-version-mismatches",
-    ]
-    if not release:
-        command.append("--debug")
-    else:
+    if release:
         # Measurement builds keep release optimisation but also debug
         # assertions for diagnostics. Isolated NEWMOB_* roots are guarded by
         # the explicit com.taomni.app.qa identifier in the native app, so they
@@ -289,13 +291,20 @@ def build_qa(*, release: bool = False, force: bool = False, signed_mail: bool = 
     # Cargo may otherwise rewrite the lockfile while resolving the QA overlay
     # on a newer toolchain. The provenance snapshot must describe the exact
     # checkout that was compiled, so a native build is locked.
-    command.extend(["--", "--locked"])
     probe = ["cargo", "build", "--locked", "--manifest-path", "src-tauri/Cargo.toml",
              "--package", "taomni-rdp-probe", "--bin", "rdp-probe"]
     if release:
         probe.append("--release")
     started = time.monotonic()
-    subprocess.run(command, cwd=ROOT, env=env, check=True)
+    with tauri_config_path(signed_mail=signed_mail) as (config, features):
+        command = [
+            pnpm, "tauri", "build", "--no-bundle", "--config", str(config),
+            "--ignore-version-mismatches",
+        ]
+        if not release:
+            command.append("--debug")
+        command.extend(["--", "--locked"])
+        subprocess.run(command, cwd=ROOT, env=env, check=True)
     subprocess.run(probe, cwd=ROOT, env=env, check=True)
     tool_hashes = {}
     for package, name, suffix, key in PLATFORM_HELPERS.get(platform.system(), ()):
@@ -313,6 +322,7 @@ def build_qa(*, release: bool = False, force: bool = False, signed_mail: bool = 
         "platform": platform.system(),
         "profile": "release" if release else "debug",
         "command": command,
+        "tauri_features": features,
         "rdp_probe_command": probe,
         "source_sha256": inputs["source_sha256"],
         "build_inputs": inputs,
