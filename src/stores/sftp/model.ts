@@ -28,6 +28,16 @@ export interface SftpSessionState {
 }
 
 /**
+ * A pane's navigation position: the visited paths and where the user is now.
+ * Captured before a reconnect tears the session down so the user keeps their
+ * place (and back/forward stack) when the channel is re-established.
+ */
+export interface PaneNavigation {
+  history: string[];
+  historyIndex: number;
+}
+
+/**
  * Minimal per-session shape that `FilePanel` reads. Both `useSftpStore` and
  * the object-storage store satisfy this, so `FilePanel` can be driven by
  * either via its optional `store` prop.
@@ -80,6 +90,11 @@ export interface SftpStoreState {
   navigateForward: (sessionId: string, side: PaneSide) => Promise<void>;
   navigateUp: (sessionId: string, side: PaneSide) => Promise<void>;
   navigateHome: (sessionId: string, side: PaneSide) => Promise<void>;
+  /**
+   * Re-enter a saved pane position after a reconnect: loads the recorded path
+   * and reinstalls its full history so back/forward keep working.
+   */
+  restorePane: (sessionId: string, side: PaneSide, navigation: PaneNavigation) => Promise<void>;
   setSelection: (sessionId: string, side: PaneSide, selection: string[]) => void;
   toggleHidden: (sessionId: string, side: PaneSide) => void;
   setError: (sessionId: string, error: string | null) => void;

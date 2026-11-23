@@ -11,6 +11,9 @@ from native_pointer_buttons import (
 from native_webdriver_transport import WebDriverError
 
 MOUSE_SOURCE = "mouse"
+# A preparation round must be able to finish a stability window (0.3 s) plus
+# both WebDriver probes; anything shorter can only misreport a settled target.
+MIN_PREPARATION_ROUND = 1.0
 
 
 class ClickSession(ButtonSession, Protocol):
@@ -217,21 +220,32 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
         time.sleep(min(0.05, remaining))
 
 
-def prepare_click_target(session, origin: dict, timeout: float = 5.0,
+def prepare_click_target(session, origin: dict, timeout: float = 12.0,
                          *, allow_alternate: bool = False) -> dict:
     """Check geometry again after the driver has moved the physical pointer.
 
     WebKit's compositor can advance a pending search scroll during W3C input,
     even after DOM geometry appeared stable. Hover is safe to repeat; button
     input is never sent until that round trip still points at the same target.
+
+    Each round needs a full stability window plus two WebDriver probes. A
+    contended hosted runner can spend several seconds on those probes alone, so
+    the budget is wide enough to observe the real settled state instead of
+    reporting a false instability; only a genuinely moving or covered target
+    consumes the whole window.
     """
     end = time.monotonic() + timeout
+    last = None
     while True:
         remaining = end - time.monotonic()
         if session.deadline:
             remaining = min(remaining, session.deadline.remaining())
-        if remaining <= 0:
-            raise WebDriverError("native click target moved during pointer preparation")
+        if remaining < MIN_PREPARATION_ROUND:
+            # A round that starts this late cannot finish a stability window,
+            # so its "not stable" error would misreport a settled target.
+            raise WebDriverError(
+                "native click target moved during pointer preparation: "
+                f"last geometry {last}")
         point = prepare_pointer_target(session, origin, remaining,
                                        allow_alternate=allow_alternate)
         session.request("POST", session.endpoint("/actions"), {"actions": [{
@@ -246,3 +260,4 @@ def prepare_click_target(session, origin: dict, timeout: float = 5.0,
         if (isinstance(current, dict) and current.get("ready") is True
                 and current.get("x") == point["x"] and current.get("y") == point["y"]):
             return point
+        last = current

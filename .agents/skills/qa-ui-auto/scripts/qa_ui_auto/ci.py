@@ -20,7 +20,6 @@ from .nightly import (DEFAULT_SAMPLE_PERCENT, DEFAULT_WINDOWS_NIGHTS, WEEKDAYS,
                       night_label, platforms_for_night, select as nightly_select,
                       windows_enabled)
 from .provenance import execution_identity, input_digest
-from .real_provider import OPT_IN_FIXTURES, readiness as real_provider_readiness
 from .testcase import discover
 from .verification import browser_support, native_support, plan as impact_plan
 
@@ -163,12 +162,36 @@ def platform_required(case, target: str, cache: dict) -> bool:
     return cache[key]
 
 
+def opt_in_gap(case, opt_in: dict, environ=None) -> str | None:
+    """Return the reason this case needs a credential the planner cannot supply.
+
+    A fixture such as ``tao_real_provider`` is opt-in: without its key it skips
+    itself at setup. A skipped case still counts as a failure for the strict CI
+    report, and provisioning a native build that can only skip wastes a runner.
+    The planner therefore turns the missing credential into a declared
+    capability gap. ``policy.yaml`` owns the fixture -> variables mapping, with
+    optional per-case overrides for a case that pins one specific provider.
+    """
+    environ = os.environ if environ is None else environ
+    for fixture in case.fixtures:
+        entry = opt_in.get(fixture)
+        if not entry:
+            continue
+        entry = {**entry, **(entry.get("cases") or {}).get(case.id, {})}
+        variables = [str(name) for name in entry.get("env") or []]
+        if any(str(environ.get(name, "")).strip() for name in variables):
+            continue
+        return entry.get("reason") or f"{fixture} credential is absent on this host"
+    return None
+
+
 def make_plan(args, *, cases=None, features=None) -> dict:
     cases = discover(Path("qa-ui-auto-tests/cases")) if cases is None else cases
     by_id = {case.id: case for case in cases}
     if len(by_id) != len(cases):
         raise ValueError("duplicate case IDs")
     policy = yaml.safe_load(POLICY.read_text(encoding="utf-8"))
+    opt_in = policy.get("opt_in") or {}
     dependencies = yaml.safe_load(DEPENDENCIES.read_text(encoding="utf-8")) or {}
     known = set(by_id)
     registered = set(policy["cases"])
@@ -214,10 +237,6 @@ def make_plan(args, *, cases=None, features=None) -> dict:
                    "windows": windows_enabled(night, windows_nights),
                    "windows_nights": windows_nights, "platforms": platforms,
                    "sample_percent": sample_percent, "entries": {}}
-    opt_in_ready, opt_in_reason = real_provider_readiness()
-    defer_opt_in = (scope == "all" and not opt_in_ready
-                    and not bool(getattr(args, "include_opt_in", False)))
-    opt_in_deferred: dict[tuple[str, str, str], dict] = {}
     required_cache: dict = {}
     explicit = requested | {c.id for c in cases if wanted_features.intersection(c.covers)
                             or wanted_tags.intersection(c.tags)}
@@ -289,19 +308,13 @@ def make_plan(args, *, cases=None, features=None) -> dict:
                     if reason:
                         gaps.append({"case": cid, **combination, "reason": reason})
                         continue
+                    # Opt-in credentials are a declared gap, not a runtime skip
+                    # the strict report would count as a failure.
+                    opt_in_reason = opt_in_gap(case, opt_in)
+                    if opt_in_reason:
+                        gaps.append({"case": cid, **combination, "reason": opt_in_reason})
+                        continue
                     eligible.append(case)
-                # Undeclared commercial-provider runs would only skip after a
-                # runner was provisioned; defer them at plan time instead.
-                if defer_opt_in and eligible:
-                    deferred = [case for case in eligible
-                                if set(case.fixtures) & set(OPT_IN_FIXTURES)]
-                    if deferred:
-                        deferred_ids = {case.id for case in deferred}
-                        for case in deferred:
-                            opt_in_deferred.setdefault((case.id, platform_key, mode), {
-                                "case": case.id, "platform": platform_key, "mode": mode,
-                                "reason": opt_in_reason})
-                        eligible = [case for case in eligible if case.id not in deferred_ids]
                 if nightly_enabled and mode == "native" and eligible:
                     always = {case.id for case in eligible
                               if "crash-regression" in case.tags
@@ -388,7 +401,6 @@ def make_plan(args, *, cases=None, features=None) -> dict:
             "identity": execution_identity(Path.cwd()), "reasons": reasons, "impact": impact,
             "entries": entries, "gaps": gaps, "no_relevant_changes": not entries,
             "not_applicable": not_applicable, "nightly": nightly,
-            "opt_in_deferred": [opt_in_deferred[key] for key in sorted(opt_in_deferred)],
             "run_id": os.environ.get("GITHUB_RUN_ID"), "attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
             "unreviewed": [cid for cid in ordered if set(by_id[cid].tags) & {"needs-review", "legacy-imported"}]}
 
@@ -529,7 +541,6 @@ def aggregate(manifest: dict, root: Path) -> dict:
     return {"head": manifest["head"], "run_id": manifest.get("run_id"), "attempt": manifest.get("attempt"),
             "entries": entries, "groups": list(groups.values()), "build_hashes": build_hashes, "failures": failures,
             "gaps": manifest["gaps"], "nightly": manifest.get("nightly"),
-            "opt_in_deferred": manifest.get("opt_in_deferred", []),
             "not_applicable": manifest.get("not_applicable", []),
             "unreviewed": manifest["unreviewed"],
             # `passed` remains a strict all-cases signal for consumers that
@@ -557,8 +568,6 @@ def main(argv=None):
     plan.add_argument("--night-label", default=os.environ.get("QA_NIGHT_LABEL") or "")
     plan.add_argument("--native-sample-percent", type=int,
                       default=int(os.environ.get("QA_NIGHTLY_SAMPLE_PERCENT") or 0))
-    plan.add_argument("--include-opt-in", action="store_true",
-                      default=os.environ.get("QA_INCLUDE_OPT_IN", "").lower() in {"true", "1"})
     plan.add_argument("--output", type=Path, default=Path("qa-ui-auto-report/selection.json"))
     report = subs.add_parser("report")
     report.add_argument("--selection", type=Path, required=True)
@@ -622,9 +631,6 @@ def main(argv=None):
                     lines.append(f"Nightly: night `{nightly['night']}` ({nightly['weekday']}), "
                                  f"Windows {'enabled' if nightly['windows'] else 'skipped'}, "
                                  f"native sample {nightly['sample_percent']}%.")
-                deferred = result.get('opt_in_deferred') or []
-                if deferred:
-                    lines.append(f"Opt-in cases deferred at planning time: {len(deferred)} combinations.")
                 with open(summary_path, "a", encoding="utf-8") as stream:
                     stream.write("\n".join(lines) + "\n")
             print(json.dumps(matrix, indent=2))
@@ -646,11 +652,6 @@ def main(argv=None):
             lines.append(f"Nightly coverage: night `{nightly['night']}` ({nightly['weekday']}), "
                          f"Windows {'enabled' if nightly['windows'] else 'skipped'}, "
                          f"native sample {nightly['sample_percent']}% per rotation window.")
-        deferred = result.get("opt_in_deferred") or []
-        if deferred:
-            reasons = sorted({item["reason"] for item in deferred})
-            lines.append(f"Opt-in cases deferred at planning time ({len(deferred)} combinations): "
-                         + "; ".join(f"`{reason}`" for reason in reasons))
         for failure in result["failures"]:
             message = failure["message"].replace("\n", " ").replace("`", "'")[:500]
             lines.append(f"\n- `{failure['entry']}/{failure['case']}`: {message}")

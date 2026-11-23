@@ -71,11 +71,10 @@ no Windows browser, native shards or producer are scheduled. Override the gate
 with `QA_WINDOWS_NIGHTS` (comma-separated weekday names) or simulate a night on
 a manual dispatch with `nightly_policy=true` plus `night_label=YYYY-MM-DD`.
 
-Cases that need an opt-in commercial provider (`tao_real_provider`) are
-deferred at planning time when no `TAOMNI_QA_*_KEY`/`*_KEY_FILE` is configured.
-They appear in `opt_in_deferred` and the summary instead of failing or skipping
-after runners were provisioned. Set a supported key to execute them; explicit
-`selected` runs still execute requested cases regardless.
+Cases that need an opt-in commercial provider (`tao_real_provider`) follow the
+`policy.yaml` opt-in mapping: without a configured credential they become
+declared capability gaps at planning time, so no native runner is provisioned
+for a case that can only skip. See "Opt-in credentials" below.
 
 ### Shards and reusable native builds
 
@@ -199,6 +198,19 @@ automatically includes its predecessor in the same native invocation. Unknown
 IDs, missing diff refs, unsupported explicit scope, changed inputs or selected
 skips fail. Pure documentation changes can yield an explicit zero-execution
 report. No empty execution is presented as six-platform success.
+
+### Opt-in credentials
+
+Cases whose fixture needs a credential a hosted runner intentionally does not
+hold (`tao_real_provider`, the real commercial provider probes) are opt-in.
+`policy.yaml` maps such a fixture to the variables that satisfy it, with optional
+per-case overrides for a case that pins one provider. When none of the variables
+is set at plan time the case becomes a **declared capability gap** instead of a
+runnable case: no shard is provisioned for it, the summary reports it under
+"Declared capability gaps", and the strict gate does not treat the resulting
+runtime skip as a failure. Export the variables to plan and run those cases
+locally or in a dedicated job. Explicitly selecting an unmet opt-in case still
+fails planning, so a requested case can never silently turn into a gap.
 
 Reusable caller example (opt in from a separate business flow):
 

@@ -82,6 +82,24 @@ def _classify_runner_result(report: Path, runner_exit_code: int) -> dict:
     return result
 
 
+def native_webdriver_config(entry: dict, system: str, native_driver: str = "") -> dict:
+    """Record the platform-specific native WebDriver launcher for this shard.
+
+    macOS runs the QA app's own bridge: it binds from the first page-load
+    callback, so a contended hosted runner can bind later than the 20 s default
+    and fail every case of the shard at setup. The hosted config therefore
+    always states a startup budget. Windows wraps msedgedriver so its own
+    transport log is retained beside the report; Linux keeps the defaults.
+    """
+    if entry.get("mode") != "native":
+        return {}
+    if system == "Windows":
+        return {"native_driver": native_driver}
+    if system == "Darwin":
+        return {"startup_timeout": 60}
+    return {}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--selection", type=Path, required=True)
@@ -160,7 +178,6 @@ def main():
             if entry["mode"] == "native" and platform.system() == "Darwin" and os.environ.get("TAOMNI_QA_MACOS_LLDB") == "1":
                 # Opt-in crash capture is part of the recorded run config.
                 config["app"]["macos_lldb"] = True
-                config["webdriver"] = {"startup_timeout": 60}
             release = entry["mode"] == "native" and "release" in entry["capabilities"]
             if release:
                 from native_build import qa_binary as release_binary
@@ -172,7 +189,11 @@ def main():
                 wrapper = args.report.resolve() / "webview-driver.cmd"
                 log_path = args.report.resolve() / "webview-driver.log"
                 wrapper.write_text(f'@echo off\n"{driver}" --verbose "--log-path={log_path}" %*\n', encoding="utf-8")
-                config["webdriver"] = {"native_driver": str(wrapper)}
+                config["webdriver"] = native_webdriver_config(entry, platform.system(), str(wrapper))
+            elif entry["mode"] == "native":
+                webdriver = native_webdriver_config(entry, platform.system())
+                if webdriver:
+                    config["webdriver"] = webdriver
             cfg_path = args.report / "config.yaml"
             cfg_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
             if entry["mode"] == "native":

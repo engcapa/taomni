@@ -9,19 +9,25 @@ export function useSnapshot<T>(instance: Instance, path: string | null, revision
   const [snapshot, setSnapshot] = useState<Snapshot<T>>(empty);
   const owner = useRef<{ controller: AbortController; key: string } | null>(null);
   const key = JSON.stringify([instance.id, instance.endpoint, instance.token, path]);
-  const refresh = useCallback(async () => {
+  // Resolve with the snapshot this refresh observed: callers must act on
+  // authoritative data, never on retained data a background refresh may replace.
+  const refresh = useCallback(async (): Promise<Snapshot<T>> => {
     owner.current?.controller.abort();
     const current = { controller: new AbortController(), key };
     owner.current = current;
-    if (!path) { setSnapshot(empty()); return; }
+    if (!path) { setSnapshot(empty()); return empty<T>(); }
     setSnapshot(v => ({ ...(v.key === key ? v : empty<T>()), key, loading: true, error: "" }));
     try {
       const value = await request<T>(instance, path, undefined, current.controller.signal);
-      if (owner.current !== current || current.controller.signal.aborted) return;
-      setSnapshot({ key, value, updated: new Date().toLocaleTimeString(), loading: false, error: "" });
+      if (owner.current !== current || current.controller.signal.aborted) return empty<T>();
+      const next = { key, value, updated: new Date().toLocaleTimeString(), loading: false, error: "" };
+      setSnapshot(next);
+      return next;
     } catch (error) {
-      if (owner.current !== current || current.controller.signal.aborted) return;
-      setSnapshot(v => ({ ...v, loading: false, error: errorText(error) }));
+      if (owner.current !== current || current.controller.signal.aborted) return empty<T>();
+      const message = errorText(error);
+      setSnapshot(v => ({ ...v, loading: false, error: message }));
+      return { ...empty<T>(), key, error: message };
     }
   }, [instance, path, key]);
   useEffect(() => {

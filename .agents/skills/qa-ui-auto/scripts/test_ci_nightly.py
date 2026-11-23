@@ -131,37 +131,31 @@ class NightlyPlanTests(unittest.TestCase):
                            night_label='2026-11-24'))
 
 
-class OptInDeferralTests(unittest.TestCase):
-    def test_scope_all_defers_real_provider_cases_without_a_key(self):
-        with patch.dict(os.environ, {'TAOMNI_QA_DEEPSEEK_KEY': '',
-                                     'TAOMNI_QA_DEEPSEEK_KEY_FILE': '',
-                                     'TAOMNI_QA_OPENCODE_KEY': '',
-                                     'TAOMNI_QA_OPENCODE_KEY_FILE': ''}, clear=False):
+class OptInGapTests(unittest.TestCase):
+    def test_scope_all_reports_opt_in_cases_as_declared_gaps(self):
+        env = {name: '' for name in ('TAOMNI_QA_DEEPSEEK_KEY', 'TAOMNI_QA_DEEPSEEK_KEY_FILE',
+                                     'TAOMNI_QA_OPENCODE_KEY', 'TAOMNI_QA_OPENCODE_KEY_FILE',
+                                     'TAOMNI_QA_AGNES_KEY', 'TAOMNI_QA_AGNES_KEY_FILE')}
+        with patch.dict(os.environ, env, clear=False):
             plan = make_plan(args(scope='all', platforms='linux', modes='native'))
-        deferred = plan['opt_in_deferred']
-        self.assertTrue(deferred)
-        self.assertTrue(all(item['reason'].endswith('real-provider QA is opt-in') for item in deferred))
-        deferred_cases = {item['case'] for item in deferred}
+        opt_in_gaps = [gap for gap in plan['gaps']
+                        if 'credential' in gap['reason'] or 'opt-in' in gap['reason']]
+        self.assertTrue(opt_in_gaps)
+        self.assertTrue(all(gap['case'].startswith('TC-TAO-HOME-') for gap in opt_in_gaps))
         selected = {case_id for entry in plan['entries'] for case_id in entry['selected_ids']}
-        self.assertFalse(deferred_cases & selected)
+        self.assertFalse({gap['case'] for gap in opt_in_gaps} & selected)
 
-    def test_configured_provider_and_explicit_opt_in_keep_the_cases(self):
+    def test_configured_provider_keeps_the_cases_out_of_gaps(self):
         with patch.dict(os.environ, {'TAOMNI_QA_DEEPSEEK_KEY': 'test-key',
                                      'TAOMNI_QA_DEEPSEEK_KEY_FILE': ''}, clear=False):
             plan = make_plan(args(scope='all', platforms='linux', modes='native'))
-        self.assertEqual(plan['opt_in_deferred'], [])
+        gaps = [gap for gap in plan['gaps']
+                if 'credential' in gap['reason'] or 'opt-in' in gap['reason']]
+        # The DeepSeek credential satisfies the default provider; only the case
+        # that pins Agnes through its per-case policy override stays a gap.
+        self.assertEqual([gap['case'] for gap in gaps], ['TC-TAO-HOME-047'])
         selected = {case_id for entry in plan['entries'] for case_id in entry['selected_ids']}
-        self.assertTrue(any(case_id.startswith('TC-TAO-HOME-0') for case_id in selected))
-
-    def test_explicit_selection_is_never_silently_deferred(self):
-        with patch.dict(os.environ, {'TAOMNI_QA_DEEPSEEK_KEY': '',
-                                     'TAOMNI_QA_DEEPSEEK_KEY_FILE': '',
-                                     'TAOMNI_QA_OPENCODE_KEY': '',
-                                     'TAOMNI_QA_OPENCODE_KEY_FILE': ''}, clear=False):
-            plan = make_plan(args(scope='selected', platforms='linux', modes='native',
-                                  case_ids='TC-TAO-HOME-013'))
-        self.assertEqual(plan['opt_in_deferred'], [])
-        self.assertEqual(plan['entries'][0]['selected_ids'], ['TC-TAO-HOME-013'])
+        self.assertIn('TC-TAO-HOME-013', selected)
 
 
 if __name__ == '__main__':

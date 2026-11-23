@@ -66,12 +66,9 @@
 
 ## 3. opt-in 真实 provider 用例
 
-`tao_real_provider` fixture 在缺少 `TAOMNI_QA_*_KEY`/`*_KEY_FILE` 时抛 `FixtureSkip`，而汇总把 skip 计为失败：上一轮夜跑 53 个失败用例中约 48 个来自这条路径。本轮在**计划阶段**处理：
+`tao_real_provider` fixture 在缺少 `TAOMNI_QA_*_KEY`/`*_KEY_FILE` 时抛 `FixtureSkip`，而汇总把 skip 计为失败：上一轮夜跑 53 个失败用例中约 48 个来自这条路径。
 
-- 新增 `qa_ui_auto/real_provider.py`，与 fixture 共用 provider 表与就绪判断；
-- `scope=all` 且 provider 未就绪时，计划把这些用例放入 `opt_in_deferred`（附原因），不进入执行矩阵，也不再产生 skip/失败；
-- provider 就绪（设置任意受支持 key）时行为不变；`selected` 显式请求仍会执行并以真实结果报告；
-- `summary.md` 输出 deferred 数量与原因，避免“全量通过”掩盖未执行。
+本轮最初在计划器里加了 `opt_in_deferred` 私有通道；合并 `main` 时与已合入的 #868（`policy.yaml` 的 `opt_in` 映射、按用例覆盖、以“declared capability gap”呈现、显式选择未满足时规划失败）重合。最终树采用 #868 的机制，本方案只保留夜跑策略与缓存改动：无凭据时这些用例进入 `gaps`（不再是失败/跳过），有凭据时正常执行，`selected` 显式请求不会被静默降级。
 
 ## 4. 调度与并发
 
@@ -121,7 +118,7 @@
 
 - **计划等价（本地/CI 均可）**：同一 head 用 `night_label` 连续跑 1 个轮换周期（5 夜），断言每个共享 native 用例恰好出现一次；`selected`/`impacted` 的计划与改动前一致；crash 与平台限定用例每晚都在。
 - **Windows 门控**：分别模拟周五/周六/周日与周一至周四的 `night_label`，断言 `platforms` 与矩阵；`scope=selected` 始终保留显式请求的 Windows。
-- **opt-in**：无 key 的 `scope=all` 计划 `opt_in_deferred` = 16 个用例 × 平台；设置 key 后恢复；`selected` 不受影响。
+- **opt-in**：无 key 的 `scope=all` 计划把相关用例记入 `gaps`；设置 key 后恢复；`selected` 显式请求未满足时规划失败。
 - **受信任归档**：在未改 manifest/工具链的新分支上派发 focused native 运行，构建日志出现来自默认分支 run 的 `Restored Cargo ...`，构建时间接近暖编；改名/过期/伪造来源测试回退冷编。
 - **vendor A/B**：同一 commit 两个分支：A 关闭（现状），B 开启。B 首轮冷编建立新键，次轮恢复后记录重编 crate 数与构建步骤耗时；A 用同轮暖编对照。验收判据：B 暖编构建步骤 ≤ 6 分钟且二进制身份校验通过；否则回退开关。
 - **夜跑实测**：连续两个自然夜跑记录墙钟、各 job 等待、native 执行数与失败/跳过；与上一轮 113:29 对比；任何抽样导致的“未执行”必须出现在 `nightly.deferred` 与 summary 中。
@@ -132,8 +129,8 @@
 
 | 验证 | 运行 | 结果 |
 | --- | --- | --- |
-| 夜间计划（周二夜） | `45118200487` | night `2026-11-24` 周二，`platforms=['linux']`，Windows 跳过；Linux native always 73 + 样本 26 = 100/414，deferred 314；opt-in 17 个组合延期；5 个 native entry（4 片 + 双屏） |
-| 汇总展示 | `45118242633` | `summary.md` 出现 Nightly 行与 opt-in deferred 行；99 个 native 用例与计划一致 |
+| 夜间计划（周二夜） | `45118200487` | night `2026-11-24` 周二，`platforms=['linux']`，Windows 跳过；Linux native always 73 + 样本 26 = 100/414，deferred 314；17 个 opt-in 组合未进入矩阵（当时为临时 deferred 实现，最终树对应 17 个 declared gaps）；5 个 native entry（4 片 + 双屏） |
+| 汇总展示 | `45118242633` | `summary.md` 出现 Nightly 行；99 个 native 用例与计划一致；无凭据的 opt-in 用例未产生失败 |
 | 容量门控 | 本地对真实 API 运行 | 列出 5 个更早的 active run，超时后 `::warning::` fail-open，写出 `capacity-gate.json` |
 | 受信任归档（负向） | `45118200487` | main 尚无当前键归档时打印 `No retained artifact ... on trusted main` 并回退冷编 |
 | 受信任归档（正向） | `45131100717` | 无本分支归档时从 main 的 run `45124668225` 取到 `...72f90c23...`；下载 23 秒、解包 45 秒、构建步骤 7:43（36 个 crate），对照冷编 22.6 分钟 |
@@ -145,12 +142,13 @@
 
 ### 8.1 结论与判读
 
-- **夜间策略与 Windows 门控按计划工作**：计划、矩阵、汇总和 deferred 记录都能从 `selection.json` 复算；V1 的失败来自 Maven Central 429（基础设施）与 2 个既有产品断言（`linux-native-shard-2/TC-WS-079`、`linux-native-shard-4/TC-FILE-OPEN-045`），不是策略或缓存改动。
+- **夜间策略与 Windows 门控按计划工作**：计划、矩阵和 deferred 记录都能从 `selection.json` 复算；V1 的失败来自 Maven Central 429（基础设施）与 2 个既有产品断言（`linux-native-shard-2/TC-WS-079`、`linux-native-shard-4/TC-FILE-OPEN-045`），不是策略或缓存改动。
 - **vendor 归档机制成立**：开关打开后，暖编重编 crate 从 36 降到 3，说明 vendor 中间产物确实被 Cargo 复用。
 - **Linux 上的净收益有限**：本机 Linux 暖编本来就只需 ~10 分钟，恢复 1.6 GB 归档的 1.5 分钟会抵消一部分收益；同条件对照只快约 1 分钟（9.7 → 8.7）。Windows/macOS 的第二轮实测暖编构建步骤为 13.5/16.4 分钟，是这项优化真正的目标平台，需要按同一 A/B 协议补测后再决定是否默认打开。当前保持默认关闭。
 - **冷编不受开关影响**：22.6 分钟（关）对 22.0 分钟（开），符合“只影响恢复路径”的预期。
 - **同分支归档已可跨 commit 复用**：`45129303833`（新探针提交）仍从同分支早先的 run 取到了 Cargo 依赖归档（键不含源码），说明归档键不含源码是可行的。
 - **受信任默认分支路径已端到端验证**：在没有任何本分支归档的 `qa/trusted-cache-probe` 上，`45131100717` 的日志记录 `Found qa-cargo-dependencies-v1-...-72f90c... in trusted workflow run 45124668225 (workflow_dispatch on main)`；没有归档时回退冷编（`45118200487` 的 `No retained artifact ... on trusted main`）。来源校验（默认分支、completed、非当前 run、同一 workflow）在两次运行中都按预期过滤。
+- **与 main 的合并**：验证后分支合并了 `origin/main@062a72a6`（含 #868 的 opt-in declared-gap 机制），删除了重复的 opt-in 实现；缓存、调度与夜间策略代码未变，本地 `test_ci_nightly` 与全量计划复算通过。
 - **首个夜跑的预期**：合并当晚 schedule 运行在 main 上仍是冷编（main 尚无当前键归档），但它会发布当前键归档；次日夜间应命中受信任归档并把三端依赖编译变成暖编（实测单平台约省 15 分钟）。
 
 ## 9. 回退
@@ -163,8 +161,6 @@
 ## 10. 改动清单
 
 - `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/ci.py`：夜间策略与 opt-in 计划集成、`nightly` 清单字段。
-- `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/real_provider.py`：provider 就绪判断（与 fixture 共用）。
-- `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/fixtures/tao_real_provider.py`：复用共享 provider 表。
 - `.github/scripts/qa_capacity_gate.py` + 测试：容量门控。
 - `.github/actions/qa-branch-artifact/action.yml`：`trusted` 查找模式。
 - `.github/workflows/qa-ui-auto-platforms.yml`：夜间策略计算、容量门控、macOS browser 独立矩阵、`vendor_cache`/`nightly_policy` 输入、汇总展示 deferred。
