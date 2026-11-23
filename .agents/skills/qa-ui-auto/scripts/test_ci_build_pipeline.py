@@ -198,10 +198,14 @@ class NightlyAndCachePipelineTests(unittest.TestCase):
 
     def test_schedule_policy_and_capacity_gate_are_wired(self):
         plan_job = self.platforms['jobs']['plan']
-        gate = plan_job['steps'][0]
-        self.assertEqual(gate['name'], 'Wait for earlier QA platform runs')
+        gate = next(step for step in plan_job['steps']
+                    if step.get('name') == 'Wait for earlier QA platform runs')
         self.assertIn("github.event_name == 'schedule'", gate['if'])
         self.assertIn('qa_capacity_gate.py', gate['run'])
+        names = [step.get('name') for step in plan_job['steps']]
+        self.assertLess(names.index('Allocate invocation identity'), names.index('Wait for earlier QA platform runs'))
+        self.assertTrue(any(str(step.get('uses', '')).startswith('actions/checkout@')
+                            for step in plan_job['steps'][:names.index('Wait for earlier QA platform runs')]))
         self.assertEqual(gate['env']['QA_GATE_MAX_WAIT_SECONDS'], '1200')
         plan = next(step for step in plan_job['steps'] if step.get('id') == 'plan')
         self.assertIn("github.event_name == 'schedule'", plan['env']['QA_NIGHTLY_POLICY'])
@@ -232,6 +236,7 @@ class NightlyAndCachePipelineTests(unittest.TestCase):
         self.assertEqual(trusted['with']['default-branch'], '${{ env.QA_DEFAULT_BRANCH }}')
         self.assertIn("steps.branch-cargo.outputs.run-id == ''", trusted['if'])
         self.assertIn("env.QA_TRUSTED_CACHE == 'true'", trusted['if'])
+        self.assertIn("inputs.trusted_cache != 'false'", self.entry['jobs']['entry']['env']['QA_TRUSTED_CACHE'])
         self.assertIn('trusted_cache:', (ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())
         download = self.step(self.entry, 'Retrieve the trusted Cargo dependencies')
         self.assertEqual(download['with']['run-id'], '${{ steps.trusted-cargo.outputs.run-id }}')

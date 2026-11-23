@@ -10,7 +10,7 @@ on:
       run_rdp_unit_contracts: {type: boolean, default: true}
       workspace_stage_trace: {type: boolean, default: false}
       vendor_cache: {type: boolean, default: false}
-      trusted_cache: {type: boolean, default: true}
+      trusted_cache: {type: string, default: 'true'}
 permissions:
   contents: read
   actions: read
@@ -42,7 +42,7 @@ jobs:
       QA_CARGO_ARCHIVE: qa-build-output/cargo-dependencies
       QA_VENDOR_CACHE: ${{ (inputs.operation == 'build' || inputs.operation == 'contracts') && inputs.vendor_cache && '1' || '' }}
       QA_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-      QA_TRUSTED_CACHE: ${{ inputs.trusted_cache && 'true' || 'false' }}
+      QA_TRUSTED_CACHE: ${{ inputs.trusted_cache != 'false' && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
         with:
