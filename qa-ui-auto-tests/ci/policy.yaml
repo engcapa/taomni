@@ -31,6 +31,22 @@ smoke:
 - TC-FILE-OPEN-005
 - TC-FILE-OPEN-006
 unavailable: {}
+# Opt-in fixtures need a credential a hosted runner intentionally does not hold.
+# When none of the listed variables is set at plan time the fixture's cases are
+# recorded as declared capability gaps instead of running and skipping, which
+# the strict report would count as failures. Export the variables locally (or
+# in a dedicated job) to select and execute these cases.
+opt_in:
+  tao_real_provider:
+    env:
+    - TAOMNI_QA_OPENCODE_KEY
+    - TAOMNI_QA_DEEPSEEK_KEY
+    reason: real provider key is not provisioned; real-provider QA is opt-in
+    cases:
+      TC-TAO-HOME-047:
+        env:
+        - TAOMNI_QA_AGNES_KEY
+        reason: Agnes key is not provisioned; the Agnes regression is opt-in
 cases:
 - TC-WS-GIT-CLONE-01-defaults-proxy-and-clone-browser
 - TC-WS-GIT-CLONE-02-background-close-cancel-retry-browser

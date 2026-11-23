@@ -161,7 +161,10 @@ class SelectionTests(unittest.TestCase):
         # planner's changed-path list with its loop-control boolean. The
         # workflow summary iterates this field after planning.
         self.assertIsInstance(plan['changed_paths'], list)
-        self.assertEqual([(g['case'], g['linux_profile']) for g in plan['gaps']],
+        # Only the profile-bound X11 requirements are compared here; opt-in
+        # credential gaps apply to both profiles and are asserted separately.
+        self.assertEqual([(g['case'], g['linux_profile']) for g in plan['gaps']
+                          if g['case'] in x11_only],
                          [(cid, 'ubuntu-26.04-wayland') for cid in sorted(x11_only)])
 
     def test_mfa_scan_retains_authorization_browser_cleanup_predecessor_in_same_shard(self):
@@ -217,6 +220,51 @@ class SelectionTests(unittest.TestCase):
                 self.assertIn('java-real-project', entry['capabilities'])
         other = make_plan(args(scope='selected', case_ids='TC-IDE-C6-05-query-definition-reveal-history-native', modes='native'))
         self.assertTrue(all('java-real-project' not in entry['capabilities'] for entry in other['entries']))
+
+    def test_opt_in_fixture_cases_become_declared_gaps_without_a_credential(self):
+        plan = make_plan(args(scope='all', platforms='linux', modes='native'))
+        gapped = {gap['case'] for gap in plan['gaps']}
+        selected = {cid for entry in plan['entries'] for cid in entry['selected_ids']}
+        self.assertIn('TC-TAO-HOME-005', gapped)
+        self.assertIn('TC-TAO-HOME-047', gapped)
+        self.assertFalse(gapped & selected)
+        reasons = {gap['reason'] for gap in plan['gaps']}
+        self.assertTrue(any('real provider key' in reason for reason in reasons))
+        self.assertTrue(any('Agnes key' in reason for reason in reasons))
+        # The gap is per platform/mode and every real-provider case is native only.
+        self.assertTrue(all(gap['mode'] == 'native' for gap in plan['gaps']))
+
+    def test_opt_in_fixture_is_selected_when_its_credential_is_exported(self):
+        environment = {key: value for key, value in os.environ.items()
+                       if not key.startswith('TAOMNI_QA_') or key.startswith('TAOMNI_QA_TAO_')}
+        with patch.dict(os.environ, {**environment, 'TAOMNI_QA_DEEPSEEK_KEY': 'unit-secret'}, clear=True):
+            plan = make_plan(args(scope='selected', platforms='linux', modes='native',
+                                  case_ids='TC-TAO-HOME-005'))
+        self.assertEqual([entry['selected_ids'] for entry in plan['entries']],
+                         [['TC-TAO-HOME-005']])
+        self.assertFalse(any(gap['case'] == 'TC-TAO-HOME-005' for gap in plan['gaps']))
+
+    def test_agnes_regression_requires_the_agnes_credential(self):
+        environment = {key: value for key, value in os.environ.items()
+                       if not key.startswith('TAOMNI_QA_') or key.startswith('TAOMNI_QA_TAO_')}
+        with patch.dict(os.environ, {**environment, 'TAOMNI_QA_DEEPSEEK_KEY': 'unit-secret'}, clear=True):
+            plan = make_plan(args(scope='all', platforms='linux', modes='native'))
+        reasons = {gap['case']: gap['reason'] for gap in plan['gaps']}
+        self.assertIn('Agnes key', reasons['TC-TAO-HOME-047'])
+        self.assertNotIn('TC-TAO-HOME-005', reasons)
+        with patch.dict(os.environ, {**environment, 'TAOMNI_QA_DEEPSEEK_KEY': 'unit-secret',
+                                     'TAOMNI_QA_AGNES_KEY': 'unit-secret'}, clear=True):
+            plan = make_plan(args(scope='selected', platforms='linux', modes='native',
+                                  case_ids='TC-TAO-HOME-047'))
+        self.assertEqual([entry['selected_ids'] for entry in plan['entries']],
+                         [['TC-TAO-HOME-047']])
+
+    def test_explicit_opt_in_selection_without_a_credential_fails_planning(self):
+        with patch.dict(os.environ, {key: value for key, value in os.environ.items()
+                                     if not key.startswith('TAOMNI_QA_')}, clear=True):
+            with self.assertRaisesRegex(ValueError, 'unavailable in requested combinations'):
+                make_plan(args(scope='selected', platforms='linux', modes='native',
+                               case_ids='TC-TAO-HOME-005'))
 
     def test_unknown_empty_and_wrong_platform_requests_fail(self):
         for override in ({'scope':'selected'}, {'scope':'selected','case_ids':'TC-NOT-REAL'},

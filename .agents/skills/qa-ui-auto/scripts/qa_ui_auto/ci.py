@@ -145,12 +145,36 @@ def capabilities(cases, mode: str) -> list[str]:
     return sorted(result)
 
 
+def opt_in_gap(case, opt_in: dict, environ=None) -> str | None:
+    """Return the reason this case needs a credential the planner cannot supply.
+
+    A fixture such as ``tao_real_provider`` is opt-in: without its key it skips
+    itself at setup. A skipped case still counts as a failure for the strict CI
+    report, and provisioning a native build that can only skip wastes a runner.
+    The planner therefore turns the missing credential into a declared
+    capability gap. ``policy.yaml`` owns the fixture -> variables mapping, with
+    optional per-case overrides for a case that pins one specific provider.
+    """
+    environ = os.environ if environ is None else environ
+    for fixture in case.fixtures:
+        entry = opt_in.get(fixture)
+        if not entry:
+            continue
+        entry = {**entry, **(entry.get("cases") or {}).get(case.id, {})}
+        variables = [str(name) for name in entry.get("env") or []]
+        if any(str(environ.get(name, "")).strip() for name in variables):
+            continue
+        return entry.get("reason") or f"{fixture} credential is absent on this host"
+    return None
+
+
 def make_plan(args, *, cases=None, features=None) -> dict:
     cases = discover(Path("qa-ui-auto-tests/cases")) if cases is None else cases
     by_id = {case.id: case for case in cases}
     if len(by_id) != len(cases):
         raise ValueError("duplicate case IDs")
     policy = yaml.safe_load(POLICY.read_text(encoding="utf-8"))
+    opt_in = policy.get("opt_in") or {}
     dependencies = yaml.safe_load(DEPENDENCIES.read_text(encoding="utf-8")) or {}
     known = set(by_id)
     registered = set(policy["cases"])
@@ -245,6 +269,12 @@ def make_plan(args, *, cases=None, features=None) -> dict:
                         reason = reason or profile_support(case, profile_name)
                     if reason:
                         gaps.append({"case": cid, **combination, "reason": reason})
+                        continue
+                    # Opt-in credentials are a declared gap, not a runtime skip
+                    # the strict report would count as a failure.
+                    opt_in_reason = opt_in_gap(case, opt_in)
+                    if opt_in_reason:
+                        gaps.append({"case": cid, **combination, "reason": opt_in_reason})
                         continue
                     eligible.append(case)
                 # A Wayland/Mutter dual-output desktop changes global window
