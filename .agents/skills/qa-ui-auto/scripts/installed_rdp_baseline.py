@@ -28,12 +28,20 @@ def install_signed_server(steps, origin, profile, source):
     desktop_action(steps, "wait_for", element("status-bar"))
     desktop_action(steps, "click", element("ribbon-settings"))
     desktop_action(steps, "fill", {"selector": element("settings-search-input"), "value": "module store"})
-    for input_id, path in (("module-offline-archive", archive), ("module-offline-signature", signature)):
-        desktop_action(steps, "fill", {"selector": element(input_id), "value": str(path.resolve(strict=True))})
-    desktop_action(steps, "click", element("module-offline-submit"))
-    desktop_action(steps, "wait_for", {
-        "selector": element("module-offline-install") + '[data-phase="completed"]', "timeout_sec": 60,
+    desktop_action(steps, "fill", {
+        "selector": element("module-offline-archive"), "value": str(archive.resolve(strict=True)),
     })
+    desktop_action(steps, "fill", {
+        "selector": element("module-offline-signature"), "value": signature.read_text(encoding="utf-8"),
+    })
+    desktop_action(steps, "click", element("module-offline-submit"))
+    try:
+        desktop_action(steps, "wait_for", {
+            "selector": element("module-offline-install") + '[data-phase="completed"]', "timeout_sec": 60,
+        })
+    except RuntimeError:
+        steps.session.screenshot(steps.case_dir / "signed-rdp-server-install-failed.png")
+        raise
     desktop_action(steps, "click", element("module-action-enable-rdp-server"))
     desktop_action(steps, "wait_for", element("module-action-disable-rdp-server"))
     desktop_action(steps, "click", element("tab-item") + '[data-tab-type="settings"] ' + element("tab-close"))

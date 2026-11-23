@@ -78,7 +78,7 @@ class InstalledRdpBaselineTests(unittest.TestCase):
             archive = root / "rdp-server.taomni-plugin"
             signature = root / "rdp-server.taomni-plugin.minisig"
             archive.write_bytes(b"signed package fixture")
-            signature.touch()
+            signature.write_text("detached signature contents\n", encoding="utf-8")
             version = "0.1.0"
             module = root / "plugins/rdp-server"
             installed = module / "versions" / version
@@ -96,6 +96,7 @@ class InstalledRdpBaselineTests(unittest.TestCase):
                 result = install_signed_server(Mock(), origin, root, receipt["sourceSha"])
                 self.assertEqual(result["hostSha256"], receipt["hostSha256"])
                 self.assertIn("enable-rdp-server", str(action.call_args_list))
+                self.assertIn("detached signature contents", str(action.call_args_list))
                 action.reset_mock()
                 with self.assertRaisesRegex(RuntimeError, "does not match"):
                     install_signed_server(Mock(), origin, root, "b" * 40)
