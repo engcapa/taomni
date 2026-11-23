@@ -54,3 +54,24 @@ impl std::fmt::Display for MutationError {
         formatter.write_str(&self.message)
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MutationKind {
+    Move,
+    Copy,
+    Delete,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MutationProgress {
+    pub operation_id: String,
+    pub completed_uids: Vec<u32>,
+    pub pending_uids: Vec<u32>,
+    pub uncertain_uids: Vec<u32>,
+    pub error: Option<String>,
+    pub detail: Option<String>,
+    pub retryable: bool,
+    pub batch_size: usize,
+}

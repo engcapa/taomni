@@ -288,11 +288,13 @@ pub(super) async fn run_mail_mutation(
     let account = resolve_config(&state, config)?;
     let db = state.mail_db(&account.config.session_id)?;
     let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+    let gate = state.legacy.mail.mutation_gate(&account.config.session_id);
     let registry = state.plugins.clone();
     let runtime = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
         mutations::run_cached(
             &pool,
+            &gate,
             &account,
             &runtime,
             &db,

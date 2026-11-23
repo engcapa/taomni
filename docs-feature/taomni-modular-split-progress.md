@@ -2,6 +2,9 @@
 
 ## 2026-11-23 当前进展
 
+- `21752fbb0` 的 GitHub 发布演练完成，产出四目标基座、40 个签名模块包及含十个首装模块的签名目录。两个 macOS 架构各十份宿主回执使用同一固定证书，均带 hardened runtime，保存了 Gatekeeper 的返回值 3。安装和实际权限继续由四目标验收核对。 [发布演练](https://github.com/engcapa/taomni/actions/runs/45076694848)
+- `356021e10` 的 18 个分片在运行中收齐。Linux、Windows 和 macOS 每端各通过 27 项 Browser 和 33 项 Native，覆盖完整崩溃回归及签名包批量操作 TC-MAIL-BULK-03。 [批量操作回执](https://github.com/engcapa/taomni/actions/runs/45084427032)
+- 批量 IMAP 的写前日志、回执和缓存清除事务移至共享邮件引擎，基座提供连接适配和每账户串行锁。现有日志表、状态序列化和 IPC 响应字段延续。11 项 Rust 单测与模块边界检查通过。保留 TC-MAIL-BULK-01/02/03，通过原入口覆盖首次操作、续做和丢失回执后的恢复。
 - IMAP 页读取、增量同步、检索、正文预读和归档状态的协议结构移到 `taomni-mail-api`，既有字段和 IPC 入口保留。107 项 Rust 单测、基座编译与模块边界检查通过。SQLite 缓存实现仍待迁出。
 - Mail 导入导出的首轮三端 Browser 在取消后查服务器时失败。预置的 Archive 有两封邮件，用例原先错误地要求空文件夹。现核对两封原件及同步列表，原生实装选集继续运行。 [原始分片](https://github.com/engcapa/taomni/actions/runs/45085885699)
 - Mail 过滤规则匹配后经签名宿主读取原始 MIME 并发送。基座每次使用独立临时文件保存附件，发送返回后释放临时文件。TC-MODULES-096 核对实际 IMAP 原件读取、SMTP 收件人、原件标识及正文。TC-MAIL-FILTER-01 补充转发规则的保存断言。

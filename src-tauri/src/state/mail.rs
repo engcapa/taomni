@@ -8,6 +8,7 @@ pub(crate) struct MailRuntime {
     // Each account's database is separate from taomni.db and other accounts.
     cache_root: PathBuf,
     databases: Mutex<HashMap<String, MailDbHandle>>,
+    mutation_gates: Mutex<HashMap<String, Arc<Mutex<()>>>>,
     pub(crate) migrated: Result<bool, String>,
     // The pool also owns each connection's account-level proxy forwarder.
     pub(crate) mail_imap_pool: Arc<crate::mail::MailImapPool>,
@@ -20,10 +21,20 @@ impl MailRuntime {
             // MailDatabase creates the selected account directory when it opens storage.
             cache_root: profile.join("mail-cache"),
             databases: Mutex::new(HashMap::new()),
+            mutation_gates: Mutex::new(HashMap::new()),
             migrated: crate::plugin::migration_mail::profile_committed(profile),
             mail_imap_pool: Arc::new(crate::mail::MailImapPool::new()),
             mail_archive: Arc::default(),
         }
+    }
+
+    pub(crate) fn mutation_gate(&self, account_id: &str) -> Arc<Mutex<()>> {
+        self.mutation_gates
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .entry(account_id.to_owned())
+            .or_default()
+            .clone()
     }
 
     pub(crate) fn database(

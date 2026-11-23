@@ -19,6 +19,7 @@ fn moving_200_messages_adapts_to_provider_copy_count_limit() {
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let result = mutations::run_cached(
         &MailImapPool::new(),
+        &std::sync::Mutex::new(()),
         &account(fake.port),
         runtime.handle(),
         &db,

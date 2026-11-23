@@ -249,7 +249,6 @@ pub(super) fn retire_imap_session(mut session: ActiveImapSession) {
 /// session-level proxy forwarder across mail commands. Does not consult the
 /// app global proxy.
 pub struct MailImapPool {
-    pub(super) mutation_gates: std::sync::Mutex<HashMap<String, Arc<std::sync::Mutex<()>>>>,
     pub(super) entries: std::sync::Mutex<HashMap<ImapPoolKey, LiveImapEntry>>,
     /// Each lane owns its connection and proxy forwarder. Never interleave
     /// commands on one stream, but keep interactive work independent of sync.
@@ -302,19 +301,9 @@ impl ImapSessionOpts {
 }
 
 impl MailImapPool {
-    pub(super) fn mutation_gate(&self, account: &str) -> Arc<std::sync::Mutex<()>> {
-        self.mutation_gates
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .entry(account.to_string())
-            .or_insert_with(|| Arc::new(std::sync::Mutex::new(())))
-            .clone()
-    }
-
     pub fn new() -> Self {
         Self {
             entries: std::sync::Mutex::new(HashMap::new()),
-            mutation_gates: std::sync::Mutex::new(HashMap::new()),
             account_gates: std::sync::Mutex::new(HashMap::new()),
         }
     }

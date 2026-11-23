@@ -54,6 +54,7 @@ impl Harness {
     fn run(&self, kind: Kind, uids: Vec<u32>, id: Option<String>) -> Progress {
         run_cached(
             &MailImapPool::new(),
+            &std::sync::Mutex::new(()),
             &self.account,
             self.runtime.handle(),
             &self.db,
@@ -264,6 +265,7 @@ fn empty_folder_captures_server_uids_even_with_a_client_request_id() {
     let h = Harness::new(3);
     let result = run_cached(
         &MailImapPool::new(),
+        &std::sync::Mutex::new(()),
         &h.account,
         h.runtime.handle(),
         &h.db,
@@ -280,6 +282,7 @@ fn empty_folder_captures_server_uids_even_with_a_client_request_id() {
     h.fake.deliver("INBOX", 1, "arrived-later");
     let repeat = run_cached(
         &MailImapPool::new(),
+        &std::sync::Mutex::new(()),
         &h.account,
         h.runtime.handle(),
         &h.db,
