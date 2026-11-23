@@ -4538,6 +4538,7 @@
 
 ## tunnel (F8.2)
 
+- `[data-testid="sidebar-tool-tunneling"]` — interactive — F8.2.sidebar-entry
 - `[data-testid="tunnel-manager"]` — display — F8.2.panel-root
 - `[data-testid="tunnel-list"]` — display — F8.2.tunnel-list
 - `[data-testid="tunnel-new"]` — interactive — F8.2.new-tunnel

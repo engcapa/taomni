@@ -37,15 +37,18 @@ class ModuleProfileSelectionTests(unittest.TestCase):
         self.assertEqual([b["id"] for b in core["builds"]], [b["id"] for b in full["builds"]])
         self.assertTrue(all(b["id"].endswith("-release-modular") for b in full["builds"]))
         self.assertTrue(all("modular-release" in b["capabilities"] for b in full["builds"]))
+        plugin_cases = {"TC-FILE-OPEN-047": "mail", "TC-MODULES-102": "mfa"}
         excludes = [entry for entry in core["not_applicable"] if "requires_plugin" in entry]
-        self.assertEqual(len(excludes), 6)
-        self.assertTrue(all(e["case"] == "TC-FILE-OPEN-047" and e["requires_plugin"] == "mail" for e in excludes))
+        self.assertEqual(len(excludes), 12)
+        self.assertEqual({e["case"]: e["requires_plugin"] for e in excludes}, plugin_cases)
         core_modes = {(e["mode"], e["platform_key"], case) for e in core["entries"] for case in e["selected_ids"]}
         full_modes = {(e["mode"], e["platform_key"], case) for e in full["entries"] for case in e["selected_ids"]}
-        self.assertEqual(full_modes - core_modes,
-                         {("browser", "linux", "TC-FILE-OPEN-047"), ("native", "linux", "TC-FILE-OPEN-047"),
-                          ("browser", "windows", "TC-FILE-OPEN-047"), ("native", "windows", "TC-FILE-OPEN-047"),
-                          ("browser", "macos", "TC-FILE-OPEN-047"), ("native", "macos", "TC-FILE-OPEN-047")})
+        self.assertEqual(full_modes - core_modes, {
+            (mode, platform, case) for mode in ("browser", "native")
+            for platform in ("linux", "windows", "macos") for case in plugin_cases
+        })
+        self.assertTrue(all((mode, platform, "TC-WS-039") in core_modes
+                            for mode in ("browser", "native") for platform in ("linux", "windows", "macos")))
         for entry in full["entries"]:
             self.assertEqual("full-module-profile" in entry["capabilities"], entry["mode"] == "native")
             self.assertNotIn("legacy-mail-imap", entry["capabilities"])

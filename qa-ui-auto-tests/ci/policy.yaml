@@ -36,6 +36,7 @@ smoke:
 unavailable: {}
 requires_plugin:
   TC-FILE-OPEN-047: mail
+  TC-MODULES-102: mfa
 # Opt-in fixtures need a credential a hosted runner intentionally does not hold.
 # When none of the listed variables is set at plan time the fixture's cases are
 # recorded as declared capability gaps instead of running and skipping, which
@@ -154,6 +155,7 @@ cases:
 - TC-MODULES-096
 - TC-MODULES-098
 - TC-MODULES-101
+- TC-MODULES-102
 - TC-BACKUP-RESTORE-001
 - TC-WS-GIT-CLONE-01-defaults-proxy-and-clone-browser
 - TC-WS-GIT-CLONE-02-background-close-cancel-retry-browser

@@ -3852,11 +3852,15 @@ controls:
 id: F8.2
 status: done
 area: tunnel
-components: [TunnelManager, TunnelEditor]
+components: [TunnelManager, TunnelEditor, ToolsPanel]
 files:
   - src/components/tunnel/TunnelManager.tsx
   - src/components/tunnel/TunnelEditor.tsx
+  - src/components/sidebar/ToolsPanel.tsx
 controls:
+  - id: sidebar-entry
+    selector: '[data-testid="sidebar-tool-tunneling"]'
+    kind: interactive
   - id: panel-root
     selector: '[data-testid="tunnel-manager"]'
     kind: display
@@ -15321,7 +15325,7 @@ controls:
 
 隐藏编辑器布局恢复：`TC-WS-038`（browser/native），通过用户入口隐藏 Project、切换到终端、从 Home 重载并恢复，保留草稿、活动标签及工具窗口；覆盖零尺寸面板注册顺序导致的崩溃。
 
-共享面板组件升级回归：`TC-WS-039`（browser/native），真实嵌套分栏、Documentation、侧栏拖动、终端隐藏、大预览和重载连续操作后保留草稿与编辑器所有权；与 `TC-WS-038` 一起显式断言未捕获异常、未处理 Promise、React 根错误与崩溃页，防止界面恢复后漏报组件异常。
+共享面板组件升级回归 `TC-WS-039` 在 Browser 和 Native 核对嵌套分栏、Documentation、侧栏拖动、终端隐藏、大预览、重载和隧道管理器标签切换。断言草稿及编辑器所有权，并检查未捕获异常、未处理的 Promise、React 根错误及崩溃页。安装 MFA 的场景由 `TC-MODULES-102` 核对相同的标签激活和关闭操作。
 
 TC-WS-075 adds native Home source-to-document activation coverage for the real `workspace_execution_model` command. It retains the 150ms frame and 1500ms content/highlight budgets, exact public contents and editor reuse; TC-WS-073/074 also reject automatic execution-model scans for ordinary folders.
 
