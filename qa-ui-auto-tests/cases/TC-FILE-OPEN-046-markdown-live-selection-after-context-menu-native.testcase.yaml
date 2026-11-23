@@ -52,9 +52,15 @@ steps:
     name: data-editing
     equals: 'false'
 - wait_for: '[data-testid="viewer-editor"] .fv-md-rendered-block strong'
-# A real double click selects a rendered word through the WebView's native
-# selection (Live browse mode has no CodeMirror selection layer).
-- dblclick: '[data-testid="viewer-editor"] .fv-md-rendered-block strong'
+# A real drag across the rendered paragraph selects text through the WebView's
+# native selection (Live browse mode has no CodeMirror selection layer). The
+# macOS bridge's synthetic double click does not produce a WKWebView selection,
+# so the drag uses the AppKit mouse transport on macOS and W3C pointer input
+# elsewhere.
+- drag_to:
+    from: '[data-testid="viewer-editor"] .fv-md-rendered-block strong'
+    to: '[data-testid="viewer-editor"] .fv-md-rendered-block p'
+    macos_appkit: true
 - eval_readonly:
     expression: >-
       document.getSelection().rangeCount >= 1 && document.getSelection().toString().length > 0
