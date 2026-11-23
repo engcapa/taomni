@@ -51,8 +51,10 @@ test("artifact-only selection controls builders and cannot enter the publishing 
   assert(mac.includes("bash scripts/verify-macos-release-bundle.sh \"$TARGET\" \"$EXPECTED_ARCH\""));
 });
 
-test("joint releases use the same source for core and selected modules and require all package jobs", () => {
-  const pack = workflow.split("  package-modules:\n")[1].split("  # ----")[0];
+test("joint releases queue every selected module from the same source and require all package jobs", () => {
+  const pack = workflow.split("  package-modules:\n")[1].split("  verify-candidate-roster:\n")[0];
+  assert.match(pack, /^      fail-fast: false$/m);
+  assert.doesNotMatch(pack, /^\s*max-parallel:/m, "schedule all module jobs as runners become available");
   assert.match(pack, /module: \$\{\{ fromJSON\(needs\.plan\.outputs\.modules\) \}\}/);
   assert.match(pack, /head: \$\{\{ github\.sha \}\}/);
   assert.match(pack, /uses: \.\/\.github\/workflows\/release-modules\.yml/);

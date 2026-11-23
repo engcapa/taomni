@@ -416,7 +416,7 @@ jobs:
     if: needs.plan.outputs.modules != '[]' && needs.plan.outputs.candidate_run == ''
     strategy:
       fail-fast: false
-      max-parallel: 3
+      # Queue all selected modules so their target jobs can use available runners.
       matrix:
         module: ${{ fromJSON(needs.plan.outputs.modules) }}
     uses: ./.github/workflows/release-modules.yml
