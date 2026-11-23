@@ -104,10 +104,12 @@ async fn get_message_body(
     let cache_enabled = account.config.cache.enabled;
     let observed_at = sync::now_ms();
     // Older Mail packages keep their pooled background connection.
-    let mut message = if !background && module_host::fetches_imap_body(&state.plugins) {
+    let mut message = if module_host::fetches_imap_body(&state.plugins)
+        && (!background || !cfg!(any(test, feature = "legacy-mail-imap")))
+    {
         fetch_host_body(state.plugins.clone(), account, folder, uid).await?
     } else {
-        fetch_legacy_body(&state, account, folder, uid, background).await?
+        legacy_imap!({ fetch_legacy_body(&state, account, folder, uid, background).await })?
     };
 
     if cache_enabled {
@@ -144,6 +146,7 @@ async fn fetch_host_body(
     Ok(message)
 }
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 async fn fetch_legacy_body(
     state: &State<'_, AppState>,
     account: ResolvedMailAccount,

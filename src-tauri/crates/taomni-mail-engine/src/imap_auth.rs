@@ -1,18 +1,24 @@
 //! IMAP authentication for an already connected peer.
 
+#[cfg(feature = "imap-runtime")]
 use std::io::{Read, Write};
+#[cfg(feature = "imap-runtime")]
 use std::time::Duration;
 
+#[cfg(feature = "imap-runtime")]
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 pub use taomni_mail_api::{MailAuthMode, MailProvider};
 
+#[cfg(feature = "imap-runtime")]
 const IMAP_LOGIN_RETRY_DELAYS_MS: [u64; 2] = [500, 1500];
 
+#[cfg(feature = "imap-runtime")]
 struct Xoauth2Authenticator<'a> {
     username: &'a str,
     access_token: &'a str,
 }
 
+#[cfg(feature = "imap-runtime")]
 impl imap::Authenticator for Xoauth2Authenticator<'_> {
     type Response = String;
 
@@ -25,6 +31,7 @@ pub fn xoauth2_sasl_response(username: &str, access_token: &str) -> String {
     format!("user={username}\x01auth=Bearer {access_token}\x01\x01")
 }
 
+#[cfg(feature = "imap-runtime")]
 pub fn authenticate<T: Read + Write>(
     client: imap::Client<T>,
     username: &str,
@@ -54,6 +61,7 @@ pub fn authenticate<T: Read + Write>(
     }
 }
 
+#[cfg(feature = "imap-runtime")]
 fn imap_xoauth2_auth_error(provider: MailProvider, error: imap::Error) -> String {
     let detail = error.to_string();
     if provider == MailProvider::Outlook
@@ -67,6 +75,7 @@ fn imap_xoauth2_auth_error(provider: MailProvider, error: imap::Error) -> String
     }
 }
 
+#[cfg(feature = "imap-runtime")]
 fn login_imap_client<T: Read + Write>(
     mut client: imap::Client<T>,
     username: &str,
@@ -96,6 +105,7 @@ fn login_imap_client<T: Read + Write>(
     Err("IMAP login failed".into())
 }
 
+#[cfg(any(feature = "imap-runtime", test))]
 fn should_retry_imap_login(message: &str) -> bool {
     let message = message.to_ascii_lowercase();
     if message.contains("authenticationfailed")

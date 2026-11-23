@@ -1,16 +1,23 @@
 //! IMAP mailbox naming, subscriptions and change detection over an established connection.
 
+#[cfg(any(feature = "imap-runtime", test))]
 use std::collections::HashSet;
+#[cfg(feature = "imap-runtime")]
 use std::io::{Read, Write};
 
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
+#[cfg(feature = "imap-runtime")]
 use imap::types::NameAttribute;
+#[cfg(feature = "imap-runtime")]
 use taomni_mail_api::ImapFolderChange;
 
-use crate::{MailFolder, now_ts};
+use crate::MailFolder;
+#[cfg(feature = "imap-runtime")]
+use crate::now_ts;
 
 pub const SUBSCRIBED_ATTRIBUTE: &str = "\\Subscribed";
 
+#[cfg(feature = "imap-runtime")]
 pub fn imap_change_folder<T: Read + Write>(
     session: &mut imap::Session<T>,
     change: &ImapFolderChange,
@@ -29,6 +36,7 @@ pub fn imap_change_folder<T: Read + Write>(
 }
 
 /// RFC wire form of a LIST attribute (the `imap` crate only has Debug output).
+#[cfg(feature = "imap-runtime")]
 fn attribute_string(attribute: &NameAttribute<'_>) -> String {
     match attribute {
         NameAttribute::NoInferiors => "\\Noinferiors".into(),
@@ -58,6 +66,7 @@ pub fn folder_visible(folder: &MailFolder, subscribed_only: bool) -> bool {
 /// Mark LSUB-reported folders `\Subscribed`. An empty or failed LSUB means
 /// the server does not track subscriptions: every folder counts as subscribed
 /// so "subscribed only" never hides a whole account.
+#[cfg(any(feature = "imap-runtime", test))]
 fn mark_subscribed(folders: &mut [MailFolder], subscribed: Option<HashSet<String>>) {
     let subscribed = subscribed.filter(|names| !names.is_empty());
     for folder in folders.iter_mut() {
@@ -73,6 +82,7 @@ fn mark_subscribed(folders: &mut [MailFolder], subscribed: Option<HashSet<String
     }
 }
 
+#[cfg(feature = "imap-runtime")]
 fn imap_subscribed_names<T: Read + Write>(
     session: &mut imap::Session<T>,
 ) -> Option<HashSet<String>> {
@@ -82,6 +92,7 @@ fn imap_subscribed_names<T: Read + Write>(
         .map(|names| names.iter().map(|name| name.name().to_string()).collect())
 }
 
+#[cfg(feature = "imap-runtime")]
 pub fn imap_set_subscription<T: Read + Write>(
     session: &mut imap::Session<T>,
     folder: &str,
@@ -112,6 +123,7 @@ pub struct FolderStatus {
 }
 
 /// Parse `* STATUS <name> (KEY value ...)` from a raw response.
+#[cfg(any(feature = "imap-runtime", test))]
 fn parse_status_response(raw: &str) -> Option<FolderStatus> {
     let line = raw
         .lines()
@@ -139,6 +151,7 @@ fn parse_status_response(raw: &str) -> Option<FolderStatus> {
 
 /// Raw STATUS: the crate's typed `status()` routes the attributes through the
 /// unsolicited channel, which desynced some Outlook + proxy streams.
+#[cfg(feature = "imap-runtime")]
 pub fn imap_folder_status<T: Read + Write>(
     session: &mut imap::Session<T>,
     folder: &str,
@@ -155,6 +168,7 @@ pub fn imap_folder_status<T: Read + Write>(
     parse_status_response(&String::from_utf8_lossy(&raw))
 }
 
+#[cfg(feature = "imap-runtime")]
 pub fn imap_list_folders<T: Read + Write>(
     session: &mut imap::Session<T>,
     account_id: &str,
@@ -267,6 +281,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "imap-runtime")]
     #[test]
     fn attributes_use_rfc_form() {
         assert_eq!(attribute_string(&NameAttribute::NoSelect), "\\Noselect");

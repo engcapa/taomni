@@ -1,12 +1,14 @@
 use super::actions::execute_plans;
 use super::imap_search::body_needles;
 use super::store;
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 use crate::mail::ImapSessionOpts;
 use crate::mail::MailAccountConfig;
 use crate::mail::MailMessageHeader;
 use crate::mail::module_host;
 use crate::mail::now_ts;
 use crate::mail::resolve_config;
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 use crate::mail::with_imap_session;
 use crate::mail::with_mail_db;
 use crate::state::AppState;
@@ -118,20 +120,22 @@ pub async fn mail_apply_filters(
                 )
                 .await
             } else {
-                let pool = std::sync::Arc::clone(&state.legacy.mail.mail_imap_pool);
-                let handle = tokio::runtime::Handle::current();
-                let folder_for_task = folder.clone();
-                tokio::task::spawn_blocking(move || {
-                    with_imap_session(
-                        &pool,
-                        &account,
-                        &handle,
-                        ImapSessionOpts::default(),
-                        |imap| imap.filter_body_hits(&folder_for_task, &uncached, &needles),
-                    )
+                legacy_imap!({
+                    let pool = std::sync::Arc::clone(&state.legacy.mail.mail_imap_pool);
+                    let handle = tokio::runtime::Handle::current();
+                    let folder_for_task = folder.clone();
+                    tokio::task::spawn_blocking(move || {
+                        with_imap_session(
+                            &pool,
+                            &account,
+                            &handle,
+                            ImapSessionOpts::default(),
+                            |imap| imap.filter_body_hits(&folder_for_task, &uncached, &needles),
+                        )
+                    })
+                    .await
+                    .map_err(|e| format!("filter body search failed: {e}"))?
                 })
-                .await
-                .map_err(|e| format!("filter body search failed: {e}"))?
             };
             match lookup {
                 Ok(hits) => server_hits = hits,

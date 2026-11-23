@@ -4,8 +4,7 @@ use std::io::{Read, Write};
 
 use crate::imap_messages::uid_set_string;
 
-// Even sparse ten-digit UIDs stay below a 4 KiB command-line limit.
-pub const UID_BATCH_SIZE: usize = 250;
+pub use taomni_mail_api::imap_mutation::UID_BATCH_SIZE;
 
 pub fn unread_uids<T: Read + Write>(
     session: &mut imap::Session<T>,

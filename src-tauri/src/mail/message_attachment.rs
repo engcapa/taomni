@@ -143,16 +143,18 @@ pub async fn mail_download_attachment(
         )
         .await?
     } else {
-        download_legacy_attachment(
-            &state,
-            account,
-            folder,
-            uid,
-            attachment_index,
-            target_path,
-            section,
-        )
-        .await?
+        legacy_imap!({
+            download_legacy_attachment(
+                &state,
+                account,
+                folder,
+                uid,
+                attachment_index,
+                target_path,
+                section,
+            )
+            .await
+        })?
     };
     if let Some(key) = cache_key {
         let source = result.path.clone();
@@ -263,6 +265,7 @@ async fn download_host_attachment(
     Ok(result)
 }
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 async fn download_legacy_attachment(
     state: &State<'_, AppState>,
     account: ResolvedMailAccount,

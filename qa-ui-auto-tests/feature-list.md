@@ -7841,7 +7841,7 @@ controls:
 -->
 
 - 同步按持久化的连续 UID 区间 `[sync_low_uid, sync_high_uid]` 进行：打开/重开、定时刷新与手工刷新都按“服务器 UID − 缓存 UID”集合差分批补齐，直到后端 `more=false`，关闭任意时长后重开不再漏收（设计 `docs-feature/mail-thunderbird-parity-design.md` AC-01～AC-12）。
-- TC-MODULES-059 从签名前端测试选中文件夹补齐和全账户手工刷新。Mail 宿主负责邮件头同步，核心过渡仓储提交 UID 水位。
+- TC-MODULES-059 从签名前端测试选中文件夹补齐、全账户手工刷新和重新启用后接收停用期间收到的邮件。TC-MODULES-060 检查浏览器保留的账户标签重新同步和打开归档。Mail 宿主负责邮件头同步，核心过渡仓储提交 UID 水位。
 - 定时刷新在 catch-up 之后对最新窗口对账，手工刷新对全区间对账：服务器端删除/移动的邮件从缓存移除，已读/未读/星标以 FETCH FLAGS 为准（CONDSTORE 可用时用 `CHANGEDSINCE`）。
 - 列表只读本地缓存；缓存到底后“加载更早邮件”向服务器回补历史，选中文件夹在后台回补并显示进度。默认保留全部邮件头（0 = 不限制），按天保留时使用服务器到达时间。
 - 同一 Quick Connect 邮件地址复用同一会话缓存；`mail://user:pass@host:port?security=none&smtp=host:port` 支持口令、明文/STARTTLS 与 SMTP 端点。

@@ -1,15 +1,16 @@
 //! SQLite substring search and IMAP server search over mailbox headers.
 
+#[cfg(feature = "imap-runtime")]
 use std::io::{Read, Write};
 
 use rusqlite::{Connection, Result as SqlResult, ToSql, params_from_iter};
 
-use crate::{
-    MailMessageHeader,
-    cache::{MailCacheSettings, row_to_header},
-    imap_folders::quote_imap_string,
-    imap_messages::Mailbox,
-};
+use crate::{MailMessageHeader, cache::row_to_header};
+
+#[cfg(any(feature = "imap-runtime", test))]
+use crate::imap_folders::quote_imap_string;
+#[cfg(feature = "imap-runtime")]
+use crate::{cache::MailCacheSettings, imap_messages::Mailbox};
 
 pub use taomni_mail_api::search::{ImapSearchRequest, MailSearchField, MailSearchQuery};
 
@@ -153,6 +154,7 @@ pub fn search_cached_messages(
 }
 
 /// IMAP SEARCH criteria for the text query (every term must match).
+#[cfg(any(feature = "imap-runtime", test))]
 fn imap_search_criteria(query: &MailSearchQuery) -> (bool, String) {
     let key = match query.field {
         MailSearchField::All => "TEXT",
@@ -193,6 +195,7 @@ fn imap_search_criteria(query: &MailSearchQuery) -> (bool, String) {
     )
 }
 
+#[cfg(feature = "imap-runtime")]
 pub fn search_imap_messages<T: Read + Write>(
     session: &mut imap::Session<T>,
     request: &ImapSearchRequest,

@@ -1,4 +1,5 @@
 use super::planning::{plan_backfill, plan_fill_range, recent_window_start};
+#[cfg(feature = "imap-runtime")]
 use super::protocol::parse_examine_response;
 use crate::imap_folders::quote_imap_string;
 
@@ -84,6 +85,7 @@ fn recent_window_start_uses_newest_cached_uids() {
     assert_eq!(recent_window_start(&cached, 9, 3), 9);
 }
 
+#[cfg(feature = "imap-runtime")]
 #[test]
 fn parses_condstore_examine_response() {
     let raw = "* FLAGS (\\Answered \\Flagged \\Seen $Junk)\r\n\

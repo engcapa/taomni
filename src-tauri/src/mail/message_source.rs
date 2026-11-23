@@ -95,20 +95,22 @@ pub(super) async fn fetch_original_from_server(
         }
         return first;
     }
-    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let runtime = tokio::runtime::Handle::current();
-    let folder = folder.to_owned();
-    tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &runtime,
-            ImapSessionOpts::default(),
-            |imap| imap.fetch_raw(&folder, uid),
-        )
+    legacy_imap!({
+        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+        let runtime = tokio::runtime::Handle::current();
+        let folder = folder.to_owned();
+        tokio::task::spawn_blocking(move || {
+            with_imap_session(
+                &pool,
+                &account,
+                &runtime,
+                ImapSessionOpts::default(),
+                |imap| imap.fetch_raw(&folder, uid),
+            )
+        })
+        .await
+        .map_err(|error| format!("mail fetch raw task failed: {error}"))?
     })
-    .await
-    .map_err(|error| format!("mail fetch raw task failed: {error}"))?
 }
 
 fn publish_original(

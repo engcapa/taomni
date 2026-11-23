@@ -8,15 +8,19 @@
 use std::sync::Arc;
 
 use taomni_mail_api::RemoteDraftLocation;
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 use taomni_mail_engine::imap_outgoing::{store_remote_draft, store_sent_copy};
 use tauri::State;
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 pub(super) use taomni_mail_engine::imap_outgoing::imap_append;
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use super::{ActiveImapSession, ImapSessionOpts, MailImapPool, with_imap_session};
 use super::{
-    ActiveImapSession, ImapSessionOpts, MailAccountConfig, MailDraft, MailImapPool, MailProvider,
-    MailSendAttachment, MailSendRequest, MessageBuildOptions, ResolvedMailAccount,
-    build_send_message_with, draft_store, module_host, resolve_config, with_imap_session,
+    MailAccountConfig, MailDraft, MailProvider, MailSendAttachment, MailSendRequest,
+    MessageBuildOptions, ResolvedMailAccount, build_send_message_with, draft_store, module_host,
+    resolve_config,
 };
 use crate::state::AppState;
 
@@ -37,6 +41,7 @@ pub(super) fn new_message_id(email_address: &str) -> String {
     format!("<{}@{}>", uuid::Uuid::new_v4().simple(), domain)
 }
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 impl ActiveImapSession {
     pub(super) fn append(
         &mut self,
@@ -100,6 +105,7 @@ pub(super) fn prepare_send(
     Ok((message, pending))
 }
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 pub(super) fn store_pending_copy(
     pool: &MailImapPool,
     account: &ResolvedMailAccount,
@@ -209,40 +215,42 @@ pub async fn mail_store_remote_draft(
         )
         .await?
     } else {
-        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-        let handle = tokio::runtime::Handle::current();
-        tokio::task::spawn_blocking(move || {
-            let folder = account
-                .config
-                .special_folders
-                .get("drafts")
-                .map(String::as_str);
-            // A server can accept APPEND before its response reaches us.
-            let opts = ImapSessionOpts {
-                retry_on_error: false,
-                ..ImapSessionOpts::default()
-            };
-            with_imap_session(&pool, &account, &handle, opts, |imap| match imap {
-                ActiveImapSession::Plain { session, .. } => store_remote_draft(
-                    session,
-                    &account.config.session_id,
-                    folder,
-                    &bytes,
-                    &message_id,
-                    previous.as_ref(),
-                ),
-                ActiveImapSession::Tls { session, .. } => store_remote_draft(
-                    session,
-                    &account.config.session_id,
-                    folder,
-                    &bytes,
-                    &message_id,
-                    previous.as_ref(),
-                ),
+        legacy_imap!({
+            let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+            let handle = tokio::runtime::Handle::current();
+            tokio::task::spawn_blocking(move || {
+                let folder = account
+                    .config
+                    .special_folders
+                    .get("drafts")
+                    .map(String::as_str);
+                // A server can accept APPEND before its response reaches us.
+                let opts = ImapSessionOpts {
+                    retry_on_error: false,
+                    ..ImapSessionOpts::default()
+                };
+                with_imap_session(&pool, &account, &handle, opts, |imap| match imap {
+                    ActiveImapSession::Plain { session, .. } => store_remote_draft(
+                        session,
+                        &account.config.session_id,
+                        folder,
+                        &bytes,
+                        &message_id,
+                        previous.as_ref(),
+                    ),
+                    ActiveImapSession::Tls { session, .. } => store_remote_draft(
+                        session,
+                        &account.config.session_id,
+                        folder,
+                        &bytes,
+                        &message_id,
+                        previous.as_ref(),
+                    ),
+                })
             })
-        })
-        .await
-        .map_err(|error| format!("Mail draft task failed: {error}"))??
+            .await
+            .map_err(|error| format!("Mail draft task failed: {error}"))?
+        })?
     };
     let previous = draft.remote_location();
     draft_store::set_location(&state, &account_id, draft.id, previous, location)
@@ -274,19 +282,21 @@ pub async fn mail_discard_remote_draft(
     if module_host::discards_remote_drafts(&state.plugins) {
         module_host::discard_remote_draft(state.plugins.clone(), &account, location).await?;
     } else {
-        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-        let handle = tokio::runtime::Handle::current();
-        tokio::task::spawn_blocking(move || {
-            with_imap_session(
-                &pool,
-                &account,
-                &handle,
-                ImapSessionOpts::default(),
-                |imap| imap.delete_messages(&location.folder, &[location.uid], false),
-            )
-        })
-        .await
-        .map_err(|error| format!("Mail draft task failed: {error}"))??;
+        legacy_imap!({
+            let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+            let handle = tokio::runtime::Handle::current();
+            tokio::task::spawn_blocking(move || {
+                with_imap_session(
+                    &pool,
+                    &account,
+                    &handle,
+                    ImapSessionOpts::default(),
+                    |imap| imap.delete_messages(&location.folder, &[location.uid], false),
+                )
+            })
+            .await
+            .map_err(|error| format!("Mail draft task failed: {error}"))?
+        })?;
     }
     draft_store::set_location(&state, &account_id, draft_id, Some(previous), None).await?;
     Ok(true)

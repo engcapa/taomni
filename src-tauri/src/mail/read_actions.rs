@@ -3,11 +3,12 @@ use super::*;
 use crate::{plugin::PluginRegistry, state::MailDbHandle};
 use std::future::Future;
 
-use taomni_mail_api::ImapFlagUpdate;
-use taomni_mail_engine::imap_mutations::UID_BATCH_SIZE;
+use taomni_mail_api::{ImapFlagUpdate, imap_mutation::UID_BATCH_SIZE};
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 pub(super) use taomni_mail_engine::imap_mutations::unread_uids;
 
 pub(super) struct ReadFlagTransport {
+    #[cfg(any(test, feature = "legacy-mail-imap"))]
     pool: Arc<MailImapPool>,
     account: Arc<ResolvedMailAccount>,
     registry: Option<Arc<PluginRegistry>>,
@@ -15,11 +16,12 @@ pub(super) struct ReadFlagTransport {
 
 impl ReadFlagTransport {
     pub(super) fn new(
-        pool: Arc<MailImapPool>,
+        #[cfg(any(test, feature = "legacy-mail-imap"))] pool: Arc<MailImapPool>,
         account: ResolvedMailAccount,
         registry: Option<Arc<PluginRegistry>>,
     ) -> Self {
         Self {
+            #[cfg(any(test, feature = "legacy-mail-imap"))]
             pool,
             account: Arc::new(account),
             registry: registry.filter(|registry| {
@@ -35,9 +37,11 @@ impl ReadFlagTransport {
             })
             .await;
         }
-        let folder = folder.to_owned();
-        self.with_legacy(move |imap| imap.unread_uids(&folder))
-            .await
+        legacy_imap!({
+            let folder = folder.to_owned();
+            self.with_legacy(move |imap| imap.unread_uids(&folder))
+                .await
+        })
     }
 
     async fn mark_read(&self, folder: &str, uids: &[u32]) -> Result<(), String> {
@@ -53,12 +57,15 @@ impl ReadFlagTransport {
             })
             .await;
         }
-        let folder = folder.to_owned();
-        let uids = uids.to_vec();
-        self.with_legacy(move |imap| imap.mark_read(&folder, &uids).map(|_| ()))
-            .await
+        legacy_imap!({
+            let folder = folder.to_owned();
+            let uids = uids.to_vec();
+            self.with_legacy(move |imap| imap.mark_read(&folder, &uids).map(|_| ()))
+                .await
+        })
     }
 
+    #[cfg(any(test, feature = "legacy-mail-imap"))]
     async fn with_legacy<T: Send + 'static>(
         &self,
         run: impl FnMut(&mut ActiveImapSession) -> Result<T, String> + Send + 'static,

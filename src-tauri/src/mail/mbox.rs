@@ -16,15 +16,19 @@ use taomni_mail_api::{
     HOST_REQUEST_TIMEOUT, OPEN_IMAP_IMPORT,
     imap_exchange::{ImportMessage, MAX_IMPORT_FILE_BYTES},
 };
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use taomni_mail_engine::mbox::imap_export_folder;
 use taomni_mail_engine::mbox::{
-    imap_export_folder, is_mbox, mbox_separator, mboxrd_escape, normalize_crlf, split_mbox,
+    is_mbox, mbox_separator, mboxrd_escape, normalize_crlf, split_mbox,
 };
 use tauri::State;
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use super::{ActiveImapSession, ImapSessionOpts, with_imap_session};
 use super::{
-    ActiveImapSession, ImapSessionOpts, MailAccountConfig, ResolvedMailAccount,
+    MailAccountConfig, ResolvedMailAccount,
     module_host::{HostedImap, export_imap_mbox, exports_imap_mbox, imports_imap},
-    resolve_config, with_imap_session,
+    resolve_config,
 };
 use crate::plugin::PluginRegistry;
 use crate::state::AppState;
@@ -57,6 +61,7 @@ impl MailImportResult {
     }
 }
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 impl ActiveImapSession {
     fn export_folder<W: Write>(&mut self, folder: &str, out: &mut W) -> Result<usize, String> {
         match self {
@@ -105,32 +110,34 @@ pub async fn mail_export_mbox(
             count,
         });
     }
-    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    let target_for_task = target.clone();
-    let count = tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            ImapSessionOpts::default(),
-            |imap| {
-                // Recreated on a pooled-session retry so a partial file never stays.
-                let file = File::create(&target_for_task)
-                    .map_err(|e| format!("cannot create {}: {e}", target_for_task.display()))?;
-                let mut out = BufWriter::new(file);
-                let count = imap.export_folder(&folder, &mut out)?;
-                out.flush()
-                    .map_err(|e| format!("writing mbox failed: {e}"))?;
-                Ok(count)
-            },
-        )
-    })
-    .await
-    .map_err(|e| format!("mail export task failed: {e}"))??;
-    Ok(MailExportResult {
-        path: target.display().to_string(),
-        count,
+    legacy_imap!({
+        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+        let handle = tokio::runtime::Handle::current();
+        let target_for_task = target.clone();
+        let count = tokio::task::spawn_blocking(move || {
+            with_imap_session(
+                &pool,
+                &account,
+                &handle,
+                ImapSessionOpts::default(),
+                |imap| {
+                    // Recreated on a pooled-session retry so a partial file never stays.
+                    let file = File::create(&target_for_task)
+                        .map_err(|e| format!("cannot create {}: {e}", target_for_task.display()))?;
+                    let mut out = BufWriter::new(file);
+                    let count = imap.export_folder(&folder, &mut out)?;
+                    out.flush()
+                        .map_err(|e| format!("writing mbox failed: {e}"))?;
+                    Ok(count)
+                },
+            )
+        })
+        .await
+        .map_err(|e| format!("mail export task failed: {e}"))??;
+        Ok(MailExportResult {
+            path: target.display().to_string(),
+            count,
+        })
     })
 }
 
@@ -162,24 +169,26 @@ pub async fn mail_import_messages(
     if imports_imap(&state.plugins) {
         return Ok(import_hosted(state.plugins.clone(), &account, folder, messages).await);
     }
-    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        let mut result = MailImportResult::default();
-        for message in &messages {
-            let appended = with_imap_session(
-                &pool,
-                &account,
-                &handle,
-                ImapSessionOpts::default(),
-                |imap| imap.append(&folder, message, &["\\Seen"]),
-            );
-            result.record(appended);
-        }
-        result
+    legacy_imap!({
+        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::spawn_blocking(move || {
+            let mut result = MailImportResult::default();
+            for message in &messages {
+                let appended = with_imap_session(
+                    &pool,
+                    &account,
+                    &handle,
+                    ImapSessionOpts::default(),
+                    |imap| imap.append(&folder, message, &["\\Seen"]),
+                );
+                result.record(appended);
+            }
+            result
+        })
+        .await
+        .map_err(|e| format!("mail import task failed: {e}"))
     })
-    .await
-    .map_err(|e| format!("mail import task failed: {e}"))
 }
 
 fn read_import_file(source: &Path) -> Result<Vec<Vec<u8>>, String> {

@@ -9,7 +9,9 @@ use taomni_mail_api::{
 use taomni_plugin_stream::routed_tcp::Route;
 
 use super::{PluginRegistry, ResolvedMailAccount, invoke_with_incoming, supports};
-use crate::mail::{MailImapPool, outgoing::PendingSentCopy};
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use crate::mail::MailImapPool;
+use crate::mail::outgoing::PendingSentCopy;
 
 pub(in crate::mail) fn stores_remote_drafts(registry: &PluginRegistry) -> bool {
     supports(registry, STORE_IMAP_DRAFT)
@@ -21,17 +23,19 @@ pub(in crate::mail) fn discards_remote_drafts(registry: &PluginRegistry) -> bool
 
 pub(in crate::mail) async fn store_sent_copy(
     registry: Arc<PluginRegistry>,
-    pool: Arc<MailImapPool>,
+    #[cfg(any(test, feature = "legacy-mail-imap"))] pool: Arc<MailImapPool>,
     account: ResolvedMailAccount,
     pending: PendingSentCopy,
 ) -> Result<Option<String>, String> {
     if !supports(&registry, STORE_IMAP_SENT) {
-        let runtime = tokio::runtime::Handle::current();
-        return tokio::task::spawn_blocking(move || {
-            crate::mail::outgoing::store_pending_copy(&pool, &account, pending, &runtime)
-        })
-        .await
-        .map_err(|error| format!("Mail Sent copy task failed: {error}"))?;
+        return legacy_imap!({
+            let runtime = tokio::runtime::Handle::current();
+            tokio::task::spawn_blocking(move || {
+                crate::mail::outgoing::store_pending_copy(&pool, &account, pending, &runtime)
+            })
+            .await
+            .map_err(|error| format!("Mail Sent copy task failed: {error}"))?
+        });
     }
     let (_offer, mime) = match pending.copy {
         Some(bytes) => {

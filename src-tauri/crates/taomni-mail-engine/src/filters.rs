@@ -1,6 +1,7 @@
 //! Persisted mail filters and their rule evaluation.
 
 mod cache;
+#[cfg(feature = "imap-runtime")]
 pub mod imap;
 mod matching;
 mod model;

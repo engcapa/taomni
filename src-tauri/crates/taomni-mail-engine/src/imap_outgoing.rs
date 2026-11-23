@@ -1,14 +1,19 @@
 //! Mailbox selection and APPEND behavior shared by both IMAP adapters.
 
+#[cfg(feature = "imap-runtime")]
 use std::io::{Read, Write};
 
+#[cfg(feature = "imap-runtime")]
 use taomni_mail_api::{ImapFolderChange, RemoteDraftLocation};
 
+#[cfg(feature = "imap-runtime")]
 use crate::{
-    MailFolder, clean_message_id,
+    clean_message_id,
     imap_folders::{imap_change_folder, imap_list_folders, quote_imap_string},
     imap_mutations::imap_delete_messages,
 };
+
+use crate::MailFolder;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpecialFolder {
@@ -41,6 +46,7 @@ impl SpecialFolder {
         }
     }
 
+    #[cfg(feature = "imap-runtime")]
     fn create_name(self) -> &'static str {
         match self {
             Self::Sent => "Sent",
@@ -86,6 +92,7 @@ pub fn special_folder_name(
     None
 }
 
+#[cfg(feature = "imap-runtime")]
 pub fn imap_append<T: Read + Write>(
     session: &mut imap::Session<T>,
     folder: &str,
@@ -101,6 +108,7 @@ pub fn imap_append<T: Read + Write>(
         .map_err(|error| format!("IMAP APPEND {folder} failed: {error}"))
 }
 
+#[cfg(feature = "imap-runtime")]
 pub fn store_sent_copy<T: Read + Write>(
     session: &mut imap::Session<T>,
     account_id: &str,
@@ -123,6 +131,7 @@ pub fn store_sent_copy<T: Read + Write>(
     Ok(sent_folder)
 }
 
+#[cfg(feature = "imap-runtime")]
 pub fn store_remote_draft<T: Read + Write>(
     session: &mut imap::Session<T>,
     account_id: &str,
@@ -149,6 +158,7 @@ pub fn store_remote_draft<T: Read + Write>(
     Ok(Some(RemoteDraftLocation { folder, uid }))
 }
 
+#[cfg(feature = "imap-runtime")]
 fn ensure_folder<T: Read + Write>(
     session: &mut imap::Session<T>,
     account_id: &str,
@@ -164,6 +174,7 @@ fn ensure_folder<T: Read + Write>(
     Ok(name)
 }
 
+#[cfg(feature = "imap-runtime")]
 pub fn uid_by_message_id<T: Read + Write>(
     session: &mut imap::Session<T>,
     folder: &str,

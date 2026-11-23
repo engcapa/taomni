@@ -412,25 +412,6 @@ pub(super) fn network_fingerprint(network: Option<&NetworkSettings>) -> String {
     )
 }
 
-pub(super) fn is_imap_transport_error(message: &str) -> bool {
-    let message = message.to_ascii_lowercase();
-    message.contains("connection")
-        || message.contains("broken pipe")
-        || message.contains("reset")
-        || message.contains("timed out")
-        || message.contains("timeout")
-        || message.contains("eof")
-        || message.contains("not connected")
-        || message.contains("noop failed")
-        || message.contains("tls")
-        || message.contains("i/o")
-        || message.contains("io error")
-        || message.contains("protocol desync")
-        || message.contains("desync")
-}
-
-pub(super) use taomni_mail_engine::imap_transport::imap_catch_result;
-
 /// Checkout or connect an IMAP session, run `f`, then return the session to
 /// the pool on success (unless `force_fresh`).
 ///

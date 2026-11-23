@@ -18,6 +18,24 @@ def entry(ids, mode='native', platform='windows'):
 
 
 class ShardingTests(unittest.TestCase):
+    def test_selected_signed_mail_has_its_own_build_and_retains_legacy_crash_case(self):
+        ids = ['attachment-crash', 'prepare', 'signed-mail']
+        base = entry(ids)
+        base['capabilities'] += ['signed-mail', 'legacy-mail-imap']
+        fixtures = {'attachment-crash': ['file_open_mail'], 'signed-mail': ['module_signed_mail_archive']}
+        shards, groups, builds = schedule(
+            [base], cases(ids, fixtures), {'signed-mail': ['prepare']},
+            scope='selected', shards='1', costs={},
+        )
+        legacy, signed = shards
+        self.assertEqual(legacy['selected_ids'], ['attachment-crash'])
+        self.assertEqual(signed['selected_ids'], ['prepare', 'signed-mail'])
+        self.assertNotEqual(legacy['build_id'], signed['build_id'])
+        self.assertIn('legacy-mail-imap', builds[0]['capabilities'])
+        self.assertIn('signed-mail', builds[1]['capabilities'])
+        self.assertNotIn('legacy-mail-imap', builds[1]['capabilities'])
+        validate_partition(groups, shards)
+
     def test_linux_profiles_share_release_baseline_and_keep_execution_identity(self):
         from qa_ui_auto.linux_profiles import LINUX_PROFILES
         entries = []

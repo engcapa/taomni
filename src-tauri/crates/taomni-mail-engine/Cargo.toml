@@ -7,6 +7,8 @@ publish = false
 description = "Mail message parsing and data contracts independent of desktop runtime"
 
 [features]
+default = ["imap-runtime"]
+imap-runtime = ["dep:imap", "dep:imap-proto"]
 legacy-smtp = ["lettre/hostname", "lettre/native-tls", "lettre/pool", "lettre/smtp-transport"]
 routed-smtp = ["lettre/hostname", "lettre/smtp-transport", "lettre/tokio1-native-tls", "dep:tokio", "dep:tokio-native-tls"]
 
@@ -15,8 +17,8 @@ base64 = "0.22"
 chrono = "0.4"
 flate2 = "1"
 hex = "0.4"
-imap = { version = "2.4.1", features = ["tls"], default-features = false }
-imap-proto = "=0.10.2"
+imap = { version = "2.4.1", features = ["tls"], default-features = false, optional = true }
+imap-proto = { version = "=0.10.2", optional = true }
 lettre = { version = "0.11.22", default-features = false, features = ["builder"] }
 mail-parser = { version = "0.11.4", features = ["full_encoding"] }
 md-5 = "0.11"

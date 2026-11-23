@@ -13,13 +13,19 @@ pub mod draft_import;
 pub mod drafts;
 pub mod filters;
 pub mod imap_auth;
+pub mod imap_errors;
 pub mod imap_folders;
+#[cfg(feature = "imap-runtime")]
 pub mod imap_idle;
+#[cfg(feature = "imap-runtime")]
 pub mod imap_messages;
+#[cfg(feature = "imap-runtime")]
 pub mod imap_mutations;
 pub mod imap_outgoing;
+#[cfg(feature = "imap-runtime")]
 pub mod imap_parts;
 pub mod imap_sync;
+#[cfg(feature = "imap-runtime")]
 pub mod imap_transport;
 mod inline_images;
 mod lists;
@@ -29,6 +35,7 @@ mod mime;
 pub mod mime_sections;
 mod models;
 pub mod mutation_journal;
+#[cfg(feature = "imap-runtime")]
 pub mod mutation_transport;
 pub mod pop3;
 pub mod responses;

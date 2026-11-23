@@ -1,5 +1,6 @@
 //! mboxrd and RFC 5322 byte transformations shared by Mail import and export.
 
+#[cfg(feature = "imap-runtime")]
 use std::io::{Read, Write};
 
 /// `From - Tue Sep 30 03:38:00 2026` (asctime, UTC).
@@ -94,8 +95,10 @@ pub fn normalize_crlf(raw: &[u8]) -> Vec<u8> {
     out
 }
 
+#[cfg(feature = "imap-runtime")]
 const EXPORT_CHUNK: usize = 50;
 
+#[cfg(feature = "imap-runtime")]
 pub fn imap_export_folder<T: Read + Write, W: Write>(
     session: &mut imap::Session<T>,
     folder: &str,

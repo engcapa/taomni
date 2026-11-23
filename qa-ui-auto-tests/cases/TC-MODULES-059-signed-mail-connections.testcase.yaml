@@ -6,7 +6,7 @@ description: >-
   update message flags, view and save the original of an unarchived message, and send
   messages from IMAP and POP3 accounts. Check the installed renderer,
   connection tests, SMTP delivery, IMAP Sent copies, remote draft cleanup,
-  and the signed host's data lease through disable.
+  and the signed host's data lease through disable and re-enable.
 covers: [F-Modules-1, F-MAIL-3, F-MAIL-6, F-MAIL-7, F-MAIL-11, F-MAIL-12, F-MAIL-15, F-MAIL-17, F-MAIL-23, F-FILEOPEN-1]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
@@ -199,6 +199,16 @@ steps:
 - assert_count: {selector: '[data-testid="mail-test-connection"]', equal: 0}
 - assert_count: {selector: '[data-testid="mail-compose-open"]', equal: 0}
 - assert_no_runtime_errors: null
+- mail_server_deliver: {count: 1, prefix: After Mail re-enable}
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="tab-item"]:nth-child(1 of [data-tab-type="mail"])'
+- wait_for: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- wait_for: {selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-message-row"][data-subject="After Mail re-enable 0001"]', timeout_sec: 40}
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 25}
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 2}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -334,6 +344,16 @@ verification:
     - {step: 144, expectation: The server no longer lists the discarded draft.}
     - {step: 145, expectation: The deleted draft leaves the local list.}
     results: [123, 137, 144, 145]
+  - id: R14
+    requirement: Re-enabling Mail resumes IMAP sync in the retained account tab and receives messages that arrived while the module was disabled.
+    actions: [173, 174, 176, 178]
+    checkpoints:
+    - {step: 175, expectation: The module store reports Mail enabled.}
+    - {step: 179, expectation: The retained IMAP account displays the new header.}
+    - {step: 180, expectation: The active account shows the same messages as the live INBOX.}
+    - {step: 181, expectation: Both existing account tabs remain open.}
+    - {step: 182, expectation: Re-enabling produces no runtime errors.}
+    results: [175, 179, 180, 181, 182]
   visual:
   - check: The Mail pane shows the connection results for both accounts.
     method: automated

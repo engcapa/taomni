@@ -1,17 +1,19 @@
 //! Desktop search commands for the account cache and the authorized IMAP route.
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 use std::sync::Arc;
 
 use taomni_mail_api::{message::MailMessageHeader, search::ImapSearchRequest};
-use taomni_mail_engine::search::{search_cached_messages, search_imap_messages};
+use taomni_mail_engine::search::search_cached_messages;
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use taomni_mail_engine::search::search_imap_messages;
 use tauri::State;
 
 pub use taomni_mail_api::search::{MailSearchField, MailSearchQuery};
 
-use super::{
-    ActiveImapSession, ImapSessionOpts, MailAccountConfig, module_host, resolve_config,
-    with_imap_session, with_mail_db_async,
-};
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use super::{ActiveImapSession, ImapSessionOpts, with_imap_session};
+use super::{MailAccountConfig, module_host, resolve_config, with_mail_db_async};
 use crate::state::AppState;
 
 /// Search the local index (headers of every cached message, bodies that are
@@ -57,20 +59,26 @@ pub async fn mail_search_server(
     if module_host::searches_imap(&state.plugins) {
         return module_host::search_imap(state.plugins.clone(), &account, &request).await;
     }
-    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            ImapSessionOpts::default(),
-            |imap| match imap {
-                ActiveImapSession::Tls { session, .. } => search_imap_messages(session, &request),
-                ActiveImapSession::Plain { session, .. } => search_imap_messages(session, &request),
-            },
-        )
+    legacy_imap!({
+        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::spawn_blocking(move || {
+            with_imap_session(
+                &pool,
+                &account,
+                &handle,
+                ImapSessionOpts::default(),
+                |imap| match imap {
+                    ActiveImapSession::Tls { session, .. } => {
+                        search_imap_messages(session, &request)
+                    }
+                    ActiveImapSession::Plain { session, .. } => {
+                        search_imap_messages(session, &request)
+                    }
+                },
+            )
+        })
+        .await
+        .map_err(|e| format!("mail search task failed: {e}"))?
     })
-    .await
-    .map_err(|e| format!("mail search task failed: {e}"))?
 }

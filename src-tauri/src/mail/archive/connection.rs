@@ -5,14 +5,18 @@ use std::{future::Future, time::Duration};
 use taomni_mail_api::{HOST_REQUEST_TIMEOUT, OPEN_IMAP_ARCHIVE};
 use taomni_mail_engine::{
     MailFolder,
-    archive::{ArchiveQuery, fetch_imap_chunk, scanner::ArchiveConnection},
+    archive::{ArchiveQuery, scanner::ArchiveConnection},
     imap_sync::{FolderStepOutcome, FolderSyncState, HeaderStepRequest, StepParams},
 };
 use tokio::runtime::Handle;
 
 use super::lifetime::ArchiveJob;
-use crate::mail::{ActiveImapSession, ResolvedMailAccount, module_host::HostedImap};
+use crate::mail::{ResolvedMailAccount, module_host::HostedImap};
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use crate::mail::ActiveImapSession;
+
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 impl ArchiveConnection for ActiveImapSession {
     fn list(&mut self, account_id: &str) -> Result<Vec<MailFolder>, String> {
         self.list_folders(account_id)
@@ -47,6 +51,7 @@ impl ArchiveConnection for ActiveImapSession {
         uid: u32,
         offset: u64,
     ) -> Result<(u32, u64, Vec<u8>), String> {
+        use taomni_mail_engine::archive::fetch_imap_chunk;
         match self {
             Self::Tls { session, .. } => fetch_imap_chunk(session, folder, uid, offset),
             Self::Plain { session, .. } => fetch_imap_chunk(session, folder, uid, offset),

@@ -86,26 +86,28 @@ async fn change_folder(
     let folders = if module_host::changes_imap_folders(&state.plugins) {
         module_host::change_imap_folder(state.plugins.clone(), &account, change).await?
     } else {
-        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-        let runtime = tokio::runtime::Handle::current();
-        tokio::task::spawn_blocking(move || {
-            with_imap_session(
-                &pool,
-                &account,
-                &runtime,
-                // A disconnect during LIST may follow a successful mutation.
-                ImapSessionOpts {
-                    retry_on_error: false,
-                    ..Default::default()
-                },
-                |imap| {
-                    imap.change_folder(&change)?;
-                    imap.list_folders(&account.config.session_id)
-                },
-            )
-        })
-        .await
-        .map_err(|error| format!("mail folder update task failed: {error}"))??
+        legacy_imap!({
+            let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+            let runtime = tokio::runtime::Handle::current();
+            tokio::task::spawn_blocking(move || {
+                with_imap_session(
+                    &pool,
+                    &account,
+                    &runtime,
+                    // A disconnect during LIST may follow a successful mutation.
+                    ImapSessionOpts {
+                        retry_on_error: false,
+                        ..Default::default()
+                    },
+                    |imap| {
+                        imap.change_folder(&change)?;
+                        imap.list_folders(&account.config.session_id)
+                    },
+                )
+            })
+            .await
+            .map_err(|error| format!("mail folder update task failed: {error}"))?
+        })?
     };
     if folders.iter().any(|folder| folder.account_id != account_id) {
         return Err("Mail module returned folders for a different account".into());

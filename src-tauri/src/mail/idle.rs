@@ -8,6 +8,7 @@
 //! Stopping shuts the socket down so a blocked IDLE wait returns at once.
 
 use std::collections::HashMap;
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 use std::net::{Shutdown, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -15,14 +16,17 @@ use std::time::Duration;
 
 use serde::Serialize;
 use taomni_mail_api::imap_exchange::ImapIdleNotice;
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 use taomni_mail_engine::imap_idle as engine;
 use taomni_plugin_stream::CancellationToken;
 use tauri::{AppHandle, Emitter, State};
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use super::{ActiveImapSession, connect_imap_with_socket, retire_imap_session};
 use super::{
-    ActiveImapSession, MailAccountConfig, ResolvedMailAccount, connect_imap_with_socket,
+    MailAccountConfig, ResolvedMailAccount,
     module_host::imap_idle::{HostedIdle, available},
-    resolve_config, retire_imap_session,
+    resolve_config,
 };
 use crate::plugin::PluginRegistry;
 use crate::state::AppState;
@@ -45,6 +49,7 @@ struct Watcher {
     folder: String,
     stop: Arc<AtomicBool>,
     cancel: CancellationToken,
+    #[cfg(any(test, feature = "legacy-mail-imap"))]
     socket: Arc<Mutex<Option<TcpStream>>>,
 }
 
@@ -52,6 +57,7 @@ impl Watcher {
     fn shutdown(&self) {
         self.stop.store(true, Ordering::SeqCst);
         self.cancel.cancel();
+        #[cfg(any(test, feature = "legacy-mail-imap"))]
         if let Ok(mut socket) = self.socket.lock() {
             if let Some(socket) = socket.take() {
                 let _ = socket.shutdown(Shutdown::Both);
@@ -65,6 +71,7 @@ fn watchers() -> &'static Mutex<HashMap<String, Watcher>> {
     WATCHERS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 impl ActiveImapSession {
     fn prepare_idle(&mut self, folder: &str) -> Result<bool, String> {
         match self {
@@ -93,6 +100,7 @@ fn emit(app: &AppHandle, account_id: &str, folder: &str, kind: &str, error: Opti
     );
 }
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 fn run_watcher(
     app: AppHandle,
     account: ResolvedMailAccount,
@@ -173,6 +181,7 @@ fn run_watcher(
 }
 
 /// Sleep before reconnecting; false when stopped or out of attempts.
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 fn backoff(stop: &AtomicBool, failures: &mut usize) -> bool {
     let Some(delay) = RECONNECT_DELAYS_SECS.get(*failures).copied() else {
         return false;
@@ -277,6 +286,7 @@ pub async fn mail_idle_start(
         }
         let stop = Arc::new(AtomicBool::new(false));
         let cancel = CancellationToken::new();
+        #[cfg(any(test, feature = "legacy-mail-imap"))]
         let socket = Arc::new(Mutex::new(None));
         map.insert(
             account_id.clone(),
@@ -284,6 +294,7 @@ pub async fn mail_idle_start(
                 folder: folder.clone(),
                 stop: Arc::clone(&stop),
                 cancel: cancel.clone(),
+                #[cfg(any(test, feature = "legacy-mail-imap"))]
                 socket: Arc::clone(&socket),
             },
         );
@@ -295,18 +306,22 @@ pub async fn mail_idle_start(
             });
             return Ok(true);
         }
-        let runtime = tokio::runtime::Handle::current();
-        let thread_account_id = account_id.clone();
-        let started = std::thread::Builder::new()
-            .name(format!("mail-idle-{account_id}"))
-            .spawn(move || {
-                run_watcher(app, account, runtime, folder, Arc::clone(&stop), socket);
-                remove_watcher(&thread_account_id, &stop);
-            });
-        if let Err(error) = started {
+        let started: Result<(), String> = legacy_imap!({
+            let runtime = tokio::runtime::Handle::current();
+            let thread_account_id = account_id.clone();
+            std::thread::Builder::new()
+                .name(format!("mail-idle-{account_id}"))
+                .spawn(move || {
+                    run_watcher(app, account, runtime, folder, Arc::clone(&stop), socket);
+                    remove_watcher(&thread_account_id, &stop);
+                })
+                .map(|_| ())
+                .map_err(|error| format!("failed to start mail IDLE thread: {error}"))
+        });
+        if started.is_err() {
             map.remove(&account_id);
-            return Err(format!("failed to start mail IDLE thread: {error}"));
         }
+        started?;
     }
     Ok(true)
 }

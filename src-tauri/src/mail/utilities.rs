@@ -1,5 +1,5 @@
 use super::message_model::MailFolder;
-use crate::mail::imap_messages::merge_selected_folder;
+use crate::mail::folders::merge_selected_folder;
 pub(super) use taomni_mail_engine::now_ts;
 
 /// Whether header sync should issue a remote IMAP LIST.

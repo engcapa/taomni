@@ -65,7 +65,7 @@ pub async fn mail_sync_headers(
             first?
         }
     } else {
-        sync_legacy_imap_page(&state, account, page, include_bodies).await?
+        legacy_imap!({ sync_legacy_imap_page(&state, account, page, include_bodies).await })?
     };
 
     let HeaderPageOutcome {
@@ -120,6 +120,7 @@ pub async fn mail_sync_headers(
     })
 }
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 async fn sync_legacy_imap_page(
     state: &AppState,
     account: ResolvedMailAccount,
@@ -237,26 +238,28 @@ pub async fn mail_sync_folder(
             first
         }
     } else {
-        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-        let handle = tokio::runtime::Handle::current();
-        let step_folder = folder.clone();
-        tokio::task::spawn_blocking(move || {
-            with_imap_session(
-                &pool,
-                &account,
-                &handle,
-                ImapSessionOpts::background(),
-                |imap| {
-                    let params = StepParams {
-                        condstore: imap.has_capability("CONDSTORE"),
-                        ..params
-                    };
-                    imap.sync_folder_step(&account, &step_folder, &sync_state, &params)
-                },
-            )
+        legacy_imap!({
+            let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+            let handle = tokio::runtime::Handle::current();
+            let step_folder = folder.clone();
+            tokio::task::spawn_blocking(move || {
+                with_imap_session(
+                    &pool,
+                    &account,
+                    &handle,
+                    ImapSessionOpts::background(),
+                    |imap| {
+                        let params = StepParams {
+                            condstore: imap.has_capability("CONDSTORE"),
+                            ..params
+                        };
+                        imap.sync_folder_step(&account, &step_folder, &sync_state, &params)
+                    },
+                )
+            })
+            .await
+            .map_err(|e| format!("mail sync task failed: {e}"))?
         })
-        .await
-        .map_err(|e| format!("mail sync task failed: {e}"))?
     };
 
     let mut outcome = match result {
@@ -314,13 +317,7 @@ pub async fn mail_sync_all_folders(
         MailSyncRequestMode::Reconcile
     };
     let skip_unchanged = cache_enabled && reconcile_mode == MailSyncRequestMode::Reconcile;
-    let listed = folders::live_imap_folder_tree(
-        &state,
-        account.clone(),
-        None,
-        ImapSessionOpts::background(),
-    )
-    .await?;
+    let listed = folders::live_imap_folder_tree(&state, account.clone(), None, true).await?;
     if cache_enabled {
         let tree = listed.clone();
         with_mail_db_async(&state, &account_id, move |db, account_id| {
@@ -465,20 +462,22 @@ async fn sync_account_folder(
         }
         return first;
     }
-    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    let account = account.clone();
-    tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            ImapSessionOpts::background(),
-            |imap| imap.sync_folder_round(&account, &request, include_bodies),
-        )
+    legacy_imap!({
+        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+        let handle = tokio::runtime::Handle::current();
+        let account = account.clone();
+        tokio::task::spawn_blocking(move || {
+            with_imap_session(
+                &pool,
+                &account,
+                &handle,
+                ImapSessionOpts::background(),
+                |imap| imap.sync_folder_round(&account, &request, include_bodies),
+            )
+        })
+        .await
+        .map_err(|error| format!("mail folder sync task failed: {error}"))?
     })
-    .await
-    .map_err(|error| format!("mail folder sync task failed: {error}"))?
 }
 
 pub(super) fn folder_is_noselect(folder: &MailFolder) -> bool {

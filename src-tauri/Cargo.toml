@@ -201,10 +201,10 @@ flate2 = "1"
 zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2"] }
 tungstenite = "0.29"
 tokio-tungstenite = { version = "0.29", features = ["rustls-tls-native-roots"] }
-imap = "2.4.1"
+imap = { version = "2.4.1", optional = true }
 taomni-mail-api = { path = "crates/taomni-mail-api" }
 taomni-sockscap-api = { path = "crates/taomni-sockscap-api" }
-taomni-mail-engine = { path = "crates/taomni-mail-engine" }
+taomni-mail-engine = { path = "crates/taomni-mail-engine", default-features = false }
 native-tls = "0.2"
 tokio-native-tls = "0.3"
 # `qoi`/`qoiz` must stay enabled together with `session`: the server's default
@@ -332,6 +332,7 @@ legacy-rdp-server = ["dep:taomni-rdp-server-engine", "rdp-server-audio"]
 legacy-local-servers = ["dep:taomni-local-servers-engine"]
 legacy-screenshot-media = ["dep:taomni-screenshot-ocr", "dep:taomni-screenshot-recording"]
 legacy-mfa = ["dep:taomni-mfa-engine"]
+legacy-mail-imap = ["dep:imap", "taomni-mail-engine/imap-runtime"]
 legacy-mail-smtp = ["taomni-mail-engine/legacy-smtp"]
 # Dedicated hosted test harness: use the production pinned key on every thread
 # instead of the normal unit-fixture key. Production verification is unchanged.
@@ -446,6 +447,8 @@ webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 gtk = "0.18.2"
 
 [dev-dependencies]
+imap = "2.4.1"
+taomni-mail-engine = { path = "crates/taomni-mail-engine", features = ["imap-runtime"], default-features = false }
 taomni-mfa-engine = { path = "crates/taomni-mfa-engine" }
 # Cargo enables the helper when building integration tests. Tauri enumerates
 # only enabled binary targets when it assembles a desktop installer.

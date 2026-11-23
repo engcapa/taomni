@@ -13,17 +13,18 @@ use std::collections::HashMap;
 use taomni_mail_api::FolderSubscription;
 use tauri::State;
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use super::{ImapSessionOpts, with_imap_session};
 use super::{
-    ImapSessionOpts, MailAccountConfig, MailFolder, ResolvedMailAccount, module_host,
-    resolve_config, with_imap_session, with_mail_db,
+    MailAccountConfig, MailFolder, ResolvedMailAccount, module_host, resolve_config, with_mail_db,
 };
 use crate::state::AppState;
 
 #[cfg(test)]
 use taomni_mail_engine::imap_folders::imap_list_folders;
-pub(super) use taomni_mail_engine::imap_folders::{
-    SUBSCRIBED_ATTRIBUTE, folder_visible, imap_set_subscription,
-};
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+pub(super) use taomni_mail_engine::imap_folders::imap_set_subscription;
+pub(super) use taomni_mail_engine::imap_folders::{SUBSCRIBED_ATTRIBUTE, folder_visible};
 
 #[cfg(test)]
 use taomni_mail_engine::{
@@ -35,6 +36,14 @@ pub(super) fn merge_folder_status(previous: &MailFolder, mut status: MailFolder)
     status.flags.clone_from(&previous.flags);
     status.delimiter.clone_from(&previous.delimiter);
     status
+}
+
+pub(super) fn merge_selected_folder(folders: &mut Vec<MailFolder>, selected: MailFolder) {
+    if let Some(existing) = folders.iter_mut().find(|f| f.name == selected.name) {
+        *existing = merge_folder_status(existing, selected);
+    } else {
+        folders.push(selected);
+    }
 }
 
 /// LIST (+LSUB) the remote folder tree without syncing messages, so a new
@@ -50,7 +59,7 @@ pub async fn mail_list_folders(
     let account = resolve_config(&state, config)?;
     let account_id = account.config.session_id.clone();
     let cache_enabled = account.config.cache.enabled;
-    let listed = live_imap_folder_tree(&state, account, None, ImapSessionOpts::default()).await?;
+    let listed = live_imap_folder_tree(&state, account, None, false).await?;
     if !cache_enabled {
         return Ok(listed);
     }
@@ -76,8 +85,7 @@ pub async fn mail_set_folder_subscription(
     let account_id = account.config.session_id.clone();
     let cache_enabled = account.config.cache.enabled;
     let change = FolderSubscription { folder, subscribed };
-    let listed =
-        live_imap_folder_tree(&state, account, Some(change), ImapSessionOpts::default()).await?;
+    let listed = live_imap_folder_tree(&state, account, Some(change), false).await?;
     if !cache_enabled {
         return Ok(listed);
     }
@@ -101,23 +109,31 @@ pub(super) async fn live_imap_folder_tree(
     state: &State<'_, AppState>,
     account: ResolvedMailAccount,
     subscription: Option<FolderSubscription>,
-    options: ImapSessionOpts,
+    #[cfg_attr(not(any(test, feature = "legacy-mail-imap")), allow(unused_variables))]
+    background: bool,
 ) -> Result<Vec<MailFolder>, String> {
     if module_host::manages_imap_folders(&state.plugins) {
         return module_host::imap_folder_tree(state.plugins.clone(), &account, subscription).await;
     }
-    let pool = std::sync::Arc::clone(&state.legacy.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        with_imap_session(&pool, &account, &handle, options, |imap| {
-            if let Some(change) = &subscription {
-                imap.set_subscription(&change.folder, change.subscribed)?;
-            }
-            imap.list_folders(&account.config.session_id)
+    legacy_imap!({
+        let pool = std::sync::Arc::clone(&state.legacy.mail.mail_imap_pool);
+        let options = if background {
+            ImapSessionOpts::background()
+        } else {
+            ImapSessionOpts::default()
+        };
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::spawn_blocking(move || {
+            with_imap_session(&pool, &account, &handle, options, |imap| {
+                if let Some(change) = &subscription {
+                    imap.set_subscription(&change.folder, change.subscribed)?;
+                }
+                imap.list_folders(&account.config.session_id)
+            })
         })
+        .await
+        .map_err(|error| format!("mail folder tree task failed: {error}"))?
     })
-    .await
-    .map_err(|error| format!("mail folder tree task failed: {error}"))?
 }
 
 #[cfg(test)]

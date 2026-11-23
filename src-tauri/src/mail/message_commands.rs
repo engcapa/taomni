@@ -12,25 +12,27 @@ pub async fn mail_test_connection(
     let folder_count = if module_host::checks_incoming(&state.plugins) {
         module_host::check_incoming(state.plugins.clone(), &account).await?
     } else {
-        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-        let handle = tokio::runtime::Handle::current();
-        let incoming = account.clone();
-        tokio::task::spawn_blocking(move || {
-            with_imap_session(
-                &pool,
-                &incoming,
-                &handle,
-                ImapSessionOpts {
-                    force_fresh: true,
-                    retry_on_error: false,
-                    ..ImapSessionOpts::default()
-                },
-                |imap| imap.list_folders(&incoming.config.session_id),
-            )
-            .map(|folders| folders.len())
-        })
-        .await
-        .map_err(|error| format!("mail test task failed: {error}"))??
+        legacy_imap!({
+            let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+            let handle = tokio::runtime::Handle::current();
+            let incoming = account.clone();
+            tokio::task::spawn_blocking(move || {
+                with_imap_session(
+                    &pool,
+                    &incoming,
+                    &handle,
+                    ImapSessionOpts {
+                        force_fresh: true,
+                        retry_on_error: false,
+                        ..ImapSessionOpts::default()
+                    },
+                    |imap| imap.list_folders(&incoming.config.session_id),
+                )
+                .map(|folders| folders.len())
+            })
+            .await
+            .map_err(|error| format!("mail test task failed: {error}"))?
+        })?
     };
     module_host::test_smtp(state.plugins.clone(), &account).await?;
     Ok(MailTestConnectionResult {
@@ -102,6 +104,7 @@ pub(super) async fn send_message(
         None => None,
     };
     let db = state.mail_db(&account_id)?;
+    #[cfg(any(test, feature = "legacy-mail-imap"))]
     let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
     let (message, pending, account) = tokio::task::spawn_blocking(move || {
         let (message, pending) = outgoing::prepare_send(&account, &request, remote_draft)?;
@@ -135,7 +138,14 @@ pub(super) async fn send_message(
                 tracing::warn!(%account_id, %error, "mail sent; contact cache update failed");
             }
             if let Some(pending) = pending {
-                let stored = module_host::store_sent_copy(registry, pool, account, pending).await;
+                let stored = module_host::store_sent_copy(
+                    registry,
+                    #[cfg(any(test, feature = "legacy-mail-imap"))]
+                    pool,
+                    account,
+                    pending,
+                )
+                .await;
                 let (folder, error) = match stored {
                     Ok(folder) => (folder, None),
                     Err(error) => (None, Some(error)),

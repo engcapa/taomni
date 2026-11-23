@@ -2,7 +2,6 @@
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use imap::{Client, Session};
 use native_tls::TlsStream;
@@ -39,13 +38,7 @@ pub enum ImapSession {
     Tls(Session<TlsStream<TcpStream>>),
 }
 
-/// Discard a session after the IMAP library detects an out-of-sequence reply.
-pub fn imap_catch_result<T>(work: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
-    match catch_unwind(AssertUnwindSafe(work)) {
-        Ok(result) => result,
-        Err(_) => Err("IMAP protocol desync".into()),
-    }
-}
+pub use crate::imap_errors::imap_catch_result;
 
 impl ImapSession {
     pub fn append_imported(&mut self, folder: &str, bytes: &[u8]) -> Result<(), String> {

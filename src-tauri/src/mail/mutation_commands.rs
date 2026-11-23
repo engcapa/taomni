@@ -25,6 +25,7 @@ pub async fn mail_mark_read(
     let account = resolve_config(&state, config)?;
     let db = state.mail_db(&account.config.session_id)?;
     let transport = read_actions::ReadFlagTransport::new(
+        #[cfg(any(test, feature = "legacy-mail-imap"))]
         state.legacy.mail.mail_imap_pool.clone(),
         account,
         Some(state.plugins.clone()),
@@ -49,6 +50,7 @@ pub async fn mail_clear_cache(
     })? {
         return Err("This POP3 account keeps its mail only on this computer; clearing the cache would delete it.".into());
     }
+    #[cfg(any(test, feature = "legacy-mail-imap"))]
     state.legacy.mail.mail_imap_pool.invalidate(&account_id);
     with_mail_db(&state, &account_id, |db| {
         db.execute(
@@ -104,20 +106,24 @@ pub async fn mail_set_flags(
     if module_host::sets_imap_flags(&state.plugins) {
         module_host::set_imap_flags(state.plugins.clone(), &account, &update).await?;
     } else {
-        let update = update.clone();
-        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
-        let handle = tokio::runtime::Handle::current();
-        tokio::task::spawn_blocking(move || {
-            with_imap_session(
-                &pool,
-                &account,
-                &handle,
-                ImapSessionOpts::default(),
-                |imap| imap.set_flags(&update.folder, &update.uids, &update.add, &update.remove),
-            )
-        })
-        .await
-        .map_err(|e| format!("mail set flags task failed: {e}"))??;
+        legacy_imap!({
+            let update = update.clone();
+            let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+            let handle = tokio::runtime::Handle::current();
+            tokio::task::spawn_blocking(move || {
+                with_imap_session(
+                    &pool,
+                    &account,
+                    &handle,
+                    ImapSessionOpts::default(),
+                    |imap| {
+                        imap.set_flags(&update.folder, &update.uids, &update.add, &update.remove)
+                    },
+                )
+            })
+            .await
+            .map_err(|e| format!("mail set flags task failed: {e}"))?
+        })?;
     }
 
     let updated = update.uids.len();
@@ -287,12 +293,14 @@ pub(super) async fn run_mail_mutation(
 ) -> Result<mutations::Progress, String> {
     let account = resolve_config(&state, config)?;
     let db = state.mail_db(&account.config.session_id)?;
+    #[cfg(any(test, feature = "legacy-mail-imap"))]
     let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
     let gate = state.legacy.mail.mutation_gate(&account.config.session_id);
     let registry = state.plugins.clone();
     let runtime = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
         mutations::run_cached(
+            #[cfg(any(test, feature = "legacy-mail-imap"))]
             &pool,
             &gate,
             &account,

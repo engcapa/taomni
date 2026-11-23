@@ -11,8 +11,28 @@
 //! onto a plain OS thread when a Tokio runtime is already current, to avoid
 //! nested-runtime drop panics in debug builds.
 
+#[cfg(not(any(test, feature = "legacy-mail-imap")))]
+const SIGNED_IMAP_REQUIRED: &str =
+    "Install or update the Mail module and enable it to connect to this mailbox";
+
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+macro_rules! legacy_imap {
+    ($operation:block) => {
+        $operation
+    };
+}
+
+#[cfg(not(any(test, feature = "legacy-mail-imap")))]
+macro_rules! legacy_imap {
+    ($operation:block) => {
+        Err(String::from($crate::mail::SIGNED_IMAP_REQUIRED))
+    };
+}
+
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 mod imap_pool;
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 pub use imap_pool::*;
 
 mod smtp;
@@ -58,6 +78,7 @@ pub use mutation_commands::*;
 
 mod account_config;
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 mod imap_messages;
 
 mod attachment_files;
@@ -130,6 +151,7 @@ use imap_transport::*;
 
 use account_config::*;
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 use imap_messages::*;
 
 use attachment_files::*;
@@ -179,6 +201,7 @@ use crate::state::AppState;
 use crate::terminal::network::NetworkSettings;
 
 use sync::{FolderStepOutcome, FolderSyncState, StepParams};
+use taomni_mail_engine::imap_errors::{imap_catch_result, is_imap_transport_error};
 
 mod limits;
 

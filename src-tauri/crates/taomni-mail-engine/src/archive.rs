@@ -1,4 +1,5 @@
 //! Streaming codec for immutable, content-addressed email archives.
+#[cfg(feature = "imap-runtime")]
 mod imap_chunks;
 mod metadata;
 pub mod progress;
@@ -6,7 +7,10 @@ pub mod scanner;
 mod transfer;
 pub mod writer;
 
-pub use imap_chunks::{CHUNK, CONTENT_ERROR, fetch_imap_chunk};
+#[cfg(feature = "imap-runtime")]
+pub use imap_chunks::fetch_imap_chunk;
+pub use taomni_mail_api::archive::IMAP_ARCHIVE_CHUNK_BYTES as CHUNK;
+pub const CONTENT_ERROR: &str = "MAIL_ARCHIVE_CONTENT: ";
 pub use transfer::download_imap_original;
 
 use std::io::{BufRead, BufReader, Read, Write};

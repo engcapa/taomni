@@ -12,17 +12,24 @@
 //! Every fetch here is planned as a set difference (server − cached), which is
 //! idempotent: an interrupted step is simply recomputed by the next call.
 
+#[cfg(feature = "imap-runtime")]
 mod folder_step;
 mod limits;
 mod model;
+#[cfg(any(feature = "imap-runtime", test))]
 mod planning;
+#[cfg(feature = "imap-runtime")]
 mod protocol;
+#[cfg(feature = "imap-runtime")]
 mod round;
 
+#[cfg(feature = "imap-runtime")]
 pub use folder_step::imap_sync_folder_step;
 pub use limits::FLAG_RECONCILE_WINDOW;
 pub use model::{AppliedStep, StepParams, advance_state, step_result};
+#[cfg(feature = "imap-runtime")]
 pub use protocol::imap_has_capability;
+#[cfg(feature = "imap-runtime")]
 pub use round::{folder_unchanged, sync_folder_round};
 pub use taomni_mail_api::imap_sync::{
     BodySyncOutcome, BodySyncRequest, BodySyncTask, FolderRoundOutcome, FolderRoundRequest,

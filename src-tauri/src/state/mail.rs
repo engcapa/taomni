@@ -11,6 +11,7 @@ pub(crate) struct MailRuntime {
     mutation_gates: Mutex<HashMap<String, Arc<Mutex<()>>>>,
     pub(crate) migrated: Result<bool, String>,
     // The pool also owns each connection's account-level proxy forwarder.
+    #[cfg(any(test, feature = "legacy-mail-imap"))]
     pub(crate) mail_imap_pool: Arc<crate::mail::MailImapPool>,
     pub(crate) mail_archive: Arc<crate::mail::archive::ArchiveManager>,
 }
@@ -23,6 +24,7 @@ impl MailRuntime {
             databases: Mutex::new(HashMap::new()),
             mutation_gates: Mutex::new(HashMap::new()),
             migrated: crate::plugin::migration_mail::profile_committed(profile),
+            #[cfg(any(test, feature = "legacy-mail-imap"))]
             mail_imap_pool: Arc::new(crate::mail::MailImapPool::new()),
             mail_archive: Arc::default(),
         }

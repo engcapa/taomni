@@ -2,6 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 
+// Even sparse ten-digit UIDs stay below a 4 KiB command-line limit.
+pub const UID_BATCH_SIZE: usize = 250;
+
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "action", rename_all = "camelCase", deny_unknown_fields)]
 pub enum MutationRequest {

@@ -72,11 +72,3 @@ pub(super) fn imap_download_attachment<T: Read + Write>(
         size: attachment.bytes.len(),
     })
 }
-
-pub(super) fn merge_selected_folder(folders: &mut Vec<MailFolder>, selected: MailFolder) {
-    if let Some(existing) = folders.iter_mut().find(|f| f.name == selected.name) {
-        *existing = folders::merge_folder_status(existing, selected);
-    } else {
-        folders.push(selected);
-    }
-}

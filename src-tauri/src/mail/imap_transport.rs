@@ -2,6 +2,7 @@ use super::*;
 
 #[cfg(test)]
 pub(super) use taomni_mail_engine::imap_auth::xoauth2_sasl_response;
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 use taomni_mail_engine::imap_transport::{ImapConnection, ImapSession};
 
 pub(super) struct ProxyForward(JoinHandle<()>);
@@ -12,6 +13,7 @@ impl Drop for ProxyForward {
     }
 }
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 pub(super) fn connect_imap(
     account: &ResolvedMailAccount,
     runtime: &tokio::runtime::Handle,
@@ -21,6 +23,7 @@ pub(super) fn connect_imap(
 
 /// Connect and also return a clone of the TCP socket, so a watcher can shut
 /// the connection down from another thread (e.g. to end a blocked IDLE).
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 pub(super) fn connect_imap_with_socket(
     account: &ResolvedMailAccount,
     runtime: &tokio::runtime::Handle,

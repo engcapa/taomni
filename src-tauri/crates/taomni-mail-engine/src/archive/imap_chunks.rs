@@ -2,8 +2,7 @@
 
 use std::io::{Read, Write};
 
-pub use taomni_mail_api::archive::IMAP_ARCHIVE_CHUNK_BYTES as CHUNK;
-pub const CONTENT_ERROR: &str = "MAIL_ARCHIVE_CONTENT: ";
+use super::{CHUNK, CONTENT_ERROR};
 
 fn parse_chunk(mut response: &[u8], uid: u32, offset: u64) -> Result<(u64, Vec<u8>), String> {
     use imap_proto::types::{AttributeValue, Response};
