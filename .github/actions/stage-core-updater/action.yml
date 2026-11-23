@@ -4,14 +4,29 @@ inputs:
   version:
     description: Version embedded in the core bundles
     required: true
+  candidate_run:
+    description: Verified artifact-only Release Bundle run
+    default: ''
+  core_artifacts:
+    description: Immutable artifact IDs for the verified candidate core bundles
+    default: ''
 runs:
   using: composite
   steps:
     - uses: actions/download-artifact@v4
+      if: inputs.candidate_run == ''
       with:
         pattern: taomni-${{ inputs.version }}-*
         path: core-bundles
         merge-multiple: false
+    - uses: actions/download-artifact@v4
+      if: inputs.candidate_run != ''
+      with:
+        artifact-ids: ${{ inputs.core_artifacts }}
+        path: core-bundles
+        merge-multiple: false
+        github-token: ${{ github.token }}
+        run-id: ${{ inputs.candidate_run }}
     - name: Compose and verify the core updater
       shell: bash
       env:

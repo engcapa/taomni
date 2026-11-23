@@ -26,6 +26,10 @@ export function releaseBuildPlan(env, packageVersion) {
   const arch = manual ? env.INPUT_MACOS_ARCH || "both" : "both";
   const macosRunner = manual && !tag ? env.INPUT_MACOS_RUNNER || "macos-15" : "macos-15";
   const testVersion = manual ? env.RELEASE_TEST_VERSION || "" : "";
+  const candidateRun = manual ? env.INPUT_CANDIDATE_RUN || "" : "";
+  if (candidateRun && (!tag || !/^[1-9]\d*$/.test(candidateRun))) {
+    throw new Error("candidate_run requires a release tag and a positive run ID.");
+  }
   const moduleInput = manual ? env.INPUT_RELEASE_MODULES?.trim() : "";
   const modules = moduleInput ? moduleInput.split(",").map((slug) => slug.trim()) : [];
   if (modules.some((slug) => !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(slug))
@@ -61,6 +65,7 @@ export function releaseBuildPlan(env, packageVersion) {
     macos_architectures: JSON.stringify(macosArchitectures),
     macos_runner: macosRunner,
     modules: JSON.stringify(modules),
+    candidate_run: candidateRun,
   };
 }
 

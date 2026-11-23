@@ -9,7 +9,7 @@ const manual = { GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF_TYPE: "branc
 test("the default manual build collects all platforms without publishing", () => {
   assert.deepEqual(releaseBuildPlan(manual, version), {
     version, tag: "", test_version: "", build_desktop: "true", desktop_platforms: '["ubuntu-22.04","windows-latest"]',
-    macos_architectures: '["aarch64","x86_64"]', macos_runner: "macos-15", modules: "[]",
+    macos_architectures: '["aarch64","x86_64"]', macos_runner: "macos-15", modules: "[]", candidate_run: "",
   });
 });
 
@@ -18,7 +18,7 @@ test("Intel-only upgrade tests resolve distinct versions without enabling releas
     const plan = releaseBuildPlan({ ...manual, INPUT_PLATFORMS: "macos", INPUT_MACOS_ARCH: "x86_64", RELEASE_TEST_VERSION: testVersion }, version);
     assert.deepEqual(plan, {
       version: testVersion, tag: "", test_version: testVersion, build_desktop: "false", desktop_platforms: "[]",
-      macos_architectures: '["x86_64"]', macos_runner: "macos-15", modules: "[]",
+      macos_architectures: '["x86_64"]', macos_runner: "macos-15", modules: "[]", candidate_run: "",
     });
   }
   const arm = releaseBuildPlan({ ...manual, INPUT_MACOS_ARCH: "aarch64" }, version);
@@ -109,6 +109,15 @@ test("manual releases forbid partial builds and test versions before any bundles
   assert.throws(() => releaseBuildPlan({ ...env, RELEASE_TEST_VERSION: "0.4.31-test.1" }, version), /empty tag/);
   assert.throws(() => releaseBuildPlan({ ...manual, GITHUB_REF_TYPE: "tag", GITHUB_REF_NAME: "v0.4.30", RELEASE_TEST_VERSION: "0.4.31-test.1" }, version), /empty tag/);
   assert.throws(() => releaseBuildPlan({ ...env, INPUT_RELEASE_TAG: "v0.4.29" }, version), /must match/);
+});
+
+test("only a manual tagged release can select a candidate producer", () => {
+  const reuse = { ...manual, INPUT_RELEASE_TAG: `v${version}`, INPUT_CANDIDATE_RUN: "123" };
+  assert.equal(releaseBuildPlan(reuse, version).candidate_run, "123");
+  assert.throws(() => releaseBuildPlan({ ...reuse, INPUT_RELEASE_TAG: "" }, version), /requires a release tag/);
+  assert.throws(() => releaseBuildPlan({ ...reuse, INPUT_CANDIDATE_RUN: "../123" }, version), /positive run ID/);
+  assert.equal(releaseBuildPlan({ ...reuse, GITHUB_EVENT_NAME: "push", GITHUB_REF_TYPE: "tag",
+    GITHUB_REF_NAME: `v${version}` }, version).candidate_run, "");
 });
 
 test("test versions reject malformed SemVer and command/env-file injection", () => {

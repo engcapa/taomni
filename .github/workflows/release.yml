@@ -41,6 +41,10 @@ on:
         description: Comma-separated module slugs to build with the core
         required: false
         type: string
+      candidate_run:
+        description: Verified artifact-only Release Bundle run to publish with the tag
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -62,6 +66,7 @@ jobs:
       macos_architectures: ${{ steps.plan.outputs.macos_architectures }}
       macos_runner: ${{ steps.plan.outputs.macos_runner }}
       modules: ${{ steps.plan.outputs.modules }}
+      candidate_run: ${{ steps.plan.outputs.candidate_run }}
       rehearse_first_upgrade: ${{ steps.plan.outputs.rehearse_first_upgrade }}
     steps:
       - uses: actions/checkout@v4
@@ -70,7 +75,7 @@ jobs:
           node-version: '22'
       - name: Build selection contracts
         run: |
-          node --test scripts/resolve-release-build.test.mjs scripts/release-workflow.test.mjs scripts/install-linux-release-deps.test.mjs scripts/sherpa-onnx-cache.test.mjs
+          node --test scripts/resolve-release-build.test.mjs scripts/release-workflow.test.mjs scripts/verify-release-candidate.test.mjs scripts/install-linux-release-deps.test.mjs scripts/sherpa-onnx-cache.test.mjs
           python -m unittest discover -s scripts -p test_linux_module_abi.py
       - name: Resolve build selection and version
         id: plan
@@ -84,6 +89,7 @@ jobs:
           INPUT_MACOS_RUNNER: ${{ inputs.macos_runner }}
           RELEASE_TEST_VERSION: ${{ inputs.test_version }}
           INPUT_RELEASE_MODULES: ${{ inputs.modules }}
+          INPUT_CANDIDATE_RUN: ${{ inputs.candidate_run }}
         run: node scripts/resolve-release-build.mjs
 
   # ---------------------------------------------------------------------------
@@ -91,7 +97,7 @@ jobs:
   # ---------------------------------------------------------------------------
   build:
     needs: plan
-    if: needs.plan.outputs.build_desktop == 'true'
+    if: needs.plan.outputs.build_desktop == 'true' && needs.plan.outputs.candidate_run == ''
     name: Bundle (${{ matrix.platform }})
     runs-on: ${{ matrix.platform }}
     strategy:
@@ -229,7 +235,7 @@ jobs:
   # ---------------------------------------------------------------------------
   build-macos:
     needs: plan
-    if: needs.plan.outputs.macos_architectures != '[]'
+    if: needs.plan.outputs.macos_architectures != '[]' && needs.plan.outputs.candidate_run == ''
     name: Bundle (macOS ${{ matrix.arch }})
     strategy:
       fail-fast: false
@@ -375,7 +381,10 @@ jobs:
         env:
           TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos.outputs.artifactPaths }}
           TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-${{ matrix.arch }}
-        run: node scripts/collect-tauri-action-artifacts.mjs
+          BUNDLE_ARCH: ${{ matrix.arch }}
+        run: |
+          node scripts/collect-tauri-action-artifacts.mjs
+          node scripts/verify-release-candidate.mjs record-macos "$TAURI_ACTION_ARTIFACT_OUT_DIR"
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
@@ -404,7 +413,7 @@ jobs:
 
   package-modules:
     needs: plan
-    if: needs.plan.outputs.modules != '[]'
+    if: needs.plan.outputs.modules != '[]' && needs.plan.outputs.candidate_run == ''
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -477,13 +486,12 @@ jobs:
       - name: Record candidate inputs and installer digests
         env:
           VERSION: ${{ needs.plan.outputs.version }}
+          MODULE_SELECTION: ${{ needs.plan.outputs.modules }}
         run: |
           mkdir candidate-updater
           cp updater-assets/latest.json candidate-updater/
           (cd updater-assets && sha256sum -- *) > candidate-updater/SHA256SUMS
-          jq -n --arg sha "$GITHUB_SHA" --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" \
-            --arg version "$VERSION" --arg image "$ImageOS/$ImageVersion" \
-            '{sourceSha:$sha, runId:$run, runAttempt:$attempt, version:$version, runnerImage:$image}' > candidate-updater/receipt.json
+          node scripts/verify-release-candidate.mjs record-updater candidate-updater
       - uses: actions/upload-artifact@v4
         with:
           name: modular-candidate-updater-${{ github.run_id }}
@@ -502,7 +510,15 @@ jobs:
     name: Publish verified bundles and latest.json
     needs: [plan, build, build-macos, package-modules]
     runs-on: ubuntu-22.04
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build.result == 'success' && needs.build-macos.result == 'success' && (needs.package-modules.result == 'success' || (needs.plan.outputs.modules == '[]' && needs.package-modules.result == 'skipped')) && needs.plan.outputs.tag != '' }}
+    if: >-
+      ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.tag != '' &&
+          (needs.plan.outputs.candidate_run != '' ||
+           (needs.build.result == 'success' && needs.build-macos.result == 'success' &&
+            (needs.package-modules.result == 'success' ||
+             (needs.plan.outputs.modules == '[]' && needs.package-modules.result == 'skipped')))) }}
+    permissions:
+      actions: read
+      contents: write
     concurrency:
       group: taomni-release-catalog-publication
       cancel-in-progress: false
@@ -513,16 +529,64 @@ jobs:
           node-version: '22'
       - name: Updater and plugin manifest unit contracts
         run: node --test scripts/compose-updater-manifest.test.mjs scripts/compose-modules-manifest.test.mjs scripts/verify-updater-signatures.test.mjs scripts/stage-published-module-catalog.test.mjs scripts/release-workflow.test.mjs
+      - name: Select the verified candidate artifacts
+        if: needs.plan.outputs.candidate_run != ''
+        id: candidate
+        env:
+          CANDIDATE_RUN: ${{ needs.plan.outputs.candidate_run }}
+          GH_TOKEN: ${{ github.token }}
+          MODULE_SELECTION: ${{ needs.plan.outputs.modules }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir release-candidate
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN" > release-candidate/producer.json
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN/artifacts?per_page=100" > release-candidate/artifacts.json
+          git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}" > release-candidate/tag-refs.txt
+          node scripts/verify-release-candidate.mjs select release-candidate
       - uses: ./.github/actions/stage-core-updater
         with:
           version: ${{ needs.plan.outputs.version }}
+          candidate_run: ${{ needs.plan.outputs.candidate_run }}
+          core_artifacts: ${{ steps.candidate.outputs.core_artifacts }}
       - name: Download signed module packages
-        if: needs.plan.outputs.modules != '[]'
+        if: needs.plan.outputs.modules != '[]' && needs.plan.outputs.candidate_run == ''
         uses: actions/download-artifact@v4
         with:
           pattern: module-signed-*-${{ github.run_id }}
           path: signed-module-artifacts
           merge-multiple: false
+      - name: Download the candidate updater receipt
+        if: needs.plan.outputs.candidate_run != ''
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.candidate.outputs.updater_artifact }}
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.plan.outputs.candidate_run }}
+          path: release-candidate/updater
+      - name: Download the candidate's signed module packages
+        if: needs.plan.outputs.candidate_run != '' && needs.plan.outputs.modules != '[]'
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.candidate.outputs.module_artifacts }}
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.plan.outputs.candidate_run }}
+          path: signed-module-artifacts
+          merge-multiple: false
+      - name: Verify the reused installer and signed module bytes
+        if: needs.plan.outputs.candidate_run != ''
+        env:
+          MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
+        run: node scripts/verify-release-candidate.mjs verify release-candidate
+      - uses: actions/upload-artifact@v4
+        if: needs.plan.outputs.candidate_run != ''
+        with:
+          name: verified-release-candidate-${{ github.run_id }}
+          path: |
+            release-candidate/verified-assets.json
+            release-candidate/updater/receipt.json
+          if-no-files-found: error
 
       - name: Assemble or carry forward the signed module catalog
         id: module-catalog
@@ -589,6 +653,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.plan.outputs.tag }}
           MODULE_CATALOG_SOURCE_TAG: ${{ steps.module-catalog.outputs.source_tag }}
+          CANDIDATE_RUN: ${{ needs.plan.outputs.candidate_run }}
         shell: bash
         run: |
           set -euo pipefail
@@ -667,5 +732,9 @@ jobs:
             gh release edit "$TAG" --notes-file module-release-notes.md
           fi
           if [ "$publish_draft" = true ]; then
-            gh release edit "$TAG" --draft=false
+            draft_args=(--draft=false)
+            if [[ -n "${CANDIDATE_RUN:-}" ]]; then
+              draft_args+=(--target "$GITHUB_SHA")
+            fi
+            gh release edit "$TAG" "${draft_args[@]}"
           fi

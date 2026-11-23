@@ -84,6 +84,21 @@ test("joint builds download core bundles and signed module packages from their r
   assert(rehearsal.includes("contents: read") && rehearsal.includes("needs.plan.outputs.tag == ''"));
   assert(rehearsal.includes("inputs.platforms == 'all' && inputs.macos_arch == 'both'"));
 });
+
+test("candidate publication bypasses compilation and verifies exact prior artifacts before upload", () => {
+  for (const name of ["build", "build-macos", "package-modules"]) {
+    assert.match(workflow.split(`  ${name}:\n`)[1].split("    steps:")[0], /if: .*candidate_run == ''/);
+  }
+  const finalizer = workflow.split("  finalize-updater-manifest:\n")[1];
+  const select = finalizer.indexOf("verify-release-candidate.mjs select");
+  const verify = finalizer.indexOf("verify-release-candidate.mjs verify");
+  const publish = finalizer.indexOf("name: Verify and publish release assets");
+  assert(select > 0 && select < verify && verify < publish);
+  assert.match(finalizer, /artifact-ids: \$\{\{ steps\.candidate\.outputs\.module_artifacts \}\}/);
+  assert.match(finalizer, /artifact-ids: \$\{\{ steps\.candidate\.outputs\.updater_artifact \}\}/);
+  assert.match(coreAction, /artifact-ids: \$\{\{ inputs\.core_artifacts \}\}/);
+  assert.match(coreAction, /run-id: \$\{\{ inputs\.candidate_run \}\}/);
+});
 const publishStep = workflow.split("      - name: Verify and publish release assets\n")[1];
 assert(publishStep, "the tested publishing step must exist in release.yml");
 const publishScript = publishStep.split("        run: |\n")[1].split("\n")
