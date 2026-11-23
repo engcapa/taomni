@@ -63,12 +63,23 @@ def sample_linux(ctx, executable, work, evidence, label):
             if any((profile / "plugins").glob("*/active.json")):
                 raise RuntimeError("An installed module was present in the core startup comparison")
             samples.append({"readyMs": round(ready_ms, 3), "rssBytes": rss, "pid": owner.pid})
+    return summarize(executable, samples)
+
+
+def summarize(executable, samples):
     return {"executableSha256": digest(executable), "samples": samples,
             "medianReadyMs": median(sample["readyMs"] for sample in samples),
             "medianCoreRssBytes": median(median(sample["rssBytes"]) for sample in samples)}
 
 
 def record_linux_comparison(evidence, target, old_package, candidate_package, original, candidate):
+    return record_comparison(
+        evidence, target, old_package, candidate_package, original, candidate,
+        readiness="Launch the owned WebDriver and app, then wait for the visible status bar",
+    )
+
+
+def record_comparison(evidence, target, old_package, candidate_package, original, candidate, *, readiness):
     result = {
         "schema": "taomni.qa.installed-core-resources.v1",
         "producerSource": target["producerSource"],
@@ -79,7 +90,7 @@ def record_linux_comparison(evidence, target, old_package, candidate_package, or
         "runnerArchitecture": os.environ.get("RUNNER_ARCH"),
         "runnerImage": os.environ.get("ImageOS"),
         "runnerImageVersion": os.environ.get("ImageVersion"),
-        "readiness": "Launch the owned WebDriver and app, then wait for the visible status bar",
+        "readiness": readiness,
         "residentMemory": "RSS of the installed core PID sampled three times after readiness",
         "original": {**original, "installerSha256": digest(old_package)},
         "candidate": {**candidate, "installerSha256": digest(candidate_package)},

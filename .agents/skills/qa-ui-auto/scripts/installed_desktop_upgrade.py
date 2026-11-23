@@ -10,6 +10,7 @@ from uuid import UUID
 from types import SimpleNamespace
 
 import installed_first_release
+from installed_core_resources_desktop import ProfileRestoreError, record_desktop_comparison, sample_desktop
 
 from installed_desktop_mfa_crash import verify_crash_recovery
 from installed_desktop_mode_lease import check_mode_lease, finish_first_release_mode_lease, reserve_default_profile
@@ -145,12 +146,28 @@ def execute(args):
     origin = None
     ctx = SimpleNamespace(cfg={"webdriver": {"startup_timeout": 60}})
     environment = {}
+    resources = {}
+    resource_failures = {}
+
+    def measure_core(label, executable):
+        try:
+            resources[label] = sample_desktop(
+                ctx, executable, profile, work / "core-resources", report / "core-resources", label,
+            )
+        except ProfileRestoreError:
+            raise
+        except Exception as error:
+            resource_failures[label] = str(error)
+            write_json(report / "core-resources" / f"{label}-failure.json", {"error": str(error)})
+
     try:
         if args.first_release:
             origin = installed_first_release.open_release(args.first_release.resolve(strict=True), identity, report)
             if system == "Windows":
                 enable_defender(report)
         old_binary, stages["original"] = install(old_package, slot, report / "original", old_version)
+        if origin:
+            measure_core("original", old_binary)
         initialize_profile(old_binary, profile, work, report, "original-start")
         insert_business_rows(profile, input_sessions(True))
         expected_rows = session_rows(profile)
@@ -185,6 +202,14 @@ def execute(args):
         if system == "Windows":
             require_registration(msi_registration(old_package, report, "original-after-upgrade"),
                                  msi_registration(package, report, "candidate-registered"), upgraded=True)
+        if origin:
+            measure_core("candidate", candidate)
+            if resource_failures:
+                stages["coreResources"] = {**resources, "errors": resource_failures}
+            else:
+                stages["coreResources"] = record_desktop_comparison(
+                    report, identity, old_package, package, resources["original"], resources["candidate"],
+                )
         stages["afterUpgrade"] = start_profile(
             candidate, profile, work, report, "candidate-reopen", expected_rows, retained, verify_mode_lease=True,
         )
@@ -231,6 +256,8 @@ def execute(args):
             raise RuntimeError("The installed upgrade lost a previously granted macOS permission")
         if origin and system == "Darwin" and not (continuity and continuity["retainedBothGrants"]):
             raise RuntimeError("The installed upgrade did not establish both macOS grants under the same identity")
+        if resource_failures:
+            raise RuntimeError(f"Installed core resource samples are incomplete: {resource_failures}")
         result.update(passed=True, sessionTypes=[row["session_type"] for row in expected_rows], retainedFiles=retained)
     finally:
         if origin:
