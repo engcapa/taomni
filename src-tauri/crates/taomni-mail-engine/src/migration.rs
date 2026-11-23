@@ -20,6 +20,7 @@ use crate::{archive::verify_message_with, database::mail_db_file_stem, storage::
 pub struct LegacyMailbox {
     pub account_id: String,
     pub database: PathBuf,
+    pub pop3: bool,
 }
 
 /// A core-only upgrade can retain an older signed Mail host. Only hand it
@@ -30,6 +31,7 @@ pub struct HostedMailboxData {
     pub address_book: bool,
     pub agenda: bool,
     pub filter_rules: bool,
+    pub pop3_cache: bool,
 }
 
 impl HostedMailboxData {
@@ -38,6 +40,7 @@ impl HostedMailboxData {
         address_book: true,
         agenda: true,
         filter_rules: true,
+        pop3_cache: true,
     };
 }
 
@@ -155,6 +158,9 @@ fn stage_account(
         .open(destination)
         .and_then(|file| file.sync_all())
         .map_err(string_error)?;
+    if hosted.pop3_cache && mailbox.pop3 {
+        crate::pop3::ownership::mark_owned(target, &mailbox.account_id).map_err(string_error)?;
+    }
     check(control)?;
     Ok(true)
 }

@@ -14,7 +14,7 @@ pub(super) async fn raw_bytes(
     uid: u32,
 ) -> Result<Vec<u8>, String> {
     if super::super::pop3::is_pop3(config) {
-        return super::super::local_cmds::raw(state, &config.session_id, folder, uid);
+        return super::super::local_cmds::raw(state, &config.session_id, folder, uid).await;
     }
     fetch_original_from_server(state, config.clone(), folder, uid).await
 }

@@ -13,7 +13,7 @@ pub async fn mail_create_folder(
 ) -> Result<Vec<MailFolder>, String> {
     let name = name.trim();
     if pop3::is_pop3(&config) {
-        return local_cmds::create_folder(&state, &config.session_id, name);
+        return local_cmds::create_folder(&state, &config.session_id, name).await;
     }
     if name.is_empty() {
         return Err("folder name is required".into());
@@ -35,7 +35,7 @@ pub async fn mail_rename_folder(
 ) -> Result<Vec<MailFolder>, String> {
     let (from, to) = (from.trim(), to.trim());
     if pop3::is_pop3(&config) {
-        return local_cmds::rename_folder(&state, &config.session_id, from, to);
+        return local_cmds::rename_folder(&state, &config.session_id, from, to).await;
     }
     if from.is_empty() || to.is_empty() {
         return Err("current and new folder names are required".into());
@@ -59,7 +59,7 @@ pub async fn mail_delete_folder(
 ) -> Result<Vec<MailFolder>, String> {
     let name = name.trim();
     if pop3::is_pop3(&config) {
-        return local_cmds::delete_folder(&state, &config.session_id, name);
+        return local_cmds::delete_folder(&state, &config.session_id, name).await;
     }
     if name.is_empty() {
         return Err("folder name is required".into());

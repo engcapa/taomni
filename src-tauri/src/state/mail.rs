@@ -9,6 +9,7 @@ pub(crate) struct MailRuntime {
     cache_root: PathBuf,
     databases: Mutex<HashMap<String, MailDbHandle>>,
     mutation_gates: Mutex<HashMap<String, Arc<Mutex<()>>>>,
+    pop3_owner_gates: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     pub(crate) migrated: Result<bool, String>,
     // The pool also owns each connection's account-level proxy forwarder.
     #[cfg(any(test, feature = "legacy-mail-imap"))]
@@ -23,6 +24,7 @@ impl MailRuntime {
             cache_root: profile.join("mail-cache"),
             databases: Mutex::new(HashMap::new()),
             mutation_gates: Mutex::new(HashMap::new()),
+            pop3_owner_gates: Mutex::new(HashMap::new()),
             migrated: crate::plugin::migration_mail::profile_committed(profile),
             #[cfg(any(test, feature = "legacy-mail-imap"))]
             mail_imap_pool: Arc::new(crate::mail::MailImapPool::new()),
@@ -32,6 +34,15 @@ impl MailRuntime {
 
     pub(crate) fn mutation_gate(&self, account_id: &str) -> Arc<Mutex<()>> {
         self.mutation_gates
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .entry(account_id.to_owned())
+            .or_default()
+            .clone()
+    }
+
+    pub(crate) fn pop3_owner_gate(&self, account_id: &str) -> Arc<tokio::sync::Mutex<()>> {
+        self.pop3_owner_gates
             .lock()
             .unwrap_or_else(|error| error.into_inner())
             .entry(account_id.to_owned())

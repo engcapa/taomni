@@ -17,11 +17,14 @@ mod imap_outgoing;
 mod mutations;
 mod pop3;
 mod pop3_round;
+pub(super) mod pop3_store;
 mod prefetch;
 mod responses;
 pub(super) use responses::send_response;
 
-pub(super) use archive::{HostedImap, archives_imap, imports_imap};
+pub(super) use archive::{
+    HostedImap, archives_imap, imports_imap, queries_archive_index, query_archive_index,
+};
 pub(super) use compose::compose_message;
 pub(super) use downloads::{fetch_imap_attachment, fetch_imap_body, fetch_imap_raw};
 pub(super) use imap_outgoing::{

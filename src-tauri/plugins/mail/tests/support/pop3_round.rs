@@ -1,13 +1,19 @@
-use std::net::Ipv4Addr;
+use std::{net::Ipv4Addr, path::Path};
 
 use rusqlite::Connection;
 use taomni_mail_api::{
     IncomingTest, MailAuthMode, MailConnectionSecurity, MailIncomingProtocol, MailProvider,
-    SYNC_POP3_ROUND,
+    MailboxRequest, SYNC_POP3_ROUND,
     imap_exchange::read_body_frame,
-    pop3_exchange::{Pop3LedgerRequest, Pop3Round, read_ledger_message, write_ledger_message},
+    pop3_exchange::{
+        Pop3LedgerRequest, Pop3Round, Pop3SyncOutcome, read_ledger_message, write_ledger_message,
+    },
+    pop3_store::{LOCAL_MAILBOX, LocalMailboxAction, OwnedPop3Round, SYNC_OWNED_MAILBOX},
 };
-use taomni_mail_engine::pop3::{Pop3Ledger, local_store::list_local_originals, sqlite_ledger};
+use taomni_mail_engine::{
+    database::mail_db_file_stem,
+    pop3::{Pop3Ledger, local_store::list_local_originals, sqlite_ledger},
+};
 use taomni_plugin_stream::routed_tcp::Route;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, DuplexStream},
@@ -17,6 +23,118 @@ use tokio::{
 use super::{MailHost, WAIT};
 
 const ORIGINAL: &[u8] = b"Subject: Hosted receipt\r\n\r\nOriginal bytes \x80\xff\r\n";
+
+pub(super) fn check_owned_sync_round(host: &mut MailHost, profile: &Path) {
+    const ACCOUNT: &str = "host-owned-pop3";
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    local_mailbox_call::<()>(&runtime, host, ACCOUNT, LocalMailboxAction::Initialize);
+    for accepted in [false, true] {
+        let outcome = std::thread::scope(|scope| {
+            runtime.block_on(async {
+                let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+                let address = listener.local_addr().unwrap();
+                let (_network, route) = Route::bind(move || async move {
+                    let stream = TcpStream::connect(address)
+                        .await
+                        .map_err(|error| error.to_string())?;
+                    Ok((stream, address))
+                })
+                .await
+                .unwrap();
+                let (_reply, endpoint, mut peer) = Route::pair().await.unwrap();
+                let request = OwnedPop3Round {
+                    account_id: ACCOUNT.into(),
+                    connection: incoming(route),
+                    reply: endpoint,
+                    leave_days: Some(0),
+                };
+                let host = &mut *host;
+                scope.spawn(move || {
+                    let result =
+                        host.call(SYNC_OWNED_MAILBOX, serde_json::to_value(request).unwrap());
+                    serde_json::from_value::<Result<(), String>>(result)
+                        .unwrap()
+                        .unwrap();
+                });
+                let ((), outcome) = tokio::time::timeout(WAIT, async {
+                    tokio::join!(
+                        serve(listener, accepted),
+                        read_ledger_message::<Result<Pop3SyncOutcome, String>>(&mut peer)
+                    )
+                })
+                .await
+                .expect("host-owned round completed before its deadline");
+                outcome.unwrap()
+            })
+        });
+        if accepted {
+            let outcome = outcome.unwrap();
+            assert_eq!(outcome.deleted_on_server, 1);
+            assert!(outcome.messages.is_empty());
+            assert_eq!(outcome.remaining, 0);
+        } else {
+            let error = outcome.err().expect("rejected QUIT");
+            assert!(error.contains("deletion refused"), "{error}");
+        }
+        let stem = mail_db_file_stem(ACCOUNT);
+        let db = Connection::open(profile.join(format!("plugins/mail/data/{stem}.db"))).unwrap();
+        assert_eq!(
+            list_local_originals(&db, ACCOUNT, "INBOX").unwrap(),
+            [(1, ORIGINAL.to_vec())]
+        );
+        let deleted: bool = db
+            .query_row(
+                "SELECT deleted FROM mail_pop3_uidl WHERE uidl='routed-uidl'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(deleted, accepted);
+        assert!(!profile.join(format!("mail-cache/{stem}.db")).exists());
+    }
+    let raw: Option<Vec<u8>> = local_mailbox_call(
+        &runtime,
+        host,
+        ACCOUNT,
+        LocalMailboxAction::Raw {
+            folder: "INBOX".into(),
+            uid: 1,
+        },
+    );
+    assert_eq!(raw.as_deref(), Some(ORIGINAL));
+}
+
+fn local_mailbox_call<T: serde::de::DeserializeOwned>(
+    runtime: &tokio::runtime::Runtime,
+    host: &mut MailHost,
+    account: &str,
+    action: LocalMailboxAction,
+) -> T {
+    std::thread::scope(|scope| {
+        runtime.block_on(async {
+            let (_route, endpoint, mut peer) = Route::pair().await.unwrap();
+            scope.spawn(move || {
+                let result = host.call(LOCAL_MAILBOX, serde_json::to_value(endpoint).unwrap());
+                serde_json::from_value::<Result<(), String>>(result)
+                    .unwrap()
+                    .unwrap();
+            });
+            write_ledger_message(
+                &mut peer,
+                &MailboxRequest {
+                    account_id: account.into(),
+                    action,
+                },
+            )
+            .await
+            .unwrap();
+            read_ledger_message(&mut peer).await.unwrap()
+        })
+    })
+}
 
 pub(super) fn check_sync_round(host: &mut MailHost) {
     let db = Connection::open_in_memory().unwrap();
@@ -41,17 +159,7 @@ pub(super) fn check_sync_round(host: &mut MailHost) {
                 .unwrap();
                 let (_ledger, endpoint, mut peer) = Route::pair().await.unwrap();
                 let request = Pop3Round {
-                    connection: IncomingTest {
-                        route,
-                        server_name: "pop3.test".into(),
-                        security: MailConnectionSecurity::None,
-                        trusted_certificate: None,
-                        protocol: MailIncomingProtocol::Pop3,
-                        provider: MailProvider::Custom,
-                        authentication: MailAuthMode::Password,
-                        username: "qa".into(),
-                        secret: "fixture-password".to_owned().into(),
-                    },
+                    connection: incoming(route),
                     ledger: endpoint,
                     leave_days: Some(0),
                 };
@@ -81,6 +189,20 @@ pub(super) fn check_sync_round(host: &mut MailHost) {
             })
             .unwrap();
         assert_eq!(deleted, accepted);
+    }
+}
+
+fn incoming(route: taomni_plugin_stream::routed_tcp::Endpoint) -> IncomingTest {
+    IncomingTest {
+        route,
+        server_name: "pop3.test".into(),
+        security: MailConnectionSecurity::None,
+        trusted_certificate: None,
+        protocol: MailIncomingProtocol::Pop3,
+        provider: MailProvider::Custom,
+        authentication: MailAuthMode::Password,
+        username: "qa".into(),
+        secret: "fixture-password".to_owned().into(),
     }
 }
 

@@ -3,6 +3,7 @@
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 use std::sync::Arc;
 
+use taomni_mail_api::pop3_store::LocalMailboxAction;
 use taomni_mail_api::{message::MailMessageHeader, search::ImapSearchRequest};
 use taomni_mail_engine::search::search_cached_messages;
 #[cfg(any(test, feature = "legacy-mail-imap"))]
@@ -24,9 +25,12 @@ pub async fn mail_search_messages(
     query: MailSearchQuery,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailMessageHeader>, String> {
-    with_mail_db_async(&state, &account_id, move |db, account_id| {
-        search_cached_messages(db, account_id, &query)
-    })
+    super::pop3_store::run(
+        &state,
+        &account_id,
+        LocalMailboxAction::Search(query.clone()),
+        move |db, account_id| search_cached_messages(db, account_id, &query),
+    )
     .await
 }
 
@@ -45,9 +49,12 @@ pub async fn mail_search_server(
             folder: Some(folder),
             ..query
         };
-        return with_mail_db_async(&state, &config.session_id, move |db, account_id| {
-            search_cached_messages(db, account_id, &local)
-        })
+        return super::pop3_store::run(
+            &state,
+            &config.session_id,
+            LocalMailboxAction::Search(local.clone()),
+            move |db, account_id| search_cached_messages(db, account_id, &local),
+        )
         .await;
     }
     let account = resolve_config(&state, config)?;

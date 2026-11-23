@@ -21,7 +21,8 @@ pub async fn mail_download_attachment(
             uid,
             attachment_index,
             target_path.trim(),
-        );
+        )
+        .await;
     }
     let target_path = target_path.trim().to_string();
     if target_path.is_empty() {

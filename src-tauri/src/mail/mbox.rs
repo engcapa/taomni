@@ -81,7 +81,7 @@ pub async fn mail_export_mbox(
 ) -> Result<MailExportResult, String> {
     if super::pop3::is_pop3(&config) {
         let target = PathBuf::from(path.trim());
-        let raws = super::local_cmds::folder_raw(&state, &config.session_id, folder.trim())?;
+        let raws = super::local_cmds::folder_raw(&state, &config.session_id, folder.trim()).await?;
         let file = File::create(&target)
             .map_err(|e| format!("cannot create {}: {e}", target.display()))?;
         let mut out = BufWriter::new(file);
@@ -158,7 +158,7 @@ pub async fn mail_import_messages(
     }
     if super::pop3::is_pop3(&config) {
         let imported =
-            super::local_cmds::import(&state, &config.session_id, folder.trim(), &messages)?;
+            super::local_cmds::import(&state, &config.session_id, folder.trim(), messages).await?;
         return Ok(MailImportResult {
             imported,
             failed: 0,

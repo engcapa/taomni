@@ -1,5 +1,5 @@
 //! Exercise the stdio request and its authenticated byte stream in a real host.
-use super::{ACCOUNT, MailHost, WAIT};
+use super::{ACCOUNT, ARCHIVED_AT, MailHost, WAIT};
 use serde_json::json;
 use taomni_mail_api::{
     DECODE_ARCHIVE_ATTACHMENT, DECODE_ARCHIVE_ORIGINAL, ENCODE_ARCHIVE_ORIGINAL,
@@ -7,12 +7,16 @@ use taomni_mail_api::{
         ARCHIVE_FRAME_BYTES, ArchiveAttachmentDecoding, ArchiveDecoding, ArchiveEncoding,
         receive_encoding,
     },
-    imap_exchange::{read_body_frame, write_body_frame},
+    archive_index::{
+        ArchiveIndexAction, ArchiveIndexRequest, ArchiveIndexSource, ArchivePage, ArchiveQuery,
+        QUERY_ARCHIVE_INDEX, SearchField,
+    },
+    imap_exchange::{read_body_frame, write_body_frame, write_frame},
     message::MailMessageBody,
 };
 use taomni_mail_engine::archive::verify_message;
 use taomni_plugin_stream::routed_tcp::Route;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub(super) fn check(host: &mut MailHost) {
     let io = tokio::runtime::Builder::new_multi_thread()
@@ -132,4 +136,41 @@ pub(super) fn check_decoding(host: &mut MailHost) {
     assert_eq!(response.id, Some(sent));
     assert_eq!(response.result, Some(json!({"Ok": null})));
     assert_eq!(attachment, b"bytes");
+
+    let (_route, exchange, mut peer) = io.block_on(Route::pair()).unwrap();
+    let sent = host.write_request(QUERY_ARCHIVE_INDEX, serde_json::to_value(exchange).unwrap());
+    let request = ArchiveIndexRequest {
+        account_id: ACCOUNT.into(),
+        source: ArchiveIndexSource::ModuleData,
+        action: ArchiveIndexAction::Find {
+            query: ArchiveQuery {
+                text: "original".into(),
+                field: SearchField::Subject,
+                ..Default::default()
+            },
+            offset: 200,
+        },
+    };
+    let page: ArchivePage = io.block_on(async {
+        tokio::time::timeout(WAIT, async {
+            assert_eq!(peer.read_u8().await.unwrap(), 1);
+            write_frame(&mut peer, &serde_json::to_vec(&request).unwrap())
+                .await
+                .unwrap();
+            let reply = read_body_frame(&mut peer).await.unwrap();
+            serde_json::from_slice::<Result<_, String>>(&reply)
+                .unwrap()
+                .unwrap()
+        })
+        .await
+        .unwrap()
+    });
+    let response = host.read_response();
+    assert_eq!(response.id, Some(sent));
+    assert_eq!(response.result, Some(json!({"Ok": null})));
+    assert_eq!(page.offset, 0);
+    assert_eq!(page.total, 1);
+    assert_eq!(page.folders, ["INBOX"]);
+    assert_eq!(page.entries[0].entry.uid, 9);
+    assert_eq!(page.entries[0].entry.stored_at, ARCHIVED_AT);
 }

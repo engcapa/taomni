@@ -46,14 +46,19 @@ pub async fn mail_index_cached_contacts(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
-    with_mail_db_async(&state, &account_id, move |db, account_id| {
-        // Rebuilding once when opening a composer must be one transaction,
-        // not a durable SQLite commit for every address in the entire mailbox.
-        let tx = db.unchecked_transaction()?;
-        let count = reindex_cached_contacts(&tx, account_id)?;
-        tx.commit()?;
-        Ok(count)
-    })
+    pop3_store::run(
+        &state,
+        &account_id,
+        taomni_mail_api::pop3_store::LocalMailboxAction::ReindexContacts,
+        move |db, account_id| {
+            // Rebuilding once when opening a composer must be one transaction,
+            // not a durable SQLite commit for every address in the entire mailbox.
+            let tx = db.unchecked_transaction()?;
+            let count = reindex_cached_contacts(&tx, account_id)?;
+            tx.commit()?;
+            Ok(count)
+        },
+    )
     .await
 }
 

@@ -101,6 +101,9 @@ steps:
     timeout_sec: 30
 - click: '[data-testid="mail-test-connection"]'
 - assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'POP3 ok, SMTP ok'}
+- click: '[data-testid="mail-mark-folder-read"]'
+- assert_count: {selector: '[data-testid="mail-message-row"][data-unread="true"]', equal: 0}
+- assert_disabled: '[data-testid="mail-mark-folder-read"]'
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -158,12 +161,14 @@ verification:
     - {step: 32, expectation: The reopened account still renders the newest message body.}
     results: [25, 29, 30, 32]
   - id: R4
-    requirement: The Mail pane shows the POP3 and SMTP connection test status.
-    actions: [33]
+    requirement: The Mail pane reports the connection status and marks the reopened local inbox read.
+    actions: [33, 35]
     checkpoints:
     - {step: 34, expectation: The visible status reports both connections succeeded.}
-    - {step: 35, expectation: The connection test produces no uncaught renderer error.}
-    results: [34, 35]
+    - {step: 36, expectation: Marking the folder read clears all visible unread flags.}
+    - {step: 37, expectation: The Mark Folder Read command is disabled when no unread messages remain.}
+    - {step: 38, expectation: No uncaught renderer errors occur.}
+    results: [34, 36, 37, 38]
   visual:
   - check: 截图中本地文件夹（INBOX/Sent/Drafts/Trash/Junk）与 POP3 状态显示正确。
     method: manual

@@ -3,10 +3,11 @@
 //! answered (or declined) only once, from any client.
 
 use serde::Serialize;
+use taomni_mail_api::pop3_store::LocalMailboxAction;
 use taomni_mail_engine::responses::{MailResponse, Receipt};
 use tauri::State;
 
-use super::{MailAccountConfig, resolve_config, with_mail_db};
+use super::{MailAccountConfig, resolve_config};
 use crate::state::AppState;
 
 /// IMAP keyword marking "receipt handled" (sent or declined).
@@ -30,9 +31,17 @@ pub async fn mail_send_receipt(
 ) -> Result<MailReceiptResult, String> {
     let folder = folder.trim().to_string();
     let account_id = config.session_id.clone();
-    let header = with_mail_db(&state, &account_id, |db| {
-        super::cached_header(db, &account_id, &folder, uid)
-    })?
+    let header_folder = folder.clone();
+    let header = super::pop3_store::run(
+        &state,
+        &account_id,
+        LocalMailboxAction::Header {
+            folder: header_folder.clone(),
+            uid,
+        },
+        move |db, account| super::cached_header(db, account, &header_folder, uid),
+    )
+    .await?
     .ok_or_else(|| "the message is not in the local cache".to_string())?;
     let receipt_to = header
         .receipt_to

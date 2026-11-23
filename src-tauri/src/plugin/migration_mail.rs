@@ -203,6 +203,13 @@ pub(super) fn execute_under_maintenance(
             address_book: manifest.commands.contains(taomni_mail_api::ADDRESS_BOOK),
             agenda: manifest.commands.contains(taomni_mail_api::CALDAV_AGENDA),
             filter_rules: manifest.commands.contains(taomni_mail_api::FILTER_RULES),
+            pop3_cache: [
+                taomni_mail_api::pop3_store::LOCAL_MAILBOX,
+                taomni_mail_api::pop3_store::SYNC_OWNED_MAILBOX,
+                taomni_mail_api::archive_index::QUERY_ARCHIVE_INDEX,
+            ]
+            .into_iter()
+            .all(|capability| manifest.commands.contains(capability)),
         };
         if let Some(retained) = &retained {
             reuse_restored_data(root, &plugins, retained, &transaction, hosted, control)?
@@ -370,6 +377,7 @@ fn reuse_restored_data(
     let (mailboxes, source_fingerprint) =
         snapshot_mailboxes(profile, control, &restored_mailboxes)?;
     let mut missing = Vec::new();
+    let mut restored_pop3 = Vec::new();
     for mailbox in mailboxes {
         control.check().map_err(|error| error.to_string())?;
         let filename = mailbox
@@ -386,6 +394,9 @@ fn reuse_restored_data(
             .map_err(|error| error.to_string())?;
             db.prepare("SELECT uid FROM mail_messages WHERE account_id=?1 LIMIT 1")
                 .map_err(|error| error.to_string())?;
+            if hosted.pop3_cache && mailbox.pop3 {
+                restored_pop3.push(mailbox.account_id);
+            }
         } else if read_legacy_mailbox(&mailbox.database, &mailbox.account_id, |_, _| Ok(()))?
             .is_some()
         {
@@ -399,10 +410,18 @@ fn reuse_restored_data(
         source_fingerprint,
         data_schema_version: retained.data_schema_version,
     };
-    if missing.is_empty() {
+    if missing.is_empty() && restored_pop3.is_empty() {
         paths::write_json_durable(&mail_root.data.join(RECEIPT), &receipt)?;
     } else {
-        restored::publish(&mail_root, plugins, &missing, hosted, &receipt, control)?;
+        restored::publish(
+            &mail_root,
+            plugins,
+            &missing,
+            &restored_pop3,
+            hosted,
+            &receipt,
+            control,
+        )?;
     }
     Ok(receipt)
 }
@@ -483,6 +502,9 @@ fn read_mailboxes(
     while let Some(row) = rows.next().map_err(|error| error.to_string())? {
         let account_id: String = row.get(0).map_err(|error| error.to_string())?;
         let options: String = row.get(1).map_err(|error| error.to_string())?;
+        let parsed: serde_json::Value =
+            serde_json::from_str(&options).map_err(|error| error.to_string())?;
+        let pop3 = parsed.get("mailIncoming").and_then(|value| value.as_str()) == Some("pop3");
         let directory = configured_directory(&options, &default)?;
         let filename = format!("{}.db", mail_db_file_stem(&account_id));
         if directory != default && !restored_mailboxes.contains(filename.as_str()) {
@@ -494,6 +516,7 @@ fn read_mailboxes(
         mailboxes.push(LegacyMailbox {
             account_id,
             database,
+            pop3,
         });
     }
     Ok(mailboxes)

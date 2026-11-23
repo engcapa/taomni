@@ -6,6 +6,7 @@ mod agenda;
 mod archive;
 mod archive_decoding;
 mod archive_encoding;
+mod archive_index;
 mod attachment_cache;
 mod commands;
 mod compose;
@@ -19,6 +20,7 @@ mod mailbox;
 mod mbox_export;
 mod outgoing;
 mod pop3_round;
+mod pop3_store;
 mod pop3_sync;
 mod prefetch;
 mod snapshot;
@@ -81,12 +83,15 @@ fn host_config() -> HostConfig {
                 taomni_mail_api::ENCODE_ARCHIVE_ORIGINAL,
                 taomni_mail_api::DECODE_ARCHIVE_ORIGINAL,
                 taomni_mail_api::DECODE_ARCHIVE_ATTACHMENT,
+                taomni_mail_api::archive_index::QUERY_ARCHIVE_INDEX,
                 OPEN_IMAP_ARCHIVE,
                 OPEN_IMAP_IMPORT,
                 EXPORT_IMAP_MBOX,
                 OPEN_IMAP_MUTATIONS,
                 OPEN_POP3_SYNC,
                 taomni_mail_api::SYNC_POP3_ROUND,
+                taomni_mail_api::pop3_store::LOCAL_MAILBOX,
+                taomni_mail_api::pop3_store::SYNC_OWNED_MAILBOX,
                 FETCH_IMAP_ATTACHMENT,
                 SNAPSHOT_PREPARE_METHOD,
                 SNAPSHOT_METHOD,
@@ -338,6 +343,16 @@ impl PluginHandler for Handler {
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(archive::start(&self.io, operation, input)?)
             }
+            taomni_mail_api::archive_index::QUERY_ARCHIVE_INDEX => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(archive_index::query(
+                    &self.io,
+                    &self.store,
+                    operation,
+                    endpoint,
+                )?)
+            }
             OPEN_IMAP_MUTATIONS => {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
@@ -357,6 +372,26 @@ impl PluginHandler for Handler {
                 let request = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(pop3_round::start(&self.io, operation, request)?)
+            }
+            taomni_mail_api::pop3_store::LOCAL_MAILBOX => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(pop3_store::serve(
+                    &self.io,
+                    operation,
+                    &self.store,
+                    endpoint,
+                )?)
+            }
+            taomni_mail_api::pop3_store::SYNC_OWNED_MAILBOX => {
+                let request = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(pop3_store::round(
+                    &self.io,
+                    operation,
+                    self.store.clone(),
+                    request,
+                )?)
             }
             OPEN_POP3_SYNC => {
                 let input = serde_json::from_value(params.unwrap_or_default())

@@ -1,11 +1,12 @@
-use super::{lifetime::ArchiveStatus, worker};
+use super::{lifetime::ArchiveStatus, owned, worker};
 use crate::{
-    mail::{MailAccountConfig, coordination, storage, with_mail_db_async},
+    mail::{MailAccountConfig, coordination, pop3_store, storage, with_mail_db_async},
     state::AppState,
 };
 use std::{path::Path, sync::atomic::Ordering};
+use taomni_mail_api::pop3_store::LocalArchiveAction;
 use taomni_mail_engine::storage::scan;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 #[tauri::command]
 pub async fn mail_archive_status(
@@ -32,14 +33,22 @@ pub async fn mail_archive_status(
                 .clone());
         }
     }
-    let (paused, shared) = with_mail_db_async(&state, &account_id, |db, account| {
-        let paused = scan::is_paused(db, account)?;
-        let shared = coordination::ProcessLock::try_at(Path::new(db.path().unwrap()), "archive")
-            .map_err(storage::as_sql_error)?
-            .is_none();
-        Ok((paused, shared))
-    })
-    .await?;
+    let (paused, shared) = if pop3_store::is_hosted(&state, &account_id).await? {
+        (
+            owned::run(&state, &account_id, LocalArchiveAction::Paused).await?,
+            false,
+        )
+    } else {
+        with_mail_db_async(&state, &account_id, |db, account| {
+            let paused = scan::is_paused(db, account)?;
+            let shared =
+                coordination::ProcessLock::try_at(Path::new(db.path().unwrap()), "archive")
+                    .map_err(storage::as_sql_error)?
+                    .is_none();
+            Ok((paused, shared))
+        })
+        .await?
+    };
     if !shared {
         if let Some(job) = state
             .legacy
@@ -89,6 +98,9 @@ pub async fn mail_archive_pause(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state.legacy.mail.mail_archive.pause_account(&account_id)?;
+    if pop3_store::is_hosted(&state, &account_id).await? {
+        return owned::run(&state, &account_id, LocalArchiveAction::Pause).await;
+    }
     with_mail_db_async(&state, &account_id, scan::pause).await
 }
 
@@ -98,6 +110,13 @@ pub async fn mail_archive_start(
     resume: Option<bool>,
     app: AppHandle,
 ) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    if (crate::mail::pop3::is_pop3(&config)
+        && pop3_store::prepare_fresh(&state, &config.session_id).await?)
+        || pop3_store::is_hosted(&state, &config.session_id).await?
+    {
+        return owned::start(app, config.session_id, resume.unwrap_or(false));
+    }
     tokio::task::spawn_blocking(move || worker::start(app, config, resume.unwrap_or(false)))
         .await
         .map_err(|error| error.to_string())?

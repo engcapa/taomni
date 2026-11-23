@@ -129,6 +129,7 @@ pub mod outgoing;
 mod parts;
 
 mod pop3;
+pub(crate) mod pop3_store;
 
 mod read_actions;
 

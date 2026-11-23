@@ -111,21 +111,7 @@ pub(super) fn snapshot_mail_with_options(
     std::fs::create_dir_all(target.parent().unwrap()).map_err(|e| e.to_string())?;
     hot_backup_conn(db, &target, context)?;
     if !flags.mail_originals {
-        let snapshot = rusqlite::Connection::open(&target).map_err(|e| e.to_string())?;
-        let has_table: bool = snapshot
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='mail_full_messages')",
-                [],
-                |r| r.get(0),
-            )
-            .map_err(|e| e.to_string())?;
-        if has_table {
-            context.sqlite(&snapshot, || {
-                snapshot
-                    .execute_batch("DELETE FROM mail_full_messages;")
-                    .map_err(|e| e.to_string())
-            })?;
-        }
+        omit_archive_index(&target, context)?;
     }
     let mut files = vec![StagedFile {
         archive_path: format!("mail-cache/{filename}"),
@@ -172,6 +158,25 @@ pub(super) fn snapshot_mail_with_options(
         }
     }
     Ok(files)
+}
+
+pub(super) fn omit_archive_index(path: &Path, context: &SnapshotContext) -> Result<(), String> {
+    let snapshot = rusqlite::Connection::open(path).map_err(|e| e.to_string())?;
+    let has_table: bool = snapshot
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='mail_full_messages')",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if has_table {
+        context.sqlite(&snapshot, || {
+            snapshot
+                .execute_batch("DELETE FROM mail_full_messages;")
+                .map_err(|e| e.to_string())
+        })?;
+    }
+    Ok(())
 }
 
 fn snapshot_attachment_tree(

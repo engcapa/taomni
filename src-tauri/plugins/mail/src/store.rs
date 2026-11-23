@@ -12,6 +12,8 @@ use taomni_plugin_api::{ErrorCode, RpcError, services::SafeRelativePath};
 pub(super) struct Store {
     profile: PathBuf,
     creation: std::sync::Mutex<()>,
+    pub(super) archive_previews:
+        std::sync::Mutex<std::collections::HashMap<String, (Connection, std::time::Instant)>>,
 }
 
 impl Store {
@@ -19,6 +21,7 @@ impl Store {
         Self {
             profile: profile.to_owned(),
             creation: std::sync::Mutex::new(()),
+            archive_previews: Default::default(),
         }
     }
 
@@ -92,6 +95,30 @@ impl Store {
             return Ok(None);
         }
         Ok(Some(path))
+    }
+
+    pub(super) fn open_writable_mailbox(&self, account: &str) -> Result<Connection, RpcError> {
+        let path = self.database_path(account)?.ok_or_else(unavailable)?;
+        connect(&path, OpenFlags::SQLITE_OPEN_READ_WRITE)
+    }
+
+    pub(super) fn pop3_data(&self, account: &str) -> Result<PathBuf, RpcError> {
+        let path = self.database_path(account)?.ok_or_else(unavailable)?;
+        path.parent().map(Path::to_owned).ok_or_else(unavailable)
+    }
+
+    pub(super) fn require_pop3_owner(&self, account: &str) -> Result<(), RpcError> {
+        let data = self.pop3_data(account)?;
+        if taomni_mail_engine::pop3::ownership::is_owned(&data, account)
+            .map_err(|_| unavailable())?
+        {
+            Ok(())
+        } else {
+            Err(RpcError::new(
+                ErrorCode::InvalidState,
+                "POP3_OWNER_RECEIPT_MISSING",
+            ))
+        }
     }
 
     fn data_root(&self, create: bool) -> Result<Option<PathBuf>, RpcError> {

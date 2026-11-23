@@ -35,6 +35,12 @@ pub fn save_mail_session(
     state: &crate::state::AppState,
     config: &crate::session::models::SessionConfig,
 ) -> Result<(), String> {
+    if super::super::pop3_store::receipt_exists(state.plugins.root(), &config.id)? {
+        // Account settings retain the old directory for rollback. The signed
+        // Mail host owns the live cache and portable backup paths.
+        let main_db = state.core.db.lock().map_err(|e| e.to_string())?;
+        return crate::session::db::save_session(&main_db, config).map_err(|e| e.to_string());
+    }
     let target_root = configured_directory(&config.options_json, state.mail_cache_root())?;
     let _changes = state
         .legacy

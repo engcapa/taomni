@@ -293,12 +293,25 @@ pub fn move_local(
     copy: bool,
 ) -> SqlResult<usize> {
     let tx = conn.unchecked_transaction()?;
+    let moved = move_local_in_transaction(&tx, account_id, folder, uids, target, copy)?;
+    tx.commit()?;
+    Ok(moved)
+}
+
+pub fn move_local_in_transaction(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    uids: &[u32],
+    target: &str,
+    copy: bool,
+) -> SqlResult<usize> {
     let mut moved = 0;
     for uid in uids {
-        let Some(raw) = local_raw(&tx, account_id, folder, *uid)? else {
+        let Some(raw) = local_raw(conn, account_id, folder, *uid)? else {
             continue;
         };
-        let flags_json: String = tx
+        let flags_json: String = conn
             .query_row(
                 "SELECT flags_json FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
                 params![account_id, folder, uid],
@@ -308,15 +321,14 @@ pub fn move_local(
             .unwrap_or_else(|| "[]".into());
         let flags: Vec<String> = serde_json::from_str(&flags_json).unwrap_or_default();
         let refs: Vec<&str> = flags.iter().map(String::as_str).collect();
-        insert_local(&tx, account_id, target, &raw, &refs)?;
+        insert_local(conn, account_id, target, &raw, &refs)?;
         if !copy {
-            delete_rows(&tx, account_id, folder, *uid)?;
+            delete_rows(conn, account_id, folder, *uid)?;
         }
         moved += 1;
     }
-    refresh_counts(&tx, account_id, target)?;
-    refresh_counts(&tx, account_id, folder)?;
-    tx.commit()?;
+    refresh_counts(conn, account_id, target)?;
+    refresh_counts(conn, account_id, folder)?;
     Ok(moved)
 }
 
@@ -378,19 +390,29 @@ pub fn rename_local_folder(
     to: &str,
 ) -> SqlResult<()> {
     let tx = conn.unchecked_transaction()?;
-    tx.execute(
+    rename_local_folder_in_transaction(&tx, account_id, from, to)?;
+    tx.commit()
+}
+
+pub fn rename_local_folder_in_transaction(
+    conn: &Connection,
+    account_id: &str,
+    from: &str,
+    to: &str,
+) -> SqlResult<()> {
+    conn.execute(
         "UPDATE mail_folders SET name = ?3 WHERE account_id = ?1 AND name = ?2",
         params![account_id, from, to],
     )?;
-    tx.execute(
+    conn.execute(
         "UPDATE mail_messages SET folder = ?3 WHERE account_id = ?1 AND folder = ?2",
         params![account_id, from, to],
     )?;
-    tx.execute(
+    conn.execute(
         "UPDATE mail_local_raw SET folder = ?3 WHERE account_id = ?1 AND folder = ?2",
         params![account_id, from, to],
     )?;
-    tx.commit()
+    Ok(())
 }
 
 pub fn delete_local_folder(conn: &Connection, account_id: &str, name: &str) -> SqlResult<()> {

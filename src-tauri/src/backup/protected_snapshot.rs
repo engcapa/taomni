@@ -16,7 +16,7 @@ pub(crate) fn stage_with_plugins(
     flags: BackupScopeFlags,
     context: &SnapshotContext,
 ) -> Result<super::plugins::snapshot::PluginSnapshots, String> {
-    if !flags.vault && !flags.mfa && !flags.plugins {
+    if !flags.vault && !flags.mfa && !flags.plugins && !flags.mail {
         return Ok(Default::default());
     }
     context.check()?;

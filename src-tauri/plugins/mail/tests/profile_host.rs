@@ -171,6 +171,7 @@ fn snapshot_cache(
     attachment: &str,
 ) {
     let export = profile.join("backup-export");
+    let owner_receipt = Path::new(database).with_extension("pop3-owner");
     fs::create_dir(&export).unwrap();
     let prepared = host.call(
         SNAPSHOT_PREPARE_METHOD,
@@ -179,7 +180,7 @@ fn snapshot_cache(
             "profileGeneration":context.generation,
             "destination":{
                 "token":STAGING,"absoluteJobRoot":export,
-                "allowedFiles":[database,attachment],"opaqueFiles":[attachment]
+                "allowedFiles":[database,attachment,owner_receipt],"opaqueFiles":[attachment,owner_receipt]
             },
         }),
     );
@@ -195,7 +196,7 @@ fn snapshot_cache(
         }),
     );
     let snapshot: SnapshotResult = serde_json::from_value(snapshot).unwrap();
-    assert_eq!(snapshot.files.len(), 2);
+    assert_eq!(snapshot.files.len(), 3);
     assert_eq!(snapshot.host_instance.as_str(), HOST);
     let db = Connection::open_with_flags(
         export.join(database),
@@ -211,6 +212,22 @@ fn snapshot_cache(
     assert_eq!(cards.len(), 1);
     assert_eq!(cards[0].display_name, "Migrated Card");
     assert!(cards[0].pending_sync);
+    let archive = storage::query::query(&db, ACCOUNT, &Default::default(), 0).unwrap();
+    assert_eq!(archive.total, 1);
+    assert_eq!(archive.entries[0].entry.stored_at, ARCHIVED_AT);
+    assert!(taomni_mail_engine::pop3::ownership::is_owned(&export, ACCOUNT).unwrap());
+    let ledger: (i64, bool) = db
+        .query_row(
+            "SELECT fetched_at, deleted FROM mail_pop3_uidl WHERE account_id=?1 AND uidl='archived-pop3-uidl'",
+            [ACCOUNT],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(ledger, (ARCHIVED_AT, true));
+    let copy = taomni_mail_engine::pop3::local_store::read_local_raw(&db, ACCOUNT, "Sent", 3)
+        .unwrap()
+        .unwrap();
+    assert!(copy.ends_with(b"Saved POP3 copy\r\n"));
     let original = fs::read(profile.join("plugins/mail/data").join(attachment)).unwrap();
     assert!(original.starts_with(b"SQLite format 3\0"));
     assert_eq!(fs::read(export.join(attachment)).unwrap(), original);
@@ -293,6 +310,11 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
         .unwrap();
         migrate_local_tables(&db).unwrap();
         db.execute(
+            "INSERT INTO mail_pop3_uidl (account_id,uidl,fetched_at,deleted) VALUES (?1,'archived-pop3-uidl',?2,1)",
+            rusqlite::params![ACCOUNT, ARCHIVED_AT],
+        )
+        .unwrap();
+        db.execute(
             "INSERT INTO mail_local_raw(account_id, folder, uid, raw) VALUES (?1, 'Sent', 3, ?2)",
             rusqlite::params![
                 ACCOUNT,
@@ -327,12 +349,14 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
         &[LegacyMailbox {
             account_id: ACCOUNT.into(),
             database: source.clone(),
+            pop3: true,
         }],
         taomni_mail_engine::migration::HostedMailboxData::ALL,
         &SnapshotControl::with_timeout(WAIT),
     )
     .unwrap();
     assert_eq!(stage.mailbox_count(), 1);
+    assert!(taomni_mail_engine::pop3::ownership::is_owned(&stage.data(), ACCOUNT).unwrap());
     fs::rename(stage.data(), &root).unwrap();
     assert_eq!(fs::read(&source).unwrap(), legacy_bytes);
     drop(writer);
@@ -360,6 +384,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     imap::check_routed_draft(&mut host);
     pop3::check_routed_sync(&mut host);
     pop3_round::check_sync_round(&mut host);
+    pop3_round::check_owned_sync_round(&mut host, &profile);
     snapshot_cache(&mut host, &context, &profile, &filename, &attachment);
     let folders = host.call("mail_list_cached_folders", json!({"accountId":ACCOUNT}));
     assert_eq!(folders[0]["name"], "INBOX");

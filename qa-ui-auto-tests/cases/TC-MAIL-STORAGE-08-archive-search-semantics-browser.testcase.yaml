@@ -226,6 +226,18 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="mail-archive-close"]'
 - assert_not_visible: '[data-testid="mail-archive-dialog"]'
+- click: '[data-testid="mail-archive-open"]'
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-folder"]'
+    value: INBOX
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 19 messages
+    timeout_sec: 60
+- assert_no_runtime_errors: null
 verification:
   native:
   - check: Indexed SQLite/FTS search, stored-byte accounting and disk integrity
@@ -277,6 +289,8 @@ verification:
     - 69
     - 73
     - 76
+    - 78
+    - 80
     checkpoints:
     - expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Mail save directory\"]", "name": "placeholder", "equals": "Optional directory for extra .eml copies"}}'
       step: 14
@@ -322,6 +336,10 @@ verification:
       step: 75
     - expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
       step: 77
+    - expectation: Reopening the archive finds every saved INBOX message again.
+      step: 81
+    - expectation: The archive reopens without runtime errors.
+      step: 82
     id: R1
     requirement: Literal whole-archive search stays exact for short, wildcard-like, quoted and non-Latin queries, and field scoping selects recipients only. Browser renderer and
       stub workflow; the indexed SQLite path is covered by TC-MAIL-STORAGE-09.
@@ -348,6 +366,8 @@ verification:
     - 71
     - 75
     - 77
+    - 81
+    - 82
   review: reviewed
   visual:
   - check: Filtered-empty copy and the active-filter count in the advanced summary

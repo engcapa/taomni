@@ -34,6 +34,9 @@ pub async fn mail_prefetch_message_body(
     let mut seen = HashSet::new();
     uids.retain(|uid| seen.insert(*uid));
 
+    if pop3_store::is_hosted(&state, &config.session_id).await? {
+        return Ok(true);
+    }
     if !pop3::is_pop3(&config) && module_host::prefetches_imap_bodies(&state.plugins) {
         module_host::prefetch_imap_bodies(&state, config, folder, uids).await?;
         return Ok(true);
@@ -70,7 +73,7 @@ async fn get_message_body(
     state: State<'_, AppState>,
 ) -> Result<MailMessageBody, String> {
     if pop3::is_pop3(&config) {
-        return local_cmds::get_body(&state, &config.session_id, folder.trim(), uid);
+        return local_cmds::get_body(&state, &config.session_id, folder.trim(), uid).await;
     }
     let account_id = config.session_id.clone();
     let cache_folder = folder.clone();

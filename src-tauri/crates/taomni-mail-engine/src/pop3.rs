@@ -2,6 +2,7 @@
 
 mod ledger;
 pub mod local_store;
+pub mod ownership;
 mod synchronization;
 
 pub use ledger::{Pop3Ledger, sqlite_ledger};

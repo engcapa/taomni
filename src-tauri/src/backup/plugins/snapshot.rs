@@ -45,6 +45,7 @@ pub(crate) fn stage(
     for slug in super::discover_owners(registry.root())? {
         if !flags.plugins
             && !(flags.mfa && slug == taomni_plugin_services::MFA_FIXED_KEY_OWNER.slug)
+            && !(flags.mail && slug == taomni_mail_api::SLUG)
         {
             continue;
         }
@@ -53,7 +54,7 @@ pub(crate) fn stage(
             .get(&slug)
             .filter(|record| record.reason.is_none())
             .map(|record| record.manifest.data_schema_version);
-        let snapshot = if registry.owns_snapshot_host(&slug)? {
+        let mut snapshot = if registry.owns_snapshot_host(&slug)? {
             let (snapshot, host) = super::live::stage(
                 registry,
                 &slug,
@@ -69,6 +70,9 @@ pub(crate) fn stage(
         } else {
             super::offline::stage(&profile, &slug, schema, staging, context)?
         };
+        if slug == taomni_mail_api::SLUG && flags.mail {
+            retain_selected_mail_sections(&mut snapshot, flags, context)?;
+        }
         if snapshot.inventory.is_empty() {
             continue;
         }
@@ -85,4 +89,43 @@ pub(crate) fn stage(
         result.datasets.push(dataset);
     }
     Ok(result)
+}
+
+fn retain_selected_mail_sections(
+    snapshot: &mut super::offline::OfflineSnapshot,
+    flags: BackupScopeFlags,
+    context: &SnapshotContext,
+) -> Result<(), String> {
+    let include = |relative: &str| {
+        !(!flags.mail_originals
+            && relative
+                .split('/')
+                .next()
+                .is_some_and(|folder| folder.ends_with(".mail")))
+            && !(!flags.mail_attachments && relative.starts_with("attachments/"))
+    };
+    snapshot.inventory.retain(|item| include(&item.path));
+    snapshot.files.retain(|item| {
+        include(
+            item.archive_path
+                .strip_prefix("plugins/mail/data/")
+                .unwrap_or(&item.archive_path),
+        )
+    });
+    if !flags.mail_originals {
+        for database in snapshot
+            .inventory
+            .iter()
+            .filter(|file| file.kind == super::contracts::PluginDataFileKind::Sqlite)
+        {
+            let path = format!("plugins/mail/data/{}", database.path);
+            let file = snapshot
+                .files
+                .iter()
+                .find(|file| file.archive_path == path)
+                .ok_or("Missing Mail database snapshot")?;
+            super::super::mail_snapshot::omit_archive_index(&file.disk_path, context)?;
+        }
+    }
+    Ok(())
 }

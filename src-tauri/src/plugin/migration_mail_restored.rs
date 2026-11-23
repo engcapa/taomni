@@ -68,6 +68,7 @@ pub(super) fn publish(
     root: &PluginDataRoot,
     plugins: &Path,
     missing: &[LegacyMailbox],
+    restored_pop3: &[String],
     hosted: HostedMailboxData,
     receipt: &DataReceipt,
     control: &SnapshotControl,
@@ -92,6 +93,11 @@ pub(super) fn publish(
             .map_err(|error| error.to_string())?;
         let destination = staged.join(entry.path);
         copy_retained_file(&source, &destination, control)?;
+    }
+    for account in restored_pop3 {
+        control.check().map_err(|error| error.to_string())?;
+        taomni_mail_engine::pop3::ownership::mark_owned(&staged, account)
+            .map_err(|error| error.to_string())?;
     }
     paths::write_json_durable(&staged.join(RECEIPT), receipt)?;
     sync_tree(&staged, control)?;

@@ -11,6 +11,7 @@ pub async fn mail_fetch_raw(
 ) -> Result<String, String> {
     if pop3::is_pop3(&config) {
         return local_cmds::raw(&state, &config.session_id, folder.trim(), uid)
+            .await
             .map(|raw| String::from_utf8_lossy(&raw).to_string());
     }
     let folder = folder.trim().to_string();
@@ -41,7 +42,7 @@ pub async fn mail_save_raw(
     state: State<'_, AppState>,
 ) -> Result<MailDownloadAttachmentResult, String> {
     if pop3::is_pop3(&config) {
-        let raw = local_cmds::raw(&state, &config.session_id, folder.trim(), uid)?;
+        let raw = local_cmds::raw(&state, &config.session_id, folder.trim(), uid).await?;
         let path = write_attachment_file(target_path.trim(), &raw)?;
         return Ok(MailDownloadAttachmentResult {
             path,

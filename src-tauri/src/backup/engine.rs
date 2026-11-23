@@ -239,6 +239,14 @@ fn create_backup_locked(
     )?;
     let module_owned_rows =
         super::server_configs::module_owned_rows(&protected.files, flags.sessions)?;
+    let owned_mailboxes = protected
+        .datasets
+        .iter()
+        .filter(|dataset| dataset.slug == taomni_mail_api::SLUG)
+        .flat_map(|dataset| &dataset.files)
+        .filter_map(|file| file.path.strip_suffix(".pop3-owner"))
+        .map(|stem| format!("{stem}.db"))
+        .collect::<std::collections::HashSet<_>>();
     staged_files.extend(protected.files);
 
     let mail_paths = if flags.mail {
@@ -314,12 +322,15 @@ fn create_backup_locked(
             let db = context.lock(&state.core.db)?;
             crate::session::db::list_sessions(&db, None).map_err(|e| e.to_string())?
         };
-        let mut covered = std::collections::HashSet::new();
+        let mut covered = owned_mailboxes;
         for session in sessions
             .into_iter()
             .filter(|s| s.session_type == crate::session::models::SessionType::Mail)
         {
             let stem = crate::state::mail_db_file_stem(&session.id);
+            if covered.contains(&format!("{stem}.db")) {
+                continue;
+            }
             let directory = crate::mail::storage::configured_directory(
                 &session.options_json,
                 state.mail_cache_root(),

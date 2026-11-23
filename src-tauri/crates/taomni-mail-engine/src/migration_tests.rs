@@ -14,6 +14,7 @@ fn mailbox(root: &Path, account: &str) -> LegacyMailbox {
     LegacyMailbox {
         account_id: account.to_owned(),
         database: root.join(format!("{}.db", mail_db_file_stem(account))),
+        pop3: false,
     }
 }
 
@@ -68,6 +69,7 @@ fn captures_wal_and_originals_from_custom_storage_without_changing_the_source() 
     let unused = LegacyMailbox {
         account_id: "unused".into(),
         database: default_root.join(format!("{}.db", mail_db_file_stem("unused"))),
+        pop3: false,
     };
     let staged = StagedMailData::prepare(
         staging.path(),

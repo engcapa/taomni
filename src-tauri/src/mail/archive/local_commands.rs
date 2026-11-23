@@ -2,14 +2,18 @@ use crate::mail::MailMessageBody;
 use crate::mail::archive_query;
 use crate::mail::storage;
 use crate::mail::{
-    attachment_files::publish_mail_bytes, decode_mail_original, module_host, with_mail_db_async,
-    with_mail_original,
+    attachment_files::publish_mail_bytes, decode_mail_original, module_host, pop3_store,
+    with_mail_db_async, with_mail_original,
 };
 use crate::state::AppState;
 use std::io::Read;
 use std::path::Path;
+use taomni_mail_api::archive_index::ArchiveIndexAction;
+use taomni_mail_api::pop3_store::LocalArchiveAction;
 use taomni_mail_engine::storage::scan;
 use tauri::State;
+
+use super::owned;
 
 #[tauri::command]
 pub async fn mail_archive_query(
@@ -18,9 +22,24 @@ pub async fn mail_archive_query(
     offset: Option<u32>,
     state: State<'_, AppState>,
 ) -> Result<archive_query::ArchivePage, String> {
+    let offset = offset.unwrap_or(0);
+    let hosted = pop3_store::is_hosted(&state, &account_id).await?;
+    if module_host::queries_archive_index(&state.plugins) {
+        let cache = if hosted {
+            None
+        } else {
+            Some(state.mail_db(&account_id)?)
+        };
+        return module_host::query_archive_index(
+            state.plugins.clone(),
+            account_id,
+            cache,
+            ArchiveIndexAction::Find { query, offset },
+        )
+        .await;
+    }
     with_mail_db_async(&state, &account_id, move |db, account| {
-        archive_query::query(db, account, &query, offset.unwrap_or(0))
-            .map_err(storage::as_sql_error)
+        archive_query::query(db, account, &query, offset).map_err(storage::as_sql_error)
     })
     .await
 }
@@ -31,6 +50,14 @@ pub async fn mail_archive_preview_cleanup(
     selection: archive_query::ArchiveSelection,
     state: State<'_, AppState>,
 ) -> Result<archive_query::CleanupPreview, String> {
+    if pop3_store::is_hosted(&state, &account_id).await? {
+        return owned::run(
+            &state,
+            &account_id,
+            LocalArchiveAction::Preview { selection },
+        )
+        .await;
+    }
     with_mail_db_async(&state, &account_id, move |db, account| {
         archive_query::preview(db, account, &selection).map_err(storage::as_sql_error)
     })
@@ -46,6 +73,9 @@ pub async fn mail_archive_cleanup(
     // Stop publication before deleting the frozen preview; skip markers prevent
     // other instances from publishing these originals again.
     state.legacy.mail.mail_archive.pause_account(&account_id)?;
+    if pop3_store::is_hosted(&state, &account_id).await? {
+        return owned::run(&state, &account_id, LocalArchiveAction::Cleanup { token }).await;
+    }
     with_mail_db_async(&state, &account_id, move |db, account| {
         archive_query::remove_preview(db, account, &token).map_err(storage::as_sql_error)
     })
@@ -58,8 +88,24 @@ pub async fn mail_archive_list(
     offset: Option<u32>,
     state: State<'_, AppState>,
 ) -> Result<Vec<storage::ArchiveEntry>, String> {
+    let offset = offset.unwrap_or(0);
+    let hosted = pop3_store::is_hosted(&state, &account_id).await?;
+    if module_host::queries_archive_index(&state.plugins) {
+        let cache = if hosted {
+            None
+        } else {
+            Some(state.mail_db(&account_id)?)
+        };
+        return module_host::query_archive_index(
+            state.plugins.clone(),
+            account_id,
+            cache,
+            ArchiveIndexAction::List { offset },
+        )
+        .await;
+    }
     with_mail_db_async(&state, &account_id, move |db, account| {
-        storage::list(db, account, offset.unwrap_or(0)).map_err(storage::as_sql_error)
+        storage::list(db, account, offset).map_err(storage::as_sql_error)
     })
     .await
 }
@@ -70,6 +116,9 @@ pub async fn mail_archive_read(
     entry: storage::ArchiveEntry,
     state: State<'_, AppState>,
 ) -> Result<MailMessageBody, String> {
+    if pop3_store::is_hosted(&state, &account_id).await? {
+        return owned::run(&state, &account_id, LocalArchiveAction::Read { entry }).await;
+    }
     let folder = entry.folder.clone();
     let uid = entry.uid;
     let original = with_mail_original(&state, &account_id, move |db, account| {
@@ -87,6 +136,16 @@ pub async fn mail_archive_export(
     target_path: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    if pop3_store::is_hosted(&state, &account_id).await? {
+        return module_host::pop3_store::export(
+            state.plugins.clone(),
+            account_id,
+            entry,
+            None,
+            Path::new(&target_path),
+        )
+        .await;
+    }
     let original = with_mail_original(&state, &account_id, move |db, account| {
         storage::open_entry(db, account, &entry)
     })
@@ -102,6 +161,16 @@ pub async fn mail_archive_attachment(
     target_path: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    if pop3_store::is_hosted(&state, &account_id).await? {
+        return module_host::pop3_store::export(
+            state.plugins.clone(),
+            account_id,
+            entry,
+            Some(attachment_index),
+            Path::new(&target_path),
+        )
+        .await;
+    }
     let original = with_mail_original(&state, &account_id, move |db, account| {
         storage::open_entry(db, account, &entry)
     })
@@ -119,6 +188,9 @@ pub async fn mail_archive_remove(
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
     state.legacy.mail.mail_archive.pause_account(&account_id)?;
+    if pop3_store::is_hosted(&state, &account_id).await? {
+        return owned::run(&state, &account_id, LocalArchiveAction::Remove { entries }).await;
+    }
     with_mail_db_async(&state, &account_id, move |db, account| {
         scan::pause(db, account)?;
         storage::remove_entries(db, account, &entries).map_err(storage::as_sql_error)

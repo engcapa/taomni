@@ -7,14 +7,15 @@ use crate::mail::MailAccountConfig;
 use crate::mail::MailMessageHeader;
 use crate::mail::module_host;
 use crate::mail::now_ts;
+use crate::mail::pop3_store;
 use crate::mail::resolve_config;
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 use crate::mail::with_imap_session;
-use crate::mail::with_mail_db;
 use crate::state::AppState;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use taomni_mail_api::imap_exchange::FilterBodyQuery;
+use taomni_mail_api::pop3_store::LocalMailboxAction;
 use taomni_mail_engine::filters::rules::FilterRulesAction;
 use taomni_mail_engine::filters::{
     CandidateSelection, FilterMessage, MailFilter, MailFilterRunResult, MessagePlan,
@@ -53,13 +54,19 @@ pub async fn mail_apply_filters(
         .filter(|f| f.enabled && (!incoming || f.on_incoming))
         .filter(|f| wanted.as_ref().is_none_or(|ids| ids.contains(&f.id)))
         .collect();
-    let (candidates, new_high) = with_mail_db(&state, &account_id, |db| {
+    let action = LocalMailboxAction::FilterCandidates {
+        folder: folder.clone(),
+        incoming,
+        uids: uids.clone(),
+    };
+    let candidate_folder = folder.clone();
+    let candidates = pop3_store::run(&state, &account_id, action, move |db, account| {
         let selection = if incoming {
-            match filter_mark(db, &account_id, &folder)? {
+            match filter_mark(db, account, &candidate_folder)? {
                 Some(mark) => CandidateSelection::Above(mark),
                 None => {
-                    ensure_filter_mark(db, &account_id, &folder)?;
-                    return Ok((Vec::new(), None));
+                    ensure_filter_mark(db, account, &candidate_folder)?;
+                    return Ok(Vec::new());
                 }
             }
         } else {
@@ -68,21 +75,15 @@ pub async fn mail_apply_filters(
                 None => CandidateSelection::All,
             }
         };
-        let candidates = load_candidates(db, &account_id, &folder, &selection)?;
-        let new_high = candidates.iter().map(|(h, _)| h.uid).max();
-        Ok((candidates, new_high))
-    })?;
+        load_candidates(db, account, &candidate_folder, &selection)
+    })
+    .await?;
+    let new_high = incoming
+        .then(|| candidates.iter().map(|(header, _)| header.uid).max())
+        .flatten();
     result.examined = candidates.len();
-    let finish_mark = |state: &State<'_, AppState>| -> Result<(), String> {
-        if let (true, Some(high)) = (incoming, new_high) {
-            with_mail_db(state, &account_id, |db| {
-                set_filter_mark(db, &account_id, &folder, high)
-            })?;
-        }
-        Ok(())
-    };
     if filters.is_empty() || candidates.is_empty() {
-        finish_mark(&state)?;
+        finish_mark(&state, &account_id, &folder, new_high).await?;
         return Ok(result);
     }
     let refs: Vec<&MailFilter> = filters.iter().collect();
@@ -101,7 +102,7 @@ pub async fn mail_apply_filters(
         if super::super::pop3::is_pop3(&config) {
             for uid in &uncached {
                 if let Ok(body) =
-                    super::super::local_cmds::get_body(&state, &account_id, &folder, *uid)
+                    super::super::local_cmds::get_body(&state, &account_id, &folder, *uid).await
                 {
                     local_bodies.insert(*uid, body.text.or(body.html).unwrap_or_default());
                 }
@@ -172,6 +173,26 @@ pub async fn mail_apply_filters(
         &mut result,
     )
     .await;
-    finish_mark(&state)?;
+    finish_mark(&state, &account_id, &folder, new_high).await?;
     Ok(result)
+}
+
+async fn finish_mark(
+    state: &AppState,
+    account: &str,
+    folder: &str,
+    high: Option<u32>,
+) -> Result<(), String> {
+    let Some(uid) = high else {
+        return Ok(());
+    };
+    let folder = folder.to_owned();
+    let action = LocalMailboxAction::AdvanceFilterMark {
+        folder: folder.clone(),
+        uid,
+    };
+    pop3_store::run(state, account, action, move |db, account| {
+        set_filter_mark(db, account, &folder, uid)
+    })
+    .await
 }

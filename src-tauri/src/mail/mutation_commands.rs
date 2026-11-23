@@ -16,7 +16,8 @@ pub async fn mail_mark_read(
             folder.trim(),
             uids,
             all.unwrap_or(false),
-        );
+        )
+        .await;
     }
     let folder = folder.trim().to_string();
     if folder.is_empty() {
@@ -45,9 +46,11 @@ pub async fn mail_clear_cache(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    if with_mail_db(&state, &account_id, |db| {
-        pop3::has_local_store(db, &account_id)
-    })? {
+    if pop3_store::is_hosted(&state, &account_id).await?
+        || with_mail_db(&state, &account_id, |db| {
+            pop3::has_local_store(db, &account_id)
+        })?
+    {
         return Err("This POP3 account keeps its mail only on this computer; clearing the cache would delete it.".into());
     }
     #[cfg(any(test, feature = "legacy-mail-imap"))]
@@ -82,7 +85,8 @@ pub async fn mail_set_flags(
             &uids,
             &add.unwrap_or_default(),
             &remove.unwrap_or_default(),
-        );
+        )
+        .await;
     }
     let folder = folder.trim().to_string();
     if folder.is_empty() {
@@ -160,7 +164,8 @@ pub async fn mail_move_messages(
             &uids,
             target_folder.trim(),
             false,
-        );
+        )
+        .await;
     }
     if folder.trim() == target_folder.trim() {
         return Err("source and target folders must differ".into());
@@ -194,7 +199,8 @@ pub async fn mail_copy_messages(
             &uids,
             target_folder.trim(),
             true,
-        );
+        )
+        .await;
     }
     transfer_messages(
         config,
@@ -257,7 +263,8 @@ pub async fn mail_delete_messages(
             folder.trim(),
             uids,
             all.unwrap_or(false),
-        );
+        )
+        .await;
     }
     let folder = folder.trim().to_string();
     if folder.is_empty() {

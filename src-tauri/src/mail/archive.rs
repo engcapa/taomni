@@ -8,6 +8,7 @@ mod connection;
 mod sync;
 
 mod local_commands;
+mod owned;
 mod worker;
 
 #[cfg(test)]

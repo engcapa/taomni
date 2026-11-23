@@ -16,6 +16,7 @@ pub mod imap_mutation;
 pub mod imap_sync;
 pub mod message;
 pub mod pop3_exchange;
+pub mod pop3_store;
 pub mod search;
 
 pub const SLUG: &str = "mail";

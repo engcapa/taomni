@@ -3,6 +3,7 @@ use super::connectors::{Entry, collect as rows};
 use crate::state::AppState;
 use rusqlite::{Connection, OpenFlags};
 use std::{collections::BTreeMap, path::Path};
+use taomni_mail_api::pop3_store::{LocalMailboxAction, SearchIndexRow};
 
 pub async fn collect(
     state: &AppState,
@@ -42,6 +43,28 @@ pub async fn collect(
                     ts: draft.updated_at,
                     uses: 1,
                 }));
+            }
+            if crate::mail::pop3_store::is_hosted(state, &account.reference).await? {
+                for (source, bodies) in [("mail", false), ("mail_bodies", true)] {
+                    if on(source) {
+                        let rows: Vec<SearchIndexRow> = crate::mail::pop3_store::hosted(
+                            state,
+                            &account.reference,
+                            LocalMailboxAction::SearchIndex { bodies },
+                        )
+                        .await?;
+                        result.extend(rows.into_iter().map(|row| Entry {
+                            source: source.into(),
+                            reference: row.reference,
+                            title: row.subject,
+                            body: row.text,
+                            host: String::new(),
+                            ts: row.timestamp,
+                            uses: 1,
+                        }));
+                    }
+                }
+                continue;
             }
             let handle = state.mail_db(&account.reference)?;
             let db = handle.lock_for_snapshot(&tokio_util::sync::CancellationToken::new())?;

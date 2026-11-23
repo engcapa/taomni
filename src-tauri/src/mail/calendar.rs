@@ -27,7 +27,7 @@ pub async fn mail_get_invite(
         return Err("mail folder is required".into());
     }
     if super::pop3::is_pop3(&config) {
-        let raw = super::local_cmds::raw(&state, &config.session_id, &folder, uid)?;
+        let raw = super::local_cmds::raw(&state, &config.session_id, &folder, uid).await?;
         return Ok(invite_from_message(&raw));
     }
     let raw =

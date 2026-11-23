@@ -5,7 +5,7 @@ use crate::{
     state::AppState,
 };
 use serde::de::DeserializeOwned;
-use taomni_mail_api::{ADDRESS_BOOK, MailboxRequest};
+use taomni_mail_api::{ADDRESS_BOOK, MailboxRequest, pop3_store::LocalMailboxAction};
 use taomni_mail_engine::contacts::{
     handoff::{self, AddressBookImport},
     mailbox::BookAction,
@@ -93,9 +93,15 @@ pub(in crate::mail) async fn suggestions(
         },
     )
     .await?;
-    let collected = crate::mail::with_mail_db_async(state, account, move |db, account| {
-        search_contacts(db, account, &query, limit)
-    })
+    let collected = crate::mail::pop3_store::run(
+        state,
+        account,
+        LocalMailboxAction::SearchContacts {
+            query: query.clone(),
+            limit,
+        },
+        move |db, account| search_contacts(db, account, &query, limit),
+    )
     .await?;
     Ok(merge_suggestions(book, collected, limit))
 }

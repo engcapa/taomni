@@ -15,11 +15,15 @@ use std::path::Path;
 pub struct OpenMessage {
     pub(super) file: File,
     pub(super) hash: String,
-    pub raw_size: u64,
+    pub(super) raw_size: u64,
     pub stored_at: i64,
 }
 
 impl OpenMessage {
+    pub fn raw_size(&self) -> u64 {
+        self.raw_size
+    }
+
     pub fn read(self) -> Result<Vec<u8>, String> {
         self.read_with(|| Ok(()))
     }
@@ -40,6 +44,15 @@ impl OpenMessage {
         verify_message(self.file, &self.hash, self.raw_size, temp.as_file_mut())?;
         temp.as_file().sync_all().map_err(|e| e.to_string())?;
         temp.persist(target).map_err(|e| e.error.to_string())?;
+        Ok(self.raw_size)
+    }
+
+    pub fn copy_verified(
+        self,
+        destination: impl std::io::Write,
+        check: impl Fn() -> Result<(), String>,
+    ) -> Result<u64, String> {
+        verify_message_with(self.file, &self.hash, self.raw_size, destination, check)?;
         Ok(self.raw_size)
     }
 }

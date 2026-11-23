@@ -28,7 +28,8 @@ def run(ctx, args):
         "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source",
         "imap-prefetch", "imap-mutations", "imap-mbox", "imap-forward", "outbox-queued", "outbox-sent",
     }
-    retained = {"outbox-retained", "contact-retained", "agenda-retained", "filter-retained"}
+    retained = {"outbox-retained", "contact-retained", "agenda-retained", "filter-retained", "pop3-retained"}
+    active.update({"pop3-saved", "pop3-reopened"})
     if phase not in active | retained | {"idle", "disabled"} or not signed or owner.case_id not in SIGNED_MAIL_CASES:
         raise StepError("The Mail host observation requires the registered signed native case")
     plugins = isolated_data_root(owner) / "plugins"
@@ -94,15 +95,26 @@ def run(ctx, args):
             raise StepError("The installed Mail version does not assemble messages in its host")
         report["delivery"] = observe_delivery(phase)
     if phase == "pop3-sync":
+        from .module_mail_pop3 import observe
+
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
-        if "mail/sync-pop3-round" not in manifest["commands"]:
-            raise StepError("The installed Mail version does not run complete POP3 rounds")
+        if "mail/sync-owned-pop3-mailbox" not in manifest["commands"]:
+            raise StepError("The installed Mail version does not own the POP3 mailbox")
         server = mail_fake_server.ACTIVE.state
         with server.lock:
             commands = [command for command in server.log if command.startswith("POP3 ")]
         if any(command not in commands for command in ("POP3 UIDL", "POP3 RETR", "POP3 QUIT")):
             raise StepError("The POP3 fixture did not observe a complete mailbox round")
         report["pop3Commands"] = commands
+        report["mailbox"] = observe(module / "data", plugins.parent / "mail-cache")
+    if phase in {"pop3-saved", "pop3-reopened", "pop3-retained"}:
+        from .module_mail_pop3 import observe
+
+        report["mailbox"] = observe(module / "data", plugins.parent / "mail-cache", "Signed-POP3 0001")
+        if phase == "pop3-saved":
+            signed["pop3Mailbox"] = report["mailbox"]
+        elif report["mailbox"] != signed.get("pop3Mailbox"):
+            raise StepError("The POP3 UIDL ledger or stored originals changed")
     if phase in {"filter-saved", "filter-retained"}:
         if owner.case_id != "TC-MODULES-092":
             raise StepError("Filter storage requires the signed filter case")

@@ -1,6 +1,32 @@
 //! Mail archive entries, filters, and cleanup receipts.
 
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
+
+pub const QUERY_ARCHIVE_INDEX: &str = "mail/query-archive-index";
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ArchiveIndexRequest {
+    pub account_id: String,
+    pub source: ArchiveIndexSource,
+    pub action: ArchiveIndexAction,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub enum ArchiveIndexSource {
+    AccountCache { database: PathBuf },
+    ModuleData,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub enum ArchiveIndexAction {
+    Find { query: ArchiveQuery, offset: u32 },
+    List { offset: u32 },
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]

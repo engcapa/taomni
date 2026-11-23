@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 
+use taomni_mail_api::pop3_store::LocalMailboxAction;
 use tauri::State;
 
 use super::pop3;
@@ -13,14 +14,19 @@ use super::{
     MailAccountConfig, MailDeleteResult, MailDownloadAttachmentResult, MailFlagResult, MailFolder,
     MailMarkReadResult, MailMessageBody, MailMoveResult, MailSendRequest, MailSendResult,
     MailSyncAllResult, MailTestConnectionResult, MessageBuildOptions, extract_attachment, now_ts,
-    resolve_config, upsert_sent_contacts, with_mail_db,
+    pop3_store, resolve_config, upsert_sent_contacts,
 };
 use crate::state::AppState;
 
-fn folders(state: &State<'_, AppState>, account_id: &str) -> Result<Vec<MailFolder>, String> {
-    with_mail_db(state, account_id, |db| {
-        pop3::list_local_folders(db, account_id)
-    })
+async fn folders(state: &State<'_, AppState>, account_id: &str) -> Result<Vec<MailFolder>, String> {
+    pop3_store::prepare_fresh(state, account_id).await?;
+    pop3_store::run(
+        state,
+        account_id,
+        LocalMailboxAction::Folders,
+        pop3::list_local_folders,
+    )
+    .await
 }
 
 fn folder_meta(folders: &[MailFolder], name: &str, account_id: &str) -> MailFolder {
@@ -62,7 +68,7 @@ pub(super) async fn test_connection(
     Ok(MailTestConnectionResult {
         imap_ok: true,
         smtp_ok,
-        folder_count: folders(state, &account.config.session_id)?.len(),
+        folder_count: folders(state, &account.config.session_id).await?.len(),
     })
 }
 
@@ -73,6 +79,17 @@ async fn download(
 ) -> Result<(Vec<super::MailMessageHeader>, usize, usize), String> {
     let account = resolve_config(state, config)?;
     let account_id = account.config.session_id.clone();
+    let _authority = state
+        .legacy
+        .mail
+        .pop3_owner_gate(&account_id)
+        .lock_owned()
+        .await;
+    if pop3_store::prepare_locked(state, &account_id).await? {
+        let outcome = super::module_host::pop3_store::sync(state.plugins.clone(), &account).await?;
+        let new_unseen = outcome.messages.len();
+        return Ok((outcome.messages, new_unseen, outcome.remaining));
+    }
     let leave_days = account.config.pop3_leave_days;
     let db = state.mail_db(&account_id)?;
     let gate = state.legacy.mail.mutation_gate(&account_id);
@@ -119,7 +136,7 @@ pub(super) async fn sync_folder(
     } else {
         (Vec::new(), 0, 0)
     };
-    let listed = folders(state, &account_id)?;
+    let listed = folders(state, &account_id).await?;
     Ok(MailFolderSyncResult {
         account_id: account_id.clone(),
         folder: folder_meta(&listed, folder, &account_id),
@@ -149,7 +166,7 @@ pub(super) async fn sync_all(
     }
     Ok(MailSyncAllResult {
         account_id: account_id.clone(),
-        folders: folders(state, &account_id)?,
+        folders: folders(state, &account_id).await?,
         fetched_messages: messages.len(),
         new_messages: new_unseen,
         new_unseen_by_folder,
@@ -165,26 +182,35 @@ pub(super) async fn sync_all(
     })
 }
 
-pub(super) fn list_folders(
+pub(super) async fn list_folders(
     state: &State<'_, AppState>,
     account_id: &str,
 ) -> Result<Vec<MailFolder>, String> {
-    folders(state, account_id)
+    folders(state, account_id).await
 }
 
-pub(super) fn get_body(
+pub(super) async fn get_body(
     state: &State<'_, AppState>,
     account_id: &str,
     folder: &str,
     uid: u32,
 ) -> Result<MailMessageBody, String> {
-    with_mail_db(state, account_id, |db| {
-        pop3::local_body(db, account_id, folder, uid)
-    })?
-    .ok_or_else(|| format!("message {uid} is not in the local {folder} folder"))
+    let folder = folder.to_owned();
+    let missing = format!("message {uid} is not in the local {folder} folder");
+    pop3_store::run(
+        state,
+        account_id,
+        LocalMailboxAction::Body {
+            folder: folder.clone(),
+            uid,
+        },
+        move |db, account| pop3::local_body(db, account, &folder, uid),
+    )
+    .await?
+    .ok_or(missing)
 }
 
-pub(super) fn mark_read(
+pub(super) async fn mark_read(
     state: &State<'_, AppState>,
     account_id: &str,
     folder: &str,
@@ -196,9 +222,17 @@ pub(super) fn mark_read(
     } else {
         Some(uids.unwrap_or_default())
     };
-    let marked = with_mail_db(state, account_id, |db| {
-        pop3::mark_local_read(db, account_id, folder, targets)
-    })?;
+    let key = folder.to_owned();
+    let marked = pop3_store::run(
+        state,
+        account_id,
+        LocalMailboxAction::MarkRead {
+            folder: key.clone(),
+            uids: targets.clone(),
+        },
+        move |db, account| pop3::mark_local_read(db, account, &key, targets),
+    )
+    .await?;
     Ok(MailMarkReadResult {
         folder: folder.to_string(),
         marked,
@@ -206,7 +240,7 @@ pub(super) fn mark_read(
     })
 }
 
-pub(super) fn set_flags(
+pub(super) async fn set_flags(
     state: &State<'_, AppState>,
     account_id: &str,
     folder: &str,
@@ -214,16 +248,31 @@ pub(super) fn set_flags(
     add: &[String],
     remove: &[String],
 ) -> Result<MailFlagResult, String> {
-    with_mail_db(state, account_id, |db| {
-        pop3::set_local_flags(db, account_id, folder, uids, add, remove)
-    })?;
+    let (key, ids, added, removed) = (
+        folder.to_owned(),
+        uids.to_vec(),
+        add.to_vec(),
+        remove.to_vec(),
+    );
+    pop3_store::run(
+        state,
+        account_id,
+        LocalMailboxAction::SetFlags {
+            folder: key.clone(),
+            uids: ids.clone(),
+            add: added.clone(),
+            remove: removed.clone(),
+        },
+        move |db, account| pop3::set_local_flags(db, account, &key, &ids, &added, &removed),
+    )
+    .await?;
     Ok(MailFlagResult {
         folder: folder.to_string(),
         updated: uids.len(),
     })
 }
 
-pub(super) fn move_or_copy(
+pub(super) async fn move_or_copy(
     state: &State<'_, AppState>,
     account_id: &str,
     folder: &str,
@@ -231,10 +280,22 @@ pub(super) fn move_or_copy(
     target: &str,
     copy: bool,
 ) -> Result<MailMoveResult, String> {
-    let count = with_mail_db(state, account_id, |db| {
-        pop3::ensure_local_folders(db, account_id)?;
-        pop3::move_local(db, account_id, folder, uids, target, copy)
-    })?;
+    let (key, ids, destination) = (folder.to_owned(), uids.to_vec(), target.to_owned());
+    let count = pop3_store::run(
+        state,
+        account_id,
+        LocalMailboxAction::MoveOrCopy {
+            folder: key.clone(),
+            uids: ids.clone(),
+            target: destination.clone(),
+            copy,
+        },
+        move |db, account| {
+            pop3::ensure_local_folders(db, account)?;
+            pop3::move_local(db, account, &key, &ids, &destination, copy)
+        },
+    )
+    .await?;
     Ok(MailMoveResult {
         folder: folder.to_string(),
         target: target.to_string(),
@@ -243,21 +304,29 @@ pub(super) fn move_or_copy(
     })
 }
 
-pub(super) fn delete(
+pub(super) async fn delete(
     state: &State<'_, AppState>,
     account_id: &str,
     folder: &str,
     uids: Option<Vec<u32>>,
     all: bool,
 ) -> Result<MailDeleteResult, String> {
-    let deleted = with_mail_db(state, account_id, |db| {
-        let targets = if all {
-            None
-        } else {
-            Some(uids.clone().unwrap_or_default())
-        };
-        pop3::delete_local(db, account_id, folder, targets.as_deref())
-    })?;
+    let key = folder.to_owned();
+    let targets = if all {
+        None
+    } else {
+        Some(uids.unwrap_or_default())
+    };
+    let deleted = pop3_store::run(
+        state,
+        account_id,
+        LocalMailboxAction::Delete {
+            folder: key.clone(),
+            uids: targets.clone(),
+        },
+        move |db, account| pop3::delete_local(db, account, &key, targets.as_deref()),
+    )
+    .await?;
     Ok(MailDeleteResult {
         folder: folder.to_string(),
         deleted,
@@ -265,42 +334,68 @@ pub(super) fn delete(
     })
 }
 
-pub(super) fn raw(
+pub(super) async fn raw(
     state: &State<'_, AppState>,
     account_id: &str,
     folder: &str,
     uid: u32,
 ) -> Result<Vec<u8>, String> {
-    with_mail_db(state, account_id, |db| {
-        pop3::local_raw(db, account_id, folder, uid)
-    })?
-    .ok_or_else(|| format!("message {uid} is not in the local {folder} folder"))
+    let folder = folder.to_owned();
+    let missing = format!("message {uid} is not in the local {folder} folder");
+    pop3_store::run(
+        state,
+        account_id,
+        LocalMailboxAction::Raw {
+            folder: folder.clone(),
+            uid,
+        },
+        move |db, account| pop3::local_raw(db, account, &folder, uid),
+    )
+    .await?
+    .ok_or(missing)
 }
 
-pub(super) fn create_folder(
+pub(super) async fn create_folder(
     state: &State<'_, AppState>,
     account_id: &str,
     name: &str,
 ) -> Result<Vec<MailFolder>, String> {
-    with_mail_db(state, account_id, |db| {
-        pop3::create_local_folder(db, account_id, name)
-    })?;
-    folders(state, account_id)
+    let name = name.to_owned();
+    pop3_store::run(
+        state,
+        account_id,
+        LocalMailboxAction::CreateFolder { name: name.clone() },
+        move |db, account| {
+            pop3::create_local_folder(db, account, &name)?;
+            pop3::list_local_folders(db, account)
+        },
+    )
+    .await
 }
 
-pub(super) fn rename_folder(
+pub(super) async fn rename_folder(
     state: &State<'_, AppState>,
     account_id: &str,
     from: &str,
     to: &str,
 ) -> Result<Vec<MailFolder>, String> {
-    with_mail_db(state, account_id, |db| {
-        pop3::rename_local_folder(db, account_id, from, to)
-    })?;
-    folders(state, account_id)
+    let (from, to) = (from.to_owned(), to.to_owned());
+    pop3_store::run(
+        state,
+        account_id,
+        LocalMailboxAction::RenameFolder {
+            from: from.clone(),
+            to: to.clone(),
+        },
+        move |db, account| {
+            pop3::rename_local_folder(db, account, &from, &to)?;
+            pop3::list_local_folders(db, account)
+        },
+    )
+    .await
 }
 
-pub(super) fn delete_folder(
+pub(super) async fn delete_folder(
     state: &State<'_, AppState>,
     account_id: &str,
     name: &str,
@@ -308,13 +403,20 @@ pub(super) fn delete_folder(
     if name.eq_ignore_ascii_case("INBOX") {
         return Err("the local INBOX cannot be deleted".into());
     }
-    with_mail_db(state, account_id, |db| {
-        pop3::delete_local_folder(db, account_id, name)
-    })?;
-    folders(state, account_id)
+    let name = name.to_owned();
+    pop3_store::run(
+        state,
+        account_id,
+        LocalMailboxAction::DeleteFolder { name: name.clone() },
+        move |db, account| {
+            pop3::delete_local_folder(db, account, &name)?;
+            pop3::list_local_folders(db, account)
+        },
+    )
+    .await
 }
 
-pub(super) fn download_attachment(
+pub(super) async fn download_attachment(
     state: &State<'_, AppState>,
     account_id: &str,
     folder: &str,
@@ -322,7 +424,7 @@ pub(super) fn download_attachment(
     index: usize,
     target_path: &str,
 ) -> Result<MailDownloadAttachmentResult, String> {
-    let raw = raw(state, account_id, folder, uid)?;
+    let raw = raw(state, account_id, folder, uid).await?;
     let attachment = extract_attachment(&raw, index)?;
     let path = super::write_attachment_file(target_path, &attachment.bytes)?;
     Ok(MailDownloadAttachmentResult {
@@ -341,6 +443,7 @@ pub(super) async fn send(
 ) -> Result<MailSendResult, String> {
     let account = resolve_config(state, config)?;
     let account_id = account.config.session_id.clone();
+    pop3_store::prepare_fresh(state, &account_id).await?;
     let message_id = super::outgoing::new_message_id(&account.config.email_address);
     let message = super::module_host::compose_message(
         state.plugins.clone(),
@@ -374,10 +477,41 @@ pub(super) async fn send(
     if result.accepted {
         match copy {
             Ok(bytes) => {
-                let stored = with_mail_db(state, &account_id, |db| {
-                    pop3::import_local_messages(db, &account_id, "Sent", &[bytes])?;
-                    upsert_sent_contacts(db, &account_id, &request)
-                });
+                let _authority = state
+                    .legacy
+                    .mail
+                    .pop3_owner_gate(&account_id)
+                    .lock_owned()
+                    .await;
+                let stored: Result<usize, String> =
+                    match pop3_store::is_hosted(state, &account_id).await {
+                        Ok(true) => {
+                            let sent_recipients = request
+                                .to
+                                .into_iter()
+                                .chain(request.cc)
+                                .chain(request.bcc)
+                                .collect();
+                            pop3_store::hosted(
+                                state,
+                                &account_id,
+                                LocalMailboxAction::Append {
+                                    folder: "Sent".into(),
+                                    originals: vec![bytes],
+                                    sent_recipients,
+                                },
+                            )
+                            .await
+                        }
+                        Ok(false) => {
+                            super::with_mail_db_async(state, &account_id, move |db, account| {
+                                pop3::import_local_messages(db, account, "Sent", &[bytes])?;
+                                upsert_sent_contacts(db, account, &request)
+                            })
+                            .await
+                        }
+                        Err(error) => Err(error),
+                    };
                 match stored {
                     Ok(_) => result.sent_copy_folder = Some("Sent".into()),
                     Err(e) => result.sent_copy_error = Some(e),
@@ -390,24 +524,51 @@ pub(super) async fn send(
 }
 
 /// Store raw messages (mbox/.eml import) in a local folder.
-pub(super) fn import(
+pub(super) async fn import(
     state: &State<'_, AppState>,
     account_id: &str,
     folder: &str,
-    messages: &[Vec<u8>],
+    messages: Vec<Vec<u8>>,
 ) -> Result<usize, String> {
-    with_mail_db(state, account_id, |db| {
-        pop3::import_local_messages(db, account_id, folder, messages)
+    let folder = folder.to_owned();
+    let _authority = state
+        .legacy
+        .mail
+        .pop3_owner_gate(account_id)
+        .lock_owned()
+        .await;
+    if pop3_store::is_hosted(state, account_id).await? {
+        return pop3_store::hosted(
+            state,
+            account_id,
+            LocalMailboxAction::Append {
+                folder,
+                originals: messages,
+                sent_recipients: Vec::new(),
+            },
+        )
+        .await;
+    }
+    super::with_mail_db_async(state, account_id, move |db, account| {
+        pop3::import_local_messages(db, account, &folder, &messages)
     })
+    .await
 }
 
 /// Raw messages of a local folder in UID order (mbox export).
-pub(super) fn folder_raw(
+pub(super) async fn folder_raw(
     state: &State<'_, AppState>,
     account_id: &str,
     folder: &str,
 ) -> Result<Vec<(u32, Vec<u8>)>, String> {
-    with_mail_db(state, account_id, |db| {
-        pop3::list_local_originals(db, account_id, folder)
-    })
+    let folder = folder.to_owned();
+    pop3_store::run(
+        state,
+        account_id,
+        LocalMailboxAction::Originals {
+            folder: folder.clone(),
+        },
+        move |db, account| pop3::list_local_originals(db, account, &folder),
+    )
+    .await
 }
