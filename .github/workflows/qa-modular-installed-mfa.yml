@@ -158,7 +158,7 @@ jobs:
           mkdir -p installed-mfa-evidence/rdp-probe
           git rev-parse HEAD > installed-mfa-evidence/rdp-probe/source-sha.txt
           sha256sum src-tauri/target/release/rdp-probe > installed-mfa-evidence/rdp-probe/sha256.txt
-      - name: Exercise apt replacement, signed MFA migration and rollback
+      - name: Exercise apt replacement, signed module migration and rollback
         env:
           FIRST_RELEASE: ${{ inputs.first_release }}
           VERIFY_RELOCATION: ${{ inputs.verify_relocation }}
@@ -166,7 +166,7 @@ jobs:
         run: |
           extra=(--signed signed-input)
           if [[ "$FIRST_RELEASE" == true ]]; then
-            python -m unittest test_module_first_release test_installed_first_release
+            python -m unittest test_module_first_release test_installed_first_release test_installed_mail_upgrade
             extra=(--first-release first-release-input)
           fi
           python -m unittest test_installed_mfa_crash test_installed_mfa_mode_lease

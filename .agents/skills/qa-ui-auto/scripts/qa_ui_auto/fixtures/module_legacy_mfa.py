@@ -182,9 +182,12 @@ def close_installed_desktop(driver, session, executable):
             "confirmation": session.application_restart_observation["exit_confirmation"]}
 
 
-def seed_legacy_desktop(ctx, executable, desktop, evidence, profile, *, catalog_source=None, environment=None):
+def seed_legacy_desktop(ctx, executable, desktop, evidence, profile, *,
+                        catalog_source=None, environment=None, after_seed=None):
     with installed_desktop(ctx, executable, desktop, evidence, "legacy-window", environment=environment) as (driver, session):
         create_account(session, ctx, evidence)
+        if after_seed is not None:
+            after_seed(session)
         if catalog_source:
             session.execute("localStorage.setItem('taomni.module-catalog-source.v1', "
                             + json.dumps(catalog_source) + "); return true;")
@@ -195,12 +198,13 @@ def seed_legacy_desktop(ctx, executable, desktop, evidence, profile, *, catalog_
         })
 
 
-def run_legacy_desktop(ctx, executable, work, evidence, *, catalog_source=None):
+def run_legacy_desktop(ctx, executable, work, evidence, *, catalog_source=None, after_seed=None):
     desktop = work / "desktop"
     _, profile = desktop_environment(desktop)
     if profile.exists() or profile.is_symlink():
         raise RuntimeError("The installed desktop requires a fresh isolated profile")
-    seed_legacy_desktop(ctx, executable, desktop, evidence, profile, catalog_source=catalog_source)
+    seed_legacy_desktop(ctx, executable, desktop, evidence, profile,
+                        catalog_source=catalog_source, after_seed=after_seed)
     return profile
 
 

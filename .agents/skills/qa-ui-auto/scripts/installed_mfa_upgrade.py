@@ -11,11 +11,13 @@ from types import SimpleNamespace
 
 from ci_desktop import Desktop
 import installed_first_release
+import installed_mail_upgrade
 from installed_linux_formats import appimage_binary, install_rpm, prepare_appimage
 from installed_mfa_crash import abrupt_exit
 from installed_mfa_profile import copy_profile
 from linux_noexec import NoExecBind, is_noexec
 from modular_bundle_inventory import digest, inventory
+from qa_ui_auto.mail_fake_server import FakeMailServer
 from qa_ui_auto.fixtures.module_legacy_mfa import (
     ISSUER, close_installed_desktop, commit_mfa_upgrade, desktop_action, desktop_environment, element,
     installed_desktop, isolated_desktop, open_unlocked_mfa, run_legacy_desktop, write_json,
@@ -225,12 +227,22 @@ def execute(args):
     try:
         with ExitStack() as resources, Desktop(report / "desktop", ["display", "x11"]):
             origin = None
+            mail_input = None
+            seed_mail = None
             if args.first_release:
                 origin = resources.enter_context(closing(installed_first_release.open_release(
                     args.first_release.resolve(strict=True), target, report,
                 )))
                 receipt = origin.roster["taomni-plugin-mfa"]
                 archive = origin.files["/" + receipt["archive"]]
+                server = FakeMailServer()
+                resources.callback(server.stop)
+                server.state.deliver("INBOX", 1, prefix=installed_mail_upgrade.LEGACY_PREFIX,
+                                     body=installed_mail_upgrade.LEGACY_BODY + "\r\n")
+                mail_package = origin.roster[installed_mail_upgrade.MAIL_ID]
+
+                def seed_mail(session):
+                    installed_mail_upgrade.seed_original(ctx, session, legacy_install, server)
             else:
                 receipt, archive, _, _ = load_artifact(args.signed, target["producerSource"], "linux-x86_64", "mfa")
             signature = archive.with_name(receipt["signature"])
@@ -244,8 +256,12 @@ def execute(args):
                 from installed_core_resources import record_linux_comparison, sample_linux
                 original_resources = sample_linux(ctx, old_executable, work, report, "original")
             catalog_source = f"{installed_first_release.ORIGIN}/{origin.start_catalog}" if origin else None
-            profile = run_legacy_desktop(ctx, old_executable, work, legacy_install, catalog_source=catalog_source)
+            profile = run_legacy_desktop(ctx, old_executable, work, legacy_install,
+                                         catalog_source=catalog_source, after_seed=seed_mail)
             result["profile"] = str(profile)
+            if origin:
+                mail_input = installed_mail_upgrade.LegacyMailbox.observe(profile)
+                stages["legacyMail"] = mail_input.evidence()
             candidate, replacement = replace_package(package, work, report / "candidate-install",
                                                      version=target["version"])
             stages["replacement"] = replacement
@@ -256,7 +272,21 @@ def execute(args):
                 stages["coreResources"] = record_linux_comparison(
                     report, target, old_package, package, original_resources, candidate_resources,
                 )
-                stages["firstBusinessInstall"] = installed_first_release.exercise(ctx, candidate, work, profile, report, origin)
+                stages["mailStagedForRestart"] = installed_mail_upgrade.stage_on_first_launch(
+                    ctx, candidate, work / "desktop", report, mail_input, mail_package,
+                )
+
+                def read_migrated_mail(steps):
+                    stages["migratedMail"] = installed_mail_upgrade.exercise_migrated(
+                        steps, mail_input, server, mail_package,
+                    )
+
+                stages["firstBusinessInstall"] = installed_first_release.exercise(
+                    ctx, candidate, work, profile, report, origin, mail=read_migrated_mail,
+                )
+                stages["uninstalledMailData"] = mail_input.assert_uninstalled(
+                    mail_package["version"], stages["migratedMail"]["syncedUid"],
+                )
             commit_mfa_upgrade(candidate, profile, archive, signature, report)
             stages["candidate"] = inspect_accounts(ctx, candidate, work, report, "candidate-window",
                                                     "287 082", next_code="359 152")
@@ -265,6 +295,10 @@ def execute(args):
             stages["rollbackInstall"] = rollback
             if rollback["binarySha256"] != legacy["binarySha256"]:
                 raise RuntimeError("The rollback did not restore the verified old executable")
+            if mail_input:
+                stages["rollbackMail"] = installed_mail_upgrade.exercise_rollback(
+                    ctx, old_executable, work / "desktop", report, mail_input,
+                )
             stages["rollback"] = inspect_accounts(ctx, old_executable, work, report, "rollback-window", "287 082")
             candidate, reinstalled = replace_package(package, work, report / "candidate-reinstall",
                                                     version=target["version"])
@@ -284,6 +318,9 @@ def execute(args):
                 stages["rdpPerformance"] = measure(candidate, args.rdp_probe.resolve(strict=True),
                                                    target["producerSource"], work, report, origin=origin)
             result["passed"] = True
+    except Exception as error:
+        result["error"] = str(error)
+        raise
     finally:
         write_json(report, "installed-mfa-upgrade.json", result)
 

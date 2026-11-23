@@ -43,7 +43,7 @@ def enrollment(profile, origin):
     raise RuntimeError("Installed core did not finish first enrollment with the release packages")
 
 
-def exercise(ctx, executable, work, profile, evidence, origin, *, environment=None):
+def exercise(ctx, executable, work, profile, evidence, origin, *, environment=None, mail=None):
     observation = {"passed": False, "binarySha256": digest(executable), "stages": {}}
     try:
         for label, removed in [("first-business-install", None), ("reopen-without-mail", "mail")]:
@@ -70,10 +70,15 @@ def exercise(ctx, executable, work, profile, evidence, origin, *, environment=No
                 desktop_action(steps, "wait_for", mfa)
                 stage["currentModules"] = current_roster_modules(session, origin.roster, removed)
                 if removed is None:
+                    if mail is not None:
+                        mail(steps)
+                        desktop_action(steps, "click", element("ribbon-settings"))
                     desktop_action(steps, "press", {"selector": element("module-action-uninstall-mail") + ":not([disabled])", "key": "Enter"})
                     desktop_action(steps, "wait_for", element("confirm-dialog"))
                     desktop_action(steps, "click", element("confirm-dialog-confirm"))
                 desktop_action(steps, "wait_for", element("module-action-install-mail"))
+                if mail is not None:
+                    desktop_action(steps, "wait_for", element("module-data-retained-mail"))
                 desktop_action(steps, "assert_no_runtime_errors", None)
                 stage["shutdown"] = close_installed_desktop(driver, session, executable)
         observation["passed"] = True
