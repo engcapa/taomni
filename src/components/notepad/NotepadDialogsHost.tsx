@@ -3,6 +3,7 @@ import type { NotepadHostContext } from "../../lib/notepad/host/types";
 import { acceptTamperedMacros, normalizeMacroSteps, saveMacrosList, type SavedMacroEntry } from "../../lib/notepad/macro/macroManager";
 import { viewerTabHost } from "../../lib/notepad/host/viewerTabHost";
 import { openFile } from "../../lib/openFile";
+import { readPasteText } from "../../lib/clipboard";
 import { isUntitledKey } from "../../lib/openFile/pathIdentity";
 import type { ViewerDocument } from "../../lib/viewer";
 import { useDocumentStore } from "../../stores/documentStore";
@@ -286,7 +287,7 @@ export function NotepadDialogsHost({
             ignoreCase: false,
           });
         }}
-        readClipboard={() => navigator.clipboard?.readText().catch(() => "") ?? Promise.resolve("")}
+        readClipboard={() => readPasteText().catch(() => "")}
       />
 
       {aboutOpen && (

@@ -8920,6 +8920,9 @@ controls:
   - id: mail-save-eml
     selector: '[data-testid="context-menu-item-save-as-eml"]'
     kind: interactive
+  - id: mail-save-attachment-as
+    selector: '[data-testid="context-menu-item-save-attachment-as"]'
+    kind: interactive
   - id: mail-source-dialog
     selector: '[role="dialog"][aria-label="Message source"]'
     kind: display
@@ -16634,7 +16637,7 @@ File Explorer 是 Sessions 下方的独立工作区，Tools 面板不再提供�
 
 ## 全局文件打开 / 预览 / 编辑
 
-TC-FILE-OPEN-006 检查工作区入口去重和全局文件设置。TC-FILE-OPEN-047
+TC-FILE-OPEN-006 检查工作区入口去重和全局文件设置。TC-FILE-OPEN-049
 检查 Mail 附件的只读副本、去重和最终关闭清理，并在完整模块回归中使用已启用的 Mail。
 
 <!-- feature
@@ -16822,6 +16825,9 @@ controls:
   - id: viewer-close-keep-draft
     selector: '[data-testid="viewer-close-keep-draft"]'
     kind: interactive
+  - id: viewer-close-error
+    selector: '[data-testid="viewer-close-error"]'
+    kind: display
   - id: viewer-close-cancel
     selector: '[data-testid="viewer-close-cancel"]'
     kind: interactive
@@ -17651,6 +17657,21 @@ controls:
   - id: notepad-menu-edit
     selector: '[data-testid="notepad-menu-edit"]'
     kind: interactive
+  - id: notepad-menu-item-edit-paste
+    selector: '[data-testid="notepad-menu-item-edit.paste"]'
+    kind: interactive
+  - id: notepad-menu-item-edit-clipboard-history
+    selector: '[data-testid="notepad-menu-item-edit.clipboardHistory"]'
+    kind: interactive
+  - id: notepad-clipboard-history-dialog
+    selector: '[data-testid="notepad-clipboard-history-dialog"]'
+    kind: display
+  - id: notepad-clipboard-history-empty
+    selector: '[data-testid="notepad-clipboard-history-empty"]'
+    kind: display
+  - id: notepad-clipboard-history-item
+    selector: '[data-testid="notepad-clipboard-history-item-0"]'
+    kind: interactive
   - id: notepad-menu-item-file-toggle-readonly
     selector: '[data-testid="notepad-menu-item-file.toggleReadonly"]'
     kind: interactive
@@ -17723,6 +17744,9 @@ controls:
   - id: notepad-find-bar
     selector: '[data-testid="notepad-find-bar"]'
     kind: display
+  - id: notepad-find-all-current
+    selector: '[data-testid="notepad-find-all-current"]'
+    kind: interactive
   - id: np-find-input
     selector: '[data-testid="np-find-input"]'
     kind: interactive

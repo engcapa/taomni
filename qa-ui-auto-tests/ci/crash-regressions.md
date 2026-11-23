@@ -35,7 +35,7 @@
 | TC-FILE-OPEN-013 | Markdown Live 默认只读、显式编辑、split 实际拖拽、独立 Mermaid 主题与目录选项；切换后正文保持 | browser/native |
 | TC-EXPLORER-013 | 新建 Markdown/HTML/SVG/JSON/TypeScript，进入实际编辑器、保存与关闭重开；独立文件字节和代码工作区 reload 恢复 | browser/native |
 | TC-FILE-OPEN-041 | Live 表格格式与 Split 一致，源码编辑、Tab、Undo 和 Redo 后格式及邻居保留，覆盖完整 GFM 保存重开、受控图片及 HTML 清理 | browser/native |
-| TC-FILE-OPEN-047 | Mail 附件只读打开、实际文件内容、去重和最终关闭清理，依赖 Mail 模块 | browser/native |
+| TC-FILE-OPEN-049 | Mail 附件只读打开、实际文件内容、去重和最终关闭清理，依赖 Mail 模块 | browser/native |
 | TC-TAO-HOME-002 | Tao Messages 原生 IPC、慢流停止后的真实网络关闭、多轮顺序、reload 历史及三种代理路径 | native/release |
 
 模块化发布在 GitHub Runner 执行核心和完整模块两套集合。核心集合的

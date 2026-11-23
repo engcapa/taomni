@@ -8,6 +8,7 @@ import { getAppThemeMode, setAppThemeMode } from "../../../lib/appTheme";
 import { loadValidatedMacros } from "../../../lib/notepad/macro/macroManager";
 import { viewerTabHost } from "../../../lib/notepad/host/viewerTabHost";
 import { viewerSetReadonlyAttr } from "../../../lib/notepad/ipc";
+import { readPasteText, writeText } from "../../../lib/clipboard";
 import { insertBlankLineAbove, insertBlankLineBelow, shuffleLines } from "../../../lib/notepad/transforms/lines";
 import { spacesToTabsAll } from "../../../lib/notepad/transforms/whitespace";
 import { useRecentFilesStore } from "../../../stores/app/recentFiles";
@@ -95,10 +96,10 @@ function applyCaseKind(ctx: NotepadActionContext, kind: Parameters<NotepadAction
   ctx.applyCaseOp(kind);
 }
 
-async function copySelectionOr(_ctx: NotepadActionContext, compute: () => string): Promise<void> {
+async function copySelectionOr(ctx: NotepadActionContext, compute: () => string): Promise<void> {
   const text = compute();
   if (!text) return;
-  await navigator.clipboard?.writeText(text).catch(() => undefined);
+  await writeText(text).catch((error: unknown) => ctx.onError(String(error)));
   useNotepadStore.getState().pushClipboardHistory(text);
 }
 
@@ -225,7 +226,7 @@ export function createExtraCommandMap(ctx: NotepadActionContext): Record<string,
     "edit.toggleChangeHistory": () => setNotepadPreferences({ showChangeHistory: !useNotepadPreferences.getState().showChangeHistory }),
     "edit.pasteReplaceBookmarkedLines": async () => {
       if (ctx.effectiveReadOnly) return;
-      const text = await navigator.clipboard?.readText().catch(() => "");
+      const text = await readPasteText().catch(() => "");
       if (!text) return;
       const lines = text.split(/\r?\n/);
       const bookmarks = [...ctx.docState.bookmarks].sort((a, b) => a - b);
@@ -383,7 +384,7 @@ export function createExtraCommandMap(ctx: NotepadActionContext): Record<string,
       });
     },
     "tools.compareClipboard": async () => {
-      const text = await navigator.clipboard?.readText().catch(() => "");
+      const text = await readPasteText().catch(() => "");
       useNotepadStore.getState().setCompare({
         open: true,
         leftTitle: "Clipboard",
@@ -395,7 +396,7 @@ export function createExtraCommandMap(ctx: NotepadActionContext): Record<string,
       });
     },
     "tools.compareOther": async () => {
-      const text = await navigator.clipboard?.readText().catch(() => "");
+      const text = await readPasteText().catch(() => "");
       ctx.setPickerModal({
         kind: "comparePick",
         clipboardText: text ?? "",

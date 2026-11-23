@@ -37,7 +37,7 @@ class ModuleProfileSelectionTests(unittest.TestCase):
         self.assertEqual([b["id"] for b in core["builds"]], [b["id"] for b in full["builds"]])
         self.assertTrue(all(b["id"].endswith("-release-modular") for b in full["builds"]))
         self.assertTrue(all("modular-release" in b["capabilities"] for b in full["builds"]))
-        plugin_cases = {"TC-FILE-OPEN-047": "mail", "TC-MODULES-102": "mfa"}
+        plugin_cases = {"TC-FILE-OPEN-049": "mail", "TC-MODULES-102": "mfa"}
         excludes = [entry for entry in core["not_applicable"] if "requires_plugin" in entry]
         self.assertEqual(len(excludes), 12)
         self.assertEqual({e["case"]: e["requires_plugin"] for e in excludes}, plugin_cases)
@@ -201,7 +201,7 @@ class SelectionTests(unittest.TestCase):
                     'TC-FILE-OPEN-002', 'TC-FILE-OPEN-003', 'TC-FILE-OPEN-005', 'TC-FILE-OPEN-006',
                     'TC-FILE-OPEN-007', 'TC-FILE-OPEN-008', 'TC-FILE-OPEN-009', 'TC-FILE-OPEN-010', 'TC-FILE-OPEN-011', 'TC-FILE-OPEN-012',
                     'TC-FILE-OPEN-013', 'TC-TAO-HOME-002', 'TC-EXPLORER-013', 'TC-FILE-OPEN-041',
-                    'TC-FILE-OPEN-047', 'TC-MODULES-102'}
+                    'TC-FILE-OPEN-049', 'TC-MODULES-102'}
         for entry in native:
             with self.subTest(profile=entry['linux_profile']):
                 self.assertEqual(set(entry['selected_ids']), expected)

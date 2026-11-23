@@ -32,11 +32,11 @@ smoke:
 - TC-FILE-OPEN-004
 - TC-FILE-OPEN-005
 - TC-FILE-OPEN-006
-- TC-FILE-OPEN-047
+- TC-FILE-OPEN-049
 - TC-MODULES-102
 unavailable: {}
 requires_plugin:
-  TC-FILE-OPEN-047: mail
+  TC-FILE-OPEN-049: mail
   TC-MODULES-102: mfa
 # Opt-in fixtures need a credential a hosted runner intentionally does not hold.
 # When none of the listed variables is set at plan time the fixture's cases are
@@ -180,6 +180,8 @@ cases:
 - TC-FILE-OPEN-045
 - TC-FILE-OPEN-046
 - TC-FILE-OPEN-047
+- TC-FILE-OPEN-048
+- TC-FILE-OPEN-049
 - TC-WS-098
 - TC-WS-099
 - TC-WS-100
@@ -1022,6 +1024,9 @@ cases:
 - TC-NP-005
 - TC-NP-006
 - TC-NP-007
+- TC-NP-008
 - TC-NP-101
 - TC-NP-102
 - TC-NP-103
+- TC-NP-104
+- TC-NP-105

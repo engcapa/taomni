@@ -20,6 +20,7 @@ import {
   readMultiFormat,
   readNativeTextResult,
   readNativeClipboardImagePath,
+  readPasteText,
   writeMultiFormat,
   writeText,
   writeImagePng,
@@ -210,5 +211,44 @@ describe("clipboard.readClipboardImageFiles", () => {
       configurable: true,
     });
     await expect(readClipboardImageFiles()).resolves.toEqual([]);
+  });
+});
+
+describe("clipboard.readPasteText", () => {
+  it("keeps a non-empty webview result and does not consult the native owner", async () => {
+    const webRead = vi.fn().mockResolvedValue("webview text");
+    Object.defineProperty(globalThis, "navigator", { value: { clipboard: { readText: webRead } }, configurable: true });
+    clipboardTestMocks.tauri = true;
+
+    await expect(readPasteText()).resolves.toBe("webview text");
+    expect(clipboardTestMocks.invoke).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the native owner when the webview read rejects (WebView2 denial)", async () => {
+    const webRead = vi.fn().mockRejectedValue(new DOMException("Read permission denied", "NotAllowedError"));
+    Object.defineProperty(globalThis, "navigator", { value: { clipboard: { readText: webRead } }, configurable: true });
+    clipboardTestMocks.tauri = true;
+    clipboardTestMocks.invoke.mockResolvedValue("native text");
+
+    await expect(readPasteText()).resolves.toBe("native text");
+    expect(clipboardTestMocks.invoke).toHaveBeenCalledWith("clipboard_read_text");
+  });
+
+  it("retries the native owner when the webview resolves an empty string", async () => {
+    const webRead = vi.fn().mockResolvedValue("");
+    Object.defineProperty(globalThis, "navigator", { value: { clipboard: { readText: webRead } }, configurable: true });
+    clipboardTestMocks.tauri = true;
+    clipboardTestMocks.invoke.mockResolvedValue("native only text");
+
+    await expect(readPasteText()).resolves.toBe("native only text");
+  });
+
+  it("returns empty text when both owners have nothing to paste", async () => {
+    const webRead = vi.fn().mockResolvedValue("");
+    Object.defineProperty(globalThis, "navigator", { value: { clipboard: { readText: webRead } }, configurable: true });
+    clipboardTestMocks.tauri = true;
+    clipboardTestMocks.invoke.mockRejectedValue(new Error("clipboard read: ContentNotAvailable"));
+
+    await expect(readPasteText()).resolves.toBe("");
   });
 });

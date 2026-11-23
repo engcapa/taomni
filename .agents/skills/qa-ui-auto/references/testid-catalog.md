@@ -1138,6 +1138,11 @@
 - `[data-testid="notepad-context-save"]` — interactive — F-NOTEPAD-1.notepad-context-save
 - `[data-testid="notepad-context-save-as"]` — display — F-NOTEPAD-1.notepad-context-save-as
 - `[data-testid="notepad-menu-edit"]` — interactive — F-NOTEPAD-1.notepad-menu-edit
+- `[data-testid="notepad-menu-item-edit.paste"]` — interactive — F-NOTEPAD-1.notepad-menu-item-edit-paste
+- `[data-testid="notepad-menu-item-edit.clipboardHistory"]` — interactive — F-NOTEPAD-1.notepad-menu-item-edit-clipboard-history
+- `[data-testid="notepad-clipboard-history-dialog"]` — display — F-NOTEPAD-1.notepad-clipboard-history-dialog
+- `[data-testid="notepad-clipboard-history-empty"]` — display — F-NOTEPAD-1.notepad-clipboard-history-empty
+- `[data-testid="notepad-clipboard-history-item-0"]` — interactive — F-NOTEPAD-1.notepad-clipboard-history-item
 - `[data-testid="notepad-menu-item-file.toggleReadonly"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-toggle-readonly
 - `[data-testid="notepad-status-readonly"]` — interactive — F-NOTEPAD-1.notepad-status-readonly
 - `[data-testid="notepad-menu-item-file.openWith"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-open-with
@@ -1158,6 +1163,7 @@
 
 - `[data-testid="notepad-tool-find"]` — interactive — F-NOTEPAD-2.notepad-tool-find
 - `[data-testid="notepad-find-bar"]` — display — F-NOTEPAD-2.notepad-find-bar
+- `[data-testid="notepad-find-all-current"]` — interactive — F-NOTEPAD-2.notepad-find-all-current
 - `[data-testid="np-find-input"]` — interactive — F-NOTEPAD-2.np-find-input
 - `[data-testid="notepad-find-status"]` — display — F-NOTEPAD-2.notepad-find-status
 - `[data-testid="np-find-next"]` — interactive — F-NOTEPAD-2.np-find-next
@@ -1488,6 +1494,7 @@
 - `[data-testid="viewer-close-save"]` — interactive — F-FILEOPEN-1.viewer-close-save
 - `[data-testid="viewer-close-discard"]` — interactive — F-FILEOPEN-1.viewer-close-discard
 - `[data-testid="viewer-close-keep-draft"]` — interactive — F-FILEOPEN-1.viewer-close-keep-draft
+- `[data-testid="viewer-close-error"]` — display — F-FILEOPEN-1.viewer-close-error
 - `[data-testid="viewer-close-cancel"]` — interactive — F-FILEOPEN-1.viewer-close-cancel
 - `[data-testid="image-viewer"]` — display — F-FILEOPEN-1.image-viewer
 - `[data-testid="image-render"]` — display — F-FILEOPEN-1.image-render
@@ -2003,6 +2010,7 @@
 
 - `[data-testid="context-menu-item-view-source"]` — interactive — F-MAIL-23.mail-view-source
 - `[data-testid="context-menu-item-save-as-eml"]` — interactive — F-MAIL-23.mail-save-eml
+- `[data-testid="context-menu-item-save-attachment-as"]` — interactive — F-MAIL-23.mail-save-attachment-as
 - `[role="dialog"][aria-label="Message source"]` — display — F-MAIL-23.mail-source-dialog
 - `[data-testid="mail-storage-settings"]` — display — F-MAIL-23.mail-storage-settings
 - `[data-testid="mail-storage-directory"]` — interactive — F-MAIL-23.mail-storage-directory

@@ -1,4 +1,4 @@
-id: TC-FILE-OPEN-046
+id: TC-FILE-OPEN-048
 title: Import draw.io sheets with named layers and embedded or offline images (browser)
 description: Select a sheet without the default root IDs, render its labels and images, preserve the original asset references, and reopen the saved Markdown.
 covers: [F-FILEOPEN-1, F-EXPLORER-1]

@@ -1,0 +1,122 @@
+id: TC-NP-104
+title: Notepad keyboard/menu paste, copy roundtrip and clipboard history insert
+description: >-
+  AC-17/AC-18 renderer slice. On an untitled Notepad workbench document, Ctrl/Cmd+V
+  inserted clipboard text from the real keyboard event path, the Edit menu Paste
+  command inserted the same text again through the command registry, a select-all
+  copy then paste roundtrip kept the buffer and filled the Notepad clipboard history,
+  and the Clipboard History dialog inserted its stored entry at the caret. Copy
+  correctness is asserted by roundtrip and history content; the OS clipboard
+  boundary is covered by the native companion case, this case uses the browser
+  clipboard stub.
+modes:
+- browser
+covers:
+- F-NOTEPAD-1
+tags:
+- p1
+- notepad
+- clipboard
+- regression
+fixtures:
+- reset_db
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab-new-notepad"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="notepad-workbench"]'
+- click: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Control+End
+    macos_key: Meta+ArrowDown
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- type: alpha
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - alpha
+# Keyboard path: the shared WebView clipboard event/paste command must insert text
+# while the editor owns focus.
+- seed_clipboard: PASTED-BETA
+- press:
+    key: Mod+v
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- wait: 0.3
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - alphaPASTED-BETA
+# Menu path: the Edit > Paste registry command inserts the same clipboard text.
+- click: '[data-testid="notepad-menu-edit"]'
+- wait_for: '[data-testid="notepad-menu-item-edit.paste"]'
+- click: '[data-testid="notepad-menu-item-edit.paste"]'
+- wait: 0.3
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - alphaPASTED-BETAPASTED-BETA
+# Copy roundtrip: select all, copy, then paste replaces the selection with the same
+# bytes, so the buffer and the single line stay unchanged.
+- press:
+    key: Mod+a
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Mod+c
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- wait: 0.3
+- press:
+    key: Mod+v
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- wait: 0.3
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - alphaPASTED-BETAPASTED-BETA
+# The copy paths above must also fill the app-side clipboard history. The dialog
+# lists the entries and clicking one inserts it at the caret.
+- click: '[data-testid="notepad-menu-edit"]'
+- wait_for: '[data-testid="notepad-menu-item-edit.clipboardHistory"]'
+- click: '[data-testid="notepad-menu-item-edit.clipboardHistory"]'
+- wait_for: '[data-testid="notepad-clipboard-history-dialog"]'
+- assert_not_visible: '[data-testid="notepad-clipboard-history-empty"]'
+- assert_visible: '[data-testid="notepad-clipboard-history-item-0"]'
+- click: '[data-testid="notepad-clipboard-history-item-0"]'
+- assert_not_visible: '[data-testid="notepad-clipboard-history-dialog"]'
+- wait: 0.3
+- assert_text:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    contains: PASTED-BETA
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The keyboard paste shortcut inserts seeded clipboard text into the focused Notepad editor.
+    actions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+    checkpoints:
+    - {step: 14, expectation: The keyboard paste inserted the clipboard text at the caret.}
+    results: [14]
+  - id: R2
+    requirement: The Edit menu Paste command inserts the current clipboard text through the production command registry.
+    actions: [15, 16, 17, 18]
+    checkpoints:
+    - {step: 19, expectation: The menu command appended the clipboard text again.}
+    results: [19]
+  - id: R3
+    requirement: Select-all copy then paste round-trips the buffer and the copy fills the Notepad clipboard history, whose entry re-inserts at the caret.
+    actions: [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+    checkpoints:
+    - {step: 35, expectation: The inserted history entry kept the pasted text in the buffer.}
+    - {step: 36, expectation: The workflow raised no uncaught runtime errors.}
+    results: [35, 36]
+  visual:
+  - check: Clipboard-history dialog visuals are exercised but not pixel-verified.
+    method: not-applicable
+    reason: This case asserts inserted text and dialog state; dedicated theme cases own visual contrast.
+  native:
+  - check: Real OS clipboard read/write and native OS shortcuts.
+    method: external
+    reason: Browser uses the stubbed clipboard; TC-NP-105 covers the native OS clipboard boundary.

@@ -6,8 +6,9 @@ import {
   normalizeViewerText, viewerReadText, viewerReadTextChunk, viewerReleaseTemp, viewerStat,
   viewerTextForDisk, viewerWriteText, type ViewerDocument, type ViewerEol, type ViewerTextData, type ViewerWriteAck,
 } from "../lib/viewer";
-import { readViewerDrafts, writeViewerDrafts } from "./viewerDrafts";
+import { MAX_LOCALSTORAGE_DRAFT_CHARS, readViewerDrafts, removeViewerDraftEntries, writeViewerDrafts } from "./viewerDrafts";
 import { notepadBackupList, notepadBackupPrune, notepadBackupRead } from "../lib/notepad/ipc";
+import { recoveryDraftName, writeRecoveryDraft } from "../lib/notepad/persistence/recoveryDraft";
 import { useNotepadPreferences } from "./notepadPreferences";
 import { useNotepadStore } from "./notepadStore";
 
@@ -31,6 +32,11 @@ interface DocumentState {
   readChunk: (path: string, offset: number) => Promise<void>;
   release: (path: string) => void;
   flushDrafts: () => void;
+  /** Persist a recoverable copy for the documents a close dialog is about to
+   * release. Small buffers stay in localStorage; oversized or unstorable
+   * buffers fall back to the native Notepad disk snapshot. Rejects when no
+   * recoverable copy could be written so the dialog keeps the file open. */
+  persistRecoveryDrafts: (paths: string[]) => Promise<void>;
 }
 const opening = new Map<string, Promise<void>>();
 const saving = new Map<string, Promise<void>>();
@@ -101,8 +107,52 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
     open(path, readOnlyReason, forceEdit = false) {
       const key = documentPathKey(path);
       if (isUntitledKey(key)) {
-        if (!get().documents[key]) get().createUntitled(key);
-        return Promise.resolve();
+        if (get().documents[key]) return Promise.resolve();
+        const pending = opening.get(key);
+        if (pending) return pending;
+        const created = get().createUntitled(key);
+        const draft = readViewerDrafts()[key];
+        const generation = (generations.get(key) ?? 0) + 1;
+        generations.set(key, generation);
+        // Untitled documents have no file path to reopen manually, so a kept
+        // draft may live in the bounded localStorage draft (small buffers) or
+        // in the native Notepad snapshot (oversized/unstorable buffers).
+        const task = (async () => {
+          let backupDoc: ViewerDocument | null = null;
+          let backupUpdatedAtMs = 0;
+          try {
+            const entries = await notepadBackupList();
+            const match = entries.find((entry) => entry.docId === key);
+            if (match) {
+              const loaded = await notepadBackupRead(match.id);
+              if (generations.get(key) !== generation) return;
+              backupUpdatedAtMs = loaded.entry.updatedAt * 1000;
+              backupDoc = {
+                ...created,
+                content: normalizeViewerText(loaded.content),
+                savedHash: loaded.entry.savedHash || "",
+                encoding: loaded.entry.encoding || created.encoding,
+                bom: loaded.entry.bom,
+                eol: loaded.entry.eol === "CRLF" || loaded.entry.eol === "CR" ? loaded.entry.eol : "LF",
+                dirty: true,
+                restored: true,
+              };
+            }
+          } catch {
+            // Recovery tabs fall back to the local draft when the backup IPC is unavailable.
+          }
+          const current = get().documents[key];
+          if (generations.get(key) !== generation || !current || current.revision !== created.revision) return;
+          if (backupDoc && (!draft || (draft.updatedAt !== undefined && backupUpdatedAtMs > draft.updatedAt))) {
+            update(path, (document) => ({ ...document, ...backupDoc, key, path, revision: document.revision + 1 }));
+            useNotepadStore.getState().patchDoc(key, { backupState: "saved", lastBackupAt: backupUpdatedAtMs });
+          } else if (draft) {
+            update(path, (document) => ({ ...document, ...draft, key, path, dirty: true, restored: true, revision: document.revision + 1 }));
+          }
+        })();
+        opening.set(key, task);
+        void task.finally(() => { if (opening.get(key) === task) opening.delete(key); });
+        return task;
       }
       const pending = opening.get(key);
       if (pending) return pending;
@@ -402,6 +452,51 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
     flushDrafts() {
       try { writeViewerDrafts(get().documents); if (get().draftError) set({ draftError: undefined }); }
       catch (error) { set({ draftError: `Draft recovery storage failed: ${message(error)}` }); }
+    },
+    async persistRecoveryDrafts(paths) {
+      const documents = get().documents;
+      const targets: ViewerDocument[] = [];
+      const seen = new Set<string>();
+      for (const path of paths) {
+        const key = documentPathKey(path);
+        const current = documents[key];
+        if (!current || seen.has(key) || !isDirty(current)) continue;
+        seen.add(key);
+        targets.push(current);
+      }
+      if (!targets.length) return;
+      let storageError: string | undefined;
+      try { writeViewerDrafts(documents); } catch (error) { storageError = message(error); }
+      // A local entry only counts when it holds this exact buffer; quota errors
+      // and oversized buffers leave older content (or nothing) behind.
+      const stored = storageError ? undefined : readViewerDrafts();
+      const needsNative = targets.filter((current) =>
+        isUntitledKey(current.key)
+        || current.content.length > MAX_LOCALSTORAGE_DRAFT_CHARS
+        || current.savedContent.length > MAX_LOCALSTORAGE_DRAFT_CHARS
+        || !stored || stored[current.key]?.content !== current.content);
+      if (!needsNative.length) { if (get().draftError) set({ draftError: undefined }); return; }
+      const failures: string[] = [];
+      const recovered: string[] = [];
+      for (const current of needsNative) {
+        const name = recoveryDraftName(current, useNotepadStore.getState().docs[current.key]?.titleHint);
+        try {
+          await writeRecoveryDraft(current, name);
+          recovered.push(current.key);
+          useNotepadStore.getState().patchDoc(current.key, { backupState: "saved", lastBackupAt: Date.now() });
+        } catch (error) {
+          failures.push(`${current.path}: ${message(error)}`);
+        }
+      }
+      // The native snapshot is authoritative for these keys; a stale local entry
+      // could otherwise outrank it by millisecond timestamp on the next open.
+      removeViewerDraftEntries(recovered);
+      if (failures.length) {
+        const detail = `draft_recovery_failed: ${failures.join("; ")}`;
+        set({ draftError: detail });
+        throw new Error(detail);
+      }
+      if (get().draftError) set({ draftError: undefined });
     },
   };
 });

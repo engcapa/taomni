@@ -9,6 +9,7 @@ import { runMimeTransform } from "../../../lib/notepad/transforms/mime";
 import { eolToSpace, spacesToTabsLeading, tabsToSpaces, trimBothSpaces, trimLeadingSpaces, trimTrailingSpaces } from "../../../lib/notepad/transforms/whitespace";
 import { isUntitledKey } from "../../../lib/openFile/pathIdentity";
 import { selectFilePath } from "../../../lib/ipc/files";
+import { readPasteText, writeText } from "../../../lib/clipboard";
 import { useRecentFilesStore } from "../../../stores/app/recentFiles";
 import { useDocumentStore } from "../../../stores/documentStore";
 import { setNotepadPreferences, useNotepadPreferences } from "../../../stores/notepadPreferences";
@@ -112,7 +113,9 @@ export function createCoreCommandMap(ctx: NotepadActionContext): Record<string, 
       if (sel.empty) return;
       const txt = v.state.sliceDoc(sel.from, sel.to);
       useNotepadStore.getState().pushClipboardHistory(txt);
-      await navigator.clipboard?.writeText(txt).catch(() => undefined);
+      // Write through the shared helper: the native owner is tried first and the
+      // WebView Clipboard API remains the fallback (and dev/browser stub path).
+      await writeText(txt).catch((error: unknown) => ctx.onError(String(error)));
       if (!ctx.effectiveReadOnly) v.dispatch({ changes: { from: sel.from, to: sel.to, insert: "" } });
     },
     "edit.copy": async () => {
@@ -122,12 +125,19 @@ export function createCoreCommandMap(ctx: NotepadActionContext): Record<string, 
       if (sel.empty) return;
       const txt = v.state.sliceDoc(sel.from, sel.to);
       useNotepadStore.getState().pushClipboardHistory(txt);
-      await navigator.clipboard?.writeText(txt).catch(() => undefined);
+      await writeText(txt).catch((error: unknown) => ctx.onError(String(error)));
     },
     "edit.paste": async () => {
       const v = ctx.getActiveView();
       if (!v || ctx.effectiveReadOnly) return;
-      const txt = await navigator.clipboard?.readText().catch(() => "");
+      // WebView2 can deny/focus-gate navigator.clipboard.readText and the old
+      // single-path read swallowed the rejection, so the paste silently did
+      // nothing. Ask the native clipboard owner too and report a real failure
+      // instead of pretending the clipboard was empty.
+      const txt = await readPasteText().catch((error: unknown) => {
+        ctx.onError(String(error));
+        return "";
+      });
       if (txt) {
         const sel = v.state.selection.main;
         v.dispatch({ changes: { from: sel.from, to: sel.to, insert: txt }, selection: { anchor: sel.from + txt.length } });
@@ -173,8 +183,8 @@ export function createCoreCommandMap(ctx: NotepadActionContext): Record<string, 
     "edit.convertEolLf": () => useDocumentStore.getState().configure(ctx.document.path, { eol: "LF" }),
     "edit.convertEolCrlf": () => useDocumentStore.getState().configure(ctx.document.path, { eol: "CRLF" }),
     "edit.convertEolCr": () => useDocumentStore.getState().configure(ctx.document.path, { eol: "CR" }),
-    "edit.copyCurrentFilePath": async () => { await navigator.clipboard?.writeText(ctx.document.path).catch(() => undefined); },
-    "edit.copyCurrentFileName": async () => { await navigator.clipboard?.writeText(ctx.document.path.split(/[\\/]/).pop() || ctx.docState.titleHint || "").catch(() => undefined); },
+    "edit.copyCurrentFilePath": async () => { await writeText(ctx.document.path).catch((error: unknown) => ctx.onError(String(error))); },
+    "edit.copyCurrentFileName": async () => { await writeText(ctx.document.path.split(/[\\/]/).pop() || ctx.docState.titleHint || "").catch((error: unknown) => ctx.onError(String(error))); },
     "edit.toggleOverwrite": () => {
       const store = useNotepadStore.getState();
       store.setInsertMode(!store.insertMode);
@@ -235,7 +245,7 @@ export function createCoreCommandMap(ctx: NotepadActionContext): Record<string, 
     "search.clearBookmarks": () => useNotepadStore.getState().setBookmarks(ctx.docKey, []),
     "search.cutBookmarkedLines": async () => {
       const res = applyBookmarkLinesOp(ctx.document.content, ctx.docState.bookmarks, "cut");
-      await navigator.clipboard?.writeText(res.extractedText).catch(() => undefined);
+      await writeText(res.extractedText).catch((error: unknown) => ctx.onError(String(error)));
       if (!ctx.effectiveReadOnly) {
         ctx.replaceViewSelection(ctx.getActiveView(), res.nextText, false);
         useNotepadStore.getState().setBookmarks(ctx.docKey, res.nextBookmarks);
@@ -243,7 +253,7 @@ export function createCoreCommandMap(ctx: NotepadActionContext): Record<string, 
     },
     "search.copyBookmarkedLines": async () => {
       const res = applyBookmarkLinesOp(ctx.document.content, ctx.docState.bookmarks, "copy");
-      await navigator.clipboard?.writeText(res.extractedText).catch(() => undefined);
+      await writeText(res.extractedText).catch((error: unknown) => ctx.onError(String(error)));
     },
     "search.removeBookmarkedLines": () => {
       if (ctx.effectiveReadOnly) return;

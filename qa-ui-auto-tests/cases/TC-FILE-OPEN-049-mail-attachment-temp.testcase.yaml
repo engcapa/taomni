@@ -1,4 +1,4 @@
-id: TC-FILE-OPEN-047
+id: TC-FILE-OPEN-049
 title: Mail attachments dedupe their read-only copy and clean up on final close
 description: Native mode downloads an attachment from local IMAP and verifies the observed temporary
   file bytes and removal. Browser mode verifies the same flow using its virtual file system.
