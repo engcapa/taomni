@@ -20,12 +20,11 @@ UIA_STAGES = {
 
 
 @contextmanager
-def installed_windows_desktop(executable, work, evidence, label, *, webview=None):
-    if webview is None:
-        webview = work / f"{label}-webview"
-        webview.mkdir()
-    else:
-        webview.mkdir(exist_ok=True)
+def installed_windows_desktop(executable, work, evidence, label):
+    # Installer replacement and recovery reopen the same WebView2 data as well
+    # as the same app data, including the previously selected catalog mirror.
+    webview = work / "webview"
+    webview.mkdir(exist_ok=True)
     environment = {
         **os.environ,
         "WEBVIEW2_USER_DATA_FOLDER": str(webview),
@@ -55,7 +54,8 @@ def verify_mfa_controls(owner, phase, evidence):
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-Sta", "-File", str(script),
              "-OwnerId", str(owner.pid), "-Phase", phase],
             input=json.dumps({"password": PASSWORD, "issuer": ISSUER, "uri": uri}),
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=85, check=False,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=85 if phase == "seed" else 315, check=False,
         )
         if observed.returncode:
             failure = f"PowerShell exit {observed.returncode}"
@@ -75,9 +75,11 @@ def verify_mfa_controls(owner, phase, evidence):
                         result["stage"] = stage
                         failure += f", stage {stage}"
                     handle = diagnostic.get("windowHandle")
-                    screenshot = ("windows-mfa-before-vault-setup.png" if phase == "seed" and stage == "vault-setup-fields"
-                                  else f"windows-mfa-{phase}-{stage}.png" if stage in {"open-tools", "open-mfa"}
-                                  else None)
+                    screenshot = None
+                    if phase == "seed" and stage == "vault-setup-fields":
+                        screenshot = "windows-mfa-before-vault-setup.png"
+                    elif stage in {"vault-unlock-field", "unlock-vault", "open-tools", "open-mfa"}:
+                        screenshot = f"windows-mfa-{phase}-{stage}.png"
                     if (os.name == "nt" and screenshot is not None and type(handle) is int
                             and 0 < handle < 2**63 and owner.poll() is None):
                         result["windowScreenshot"] = capture_window(handle, evidence, screenshot)

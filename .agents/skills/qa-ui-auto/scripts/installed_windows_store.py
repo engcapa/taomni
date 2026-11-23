@@ -52,7 +52,7 @@ def close_window(owner, evidence):
 def seed(executable, work, evidence, profile):
     phase = evidence / "legacy-window"
     phase.mkdir()
-    with installed_windows_desktop(executable, work, phase, "legacy", webview=work / "webview") as owner:
+    with installed_windows_desktop(executable, work, phase, "legacy") as owner:
         verify_mfa_controls(owner, "seed", phase)
         close = close_window(owner, phase)
     write_json(evidence / "legacy-desktop.json", {
@@ -71,7 +71,7 @@ def exercise_stage(executable, work, profile, evidence, origin, label, removed, 
         # The marketplace searches the displayed name, description and slug in this order.
         query = f"{entry['name']} {entry.get('description') or ''} {row['slug']}"
         modules.append({"id": module_id, "name": entry["name"], "query": query, "removed": row["slug"] == removed})
-    with installed_windows_desktop(executable, work, folder, label, webview=work / "webview") as owner:
+    with installed_windows_desktop(executable, work, folder, label) as owner:
         # The monolith has no catalog setting. On first candidate launch, select
         # the verified CI feed through the product mirror input. Reopen must
         # retain that preference and the user's removal across real app exits.

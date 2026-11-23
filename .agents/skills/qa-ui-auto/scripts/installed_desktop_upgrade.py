@@ -54,6 +54,7 @@ def start_profile(executable, profile, work, evidence, label, expected_rows, ret
         raise RuntimeError(f"{label} did not reopen the original SSH/VNC records")
     observed = retained_manifest(profile)
     if retained is not None and observed != retained:
+        write_json(evidence / f"{label}-retained-files.json", {"expected": retained, "observed": observed})
         raise RuntimeError(f"{label} changed the original historical chat files")
     return {"executable": str(executable), "profile": str(profile), "process": process, "retainedFiles": observed}
 
@@ -156,8 +157,6 @@ def execute(args):
             seed_legacy_desktop(ctx, old_binary, work / "desktop", report, profile,
                                 catalog_source=f"{installed_first_release.ORIGIN}/{origin.start_catalog}",
                                 environment=environment)
-        stages["beforeUpgrade"] = start_profile(old_binary, profile, work, report, "original-reopen", expected_rows)
-        retained = stages["beforeUpgrade"]["retainedFiles"]
         if system == "Windows":
             require_registration(msi_registration(old_package, report, "original-registered"),
                                  msi_registration(package, report, "candidate-before-install"), upgraded=False)
@@ -168,6 +167,11 @@ def execute(args):
             except Exception as error:
                 permission_failure = error
                 stages["originalPermissions"] = {"error": str(error)}
+
+        # The old macOS desktop opens LanChat SQLite in WAL mode during its permissions check.
+        # Snapshot the historical files after the last legacy desktop run.
+        stages["beforeUpgrade"] = start_profile(old_binary, profile, work, report, "original-reopen", expected_rows)
+        retained = stages["beforeUpgrade"]["retainedFiles"]
         if system == "Darwin":
             old_binary.parents[2].rename(work / "original.app")
 
@@ -218,8 +222,11 @@ def execute(args):
             raise recovery_failure
         if permission_failure is not None:
             raise permission_failure
-        if stages.get("permissionContinuity", {}).get("lostGrants"):
+        continuity = stages.get("permissionContinuity")
+        if continuity and continuity["lostGrants"]:
             raise RuntimeError("The installed upgrade lost a previously granted macOS permission")
+        if origin and system == "Darwin" and not (continuity and continuity["retainedBothGrants"]):
+            raise RuntimeError("The installed upgrade did not establish both macOS grants under the same identity")
         result.update(passed=True, sessionTypes=[row["session_type"] for row in expected_rows], retainedFiles=retained)
     finally:
         if origin:

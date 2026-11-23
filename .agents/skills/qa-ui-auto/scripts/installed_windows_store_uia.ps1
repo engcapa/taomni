@@ -89,17 +89,7 @@ function Dialog-Button([string]$Message, [string]$Button) {
 $result = [ordered]@{ ownerPid = $OwnerId; phase = $Phase }
 switch ($Phase) {
     'open-store' {
-        # A cold reopen loads the installed business modules before showing the
-        # Vault dialog. Re-resolve the window in case its initial HWND changes.
-        $passwords = Wait-Element {
-            $handle = (Get-Process -Id $OwnerId).MainWindowHandle
-            if ($handle -eq [IntPtr]::Zero) { return }
-            $current = $automation::FromHandle($handle)
-            if ($current.Current.ProcessId -ne $OwnerId) { return }
-            $script:windowHandle = $handle
-            $script:window = $current
-            Find-Passwords 1
-        } 'vault-unlock-field' 225
+        $passwords = Wait-VaultUnlockField
         $result.unlockControlWaitMs = $clock.ElapsedMilliseconds
         Set-Value $passwords[0] $fixture.password
         Invoke-Button $window 'Unlock' 'unlock-vault' -Physical

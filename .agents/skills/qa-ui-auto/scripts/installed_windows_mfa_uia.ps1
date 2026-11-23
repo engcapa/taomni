@@ -25,7 +25,8 @@ trap {
     exit 1
 }
 $fixture = [Console]::In.ReadToEnd() | ConvertFrom-Json
-. (Join-Path $PSScriptRoot "installed_windows_uia_common.ps1")
+$phaseTimeout = if ($Phase -eq 'seed') { 75 } else { 300 }
+. (Join-Path $PSScriptRoot "installed_windows_uia_common.ps1") -PhaseTimeoutSeconds $phaseTimeout
 
 function Find-ToolsMfa {
     # The rail's floating MFA toggle has the same accessible name. Match the
@@ -92,7 +93,7 @@ function Read-Code([string]$Expected) {
 }
 
 if ($Phase -ne 'seed') {
-    $fields = Wait-Element { Find-Passwords 1 } 'vault-unlock-field'
+    $fields = Wait-VaultUnlockField
     Set-Value $fields[0] $fixture.password
     Invoke-Button $window 'Unlock' 'unlock-vault' -Physical
     $null = Wait-Element { if (@(Get-VisiblePasswords).Count -eq 0) { return $true } } 'unlock-vault'

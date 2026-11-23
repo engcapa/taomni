@@ -116,12 +116,22 @@ function Find-Passwords([int]$Count) {
     if ($fields.Length -eq $Count) { return ,$fields }
 }
 
-$windowHandle = Wait-Element {
-    $process = Get-Process -Id $OwnerId
-    if ($process.MainWindowHandle -ne [IntPtr]::Zero) {
-        $element = $automation::FromHandle($process.MainWindowHandle)
-        if ($element.Current.ProcessId -eq $OwnerId) { return $process.MainWindowHandle }
-    }
-} 'owned-window'
-$window = $automation::FromHandle($windowHandle)
+function Find-OwnedWindow {
+    $handle = (Get-Process -Id $OwnerId).MainWindowHandle
+    if ($handle -eq [IntPtr]::Zero) { return }
+    $current = $automation::FromHandle($handle)
+    if ($current.Current.ProcessId -ne $OwnerId) { return }
+    $script:windowHandle = $handle
+    $script:window = $current
+    return $current
+}
+
+function Wait-VaultUnlockField {
+    # The initial HWND can change while the installed app starts its renderer.
+    Wait-Element {
+        if ($null -ne (Find-OwnedWindow)) { Find-Passwords 1 }
+    } 'vault-unlock-field' 225
+}
+
+$null = Wait-Element { Find-OwnedWindow } 'owned-window'
 

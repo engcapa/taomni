@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch
 
 from installed_first_release import enrollment
 import installed_windows_store as windows_store
+from installed_windows_mfa import installed_windows_desktop
 from installed_windows_webview import owned_listener
 from native_driver_lifecycle import windows_webview_options
 from native_webdriver_transport import WebDriverError
@@ -60,6 +61,22 @@ class InstalledFirstReleaseTests(unittest.TestCase):
         with self.assertRaises(WebDriverError):
             windows_webview_options({}, "qa-id")
 
+    def test_replacement_and_crash_reopen_use_the_same_installed_windows_webview(self):
+        executable = self.profile / "Taomni.exe"
+        owner = Mock()
+        owner.poll.return_value = 0
+        opened = Mock()
+        opened.__enter__ = Mock(return_value=owner)
+        opened.__exit__ = Mock(return_value=False)
+        with patch("installed_windows_mfa.subprocess.Popen", return_value=opened) as launch:
+            for label in ("legacy", "first-install", "before-crash", "after-crash"):
+                with installed_windows_desktop(executable, self.profile, self.profile, label):
+                    pass
+        expected = str(self.profile / "webview")
+        self.assertTrue(Path(expected).is_dir())
+        self.assertEqual([call.kwargs["env"]["WEBVIEW2_USER_DATA_FOLDER"] for call in launch.call_args_list],
+                         [expected] * 4)
+
     def test_windows_close_requires_the_installed_process_to_exit_before_the_next_launch(self):
         exe = self.profile / "Taomni.exe"
         app = Mock(pid=42)
@@ -105,7 +122,7 @@ class InstalledFirstReleaseTests(unittest.TestCase):
                  patch.object(windows_store, "close_window"):
                 windows_store.exercise_stage("Taomni.exe", self.profile, self.profile, self.profile,
                                              self.origin, label, removed, stage, Mock())
-                self.assertEqual(start.call_args.kwargs["webview"], self.profile / "webview")
+                start.assert_called_once_with("Taomni.exe", self.profile, self.profile / label, label)
                 disk.assert_called_once_with(self.profile / "plugins", self.origin, removed)
                 phases = [call.args[1] for call in ui.call_args_list]
                 self.assertEqual(phases, ["open-store", "roster"] + ([] if removed else ["remove-mail"]))

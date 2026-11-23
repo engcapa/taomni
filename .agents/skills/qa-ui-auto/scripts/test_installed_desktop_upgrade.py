@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 from installed_desktop_mode_lease import check_mode_lease, reserve_default_profile
 from installed_desktop_mfa_crash import observe_abrupt_exit, verify_crash_recovery
-from installed_desktop_upgrade import exercise_desktop_contracts, require_registration, select_candidate
+from installed_desktop_upgrade import exercise_desktop_contracts, require_registration, select_candidate, start_profile
 from installed_macos_host_signature import require_fixed_signature
 from installed_macos_permissions import compare_permissions, observe_hosted_screen_scan
 from installed_windows_mfa import verify_mfa_controls
@@ -52,6 +52,19 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
                          {"windows-x86_64", "darwin-x86_64", "darwin-aarch64"})
         with self.assertRaisesRegex(ValueError, "supported package targets"):
             plan_targets("linux-x86_64", upgrade_desktop=True)
+
+    def test_keeps_the_legacy_and_candidate_file_hashes_when_retention_fails(self):
+        baseline = {"lanchat.sqlite": {"sha256": "db", "bytes": 4096}}
+        changed = {**baseline, "lanchat.sqlite-wal": {"sha256": "wal", "bytes": 8192}}
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch("installed_desktop_upgrade.initialize_profile"), patch(
+                "installed_desktop_upgrade.session_rows", return_value=[],
+            ), patch("installed_desktop_upgrade.retained_manifest", return_value=changed):
+                with self.assertRaisesRegex(RuntimeError, "changed the original historical chat files"):
+                    start_profile("app", root, root, root, "candidate-reopen", [], baseline)
+            evidence = json.loads((root / "candidate-reopen-retained-files.json").read_text())
+            self.assertEqual(evidence, {"expected": baseline, "observed": changed})
 
     def test_first_release_uses_the_same_profile_and_roster_for_installed_host_checks(self):
         profile = Path("enrolled-profile")
