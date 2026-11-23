@@ -25,6 +25,9 @@ on:
       first_release:
         type: boolean
         default: false
+      include_linux_inventory:
+        type: boolean
+        default: false
       macos_hardened_mfa:
         type: boolean
         default: false
@@ -61,6 +64,7 @@ jobs:
         env:
           SAMPLE_TARGETS: ${{ inputs.package_targets }}
           SAMPLE_UPGRADE_DESKTOP: ${{ inputs.upgrade_desktop }}
+          SAMPLE_INCLUDE_LINUX_INVENTORY: ${{ inputs.include_linux_inventory }}
           SAMPLE_MACOS_HARDENED_MFA: ${{ inputs.macos_hardened_mfa }}
           SAMPLE_MACOS_ARM_RUNNER: ${{ inputs.macos_arm_runner }}
         run: |
@@ -72,6 +76,9 @@ jobs:
           fi
           if [[ "$SAMPLE_UPGRADE_DESKTOP" == true ]]; then
             args+=(--upgrade-desktop)
+          fi
+          if [[ "$SAMPLE_INCLUDE_LINUX_INVENTORY" == true ]]; then
+            args+=(--include-linux-inventory)
           fi
           python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py plan-targets \
             --targets "$SAMPLE_TARGETS" --macos-arm-runner "$SAMPLE_MACOS_ARM_RUNNER" \
@@ -209,21 +216,21 @@ jobs:
           python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py validate-payload \
             --target "$SAMPLE_TARGET" --directory bundle-evidence
       - uses: actions/checkout@v4
-        if: inputs.first_release
+        if: inputs.first_release && runner.os != 'Linux'
         with:
           ref: ${{ inputs.package_source }}
           path: first-release-input/source
           sparse-checkout: src-tauri/plugins
           persist-credentials: false
       - uses: actions/download-artifact@v4
-        if: inputs.first_release
+        if: inputs.first_release && runner.os != 'Linux'
         with:
           name: modular-candidate-roster-${{ inputs.package_run }}
           run-id: ${{ inputs.package_run }}
           github-token: ${{ github.token }}
           path: first-release-input/catalog
       - uses: actions/download-artifact@v4
-        if: inputs.first_release
+        if: inputs.first_release && runner.os != 'Linux'
         with:
           pattern: module-signed-*-${{ matrix.target }}-${{ inputs.package_run }}
           run-id: ${{ inputs.package_run }}
@@ -231,18 +238,18 @@ jobs:
           path: first-release-input/packages
           merge-multiple: false
       - name: Fetch the platform's pinned legacy installer
-        if: inputs.upgrade_desktop
+        if: inputs.upgrade_desktop && runner.os != 'Linux'
         env:
           GH_TOKEN: ${{ github.token }}
           OLD_VERSION: ${{ inputs.first_release && '0.5.12' || '0.5.10' }}
         run: python -m qa_ui_auto.legacy_release legacy-input --version "$OLD_VERSION"
       - uses: actions/download-artifact@v4
-        if: inputs.upgrade_desktop && !inputs.first_release
+        if: inputs.upgrade_desktop && !inputs.first_release && runner.os != 'Linux'
         with:
           name: qa-modular-package-${{ matrix.target }}-installed-desktop-${{ github.run_id }}
           path: signed-mfa-input
       - name: Replace the installed application, reopen its profile and roll back
-        if: inputs.upgrade_desktop
+        if: inputs.upgrade_desktop && runner.os != 'Linux'
         env:
           SAMPLE_MACOS_HARDENED_MFA: ${{ inputs.macos_hardened_mfa }}
           FIRST_RELEASE: ${{ inputs.first_release }}

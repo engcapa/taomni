@@ -28,7 +28,7 @@ on:
         type: boolean
         default: false
       package_first_release_linux:
-        description: Replace 0.5.12 with the candidate deb and verify its signed business roster
+        description: Verify the 0.5.12 Linux upgrade. Combine with the desktop first-release check to cover all four targets.
         type: boolean
         default: false
       package_relocation_linux:
@@ -186,7 +186,17 @@ permissions:
   actions: read
 
 concurrency:
-  group: modular-upgrade-${{ github.ref }}-${{ inputs.signed_mfa_only && format('signed-{0}', inputs.signed_migration_module || 'mfa') || (inputs.package_run && format('packages-{0}-{1}-{2}', inputs.package_run, inputs.package_targets, inputs.package_first_release_linux && 'first-release-linux' || inputs.package_rdp_perf && 'rdp-perf-linux' || inputs.package_relocation_linux && 'relocate-linux' || inputs.package_upgrade_linux && 'upgrade-linux' || inputs.package_first_release_desktop && 'first-release-desktop' || inputs.package_upgrade_desktop && 'upgrade-desktop' || 'inventory') || inputs.protocol_only && 'protocol' || (inputs.host_only && 'host' || (inputs.system_execution_only && 'system-execution' || (inputs.network_only && 'network' || (inputs.download_only || false))))) }}
+  group: >-
+    modular-upgrade-${{ github.ref }}-${{
+      inputs.signed_mfa_only && format('signed-{0}', inputs.signed_migration_module || 'mfa') ||
+      (inputs.package_run && format('packages-{0}-{1}-{2}', inputs.package_run, inputs.package_targets,
+        inputs.package_first_release_linux && inputs.package_first_release_desktop && 'first-release-all' ||
+        inputs.package_first_release_linux && 'first-release-linux' || inputs.package_rdp_perf && 'rdp-perf-linux' ||
+        inputs.package_relocation_linux && 'relocate-linux' || inputs.package_upgrade_linux && 'upgrade-linux' ||
+        inputs.package_first_release_desktop && 'first-release-desktop' ||
+        inputs.package_upgrade_desktop && 'upgrade-desktop' || 'inventory') ||
+      inputs.protocol_only && 'protocol' || inputs.host_only && 'host' || inputs.system_execution_only && 'system-execution' ||
+      inputs.network_only && 'network' || inputs.download_only || false) }}
   cancel-in-progress: true
 
 env:
@@ -213,7 +223,11 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   release-bundle-samples:
-    if: ${{ !inputs.signed_mfa_only && inputs.package_run != '' && !inputs.package_first_release_linux && !inputs.package_upgrade_linux && !inputs.package_relocation_linux && !inputs.package_rdp_perf }}
+    if: >-
+      ${{ !inputs.signed_mfa_only && inputs.package_run != '' &&
+      ((inputs.package_first_release_linux && inputs.package_first_release_desktop) ||
+      (!inputs.package_first_release_linux && !inputs.package_upgrade_linux &&
+      !inputs.package_relocation_linux && !inputs.package_rdp_perf)) }}
     uses: ./.github/workflows/qa-modular-bundles.yml
     with:
       head: ${{ inputs.head || github.sha }}
@@ -223,6 +237,7 @@ jobs:
       package_targets: ${{ inputs.package_targets }}
       upgrade_desktop: ${{ inputs.package_upgrade_desktop || inputs.package_first_release_desktop }}
       first_release: ${{ inputs.package_first_release_desktop }}
+      include_linux_inventory: ${{ inputs.package_first_release_linux && inputs.package_first_release_desktop }}
       macos_hardened_mfa: ${{ inputs.package_macos_hardened_mfa }}
       macos_arm_runner: ${{ inputs.package_macos_arm_runner || 'macos-15' }}
     secrets:

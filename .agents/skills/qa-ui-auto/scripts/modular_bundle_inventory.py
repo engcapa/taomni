@@ -28,10 +28,12 @@ RUNNERS = {'linux-x86_64': 'ubuntu-22.04', 'windows-x86_64': 'windows-latest',
 MODULE_REEXEC_ARGUMENTS = ('--vnc-special-key-hook', '--sockscap-redirector-bridge')
 
 
-def plan_targets(value: str, *, upgrade_desktop: bool = False, macos_arm_runner: str = 'macos-15') -> dict:
+def plan_targets(value: str, *, upgrade_desktop: bool = False, include_linux_inventory: bool = False,
+                 macos_arm_runner: str = 'macos-15') -> dict:
     if macos_arm_runner not in {'macos-15', 'macos-26'}:
         raise ValueError('select a supported macOS ARM64 runner')
-    supported = [target for target in TARGETS if not upgrade_desktop or not target.startswith('linux-')]
+    supported = [target for target in TARGETS
+                 if not upgrade_desktop or include_linux_inventory or not target.startswith('linux-')]
     targets = supported if value == 'all' else [part.strip() for part in value.split(',')]
     if not targets or len(set(targets)) != len(targets) or any(target not in supported for target in targets):
         raise ValueError('select all or unique supported package targets')
@@ -262,6 +264,7 @@ def main() -> None:
     plan = commands.add_parser('plan-targets')
     plan.add_argument('--targets', required=True)
     plan.add_argument('--upgrade-desktop', action='store_true')
+    plan.add_argument('--include-linux-inventory', action='store_true')
     plan.add_argument('--macos-arm-runner', default='macos-15', choices=('macos-15', 'macos-26'))
     plan.add_argument('--github-output', type=Path, required=True)
     payload = commands.add_parser('validate-payload')
@@ -283,7 +286,8 @@ def main() -> None:
     collect.add_argument('--linux-metadata', action='store_true')
     args = parser.parse_args()
     if args.command == 'plan-targets':
-        matrix = plan_targets(args.targets, upgrade_desktop=args.upgrade_desktop, macos_arm_runner=args.macos_arm_runner)
+        matrix = plan_targets(args.targets, upgrade_desktop=args.upgrade_desktop,
+                              include_linux_inventory=args.include_linux_inventory, macos_arm_runner=args.macos_arm_runner)
         with args.github_output.open('a', encoding='utf-8') as stream:
             stream.write('matrix=' + json.dumps(matrix, separators=(',', ':')) + '\n')
             if args.upgrade_desktop:
@@ -292,6 +296,7 @@ def main() -> None:
                      "arch": "ARM64" if entry["target"].endswith("-aarch64") else "X64",
                      "capabilities": ["signed-mfa"]}
                     for entry in matrix["include"]
+                    if not entry["target"].startswith("linux-")
                 ]}
                 stream.write('mfa_builds=' + json.dumps(builds, separators=(',', ':')) + '\n')
         return

@@ -94,6 +94,14 @@ def plan(suite, macos_runner, package_run, package_version, package_targets="all
             raise ValueError("Select all or unique supported release package targets")
         package = {"package_run": package_run, "package_version": package_version}
         arm_runner = "macos-26" if macos_runner == "macos-26" else "macos-15"
+        desktop = [target for target in targets if target in DESKTOP_PACKAGES]
+        if first_release and LINUX_PACKAGE in targets and desktop:
+            return [("G1/G3/G4/G5/G6/G9/G11 first-release installation and payloads", UPGRADE, {
+                **package, "package_targets": ",".join(targets),
+                "package_first_release_linux": "true", "package_first_release_desktop": "true",
+                "package_relocation_linux": "true", "package_rdp_perf": "true",
+                "package_macos_arm_runner": arm_runner,
+            })]
         if LINUX_PACKAGE in targets:
             linux = {**package, "package_targets": LINUX_PACKAGE}
             installed = {**linux, "package_relocation_linux": "true", "package_rdp_perf": "true"}
@@ -104,7 +112,6 @@ def plan(suite, macos_runner, package_run, package_version, package_targets="all
                 ("G4/G5/G6/G11 installed Linux recovery, RDP, forced exit and profile leases",
                  UPGRADE, installed),
             ])
-        desktop = [target for target in targets if target in DESKTOP_PACKAGES]
         if desktop:
             upgrade = "package_first_release_desktop" if first_release else "package_upgrade_desktop"
             checks.append(("G1/G3/G9/G11 MSI/DMG inspection, upgrade and rollback", UPGRADE, {

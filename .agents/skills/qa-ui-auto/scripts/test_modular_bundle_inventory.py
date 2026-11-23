@@ -55,6 +55,18 @@ class BundleSourceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'supported macOS ARM64 runner'):
             plan_targets('darwin-aarch64', macos_arm_runner='self-hosted')
 
+    def test_combined_upgrade_plans_linux_inventory_and_the_three_desktop_targets(self):
+        self.assertEqual(plan_targets('all', upgrade_desktop=True, include_linux_inventory=True,
+                                      macos_arm_runner='macos-26')['include'], [
+            {'os': 'ubuntu-22.04', 'target': 'linux-x86_64'},
+            {'os': 'windows-latest', 'target': 'windows-x86_64'},
+            {'os': 'macos-26', 'target': 'darwin-aarch64'},
+            {'os': 'macos-15-intel', 'target': 'darwin-x86_64'},
+        ])
+        self.assertEqual(len(plan_targets('all', upgrade_desktop=True)['include']), 3)
+        with self.assertRaisesRegex(ValueError, 'supported package targets'):
+            plan_targets('linux-x86_64', upgrade_desktop=True)
+
     def test_completed_artifact_can_be_sampled_before_the_other_builders_finish(self):
         run, artifacts = source_fixture()
         result = validate(run, artifacts)

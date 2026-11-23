@@ -101,21 +101,26 @@ class ReleasePackageSelectionTests(unittest.TestCase):
             with self.subTest(targets=targets), self.assertRaisesRegex(ValueError, "supported release package targets"):
                 plan("release", "macos-15", "123", "0.5.11", targets)
 
-    def test_first_release_uses_candidate_roster_with_the_same_three_runs(self):
-        inventory, linux, desktop = [
-            check[2] for check in plan("release", "macos-26", "123", "0.6.0", first_release=True)
-        ]
-        self.assertEqual(inventory, {
-            "package_run": "123", "package_version": "0.6.0", "package_targets": "linux-x86_64",
-        })
-        self.assertEqual(linux, {
-            **inventory, "package_first_release_linux": "true", "package_relocation_linux": "true",
+    def test_first_release_runs_all_installers_and_payloads_in_parallel(self):
+        checks = plan("release", "macos-26", "123", "0.6.0", first_release=True)
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0][1], UPGRADE)
+        self.assertEqual(checks[0][2], {
+            "package_run": "123", "package_version": "0.6.0",
+            "package_targets": "linux-x86_64,windows-x86_64,darwin-aarch64,darwin-x86_64",
+            "package_first_release_linux": "true", "package_first_release_desktop": "true",
+            "package_relocation_linux": "true", "package_macos_arm_runner": "macos-26",
             "package_rdp_perf": "true",
         })
-        self.assertEqual(desktop, {
-            "package_run": "123", "package_version": "0.6.0", "package_first_release_desktop": "true",
-            "package_targets": "windows-x86_64,darwin-aarch64,darwin-x86_64",
-            "package_macos_arm_runner": "macos-26",
+
+    def test_first_release_keeps_linux_only_inventory_and_recovery(self):
+        checks = plan("release", "macos-26", "123", "0.6.0", "linux-x86_64", first_release=True)
+        self.assertEqual(len(checks), 2)
+        inventory, installed = (check[2] for check in checks)
+        self.assertEqual(inventory["package_targets"], "linux-x86_64")
+        self.assertEqual(installed, {
+            **inventory, "package_first_release_linux": "true", "package_relocation_linux": "true",
+            "package_rdp_perf": "true",
         })
 
     def test_first_release_requires_a_package_suite_and_matching_bundle(self):
