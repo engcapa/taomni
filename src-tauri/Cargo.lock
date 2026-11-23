@@ -11101,6 +11101,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "taomni-mfa-api",
  "taomni-mfa-engine",
  "taomni-plugin-api",
  "taomni-plugin-mfa",

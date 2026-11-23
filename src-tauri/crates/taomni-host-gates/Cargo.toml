@@ -25,6 +25,7 @@ hex = "0.4"
 tempfile = "3"
 rusqlite = { version = "0.40", features = ["bundled"] }
 taomni-plugin-mfa = { path = "../../plugins/mfa" }
+taomni-mfa-api = { path = "../taomni-mfa-api" }
 taomni-mfa-engine = { path = "../taomni-mfa-engine" }
 taomni-rdp-client-api = { path = "../taomni-rdp-client-api" }
 taomni-server-process = { path = "../taomni-server-process" }
