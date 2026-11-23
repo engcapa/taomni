@@ -240,6 +240,9 @@ def execute(args):
             old_executable, legacy = replace_package(old_package, work, legacy_install / "deb",
                                                     version=old_version)
             stages["originalInstall"] = legacy
+            if origin:
+                from installed_core_resources import record_linux_comparison, sample_linux
+                original_resources = sample_linux(ctx, old_executable, work, report, "original")
             catalog_source = f"{installed_first_release.ORIGIN}/{origin.start_catalog}" if origin else None
             profile = run_legacy_desktop(ctx, old_executable, work, legacy_install, catalog_source=catalog_source)
             result["profile"] = str(profile)
@@ -249,6 +252,10 @@ def execute(args):
             if candidate != old_executable or replacement["binarySha256"] == legacy["binarySha256"]:
                 raise RuntimeError("The deb did not replace the original installed executable")
             if origin:
+                candidate_resources = sample_linux(ctx, candidate, work, report, "candidate")
+                stages["coreResources"] = record_linux_comparison(
+                    report, target, old_package, package, original_resources, candidate_resources,
+                )
                 stages["firstBusinessInstall"] = installed_first_release.exercise(ctx, candidate, work, profile, report, origin)
             commit_mfa_upgrade(candidate, profile, archive, signature, report)
             stages["candidate"] = inspect_accounts(ctx, candidate, work, report, "candidate-window",
