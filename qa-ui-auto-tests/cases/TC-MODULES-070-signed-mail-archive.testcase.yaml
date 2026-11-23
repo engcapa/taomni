@@ -195,8 +195,8 @@ steps:
     full: {INBOX: 1}
 - assert_signed_mail_host: cache-cleared
 - click: '[data-testid="mail-archive-open"]'
+- assert_text: {selector: '[data-testid="mail-archive-row"]', contains: Complete INBOX 1, timeout_sec: 30}
 - assert_count: {selector: '[data-testid="mail-archive-row"]', equal: 1}
-- assert_text: {selector: '[data-testid="mail-archive-row"]', contains: Complete INBOX 1}
 - assert_no_runtime_errors: null
 - click: '[data-testid="mail-archive-read"]'
 - click: '[data-testid="mail-archive-preview"] [data-testid="mail-body-mode-plain"]'
@@ -276,8 +276,8 @@ verification:
     - {step: 109, expectation: The toolbar reports that the cache was cleared.}
     - {step: 110, expectation: SQLite has no live folders or headers and the paused archive still contains the verified original.}
     - {step: 111, expectation: The installed signed host declares archive-state and cache maintenance and holds the writer lease.}
-    - {step: 113, expectation: The reopened archive manager lists one original.}
-    - {step: 114, expectation: The retained original has the expected subject.}
+    - {step: 113, expectation: The reopened archive query returns the original with the expected subject.}
+    - {step: 114, expectation: The reopened archive manager lists exactly one original.}
     - {step: 115, expectation: The workflow reports no runtime errors.}
     results: [109, 110, 111, 113, 114, 115]
   - id: signed-archive-original
