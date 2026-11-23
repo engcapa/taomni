@@ -1,6 +1,8 @@
 //! Save cached attachments or fetch them through the signed Mail host.
 
 use super::*;
+use module_host::imap_archive_original;
+use taomni_mail_api::archive_original::ImapArchiveAction;
 use taomni_mail_api::{ATTACHMENT_CACHE, attachment_cache::AttachmentKey};
 
 #[tauri::command]
@@ -28,25 +30,41 @@ pub async fn mail_download_attachment(
     if target_path.is_empty() {
         return Err("attachment download path is required".into());
     }
-    let saved_folder = folder.clone();
-    let saved_target = target_path.clone();
-    let saved_section = section.clone();
-    let original = with_mail_original(&state, &config.session_id, move |db, account| {
-        storage::open(db, account, &saved_folder, uid)
-    })
-    .await?;
-    if let Some(original) = original {
+    let section = section
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    if imap_archive_original::supported(&state.plugins) {
+        if let Some(receipt) = imap_archive_original::save(
+            state.plugins.clone(),
+            state.mail_db(&config.session_id)?,
+            &config.session_id,
+            &folder,
+            uid,
+            ImapArchiveAction::Attachment {
+                index: attachment_index,
+                section: section.clone(),
+            },
+            Path::new(&target_path),
+        )
+        .await?
+        {
+            return Ok(MailDownloadAttachmentResult {
+                path: target_path,
+                name: receipt.name,
+                content_type: receipt.content_type,
+                size: receipt.size,
+            });
+        }
+    } else if let Some(original) =
+        message_source::open_legacy_original(&state, &config.session_id, &folder, uid).await?
+    {
         return decode_mail_original(move || {
             let raw = original.read()?;
-            let attachment = match saved_section
-                .as_deref()
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-            {
+            let attachment = match section.as_deref() {
                 Some(section) => extract_attachment_section(&raw, section),
                 None => extract_attachment(&raw, attachment_index),
             }?;
-            let path = write_attachment_file(&saved_target, &attachment.bytes)?;
+            let path = write_attachment_file(&target_path, &attachment.bytes)?;
             Ok(MailDownloadAttachmentResult {
                 path,
                 name: attachment.name,
@@ -57,9 +75,6 @@ pub async fn mail_download_attachment(
         .await;
     }
     let account = resolve_config(&state, config)?;
-    let section = section
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty());
     // Resolve cache paths from the shared DB handle on each I/O operation,
     // including after a concurrent storage relocation. File copies run off Tokio.
     let cache_key = account.config.cache.attachment_cache.then(|| {

@@ -36,6 +36,7 @@ mod index_cache;
 pub(super) use index_cache::{publish_imap_index, publishes_imap_index};
 mod local_mailbox;
 pub(super) use local_mailbox::local_mailbox;
+pub(super) mod imap_archive_original;
 mod imap_outgoing;
 mod mutations;
 mod pop3;

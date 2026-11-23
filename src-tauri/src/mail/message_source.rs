@@ -1,6 +1,8 @@
 //! Read or export the original MIME message for a saved mail account.
 
 use super::*;
+use module_host::imap_archive_original;
+use taomni_mail_api::archive_original::ImapArchiveAction;
 
 #[tauri::command]
 pub async fn mail_fetch_raw(
@@ -18,11 +20,20 @@ pub async fn mail_fetch_raw(
     if folder.is_empty() {
         return Err("mail folder is required".into());
     }
-    let saved_folder = folder.clone();
-    if let Some(original) = with_mail_original(&state, &config.session_id, move |db, account| {
-        storage::open(db, account, &saved_folder, uid)
-    })
-    .await?
+    if imap_archive_original::supported(&state.plugins) {
+        if let Some(raw) = imap_archive_original::fetch_raw(
+            state.plugins.clone(),
+            state.mail_db(&config.session_id)?,
+            &config.session_id,
+            &folder,
+            uid,
+        )
+        .await?
+        {
+            return Ok(raw);
+        }
+    } else if let Some(original) =
+        open_legacy_original(&state, &config.session_id, &folder, uid).await?
     {
         return decode_mail_original(move || {
             Ok(String::from_utf8_lossy(&original.read()?).into_owned())
@@ -58,25 +69,56 @@ pub async fn mail_save_raw(
     if target_path.trim().is_empty() {
         return Err("target path is required".into());
     }
-    let saved_folder = folder.clone();
-    let saved_target = target_path.clone();
-    if let Some(original) = with_mail_original(&state, &config.session_id, move |db, account| {
-        storage::open(db, account, &saved_folder, uid)
-    })
-    .await?
+    if imap_archive_original::supported(&state.plugins) {
+        if let Some(receipt) = imap_archive_original::save(
+            state.plugins.clone(),
+            state.mail_db(&config.session_id)?,
+            &config.session_id,
+            &folder,
+            uid,
+            ImapArchiveAction::SaveOriginal,
+            Path::new(&target_path),
+        )
+        .await?
+        {
+            return Ok(MailDownloadAttachmentResult {
+                path: target_path,
+                name: None,
+                content_type: receipt.content_type,
+                size: receipt.size,
+            });
+        }
+    } else if let Some(original) =
+        open_legacy_original(&state, &config.session_id, &folder, uid).await?
     {
-        let size = decode_mail_original(move || original.export(Path::new(&saved_target))).await?;
-        return Ok(MailDownloadAttachmentResult {
-            path: target_path,
-            name: None,
-            content_type: Some("message/rfc822".into()),
-            size: size as usize,
-        });
+        return decode_mail_original(move || {
+            let size = original.export(Path::new(&target_path))?;
+            Ok(MailDownloadAttachmentResult {
+                path: target_path,
+                name: None,
+                content_type: Some("message/rfc822".into()),
+                size: size as usize,
+            })
+        })
+        .await;
     }
     let raw = fetch_original_from_server(&state, config, &folder, uid).await?;
     tokio::task::spawn_blocking(move || publish_original(&target_path, &raw))
         .await
         .map_err(|error| format!("mail save raw task failed: {error}"))?
+}
+
+pub(super) async fn open_legacy_original(
+    state: &State<'_, AppState>,
+    account: &str,
+    folder: &str,
+    uid: u32,
+) -> Result<Option<storage::OpenMessage>, String> {
+    let folder = folder.to_owned();
+    with_mail_original(state, account, move |db, account| {
+        storage::open(db, account, &folder, uid)
+    })
+    .await
 }
 
 pub(super) async fn fetch_original_from_server(

@@ -8,6 +8,7 @@ use rusqlite::params;
 use std::fs;
 use std::fs::File;
 use std::path::Path;
+use taomni_mail_api::archive_original::MAX_ARCHIVE_READER_BYTES;
 
 /// Open while the DB lock protects the object reference, then release that
 /// lock before decompressing, parsing or exporting a potentially large MIME.
@@ -29,7 +30,7 @@ impl OpenMessage {
     }
 
     pub fn read_with(self, check: impl Fn() -> Result<(), String>) -> Result<Vec<u8>, String> {
-        if self.raw_size > 512 * 1024 * 1024 {
+        if self.raw_size > MAX_ARCHIVE_READER_BYTES {
             return Err("This saved email exceeds the 512 MiB reader limit; save its original EML to open it externally".into());
         }
         let mut bytes = Vec::new();

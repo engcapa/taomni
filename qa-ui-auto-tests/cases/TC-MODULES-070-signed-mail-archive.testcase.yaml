@@ -118,9 +118,35 @@ steps:
       Archive: 2
 - assert_signed_mail_host: archive-published
 - click: '[data-testid="mail-message-row"][data-subject="Complete INBOX 1"]'
-- assert_text: {selector: '[data-testid="mail-reader-text"]', contains: Offline body Complete INBOX 1}
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent ||
+       document.querySelector('.taomni-mail-reader-text')?.textContent || '').includes('Offline body Complete INBOX 1')
+    expect_truthy: true
+    timeout_sec: 20
 - assert_visible: '[data-testid="mail-attachment-open"][data-name="complete.bin"]'
 - assert_signed_mail_host: imap-cached-body
+- right_click: '[data-testid="mail-message-row"][data-subject="Complete INBOX 1"]'
+- click: '[data-testid="context-menu-item-view-source"]'
+- assert_text: {selector: '[role="dialog"][aria-label="Message source"] pre', contains: Offline body Complete INBOX 1}
+- click: '[role="dialog"][aria-label="Message source"] [aria-label="Close dialog"]'
+- right_click: '[data-testid="mail-message-row"][data-subject="Complete INBOX 1"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    title: Save message as .eml
+    trigger: '[data-testid="context-menu-item-save-as-eml"]'
+    path: ${fixture.mail_storage_a}/account-original.eml
+- assert_file_sha256: {path: '${fixture.mail_storage_a}/account-original.eml', equals: '${fixture.mail_archive_retained_eml_sha256}'}
+- right_click: '[data-testid="mail-attachment-open"][data-name="complete.bin"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    title: Save attachment
+    trigger: '[data-testid="context-menu-item-save-attachment-as"]'
+    path: ${fixture.mail_storage_a}/account-attachment.bin
+- assert_file_sha256: {path: '${fixture.mail_storage_a}/account-attachment.bin', equals: '${fixture.mail_archive_attachment_sha256}'}
+- assert_signed_mail_host: imap-archive-export
 - mail_server_expunge_newest: {folder: INBOX, count: 2}
 - click: '[data-testid="mail-sync-button"]'
 - mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 60}
@@ -236,20 +262,29 @@ verification:
     - {step: 67, expectation: The same reader exposes the original attachment.}
     - {step: 68, expectation: The signed host declares the cached-body command and the fixture observes no additional body fetch.}
     results: [66, 67, 68]
+  - id: export-from-account
+    requirement: The regular account viewer and export actions use the verified archive without another IMAP body request.
+    actions: [69, 70, 72, 73, 74, 76, 77]
+    checkpoints:
+    - {step: 71, expectation: The source dialog displays the actual archived MIME body for the selected message.}
+    - {step: 75, expectation: The complete EML matches the original fixture bytes.}
+    - {step: 78, expectation: The downloaded attachment matches the MIME fixture bytes.}
+    - {step: 79, expectation: The verified package declares the archive read command and the fixture saw no further IMAP body requests.}
+    results: [71, 75, 78, 79]
   - id: read-after-server-removal
     requirement: Local originals and their attachments remain readable after both messages have been removed from IMAP.
-    actions: [69, 70, 72, 75, 77, 80, 83]
+    actions: [80, 81, 83, 86, 88, 91, 94]
     checkpoints:
-    - {step: 71, expectation: The synced inbox matches the now-empty server inbox.}
-    - {step: 74, expectation: The local archive still lists both originals.}
-    - {step: 76, expectation: The saved MIME exposes the original attachment.}
-    - {step: 78, expectation: The saved plaintext body identifies the expunged fixture message.}
-    - {step: 81, expectation: The archive manager reports saving the selected attachment.}
-    - {step: 82, expectation: The exported file matches the original attachment digest.}
-    - {step: 84, expectation: Both originals and attachments still match the fixture digests after their live headers disappear.}
-    - {step: 85, expectation: The workflow finishes without runtime errors.}
-    - {step: 86, expectation: The signed host still owns the mailbox after decoding the original.}
-    results: [71, 74, 76, 78, 81, 82, 84, 85, 86]
+    - {step: 82, expectation: The synced inbox matches the now-empty server inbox.}
+    - {step: 85, expectation: The local archive still lists both originals.}
+    - {step: 87, expectation: The saved MIME exposes the original attachment.}
+    - {step: 89, expectation: The saved plaintext body identifies the expunged fixture message.}
+    - {step: 92, expectation: The archive manager reports saving the selected attachment.}
+    - {step: 93, expectation: The exported file matches the original attachment digest.}
+    - {step: 95, expectation: Both originals and attachments still match the fixture digests after their live headers disappear.}
+    - {step: 96, expectation: The workflow finishes without runtime errors.}
+    - {step: 97, expectation: The signed host still owns the mailbox after decoding the original.}
+    results: [82, 85, 87, 89, 92, 93, 95, 96, 97]
   - id: archive-module-lifecycle
     requirement: Disabling Mail releases the active archive worker and retains its tab for automatic resume after re-enabling.
     actions: [44, 50, 52, 53, 55, 57]
@@ -263,46 +298,46 @@ verification:
     results: [41, 46, 47, 51, 58, 63]
   - id: archive-index-query
     requirement: Reopening and searching the custom local archive finds both originals after the live inbox is empty and returns an empty page for a missing subject.
-    actions: [87, 88, 90, 92]
+    actions: [98, 99, 101, 103]
     checkpoints:
-    - {step: 89, expectation: The signed host finds both saved subjects in the configured account cache.}
-    - {step: 91, expectation: A query with no matching subject shows an empty page.}
-    - {step: 93, expectation: Repeated archive queries finish without runtime errors.}
-    results: [89, 91, 93]
+    - {step: 100, expectation: The signed host finds both saved subjects in the configured account cache.}
+    - {step: 102, expectation: A query with no matching subject shows an empty page.}
+    - {step: 104, expectation: Repeated archive queries finish without runtime errors.}
+    results: [100, 102, 104]
   - id: archive-cleanup-confirmation
     requirement: The signed Mail host keeps originals when cleanup is cancelled. Confirming a new preview removes the selected local original and pauses full storage.
-    actions: [94, 96, 97, 99, 103, 104, 111]
+    actions: [105, 107, 108, 110, 114, 115, 122]
     checkpoints:
-    - {step: 98, expectation: The confirmation previews only the selected original.}
-    - {step: 101, expectation: Cancelling the confirmation retains both visible originals.}
-    - {step: 102, expectation: Cancelling leaves both gzip originals on disk and leaves storage active.}
-    - {step: 105, expectation: Confirming a new preview reports removal of one local original.}
-    - {step: 108, expectation: The unselected original remains visible.}
-    - {step: 109, expectation: Disk contains only the remaining verified MIME original and storage is paused.}
-    - {step: 110, expectation: The verified Mail host declares archive cleanup and still holds its writer lease.}
-    - {step: 112, expectation: Cleanup finishes without runtime errors.}
-    results: [98, 101, 102, 105, 108, 109, 110, 112]
+    - {step: 109, expectation: The confirmation previews only the selected original.}
+    - {step: 112, expectation: Cancelling the confirmation retains both visible originals.}
+    - {step: 113, expectation: Cancelling leaves both gzip originals on disk and leaves storage active.}
+    - {step: 116, expectation: Confirming a new preview reports removal of one local original.}
+    - {step: 119, expectation: The unselected original remains visible.}
+    - {step: 120, expectation: Disk contains only the remaining verified MIME original and storage is paused.}
+    - {step: 121, expectation: The verified Mail host declares archive cleanup and still holds its writer lease.}
+    - {step: 123, expectation: Cleanup finishes without runtime errors.}
+    results: [109, 112, 113, 116, 119, 120, 121, 123]
   - id: clear-live-cache
     requirement: The signed host clears the live index and keeps the remaining verified archive original and persisted pause.
-    actions: [113, 117]
+    actions: [124, 128]
     checkpoints:
-    - {step: 114, expectation: The toolbar reports that the cache was cleared.}
-    - {step: 115, expectation: SQLite has no live folders or headers and the paused archive still contains the verified original.}
-    - {step: 116, expectation: The installed signed host declares archive-state and cache maintenance and holds the writer lease.}
-    - {step: 118, expectation: The reopened archive query returns the original with the expected subject.}
-    - {step: 119, expectation: The reopened archive manager lists exactly one original.}
-    - {step: 120, expectation: The workflow reports no runtime errors.}
-    results: [114, 115, 116, 118, 119, 120]
+    - {step: 125, expectation: The toolbar reports that the cache was cleared.}
+    - {step: 126, expectation: SQLite has no live folders or headers and the paused archive still contains the verified original.}
+    - {step: 127, expectation: The installed signed host declares archive-state and cache maintenance and holds the writer lease.}
+    - {step: 129, expectation: The reopened archive query returns the original with the expected subject.}
+    - {step: 130, expectation: The reopened archive manager lists exactly one original.}
+    - {step: 131, expectation: The workflow reports no runtime errors.}
+    results: [125, 126, 127, 129, 130, 131]
   - id: signed-archive-original
     requirement: The signed host opens the retained original and exports the complete MIME after the live cache is cleared.
-    actions: [121, 122, 124]
+    actions: [132, 133, 135]
     checkpoints:
-    - {step: 123, expectation: The retained original still renders its plaintext body.}
-    - {step: 125, expectation: The archive manager reports the chosen EML destination.}
-    - {step: 126, expectation: The exported EML matches the raw fixture bytes for the retained message.}
-    - {step: 127, expectation: The installed host and frontend match the signed input and the host declares the original-reading capability.}
-    - {step: 128, expectation: Reading and exporting the original produce no runtime errors.}
-    results: [123, 125, 126, 127, 128]
+    - {step: 134, expectation: The retained original still renders its plaintext body.}
+    - {step: 136, expectation: The archive manager reports the chosen EML destination.}
+    - {step: 137, expectation: The exported EML matches the raw fixture bytes for the retained message.}
+    - {step: 138, expectation: The installed host and frontend match the signed input and the host declares the original-reading capability.}
+    - {step: 139, expectation: Reading and exporting the original produce no runtime errors.}
+    results: [134, 136, 137, 138, 139]
   visual:
   - check: The Mail pane displays downloading, paused and completed as the scan runs.
     method: automated

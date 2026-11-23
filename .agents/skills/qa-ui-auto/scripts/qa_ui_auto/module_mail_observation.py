@@ -27,6 +27,7 @@ def run(ctx, args):
         "attachment-saved", "attachment-reopened", "agenda-written", "filter-saved", "archive-published",
         "archive-cleaned", "archive-original", "cache-cleared", "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source",
         "imap-prefetch", "imap-mutations", "imap-mbox", "imap-forward", "imap-cache", "imap-cached-body",
+        "imap-archive-export",
         "outbox-queued", "outbox-sent", "imap-account-created", "imap-account-synced",
     }
     retained = {"outbox-retained", "contact-retained", "agenda-retained", "filter-retained", "pop3-retained"}
@@ -198,15 +199,18 @@ def run(ctx, args):
         report["prefetch"] = observe_prefetch(args, plugins.parent / "mail-cache")
     if phase in {"imap-prefetch", "archive-published"} and owner.case_id in {"TC-MODULES-068", "TC-MODULES-070"}:
         signed["cachedBodyFetches"] = inbox_body_fetches()
-    if phase == "imap-cached-body":
+    if phase in {"imap-cached-body", "imap-archive-export"}:
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
-        command = "mail/read-imap-cached-body"
+        command = "mail/read-imap-archive" if phase == "imap-archive-export" else "mail/read-imap-cached-body"
+        if phase == "imap-archive-export" and owner.case_id != "TC-MODULES-070":
+            raise StepError("The archive export observation requires the signed archive case")
         if command not in manifest["commands"]:
-            raise StepError("The signed Mail host does not read cached IMAP bodies")
+            raise StepError(f"The signed Mail host lacks {command}")
         fetches = inbox_body_fetches()
         if fetches != signed.get("cachedBodyFetches"):
-            raise StepError("Opening the cached body sent another IMAP body request")
-        report["cachedBody"] = {"command": command, **fetches}
+            raise StepError("Reading the local message sent another IMAP body request")
+        key = "archiveExport" if phase == "imap-archive-export" else "cachedBody"
+        report[key] = {"command": command, **fetches}
     if phase == "imap-mutations":
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
         if owner.case_id != "TC-MAIL-BULK-03" or "mail/run-imap-mutation-job" not in manifest["commands"]:

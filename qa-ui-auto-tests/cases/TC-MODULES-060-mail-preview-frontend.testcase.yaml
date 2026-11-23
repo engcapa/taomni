@@ -83,6 +83,12 @@ steps:
 - assert_file_open_bytes:
     path: ${fixture.file_open_root}/mail-original.eml
     equals: "From: qa-sender@example.com\r\nSubject: Module source 0001\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nHello from Taomni Mail preview.\r\n\r\nThis body is shaped like a cached IMAP message body. Use Sync in the desktop build to fetch live mailbox data.\r\n\r\nSubject: Module source 0001"
+- right_click: '[data-testid="mail-message-row"][data-subject="Module source 0001"]'
+- click: '[data-testid="context-menu-item-save-as-eml"]'
+- fill: {selector: '[data-testid="text-input-dialog-input"]', value: '${fixture.file_open_root}/cancelled-original.eml'}
+- click: '[data-testid="text-input-dialog-cancel"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Save cancelled}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/cancelled-original.eml', absent: true}
 - mail_server_deliver: {count: 1, prefix: Module frontend}
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-mail-unified"]'
@@ -124,36 +130,38 @@ verification:
   requirements:
   - id: R1
     requirement: Enabling Mail renders the account list in the original tab and the unified list in its own tab.
-    actions: [5, 6, 9, 10, 12, 14, 62, 63, 64, 66]
+    actions: [5, 6, 9, 10, 12, 14, 68, 69, 70, 72]
     checkpoints:
     - {step: 7, expectation: The first open shows the disabled module.}
     - {step: 8, expectation: The disabled module has no account pane.}
     - {step: 15, expectation: The existing tab mounts the account pane from the Mail module.}
     - {step: 16, expectation: The account shows the same inbox as its stub server.}
-    - {step: 65, expectation: The Unified Mail entry mounts the module's unified pane.}
-    - {step: 67, expectation: Refresh populates the unified pane with the new message.}
-    results: [7, 8, 15, 16, 65, 67]
+    - {step: 71, expectation: The Unified Mail entry mounts the module's unified pane.}
+    - {step: 73, expectation: Refresh populates the unified pane with the new message.}
+    results: [7, 8, 15, 16, 71, 73]
   - id: R2
     requirement: Disabling Mail unmounts both panes while preserving both tabs.
-    actions: [68, 69, 70, 73, 75, 78]
+    actions: [74, 75, 76, 79, 81, 84]
     checkpoints:
-    - {step: 72, expectation: Both module panes have unmounted.}
-    - {step: 76, expectation: The original account tab displays the disabled state.}
-    - {step: 77, expectation: Exactly one account tab remains.}
-    - {step: 79, expectation: The original unified tab displays the disabled state.}
-    - {step: 80, expectation: Exactly one unified tab remains.}
-    - {step: 81, expectation: The transitions produce no uncaught errors.}
-    results: [72, 76, 77, 79, 80, 81]
+    - {step: 78, expectation: Both module panes have unmounted.}
+    - {step: 82, expectation: The original account tab displays the disabled state.}
+    - {step: 83, expectation: Exactly one account tab remains.}
+    - {step: 85, expectation: The original unified tab displays the disabled state.}
+    - {step: 86, expectation: Exactly one unified tab remains.}
+    - {step: 87, expectation: The transitions produce no uncaught errors.}
+    results: [78, 82, 83, 85, 86, 87]
   - id: R3
-    requirement: The Mail account context menu shows the selected message's full source and saves it to the chosen browser path.
-    actions: [46, 47, 51, 52, 55, 57, 58, 59, 60]
+    requirement: The Mail context menu displays the selected source, saves it to the chosen path and lets the user cancel a subsequent export.
+    actions: [46, 47, 51, 52, 55, 57, 58, 59, 60, 62, 63, 64, 65]
     checkpoints:
     - {step: 48, expectation: Sync adds the newly delivered message to the account.}
     - {step: 53, expectation: The source dialog shows the selected subject header.}
     - {step: 54, expectation: The source dialog also renders the body.}
     - {step: 56, expectation: Closing the source dialog leaves the account available.}
     - {step: 61, expectation: The browser saves the full source in the chosen virtual file.}
-    results: [48, 53, 54, 56, 61]
+    - {step: 66, expectation: The account reports that the second export was cancelled.}
+    - {step: 67, expectation: Cancelling the save leaves no file at the second destination.}
+    results: [48, 53, 54, 56, 61, 66, 67]
   - id: R4
     requirement: Opening the newly delivered message shows its corresponding body before exporting.
     actions: [49]
@@ -179,15 +187,15 @@ verification:
     results: [30, 35, 40, 44]
   - id: archive-module-lifecycle
     requirement: Re-enabling restores sync and archive access in the retained account tab.
-    actions: [82, 85, 86, 87, 91, 95]
+    actions: [88, 91, 92, 93, 97, 101]
     checkpoints:
-    - {step: 83, expectation: The disabled account has no Local Archive control.}
-    - {step: 84, expectation: The disabled account has no sync control.}
-    - {step: 92, expectation: The retained account catches up to a message delivered while disabled.}
-    - {step: 93, expectation: The visible inbox matches the model server.}
-    - {step: 96, expectation: The Local Archive opens in the retained account tab.}
-    - {step: 97, expectation: The module transition and archive reopen produce no runtime errors.}
-    results: [83, 84, 92, 93, 96, 97]
+    - {step: 89, expectation: The disabled account has no Local Archive control.}
+    - {step: 90, expectation: The disabled account has no sync control.}
+    - {step: 98, expectation: The retained account catches up to a message delivered while disabled.}
+    - {step: 99, expectation: The visible inbox matches the model server.}
+    - {step: 102, expectation: The Local Archive opens in the retained account tab.}
+    - {step: 103, expectation: The module transition and archive reopen produce no runtime errors.}
+    results: [89, 90, 98, 99, 102, 103]
   visual:
   - check: The account and unified panes each show content when enabled and a status when disabled.
     method: automated

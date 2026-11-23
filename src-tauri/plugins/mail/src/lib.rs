@@ -22,6 +22,7 @@ mod filter_cache;
 mod filter_rules;
 mod flag_cache;
 mod folder_cache;
+mod imap_archive_original;
 mod imap_body_sync;
 mod imap_exchange;
 mod imap_idle;
@@ -112,6 +113,7 @@ fn host_config() -> HostConfig {
                 taomni_mail_api::archive_index::QUERY_ARCHIVE_INDEX,
                 taomni_mail_api::archive_index::CLEANUP_ARCHIVE_INDEX,
                 taomni_mail_api::archive_original::OPEN_ARCHIVE_ORIGINAL,
+                taomni_mail_api::archive_original::READ_IMAP_ARCHIVE,
                 OPEN_IMAP_ARCHIVE,
                 OPEN_IMAP_IMPORT,
                 EXPORT_IMAP_MBOX,
@@ -437,6 +439,11 @@ impl PluginHandler for Handler {
                 let endpoint = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(archive_original::serve(&self.io, operation, endpoint)?)
+            }
+            taomni_mail_api::archive_original::READ_IMAP_ARCHIVE => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(imap_archive_original::serve(&self.io, operation, endpoint)?)
             }
             taomni_mail_api::archive_index::CLEANUP_ARCHIVE_INDEX => {
                 let endpoint = serde_json::from_value(params.unwrap_or_default())

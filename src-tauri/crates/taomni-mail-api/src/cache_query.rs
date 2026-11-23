@@ -44,6 +44,15 @@ impl CacheQuery {
             _ => QUERY_ACCOUNT_CACHE,
         }
     }
+
+    pub fn reply_limit(&self) -> u64 {
+        match self {
+            // Archived and cached body reads retain the same frame as the
+            // existing large-message reader. A page of headers stays bounded.
+            Self::Body { .. } => u64::MAX,
+            _ => MAX_CACHE_REPLY_BYTES,
+        }
+    }
 }
 
 impl From<CacheQuery> for LocalMailboxAction {

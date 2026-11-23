@@ -4,10 +4,7 @@ use std::io::{self, Write};
 
 use serde::Serialize;
 use taomni_mail_api::{
-    cache_query::{
-        CacheQuery, CacheQueryRequest, MAX_CACHE_QUERY_BYTES, MAX_CACHE_REPLY_BYTES,
-        MAX_CACHED_MESSAGE_PAGE,
-    },
+    cache_query::{CacheQuery, CacheQueryRequest, MAX_CACHE_QUERY_BYTES, MAX_CACHED_MESSAGE_PAGE},
     imap_exchange::{read_bounded_body_frame, write_body_frame},
     message::MailMessageBody,
 };
@@ -82,11 +79,13 @@ fn execute(
     db.progress_handler(1_000, Some(move || progress.is_cancelled()))
         .map_err(|_| unavailable())?;
 
-    // A response larger than the transfer limit fails without a partial page.
+    let reply_limit = query.reply_limit() as usize;
     match query {
-        CacheQuery::Folders => {
-            serialize_result(cache::list_cached_folders(&db, &account_id), &cancellation)
-        }
+        CacheQuery::Folders => serialize_result(
+            cache::list_cached_folders(&db, &account_id),
+            &cancellation,
+            reply_limit,
+        ),
         CacheQuery::Messages {
             folder,
             limit,
@@ -100,10 +99,12 @@ fn execute(
                 offset,
             ),
             &cancellation,
+            reply_limit,
         ),
         CacheQuery::Search(query) => serialize_result(
             search_cached_messages(&db, &account_id, &query),
             &cancellation,
+            reply_limit,
         ),
         CacheQuery::Body {
             folder,
@@ -124,14 +125,14 @@ fn execute(
                 check(&cancellation)?;
                 let raw = raw.map_err(|error| RpcError::new(ErrorCode::InvalidState, error))?;
                 let body = archived_body(&account_id, &folder, uid, &raw);
-                serialize_result(Ok(Some(body)), &cancellation)
+                serialize_result(Ok(Some(body)), &cancellation, reply_limit)
             } else {
                 let cached = if cache_enabled {
                     cache::get_cached_body(&db, &account_id, &folder, uid)
                 } else {
                     Ok(None::<MailMessageBody>)
                 };
-                serialize_result(cached, &cancellation)
+                serialize_result(cached, &cancellation, reply_limit)
             }
         }
     }
@@ -148,10 +149,11 @@ fn check(token: &CancellationToken) -> Result<(), RpcError> {
 fn serialize_result<T: Serialize>(
     result: rusqlite::Result<T>,
     cancellation: &CancellationToken,
+    limit: usize,
 ) -> Result<Vec<u8>, RpcError> {
     check(cancellation)?;
     let rows = result.map_err(|_| unavailable())?;
-    encode(&rows, MAX_CACHE_REPLY_BYTES as usize)
+    encode(&rows, limit)
 }
 
 fn encode<T: Serialize>(rows: &T, limit: usize) -> Result<Vec<u8>, RpcError> {

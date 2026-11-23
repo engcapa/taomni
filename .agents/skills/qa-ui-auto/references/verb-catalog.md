@@ -580,6 +580,10 @@ Always rejects duplicate source copies or mailbox-wide EXPUNGE.
 and compares the fixture's newest INBOX body-fetch count before and after opening
 the persisted body in TC-MODULES-068 or TC-MODULES-070.
 
+In TC-MODULES-070, `assert_signed_mail_host: imap-archive-export` checks
+`mail/read-imap-archive` and confirms the same IMAP body-fetch count after
+viewing the original and saving both the EML and an attachment.
+
 `TC-MAIL-BULK-03` also uses `assert_signed_mail_host: imap-mutations` to record the
 installed package identity, writer lease, COPY attempts, STORE commands and
 targeted expunges in the signed Mail report.
