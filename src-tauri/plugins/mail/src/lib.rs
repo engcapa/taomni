@@ -11,6 +11,7 @@ mod archive_encoding;
 mod archive_index;
 mod archive_publication;
 mod attachment_cache;
+mod body_cache;
 mod commands;
 mod compose;
 mod filter_rules;
@@ -84,6 +85,7 @@ fn host_config() -> HostConfig {
                 taomni_mail_api::OPEN_IMAP_IDLE,
                 FETCH_IMAP_RAW,
                 FETCH_IMAP_BODY,
+                taomni_mail_api::body_cache::PUBLISH_IMAP_BODY_CACHE,
                 PREFETCH_IMAP_BODIES,
                 taomni_mail_api::ENCODE_ARCHIVE_ORIGINAL,
                 taomni_mail_api::archive::PUBLISH_IMAP_ARCHIVE,
@@ -339,6 +341,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(imap_exchange::fetch_body(&self.io, operation, input)?)
+            }
+            taomni_mail_api::body_cache::PUBLISH_IMAP_BODY_CACHE => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(body_cache::serve(&self.io, operation, endpoint)?)
             }
             PREFETCH_IMAP_BODIES => {
                 let input = serde_json::from_value(params.unwrap_or_default())

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use super::*;
 
 pub use taomni_mail_engine::cache::init_mail_tables;
@@ -56,4 +58,14 @@ pub(super) async fn mail_db_task<T: Send + 'static>(
     })
     .await
     .map_err(|e| format!("mail cache task failed: {e}"))?
+}
+
+/// Resolve relocation before sending the account cache to its signed writer.
+pub(super) fn canonical_cache_database(
+    cache: &crate::state::MailDbHandle,
+) -> Result<PathBuf, String> {
+    let db = cache.lock()?;
+    Path::new(db.path().ok_or("Mail storage has no disk path")?)
+        .canonicalize()
+        .map_err(|error| error.to_string())
 }

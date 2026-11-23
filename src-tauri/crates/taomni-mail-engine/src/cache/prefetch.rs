@@ -43,22 +43,36 @@ fn folder_uid_validity(
 
 pub fn cache_body_if_current(
     db: &Connection,
-    mut message: MailMessageCached,
+    message: MailMessageCached,
     uid_validity: Option<u32>,
     observed_at: i64,
 ) -> rusqlite::Result<bool> {
     // A second connection can synchronize this folder or open the message while
     // the IMAP request is in flight. Hold the SQLite writer lock through commit.
     let tx = Transaction::new_unchecked(db, TransactionBehavior::Immediate)?;
+    let applied = cache_body_if_current_in_transaction(&tx, message, uid_validity, observed_at)?;
+    if applied {
+        tx.commit()?;
+    }
+    Ok(applied)
+}
+
+/// The caller holds the writer transaction and can check cancellation at commit.
+pub fn cache_body_if_current_in_transaction(
+    db: &Connection,
+    mut message: MailMessageCached,
+    uid_validity: Option<u32>,
+    observed_at: i64,
+) -> rusqlite::Result<bool> {
     let header = &mut message.header;
-    if folder_uid_validity(&tx, &header.account_id, &header.folder)? != uid_validity {
+    if folder_uid_validity(db, &header.account_id, &header.folder)? != uid_validity {
         return Ok(false);
     }
-    let Some(current) = cached_header(&tx, &header.account_id, &header.folder, header.uid)? else {
+    let Some(current) = cached_header(db, &header.account_id, &header.folder, header.uid)? else {
         return Ok(false);
     };
     if current.body_cached
-        || storage::lookup(&tx, &header.account_id, &header.folder, header.uid)
+        || storage::lookup(db, &header.account_id, &header.folder, header.uid)
             .map_err(storage::as_sql_error)?
             .is_some()
         || matches!((&current.message_id, &header.message_id), (Some(current), Some(fetched)) if current != fetched)
@@ -67,8 +81,7 @@ pub fn cache_body_if_current(
     }
     // Sync and local actions own flags. A late prefetch only fills the body.
     header.flags = current.flags;
-    upsert_message_at(&tx, &message, Some(observed_at))?;
-    tx.commit()?;
+    upsert_message_at(db, &message, Some(observed_at))?;
     Ok(true)
 }
 

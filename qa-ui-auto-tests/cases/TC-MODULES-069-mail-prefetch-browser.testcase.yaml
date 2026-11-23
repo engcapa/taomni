@@ -36,13 +36,16 @@ steps:
 - assert_text: {selector: '[data-testid="mail-reader-text"]', contains: 'Subject: Browser prefetch 0001'}
 - wait_for: '[data-testid="mail-message-row"][data-subject="Browser prefetch 0001"][data-unread="false"]'
 - assert_attribute: {selector: '[data-testid="mail-message-row"][data-subject="Browser prefetch 0004"]', name: data-unread, equals: 'true'}
+- click: '[data-testid="mail-message-row"][data-subject="Browser prefetch 0004"]'
+- assert_text: {selector: '[data-testid="mail-reader-text"]', contains: 'Subject: Browser prefetch 0004'}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Browser prefetch 0004"][data-unread="false"]'
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: foreground-reader
     requirement: Synchronized headers are usable during background prefetch and warming never replaces the open reader.
-    actions: [9, 17, 18, 19, 22, 25]
+    actions: [9, 17, 18, 19, 22, 25, 30]
     checkpoints:
     - {step: 20, expectation: The new headers appear in the account list.}
     - {step: 21, expectation: All four recent bodies are still pending in the background.}
@@ -52,8 +55,10 @@ verification:
     - {step: 27, expectation: The reader still shows the same message after warming.}
     - {step: 28, expectation: The foreground message stays read after the background results arrive.}
     - {step: 29, expectation: The untouched warmed message stays unread.}
-    - {step: 30, expectation: Loading and reading mail produce no runtime errors.}
-    results: [20, 21, 23, 24, 26, 27, 28, 29, 30]
+    - {step: 31, expectation: Opening an unopened warmed message displays its own body.}
+    - {step: 32, expectation: The warmed message becomes read only after opening it.}
+    - {step: 33, expectation: Loading and reading mail produce no runtime errors.}
+    results: [20, 21, 23, 24, 26, 27, 28, 29, 31, 32, 33]
   visual:
   - check: The preview displays progress beside the active reader.
     method: automated

@@ -27,7 +27,7 @@ pub use folder_tree::{
 };
 pub use header::{cached_header, row_to_header};
 pub use mapping::cached_to_body;
-pub use prefetch::{cache_body_if_current, pending_bodies};
+pub use prefetch::{cache_body_if_current, cache_body_if_current_in_transaction, pending_bodies};
 pub use pruning::{prune_mail_cache, purge_cached_folder, remove_cached_messages};
 pub use reading::{get_cached_body, list_cached_folders, list_cached_messages, unread_cached_uids};
 pub use schema::{MAIL_SCHEMA_VERSION, init_cache_tables, migrate_mail_tables};

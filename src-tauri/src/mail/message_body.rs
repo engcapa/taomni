@@ -1,5 +1,7 @@
 //! Read cached bodies or fetch and decode them through the signed Mail host.
 
+use taomni_mail_api::body_cache::ImapBodyCacheSource;
+
 use super::*;
 
 #[tauri::command]
@@ -105,6 +107,7 @@ async fn get_message_body(
 
     let account = resolve_config(&state, config)?;
     let cache_enabled = account.config.cache.enabled;
+    let publish_to_host = module_host::publishes_body_cache(&state.plugins);
     let observed_at = sync::now_ms();
     // Older Mail packages keep their pooled background connection.
     let mut message = if module_host::fetches_imap_body(&state.plugins)
@@ -115,7 +118,18 @@ async fn get_message_body(
         legacy_imap!({ fetch_legacy_body(&state, account, folder, uid, background).await })?
     };
 
-    if cache_enabled {
+    if cache_enabled && publish_to_host {
+        let cache = state.mail_db(&account_id)?;
+        (_, message) = module_host::publish_body_cache(
+            state.plugins.clone(),
+            cache,
+            account_id,
+            message,
+            observed_at,
+            ImapBodyCacheSource::Opened,
+        )
+        .await?;
+    } else if cache_enabled {
         message = with_mail_db_async(&state, &account_id, move |db, _| {
             upsert_message_at(db, &message, Some(observed_at))?;
             Ok(message)

@@ -10,6 +10,7 @@ use zeroize::Zeroizing;
 pub mod archive;
 pub mod archive_index;
 pub mod attachment_cache;
+pub mod body_cache;
 pub mod compose;
 pub mod folder_cache;
 pub mod imap_exchange;

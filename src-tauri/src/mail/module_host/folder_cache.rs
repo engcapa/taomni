@@ -1,6 +1,6 @@
 //! Publish an IMAP folder result through the host that owns the update.
 
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 
 use taomni_mail_api::{
     HOST_REQUEST_TIMEOUT,
@@ -10,7 +10,7 @@ use taomni_mail_api::{
 use taomni_plugin_stream::routed_tcp::Route;
 
 use super::{MailFolder, PluginRegistry, invoke, supports};
-use crate::state::MailDbHandle;
+use crate::{mail::cache_access::canonical_cache_database, state::MailDbHandle};
 
 pub(in crate::mail) fn publishes_folder_cache(registry: &PluginRegistry) -> bool {
     supports(registry, UPDATE_IMAP_FOLDER_CACHE)
@@ -24,12 +24,7 @@ pub(in crate::mail) async fn update_folder_cache(
     folders: Vec<MailFolder>,
 ) -> Result<Vec<MailFolder>, String> {
     let request = tokio::task::spawn_blocking(move || {
-        let database = {
-            let db = cache.lock()?;
-            Path::new(db.path().ok_or("Mail storage has no disk path")?)
-                .canonicalize()
-                .map_err(|error| error.to_string())?
-        };
+        let database = canonical_cache_database(&cache)?;
         serde_json::to_vec(&FolderCacheUpdate {
             account_id,
             database,

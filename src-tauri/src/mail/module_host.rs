@@ -6,6 +6,8 @@ mod archive_encoding;
 mod archive_index;
 mod archive_publication;
 pub(super) mod attachment_cache;
+mod body_cache;
+pub(super) use body_cache::{publish_body_cache, publishes_body_cache};
 mod body_sync;
 mod compose;
 pub(super) mod imap_idle;

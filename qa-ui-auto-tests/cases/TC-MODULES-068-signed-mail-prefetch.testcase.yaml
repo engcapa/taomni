@@ -56,7 +56,7 @@ verification:
     checkpoints:
     - {step: 12, expectation: The verified Mail package supplied the installed binary and renderer.}
     - {step: 22, expectation: The synchronized headers are available in the account list.}
-    - {step: 23, expectation: The mail fixture records four IMAP body fetches over the same connection with the signed host enabled.}
+    - {step: 23, expectation: The signed host fetches four bodies over one IMAP connection and commits them to SQLite without marking them read.}
     - {step: 26, expectation: Opening the oldest warmed message displays its matching body.}
     - {step: 27, expectation: The reader reports SQLite as the source without downloading the body again.}
     - {step: 28, expectation: Opening the cached message marks it as read.}
@@ -71,4 +71,4 @@ verification:
   native:
   - check: Signed app module uses a real IMAP socket and a native SQLite cache.
     method: automated
-    reason: The protocol server receipts bind the body requests to the signed test package and app checkout.
+    reason: The protocol and read-only SQLite observations bind the fetched and stored bodies to the signed test package and app checkout.

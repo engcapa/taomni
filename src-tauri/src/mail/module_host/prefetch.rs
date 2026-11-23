@@ -4,6 +4,7 @@ use std::{sync::Arc, time::Duration};
 
 use taomni_mail_api::{
     HOST_REQUEST_TIMEOUT, PREFETCH_IMAP_BODIES,
+    body_cache::ImapBodyCacheSource,
     imap_exchange::{
         ImapBodyReply, ImapExchange, PrefetchBodies, read_body_frame, read_frame, write_frame,
     },
@@ -12,7 +13,10 @@ use taomni_mail_engine::cache::{cache_body_if_current, pending_bodies};
 use taomni_plugin_stream::routed_tcp::Route;
 use tauri::State;
 
-use super::{PluginRegistry, ResolvedMailAccount, bind_incoming, invoke, supports};
+use super::{
+    PluginRegistry, ResolvedMailAccount, bind_incoming, invoke, publish_body_cache,
+    publishes_body_cache, supports,
+};
 use crate::mail::{MailAccountConfig, resolve_config, save_raw_message, sync, with_mail_db_async};
 use crate::state::AppState;
 
@@ -48,6 +52,7 @@ pub(in crate::mail) async fn prefetch_imap_bodies(
             .as_deref()
             .is_some_and(|path| !path.trim().is_empty()),
     };
+    let publish_to_host = publishes_body_cache(&state.plugins);
     let observed_at = sync::now_ms();
     let (_mail_route, connection) = bind_incoming(&account).await?;
     let (_exchange, endpoint, mut peer) = Route::pair().await.map_err(|error| error.to_string())?;
@@ -106,10 +111,23 @@ pub(in crate::mail) async fn prefetch_imap_bodies(
             } else {
                 None
             };
-            let applied = with_mail_db_async(state, &request.account_id, move |db, _| {
-                cache_body_if_current(db, reply.message, uid_validity, observed_at)
-            })
-            .await?;
+            let applied = if publish_to_host {
+                publish_body_cache(
+                    state.plugins.clone(),
+                    state.mail_db(&request.account_id)?,
+                    request.account_id.clone(),
+                    reply.message,
+                    observed_at,
+                    ImapBodyCacheSource::Prefetched { uid_validity },
+                )
+                .await?
+                .0
+            } else {
+                with_mail_db_async(state, &request.account_id, move |db, _| {
+                    cache_body_if_current(db, reply.message, uid_validity, observed_at)
+                })
+                .await?
+            };
             if let (true, Some(original)) = (applied, original) {
                 if let Err(error) =
                     save_original(account.clone(), request.folder.clone(), uid, original).await

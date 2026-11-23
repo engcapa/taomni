@@ -140,7 +140,10 @@ def run(ctx, args):
         elif report["filter"] != signed.get("filter"):
             raise StepError("Disabling Mail changed the saved filter")
     if phase == "imap-prefetch":
-        report["prefetch"] = observe_prefetch(args)
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        if "mail/publish-imap-body-cache" not in manifest["commands"]:
+            raise StepError("The installed Mail host does not publish the IMAP body cache")
+        report["prefetch"] = observe_prefetch(args, plugins.parent / "mail-cache")
     if phase == "imap-mutations":
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
         if owner.case_id != "TC-MAIL-BULK-03" or "mail/open-imap-mutations" not in manifest["commands"]:
@@ -369,7 +372,7 @@ def observe_outbox(module_data, legacy_cache, phase, previous):
     return current
 
 
-def observe_prefetch(args):
+def observe_prefetch(args, cache_root):
     prefix = args.get("subject_prefix", "") if isinstance(args, dict) else ""
     count = args.get("count", 0) if isinstance(args, dict) else 0
     server = mail_fake_server.ACTIVE
@@ -397,6 +400,39 @@ def observe_prefetch(args):
                 by_connection.setdefault(event["connection"], {})[uid] = event
         for connection, replies in by_connection.items():
             if sorted(replies) == uids:
-                return {"uids": uids, "connection": connection, "fetches": list(replies.values())}
+                cached = observe_prefetched_cache(cache_root, uids)
+                if cached is not None:
+                    return {"uids": uids, "connection": connection,
+                            "fetches": list(replies.values()), "cache": cached}
         time.sleep(.1)
-    raise StepError(f"IMAP prefetch did not fetch UIDs {uids} on one connection. Observed {by_connection}")
+    raise StepError(f"IMAP prefetch did not fetch and cache UIDs {uids}. Observed {by_connection}")
+
+
+def observe_prefetched_cache(root, uids):
+    databases = sorted(root.glob("*.db"))
+    if not databases:
+        return None
+    if len(databases) != 1:
+        raise StepError(f"Expected one IMAP body cache, found {len(databases)}")
+    database = databases[0]
+    ordinary(database)
+    placeholders = ", ".join("?" for _ in uids)
+    with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=1)) as conn:
+        rows = conn.execute(
+            f"""SELECT uid, subject, body_text, body_html, flags_json
+                FROM mail_messages
+                WHERE folder='INBOX' AND uid IN ({placeholders}) AND body_cached_at IS NOT NULL
+                ORDER BY uid""",
+            uids,
+        ).fetchall()
+    if [row[0] for row in rows] != uids:
+        return None
+    cached = []
+    for uid, subject, text, html, flags in rows:
+        content = (text or "") + (html or "")
+        if f"Body of {subject}" not in content:
+            raise StepError(f"The prefetched body for UID {uid} differs from the delivered message")
+        if any(flag.lower() == "\\seen" for flag in json.loads(flags)):
+            raise StepError(f"Prefetch marked the unopened UID {uid} as read")
+        cached.append({"uid": uid, "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest()})
+    return {"database": database.name, "bodies": cached}
