@@ -4,7 +4,7 @@ import subprocess
 import unittest
 from unittest.mock import call, patch
 
-from modular_gate_runs import PLATFORMS, UPGRADE, api, plan
+from modular_gate_runs import PLATFORMS, UPGRADE, api, dispatch, plan
 
 
 class GitHubRunLookupTests(unittest.TestCase):
@@ -100,3 +100,40 @@ class ReleasePackageSelectionTests(unittest.TestCase):
         for targets in ("all,linux-x86_64", "windows-x86_64,windows-x86_64", "darwin-aarch64,"):
             with self.subTest(targets=targets), self.assertRaisesRegex(ValueError, "supported release package targets"):
                 plan("release", "macos-15", "123", "0.5.11", targets)
+
+    def test_first_release_uses_candidate_roster_with_the_same_three_runs(self):
+        inventory, linux, desktop = [
+            check[2] for check in plan("release", "macos-26", "123", "0.6.0", first_release=True)
+        ]
+        self.assertEqual(inventory, {
+            "package_run": "123", "package_version": "0.6.0", "package_targets": "linux-x86_64",
+        })
+        self.assertEqual(linux, {
+            **inventory, "package_first_release_linux": "true", "package_relocation_linux": "true",
+            "package_rdp_perf": "true",
+        })
+        self.assertEqual(desktop, {
+            "package_run": "123", "package_version": "0.6.0", "package_first_release_desktop": "true",
+            "package_targets": "windows-x86_64,darwin-aarch64,darwin-x86_64",
+            "package_macos_arm_runner": "macos-26",
+        })
+
+    def test_first_release_requires_a_package_suite_and_matching_bundle(self):
+        for suite, package in (("signed", "123"), ("all", "123"), ("release", "")):
+            with self.subTest(suite=suite, package=package):
+                with self.assertRaisesRegex(ValueError, "matching first-release bundle run"):
+                    plan(suite, "macos-15", package, "0.6.0", first_release=True)
+
+    def test_unavailable_roster_fails_before_dispatching_any_jobs(self):
+        sha = "a" * 40
+        branch = {"ref": "refs/heads/qa", "object": {"sha": sha}}
+        producer = {"head_sha": sha, "path": ".github/workflows/release.yml", "event": "workflow_dispatch"}
+        roster = {"name": "modular-candidate-roster-123", "expired": True}
+        with patch("modular_gate_runs.subprocess.run"), patch(
+            "modular_gate_runs.api", side_effect=[branch, producer, {"artifacts": [roster]}],
+        ) as github:
+            with self.assertRaisesRegex(ValueError, "available signed roster artifact"):
+                dispatch("engcapa/taomni", "qa", sha, "release", "macos-15", "123", "0.6.0",
+                         first_release=True)
+        github.assert_called_with("engcapa/taomni", "actions/runs/123/artifacts?name=modular-candidate-roster-123")
+        self.assertEqual(github.call_count, 3)

@@ -36,9 +36,12 @@ def api(repository, endpoint, *, body=None, retry_missing=False):
     raise RuntimeError(f"GitHub API request failed for {endpoint}: {result.stderr.strip()}")
 
 
-def plan(suite, macos_runner, package_run, package_version, package_targets="all"):
+def plan(suite, macos_runner, package_run, package_version, package_targets="all", *,
+         first_release=False):
     if suite not in SUITES or macos_runner not in MACOS_RUNNERS:
         raise ValueError("Choose a supported QA suite and macOS runner")
+    if first_release and (suite != "release" or not package_run):
+        raise ValueError("Select the release suite with a matching first-release bundle run")
     if (package_run or package_version or suite == "release") and (
         not re.fullmatch(r"[1-9][0-9]*", package_run)
         or not re.fullmatch(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?", package_version)
@@ -93,24 +96,28 @@ def plan(suite, macos_runner, package_run, package_version, package_targets="all
         arm_runner = "macos-26" if macos_runner == "macos-26" else "macos-15"
         if LINUX_PACKAGE in targets:
             linux = {**package, "package_targets": LINUX_PACKAGE}
+            installed = {**linux, "package_relocation_linux": "true", "package_rdp_perf": "true"}
+            if first_release:
+                installed["package_first_release_linux"] = "true"
             checks.extend([
                 ("G9 Linux release bundle inspection", UPGRADE, linux),
-                ("G4/G5/G6/G11 installed Linux recovery, RDP, forced exit and profile leases", UPGRADE, {
-                    **linux, "package_relocation_linux": "true", "package_rdp_perf": "true",
-                }),
+                ("G4/G5/G6/G11 installed Linux recovery, RDP, forced exit and profile leases",
+                 UPGRADE, installed),
             ])
         desktop = [target for target in targets if target in DESKTOP_PACKAGES]
         if desktop:
+            upgrade = "package_first_release_desktop" if first_release else "package_upgrade_desktop"
             checks.append(("G1/G3/G9/G11 MSI/DMG inspection, upgrade and rollback", UPGRADE, {
-                **package, "package_upgrade_desktop": "true", "package_macos_arm_runner": arm_runner,
+                **package, upgrade: "true", "package_macos_arm_runner": arm_runner,
                 "package_targets": ",".join(desktop),
             }))
     return checks
 
 
 def dispatch(repository, source_ref, expected_head, suite, macos_runner, package_run, package_version,
-             package_targets="all"):
-    checks = plan(suite, macos_runner, package_run, package_version, package_targets)
+             package_targets="all", *, first_release=False):
+    checks = plan(suite, macos_runner, package_run, package_version, package_targets,
+                  first_release=first_release)
     subprocess.run(["git", "check-ref-format", f"refs/heads/{source_ref}"], check=True)
     branch = api(repository, f"git/ref/heads/{quote(source_ref, safe='/')}")
     head = branch.get("object", {}).get("sha", "")
@@ -124,8 +131,14 @@ def dispatch(repository, source_ref, expected_head, suite, macos_runner, package
             head, ".github/workflows/release.yml", "workflow_dispatch",
         ):
             raise ValueError("Select an artifact-only Release Bundle run for the pinned source")
+        if first_release:
+            roster = f"modular-candidate-roster-{package_run}"
+            artifacts = api(repository, f"actions/runs/{package_run}/artifacts?name={roster}")
+            if sum(row["name"] == roster and not row["expired"] for row in artifacts["artifacts"]) != 1:
+                raise ValueError(f"Expected one available signed roster artifact {roster}")
 
-    receipt = {"sourceRef": source_ref, "sourceSha": head, "suite": suite, "runs": []}
+    receipt = {"sourceRef": source_ref, "sourceSha": head, "suite": suite,
+               "firstRelease": first_release, "runs": []}
     summary = [f"## Modular QA for `{head}`", ""]
     try:
         for name, workflow, inputs in checks:
@@ -164,4 +177,5 @@ if __name__ == "__main__":
         os.environ["VERIFICATION_SUITE"], os.environ["MACOS_RUNNER"],
         os.environ["PACKAGE_RUN"], os.environ["PACKAGE_VERSION"],
         os.environ.get("PACKAGE_TARGETS") or "all",
+        first_release=os.environ.get("FIRST_RELEASE") == "true",
     )

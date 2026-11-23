@@ -30,6 +30,10 @@ on:
         description: Release package targets to verify (all or comma-separated)
         type: string
         default: all
+      first_release:
+        description: Verify the 0.5.12 upgrade using the signed module roster from the candidate build
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -67,6 +71,7 @@ jobs:
           PACKAGE_RUN: ${{ inputs.package_run }}
           PACKAGE_VERSION: ${{ inputs.package_version }}
           PACKAGE_TARGETS: ${{ inputs.package_targets }}
+          FIRST_RELEASE: ${{ inputs.first_release }}
         run: python .github/scripts/modular_gate_runs.py
       - uses: actions/upload-artifact@v4
         if: always()

@@ -62,6 +62,14 @@ cases stay failed; downloading every artifact is not a passing test result.
 Review the original receipts, source/build identity and exact selected cases
 before claiming coverage.
 
+For a first modular release candidate, dispatch `qa-modular-gates.yml` with
+`suite=release`, `first_release=true`, and the candidate's `package_run` and
+`package_version`. Set `source_ref` and `head` to the producer branch and its SHA.
+The dispatcher checks that the producer has uploaded the signed module roster.
+The installed checks use the signed roster and packages from that run to verify
+the upgrade from 0.5.12, removal of a module, restart with the remaining modules,
+and rollback. The Linux recovery run also checks relocation and RDP performance.
+
 For real release-package samples, dispatch that registered workflow with
 `package_run=<Release Bundle run ID>`, `package_source=<exact 40-character
 producer SHA>`, and `package_version=<artifact-only test version>`. `head` selects
