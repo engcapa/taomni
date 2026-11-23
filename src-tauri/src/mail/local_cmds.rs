@@ -75,15 +75,16 @@ async fn download(
     let account_id = account.config.session_id.clone();
     let leave_days = account.config.pop3_leave_days;
     let db = state.mail_db(&account_id)?;
+    let gate = state.legacy.mail.mutation_gate(&account_id);
     let registry = state.plugins.clone();
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
+        let _local = gate.lock().map_err(|error| error.to_string())?;
         let sync = |mailbox: &mut dyn taomni_mail_engine::pop3::Pop3Mailbox| {
-            let conn = db.lock().map_err(|e| e.to_string())?;
-            super::init_mail_tables(&conn).map_err(|e| e.to_string())?;
-            pop3::sync_inbox(mailbox, &conn, &account_id, leave_days)
+            pop3::sync_inbox(mailbox, || db.lock(), &account_id, leave_days)
         };
         let outcome = if super::module_host::syncs_pop3(&registry) {
+            let _mutation = db.mutation_lease()?;
             let mut client = super::module_host::HostedPop3::open(registry, &account, handle)?;
             sync(&mut client)?
         } else {
@@ -91,6 +92,7 @@ async fn download(
             return Err(super::SIGNED_MAIL_CONNECTION_REQUIRED.into());
             #[cfg(any(test, feature = "legacy-mail-pop3"))]
             {
+                let _mutation = db.mutation_lease()?;
                 let mut client = Pop3Client::connect(&account, &handle)?;
                 sync(&mut client.session)?
             }

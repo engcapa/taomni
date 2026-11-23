@@ -1,6 +1,7 @@
 //! POP3 retrieval and durable local inbox updates.
 
 use std::collections::HashMap;
+use std::ops::Deref;
 
 use rusqlite::{Connection, Transaction, TransactionBehavior, params};
 
@@ -23,23 +24,27 @@ pub struct Pop3SyncOutcome {
     pub deleted_on_server: usize,
 }
 
-pub fn sync_inbox(
+pub fn sync_inbox<D: Deref<Target = Connection>>(
     client: &mut dyn Pop3Mailbox,
-    conn: &Connection,
+    database: impl Fn() -> Result<D, String>,
     account_id: &str,
     leave_days: Option<u32>,
 ) -> Result<Pop3SyncOutcome, String> {
-    local_store::ensure_local_folders(conn, account_id).map_err(database_error)?;
+    let known = {
+        let conn = database()?;
+        local_store::ensure_local_folders(&conn, account_id).map_err(database_error)?;
+        known_messages(&conn, account_id).map_err(database_error)?
+    };
     let listing = client.uidl()?;
-    let known = known_messages(conn, account_id).map_err(database_error)?;
     let now = now_ts();
     let (fetch, mut deletes) = plan_round(&listing, &known, FETCH_BATCH, leave_days, now);
     let downloaded = (|| {
         let mut messages = Vec::new();
         for (number, uidl) in &fetch {
             let raw = client.retr(*number)?;
+            let conn = database()?;
             if let Some(message) =
-                commit_download(conn, account_id, uidl, now, &raw).map_err(database_error)?
+                commit_download(&conn, account_id, uidl, now, &raw).map_err(database_error)?
             {
                 messages.push(message);
             }
@@ -50,9 +55,11 @@ pub fn sync_inbox(
         Ok::<_, String>(messages)
     })();
     // Earlier messages may be committed even when a later RETR fails.
-    let refreshed = local_store::refresh_counts(conn, account_id, "INBOX");
+    let refreshed = database().and_then(|conn| {
+        local_store::refresh_counts(&conn, account_id, "INBOX").map_err(database_error)
+    });
     let messages = downloaded?;
-    refreshed.map_err(database_error)?;
+    refreshed?;
     for number in &deletes {
         client.dele(*number)?;
     }
@@ -60,7 +67,8 @@ pub fn sync_inbox(
     // deletion receipts from that response, after durable message downloads.
     client.finish()?;
     if !deletes.is_empty() {
-        let tx = Transaction::new_unchecked(conn, TransactionBehavior::Immediate)
+        let conn = database()?;
+        let tx = Transaction::new_unchecked(&conn, TransactionBehavior::Immediate)
             .map_err(database_error)?;
         for (number, uidl) in &listing {
             if deletes.contains(number) {
@@ -150,6 +158,7 @@ fn database_error(error: rusqlite::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
 
     #[test]
     fn plans_new_downloads_and_expired_deletes() {
@@ -171,28 +180,33 @@ mod tests {
         assert!(keep.is_empty(), "no policy keeps everything on the server");
     }
 
-    struct ServerRound {
+    struct ServerRound<'a> {
+        db: &'a Mutex<Connection>,
         accepts_quit: bool,
         retrieved: usize,
         requested_delete: bool,
     }
 
-    impl Pop3Mailbox for ServerRound {
+    impl Pop3Mailbox for ServerRound<'_> {
         fn uidl(&mut self) -> Result<Vec<(u32, String)>, String> {
+            assert!(self.db.try_lock().is_ok());
             Ok(vec![(1, "uidl-1".into())])
         }
 
         fn retr(&mut self, _: u32) -> Result<Vec<u8>, String> {
+            assert!(self.db.try_lock().is_ok());
             self.retrieved += 1;
             Ok(b"Subject: Retained message\r\n\r\nA durable POP3 copy".to_vec())
         }
 
         fn dele(&mut self, _: u32) -> Result<(), String> {
+            assert!(self.db.try_lock().is_ok());
             self.requested_delete = true;
             Ok(())
         }
 
         fn finish(&mut self) -> Result<(), String> {
+            assert!(self.db.try_lock().is_ok());
             if self.accepts_quit {
                 Ok(())
             } else {
@@ -205,39 +219,46 @@ mod tests {
     fn unconfirmed_quit_keeps_the_original_and_retries_deletion_without_redownloading() {
         let conn = Connection::open_in_memory().unwrap();
         crate::cache::init_mail_tables(&conn).unwrap();
+        let db = Mutex::new(conn);
+        let database = || db.lock().map_err(|error| error.to_string());
         let deleted = || {
-            conn.query_row(
-                "SELECT deleted FROM mail_pop3_uidl WHERE account_id='pop' AND uidl='uidl-1'",
-                [],
-                |row| row.get::<_, bool>(0),
-            )
-            .unwrap()
+            let connection = database().unwrap();
+            connection
+                .query_row(
+                    "SELECT deleted FROM mail_pop3_uidl WHERE account_id='pop' AND uidl='uidl-1'",
+                    [],
+                    |row| row.get::<_, bool>(0),
+                )
+                .unwrap()
         };
         let mut dropped = ServerRound {
+            db: &db,
             accepts_quit: false,
             retrieved: 0,
             requested_delete: false,
         };
-        assert!(sync_inbox(&mut dropped, &conn, "pop", Some(0)).is_err());
+        assert!(sync_inbox(&mut dropped, database, "pop", Some(0)).is_err());
         assert!(dropped.requested_delete);
         assert_eq!(dropped.retrieved, 1);
         assert!(!deleted());
-        let originals = local_store::list_local_originals(&conn, "pop", "INBOX").unwrap();
+        let originals =
+            local_store::list_local_originals(&database().unwrap(), "pop", "INBOX").unwrap();
         assert_eq!(originals.len(), 1);
 
         let mut retry = ServerRound {
+            db: &db,
             accepts_quit: true,
             retrieved: 0,
             requested_delete: false,
         };
-        let outcome = sync_inbox(&mut retry, &conn, "pop", Some(0)).unwrap();
+        let outcome = sync_inbox(&mut retry, database, "pop", Some(0)).unwrap();
         assert!(retry.requested_delete);
         assert_eq!(retry.retrieved, 0);
         assert_eq!(outcome.deleted_on_server, 1);
         assert!(outcome.messages.is_empty());
         assert!(deleted());
         assert_eq!(
-            local_store::list_local_originals(&conn, "pop", "INBOX").unwrap(),
+            local_store::list_local_originals(&database().unwrap(), "pop", "INBOX").unwrap(),
             originals
         );
     }

@@ -125,6 +125,15 @@ impl MailDatabase {
         self.lock_cancellable(&tokio_util::sync::CancellationToken::new())
     }
 
+    /// Resolve relocation under the cache lock before starting a remote
+    /// operation. Keep the returned lease through the last local commit.
+    pub fn mutation_lease(&self) -> Result<ProcessLock, String> {
+        let connection = self.lock()?;
+        let path = connection.path().ok_or("Mail storage has no disk path")?;
+        ProcessLock::try_at(Path::new(path), MAIL_MUTATION_LOCK)?
+            .ok_or_else(|| "Another Taomni instance is changing this mailbox. Retry once the other operation finishes".into())
+    }
+
     pub fn lock_cancellable(
         &self,
         cancel: &tokio_util::sync::CancellationToken,

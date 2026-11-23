@@ -1,6 +1,7 @@
 //! Update the server folder tree, then commit its metadata to the mailbox cache.
 
 use taomni_mail_api::ImapFolderChange;
+use taomni_mail_engine::cache::apply_folder_change;
 
 use super::*;
 
@@ -113,14 +114,7 @@ async fn change_folder(
         return Err("Mail module returned folders for a different account".into());
     }
     with_mail_db_async(state, &account_id, move |db, account_id| {
-        let tx = db.unchecked_transaction()?;
-        if let Some(previous) = previous {
-            purge_cached_folder(&tx, account_id, &previous)?;
-        }
-        for folder in &folders {
-            upsert_folder(&tx, folder)?;
-        }
-        tx.commit()?;
+        apply_folder_change(db, account_id, previous.as_deref(), &folders)?;
         Ok(folders)
     })
     .await

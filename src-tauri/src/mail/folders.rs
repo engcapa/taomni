@@ -8,9 +8,8 @@
 //!   periodic scan skip folders the server reports unchanged (one round trip
 //!   instead of EXAMINE + SEARCHes).
 
-use std::collections::HashMap;
-
 use taomni_mail_api::FolderSubscription;
+use taomni_mail_engine::cache::{refresh_subscription_flags, sync_folder_tree};
 use tauri::State;
 
 #[cfg(any(test, feature = "legacy-mail-imap"))]
@@ -64,7 +63,7 @@ pub async fn mail_list_folders(
         return Ok(listed);
     }
     with_mail_db(&state, &account_id, |db| {
-        super::sync_folder_tree(db, &account_id, &listed)?;
+        sync_folder_tree(db, &account_id, &listed)?;
         super::list_cached_folders(db, &account_id)
     })
 }
@@ -90,18 +89,7 @@ pub async fn mail_set_folder_subscription(
         return Ok(listed);
     }
     with_mail_db(&state, &account_id, |db| {
-        let flags: HashMap<&str, &MailFolder> = listed
-            .iter()
-            .map(|folder| (folder.name.as_str(), folder))
-            .collect();
-        let mut cached = super::list_cached_folders(db, &account_id)?;
-        for folder in cached.iter_mut() {
-            if let Some(remote) = flags.get(folder.name.as_str()) {
-                folder.flags = remote.flags.clone();
-                super::upsert_folder(db, folder)?;
-            }
-        }
-        super::list_cached_folders(db, &account_id)
+        refresh_subscription_flags(db, &account_id, &listed)
     })
 }
 

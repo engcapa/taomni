@@ -1,7 +1,7 @@
 use taomni_mail_api::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, HeaderPageOutcome, HeaderPageRequest,
 };
-use taomni_mail_engine::cache::apply_folder_round;
+use taomni_mail_engine::cache::{apply_folder_round, sync_folder_tree};
 
 use super::*;
 
@@ -485,32 +485,4 @@ pub(super) fn folder_is_noselect(folder: &MailFolder) -> bool {
         .flags
         .iter()
         .any(|flag| flag.to_ascii_lowercase().contains("noselect"))
-}
-
-/// Mirror the remote folder tree: upsert listed folders (metadata only) and
-/// drop cached folders the server no longer lists.
-pub(super) fn sync_folder_tree(
-    conn: &Connection,
-    account_id: &str,
-    listed: &[MailFolder],
-) -> SqlResult<()> {
-    let tx = conn.unchecked_transaction()?;
-    for folder in listed {
-        upsert_folder(&tx, folder)?;
-    }
-    let names: HashSet<&str> = listed.iter().map(|folder| folder.name.as_str()).collect();
-    let cached = list_cached_folders(&tx, account_id)?;
-    for folder in cached {
-        if !names.contains(folder.name.as_str()) {
-            tx.execute(
-                "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2",
-                params![account_id, folder.name],
-            )?;
-            tx.execute(
-                "DELETE FROM mail_folders WHERE account_id = ?1 AND name = ?2",
-                params![account_id, folder.name],
-            )?;
-        }
-    }
-    tx.commit()
 }

@@ -1,4 +1,6 @@
 use super::*;
+use crate::database::{MAIL_MUTATION_LOCK, ProcessLock};
+use std::path::Path;
 
 struct ObserveMailboxLease<'a>(&'a Path);
 
