@@ -191,6 +191,11 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertIn('Configure Linux fast linker (lld)', names)
         build_step = next(s for s in steps if s.get('name') == 'Build and export the verified native runtime')
         self.assertIn('--reusable-archive qa-build-output/reusable-runtime/reusable.tar.gz', build_step['run'])
+        runtime_upload = next(s for s in steps if s.get('name') == 'Upload native runtime once per build')
+        self.assertNotIn('continue-on-error', runtime_upload)
+        self.assertEqual(runtime_upload['with']['if-no-files-found'], 'error')
+        diagnostics = next(s for s in steps if s.get('name') == 'Retain native build diagnostics')
+        self.assertIs(diagnostics['continue-on-error'], True)
         for contract_name in (
             'Windows native session cleanup contracts',
             'Windows atomic file replacement contracts',
