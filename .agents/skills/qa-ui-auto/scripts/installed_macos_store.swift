@@ -60,7 +60,9 @@ func labels(_ element: AXUIElement) -> [String] {
     if attribute(element, kAXRoleAttribute) as? String == kAXStaticTextRole {
         fields.append(kAXValueAttribute)
     }
-    return fields.compactMap { attribute(element, $0) as? String }
+    return fields.compactMap {
+        (attribute(element, $0) as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 func button(_ elements: [AXUIElement], _ name: String) -> AXUIElement? {
@@ -79,10 +81,35 @@ func press(_ element: AXUIElement) throws {
     }
 }
 
-func fill(_ element: AXUIElement, _ value: String) throws {
-    let result = AXUIElementSetAttributeValue(element, kAXValueAttribute as CFString, value as CFString)
+func focus(_ element: AXUIElement) throws {
+    if attribute(element, kAXFocusedAttribute) as? Bool == true { return }
+    let result = AXUIElementSetAttributeValue(element, kAXFocusedAttribute as CFString, kCFBooleanTrue)
     guard result == .success else {
-        throw CheckFailure("Setting the accessible text field failed with status \(result.rawValue)")
+        throw CheckFailure("Focusing the accessible text field failed with status \(result.rawValue)")
+    }
+}
+
+func postKey(pid: pid_t, code: CGKeyCode, flags: CGEventFlags = [], text: String? = nil) throws {
+    guard let down = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true),
+          let up = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false)
+    else { throw CheckFailure("Could not create the installed app key event") }
+    down.flags = flags
+    up.flags = flags
+    if let text {
+        Array(text.utf16).withUnsafeBufferPointer { chars in
+            down.keyboardSetUnicodeString(stringLength: chars.count, unicodeString: chars.baseAddress)
+        }
+    }
+    down.postToPid(pid)
+    up.postToPid(pid)
+}
+
+func typeText(_ value: String, into element: AXUIElement, pid: pid_t) throws {
+    // WKWebView inputs are controlled by React. Send text through the focused
+    // field so the product handles input events and enables its submit button.
+    try focus(element)
+    for character in value {
+        try postKey(pid: pid, code: 0, text: String(character))
     }
 }
 
@@ -117,17 +144,6 @@ func confirmation(_ elements: [AXUIElement], message: String, action: String) ->
         }
     }
     return nil
-}
-
-func openSettings(pid: pid_t) throws {
-    // AppKit's Settings shortcut uses Command and the comma key.
-    guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 43, keyDown: true),
-          let up = CGEvent(keyboardEventSource: nil, virtualKey: 43, keyDown: false)
-    else { throw CheckFailure("Could not create the Settings key event") }
-    down.flags = .maskCommand
-    up.flags = .maskCommand
-    down.postToPid(pid)
-    up.postToPid(pid)
 }
 
 func observe(_ request: Request) throws -> Observation {
@@ -170,7 +186,7 @@ func observe(_ request: Request) throws -> Observation {
         let field = try wait("vault unlock field") {
             contents().first { attribute($0, kAXSubroleAttribute) as? String == "AXSecureTextField" }
         }
-        try fill(field, password)
+        try typeText(password, into: field, pid: request.pid)
         try press(try wait("Vault Unlock button") { button(contents(), "Unlock") })
         _ = try wait("the vault unlock field to close") {
             guard let visibleWindow = window() else { return nil as Bool? }
@@ -178,14 +194,15 @@ func observe(_ request: Request) throws -> Observation {
                 .contains { attribute($0, kAXSubroleAttribute) as? String == "AXSecureTextField" }
                 ? nil : true
         }
-        try openSettings(pid: request.pid)
+        // AppKit's Settings shortcut uses Command and the comma key.
+        try postKey(pid: request.pid, code: 43, flags: .maskCommand)
         let search = try wait("Settings search field") {
             contents().first {
                 attribute($0, kAXRoleAttribute) as? String == kAXTextFieldRole
                     && labels($0).contains { $0.hasPrefix("Search settings") }
             }
         }
-        try fill(search, "module store")
+        try typeText("module store", into: search, pid: request.pid)
         _ = try wait("Module Store") {
             contents().first { labels($0).contains("Module Store") }
         }
@@ -204,7 +221,7 @@ func observe(_ request: Request) throws -> Observation {
         try press(try wait("Mail Uninstall control") {
             storeAction(contents(), module: mail, roster: modules, action: "Uninstall")
         })
-        let message = "Uninstall Mail? Module data will be retained"
+        let message = "Uninstall Mail? Module data will be retained unless you select delete module data."
         try press(try wait("Mail retention confirmation") {
             confirmation(contents(), message: message, action: "Uninstall")
         })
