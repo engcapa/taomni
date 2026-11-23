@@ -74,8 +74,8 @@ function Observe-Controls {
 
 function Read-Code([string]$Expected) {
     [System.Windows.Forms.Clipboard]::Clear()
-    $button = Wait-Element { Find-Control $window $types::Button "Copy code for $($fixture.issuer)" } 'copy-hotp'
-    Click-Element $button
+    $name = "Copy code for $($fixture.issuer)"
+    Invoke-Button $window $name 'copy-hotp' -Physical:($Phase -eq 'seed')
     $retry = [Diagnostics.Stopwatch]::StartNew()
     Wait-Element {
         try {
@@ -85,8 +85,8 @@ function Read-Code([string]$Expected) {
         }
         if ($actual -ceq $Expected) { return $actual }
         if ($retry.Elapsed.TotalSeconds -ge 1) {
-            $current = Find-Control $window $types::Button "Copy code for $($fixture.issuer)"
-            if ($null -ne $current) { Click-Element $current }
+            $current = Find-Control $window $types::Button $name
+            if ($null -ne $current) { Invoke-Control $current -Physical:($Phase -eq 'seed') }
             $retry.Restart()
         }
     } 'read-hotp'
@@ -118,7 +118,7 @@ if ($Phase -eq 'seed') {
     $codes += Read-Code '287082'
 }
 if ($Phase -ne 'before') {
-    Invoke-Button $window "Generate the next code for $($fixture.issuer)" 'advance-hotp' -Physical
+    Invoke-Button $window "Generate the next code for $($fixture.issuer)" 'advance-hotp' -Physical:($Phase -eq 'seed')
     $codes += Read-Code $(if ($Phase -eq 'seed') { '287082' } else { '359152' })
 }
 [System.Windows.Forms.Clipboard]::Clear()

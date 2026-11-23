@@ -78,7 +78,8 @@ def verify_mfa_controls(owner, phase, evidence):
                     screenshot = None
                     if phase == "seed" and stage == "vault-setup-fields":
                         screenshot = "windows-mfa-before-vault-setup.png"
-                    elif stage in {"vault-unlock-field", "unlock-vault", "open-tools", "open-mfa"}:
+                    elif stage in {"vault-unlock-field", "unlock-vault", "open-tools", "open-mfa",
+                                   "copy-hotp", "read-hotp", "advance-hotp"}:
                         screenshot = f"windows-mfa-{phase}-{stage}.png"
                     if (os.name == "nt" and screenshot is not None and type(handle) is int
                             and 0 < handle < 2**63 and owner.poll() is None):

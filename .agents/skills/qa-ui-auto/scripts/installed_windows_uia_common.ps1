@@ -77,14 +77,18 @@ function Click-Element($Element) {
         [int]($rect.X + $rect.Width / 2), [int]($rect.Y + $rect.Height / 2))
 }
 
-function Invoke-Button($Root, [string]$Name, [string]$Stage, [switch]$Physical) {
-    $button = Wait-Element { Find-Control $Root $types::Button $Name } $Stage
+function Invoke-Control($Button, [switch]$Physical) {
     [object]$pattern = $null
-    if (-not $Physical -and $button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
+    if (-not $Physical -and $Button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
         $pattern.Invoke()
         return
     }
-    Click-Element $button
+    Click-Element $Button
+}
+
+function Invoke-Button($Root, [string]$Name, [string]$Stage, [switch]$Physical) {
+    $button = Wait-Element { Find-Control $Root $types::Button $Name } $Stage
+    Invoke-Control $button -Physical:$Physical
 }
 
 function Set-Value($Element, [string]$Value) {
