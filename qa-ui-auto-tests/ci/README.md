@@ -64,12 +64,13 @@ five nights. Browser entries stay complete. The policy is recorded in
 deferred IDs), so a night can be reproduced locally with
 `QA_NIGHTLY_POLICY=true QA_NIGHT_LABEL=YYYY-MM-DD python -m qa_ui_auto.ci plan`.
 
-Windows only runs on Saturday, Sunday and Monday **evenings** (Beijing). The
-night label is the UTC date of the nominal trigger, so Saturday evening is the
-run that starts Sunday 03:17 Beijing. Other nights plan `linux,macos` only: no
-Windows browser, native shards or producer are scheduled. Override the gate
-with `QA_WINDOWS_NIGHTS` (comma-separated weekday names) or simulate a night on
-a manual dispatch with `nightly_policy=true` plus `night_label=YYYY-MM-DD`.
+Windows only runs on the scheduled runs that start at 03:17 Beijing on Friday,
+Saturday and Sunday. The night label is the UTC date of the nominal trigger, so
+those runs carry the Thursday, Friday and Saturday labels. Other runs plan
+`linux,macos` only: no Windows browser, native shards or producer are scheduled.
+Override the gate with `QA_WINDOWS_NIGHTS` (comma-separated night-label weekday
+names) or simulate a run on a manual dispatch with `nightly_policy=true` plus
+`night_label=YYYY-MM-DD`.
 
 Cases that need an opt-in commercial provider (`tao_real_provider`) follow the
 `policy.yaml` opt-in mapping: without a configured credential they become

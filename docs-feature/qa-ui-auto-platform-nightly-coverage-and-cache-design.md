@@ -9,7 +9,7 @@
 | 决策 | 内容 |
 | --- | --- |
 | 夜跑覆盖 | 方案 B：native 保留 crash 套件 + 平台限定用例 + 共享用例的 20% 轮换窗口；browser 保持全量 |
-| Windows 平台 | 仅周六、周日、周一晚（夜标签 Sat/Sun/Mon，对应周日/周一/周二 03:17 北京启动的夜跑）运行；其余夜晚整段跳过 Windows（browser、native 与构建） |
+| Windows 平台 | 仅在北京时间周五、周六、周日 03:17 启动的定时运行中执行（对应夜标签周四/周五/周六）；其余运行整段跳过 Windows（browser、native 与构建） |
 | vendor mtime | 实验开关；2026-11-23 起默认启用（`vendor_cache=false` 可回退） |
 | 执行范围 | P0（调度与信号）→ P1（缓存）→ P2/P3（覆盖与并发收敛） |
 | 不改动 | PR/impacted/selected 的选择语义、crash 套件强制包含、release 二进制身份与逐文件校验 |
@@ -31,14 +31,14 @@
 
 夜标签与运行开始时间、Windows 是否运行：
 
-| 夜标签（北京晚上） | 定时运行开始（北京） | Windows |
+| 定时运行开始（北京） | 夜标签（UTC 名义触发日） | Windows |
 | --- | --- | --- |
-| 周六 | 周日 03:17 | 运行 |
-| 周日 | 周一 03:17 | 运行 |
-| 周一 | 周二 03:17 | 运行 |
-| 周二至周五 | 周三至周六 03:17 | 跳过 |
+| 周五 03:17 | 周四 | 运行 |
+| 周六 03:17 | 周五 | 运行 |
+| 周日 03:17 | 周六 | 运行 |
+| 周一至周四 03:17 | 周日/周一/周二/周三 | 跳过 |
 
-默认值 `QA_WINDOWS_NIGHTS=sat,sun,mon`（2026-11-23 按用户决定调整；此前为 Fri/Sat/Sun）。
+默认值 `QA_WINDOWS_NIGHTS=thu,fri,sat`。实际创建通常比标称晚 4–7 小时（约 07:00–10:00 北京同一日期），不改变所属北京日期。
 
 跳过时 `platforms=linux,macos`：Windows 的 browser 分片、native 构建与 native 分片全部不进入计划，因此也不会占用 runner 槽位。`qa-ui-auto-platforms-result` 仍按实际计划校验。
 
@@ -119,7 +119,7 @@
 ## 7. 验收与 A/B 协议
 
 - **计划等价（本地/CI 均可）**：同一 head 用 `night_label` 连续跑 1 个轮换周期（5 夜），断言每个共享 native 用例恰好出现一次；`selected`/`impacted` 的计划与改动前一致；crash 与平台限定用例每晚都在。
-- **Windows 门控**：分别模拟周六/周日/周一与周二至周五的 `night_label`，断言 `platforms` 与矩阵；`scope=selected` 始终保留显式请求的 Windows。
+- **Windows 门控**：分别模拟夜标签周四/周五/周六（对应北京周五/周六/周日 03:17）与周日/周一/周二/周三，断言 `platforms` 与矩阵；`scope=selected` 始终保留显式请求的 Windows。
 - **opt-in**：无 key 的 `scope=all` 计划把相关用例记入 `gaps`；设置 key 后恢复；`selected` 显式请求未满足时规划失败。
 - **受信任归档**：在未改 manifest/工具链的新分支上派发 focused native 运行，构建日志出现来自默认分支 run 的 `Restored Cargo ...`，构建时间接近暖编；改名/过期/伪造来源测试回退冷编。
 - **vendor A/B（已默认启用）**：Linux 已按“同一 commit、强制重编、开关开/关”完成对照（3 vs 36 个 crate）。Windows/macOS 的增益从默认启用后的夜跑与 PR 运行收集；判据仍是暖编重编 crate 数、构建步骤与二进制身份校验，异常时用 `vendor_cache=false` 回退。
