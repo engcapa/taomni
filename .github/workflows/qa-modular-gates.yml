@@ -181,6 +181,41 @@ jobs:
               `Bundled SocksCap panel or stylesheet in ${asset.file}`);
           }
           JS
+      - name: Record the build inventory receipt
+        env:
+          EXPECTED_SOURCE: ${{ needs.dispatch.outputs.head }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          directory = Path("gate-inventory")
+          source = (directory / "source-sha.txt").read_text().strip()
+          assert source == os.environ["EXPECTED_SOURCE"], "Core inventory source differs"
+          files = {}
+          for path in sorted(directory.iterdir()):
+              if path.is_file():
+                  contents = path.read_bytes()
+                  files[path.name] = {"bytes": len(contents), "sha256": hashlib.sha256(contents).hexdigest()}
+          receipt = {
+              "schema": "taomni.core-build-inventory.v1",
+              "sourceSha": source,
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "runId": os.environ["GITHUB_RUN_ID"],
+              "runAttempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "runner": {
+                  "os": os.environ["RUNNER_OS"],
+                  "architecture": os.environ["RUNNER_ARCH"],
+                  "image": os.environ["ImageOS"],
+                  "imageVersion": os.environ["ImageVersion"],
+              },
+              "files": files,
+          }
+          (directory / "inventory-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
