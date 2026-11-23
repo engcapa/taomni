@@ -55,6 +55,27 @@ pub async fn mail_download_attachment(
                 size: receipt.size,
             });
         }
+    } else if legacy_archive_without_host(&state.plugins) {
+        #[cfg(feature = "legacy-mail-imap")]
+        if let Some(original) =
+            message_source::open_legacy_original(&state, &config.session_id, &folder, uid).await?
+        {
+            return decode_mail_original(move || {
+                let raw = original.read()?;
+                let attachment = match section.as_deref() {
+                    Some(section) => extract_attachment_section(&raw, section),
+                    None => extract_attachment(&raw, attachment_index),
+                }?;
+                let path = write_attachment_file(&target_path, &attachment.bytes)?;
+                Ok(MailDownloadAttachmentResult {
+                    path,
+                    name: attachment.name,
+                    content_type: attachment.content_type,
+                    size: attachment.bytes.len(),
+                })
+            })
+            .await;
+        }
     } else {
         let folder = folder.clone();
         let archived = with_mail_db_async(&state, &config.session_id, move |db, account| {

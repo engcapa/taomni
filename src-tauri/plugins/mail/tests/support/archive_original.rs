@@ -8,6 +8,7 @@ use taomni_mail_api::{
         ArchiveOriginalRequest, ImapArchiveAction, ImapArchiveRequest, OPEN_ARCHIVE_ORIGINAL,
         READ_IMAP_ARCHIVE,
     },
+    calendar::{DECODE_INVITE, MailInvite},
     imap_exchange::{AttachmentReceipt, read_body_frame, write_body_frame},
     message::MailMessageBody,
     pop3_store::LocalArchiveAction,
@@ -117,6 +118,30 @@ fn transfer(host: &mut MailHost, database: &Path, action: LocalArchiveAction) ->
     )
 }
 
+pub(super) fn check_invitation(host: &mut MailHost) {
+    let invitation = concat!(
+        "Subject: Review meeting\r\nMIME-Version: 1.0\r\n",
+        "Content-Type: text/calendar; method=REQUEST; charset=utf-8\r\n",
+        "Content-Transfer-Encoding: quoted-printable\r\n\r\n",
+        "BEGIN:VCALENDAR\r\nMETHOD:REQUEST\r\nBEGIN:VEVENT\r\nUID:review-fixture\r\n",
+        "SUMMARY:R=C3=A9union de revue\r\nDTSTART:20261124T090000Z\r\n",
+        "ORGANIZER:mailto:organizer@example.test\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+    );
+    let decode = |host: &mut MailHost, raw: &str| {
+        exchange_bytes(host, DECODE_INVITE, raw.as_bytes(), async |mut peer| {
+            let frame = read_body_frame(&mut peer).await.unwrap();
+            serde_json::from_slice::<Option<MailInvite>>(&frame).unwrap()
+        })
+    };
+    let invite = decode(host, invitation).unwrap();
+    assert_eq!(invite.method, "REQUEST");
+    assert_eq!(invite.uid, "review-fixture");
+    assert_eq!(invite.summary, "Réunion de revue");
+    assert_eq!(invite.start.unwrap().tzid.as_deref(), Some("UTC"));
+    assert_eq!(invite.organizer.unwrap().email, "organizer@example.test");
+    assert!(decode(host, ORIGINAL).is_none());
+}
+
 fn exchange<T>(
     host: &mut MailHost,
     method: &str,
@@ -124,6 +149,15 @@ fn exchange<T>(
     read: impl AsyncFnOnce(DuplexStream) -> T,
 ) -> T {
     let request = serde_json::to_vec(&request).unwrap();
+    exchange_bytes(host, method, &request, read)
+}
+
+fn exchange_bytes<T>(
+    host: &mut MailHost,
+    method: &str,
+    request: &[u8],
+    read: impl AsyncFnOnce(DuplexStream) -> T,
+) -> T {
     let io = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -134,7 +168,7 @@ fn exchange<T>(
             let call =
                 scope.spawn(move || host.call(method, serde_json::to_value(endpoint).unwrap()));
             let reply = tokio::time::timeout(WAIT, async {
-                write_body_frame(&mut peer, &request).await.unwrap();
+                write_body_frame(&mut peer, request).await.unwrap();
                 read(peer).await
             })
             .await

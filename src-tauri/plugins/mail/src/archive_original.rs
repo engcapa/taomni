@@ -22,7 +22,7 @@ use tokio::{io::AsyncWriteExt, net::TcpStream, runtime::Runtime};
 
 use super::{
     account_cache::lock_account_cache,
-    archive_decoding::encode_body,
+    mime_decoding::encode_body,
     store::{open_database, unavailable, validate_account},
 };
 

@@ -48,6 +48,17 @@ pub(super) fn attachment(
     })
 }
 
+pub(super) fn invitation(
+    runtime: &Runtime,
+    operation: &Operation,
+    exchange: Endpoint,
+) -> Result<Result<(), String>, RpcError> {
+    transform(runtime, operation, exchange, |raw| {
+        serde_json::to_vec(&taomni_mail_engine::calendar::invite_from_message(raw))
+            .map_err(|_| RpcError::from_code(ErrorCode::InternalError))
+    })
+}
+
 fn transform(
     runtime: &Runtime,
     operation: &Operation,

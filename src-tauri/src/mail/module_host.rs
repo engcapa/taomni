@@ -14,11 +14,14 @@ mod body_sync;
 mod cache_publication;
 mod cache_query;
 pub(super) use cache_query::{queries_account_cache, query_account_cache, reads_imap_cached_body};
+mod calendar_invite;
+pub(super) use calendar_invite::{decode_invite, require_invite_decoder};
 mod compose;
 mod contact_history;
 pub(super) use contact_history::{contact_history, manages_contact_history};
 pub(super) mod imap_idle;
 mod mbox;
+mod mime_exchange;
 pub(super) use archive_decoding::{decode_archive_attachment, decode_archive_original};
 pub(super) use archive_encoding::ArchiveEncoder;
 pub(super) use archive_original::{

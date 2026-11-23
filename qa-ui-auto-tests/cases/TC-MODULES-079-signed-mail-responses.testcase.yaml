@@ -1,6 +1,6 @@
 id: TC-MODULES-079
 title: Signed Mail answers an invitation and a receipt request from the same account
-description: Open a real IMAP account through the installed Mail package and inspect both SMTP responses and the handled receipt after reopening the original.
+description: Decode a real IMAP calendar invitation through the signed Mail package and inspect both SMTP responses and the handled receipt after reopening the original.
 covers: [F-Modules-1, F-MAIL-13, F-MAIL-18]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
@@ -57,7 +57,7 @@ verification:
     - {step: 27, expectation: The SMTP server receives tentative attendance.}
     - {step: 31, expectation: The second SMTP response carries the manual-read disposition.}
     - {step: 36, expectation: Reopening the handled message leaves its receipt banner closed.}
-    - {step: 37, expectation: The signed host owns the lease and the two server messages carry the correct MIME content and recipients.}
+    - {step: 37, expectation: 'The signed host declares invitation decoding and reply delivery and owns the lease. Both messages carry the expected MIME content and recipients.'}
     - {step: 38, expectation: Both reader actions finish without a runtime error.}
     results: [17, 24, 27, 31, 36, 37, 38]
   visual:

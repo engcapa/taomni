@@ -18,6 +18,10 @@ const SIGNED_MAIL_CONNECTION_REQUIRED: &str =
 const SIGNED_MAIL_ARCHIVE_REQUIRED: &str =
     "Install or update the Mail module in Module Store and enable it to read this archive";
 
+fn legacy_archive_without_host(registry: &crate::plugin::PluginRegistry) -> bool {
+    cfg!(feature = "legacy-mail-imap") && registry.get(taomni_mail_api::SLUG).is_none()
+}
+
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 macro_rules! legacy_imap {
     ($operation:block) => {

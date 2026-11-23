@@ -16,7 +16,7 @@ use tokio::runtime::Runtime;
 
 use super::{
     account_cache::lock_account_cache,
-    archive_decoding::archived_body,
+    mime_decoding::archived_body,
     store::{open_database, open_snapshot_file, unavailable, validate_account},
 };
 

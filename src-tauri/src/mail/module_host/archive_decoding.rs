@@ -4,16 +4,20 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use taomni_mail_api::{
-    DECODE_ARCHIVE_ATTACHMENT, DECODE_ARCHIVE_ORIGINAL, HOST_REQUEST_TIMEOUT,
+    DECODE_ARCHIVE_ATTACHMENT, DECODE_ARCHIVE_ORIGINAL,
     archive::{ArchiveAttachmentDecoding, ArchiveDecoding},
-    imap_exchange::{read_body_frame, write_body_frame},
     message::MailMessageBody,
 };
 use taomni_mail_engine::storage::OpenMessage;
-use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
+use taomni_plugin_stream::routed_tcp::Endpoint;
 
-use super::{PluginRegistry, invoke, supports};
+use super::{PluginRegistry, mime_exchange::transform, supports};
+#[cfg(feature = "legacy-mail-imap")]
+use crate::mail::legacy_archive_without_host;
 use crate::mail::{SIGNED_MAIL_ARCHIVE_REQUIRED, decode_mail_original};
+
+#[cfg(feature = "legacy-mail-imap")]
+use taomni_mail_engine::{cache::cached_to_body, extract_attachment, parse_body_message};
 
 pub(in crate::mail) async fn decode_archive_original(
     registry: Arc<PluginRegistry>,
@@ -22,6 +26,24 @@ pub(in crate::mail) async fn decode_archive_original(
     folder: String,
     uid: u32,
 ) -> Result<MailMessageBody, String> {
+    #[cfg(feature = "legacy-mail-imap")]
+    if legacy_archive_without_host(&registry) {
+        return decode_mail_original(move || {
+            let raw = original.read()?;
+            Ok(cached_to_body(
+                parse_body_message(
+                    &account_id,
+                    &folder,
+                    uid,
+                    Some(raw.len() as u32),
+                    &raw,
+                    raw.len(),
+                ),
+                "archive",
+            ))
+        })
+        .await;
+    }
     let reply = transfer_original(registry, original, DECODE_ARCHIVE_ORIGINAL, |exchange| {
         ArchiveDecoding {
             exchange,
@@ -50,6 +72,14 @@ pub(in crate::mail) async fn decode_archive_attachment(
     original: OpenMessage,
     attachment_index: usize,
 ) -> Result<Vec<u8>, String> {
+    #[cfg(feature = "legacy-mail-imap")]
+    if legacy_archive_without_host(&registry) {
+        return decode_mail_original(move || {
+            let raw = original.read()?;
+            Ok(extract_attachment(&raw, attachment_index)?.bytes)
+        })
+        .await;
+    }
     transfer_original(registry, original, DECODE_ARCHIVE_ATTACHMENT, |exchange| {
         ArchiveAttachmentDecoding {
             exchange,
@@ -69,25 +99,14 @@ async fn transfer_original<P: Serialize + Send + 'static>(
         return Err(SIGNED_MAIL_ARCHIVE_REQUIRED.into());
     }
     let raw = decode_mail_original(move || original.read()).await?;
-    let (_route, exchange, mut peer) = Route::pair().await.map_err(|error| error.to_string())?;
-    let transfer = async move {
-        write_body_frame(&mut peer, &raw)
-            .await
-            .map_err(|error| error.to_string())?;
-        drop(raw);
-        read_body_frame(&mut peer)
-            .await
-            .map_err(|error| error.to_string())
-    };
-    let (_, reply) = tokio::time::timeout(HOST_REQUEST_TIMEOUT, async {
-        tokio::try_join!(
-            invoke::<(), _>(registry, method, request(exchange)),
-            transfer
-        )
-    })
+    transform(
+        registry,
+        method,
+        raw,
+        request,
+        "Decoding the archived message timed out",
+    )
     .await
-    .map_err(|_| "Decoding the archived message timed out".to_owned())??;
-    Ok(reply)
 }
 
 #[cfg(test)]
@@ -98,27 +117,40 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn an_archive_without_a_compatible_host_reports_the_update_and_retains_the_original() {
+    async fn archive_without_a_host_uses_the_explicit_legacy_feature_and_retains_the_original() {
         let profile = tempfile::tempdir().unwrap();
         let root = profile.path().canonicalize().unwrap();
         let registry = Arc::new(PluginRegistry::new(root.join("plugins")));
         let account = "archive-test";
         let folder = "INBOX";
         let uid = 3;
-        let raw = b"Subject: Saved from the monolith\r\n\r\nOriginal body\r\n";
+        let raw = concat!(
+            "Subject: Saved from the monolith\r\nContent-Type: multipart/mixed; boundary=mail\r\n\r\n",
+            "--mail\r\nContent-Type: text/plain\r\n\r\nOriginal body\r\n",
+            "--mail\r\nContent-Type: application/octet-stream\r\n",
+            "Content-Disposition: attachment; filename=retained.txt\r\n\r\nOriginal attachment\r\n",
+            "--mail--\r\n",
+        )
+        .as_bytes();
         let db = Connection::open(root.join("mail.db")).unwrap();
         init_mail_tables(&db).unwrap();
-        storage::store(&db, account, folder, uid, 1, &raw[..]).unwrap();
+        storage::store(&db, account, folder, uid, 1, raw).unwrap();
         let open = || storage::open(&db, account, folder, uid).unwrap().unwrap();
 
         let body =
             decode_archive_original(registry.clone(), open(), account.into(), folder.into(), uid)
                 .await;
-        assert_eq!(body.err().as_deref(), Some(SIGNED_MAIL_ARCHIVE_REQUIRED));
-        assert_eq!(
-            decode_archive_attachment(registry, open(), 0).await,
-            Err(SIGNED_MAIL_ARCHIVE_REQUIRED.into())
-        );
+        let attachment = decode_archive_attachment(registry, open(), 0).await;
+        #[cfg(not(feature = "legacy-mail-imap"))]
+        {
+            assert_eq!(body.err().as_deref(), Some(SIGNED_MAIL_ARCHIVE_REQUIRED));
+            assert_eq!(attachment, Err(SIGNED_MAIL_ARCHIVE_REQUIRED.into()));
+        }
+        #[cfg(feature = "legacy-mail-imap")]
+        {
+            assert_eq!(body.unwrap().subject, "Saved from the monolith");
+            assert_eq!(attachment.unwrap(), b"Original attachment");
+        }
         assert_eq!(open().read().unwrap(), raw);
     }
 }

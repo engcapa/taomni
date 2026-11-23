@@ -14,7 +14,7 @@ description: 'TASK-20 phase 1 (docs-feature/mail-thunderbird-parity-design.md AC
 
   Browser mode drives the stub server model (renderer orchestration only);
 
-  native mode parses the real message fetched from the in-process fake IMAP
+  native mode parses the real message from the fake IMAP
 
   server and sends the reply through the fake SMTP server started by the
 
@@ -74,6 +74,7 @@ steps:
 - assert_no_runtime_errors: null
 - screenshot: mail-invite-01-accepted.png
 - mail_server_assert_smtp_contains: {text: "METHOD:REPLY", timeout_sec: 20}
+- assert_text: {selector: '[data-testid="mail-invite-card"][data-method="REQUEST"][data-partstat="ACCEPTED"]', contains: 'QA Sender <qa-sender@example.com>'}
 verification:
   review: reviewed
   requirements:
@@ -114,11 +115,14 @@ verification:
       expectation: Sending the invitation reply leaves no runtime errors.
     - step: 21
       expectation: The server receives the reply field "METHOD:REPLY".
+    - step: 22
+      expectation: The accepted request still shows the original organizer.
     results:
     - 17
     - 18
     - 19
     - 21
+    - 22
   visual:
   - check: 截图中邀请卡片显示标题、时间、地点、组织者，Accept 高亮并显示 “Reply sent (accepted)”。
     method: manual

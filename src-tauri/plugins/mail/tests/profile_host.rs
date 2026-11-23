@@ -400,6 +400,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     cache_query::check_migrated_cache(&mut host, &path);
     archive_original::check(&mut host, &source);
     archive_original::check(&mut host, &path);
+    archive_original::check_invitation(&mut host);
     let folders = host.call("mail_list_cached_folders", json!({"accountId":ACCOUNT}));
     assert_eq!(folders[0]["name"], "INBOX");
     assert_eq!(folders[0]["cachedCount"], 1);

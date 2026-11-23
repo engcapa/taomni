@@ -102,9 +102,11 @@ def run(ctx, args):
             raise StepError("Disabling Mail changed the stored agenda event")
     if phase == "responses":
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
-        if "mail/send-response" not in manifest["commands"]:
-            raise StepError("The installed Mail version does not implement reply delivery")
+        commands = ["mail/decode-calendar-invite", "mail/send-response"]
+        if not set(commands) <= set(manifest["commands"]):
+            raise StepError("The installed Mail host must decode invitations and deliver their replies")
         report["responses"] = observe_responses()
+        report["responses"]["commands"] = commands
     if phase in {"imap-delivery", "pop3-delivery"}:
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
         if "mail/compose-message" not in manifest["commands"]:

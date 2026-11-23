@@ -6,7 +6,6 @@ mod address_book;
 mod agenda;
 mod archive;
 mod archive_cleanup;
-mod archive_decoding;
 mod archive_encoding;
 mod archive_index;
 mod archive_original;
@@ -32,6 +31,7 @@ mod index_cache;
 mod local_drafts;
 mod mailbox;
 mod mbox_export;
+mod mime_decoding;
 mod mutation_jobs;
 mod outgoing;
 mod pop3_round;
@@ -83,6 +83,7 @@ fn host_config() -> HostConfig {
                 SEND_SMTP,
                 taomni_mail_api::COMPOSE_MESSAGE,
                 taomni_mail_api::SEND_RESPONSE,
+                taomni_mail_api::calendar::DECODE_INVITE,
                 taomni_mail_api::sent_contacts::RECORD_SENT_CONTACTS,
                 taomni_mail_api::contact_history::CONTACT_HISTORY,
                 STORE_IMAP_SENT,
@@ -186,12 +187,17 @@ impl PluginHandler for Handler {
             taomni_mail_api::DECODE_ARCHIVE_ORIGINAL => {
                 let request = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
-                serde_json::to_value(archive_decoding::decode(&self.io, operation, request)?)
+                serde_json::to_value(mime_decoding::decode(&self.io, operation, request)?)
             }
             taomni_mail_api::DECODE_ARCHIVE_ATTACHMENT => {
                 let request = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
-                serde_json::to_value(archive_decoding::attachment(&self.io, operation, request)?)
+                serde_json::to_value(mime_decoding::attachment(&self.io, operation, request)?)
+            }
+            taomni_mail_api::calendar::DECODE_INVITE => {
+                let exchange = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(mime_decoding::invitation(&self.io, operation, exchange)?)
             }
             taomni_mail_api::ATTACHMENT_CACHE => {
                 let request = serde_json::from_value(params.unwrap_or_default())

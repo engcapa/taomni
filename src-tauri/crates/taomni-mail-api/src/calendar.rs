@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub const DECODE_INVITE: &str = "mail/decode-calendar-invite";
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct MailInviteTime {
