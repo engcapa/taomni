@@ -16,6 +16,7 @@ struct Request: Decodable {
     let modules: [Module]?
     let issuer: String?
     let codes: [String]?
+    let rdpScreenshot: String?
 }
 
 struct Observation: Encodable {
@@ -24,6 +25,7 @@ struct Observation: Encodable {
     var currentModules: [String]?
     var confirmation: String?
     var permissions: [String: String]?
+    var rdpRowClick: [String: Double]?
     var codes: [String]?
     var scannedIssuer: String?
     let transport = "macOS AppKit accessibility"
@@ -84,30 +86,6 @@ func press(_ element: AXUIElement) throws {
     guard result == .success else {
         throw CheckFailure("AXPress failed with status \(result.rawValue)")
     }
-}
-
-func clickOwnedLabel(_ element: AXUIElement, pid: pid_t) throws {
-    _ = AXUIElementPerformAction(element, "AXScrollToVisible" as CFString)
-    guard let position = attribute(element, kAXPositionAttribute),
-          let size = attribute(element, kAXSizeAttribute),
-          CFGetTypeID(position) == AXValueGetTypeID(), CFGetTypeID(size) == AXValueGetTypeID()
-    else { throw CheckFailure("The owned accessibility label has no position or size") }
-    var origin = CGPoint.zero
-    var bounds = CGSize.zero
-    guard AXValueGetValue(position as! AXValue, .cgPoint, &origin),
-          AXValueGetValue(size as! AXValue, .cgSize, &bounds),
-          bounds.width > 0, bounds.height > 0
-    else { throw CheckFailure("The owned accessibility label has no visible rectangle") }
-    let center = CGPoint(x: origin.x + bounds.width / 2, y: origin.y + bounds.height / 2)
-    var hit: AXUIElement?
-    var hitPid: pid_t = 0
-    guard AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(center.x), Float(center.y), &hit) == .success,
-          let hit = hit, AXUIElementGetPid(hit, &hitPid) == .success, hitPid == pid,
-          let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: center, mouseButton: .left),
-          let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: center, mouseButton: .left)
-    else { throw CheckFailure("The label's hit point does not belong to the installed app") }
-    down.postToPid(pid)
-    up.postToPid(pid)
 }
 
 func focus(_ element: AXUIElement) throws {
@@ -291,40 +269,20 @@ func observe(_ request: Request) throws -> Observation {
             }
         }
         try openTool("Local servers")
-        let rdp = try wait("RDP row in Local servers") { () -> AXUIElement? in
-            let elements = contents()
-            if let settings = button(elements, "Settings RDP") { return settings }
-            // WebKit may hide the nested buttons of the ARIA listbox option.
-            guard elements.flatMap(labels).contains("Local servers") else { return nil }
-            return elements.first {
-                attribute($0, kAXRoleAttribute) as? String == kAXStaticTextRole && labels($0).contains("RDP")
-            } ?? elements.first {
-                let accessible = labels($0)
-                return accessible.contains("RDP") || accessible.contains { $0.hasPrefix("RDP, ") }
-            }
+        guard let image = request.rdpScreenshot else { throw CheckFailure("Missing the RDP screenshot path") }
+        let rdp = try wait("RDP row in the owned Local servers window") {
+            try selectRdpRow(pid: request.pid, screenshot: URL(fileURLWithPath: image))
         }
-        if labels(rdp).contains("Settings RDP") {
-            try press(rdp)
-        } else {
-            try clickOwnedLabel(rdp, pid: request.pid)
-        }
-        result.permissions = try wait("RDP Screen Recording and Accessibility status") { () -> [String: String]? in
+        result.rdpRowClick = ["x": Double(rdp.x), "y": Double(rdp.y)]
+        result.permissions = try wait("RDP Screen Recording and Accessibility grants") { () -> [String: String]? in
             let elements = contents()
             let visible = elements.flatMap(labels)
-            let screenGranted = visible.contains("Permission granted")
-            let accessibilityGranted = visible.contains("Keyboard and mouse control enabled")
-            guard screenGranted || visible.contains("Permission required before the server can start"),
-                  accessibilityGranted || visible.contains("Required for keyboard and mouse control"),
-                  elements.contains(where: {
-                      attribute($0, kAXRoleAttribute) as? String == kAXButtonRole
-                          && attribute($0, kAXEnabledAttribute) as? Bool == true
-                          && labels($0).contains(where: { ["Refresh displays", "Refresh status", "Grant permission…"].contains($0) })
-                  })
+            guard visible.contains("Permission granted"), visible.contains("Keyboard and mouse control enabled"),
+                  visible.contains("Refresh displays"), visible.contains("Refresh status")
             else { return nil }
-            return ["screenRecording": screenGranted ? "granted" : "denied",
-                    "accessibility": accessibilityGranted ? "granted" : "denied", "screenshotSummary": summary]
+            return ["screenRecording": "granted", "accessibility": "granted", "screenshotSummary": summary]
         }
-        guard (result.permissions?["screenRecording"] == "granted") == summary.hasPrefix(grantedPrefix)
+        guard summary.hasPrefix(grantedPrefix)
         else { throw CheckFailure("Screenshot and RDP disagree about the installed Screen Recording permission") }
     case "mfa-before", "mfa-after":
         let expectedCount = request.phase == "mfa-before" ? 1 : 2
@@ -445,12 +403,17 @@ func observe(_ request: Request) throws -> Observation {
     return result
 }
 
-do {
-    let request = try JSONDecoder().decode(Request.self, from: FileHandle.standardInput.readDataToEndOfFile())
-    let receipt = try JSONEncoder().encode(observe(request))
-    FileHandle.standardOutput.write(receipt)
-} catch {
-    let message = (error as? CheckFailure)?.message ?? String(describing: error)
-    FileHandle.standardError.write(Data((message + "\n").utf8))
-    exit(EXIT_FAILURE)
+@main
+struct InstalledMacOSStore {
+    static func main() {
+        do {
+            let request = try JSONDecoder().decode(Request.self, from: FileHandle.standardInput.readDataToEndOfFile())
+            let receipt = try JSONEncoder().encode(observe(request))
+            FileHandle.standardOutput.write(receipt)
+        } catch {
+            let message = (error as? CheckFailure)?.message ?? String(describing: error)
+            FileHandle.standardError.write(Data((message + "\n").utf8))
+            exit(EXIT_FAILURE)
+        }
+    }
 }

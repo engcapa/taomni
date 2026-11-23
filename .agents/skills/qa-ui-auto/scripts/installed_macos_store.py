@@ -15,14 +15,17 @@ def compile_driver(work):
     executable = work / "installed-macos-store"
     if not executable.is_file():
         source = Path(__file__).with_name("installed_macos_store.swift")
+        rdp_row = source.with_name("installed_macos_rdp_row.swift")
         subprocess.run(
-            ["swiftc", str(source), "-o", str(executable)], check=True, timeout=90,
+            ["swiftc", "-parse-as-library", str(source), str(rdp_row), "-o", str(executable)], check=True, timeout=90,
         )
     return executable
 
 
 def controls(driver, owner, executable, phase, evidence, **inputs):
     payload = dict(inputs, pid=owner.pid, executable=str(executable), phase=phase)
+    if phase == "permissions":
+        payload["rdpScreenshot"] = str((evidence / "local-servers-rdp-row.png").resolve())
     observed = subprocess.run(
         [str(driver)], input=json.dumps(payload), text=True, encoding="utf-8",
         capture_output=True, timeout=100,
