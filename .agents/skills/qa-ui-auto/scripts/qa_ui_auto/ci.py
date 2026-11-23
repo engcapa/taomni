@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+import datetime as dt
 import hashlib
 import json
 import os
@@ -16,6 +17,9 @@ import yaml
 from .feature_catalog import load_features
 from .linux_profiles import DEFAULT_LINUX_PROFILE, LINUX_PROFILES, profile_support
 from . import module_profile
+from .nightly import (DEFAULT_SAMPLE_PERCENT, DEFAULT_WINDOWS_NIGHTS, WEEKDAYS,
+                      night_label, platforms_for_night, select as nightly_select,
+                      windows_enabled)
 from .provenance import execution_identity, input_digest
 from .testcase import discover
 from .verification import browser_support, native_support, plan as impact_plan
@@ -175,6 +179,19 @@ def capabilities(cases, mode: str) -> list[str]:
     return sorted(result)
 
 
+def platform_required(case, target: str, cache: dict) -> bool:
+    """True when the case cannot run on at least one other native platform.
+
+    Such cases stay in every nightly entry; only the fully shared remainder is
+    sampled by the tier-B policy.
+    """
+    key = (case.id, target)
+    if key not in cache:
+        others = [platform for platform in ("Linux", "Windows", "macOS") if platform != target]
+        cache[key] = any(native_support(case, other) is not None for other in others)
+    return cache[key]
+
+
 def opt_in_gap(case, opt_in: dict, environ=None) -> str | None:
     """Return the reason this case needs a credential the planner cannot supply.
 
@@ -233,6 +250,27 @@ def make_plan(args, *, cases=None, features=None) -> dict:
         if supplied - available:
             raise ValueError(f"unknown {label}: {sorted(supplied-available)}")
     scope = args.scope
+    nightly_enabled = bool(getattr(args, "nightly_policy", False))
+    nightly = None
+    night = None
+    sample_percent = int(getattr(args, "native_sample_percent", 0) or DEFAULT_SAMPLE_PERCENT)
+    if nightly_enabled:
+        if scope != "all":
+            raise ValueError("nightly policy requires scope=all")
+        label = str(getattr(args, "night_label", "") or "").strip()
+        try:
+            night = dt.date.fromisoformat(label) if label else night_label()
+        except ValueError as exc:
+            raise ValueError(f"invalid night_label: {label}") from exc
+        windows_nights = os.environ.get("QA_WINDOWS_NIGHTS") or DEFAULT_WINDOWS_NIGHTS
+        platforms = platforms_for_night(platforms, night, enabled=True, nights=windows_nights)
+        if not platforms:
+            raise ValueError("nightly policy excluded every platform")
+        nightly = {"night": night.isoformat(), "weekday": WEEKDAYS[night.weekday()],
+                   "windows": windows_enabled(night, windows_nights),
+                   "windows_nights": windows_nights, "platforms": platforms,
+                   "sample_percent": sample_percent, "entries": {}}
+    required_cache: dict = {}
     explicit = requested | {c.id for c in cases if wanted_features.intersection(c.covers)
                             or wanted_tags.intersection(c.tags)}
     if scope in {"all", "smoke"} and explicit:
@@ -334,6 +372,21 @@ def make_plan(args, *, cases=None, features=None) -> dict:
                         gaps.append({"case": cid, **combination, "reason": opt_in_reason})
                         continue
                     eligible.append(case)
+                if nightly_enabled and mode == "native" and eligible:
+                    always = {case.id for case in eligible
+                              if "crash-regression" in case.tags
+                              or platform_required(case, target, required_cache)}
+                    chosen_ids, nightly_reasons, nightly_entry = nightly_select(
+                        eligible, dependencies, always_ids=always,
+                        percent=sample_percent, night=night)
+                    by_eligible = {case.id: case for case in eligible}
+                    eligible = [by_eligible[case_id] for case_id in chosen_ids]
+                    for case_id, why in nightly_reasons.items():
+                        bucket = reasons.setdefault(case_id, [])
+                        if why not in bucket:
+                            bucket.append(why)
+                    nightly["entries"][f"{platform_key}/{mode}/{profile_name or '-'}"] = {
+                        **nightly_entry, "platform": target, "profile": profile_name}
                 # A Wayland/Mutter dual-output desktop changes global window
                 # placement and pointer coordinates for every native case. Run
                 # the dual-display cases in their own entry so ordinary cases
@@ -413,7 +466,7 @@ def make_plan(args, *, cases=None, features=None) -> dict:
             "merge_base": ancestor, "scope": scope, "changed_paths": changed,
             "identity": execution_identity(Path.cwd()), "reasons": reasons, "impact": impact,
             "entries": entries, "gaps": gaps, "no_relevant_changes": not entries,
-            "not_applicable": not_applicable,
+            "not_applicable": not_applicable, "nightly": nightly,
             "run_id": os.environ.get("GITHUB_RUN_ID"), "attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
             "unreviewed": [cid for cid in ordered if set(by_id[cid].tags) & {"needs-review", "legacy-imported"}]}
 
@@ -554,7 +607,8 @@ def aggregate(manifest: dict, root: Path) -> dict:
         for error in entry["errors"]
     ]
     return {"head": manifest["head"], "run_id": manifest.get("run_id"), "attempt": manifest.get("attempt"),
-            "entries": entries, "groups": list(groups.values()), "build_hashes": build_hashes, "failures": failures, "gaps": manifest["gaps"],
+            "entries": entries, "groups": list(groups.values()), "build_hashes": build_hashes, "failures": failures,
+            "gaps": manifest["gaps"], "nightly": manifest.get("nightly"),
             "not_applicable": manifest.get("not_applicable", []),
             "unreviewed": manifest["unreviewed"],
             # `passed` remains a strict all-cases signal for consumers that
@@ -580,6 +634,11 @@ def main(argv=None):
                       default=os.environ.get("QA_NATIVE_RELEASE", "").lower() in {"true", "1"})
     plan.add_argument("--modular-rdp-p95", action="store_true",
                       default=os.environ.get("QA_MODULAR_RDP_P95", "").lower() in {"true", "1"})
+    plan.add_argument("--nightly-policy", action="store_true",
+                      default=os.environ.get("QA_NIGHTLY_POLICY", "").lower() in {"true", "1"})
+    plan.add_argument("--night-label", default=os.environ.get("QA_NIGHT_LABEL") or "")
+    plan.add_argument("--native-sample-percent", type=int,
+                      default=int(os.environ.get("QA_NIGHTLY_SAMPLE_PERCENT") or 0))
     plan.add_argument("--output", type=Path, default=Path("qa-ui-auto-report/selection.json"))
     report = subs.add_parser("report")
     report.add_argument("--selection", type=Path, required=True)
@@ -596,10 +655,20 @@ def main(argv=None):
             if args.first_release_run and args.module_profile != "full" and not any("first-upgrade-installer" in job["capabilities"] for job in matrix["include"]):
                 raise ValueError("first_release_run requires the native first-upgrade case TC-MODULES-040")
             github_output("matrix", json.dumps(matrix, separators=(",", ":")))
-            for mode in ("browser", "native"):
+            for mode in ("native",):
                 items = [e for e in matrix["include"] if e["mode"] == mode]
                 github_output(mode + "_matrix", json.dumps({"include": items}, separators=(",", ":")))
                 github_output("has_" + mode, str(bool(items)).lower())
+            # macOS browser shards are scheduled separately so native shards get
+            # the scarce macOS slots first; Linux/Windows keep the shared matrix.
+            macos_browser = [e for e in matrix["include"]
+                             if e["mode"] == "browser" and e["platform_key"] == "macos"]
+            other_browser = [e for e in matrix["include"]
+                             if e["mode"] == "browser" and e["platform_key"] != "macos"]
+            github_output("browser_matrix", json.dumps({"include": other_browser}, separators=(",", ":")))
+            github_output("macos_browser_matrix", json.dumps({"include": macos_browser}, separators=(",", ":")))
+            github_output("has_browser", str(bool(other_browser)).lower())
+            github_output("has_macos_browser", str(bool(macos_browser)).lower())
             github_output("build_matrix", json.dumps({"include": [{k: v for k, v in b.items() if k not in {"selected_ids", "case_digests"}} for b in result["builds"]]}, separators=(",", ":")))
             for platform_key in ('linux', 'windows', 'macos'):
                 native = [e for e in matrix['include'] if e['mode'] == 'native' and e['platform_key'] == platform_key]
@@ -631,6 +700,11 @@ def main(argv=None):
                 if not result["entries"]:
                     lines.append("No relevant executable cases; no platform execution claimed.")
                 lines += ["", f"Not applicable: {len(result['not_applicable'])}; capability gaps: {len(result['gaps'])}."]
+                nightly = result.get('nightly')
+                if nightly:
+                    lines.append(f"Nightly: night `{nightly['night']}` ({nightly['weekday']}), "
+                                 f"Windows {'enabled' if nightly['windows'] else 'skipped'}, "
+                                 f"native sample {nightly['sample_percent']}%.")
                 with open(summary_path, "a", encoding="utf-8") as stream:
                     stream.write("\n".join(lines) + "\n")
             print(json.dumps(matrix, indent=2))
@@ -647,6 +721,11 @@ def main(argv=None):
             lines.append(f"| {entry['id']} | {entry['selected']} | {c.get('passed',0)} | {c.get('failed',0)} | {c.get('skipped',0)} | {len(entry['errors'])} |")
         lines.extend(["", f"Declared capability gaps: {len(result['gaps'])}; unreviewed cases: {len(result['unreviewed'])}.",
                       "", "See selection.json and ci-summary.json for exact IDs, exclusions and failures."])
+        nightly = result.get("nightly")
+        if nightly:
+            lines.append(f"Nightly coverage: night `{nightly['night']}` ({nightly['weekday']}), "
+                         f"Windows {'enabled' if nightly['windows'] else 'skipped'}, "
+                         f"native sample {nightly['sample_percent']}% per rotation window.")
         for failure in result["failures"]:
             message = failure["message"].replace("\n", " ").replace("`", "'")[:500]
             lines.append(f"\n- `{failure['entry']}/{failure['case']}`: {message}")
@@ -662,7 +741,6 @@ def main(argv=None):
     except (ValueError, OSError, subprocess.CalledProcessError) as exc:
         print(f"qa-ci: {exc}", file=sys.stderr)
         return 2
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

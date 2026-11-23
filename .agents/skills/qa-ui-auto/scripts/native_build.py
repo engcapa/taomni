@@ -84,6 +84,21 @@ def identity_path(binary: Path) -> Path:
     return binary.with_name(binary.name + ".qa-identity.json")
 
 
+def normalize_vendored_cargo_sources() -> None:
+    """Pin vendored Cargo source mtimes before compiling when the cache experiment is on.
+
+    The import stays local because ci_cargo_artifact imports ROOT and
+    configured_environment from this module, so a top-level import would be
+    circular.
+    """
+    from ci_cargo_artifact import normalize_vendor_mtimes, vendor_cache_enabled, vendor_mtime_epoch
+
+    if not vendor_cache_enabled():
+        return
+    count = normalize_vendor_mtimes(ROOT, vendor_mtime_epoch())
+    print(f"qa-ui-auto: normalized mtimes of {count} vendored Cargo files")
+
+
 def verify_identity(binary: Path) -> dict:
     """Reject unrecorded, production, or replaced binaries without launching them."""
     try:
@@ -204,7 +219,8 @@ def build_inputs(*, release: bool = False, env: dict[str, str] | None = None,
             "LIBCLANG_PATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "LIBGSSAPI_IMPL",
             "TAOMNI_REPLIT_NATIVE_QA", "TAOMNI_NATIVE_QA_TOOLCHAIN",
                                              "RUSTC", "OPENSSL_SRC_PERL", "PERL",
-            "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM", "NODE_ENV")},
+            "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM", "NODE_ENV",
+            "QA_VENDOR_CACHE", "QA_VENDOR_MTIME_EPOCH")},
     }
 
 
@@ -295,6 +311,7 @@ def build_qa(*, release: bool = False, force: bool = False, signed_mail: bool = 
              "--package", "taomni-rdp-probe", "--bin", "rdp-probe"]
     if release:
         probe.append("--release")
+    normalize_vendored_cargo_sources()
     started = time.monotonic()
     with tauri_config_path(signed_mail=signed_mail) as (config, features):
         command = [
