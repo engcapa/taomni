@@ -114,7 +114,8 @@ mod tests;
 
 pub(super) use taomni_mail_engine::pop3::local_store::{
     create_local_folder, delete_local, delete_local_folder, ensure_local_folders, has_local_store,
-    insert_local, local_raw, migrate_local_tables, move_local, refresh_counts, rename_local_folder,
+    import_local_messages, list_local_folders, list_local_originals, local_body, local_raw,
+    mark_local_read, move_local, rename_local_folder, set_local_flags,
 };
 
 pub(super) fn is_pop3(config: &MailAccountConfig) -> bool {

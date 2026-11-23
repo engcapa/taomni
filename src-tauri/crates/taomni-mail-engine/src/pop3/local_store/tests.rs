@@ -42,6 +42,45 @@ fn local_folders_move_copy_delete() {
 }
 
 #[test]
+fn local_mailbox_import_preserves_originals_and_reads_body_without_a_cached_copy() {
+    let db = Connection::open_in_memory().unwrap();
+    init_mail_tables(&db).unwrap();
+    let originals = [raw("first"), raw("second")];
+    assert_eq!(
+        import_local_messages(&db, "pop", "INBOX", &originals).unwrap(),
+        2
+    );
+    assert_eq!(
+        list_local_originals(&db, "pop", "INBOX").unwrap(),
+        vec![(1, originals[0].clone()), (2, originals[1].clone())]
+    );
+    assert!(
+        list_local_originals(&db, "other", "INBOX")
+            .unwrap()
+            .is_empty()
+    );
+
+    set_local_flags(&db, "pop", "INBOX", &[2], &[], &["\\Seen".to_string()]).unwrap();
+    let inbox = list_local_folders(&db, "pop")
+        .unwrap()
+        .into_iter()
+        .find(|folder| folder.name == "INBOX")
+        .unwrap();
+    assert_eq!((inbox.total, inbox.unread), (Some(2), Some(1)));
+    assert_eq!(mark_local_read(&db, "pop", "INBOX", None).unwrap(), 1);
+    assert_eq!(mark_local_read(&db, "pop", "INBOX", None).unwrap(), 0);
+
+    db.execute(
+        "UPDATE mail_messages SET body_cached_at=NULL WHERE account_id='pop' AND folder='INBOX' AND uid=2",
+        [],
+    )
+    .unwrap();
+    let body = local_body(&db, "pop", "INBOX", 2).unwrap().unwrap();
+    assert!(body.text.unwrap().contains("body of second"));
+    assert!(local_body(&db, "other", "INBOX", 2).unwrap().is_none());
+}
+
+#[test]
 fn permanent_delete_retains_original_and_cleanup_never_reuses_its_uid() {
     let dir = tempfile::tempdir().unwrap();
     let conn = Connection::open(dir.path().join("qa-pop3.db")).unwrap();

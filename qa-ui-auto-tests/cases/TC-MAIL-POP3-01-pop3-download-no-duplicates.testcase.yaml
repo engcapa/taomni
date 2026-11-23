@@ -92,6 +92,13 @@ steps:
 - wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
 - mail_server_assert_list_matches: {timeout_sec: 45}
 - assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Pop3-added 0003"]', equal: 1}
+- press: {selector: '[data-testid="mail-message-row"][data-subject="Pop3-added 0003"]', key: Enter}
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent
+      ?? document.querySelector('.taomni-mail-reader-text')?.textContent
+      ?? '').includes('Pop3-added 0003')
+    timeout_sec: 30
 - click: '[data-testid="mail-test-connection"]'
 - assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'POP3 ok, SMTP ok'}
 - assert_no_runtime_errors: null
@@ -142,19 +149,20 @@ verification:
     - 21
   - id: R3
     requirement: Reopening the same account preserves the downloaded message and its deduplication state.
-    actions: [23, 24, 26, 27]
+    actions: [23, 24, 26, 27, 31]
     checkpoints:
     - {step: 25, expectation: The original Mail tab has closed.}
     - {step: 29, expectation: The reopened account contains the complete local copy of the server inbox.}
     - {step: 30, expectation: The newest downloaded message appears once after reopen.}
-    results: [25, 29, 30]
+    - {step: 32, expectation: The reopened account still renders the newest message body.}
+    results: [25, 29, 30, 32]
   - id: R4
     requirement: The Mail pane shows the POP3 and SMTP connection test status.
-    actions: [31]
+    actions: [33]
     checkpoints:
-    - {step: 32, expectation: The visible status reports both connections succeeded.}
-    - {step: 33, expectation: The connection test produces no uncaught renderer error.}
-    results: [32, 33]
+    - {step: 34, expectation: The visible status reports both connections succeeded.}
+    - {step: 35, expectation: The connection test produces no uncaught renderer error.}
+    results: [34, 35]
   visual:
   - check: 截图中本地文件夹（INBOX/Sent/Drafts/Trash/Junk）与 POP3 状态显示正确。
     method: manual

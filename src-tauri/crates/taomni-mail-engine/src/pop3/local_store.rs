@@ -1,8 +1,10 @@
-use crate::MailFolder;
-use crate::MailMessageCached;
-use crate::cache::{list_cached_folders, upsert_folder, upsert_message};
+use crate::cache::{
+    cached_to_body, get_cached_body, list_cached_folders, mark_cached_messages_read,
+    unread_cached_uids, update_cached_flags, upsert_folder, upsert_message,
+};
 use crate::now_ts;
 use crate::parse_body_message;
+use crate::{MailFolder, MailMessageBody, MailMessageCached};
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::Result as SqlResult;
@@ -80,6 +82,39 @@ pub fn ensure_local_folders(conn: &Connection, account_id: &str) -> SqlResult<()
         }
     }
     Ok(())
+}
+
+pub fn list_local_folders(conn: &Connection, account_id: &str) -> SqlResult<Vec<MailFolder>> {
+    ensure_local_folders(conn, account_id)?;
+    list_cached_folders(conn, account_id)
+}
+
+/// A missing UID selection marks all unread messages in this local folder.
+pub fn mark_local_read(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    uids: Option<Vec<u32>>,
+) -> SqlResult<usize> {
+    let targets = match uids {
+        Some(targets) => targets,
+        None => unread_cached_uids(conn, account_id, folder)?,
+    };
+    mark_cached_messages_read(conn, account_id, folder, &targets)?;
+    refresh_counts(conn, account_id, folder)?;
+    Ok(targets.len())
+}
+
+pub fn set_local_flags(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    uids: &[u32],
+    add: &[String],
+    remove: &[String],
+) -> SqlResult<()> {
+    update_cached_flags(conn, account_id, folder, uids, add, remove)?;
+    refresh_counts(conn, account_id, folder)
 }
 
 pub fn create_local_folder(conn: &Connection, account_id: &str, name: &str) -> SqlResult<()> {
@@ -163,6 +198,57 @@ pub fn local_raw(
 ) -> SqlResult<Option<Vec<u8>>> {
     migrate_local_tables(conn)?;
     select_local_raw(conn, account_id, folder, uid)
+}
+
+pub fn local_body(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    uid: u32,
+) -> SqlResult<Option<MailMessageBody>> {
+    if let Some(body) = get_cached_body(conn, account_id, folder, uid)? {
+        return Ok(Some(body));
+    }
+    Ok(local_raw(conn, account_id, folder, uid)?.map(|raw| {
+        let message = parse_body_message(
+            account_id,
+            folder,
+            uid,
+            Some(raw.len() as u32),
+            &raw,
+            8 * 1024 * 1024,
+        );
+        cached_to_body(message, "cache")
+    }))
+}
+
+pub fn import_local_messages(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    messages: &[Vec<u8>],
+) -> SqlResult<usize> {
+    ensure_local_folders(conn, account_id)?;
+    for message in messages {
+        insert_local(conn, account_id, folder, message, &["\\Seen"])?;
+    }
+    refresh_counts(conn, account_id, folder)?;
+    Ok(messages.len())
+}
+
+pub fn list_local_originals(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+) -> SqlResult<Vec<(u32, Vec<u8>)>> {
+    migrate_local_tables(conn)?;
+    let mut query = conn.prepare(
+        "SELECT uid, raw FROM mail_local_raw WHERE account_id = ?1 AND folder = ?2 ORDER BY uid",
+    )?;
+    let rows = query.query_map(params![account_id, folder], |row| {
+        Ok((row.get::<_, i64>(0)? as u32, row.get(1)?))
+    })?;
+    rows.collect()
 }
 
 /// Read a saved POP3 original from an existing store without changing its schema.

@@ -13,16 +13,13 @@ use super::{
     MailAccountConfig, MailDeleteResult, MailDownloadAttachmentResult, MailFlagResult, MailFolder,
     MailMarkReadResult, MailMessageBody, MailMoveResult, MailSendRequest, MailSendResult,
     MailSyncAllResult, MailTestConnectionResult, MessageBuildOptions, build_send_message_with,
-    cached_to_body, extract_attachment, get_cached_body, list_cached_folders,
-    mark_cached_messages_read, now_ts, resolve_config, unread_cached_uids, update_cached_flags,
-    upsert_sent_contacts, with_mail_db,
+    extract_attachment, now_ts, resolve_config, upsert_sent_contacts, with_mail_db,
 };
 use crate::state::AppState;
 
 fn folders(state: &State<'_, AppState>, account_id: &str) -> Result<Vec<MailFolder>, String> {
     with_mail_db(state, account_id, |db| {
-        pop3::ensure_local_folders(db, account_id)?;
-        list_cached_folders(db, account_id)
+        pop3::list_local_folders(db, account_id)
     })
 }
 
@@ -181,20 +178,7 @@ pub(super) fn get_body(
     uid: u32,
 ) -> Result<MailMessageBody, String> {
     with_mail_db(state, account_id, |db| {
-        if let Some(body) = get_cached_body(db, account_id, folder, uid)? {
-            return Ok(Some(body));
-        }
-        Ok(pop3::local_raw(db, account_id, folder, uid)?.map(|raw| {
-            let message = super::parse_body_message(
-                account_id,
-                folder,
-                uid,
-                Some(raw.len() as u32),
-                &raw,
-                8 * 1024 * 1024,
-            );
-            cached_to_body(message, "cache")
-        }))
+        pop3::local_body(db, account_id, folder, uid)
     })?
     .ok_or_else(|| format!("message {uid} is not in the local {folder} folder"))
 }
@@ -206,15 +190,13 @@ pub(super) fn mark_read(
     uids: Option<Vec<u32>>,
     all: bool,
 ) -> Result<MailMarkReadResult, String> {
+    let targets = if all {
+        None
+    } else {
+        Some(uids.unwrap_or_default())
+    };
     let marked = with_mail_db(state, account_id, |db| {
-        let targets = if all {
-            unread_cached_uids(db, account_id, folder)?
-        } else {
-            uids.clone().unwrap_or_default()
-        };
-        mark_cached_messages_read(db, account_id, folder, &targets)?;
-        pop3::refresh_counts(db, account_id, folder)?;
-        Ok(targets.len())
+        pop3::mark_local_read(db, account_id, folder, targets)
     })?;
     Ok(MailMarkReadResult {
         folder: folder.to_string(),
@@ -232,8 +214,7 @@ pub(super) fn set_flags(
     remove: &[String],
 ) -> Result<MailFlagResult, String> {
     with_mail_db(state, account_id, |db| {
-        update_cached_flags(db, account_id, folder, uids, add, remove)?;
-        pop3::refresh_counts(db, account_id, folder)
+        pop3::set_local_flags(db, account_id, folder, uids, add, remove)
     })?;
     Ok(MailFlagResult {
         folder: folder.to_string(),
@@ -395,9 +376,7 @@ pub(super) async fn send(
         match copy {
             Ok(bytes) => {
                 let stored = with_mail_db(state, &account_id, |db| {
-                    pop3::ensure_local_folders(db, &account_id)?;
-                    pop3::insert_local(db, &account_id, "Sent", &bytes, &["\\Seen"])?;
-                    pop3::refresh_counts(db, &account_id, "Sent")?;
+                    pop3::import_local_messages(db, &account_id, "Sent", &[bytes])?;
                     upsert_sent_contacts(db, &account_id, &request)
                 });
                 match stored {
@@ -419,12 +398,7 @@ pub(super) fn import(
     messages: &[Vec<u8>],
 ) -> Result<usize, String> {
     with_mail_db(state, account_id, |db| {
-        pop3::ensure_local_folders(db, account_id)?;
-        for message in messages {
-            pop3::insert_local(db, account_id, folder, message, &["\\Seen"])?;
-        }
-        pop3::refresh_counts(db, account_id, folder)?;
-        Ok(messages.len())
+        pop3::import_local_messages(db, account_id, folder, messages)
     })
 }
 
@@ -435,13 +409,6 @@ pub(super) fn folder_raw(
     folder: &str,
 ) -> Result<Vec<(u32, Vec<u8>)>, String> {
     with_mail_db(state, account_id, |db| {
-        pop3::migrate_local_tables(db)?;
-        let mut stmt = db.prepare(
-            "SELECT uid, raw FROM mail_local_raw WHERE account_id = ?1 AND folder = ?2 ORDER BY uid",
-        )?;
-        let rows = stmt.query_map(rusqlite::params![account_id, folder], |row| {
-            Ok((row.get::<_, i64>(0)? as u32, row.get::<_, Vec<u8>>(1)?))
-        })?;
-        rows.collect()
+        pop3::list_local_originals(db, account_id, folder)
     })
 }
