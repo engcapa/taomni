@@ -103,6 +103,10 @@ steps:
     selector: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
     equal: 0
 - assert_visible: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- click: '[data-testid="mail-subscriptions-open"]'
+- wait_for:
+    selector: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="false"]'
+    timeout_sec: 15
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -166,6 +170,7 @@ verification:
     - 32
     - 34
     - 35
+    - 41
     checkpoints:
     - step: 33
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
@@ -179,13 +184,16 @@ verification:
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "equal": 0}}'
     - step: 40
       expectation: INBOX remains visible after reopening with the subscription filter still active.
-    - step: 41
+    - step: 42
+      expectation: The reopened subscriptions dialog still reports Archive as unsubscribed.
+    - step: 43
       expectation: Reopening and applying the folder subscription filter produces no runtime errors.
     results:
     - 38
     - 39
     - 40
-    - 41
+    - 42
+    - 43
   visual:
   - check: 截图中订阅对话框的 Archive 未勾选、“只显示已订阅”已勾选，文件夹树不含 Archive。
     method: manual

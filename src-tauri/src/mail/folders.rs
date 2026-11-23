@@ -8,7 +8,7 @@
 //!   periodic scan skip folders the server reports unchanged (one round trip
 //!   instead of EXAMINE + SEARCHes).
 
-use taomni_mail_api::FolderSubscription;
+use taomni_mail_api::{FolderSubscription, folder_cache::FolderCacheAction};
 use taomni_mail_engine::cache::{refresh_subscription_flags, sync_folder_tree};
 use tauri::State;
 
@@ -16,6 +16,7 @@ use tauri::State;
 use super::{ImapSessionOpts, with_imap_session};
 use super::{
     MailAccountConfig, MailFolder, ResolvedMailAccount, module_host, resolve_config, with_mail_db,
+    with_mail_db_async,
 };
 use crate::state::AppState;
 
@@ -62,10 +63,30 @@ pub async fn mail_list_folders(
     if !cache_enabled {
         return Ok(listed);
     }
-    with_mail_db(&state, &account_id, |db| {
-        sync_folder_tree(db, &account_id, &listed)?;
-        super::list_cached_folders(db, &account_id)
+    cache_listed_folders(&state, &account_id, listed).await
+}
+
+pub(super) async fn cache_listed_folders(
+    state: &State<'_, AppState>,
+    account_id: &str,
+    listed: Vec<MailFolder>,
+) -> Result<Vec<MailFolder>, String> {
+    if module_host::publishes_folder_cache(&state.plugins) {
+        let cache = state.mail_db(account_id)?;
+        return module_host::update_folder_cache(
+            state.plugins.clone(),
+            cache,
+            account_id.to_owned(),
+            FolderCacheAction::List,
+            listed,
+        )
+        .await;
+    }
+    with_mail_db_async(state, account_id, move |db, account_id| {
+        sync_folder_tree(db, account_id, &listed)?;
+        super::list_cached_folders(db, account_id)
     })
+    .await
 }
 
 /// Subscribe or unsubscribe a folder; returns the updated cached folders.
@@ -87,6 +108,17 @@ pub async fn mail_set_folder_subscription(
     let listed = live_imap_folder_tree(&state, account, Some(change), false).await?;
     if !cache_enabled {
         return Ok(listed);
+    }
+    if module_host::publishes_folder_cache(&state.plugins) {
+        let cache = state.mail_db(&account_id)?;
+        return module_host::update_folder_cache(
+            state.plugins.clone(),
+            cache,
+            account_id,
+            FolderCacheAction::Subscription,
+            listed,
+        )
+        .await;
     }
     with_mail_db(&state, &account_id, |db| {
         refresh_subscription_flags(db, &account_id, &listed)

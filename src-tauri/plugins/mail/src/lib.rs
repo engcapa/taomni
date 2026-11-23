@@ -14,6 +14,7 @@ mod attachment_cache;
 mod commands;
 mod compose;
 mod filter_rules;
+mod folder_cache;
 mod imap_body_sync;
 mod imap_exchange;
 mod imap_idle;
@@ -65,6 +66,7 @@ fn host_config() -> HostConfig {
                 CHECK_OUTGOING,
                 IMAP_FOLDER_TREE,
                 MUTATE_IMAP_FOLDER,
+                taomni_mail_api::folder_cache::UPDATE_IMAP_FOLDER_CACHE,
                 SEND_SMTP,
                 taomni_mail_api::COMPOSE_MESSAGE,
                 taomni_mail_api::SEND_RESPONSE,
@@ -277,6 +279,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(imap_exchange::mutate_folder(&self.io, operation, input)?)
+            }
+            taomni_mail_api::folder_cache::UPDATE_IMAP_FOLDER_CACHE => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(folder_cache::serve(&self.io, operation, endpoint)?)
             }
             SYNC_IMAP_HEADERS => {
                 let input = serde_json::from_value(params.unwrap_or_default())

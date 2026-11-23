@@ -1,7 +1,7 @@
 use taomni_mail_api::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, HeaderPageOutcome, HeaderPageRequest,
 };
-use taomni_mail_engine::cache::{apply_folder_round, sync_folder_tree};
+use taomni_mail_engine::cache::apply_folder_round;
 
 use super::*;
 
@@ -319,11 +319,7 @@ pub async fn mail_sync_all_folders(
     let skip_unchanged = cache_enabled && reconcile_mode == MailSyncRequestMode::Reconcile;
     let listed = folders::live_imap_folder_tree(&state, account.clone(), None, true).await?;
     if cache_enabled {
-        let tree = listed.clone();
-        with_mail_db_async(&state, &account_id, move |db, account_id| {
-            sync_folder_tree(db, account_id, &tree)
-        })
-        .await?;
+        folders::cache_listed_folders(&state, &account_id, listed.clone()).await?;
     }
     let mut folders = listed;
     let mut failed = Vec::new();

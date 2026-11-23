@@ -21,7 +21,10 @@ pub use contacts::{
     reindex_cached_contacts, search_contacts, upsert_contact, upsert_sent_contacts,
 };
 pub use flags::{flags_include_seen, mark_cached_messages_read, update_cached_flags};
-pub use folder_tree::{apply_folder_change, refresh_subscription_flags, sync_folder_tree};
+pub use folder_tree::{
+    apply_folder_change, refresh_subscription_flags, sync_folder_tree,
+    update_folder_cache_in_transaction,
+};
 pub use header::{cached_header, row_to_header};
 pub use mapping::cached_to_body;
 pub use prefetch::{cache_body_if_current, pending_bodies};

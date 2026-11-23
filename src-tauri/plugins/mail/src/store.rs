@@ -212,7 +212,7 @@ fn checked_data_file(root: PathBuf, relative: &Path) -> Result<PathBuf, RpcError
     Ok(root)
 }
 
-fn validate_account(account_id: &str) -> Result<(), RpcError> {
+pub(super) fn validate_account(account_id: &str) -> Result<(), RpcError> {
     if account_id.trim().is_empty() || account_id.len() > 1024 || account_id.contains('\0') {
         return Err(RpcError::from_code(ErrorCode::InvalidParams));
     }
@@ -223,7 +223,7 @@ fn database_for(root: &Path, account_id: &str) -> PathBuf {
     root.join(format!("{}.db", mail_db_file_stem(account_id)))
 }
 
-fn apply_change<T>(
+pub(super) fn apply_change<T>(
     database: &mut Connection,
     check: &dyn Fn() -> Result<(), RpcError>,
     change: impl FnOnce(&Connection) -> Result<T, RpcError>,

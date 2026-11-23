@@ -11,6 +11,7 @@ pub mod archive;
 pub mod archive_index;
 pub mod attachment_cache;
 pub mod compose;
+pub mod folder_cache;
 pub mod imap_exchange;
 pub mod imap_mutation;
 pub mod imap_sync;

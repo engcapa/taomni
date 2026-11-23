@@ -13,6 +13,8 @@ mod mbox;
 pub(super) use archive_decoding::{decode_archive_attachment, decode_archive_original};
 pub(super) use archive_encoding::ArchiveEncoder;
 mod downloads;
+mod folder_cache;
+pub(super) use folder_cache::{publishes_folder_cache, update_folder_cache};
 mod local_mailbox;
 pub(super) use local_mailbox::local_mailbox;
 mod imap_outgoing;

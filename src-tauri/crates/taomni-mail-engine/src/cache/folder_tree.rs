@@ -4,6 +4,8 @@ use std::collections::{HashMap, HashSet};
 
 use rusqlite::{Connection, Result as SqlResult, params};
 
+use taomni_mail_api::folder_cache::FolderCacheAction;
+
 use crate::MailFolder;
 
 use super::{list_cached_folders, purge_cached_folder, upsert_folder};
@@ -14,23 +16,28 @@ pub fn sync_folder_tree(
     listed: &[MailFolder],
 ) -> SqlResult<()> {
     let tx = conn.unchecked_transaction()?;
+    replace_tree(&tx, account_id, listed)?;
+    tx.commit()
+}
+
+fn replace_tree(conn: &Connection, account_id: &str, listed: &[MailFolder]) -> SqlResult<()> {
     for folder in listed {
-        upsert_folder(&tx, folder)?;
+        upsert_folder(conn, folder)?;
     }
     let names: HashSet<&str> = listed.iter().map(|folder| folder.name.as_str()).collect();
-    for folder in list_cached_folders(&tx, account_id)? {
+    for folder in list_cached_folders(conn, account_id)? {
         if !names.contains(folder.name.as_str()) {
-            tx.execute(
+            conn.execute(
                 "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2",
                 params![account_id, folder.name],
             )?;
-            tx.execute(
+            conn.execute(
                 "DELETE FROM mail_folders WHERE account_id = ?1 AND name = ?2",
                 params![account_id, folder.name],
             )?;
         }
     }
-    tx.commit()
+    Ok(())
 }
 
 pub fn refresh_subscription_flags(
@@ -39,19 +46,27 @@ pub fn refresh_subscription_flags(
     listed: &[MailFolder],
 ) -> SqlResult<Vec<MailFolder>> {
     let tx = conn.unchecked_transaction()?;
+    let folders = update_subscription(&tx, account_id, listed)?;
+    tx.commit()?;
+    Ok(folders)
+}
+
+fn update_subscription(
+    conn: &Connection,
+    account_id: &str,
+    listed: &[MailFolder],
+) -> SqlResult<Vec<MailFolder>> {
     let flags: HashMap<&str, &[String]> = listed
         .iter()
         .map(|folder| (folder.name.as_str(), folder.flags.as_slice()))
         .collect();
-    for mut folder in list_cached_folders(&tx, account_id)? {
+    for mut folder in list_cached_folders(conn, account_id)? {
         if let Some(remote) = flags.get(folder.name.as_str()) {
             folder.flags = remote.to_vec();
-            upsert_folder(&tx, &folder)?;
+            upsert_folder(conn, &folder)?;
         }
     }
-    let folders = list_cached_folders(&tx, account_id)?;
-    tx.commit()?;
-    Ok(folders)
+    list_cached_folders(conn, account_id)
 }
 
 pub fn apply_folder_change(
@@ -61,13 +76,43 @@ pub fn apply_folder_change(
     folders: &[MailFolder],
 ) -> SqlResult<()> {
     let tx = conn.unchecked_transaction()?;
+    update_changed_folders(&tx, account_id, previous, folders)?;
+    tx.commit()
+}
+
+fn update_changed_folders(
+    conn: &Connection,
+    account_id: &str,
+    previous: Option<&str>,
+    folders: &[MailFolder],
+) -> SqlResult<()> {
     if let Some(previous) = previous {
-        purge_cached_folder(&tx, account_id, previous)?;
+        purge_cached_folder(conn, account_id, previous)?;
     }
     for folder in folders {
-        upsert_folder(&tx, folder)?;
+        upsert_folder(conn, folder)?;
     }
-    tx.commit()
+    Ok(())
+}
+
+/// The caller holds the write transaction through its cancellation check.
+pub fn update_folder_cache_in_transaction(
+    conn: &Connection,
+    account_id: &str,
+    action: FolderCacheAction,
+    folders: Vec<MailFolder>,
+) -> SqlResult<Vec<MailFolder>> {
+    match action {
+        FolderCacheAction::List => {
+            replace_tree(conn, account_id, &folders)?;
+            list_cached_folders(conn, account_id)
+        }
+        FolderCacheAction::Subscription => update_subscription(conn, account_id, &folders),
+        FolderCacheAction::Change { previous } => {
+            update_changed_folders(conn, account_id, previous.as_deref(), &folders)?;
+            Ok(folders)
+        }
+    }
 }
 
 #[cfg(test)]

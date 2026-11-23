@@ -5,7 +5,7 @@ description: >-
   tab to populate the IMAP folder tree, unsubscribe Archive, search the server,
   update message flags, view and save the original of an unarchived message, and send
   messages from IMAP and POP3 accounts. Check the installed renderer,
-  connection tests, SMTP delivery, IMAP Sent copies, remote draft cleanup,
+  connection tests, persisted IMAP folder state, SMTP delivery, IMAP Sent copies, remote draft cleanup,
   and the signed host's data lease through disable and re-enable.
 covers: [F-Modules-1, F-MAIL-3, F-MAIL-6, F-MAIL-7, F-MAIL-11, F-MAIL-12, F-MAIL-15, F-MAIL-17, F-MAIL-23, F-FILEOPEN-1]
 tags: [modules, mail, native-boundary, p1]
@@ -220,7 +220,7 @@ verification:
     - {step: 12, expectation: The signed module is installed and the host has no writer lease yet.}
     - {step: 18, expectation: Opening the account mounts the module's verified frontend.}
     - {step: 20, expectation: Opening the account shows Archive from the actual IMAP server.}
-    - {step: 21, expectation: The signed Mail host holds its data lease before the connection test.}
+    - {step: 21, expectation: The signed host holds its data lease and the on-disk folder cache contains INBOX and subscribed Archive.}
     - {step: 48, expectation: The subscription dialog shows the initial subscribed state.}
     - {step: 50, expectation: The updated IMAP folder tree reports Archive as unsubscribed.}
     - {step: 54, expectation: Full synchronization reports its completed header counts.}

@@ -58,6 +58,11 @@ def run(ctx, args):
     report = {"phase": phase, "sourceSha": receipt["sourceSha"], "platform": receipt["platform"],
               "packageSha256": receipt["sha256"], "hostSha256": digest,
               "frontendSha256": frontend_digest, "writerLease": observed}
+    if phase in {"folder-tree", "folder-changes"}:
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        if "mail/update-imap-folder-cache" not in manifest["commands"]:
+            raise StepError("The installed Mail version does not publish its IMAP folder cache")
+        report["folderCache"] = observe_folder_cache(plugins.parent / "mail-cache", phase)
     if phase.startswith("attachment-"):
         from .module_mail_attachment import observe
         if owner.case_id != "TC-MODULES-083":
@@ -163,6 +168,29 @@ def run(ctx, args):
             signed["queuedDraft"] = observation
     (ctx.case_dir / f"signed-mail-{phase}.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return f"Mail {version} host lease verified ({phase})"
+
+
+def observe_folder_cache(root, phase):
+    databases = sorted(root.glob("*.db"))
+    if len(databases) != 1:
+        raise StepError(f"Expected one IMAP folder cache, found {len(databases)}")
+    database = databases[0]
+    ordinary(database)
+    try:
+        with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as conn:
+            rows = conn.execute("SELECT name, flags_json FROM mail_folders ORDER BY name").fetchall()
+        folders = {name: json.loads(flags) for name, flags in rows}
+    except (sqlite3.Error, ValueError) as error:
+        raise StepError(f"Cannot read the IMAP folder cache: {error}") from error
+    if not {"INBOX", "Archive"}.issubset(folders):
+        raise StepError("The cache does not contain the IMAP folder tree")
+    subscribed = any(flag.lower() == "\\subscribed" for flag in folders["Archive"])
+    if subscribed != (phase == "folder-tree"):
+        raise StepError(f"Archive subscription differs from the observed {phase} state")
+    retired = {"INBOX/QA module folder", "INBOX/QA module renamed"}
+    if phase == "folder-changes" and retired.intersection(folders):
+        raise StepError("Renamed or deleted IMAP folders remained in the cache")
+    return {"database": database.name, "folders": sorted(folders), "archiveSubscribed": subscribed}
 
 
 def observe_delivery(phase):
