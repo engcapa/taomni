@@ -126,14 +126,41 @@
 - **vendor A/B**：同一 commit 两个分支：A 关闭（现状），B 开启。B 首轮冷编建立新键，次轮恢复后记录重编 crate 数与构建步骤耗时；A 用同轮暖编对照。验收判据：B 暖编构建步骤 ≤ 6 分钟且二进制身份校验通过；否则回退开关。
 - **夜跑实测**：连续两个自然夜跑记录墙钟、各 job 等待、native 执行数与失败/跳过；与上一轮 113:29 对比；任何抽样导致的“未执行”必须出现在 `nightly.deferred` 与 summary 中。
 
-## 8. 回退
+## 8. 首轮实现验证（2026-11-23）
+
+所有验证都在 `perf/qa-nightly-coverage-and-cache` 分支上以 workflow_dispatch 完成，sha 固定在 `f818e1698`/`aacb9a5e8` 的实现上（临时探针提交只改变 Rust 注释，用于强制重编，不影响 cargo 依赖键；探针提交与探针分支已在测量后移除）。
+
+| 验证 | 运行 | 结果 |
+| --- | --- | --- |
+| 夜间计划（周二夜） | `45118200487` | night `2026-11-24` 周二，`platforms=['linux']`，Windows 跳过；Linux native always 73 + 样本 26 = 100/414，deferred 314；opt-in 17 个组合延期；5 个 native entry（4 片 + 双屏） |
+| 汇总展示 | `45118242633` | `summary.md` 出现 Nightly 行与 opt-in deferred 行；99 个 native 用例与计划一致 |
+| 容量门控 | 本地对真实 API 运行 | 列出 5 个更早的 active run，超时后 `::warning::` fail-open，写出 `capacity-gate.json` |
+| 受信任归档（负向） | `45118200487` | main 尚无当前键归档时打印 `No retained artifact ... on trusted main` 并回退冷编 |
+| 受信任归档（正向） | `45131100717` | 无本分支归档时从 main 的 run `45124668225` 取到 `...72f90c23...`；下载 23 秒、解包 45 秒、构建步骤 7:43（36 个 crate），对照冷编 22.6 分钟 |
+| vendor 冷编（开关开） | `45118242633` | 构建步骤 22.0 分钟；507 个 vendor 文件 mtime 归一化；归档 1.6 GB（`...f64a0657...`） |
+| vendor 暖编（开关开） | `45124662612` | 恢复同分支归档（下载 0.6 + 解包 0.9 分钟）；**重编 crate 3 个**（taomni + sherpa 链）；构建步骤 8.7 分钟 |
+| 无 vendor 暖编对照 | `45126363964` | 同样恢复归档；**重编 crate 36 个**；构建步骤 9.7 分钟 |
+| 无 vendor 冷编对照 | `45118200487` | 构建步骤 22.6 分钟 |
+| 运行时复用回归 | `45123913285`、`45123923909` | 校验后复用运行时，构建 job 约 1 分钟，单用例通过 |
+
+### 8.1 结论与判读
+
+- **夜间策略与 Windows 门控按计划工作**：计划、矩阵、汇总和 deferred 记录都能从 `selection.json` 复算；V1 的失败来自 Maven Central 429（基础设施）与 2 个既有产品断言（`linux-native-shard-2/TC-WS-079`、`linux-native-shard-4/TC-FILE-OPEN-045`），不是策略或缓存改动。
+- **vendor 归档机制成立**：开关打开后，暖编重编 crate 从 36 降到 3，说明 vendor 中间产物确实被 Cargo 复用。
+- **Linux 上的净收益有限**：本机 Linux 暖编本来就只需 ~10 分钟，恢复 1.6 GB 归档的 1.5 分钟会抵消一部分收益；同条件对照只快约 1 分钟（9.7 → 8.7）。Windows/macOS 的第二轮实测暖编构建步骤为 13.5/16.4 分钟，是这项优化真正的目标平台，需要按同一 A/B 协议补测后再决定是否默认打开。当前保持默认关闭。
+- **冷编不受开关影响**：22.6 分钟（关）对 22.0 分钟（开），符合“只影响恢复路径”的预期。
+- **同分支归档已可跨 commit 复用**：`45129303833`（新探针提交）仍从同分支早先的 run 取到了 Cargo 依赖归档（键不含源码），说明归档键不含源码是可行的。
+- **受信任默认分支路径已端到端验证**：在没有任何本分支归档的 `qa/trusted-cache-probe` 上，`45131100717` 的日志记录 `Found qa-cargo-dependencies-v1-...-72f90c... in trusted workflow run 45124668225 (workflow_dispatch on main)`；没有归档时回退冷编（`45118200487` 的 `No retained artifact ... on trusted main`）。来源校验（默认分支、completed、非当前 run、同一 workflow）在两次运行中都按预期过滤。
+- **首个夜跑的预期**：合并当晚 schedule 运行在 main 上仍是冷编（main 尚无当前键归档），但它会发布当前键归档；次日夜间应命中受信任归档并把三端依赖编译变成暖编（实测单平台约省 15 分钟）。
+
+## 9. 回退
 
 - 夜间策略由 workflow env `QA_NIGHTLY_SAMPLE_PERCENT=100` 或 `nightly_policy=false` 关闭；恢复三端全量只需派发时把策略关掉。
 - Windows 门控由 `QA_WINDOWS_NIGHTS`（默认 `fri,sat,sun`）控制，设为全周即恢复现状。
 - 受信任归档与本分支归档互不影响，查找失败自动回退；删除该 step 即恢复。
 - vendor 实验由 `QA_VENDOR_CACHE` 控制，默认关闭；关闭后归档键与当前完全一致。
 
-## 9. 改动清单
+## 10. 改动清单
 
 - `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/ci.py`：夜间策略与 opt-in 计划集成、`nightly` 清单字段。
 - `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/real_provider.py`：provider 就绪判断（与 fixture 共用）。
