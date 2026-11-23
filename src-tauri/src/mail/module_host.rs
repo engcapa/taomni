@@ -16,6 +16,8 @@ mod mbox;
 pub(super) use archive_decoding::{decode_archive_attachment, decode_archive_original};
 pub(super) use archive_encoding::ArchiveEncoder;
 mod downloads;
+mod flag_cache;
+pub(super) use flag_cache::{publish_imap_flags, publishes_imap_flags};
 mod folder_cache;
 pub(super) use folder_cache::{publishes_folder_cache, update_folder_cache};
 mod index_cache;

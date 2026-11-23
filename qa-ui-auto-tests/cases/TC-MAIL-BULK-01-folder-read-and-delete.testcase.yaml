@@ -60,7 +60,9 @@ steps:
 - mail_server_assert_list_matches:
     timeout_sec: 30
     unread: true
-- assert_disabled: '[data-testid="mail-mark-folder-read"]'
+- wait_for:
+    selector: '[data-testid="mail-mark-folder-read"][aria-busy="false"]:disabled'
+    timeout_sec: 15
 - screenshot: mail-bulk-01-read.png
 - click:
     selector: '[data-testid="mail-message-row"]:nth-child(1)'
@@ -182,7 +184,7 @@ verification:
     - step: 22
       expectation: Background work does not restore stale unread flags during selection.
     - step: 17
-      expectation: The all-read action is disabled after the server confirms zero unread messages.
+      expectation: The all-read action is idle and disabled after the server confirms zero unread messages.
     results:
     - 14
     - 15

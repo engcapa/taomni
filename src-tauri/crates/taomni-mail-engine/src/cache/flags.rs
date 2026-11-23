@@ -58,6 +58,24 @@ pub fn mark_cached_messages_read(
     Ok(())
 }
 
+/// Publish known read UIDs and, after full reconciliation, the server count.
+pub fn reconcile_cached_read(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    uids: &[u32],
+    remaining: Option<usize>,
+) -> SqlResult<()> {
+    mark_cached_messages_read(conn, account_id, folder, uids)?;
+    if let Some(remaining) = remaining {
+        conn.execute(
+            "UPDATE mail_folders SET unread = ?3 WHERE account_id = ?1 AND name = ?2",
+            params![account_id, folder, remaining as i64],
+        )?;
+    }
+    Ok(())
+}
+
 pub fn flags_include_seen(flags: &[String]) -> bool {
     flags.iter().any(|flag| flag.eq_ignore_ascii_case("\\Seen"))
 }

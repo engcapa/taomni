@@ -20,7 +20,9 @@ pub use contacts::{
     MailContactSuggestion, clean_contact_name, contact_email, escape_like, mailbox_to_contact,
     reindex_cached_contacts, search_contacts, upsert_contact, upsert_sent_contacts,
 };
-pub use flags::{flags_include_seen, mark_cached_messages_read, update_cached_flags};
+pub use flags::{
+    flags_include_seen, mark_cached_messages_read, reconcile_cached_read, update_cached_flags,
+};
 pub use folder_tree::{
     apply_folder_change, refresh_subscription_flags, sync_folder_tree,
     update_folder_cache_in_transaction,

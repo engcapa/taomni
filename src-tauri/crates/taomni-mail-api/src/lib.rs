@@ -14,6 +14,7 @@ pub mod body_cache;
 pub mod compose;
 pub mod folder_cache;
 pub mod imap_exchange;
+pub mod imap_flag_cache;
 pub mod imap_index;
 pub mod imap_mutation;
 pub mod imap_sync;

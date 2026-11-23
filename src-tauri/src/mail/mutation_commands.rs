@@ -1,5 +1,5 @@
 use super::*;
-use taomni_mail_api::ImapFlagUpdate;
+use taomni_mail_api::{ImapFlagUpdate, imap_flag_cache::ImapFlagCacheAction};
 
 #[tauri::command]
 pub async fn mail_mark_read(
@@ -101,6 +101,7 @@ pub async fn mail_set_flags(
 
     let account_id = config.session_id.clone();
     let account = resolve_config(&state, config)?;
+    let publish_to_host = module_host::publishes_imap_flags(&state.plugins);
     let update = ImapFlagUpdate {
         folder: folder.clone(),
         uids: target_uids,
@@ -131,6 +132,17 @@ pub async fn mail_set_flags(
     }
 
     let updated = update.uids.len();
+    if publish_to_host {
+        let cache = state.mail_db(&account_id)?;
+        module_host::publish_imap_flags(
+            state.plugins.clone(),
+            cache,
+            account_id,
+            ImapFlagCacheAction::Update { flags: update },
+        )
+        .await?;
+        return Ok(MailFlagResult { folder, updated });
+    }
     with_mail_db_async(&state, &account_id, move |db, account_id| {
         let tx = db.unchecked_transaction()?;
         update_cached_flags(

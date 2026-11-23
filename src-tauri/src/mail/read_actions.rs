@@ -3,7 +3,10 @@ use super::*;
 use crate::{plugin::PluginRegistry, state::MailDbHandle};
 use std::future::Future;
 
-use taomni_mail_api::{ImapFlagUpdate, imap_mutation::UID_BATCH_SIZE};
+use taomni_mail_api::{
+    ImapFlagUpdate, imap_flag_cache::ImapFlagCacheAction, imap_mutation::UID_BATCH_SIZE,
+};
+use taomni_mail_engine::cache::reconcile_cached_read;
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 pub(super) use taomni_mail_engine::imap_mutations::unread_uids;
 
@@ -12,6 +15,7 @@ pub(super) struct ReadFlagTransport {
     pool: Arc<MailImapPool>,
     account: Arc<ResolvedMailAccount>,
     registry: Option<Arc<PluginRegistry>>,
+    publish_to_host: bool,
 }
 
 impl ReadFlagTransport {
@@ -20,14 +24,48 @@ impl ReadFlagTransport {
         account: ResolvedMailAccount,
         registry: Option<Arc<PluginRegistry>>,
     ) -> Self {
+        let registry = registry.filter(|registry| {
+            module_host::sets_imap_flags(registry) && module_host::lists_imap_unread(registry)
+        });
+        let publish_to_host = registry
+            .as_deref()
+            .is_some_and(module_host::publishes_imap_flags);
         Self {
             #[cfg(any(test, feature = "legacy-mail-imap"))]
             pool,
             account: Arc::new(account),
-            registry: registry.filter(|registry| {
-                module_host::sets_imap_flags(registry) && module_host::lists_imap_unread(registry)
-            }),
+            registry,
+            publish_to_host,
         }
+    }
+
+    async fn commit_read(
+        &self,
+        db: MailDbHandle,
+        folder: String,
+        uids: Vec<u32>,
+        remaining: Option<usize>,
+    ) -> Result<(), String> {
+        let account_id = self.account.config.session_id.clone();
+        if let Some(registry) = self.registry.as_ref().filter(|_| self.publish_to_host) {
+            return module_host::publish_imap_flags(
+                registry.clone(),
+                db,
+                account_id,
+                ImapFlagCacheAction::Read {
+                    folder,
+                    uids,
+                    remaining,
+                },
+            )
+            .await;
+        }
+        mail_db_task(db, account_id, move |conn, account_id| {
+            let tx = conn.unchecked_transaction()?;
+            reconcile_cached_read(&tx, account_id, &folder, &uids, remaining)?;
+            tx.commit()
+        })
+        .await
     }
 
     async fn list_unread(&self, folder: &str) -> Result<Vec<u32>, String> {
@@ -129,14 +167,9 @@ pub(super) async fn mark_read_cached(
                 targets.len()
             )
         })?;
-        let cached_folder = folder.to_owned();
-        let committed = batch.to_vec();
-        mail_db_task(db.clone(), account_id.clone(), move |conn, account_id| {
-            let tx = conn.unchecked_transaction()?;
-            mark_cached_messages_read(&tx, account_id, &cached_folder, &committed)?;
-            tx.commit()
-        })
-        .await?;
+        transport
+            .commit_read(db.clone(), folder.to_owned(), batch.to_vec(), None)
+            .await?;
         marked += batch.len();
     }
 
@@ -150,17 +183,9 @@ pub(super) async fn mark_read_cached(
             .into_iter()
             .filter(|uid| !remaining_set.contains(uid))
             .collect();
-        let cached_folder = folder.to_owned();
-        mail_db_task(db, account_id.clone(), move |conn, account_id| {
-            let tx = conn.unchecked_transaction()?;
-            mark_cached_messages_read(&tx, account_id, &cached_folder, &reconciled)?;
-            tx.execute(
-                "UPDATE mail_folders SET unread = ?3 WHERE account_id = ?1 AND name = ?2",
-                params![account_id, cached_folder, remaining_count as i64],
-            )?;
-            tx.commit()
-        })
-        .await?;
+        transport
+            .commit_read(db, folder.to_owned(), reconciled, Some(remaining_count))
+            .await?;
         Some(remaining_count)
     } else {
         None

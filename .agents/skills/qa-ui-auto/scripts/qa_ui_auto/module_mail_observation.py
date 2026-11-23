@@ -146,6 +146,11 @@ def run(ctx, args):
         report["imapIndex"] = observe_imap_index(
             plugins.parent / "mail-cache", "Signed full-account header 0001"
         )
+    if phase == "imap-flags" and owner.case_id == "TC-MODULES-059":
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        if "mail/publish-imap-flag-cache" not in manifest["commands"]:
+            raise StepError("The installed Mail host does not publish the IMAP flag cache")
+        report["imapFlags"] = observe_imap_flag_cache(plugins.parent / "mail-cache")
     if phase == "imap-prefetch":
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
         if "mail/publish-imap-body-cache" not in manifest["commands"]:
@@ -200,6 +205,24 @@ def observe_imap_index(root, subject):
     if high is None or high < uid or validity is None:
         raise StepError("The synchronized header and folder watermark disagree")
     return {"database": database.name, "uid": uid, "highUid": high, "uidValidity": validity}
+
+
+def observe_imap_flag_cache(root):
+    databases = sorted(root.glob("*.db"))
+    if len(databases) != 1:
+        raise StepError(f"Expected one IMAP flags cache, found {len(databases)}")
+    database = databases[0]
+    ordinary(database)
+    with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as conn:
+        rows = conn.execute("SELECT subject, flags_json FROM mail_messages WHERE folder='INBOX'").fetchall()
+        folder = conn.execute("SELECT unread FROM mail_folders WHERE name='INBOX'").fetchall()
+    flags = [(subject, {flag.lower() for flag in json.loads(value)}) for subject, value in rows]
+    selected = [values for subject, values in flags if subject == "Signed full-account header 0001"]
+    if len(selected) != 1 or "\\flagged" in selected[0]:
+        raise StepError("The cache did not retain the selected message's final star state")
+    if folder != [(0,)] or any("\\seen" not in values for _, values in flags):
+        raise StepError("The IMAP cache does not record the confirmed folder read state")
+    return {"database": database.name, "cachedRows": len(rows), "folderUnread": folder[0][0]}
 
 
 def observe_folder_cache(root, phase):

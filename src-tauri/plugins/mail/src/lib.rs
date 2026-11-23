@@ -15,6 +15,7 @@ mod body_cache;
 mod commands;
 mod compose;
 mod filter_rules;
+mod flag_cache;
 mod folder_cache;
 mod imap_body_sync;
 mod imap_exchange;
@@ -83,6 +84,7 @@ fn host_config() -> HostConfig {
                 SEARCH_IMAP,
                 taomni_mail_api::FILTER_IMAP_BODIES,
                 SET_IMAP_FLAGS,
+                taomni_mail_api::imap_flag_cache::PUBLISH_IMAP_FLAG_CACHE,
                 LIST_IMAP_UNREAD,
                 taomni_mail_api::OPEN_IMAP_IDLE,
                 FETCH_IMAP_RAW,
@@ -323,6 +325,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(imap_exchange::filter_bodies(&self.io, operation, input)?)
+            }
+            taomni_mail_api::imap_flag_cache::PUBLISH_IMAP_FLAG_CACHE => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(flag_cache::serve(&self.io, operation, endpoint)?)
             }
             SET_IMAP_FLAGS => {
                 let input = serde_json::from_value(params.unwrap_or_default())

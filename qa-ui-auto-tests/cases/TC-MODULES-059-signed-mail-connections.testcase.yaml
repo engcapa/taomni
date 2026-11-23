@@ -287,7 +287,7 @@ verification:
     - {step: 68, expectation: Starred UI rows match the IMAP server's flagged UIDs.}
     - {step: 70, expectation: The selected message no longer shows a star.}
     - {step: 71, expectation: Starred UI rows still match the server after removing the flag.}
-    - {step: 76, expectation: The installed signed host and its writer lease remain active.}
+    - {step: 76, expectation: The signed host keeps its lease and the SQLite index preserves the final star and unread state.}
     results: [67, 68, 70, 71, 76]
   - id: R8
     requirement: Marking the entire inbox as read updates the actual IMAP mailbox and the cached list.
