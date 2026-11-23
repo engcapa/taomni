@@ -277,7 +277,7 @@ verification:
     - {step: 59, expectation: The IMAP server reports exactly one match in INBOX.}
     - {step: 60, expectation: The result list contains one row.}
     - {step: 61, expectation: The result row shows the newly received subject.}
-    - {step: 62, expectation: The verified Mail package and writer lease remain active.}
+    - {step: 62, expectation: The signed host holds its lease and the new header appears once in SQLite below the persisted UID watermark.}
     results: [59, 60, 61, 62]
   - id: R7
     requirement: Toggling the selected message star updates the IMAP flag and the visible message list.

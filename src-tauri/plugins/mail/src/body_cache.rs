@@ -3,7 +3,6 @@
 use rusqlite::OpenFlags;
 use taomni_mail_api::{
     body_cache::{ImapBodyCacheSource, ImapBodyPublication},
-    imap_exchange::read_body_frame,
     message::MailMessageCached,
 };
 use taomni_mail_engine::cache::{cache_body_if_current_in_transaction, upsert_message_at};
@@ -13,8 +12,7 @@ use taomni_plugin_stream::routed_tcp::Endpoint;
 use tokio::runtime::Runtime;
 
 use super::{
-    account_cache::lock_account_cache,
-    incoming::while_current,
+    account_cache::{lock_account_cache, receive_update},
     store::{apply_change, connect, unavailable, validate_account},
 };
 
@@ -23,15 +21,10 @@ pub(super) fn serve(
     operation: &Operation,
     endpoint: Endpoint,
 ) -> Result<Result<bool, String>, RpcError> {
-    let (mut peer, _) = match runtime.block_on(while_current(operation, endpoint.connect()))? {
-        Ok(connection) => connection,
+    let request = match receive_update(runtime, operation, endpoint)? {
+        Ok(request) => request,
         Err(error) => return Ok(Err(error)),
     };
-    let bytes = runtime
-        .block_on(while_current(operation, read_body_frame(&mut peer)))?
-        .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
-    let request = serde_json::from_slice(&bytes)
-        .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
     apply(request, &|| operation.check_current()).map(Ok)
 }
 

@@ -27,23 +27,37 @@ pub fn cache_sync_result(
     listed: bool,
 ) -> SqlResult<()> {
     let tx = conn.unchecked_transaction()?;
+    cache_sync_result_in_transaction(&tx, account_id, folders, messages, folder, cache, listed)?;
+    tx.commit()
+}
+
+/// Publish the network page into the transaction selected by the account writer.
+pub fn cache_sync_result_in_transaction(
+    conn: &Connection,
+    account_id: &str,
+    folders: &[MailFolder],
+    messages: &[MailMessageCached],
+    folder: &str,
+    cache: &MailCacheSettings,
+    listed: bool,
+) -> SqlResult<()> {
     for entry in folders
         .iter()
         .filter(|entry| listed || entry.name == folder)
     {
-        reset_folder_if_uid_validity_changed(&tx, entry)?;
+        reset_folder_if_uid_validity_changed(conn, entry)?;
         if listed {
-            upsert_folder(&tx, entry)?;
+            upsert_folder(conn, entry)?;
         } else {
-            upsert_folder_status(&tx, entry)?;
+            upsert_folder_status(conn, entry)?;
         }
     }
     for message in messages {
-        upsert_message(&tx, message)?;
+        upsert_message(conn, message)?;
     }
-    prune_mail_cache(&tx, account_id, folder, cache)?;
-    reindex_cached_contacts(&tx, account_id)?;
-    tx.commit()
+    prune_mail_cache(conn, account_id, folder, cache)?;
+    reindex_cached_contacts(conn, account_id)?;
+    Ok(())
 }
 
 pub fn reset_folder_if_uid_validity_changed(

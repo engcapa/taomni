@@ -1,13 +1,10 @@
 use std::collections::HashSet;
 
-use crate::{MailFolder, MailMessageHeader, now_ts};
+use crate::{MailMessageHeader, now_ts};
 
-use super::{FolderStepOutcome, FolderSyncState, MailFolderSyncResult, MailSyncRequestMode};
-
-pub struct AppliedStep {
-    pub flags_updated: usize,
-    pub folder: Option<MailFolder>,
-}
+use super::{
+    AppliedStep, FolderStepOutcome, FolderSyncState, MailFolderSyncResult, MailSyncRequestMode,
+};
 
 // ---------------------------------------------------------------------------
 // Step

@@ -26,11 +26,12 @@ mod round;
 #[cfg(feature = "imap-runtime")]
 pub use folder_step::imap_sync_folder_step;
 pub use limits::FLAG_RECONCILE_WINDOW;
-pub use model::{AppliedStep, StepParams, advance_state, step_result};
+pub use model::{StepParams, advance_state, step_result};
 #[cfg(feature = "imap-runtime")]
 pub use protocol::imap_has_capability;
 #[cfg(feature = "imap-runtime")]
 pub use round::{folder_unchanged, sync_folder_round};
+pub use taomni_mail_api::imap_index::AppliedStep;
 pub use taomni_mail_api::imap_sync::{
     BodySyncOutcome, BodySyncRequest, BodySyncTask, FolderRoundOutcome, FolderRoundRequest,
     FolderStepOutcome, FolderSyncState, HeaderPageOutcome, HeaderPageRequest, HeaderStepRequest,

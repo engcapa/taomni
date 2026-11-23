@@ -143,6 +143,7 @@ pub mod search;
 pub(crate) mod storage;
 
 mod sync;
+mod sync_cache;
 
 mod webdav;
 

@@ -138,9 +138,30 @@ pub fn apply_folder_step(
     let tx = conn.unchecked_transaction()?;
     let flags_updated = write_folder_step(&tx, account_id, outcome, cache, started_ms)?;
     tx.commit()?;
+    step_receipt(conn, account_id, &outcome.folder.name, flags_updated)
+}
+
+/// The caller owns the writer transaction and checks its operation before commit.
+pub fn apply_folder_step_in_transaction(
+    conn: &Connection,
+    account_id: &str,
+    outcome: &FolderStepOutcome,
+    cache: &MailCacheSettings,
+    started_ms: i64,
+) -> SqlResult<AppliedStep> {
+    let flags_updated = write_folder_step(conn, account_id, outcome, cache, started_ms)?;
+    step_receipt(conn, account_id, &outcome.folder.name, flags_updated)
+}
+
+fn step_receipt(
+    conn: &Connection,
+    account_id: &str,
+    folder_name: &str,
+    flags_updated: usize,
+) -> SqlResult<AppliedStep> {
     let folder = super::list_cached_folders(conn, account_id)?
         .into_iter()
-        .find(|folder| folder.name == outcome.folder.name);
+        .find(|folder| folder.name == folder_name);
     Ok(AppliedStep {
         flags_updated,
         folder,
@@ -159,14 +180,27 @@ pub fn apply_folder_round(
     server_error: Option<&str>,
 ) -> SqlResult<()> {
     let tx = conn.unchecked_transaction()?;
-    upsert_folder_status(&tx, folder)?;
+    apply_folder_round_in_transaction(&tx, folder, steps, cache, started_ms, server_error)?;
+    tx.commit()
+}
+
+/// Apply the metadata, completed steps and final error in the caller's transaction.
+pub fn apply_folder_round_in_transaction(
+    conn: &Connection,
+    folder: &MailFolder,
+    steps: &[FolderStepOutcome],
+    cache: &MailCacheSettings,
+    started_ms: i64,
+    server_error: Option<&str>,
+) -> SqlResult<()> {
+    upsert_folder_status(conn, folder)?;
     for step in steps {
-        write_folder_step(&tx, &folder.account_id, step, cache, started_ms)?;
+        write_folder_step(conn, &folder.account_id, step, cache, started_ms)?;
     }
     if let Some(error) = server_error {
-        record_folder_error(&tx, &folder.account_id, &folder.name, error)?;
+        record_folder_error(conn, &folder.account_id, &folder.name, error)?;
     }
-    tx.commit()
+    Ok(())
 }
 
 fn write_folder_step(

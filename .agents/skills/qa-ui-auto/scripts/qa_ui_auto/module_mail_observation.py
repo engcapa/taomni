@@ -139,6 +139,13 @@ def run(ctx, args):
             signed["filter"] = report["filter"]
         elif report["filter"] != signed.get("filter"):
             raise StepError("Disabling Mail changed the saved filter")
+    if phase == "imap-search" and owner.case_id == "TC-MODULES-059":
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        if "mail/publish-imap-index" not in manifest["commands"]:
+            raise StepError("The installed Mail host does not publish the IMAP header index")
+        report["imapIndex"] = observe_imap_index(
+            plugins.parent / "mail-cache", "Signed full-account header 0001"
+        )
     if phase == "imap-prefetch":
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
         if "mail/publish-imap-body-cache" not in manifest["commands"]:
@@ -171,6 +178,28 @@ def run(ctx, args):
             signed["queuedDraft"] = observation
     (ctx.case_dir / f"signed-mail-{phase}.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return f"Mail {version} host lease verified ({phase})"
+
+
+def observe_imap_index(root, subject):
+    databases = sorted(root.glob("*.db"))
+    if len(databases) != 1:
+        raise StepError(f"Expected one IMAP header index, found {len(databases)}")
+    database = databases[0]
+    ordinary(database)
+    with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as conn:
+        rows = conn.execute(
+            """SELECT m.uid, f.sync_high_uid, f.uid_validity
+               FROM mail_messages AS m
+               JOIN mail_folders AS f ON f.account_id=m.account_id AND f.name=m.folder
+               WHERE m.folder='INBOX' AND m.subject=?""",
+            (subject,),
+        ).fetchall()
+    if len(rows) != 1:
+        raise StepError(f"The synchronized header was stored {len(rows)} times")
+    uid, high, validity = rows[0]
+    if high is None or high < uid or validity is None:
+        raise StepError("The synchronized header and folder watermark disagree")
+    return {"database": database.name, "uid": uid, "highUid": high, "uidValidity": validity}
 
 
 def observe_folder_cache(root, phase):

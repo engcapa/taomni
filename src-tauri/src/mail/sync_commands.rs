@@ -1,9 +1,7 @@
+use super::{sync_cache::ImapIndexWriter, *};
 use taomni_mail_api::imap_sync::{
     FolderRoundOutcome, FolderRoundRequest, HeaderPageOutcome, HeaderPageRequest,
 };
-use taomni_mail_engine::cache::apply_folder_round;
-
-use super::*;
 
 /// Sync headers for one folder.
 ///
@@ -27,6 +25,7 @@ pub async fn mail_sync_headers(
     let cache_enabled = account.config.cache.enabled;
     let cache_settings = account.config.cache.clone();
     let account_id = account.config.session_id.clone();
+    let writer = ImapIndexWriter::new(&state, &account_id, &cache_settings);
     let offset = offset.unwrap_or(0);
     let limit = limit
         .unwrap_or(account.config.sync.max_fetch_per_sync)
@@ -75,22 +74,12 @@ pub async fn mail_sync_headers(
         has_more,
     } = outcome;
     let folders = folders_for_header_sync(folders.unwrap_or(cached_folders), selected.clone());
-    let (folders, selected, messages) = if cache_enabled {
-        with_mail_db_async(&state, &account_id, move |db, account_id| {
-            cache_sync_result(
-                db,
-                &account_id,
-                &folders,
-                &messages,
-                &selected.name,
-                &cache_settings,
-                do_list,
-            )?;
-            Ok((folders, selected, messages))
-        })
-        .await?
+    let (folders, messages) = if cache_enabled {
+        writer
+            .page(folders, messages, selected.name.clone(), do_list)
+            .await?
     } else {
-        (folders, selected, messages)
+        (folders, messages)
     };
 
     tracing::debug!(
@@ -185,6 +174,7 @@ pub async fn mail_sync_folder(
     let cache_enabled = account.config.cache.enabled;
     let cache_settings = account.config.cache.clone();
     let account_id = account.config.session_id.clone();
+    let writer = ImapIndexWriter::new(&state, &account_id, &cache_settings);
     let params = StepParams {
         request: mode.unwrap_or_default(),
         limit: limit
@@ -266,11 +256,7 @@ pub async fn mail_sync_folder(
         Ok(outcome) => outcome,
         Err(e) => {
             if cache_enabled {
-                let error = e.clone();
-                let _ = with_mail_db_async(&state, &account_id, move |db, account_id| {
-                    sync::record_folder_error(db, account_id, &folder, &error)
-                })
-                .await;
+                let _ = writer.record_failure(folder, e.clone()).await;
             }
             return Err(e);
         }
@@ -280,12 +266,7 @@ pub async fn mail_sync_folder(
         outcome.more = false;
         return Ok(sync::step_result(&account_id, outcome, None));
     }
-    with_mail_db_async(&state, &account_id, move |db, account_id| {
-        let applied =
-            sync::apply_folder_step(db, account_id, &outcome, &cache_settings, started_ms)?;
-        Ok(sync::step_result(account_id, outcome, Some(applied)))
-    })
-    .await
+    writer.step(outcome, started_ms).await
 }
 
 /// Refresh the folder tree and run one catch-up (plus reconcile) step for
@@ -306,6 +287,7 @@ pub async fn mail_sync_all_folders(
     let cache_enabled = account.config.cache.enabled;
     let cache_settings = account.config.cache.clone();
     let account_id = account.config.session_id.clone();
+    let writer = ImapIndexWriter::new(&state, &account_id, &cache_settings);
     let limit = limit
         .unwrap_or(account.config.sync.max_fetch_per_sync)
         .clamp(1, 2000) as usize;
@@ -391,19 +373,9 @@ pub async fn mail_sync_all_folders(
             });
         }
         if cache_enabled {
-            let cache_settings = cache_settings.clone();
-            let metadata = folder.clone();
-            with_mail_db_async(&state, &account_id, move |db, _| {
-                apply_folder_round(
-                    db,
-                    &metadata,
-                    &outcomes,
-                    &cache_settings,
-                    started_ms,
-                    error.as_deref(),
-                )
-            })
-            .await?;
+            writer
+                .round(folder.clone(), outcomes, started_ms, error)
+                .await?;
         }
         tokio::task::yield_now().await;
     }

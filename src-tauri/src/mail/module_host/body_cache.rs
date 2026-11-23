@@ -3,14 +3,11 @@
 use std::sync::Arc;
 
 use taomni_mail_api::{
-    HOST_REQUEST_TIMEOUT,
     body_cache::{ImapBodyCacheSource, ImapBodyPublication, PUBLISH_IMAP_BODY_CACHE},
-    imap_exchange::write_body_frame,
     message::MailMessageCached,
 };
-use taomni_plugin_stream::routed_tcp::Route;
 
-use super::{PluginRegistry, invoke, supports};
+use super::{PluginRegistry, cache_publication, supports};
 use crate::{mail::cache_access::canonical_cache_database, state::MailDbHandle};
 
 pub(in crate::mail) fn publishes_body_cache(registry: &PluginRegistry) -> bool {
@@ -39,19 +36,6 @@ pub(in crate::mail) async fn publish_body_cache(
     })
     .await
     .map_err(|error| error.to_string())??;
-    let (_route, endpoint, mut peer) = Route::pair().await.map_err(|error| error.to_string())?;
-    let send = async {
-        write_body_frame(&mut peer, &request)
-            .await
-            .map_err(|error| error.to_string())
-    };
-    let (applied, ()) = tokio::time::timeout(HOST_REQUEST_TIMEOUT, async {
-        tokio::try_join!(
-            invoke::<bool, _>(registry, PUBLISH_IMAP_BODY_CACHE, endpoint),
-            send
-        )
-    })
-    .await
-    .map_err(|_| "Mail body cache update timed out".to_owned())??;
+    let applied = cache_publication::send(registry, PUBLISH_IMAP_BODY_CACHE, request).await?;
     Ok((applied, message))
 }
