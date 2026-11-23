@@ -453,7 +453,7 @@ def make_plan(args, *, cases=None, features=None) -> dict:
     from .ci_sharding import schedule
     entries, groups, builds = schedule(entries, by_id, dependencies, scope=scope,
         shards=getattr(args, "shards", "auto"), browser_workers=getattr(args, "browser_workers", 2),
-        use_signed_mail=bool(installation))
+        modular_release=bool(installation))
     if installation_profile == "full":
         for entry in entries:
             if entry["mode"] == "native":

@@ -175,7 +175,13 @@ def requires_signed_mail(capabilities: list[str]) -> bool:
     return "signed-mail" in capabilities and "legacy-mail-imap" not in capabilities
 
 
-def recipe_identity(*, signed_mail: bool = False) -> str:
+def module_build_options(capabilities: list[str]) -> dict[str, bool]:
+    modular_release = "modular-release" in capabilities
+    return {"signed_mail": not modular_release and requires_signed_mail(capabilities),
+            "modular_release": modular_release}
+
+
+def recipe_identity(*, signed_mail: bool = False, modular_release: bool = False) -> str:
     try:
         config_rel = str(QA_CONFIG.relative_to(ROOT)).replace("\\", "/")
     except ValueError:
@@ -184,25 +190,28 @@ def recipe_identity(*, signed_mail: bool = False) -> str:
         ROOT,
         [config_rel, ".agents/skills/qa-ui-auto/scripts/native_build.py"],
     )
+    if modular_release:
+        return hashlib.sha256(f"{recipe}:modular-release".encode()).hexdigest()
     if signed_mail:
         return hashlib.sha256(f"{recipe}:signed-mail".encode()).hexdigest()
     return recipe
 
 
 def reusable_cache_key(*, platform_key: str, arch: str, runner: str, profile: str,
-                       signed_mail: bool = False) -> str:
+                       signed_mail: bool = False, modular_release: bool = False) -> str:
+    recipe = recipe_identity(signed_mail=signed_mail, modular_release=modular_release)
     return (
         f"runtime-reuse-v1-{platform_key}-{arch.lower()}-{runner}-{profile}-"
-        f"{source_identity(ROOT)[:16]}-{recipe_identity(signed_mail=signed_mail)[:16]}"
+        f"{source_identity(ROOT)[:16]}-{recipe[:16]}"
     )
 
 
 def build_inputs(*, release: bool = False, env: dict[str, str] | None = None,
-                 signed_mail: bool = False) -> dict:
+                 signed_mail: bool = False, modular_release: bool = False) -> dict:
     effective_env = configured_environment(env)
     return {
         "source_sha256": source_identity(ROOT),
-        "recipe_sha256": recipe_identity(signed_mail=signed_mail),
+        "recipe_sha256": recipe_identity(signed_mail=signed_mail, modular_release=modular_release),
         "platform": stable_platform(),
         "profile": "release" if release else "debug",
         "cargo": subprocess.check_output(["cargo", "--version"], text=True, env=effective_env).strip(),
@@ -253,16 +262,17 @@ def check_build(*, release: bool = False, inputs: dict | None = None) -> dict:
 
 
 @contextmanager
-def tauri_config_path(*, signed_mail: bool):
+def tauri_config_path(*, signed_mail: bool = False, modular_release: bool = False):
     overlay = json.loads(QA_CONFIG.read_text(encoding="utf-8"))
     if overlay.get("identifier") != QA_APP_ID or overlay.get("mainBinaryName") != "taomni":
         raise ValueError("QA overlay must declare the independent QA ID and taomni binary name")
-    if not signed_mail:
+    if not (signed_mail or modular_release):
         yield QA_CONFIG, overlay["build"].get("features", [])
         return
+    exclude = "legacy-" if modular_release else "legacy-mail-"
     features = [
         feature for feature in overlay["build"]["features"]
-        if feature not in {"legacy-mail-imap", "legacy-mail-pop3", "legacy-mail-smtp"}
+        if not feature.startswith(exclude)
     ]
     overlay["build"]["features"] = features
     # pnpm.cmd forwards the config argument through cmd.exe on Windows.
@@ -273,7 +283,8 @@ def tauri_config_path(*, signed_mail: bool):
         yield path, features
 
 
-def build_qa(*, release: bool = False, force: bool = False, signed_mail: bool = False) -> Path:
+def build_qa(*, release: bool = False, force: bool = False, signed_mail: bool = False,
+             modular_release: bool = False) -> Path:
     pnpm = shutil.which("pnpm")
     if not pnpm:
         raise ValueError("pnpm not found on PATH")
@@ -282,7 +293,8 @@ def build_qa(*, release: bool = False, force: bool = False, signed_mail: bool = 
     binary = qa_binary(release=release)
     record_path = identity_path(binary)
     env = configured_environment()
-    inputs = build_inputs(release=release, env=env, signed_mail=signed_mail)
+    module_options = {"signed_mail": signed_mail, "modular_release": modular_release}
+    inputs = build_inputs(release=release, env=env, **module_options)
     if not force:
         reuse = check_build(release=release, inputs=inputs)
         if reuse["reusable"]:
@@ -313,7 +325,7 @@ def build_qa(*, release: bool = False, force: bool = False, signed_mail: bool = 
         probe.append("--release")
     normalize_vendored_cargo_sources()
     started = time.monotonic()
-    with tauri_config_path(signed_mail=signed_mail) as (config, features):
+    with tauri_config_path(**module_options) as (config, features):
         command = [
             pnpm, "tauri", "build", "--no-bundle", "--config", str(config),
             "--ignore-version-mismatches",
@@ -331,7 +343,7 @@ def build_qa(*, release: bool = False, force: bool = False, signed_mail: bool = 
             helper.append("--release")
         subprocess.run(helper, cwd=ROOT, env=env, check=True)
         tool_hashes[key] = binary_digest(binary.with_name(f"{name}{suffix}"))
-    if inputs != build_inputs(release=release, env=env, signed_mail=signed_mail):
+    if inputs != build_inputs(release=release, env=env, **module_options):
         raise ValueError("Build inputs changed during compilation; rebuild before collecting evidence")
     record = {
         "identifier": QA_APP_ID,

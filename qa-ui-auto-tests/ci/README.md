@@ -29,6 +29,7 @@ For the modular release crash regressions, select `scope=selected`,
 `tags=crash-regression`, `modes=browser,native` and `native_release=true`.
 Run the same source with `module_profile=core-only` and
 `module_profile=full`. Supply `first_release_run` for the full native profile.
+Both native profiles use the release QA build without legacy module features.
 The selection lists the cases that require a plugin in the core-only profile.
 The browser cases use the matching preview registry. Each full native shard
 installs the signed release packages with the product verifier, restores that

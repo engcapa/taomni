@@ -60,7 +60,7 @@ def split_signed_mail(entry, by_id, dependencies, capabilities):
 
 
 def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_workers=2, costs=None,
-             use_signed_mail=False):
+             modular_release=False):
     from .ci import capabilities
     if shards != 'auto' and (not str(shards).isdigit() or not 1 <= int(shards) <= 8):
         raise ValueError('shards must be auto or an integer from 1 to 8')
@@ -70,7 +70,7 @@ def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_work
         costs = json.loads(COSTS.read_text(encoding='utf-8'))['entries'] if COSTS.exists() else {}
     scheduled, groups = [], []
     selected_entries = entries
-    if scope == 'selected':
+    if scope == 'selected' and not modular_release:
         selected_entries = [variant for entry in entries
                             for variant in split_signed_mail(entry, by_id, dependencies, capabilities)]
     for entry in selected_entries:
@@ -134,9 +134,11 @@ def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_work
             shard['signed_mail_build'] = scope == 'selected' and (
                 'signed-mail' in entry['capabilities'] and 'legacy-mail-imap' not in entry['capabilities']
             )
-            if use_signed_mail and entry['mode'] == 'native':
-                shard['capabilities'] = [cap for cap in shard['capabilities'] if cap != 'legacy-mail-imap']
-                shard['signed_mail_build'] = True
+            if modular_release and entry['mode'] == 'native':
+                shard['capabilities'] = sorted(
+                    {'modular-release'} | {cap for cap in shard['capabilities'] if not cap.startswith('legacy-')}
+                )
+                shard['signed_mail_build'] = False
             shard['case_digests'] = {cid: entry['case_digests'][cid] for cid in assigned}
             shard['rdp_unit_contracts'] = entry['rdp_unit_contracts'] and index == 0
             scheduled.append(shard)
@@ -154,7 +156,9 @@ def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_work
             continue
         profile = 'release' if 'release' in entry['capabilities'] else 'debug'
         key = f"native-build-{entry['platform_key']}-{entry['arch'].lower()}-{profile}"
-        if entry['signed_mail_build']:
+        if modular_release:
+            key += '-modular'
+        elif entry['signed_mail_build']:
             key += '-signed-mail'
         entry['build_id'] = key
         if key not in builds:
@@ -164,8 +168,6 @@ def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_work
                                    linux_wrapper='', desktop={}, cache_key='ubuntu-22.04-x11')
         build = builds[key]
         build['capabilities'] = sorted(set(build['capabilities']) | set(entry['capabilities']))
-        if use_signed_mail:
-            build['capabilities'] = sorted(set(build['capabilities']) | {'signed-mail'})
         build['rdp_unit_contracts'] |= entry['rdp_unit_contracts']
     return scheduled, groups, list(builds.values())
 

@@ -25,6 +25,17 @@ class BuildCheckTest(unittest.TestCase):
         self.assertFalse(path.exists())
         self.assertEqual(json.loads(native_build.QA_CONFIG.read_text(encoding="utf-8")), original)
 
+    def test_modular_release_has_no_legacy_features_and_its_own_recipe(self):
+        options = native_build.module_build_options(["signed-mail", "modular-release"])
+        self.assertEqual(options, {"signed_mail": False, "modular_release": True})
+        with native_build.tauri_config_path(**options) as (path, features):
+            overlay = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(overlay["identifier"], native_build.QA_APP_ID)
+            self.assertEqual(overlay["build"]["features"], features)
+            self.assertFalse(any(feature.startswith("legacy-") for feature in features))
+        recipe = native_build.recipe_identity(**options)
+        self.assertNotIn(recipe, [native_build.recipe_identity(), native_build.recipe_identity(signed_mail=True)])
+
     def test_check_never_builds_and_reports_changed_inputs_without_values(self):
         with tempfile.TemporaryDirectory() as directory:
             binary = Path(directory) / "taomni.exe"

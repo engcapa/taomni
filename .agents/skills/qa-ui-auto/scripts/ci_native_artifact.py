@@ -32,9 +32,7 @@ def build_entry(selection, build_id):
 
 
 def build_recipe(entry):
-    return native_build.recipe_identity(
-        signed_mail=native_build.requires_signed_mail(entry.get('capabilities', []))
-    )
+    return native_build.recipe_identity(**native_build.module_build_options(entry.get('capabilities', [])))
 
 
 def allowed(name, profile):
@@ -235,7 +233,7 @@ def main():
     if not reused:
         native_build.build_qa(
             release=entry['profile'] == 'release',
-            signed_mail=native_build.requires_signed_mail(entry.get('capabilities', [])),
+            **native_build.module_build_options(entry.get('capabilities', [])),
         )
         if args.reusable_archive:
             export_reusable(args.reusable_archive, selection, entry)

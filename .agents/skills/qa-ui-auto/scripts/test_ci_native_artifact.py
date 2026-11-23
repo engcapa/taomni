@@ -140,7 +140,7 @@ class NativeArtifactTests(unittest.TestCase):
                                 '--build', self.build['id'], '--archive', str(self.archive),
                                 '--reusable-archive', str(reusable)]):
             runtime.main()
-            build_qa.assert_called_once_with(release=False, signed_mail=False)
+            build_qa.assert_called_once_with(release=False, signed_mail=False, modular_release=False)
         self.assertTrue(reusable.is_file())
         self.binary.unlink()
         self.sidecar.unlink()

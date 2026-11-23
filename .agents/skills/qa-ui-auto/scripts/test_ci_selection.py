@@ -35,7 +35,8 @@ class ModuleProfileSelectionTests(unittest.TestCase):
         self.assertEqual(core["gaps"], [])
         self.assertEqual(full["gaps"], [])
         self.assertEqual([b["id"] for b in core["builds"]], [b["id"] for b in full["builds"]])
-        self.assertTrue(all(b["id"].endswith("-release-signed-mail") for b in full["builds"]))
+        self.assertTrue(all(b["id"].endswith("-release-modular") for b in full["builds"]))
+        self.assertTrue(all("modular-release" in b["capabilities"] for b in full["builds"]))
         excludes = [entry for entry in core["not_applicable"] if "requires_plugin" in entry]
         self.assertEqual(len(excludes), 6)
         self.assertTrue(all(e["case"] == "TC-FILE-OPEN-047" and e["requires_plugin"] == "mail" for e in excludes))

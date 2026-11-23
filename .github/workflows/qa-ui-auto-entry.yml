@@ -96,13 +96,13 @@ jobs:
           python - <<'PYTHON'
           import json
           import os
-          from native_build import requires_signed_mail, reusable_cache_key
+          from native_build import module_build_options, reusable_cache_key
           key = reusable_cache_key(
               platform_key=os.environ["QA_PLATFORM_KEY"],
               arch=os.environ["QA_ARCH"],
               runner=os.environ["QA_RUNNER"],
               profile=os.environ["QA_PROFILE"],
-              signed_mail=requires_signed_mail(json.loads(os.environ["QA_BUILD_CAPABILITIES"])),
+              **module_build_options(json.loads(os.environ["QA_BUILD_CAPABILITIES"])),
           )
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"key={key}\n")
