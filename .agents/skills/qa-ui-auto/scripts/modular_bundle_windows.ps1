@@ -81,12 +81,12 @@ public static class TaomniPackageRuntimeLoader {
   $treeJson = & python (Join-Path $PSScriptRoot 'modular_bundle_inventory.py') sample-tree --root $app.DirectoryName
   if ($LASTEXITCODE -ne 0) { throw 'Could not inventory the extracted MSI payload' }
   $tree = $treeJson | ConvertFrom-Json -AsHashtable
-  $argumentJson = & python (Join-Path $PSScriptRoot 'modular_bundle_inventory.py') retired-module-arguments --executable $app.FullName
-  if ($LASTEXITCODE -ne 0) { throw 'Could not scan the MSI executable for retired module arguments' }
+  $argumentJson = & python (Join-Path $PSScriptRoot 'modular_bundle_inventory.py') module-reexec-arguments --executable $app.FullName
+  if ($LASTEXITCODE -ne 0) { throw 'Could not scan the MSI executable for module re-exec arguments' }
   $result = [ordered]@{
     scope = 'msi-administrative-payload'
     executableSha256 = (Get-FileHash -LiteralPath $app.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-    retiredModuleArguments = ($argumentJson | ConvertFrom-Json -AsHashtable)
+    moduleReexecArguments = ($argumentJson | ConvertFrom-Json -AsHashtable)
     productVersion = $app.VersionInfo.ProductVersion
     architecture = 'x86_64'
     isolatedRuntimeLoads = $present

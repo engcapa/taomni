@@ -10,8 +10,8 @@ import tempfile
 import unittest
 
 from modular_bundle_inventory import (
-    RETIRED_MODULE_ARGUMENTS, digest, inventory, plan_targets, record_payload_receipt,
-    retired_module_arguments, tree_sample, validate_payload, validate_source,
+    MODULE_REEXEC_ARGUMENTS, digest, inventory, module_reexec_arguments, plan_targets,
+    record_payload_receipt, tree_sample, validate_payload, validate_source,
 )
 from modular_bundle_macos import app_identity, extract_updater
 
@@ -163,7 +163,7 @@ class BundleFileTests(unittest.TestCase):
         raw = self.root / 'linux-payload.json'
         evidence = {
             'payload': sample, 'executableSha256': digest(executable),
-            'retiredModuleArguments': retired_module_arguments(executable),
+            'moduleReexecArguments': module_reexec_arguments(executable),
         }
         raw.write_text(json.dumps(evidence))
         record_payload_receipt('linux-x86_64', self.root)
@@ -173,21 +173,31 @@ class BundleFileTests(unittest.TestCase):
         self.assertEqual(receipt['rawSha256'], digest(raw))
         self.assertEqual(receipt['package'], next(f for f in baseline['files'] if f['name'].endswith('.deb')))
         self.assertEqual(receipt['executableSha256'], digest(executable))
-        self.assertEqual(receipt['retiredModuleArguments'], dict.fromkeys(RETIRED_MODULE_ARGUMENTS, False))
+        self.assertEqual(receipt['moduleReexecArguments'], dict.fromkeys(MODULE_REEXEC_ARGUMENTS, False))
         raw.write_text(json.dumps({**evidence, 'payload': {**sample, 'files': sample['files'][1:]}}))
         with self.assertRaisesRegex(ValueError, 'incomplete'):
             record_payload_receipt('linux-x86_64', self.root)
         raw.write_text(json.dumps({**evidence, 'executableSha256': '0' * 64}))
         with self.assertRaisesRegex(ValueError, 'inventoried executable'):
             record_payload_receipt('linux-x86_64', self.root)
-        for argument in RETIRED_MODULE_ARGUMENTS:
-            executable.write_bytes(b'\0' + argument.encode('ascii') + b'\0')
-            raw.write_text(json.dumps({
-                'payload': tree_sample(payload), 'executableSha256': digest(executable),
-                'retiredModuleArguments': retired_module_arguments(executable),
-            }))
-            with self.subTest(argument=argument), self.assertRaisesRegex(ValueError, argument):
-                record_payload_receipt('linux-x86_64', self.root)
+        raw.write_text(json.dumps({**evidence, 'moduleReexecArguments': {}}))
+        with self.assertRaisesRegex(ValueError, 'complete module re-exec argument scan'):
+            record_payload_receipt('linux-x86_64', self.root)
+        executable.write_bytes(b'\0--vnc-special-key-hook\0')
+        raw.write_text(json.dumps({
+            'payload': tree_sample(payload), 'executableSha256': digest(executable),
+            'moduleReexecArguments': module_reexec_arguments(executable),
+        }))
+        with self.assertRaisesRegex(ValueError, '--vnc-special-key-hook'):
+            record_payload_receipt('linux-x86_64', self.root)
+        executable.write_bytes(b'\0--sockscap-redirector-bridge\0')
+        raw.write_text(json.dumps({
+            'payload': tree_sample(payload), 'executableSha256': digest(executable),
+            'moduleReexecArguments': module_reexec_arguments(executable),
+        }))
+        record_payload_receipt('linux-x86_64', self.root)
+        receipt = json.loads((self.root / 'core-payload-receipt.json').read_text())
+        self.assertTrue(receipt['moduleReexecArguments']['--sockscap-redirector-bridge'])
 
     def test_macos_and_windows_use_their_actual_package_families(self):
         targets = {

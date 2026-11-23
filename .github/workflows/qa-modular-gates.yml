@@ -111,14 +111,21 @@ jobs:
           done
           git ls-files src-tauri/resources > gate-inventory/resource-sources.txt
           git ls-files src-tauri/tauri.conf.json 'src-tauri/tauri.*.conf.json' > gate-inventory/bundle-configs.txt
-          git grep -n -E -- '"--(headless|vnc-special-key-hook|sockscap-redirector-bridge)"' \
-            -- src-tauri/src src-tauri/plugins > gate-inventory/entrypoints.txt || test "$?" -eq 1
+          git grep -n -E -- '"--(headless|ssh-stdio-forward|screenshot-scroll-input|vnc-special-key-hook|sockscap-redirector-bridge)"|REDIRECTOR_BRIDGE_ARG|taomni-vnc-key-helper\.exe' \
+            -- src-tauri/src src-tauri/plugins src-tauri/crates/taomni-sockscap-api > gate-inventory/entrypoints.txt
       - name: Check that the default core dependency graph excludes remote desktop and Screenshot modules
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           import json
+
+          core_entry = Path("src-tauri/src/main.rs").read_text()
+          for argument in ("--headless", "--ssh-stdio-forward", "--screenshot-scroll-input"):
+              assert f'"{argument}"' in core_entry, f"Missing core entrypoint {argument}"
+          for entry in ("--vnc-special-key-hook", "--sockscap-redirector-bridge", "REDIRECTOR_BRIDGE_ARG"):
+              assert entry not in core_entry, f"The core dispatches the module entrypoint {entry}"
+          assert "REDIRECTOR_BRIDGE_ARG" in Path("src-tauri/plugins/sockscap/src/main.rs").read_text()
 
           for target in ("x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc",
                          "aarch64-apple-darwin", "x86_64-apple-darwin"):

@@ -25,7 +25,7 @@ TARGETS = {
 RUNNERS = {'linux-x86_64': 'ubuntu-22.04', 'windows-x86_64': 'windows-latest',
            'darwin-aarch64': 'macos-15', 'darwin-x86_64': 'macos-15-intel'}
 
-RETIRED_MODULE_ARGUMENTS = ('--vnc-special-key-hook', '--sockscap-redirector-bridge')
+MODULE_REEXEC_ARGUMENTS = ('--vnc-special-key-hook', '--sockscap-redirector-bridge')
 
 
 def plan_targets(value: str, *, upgrade_desktop: bool = False, macos_arm_runner: str = 'macos-15') -> dict:
@@ -146,10 +146,10 @@ def tree_sample(root: Path) -> dict:
             'symlinks': links}
 
 
-def retired_module_arguments(executable: Path) -> dict:
+def module_reexec_arguments(executable: Path) -> dict[str, bool]:
     with executable.open('rb') as stream, mmap(stream.fileno(), 0, access=ACCESS_READ) as contents:
         return {argument: contents.find(argument.encode('ascii')) >= 0
-                for argument in RETIRED_MODULE_ARGUMENTS}
+                for argument in MODULE_REEXEC_ARGUMENTS}
 
 
 def validate_payload(target: str, evidence: dict) -> None:
@@ -199,9 +199,14 @@ def record_payload_receipt(target: str, directory: Path) -> None:
     executable = matching[0] if len(matching) == 1 else None
     if not executable or executable['sha256'] != executable_hash:
         raise ValueError('core entrypoint scan does not identify the inventoried executable')
-    retired = evidence.get('retiredModuleArguments')
-    if retired != dict.fromkeys(RETIRED_MODULE_ARGUMENTS, False):
-        raise ValueError(f'core executable still declares a retired module argument or lacks a complete scan: {retired}')
+    arguments = evidence.get('moduleReexecArguments')
+    if (not isinstance(arguments, dict) or arguments.keys() != set(MODULE_REEXEC_ARGUMENTS)
+            or any(type(present) is not bool for present in arguments.values())):
+        raise ValueError('core executable lacks a complete module re-exec argument scan')
+    if arguments['--vnc-special-key-hook']:
+        raise ValueError('core executable contains the retired --vnc-special-key-hook argument')
+    # The macOS core passes the bridge argument to the verified SocksCap host.
+    # Its presence in the executable records that string, not a core handler.
 
     baseline = json.loads((directory / 'bundle-baseline.json').read_text(encoding='utf-8'))
     if baseline['target'] != target:
@@ -215,7 +220,7 @@ def record_payload_receipt(target: str, directory: Path) -> None:
         'toolingSource': baseline['toolingSource'], 'runner': runner,
         'rawArtifact': f'modular-bundle-{target}-{baseline["producerRun"]}/{name}',
         'rawSha256': digest(raw), 'regularFiles': len(files),
-        'executableSha256': executable_hash, 'retiredModuleArguments': retired,
+        'executableSha256': executable_hash, 'moduleReexecArguments': arguments,
     })
 
 
@@ -242,7 +247,7 @@ def linux_metadata(directory: Path, output: Path, version: str) -> dict:
             raise ValueError('expected an actual taomni executable in Debian payload')
         write_json(output / 'linux-payload.json', {
             'scope': 'deb-extracted-payload', 'executableSha256': digest(binary),
-            'retiredModuleArguments': retired_module_arguments(binary),
+            'moduleReexecArguments': module_reexec_arguments(binary),
             'payload': tree_sample(payload), 'applicationLaunched': False,
             'installedUpgradeEstablished': False, 'systemTrustEstablished': False,
         })
@@ -264,7 +269,7 @@ def main() -> None:
     payload.add_argument('--directory', type=Path, required=True)
     tree = commands.add_parser('sample-tree')
     tree.add_argument('--root', type=Path, required=True)
-    entrypoints = commands.add_parser('retired-module-arguments')
+    entrypoints = commands.add_parser('module-reexec-arguments')
     entrypoints.add_argument('--executable', type=Path, required=True)
     validate = commands.add_parser('validate-source')
     for key in ('run', 'artifacts', 'out', 'github-output'):
@@ -293,8 +298,8 @@ def main() -> None:
     if args.command == 'sample-tree':
         print(json.dumps(tree_sample(args.root)))
         return
-    if args.command == 'retired-module-arguments':
-        print(json.dumps(retired_module_arguments(args.executable)))
+    if args.command == 'module-reexec-arguments':
+        print(json.dumps(module_reexec_arguments(args.executable)))
         return
     if args.command == 'validate-payload':
         record_payload_receipt(args.target, args.directory)
