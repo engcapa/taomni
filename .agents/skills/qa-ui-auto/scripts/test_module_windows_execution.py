@@ -69,6 +69,9 @@ class WindowsExecutionGateTests(unittest.TestCase):
         artifacts.mkdir()
         harness = artifacts / "harness.exe"
         harness.write_bytes(b"inert-harness")
+        manifest = root / "src-tauri/plugins/mfa/module.json"
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text('{"version":"0.1.2"}', encoding="utf-8")
         for name in ["taomni-hello-plugin.exe", "taomni-plugin-mfa.exe"]:
             path = root / "src-tauri/target/debug" / name
             path.parent.mkdir(parents=True, exist_ok=True)

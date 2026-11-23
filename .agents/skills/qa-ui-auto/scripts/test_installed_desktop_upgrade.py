@@ -11,9 +11,9 @@ import unittest
 from unittest.mock import MagicMock, Mock, patch
 
 from installed_desktop_mode_lease import check_mode_lease, reserve_default_profile
-from installed_desktop_mfa_crash import observe_abrupt_exit
-from installed_desktop_upgrade import require_registration, select_candidate
-from installed_macos_host_signature import require_hardened_signature
+from installed_desktop_mfa_crash import observe_abrupt_exit, verify_crash_recovery
+from installed_desktop_upgrade import exercise_desktop_contracts, require_registration, select_candidate
+from installed_macos_host_signature import require_fixed_signature
 from installed_macos_permissions import compare_permissions, observe_hosted_screen_scan
 from installed_windows_mfa import verify_mfa_controls
 from modular_bundle_inventory import plan_targets
@@ -52,6 +52,39 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
                          {"windows-x86_64", "darwin-x86_64", "darwin-aarch64"})
         with self.assertRaisesRegex(ValueError, "supported package targets"):
             plan_targets("linux-x86_64", upgrade_desktop=True)
+
+    def test_first_release_uses_the_same_profile_and_roster_for_installed_host_checks(self):
+        profile = Path("enrolled-profile")
+        receipt = {"profile": str(profile)}
+        roster = object()
+        lease = {"desktopOwnerPid": 19}
+        permission = {"screenRecording": "granted", "accessibility": "granted", "requirement": "fixed"}
+        stages = {
+            "firstBusinessInstall": {"stages": {"reopen-without-mail": {"desktopModeLease": lease}}},
+            "originalPermissions": permission,
+        }
+        args = SimpleNamespace(signed=None, macos_hardened_mfa=False)
+        recovered = {"passed": True}
+        with patch("installed_desktop_upgrade.platform.system", return_value="Darwin"), patch(
+            "installed_desktop_upgrade.finish_first_release_mode_lease", return_value=receipt,
+        ) as mode, patch("installed_desktop_upgrade.check_mode_lease") as fresh_mode, patch(
+            "installed_desktop_upgrade.observe_permissions", return_value=permission,
+        ), patch("installed_desktop_upgrade.verify_crash_recovery", return_value=recovered) as crash, patch(
+            "installed_desktop_upgrade.observe_hosted_screen_scan", return_value={"passed": True},
+        ) as screen:
+            recovery_error, permission_error = exercise_desktop_contracts(
+                "app", profile, stages, args, {"producerSource": "source"}, "work", "evidence", None,
+                first_release=roster,
+            )
+        self.assertIsNone(recovery_error)
+        self.assertIsNone(permission_error)
+        fresh_mode.assert_not_called()
+        mode.assert_called_once_with("app", "work", "evidence", lease)
+        crash.assert_called_once_with(
+            "app", profile, None, "source", "evidence", "work", macos_hardened_mfa=False, first_release=roster,
+        )
+        screen.assert_called_once_with("app", "evidence", recovered)
+        self.assertTrue(stages["permissionContinuity"]["retainedBothGrants"])
 
     def test_windows_retries_inspection_after_timeout_with_one_msi_install(self):
         with TemporaryDirectory() as directory:
@@ -104,18 +137,22 @@ class InstalledHardenedSignatureTests(unittest.TestCase):
         leaf = b"fixed-certificate"
         fingerprint = hashlib.sha1(leaf, usedforsecurity=False).hexdigest().upper()
         details = "Executable=/Applications/Taomni.app\nCodeDirectory v=20500 size=320 flags=0x10000(runtime) hashes=5+3\n"
-        self.assertEqual(require_hardened_signature(details, leaf, fingerprint), {
+        self.assertEqual(require_fixed_signature(details, leaf, fingerprint), {
             "certificateSha1": fingerprint, "hardenedRuntime": True,
         })
+        legacy = details.replace("0x10000(runtime)", "0x0(none)")
+        self.assertEqual(require_fixed_signature(legacy, leaf, fingerprint, require_hardened=False), {
+            "certificateSha1": fingerprint, "hardenedRuntime": False,
+        })
         with self.assertRaisesRegex(RuntimeError, "different leaf certificate"):
-            require_hardened_signature(details, b"different-certificate", fingerprint)
+            require_fixed_signature(details, b"different-certificate", fingerprint)
         for invalid in [
             details.replace("0x10000(runtime)", "0x0(none)"),
             details + "Signature=adhoc\n",
             "Executable=/fake flags=0x10000(runtime)\n",
         ]:
-            with self.subTest(invalid=invalid), self.assertRaisesRegex(RuntimeError, "hardened runtime"):
-                require_hardened_signature(invalid, leaf, fingerprint)
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(RuntimeError, "fixed-certificate"):
+                require_fixed_signature(invalid, leaf, fingerprint)
 
 
 class InstalledDesktopModeLeaseTests(unittest.TestCase):
@@ -178,6 +215,37 @@ class InstalledDesktopModeLeaseTests(unittest.TestCase):
 
 
 class InstalledDesktopMfaCrashTests(unittest.TestCase):
+    def test_first_release_reuses_the_downloaded_package_and_protected_host(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / "mfa.taomni-plugin"
+            receipt = {"archive": archive.name, "signature": archive.name + ".minisig",
+                       "sha256": "module-package", "sourceSha": "source"}
+            roster = SimpleNamespace(roster={"taomni-plugin-mfa": receipt},
+                                     files={"/" + archive.name: archive}, requests=["/" + archive.name])
+            host = root / "mfa.exe"
+            application = root / "app.exe"
+            for path in (application, root / "mfa.db", host):
+                path.touch()
+            with patch("installed_desktop_mfa_crash.platform.system", return_value="Windows"), patch(
+                "installed_desktop_mfa_crash.installed_mfa", return_value=({"activeVersion": "0.1.2"}, host),
+            ), patch("installed_desktop_mfa_crash.commit_mfa_upgrade") as migrate, patch(
+                "installed_desktop_mfa_crash.mark_download", return_value="download-zone",
+            ) as mark, patch("installed_desktop_mfa_crash.observe_downloaded_host") as protected, patch(
+                "installed_desktop_mfa_crash.open_desktop", side_effect=[nullcontext((object(), None)) for _ in range(2)],
+            ), patch("installed_desktop_mfa_crash.verify_mfa_controls") as controls, patch(
+                "installed_desktop_mfa_crash.observe_abrupt_exit",
+            ) as killed:
+                protected.side_effect = [{"security": "active-before"}, {"security": "active-after"}]
+                result = verify_crash_recovery(application, root, None, "source", root, root, first_release=roster)
+            migrate.assert_called_once_with(application, root, archive, archive.with_suffix(".taomni-plugin.minisig"), root)
+            self.assertEqual(mark.call_args.args[0], host)
+            self.assertEqual([call.args[1] for call in protected.call_args_list], ["before", "after"])
+            self.assertEqual([call.args[1] for call in controls.call_args_list], ["before", "after"])
+            self.assertEqual(killed.call_args.args[2], host)
+            self.assertTrue(result["passed"])
+            self.assertEqual(result["windowsHostExecution"]["after"]["security"], "active-after")
+
     def test_kills_only_the_owned_application_and_waits_for_the_signed_host(self):
         for host_survives in (False, True):
             with self.subTest(host_survives=host_survives), TemporaryDirectory() as temporary:

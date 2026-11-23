@@ -47,47 +47,69 @@ def wait_for_generation(owner, profile):
     raise RuntimeError("The installed desktop did not initialize the fresh production profile")
 
 
+def observe_desktop_owner(executable, profile, evidence, owner):
+    generation = read_generation(profile / ".profile-state.json")
+    contender = observe_same_profile_contender(
+        headless_command(executable, profile), lambda: owner.poll() is None,
+        evidence, "installed-headless-contender",
+    )
+    if contender != MODE_LEASE_DENIAL:
+        raise RuntimeError("The installed desktop did not reject a headless contender")
+    return {
+        "profile": str(profile), "desktopOwnerPid": owner.pid, "generation": generation,
+        "headlessContender": contender,
+    }
+
+
+def verify_headless_owner(executable, work, evidence, observation):
+    profile = Path(observation["profile"])
+
+    def check_desktop_conflict(headless):
+        contender = observe_same_profile_contender(
+            [str(executable)], lambda: headless.poll() is None, evidence,
+            "installed-desktop-contender", desktop_env=os.environ.copy(),
+        )
+        observation["desktopContender"] = contender
+        if contender != MODE_LEASE_DENIAL:
+            raise RuntimeError("The installed desktop did not report a mode conflict and exit with status 1")
+
+    observation["headlessOwner"] = initialize_profile(
+        executable, profile, work, evidence, "installed-headless-owner", observe_ready=check_desktop_conflict,
+    )
+    if read_generation(profile / ".profile-state.json") != observation["generation"]:
+        raise RuntimeError("The installed application changed the production profile generation")
+    observation["passed"] = True
+
+
+def finish_first_release_mode_lease(executable, work, evidence, desktop):
+    observation = {
+        **desktop, "passed": False, "installedBinary": str(executable), "binarySha256": digest(executable),
+    }
+    try:
+        verify_headless_owner(executable, work, evidence, observation)
+        return observation
+    finally:
+        write_json(evidence / "installed-desktop-mode-lease.json", observation)
+
+
 def check_mode_lease(executable, work, evidence, *, profile=None):
     observation = {"passed": False, "installedBinary": str(executable), "binarySha256": digest(executable)}
     try:
         if profile is None:
             profile = reserve_default_profile(evidence)
         observation["profile"] = str(profile)
-        launch = [str(executable)]
         with (evidence / "installed-desktop-owner.log").open("xb") as output, subprocess.Popen(
-            launch, stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT,
+            [str(executable)], stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT,
         ) as desktop:
             try:
-                observation["desktopOwnerPid"] = desktop.pid
-                generation = wait_for_generation(desktop, profile)
-                observation["generation"] = generation
-                contender = observe_same_profile_contender(
-                    headless_command(executable, profile), lambda: desktop.poll() is None,
-                    evidence, "installed-headless-contender",
-                )
-                observation["headlessContender"] = contender
-                if contender != MODE_LEASE_DENIAL:
-                    raise RuntimeError("The installed desktop did not reject a headless contender")
+                wait_for_generation(desktop, profile)
+                observation.update(observe_desktop_owner(executable, profile, evidence, desktop))
             finally:
                 if desktop.poll() is None:
                     desktop.kill()
                     observation["desktopOwnerExitCode"] = desktop.wait(timeout=15)
 
-        def check_desktop_conflict(headless):
-            contender = observe_same_profile_contender(
-                launch, lambda: headless.poll() is None, evidence, "installed-desktop-contender",
-                desktop_env=os.environ.copy(),
-            )
-            observation["desktopContender"] = contender
-            if contender != MODE_LEASE_DENIAL:
-                raise RuntimeError("The installed desktop did not report a mode conflict and exit with status 1")
-
-        observation["headlessOwner"] = initialize_profile(
-            executable, profile, work, evidence, "installed-headless-owner", observe_ready=check_desktop_conflict,
-        )
-        if read_generation(profile / ".profile-state.json") != generation:
-            raise RuntimeError("The installed application changed the production profile generation")
-        observation["passed"] = True
+        verify_headless_owner(executable, work, evidence, observation)
         return observation
     finally:
         write_json(evidence / "installed-desktop-mode-lease.json", observation)

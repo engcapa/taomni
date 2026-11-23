@@ -1,11 +1,25 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('host', 'security')]
+    [ValidateSet('host', 'security', 'enable-defender')]
     [string]$Operation
 )
 
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
+if ($Operation -eq 'enable-defender') {
+    if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or
+        $env:GITHUB_REPOSITORY -ne 'engcapa/taomni') {
+        throw 'Defender setup requires the disposable repository runner'
+    }
+    if (-not (Get-MpComputerStatus).RealTimeProtectionEnabled) {
+        Set-MpPreference -DisableRealtimeMonitoring $false
+        $deadline = (Get-Date).AddSeconds(30)
+        while (-not (Get-MpComputerStatus).RealTimeProtectionEnabled -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 1
+        }
+    }
+}
 
 if ($Operation -eq 'host') {
     # Paths are data, never interpolated into a PowerShell program.
@@ -27,8 +41,7 @@ if ($Operation -eq 'host') {
     exit 0
 }
 
-# This observes the runner's actual protection configuration. It never changes
-# Defender, SmartScreen, execution policy, certificate stores or exclusions.
+# Record the runner's actual protection configuration for the caller to check.
 $defender = [ordered]@{ available = $false }
 try {
     $status = Get-MpComputerStatus

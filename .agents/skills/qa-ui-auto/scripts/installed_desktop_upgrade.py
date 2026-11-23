@@ -12,8 +12,9 @@ from types import SimpleNamespace
 import installed_first_release
 
 from installed_desktop_mfa_crash import verify_crash_recovery
-from installed_desktop_mode_lease import check_mode_lease, reserve_default_profile
+from installed_desktop_mode_lease import check_mode_lease, finish_first_release_mode_lease, reserve_default_profile
 from installed_macos_permissions import compare_permissions, observe_hosted_screen_scan, observe_permissions
+from installed_windows_host_security import enable_defender
 from modular_bundle_inventory import digest, inventory, write_json
 from qa_ui_auto.fixtures.module_legacy_install import insert_business_rows, retained_manifest, session_rows
 from qa_ui_auto.fixtures.module_legacy_mfa import seed_legacy_desktop
@@ -66,9 +67,15 @@ def select_candidate(directory, identity):
     return directory / members[0], observed
 
 
-def exercise_desktop_contracts(candidate, desktop_profile, stages, args, identity, work, report, permission_failure):
+def exercise_desktop_contracts(candidate, desktop_profile, stages, args, identity, work, report, permission_failure,
+                               *, first_release=None):
     system = platform.system()
-    stages["desktopAndHeadlessModeLease"] = check_mode_lease(candidate, work, report, profile=desktop_profile)
+    if first_release is None:
+        mode_lease = check_mode_lease(candidate, work, report, profile=desktop_profile)
+    else:
+        desktop = stages["firstBusinessInstall"]["stages"]["reopen-without-mail"]
+        mode_lease = finish_first_release_mode_lease(candidate, work, report, desktop["desktopModeLease"])
+    stages["desktopAndHeadlessModeLease"] = mode_lease
     if system == "Darwin":
         try:
             stages["candidatePermissions"] = observe_permissions(candidate, report, "candidate")
@@ -82,16 +89,16 @@ def exercise_desktop_contracts(candidate, desktop_profile, stages, args, identit
     recovery_failure = None
     try:
         stages["crashRecovery"] = verify_crash_recovery(
-            candidate, Path(stages["desktopAndHeadlessModeLease"]["profile"]),
-            args.signed.resolve(strict=True), identity["producerSource"], report, work,
-            macos_hardened_mfa=args.macos_hardened_mfa,
+            candidate, Path(mode_lease["profile"]), args.signed.resolve(strict=True) if args.signed else None,
+            identity["producerSource"], report, work, macos_hardened_mfa=args.macos_hardened_mfa,
+            first_release=first_release,
         )
     except Exception as error:
         # Preserve rollback evidence after the hosted crash scenario fails.
         recovery_failure = error
         stages["crashRecovery"] = {"passed": False, "error": str(error)}
 
-    if args.macos_hardened_mfa and recovery_failure is None:
+    if system == "Darwin" and (args.macos_hardened_mfa or first_release is not None) and recovery_failure is None:
         try:
             stages["mfaScreenScan"] = observe_hosted_screen_scan(candidate, report, stages["crashRecovery"])
         except Exception as error:
@@ -136,6 +143,8 @@ def execute(args):
     try:
         if args.first_release:
             origin = installed_first_release.open_release(args.first_release.resolve(strict=True), identity, report)
+            if system == "Windows":
+                enable_defender(report)
         old_binary, stages["original"] = install(old_package, slot, report / "original", old_version)
         initialize_profile(old_binary, profile, work, report, "original-start")
         insert_business_rows(profile, input_sessions(True))
@@ -152,8 +161,8 @@ def execute(args):
         if system == "Windows":
             require_registration(msi_registration(old_package, report, "original-registered"),
                                  msi_registration(package, report, "candidate-before-install"), upgraded=False)
-        elif not origin:
-            desktop_profile = reserve_default_profile(report)
+        else:
+            desktop_profile = profile if origin else reserve_default_profile(report)
             try:
                 stages["originalPermissions"] = observe_permissions(old_binary, report, "original")
             except Exception as error:
@@ -183,10 +192,14 @@ def execute(args):
             except Exception as error:
                 recovery_failure = error
                 stages["firstBusinessInstall"] = {"passed": False, "error": str(error)}
-        else:
-            recovery_failure, permission_failure = exercise_desktop_contracts(
-                candidate, desktop_profile, stages, args, identity, work, report, permission_failure,
-            )
+        if recovery_failure is None:
+            try:
+                recovery_failure, permission_failure = exercise_desktop_contracts(
+                    candidate, desktop_profile, stages, args, identity, work, report, permission_failure,
+                    first_release=origin,
+                )
+            except Exception as error:
+                recovery_failure = error
 
         if system == "Windows":
             command(["msiexec.exe", "/x", str(package), "/qn", "/norestart", "/L*v", str(report / "candidate-uninstall.log")],

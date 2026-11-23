@@ -101,6 +101,7 @@ class InstalledFirstReleaseTests(unittest.TestCase):
                  patch.object(windows_store, "installed_windows_desktop", return_value=nullcontext(owner)) as start, \
                  patch.object(windows_store, "controls", return_value={"currentModules": expected}) as ui, \
                  patch.object(windows_store, "observe_legacy_roster") as disk, \
+                 patch.object(windows_store, "observe_desktop_owner", return_value={"desktopOwnerPid": owner.pid}) as lease, \
                  patch.object(windows_store, "close_window"):
                 windows_store.exercise_stage("Taomni.exe", self.profile, self.profile, self.profile,
                                              self.origin, label, removed, stage, Mock())
@@ -114,6 +115,11 @@ class InstalledFirstReleaseTests(unittest.TestCase):
                     slug = self.roster[row["id"]]["slug"]
                     self.assertEqual(row["query"], f"{slug} Official desktop module {slug}")
                 self.assertEqual(stage["currentModules"], expected)
+                if removed:
+                    lease.assert_called_once_with("Taomni.exe", self.profile, self.profile, owner)
+                    self.assertEqual(stage["desktopModeLease"], {"desktopOwnerPid": owner.pid})
+                else:
+                    lease.assert_not_called()
 
     def test_windows_store_rejects_another_owner_and_an_abnormal_exit(self):
         owner = Mock(pid=17)

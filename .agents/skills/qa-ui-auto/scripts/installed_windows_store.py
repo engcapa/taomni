@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import subprocess
 
+from installed_desktop_mode_lease import observe_desktop_owner
 from installed_windows_mfa import capture_window, installed_windows_desktop, verify_mfa_controls
 from modular_bundle_inventory import write_json
 from qa_ui_auto.fixtures.module_legacy_mfa import APP_ID, PASSWORD
@@ -84,4 +85,6 @@ def exercise_stage(executable, work, profile, evidence, origin, label, removed, 
         stage["currentModules"] = observed
         if removed is None:
             controls(owner, "remove-mail", folder, modules=modules)
+        else:
+            stage["desktopModeLease"] = observe_desktop_owner(executable, profile, evidence, owner)
         stage["shutdown"] = close_window(owner, folder)

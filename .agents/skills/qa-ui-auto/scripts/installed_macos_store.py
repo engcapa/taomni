@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import subprocess
 
+from installed_desktop_mode_lease import observe_desktop_owner
 from modular_bundle_inventory import write_json
 from qa_ui_auto.fixtures.module_legacy_mfa import PASSWORD, isolated_desktop
 from qa_ui_auto.module_marketplace_observation import observe_legacy_roster
@@ -58,6 +59,8 @@ def exercise_stage(executable, work, profile, evidence, origin, label, removed, 
             stage["currentModules"] = roster["currentModules"]
             if removed is None:
                 controls(driver, owner, executable, "remove-mail", folder, modules=modules)
+            else:
+                stage["desktopModeLease"] = observe_desktop_owner(executable, profile, evidence, owner)
             closed = controls(driver, owner, executable, "confirm-close", folder)
             code = owner.wait(timeout=30)
             if code != 0:
