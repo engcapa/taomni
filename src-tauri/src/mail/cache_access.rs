@@ -1,5 +1,8 @@
 use std::path::PathBuf;
 
+use serde::de::DeserializeOwned;
+use taomni_mail_api::cache_query::CacheQuery;
+
 use super::*;
 
 pub use taomni_mail_engine::cache::init_mail_tables;
@@ -60,7 +63,29 @@ pub(super) async fn mail_db_task<T: Send + 'static>(
     .map_err(|e| format!("mail cache task failed: {e}"))?
 }
 
-/// Resolve relocation before sending the account cache to its signed writer.
+pub(super) async fn query_account_cache<T: DeserializeOwned + Send + 'static>(
+    state: &AppState,
+    account: &str,
+    query: CacheQuery,
+    legacy: impl FnOnce(&Connection, &str) -> SqlResult<T> + Send + 'static,
+) -> Result<T, String> {
+    pop3_store::with_account_owner(state, account, query.clone().into(), async {
+        let cache = state.mail_db(account)?;
+        if module_host::queries_account_cache(&state.plugins) {
+            return module_host::query_account_cache(
+                state.plugins.clone(),
+                cache,
+                account.to_owned(),
+                query,
+            )
+            .await;
+        }
+        mail_db_task(cache, account.to_owned(), legacy).await
+    })
+    .await
+}
+
+/// Resolve relocation before sending the account cache to its signed host.
 pub(super) fn canonical_cache_database(
     cache: &crate::state::MailDbHandle,
 ) -> Result<PathBuf, String> {

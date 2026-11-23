@@ -12,6 +12,7 @@ mod archive_index;
 mod archive_publication;
 mod attachment_cache;
 mod body_cache;
+mod cache_query;
 mod commands;
 mod compose;
 mod filter_rules;
@@ -81,6 +82,7 @@ fn host_config() -> HostConfig {
                 SYNC_IMAP_PAGE,
                 SYNC_IMAP_ROUND,
                 taomni_mail_api::imap_index::PUBLISH_IMAP_INDEX,
+                taomni_mail_api::cache_query::QUERY_ACCOUNT_CACHE,
                 SEARCH_IMAP,
                 taomni_mail_api::FILTER_IMAP_BODIES,
                 SET_IMAP_FLAGS,
@@ -310,6 +312,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(imap_exchange::sync_round(&self.io, operation, input)?)
+            }
+            taomni_mail_api::cache_query::QUERY_ACCOUNT_CACHE => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(cache_query::serve(&self.io, operation, endpoint)?)
             }
             taomni_mail_api::imap_index::PUBLISH_IMAP_INDEX => {
                 let endpoint = serde_json::from_value(params.unwrap_or_default())

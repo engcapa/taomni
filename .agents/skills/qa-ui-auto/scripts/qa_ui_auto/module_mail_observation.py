@@ -26,7 +26,8 @@ def run(ctx, args):
         "folder-tree", "folder-changes", "running", "imap-delivery", "pop3-delivery", "pop3-sync",
         "attachment-saved", "attachment-reopened", "agenda-written", "filter-saved", "archive-published",
         "archive-cleaned", "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source",
-        "imap-prefetch", "imap-mutations", "imap-mbox", "imap-forward", "outbox-queued", "outbox-sent",
+        "imap-prefetch", "imap-mutations", "imap-mbox", "imap-forward", "imap-cache",
+        "outbox-queued", "outbox-sent",
     }
     retained = {"outbox-retained", "contact-retained", "agenda-retained", "filter-retained", "pop3-retained"}
     active.update({"pop3-saved", "pop3-reopened"})
@@ -139,6 +140,19 @@ def run(ctx, args):
             signed["filter"] = report["filter"]
         elif report["filter"] != signed.get("filter"):
             raise StepError("Disabling Mail changed the saved filter")
+    if phase == "imap-cache":
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        command = "mail/query-account-cache"
+        if owner.case_id != "TC-MODULES-098" or command not in manifest["commands"]:
+            raise StepError("The installed Mail host does not provide account cache queries")
+        server = mail_fake_server.ACTIVE
+        if not server or server.state.count("Archive") != 0:
+            raise StepError("The fixture must remove the Archive message before the local search")
+        report["imapCache"] = {
+            "command": command,
+            "archiveServerCount": 0,
+            **observe_imap_index(plugins.parent / "mail-cache", "Cache-only citation 0001", folder="Archive"),
+        }
     if phase == "imap-search" and owner.case_id == "TC-MODULES-059":
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
         if "mail/publish-imap-index" not in manifest["commands"]:
@@ -185,7 +199,7 @@ def run(ctx, args):
     return f"Mail {version} host lease verified ({phase})"
 
 
-def observe_imap_index(root, subject):
+def observe_imap_index(root, subject, *, folder="INBOX"):
     databases = sorted(root.glob("*.db"))
     if len(databases) != 1:
         raise StepError(f"Expected one IMAP header index, found {len(databases)}")
@@ -196,8 +210,8 @@ def observe_imap_index(root, subject):
             """SELECT m.uid, f.sync_high_uid, f.uid_validity
                FROM mail_messages AS m
                JOIN mail_folders AS f ON f.account_id=m.account_id AND f.name=m.folder
-               WHERE m.folder='INBOX' AND m.subject=?""",
-            (subject,),
+               WHERE m.folder=? AND m.subject=?""",
+            (folder, subject),
         ).fetchall()
     if len(rows) != 1:
         raise StepError(f"The synchronized header was stored {len(rows)} times")

@@ -1,4 +1,5 @@
 use super::*;
+use taomni_mail_api::cache_query::{CacheQuery, MAX_CACHED_MESSAGE_PAGE};
 
 #[tauri::command]
 pub async fn mail_test_connection(
@@ -47,10 +48,10 @@ pub async fn mail_list_cached_folders(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailFolder>, String> {
-    pop3_store::run(
+    query_account_cache(
         &state,
         &account_id,
-        taomni_mail_api::pop3_store::LocalMailboxAction::Folders,
+        CacheQuery::Folders,
         list_cached_folders,
     )
     .await
@@ -64,14 +65,16 @@ pub async fn mail_list_cached_messages(
     offset: Option<u32>,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailMessageHeader>, String> {
-    let limit = limit.unwrap_or(DEFAULT_MESSAGE_LIMIT as u32).min(1000);
+    let limit = limit
+        .unwrap_or(DEFAULT_MESSAGE_LIMIT as u32)
+        .min(MAX_CACHED_MESSAGE_PAGE);
     let offset = offset.unwrap_or(0);
-    let action = taomni_mail_api::pop3_store::LocalMailboxAction::Messages {
+    let query = CacheQuery::Messages {
         folder: folder.clone(),
         limit,
         offset,
     };
-    pop3_store::run(&state, &account_id, action, move |db, account_id| {
+    query_account_cache(&state, &account_id, query, move |db, account_id| {
         list_cached_messages(db, &account_id, &folder, limit, offset)
     })
     .await

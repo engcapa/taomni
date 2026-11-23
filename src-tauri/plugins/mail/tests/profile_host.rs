@@ -33,6 +33,8 @@ use taomni_sqlite_snapshot::SnapshotControl;
 mod archive_encoding;
 #[path = "support/attachment_cache.rs"]
 mod attachment_cache;
+#[path = "support/cache_query.rs"]
+mod cache_query;
 #[path = "support/compose.rs"]
 mod compose;
 #[path = "support/imap.rs"]
@@ -386,6 +388,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     pop3_round::check_sync_round(&mut host);
     pop3_round::check_owned_sync_round(&mut host, &profile);
     snapshot_cache(&mut host, &context, &profile, &filename, &attachment);
+    cache_query::check_migrated_cache(&mut host, &path);
     let folders = host.call("mail_list_cached_folders", json!({"accountId":ACCOUNT}));
     assert_eq!(folders[0]["name"], "INBOX");
     assert_eq!(folders[0]["cachedCount"], 1);

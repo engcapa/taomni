@@ -145,6 +145,18 @@ pub(super) async fn run<T>(
 where
     T: DeserializeOwned + Send + 'static,
 {
+    with_account_owner(state, account, action, async {
+        mail_db_task(state.mail_db(account)?, account.to_owned(), legacy).await
+    })
+    .await
+}
+
+pub(super) async fn with_account_owner<T: DeserializeOwned + Send + 'static>(
+    state: &AppState,
+    account: &str,
+    action: LocalMailboxAction,
+    unowned: impl Future<Output = Result<T, String>>,
+) -> Result<T, String> {
     let _authority = state
         .legacy
         .mail
@@ -154,5 +166,5 @@ where
     if is_hosted(state, account).await? {
         return hosted(state, account, action).await;
     }
-    mail_db_task(state.mail_db(account)?, account.to_owned(), legacy).await
+    unowned.await
 }

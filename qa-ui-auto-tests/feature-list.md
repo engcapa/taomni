@@ -7851,7 +7851,7 @@ controls:
 - 同步按持久化的连续 UID 区间 `[sync_low_uid, sync_high_uid]` 进行：打开/重开、定时刷新与手工刷新都按“服务器 UID − 缓存 UID”集合差分批补齐，直到后端 `more=false`，关闭任意时长后重开不再漏收（设计 `docs-feature/mail-thunderbird-parity-design.md` AC-01～AC-12）。
 - TC-MODULES-059 从签名前端测试选中文件夹补齐、全账户手工刷新和重新启用后接收停用期间收到的邮件。 已验签宿主在同一账户事务中保存同步结果、UID 水位、标记变化和部分失败记录。TC-MODULES-060 检查浏览器保留的账户标签重新同步和打开归档。Mail 宿主负责邮件头同步，核心过渡仓储提交 UID 水位。
 - 定时刷新在 catch-up 之后对最新窗口对账，手工刷新对全区间对账：服务器端删除/移动的邮件从缓存移除，已读/未读/星标以 FETCH FLAGS 为准（CONDSTORE 可用时用 `CHANGEDSINCE`）。
-- 列表只读本地缓存；缓存到底后“加载更早邮件”向服务器回补历史，选中文件夹在后台回补并显示进度。默认保留全部邮件头（0 = 不限制），按天保留时使用服务器到达时间。
+- 列表只读本地缓存；缓存到底后“加载更早邮件”向服务器回补历史，选中文件夹在后台回补并显示进度。默认保留全部邮件头（0 = 不限制），按天保留时使用服务器到达时间。签名 Mail 宿主提供 IMAP 缓存文件夹和邮件分页。TC-MODULES-098 通过常规 Mail 标签核对文件夹树、首屏和下一页，保留签名包及宿主身份。
 - 同一 Quick Connect 邮件地址复用同一会话缓存；`mail://user:pass@host:port?security=none&smtp=host:port` 支持口令、明文/STARTTLS 与 SMTP 端点。
 
 ---
@@ -7912,6 +7912,9 @@ files:
   - src-tauri/src/mail/search.rs
   - src-tauri/crates/taomni-mail-api/src/search.rs
   - src-tauri/crates/taomni-mail-engine/src/search.rs
+  - src-tauri/crates/taomni-mail-api/src/cache_query.rs
+  - src-tauri/plugins/mail/src/cache_query.rs
+  - src-tauri/src/mail/module_host/cache_query.rs
   - src-tauri/plugins/mail/src/imap_exchange.rs
 controls:
   - id: search-input
@@ -7947,7 +7950,7 @@ controls:
 
 - 搜索框查询本地 SQLite FTS5（trigram 分词，支持中文子串；少于 3 字的词回退 LIKE）覆盖整个缓存的邮件头与已缓存正文，可选“本文件夹/所有文件夹”和字段（全部/主题/发件人/收件人/正文）；用户输入按字面短语处理，不解释 FTS 语法。
 - “Server”（或 Shift+Enter）对当前文件夹执行 IMAP `UID SEARCH`（非 ASCII 用 `CHARSET UTF-8`），结果与本地结果合并，不写入缓存。
-- 启用的签名 Mail 宿主执行 IMAP 搜索，核心核对结果的账户和文件夹。TC-MODULES-059 核对真实服务器返回的主题，TC-MAIL-SEARCH-01 覆盖本地索引和服务器搜索的现有流程。
+- 启用的签名 Mail 宿主执行本地索引查询和 IMAP 搜索，核心核对服务器结果的账户和文件夹。TC-MODULES-059 核对真实服务器返回的主题。TC-MODULES-098 对照 SQLite 中仍可搜索的归档记录和服务器已删除的记录。TC-MAIL-SEARCH-01 检查所有文件夹、当前文件夹、服务器搜索及删除后的状态。
 - 快捷过滤（未读/星标/附件）同时作用于普通列表与搜索结果；跨文件夹结果显示所在文件夹。
 - TC-MODULES-059 在已启用的签名 Mail 宿主中给选中邮件加星并取消星标。TC-MAIL-KEYS-01 同时检查列表焦点快捷键。两个用例都将可见星标邮件的 UID 与服务器状态对照。
 - Mail 签名宿主执行按文件夹查询未读 UID 和批量标记已读。 服务端确认后由宿主更新账户索引的旗标和未读数。TC-MODULES-059 核对服务器剩余未读和列表状态。TC-MAIL-BULK-01 覆盖批量操作和完成后按钮状态。

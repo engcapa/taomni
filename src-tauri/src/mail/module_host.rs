@@ -10,6 +10,8 @@ mod body_cache;
 pub(super) use body_cache::{publish_body_cache, publishes_body_cache};
 mod body_sync;
 mod cache_publication;
+mod cache_query;
+pub(super) use cache_query::{queries_account_cache, query_account_cache};
 mod compose;
 pub(super) mod imap_idle;
 mod mbox;

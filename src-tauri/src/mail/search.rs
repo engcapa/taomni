@@ -3,7 +3,7 @@
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 use std::sync::Arc;
 
-use taomni_mail_api::pop3_store::LocalMailboxAction;
+use taomni_mail_api::{cache_query::CacheQuery, pop3_store::LocalMailboxAction};
 use taomni_mail_api::{message::MailMessageHeader, search::ImapSearchRequest};
 use taomni_mail_engine::search::search_cached_messages;
 #[cfg(any(test, feature = "legacy-mail-imap"))]
@@ -14,7 +14,7 @@ pub use taomni_mail_api::search::{MailSearchField, MailSearchQuery};
 
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 use super::{ActiveImapSession, ImapSessionOpts, with_imap_session};
-use super::{MailAccountConfig, module_host, resolve_config, with_mail_db_async};
+use super::{MailAccountConfig, module_host, query_account_cache, resolve_config};
 use crate::state::AppState;
 
 /// Search the local index (headers of every cached message, bodies that are
@@ -25,10 +25,10 @@ pub async fn mail_search_messages(
     query: MailSearchQuery,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailMessageHeader>, String> {
-    super::pop3_store::run(
+    query_account_cache(
         &state,
         &account_id,
-        LocalMailboxAction::Search(query.clone()),
+        CacheQuery::Search(query.clone()),
         move |db, account_id| search_cached_messages(db, account_id, &query),
     )
     .await

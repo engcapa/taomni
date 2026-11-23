@@ -1,0 +1,87 @@
+id: TC-MODULES-098
+title: Signed Mail reads IMAP folders, message pages and search results from the cache
+description: Install signed Mail and sync more than one page. Check both pages and search the local index for an Archive message removed from the IMAP fixture after sync. Compare the cached result with the fixture, then narrow the search to the inbox.
+covers: [F-Modules-1, F-MAIL-4, F-MAIL-7]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, mail_server, module_signed_mail_archive]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-mail"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"] [data-testid="mail-client-tab"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- mail_server_assert_list_matches: {timeout_sec: 45}
+- mail_server_deliver: {count: 205, prefix: Cached page}
+- mail_server_deliver: {folder: Archive, count: 1, prefix: Cache-only citation}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: new headers across, timeout_sec: 45}
+- wait_for: {selector: '[data-testid="mail-message-count"][data-count="200"][data-has-more="true"]', timeout_sec: 30}
+- assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Seed 0001"]', equal: 0}
+- assert_visible: '[data-testid="mail-load-more"]'
+- mail_server_assert_list_matches: {timeout_sec: 30}
+- assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Seed 0001"]', equal: 1}
+- assert_count: {selector: '[data-testid="mail-message-row"]', equal: 235}
+- mail_server_expunge_newest: {folder: Archive, count: 1}
+- mail_server_assert_folder_count: {folder: Archive, equals: 0, exists: true}
+- select_option: {selector: '[data-testid="mail-search-scope"]', value: all}
+- select_option: {selector: '[data-testid="mail-search-field"]', value: subject}
+- fill: {selector: '[data-testid="mail-search-input"]', value: Cache-only citation 0001}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Cache-only citation 0001"]'
+- assert_text: {selector: '[data-testid="mail-message-folder"]', contains: Archive}
+- assert_count: {selector: '[data-testid="mail-message-row"]', equal: 1}
+- screenshot: signed-mail-local-search.png
+- select_option: {selector: '[data-testid="mail-search-scope"]', value: folder}
+- wait_for: {selector: '[data-testid="mail-message-row"][data-subject="Cache-only citation 0001"]', state: detached}
+- click: '[data-testid="mail-search-server"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Server search found 0 messages in INBOX, timeout_sec: 30}
+- assert_signed_mail_host: imap-cache
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-cache-pages
+    requirement: The signed tab reads the folder tree and both cached inbox pages.
+    actions: [8, 10, 16, 20, 21, 22, 27]
+    checkpoints:
+    - {step: 12, expectation: The installed host and frontend match the signed package before its writer lease starts.}
+    - {step: 17, expectation: Quick Connect opens the signed Mail tab.}
+    - {step: 18, expectation: The folder tree contains Archive.}
+    - {step: 24, expectation: The first page shows 200 headers with an older page available.}
+    - {step: 25, expectation: The oldest original header is beyond the first page.}
+    - {step: 27, expectation: Loading the next page completes the inbox list.}
+    - {step: 28, expectation: The oldest original header appears exactly once.}
+    - {step: 29, expectation: The two pages contain 235 rendered headers.}
+    results: [12, 17, 18, 24, 25, 27, 28, 29]
+  - id: signed-cache-search
+    requirement: The local index returns a cached result that has disappeared from the server.
+    actions: [30, 32, 33, 34, 39, 41]
+    checkpoints:
+    - {step: 31, expectation: The IMAP fixture has no messages in Archive.}
+    - {step: 35, expectation: The all-folders search returns the cached header.}
+    - {step: 36, expectation: The result identifies Archive as its folder.}
+    - {step: 37, expectation: The cache returns exactly one match.}
+    - {step: 40, expectation: Current-folder search removes the Archive result.}
+    - {step: 42, expectation: The IMAP search finds no matching message in INBOX.}
+    - {step: 43, expectation: The receipt ties the installed cache command and host digests to the on-disk header and the server state.}
+    - {step: 44, expectation: The renderer reports no runtime errors.}
+    results: [31, 35, 36, 37, 40, 42, 43, 44]
+  visual:
+  - {check: The cached result displays its Archive label., method: automated, reason: The runner checks the exact subject and the visible folder label.}
+  native:
+  - {check: The signed host can read an IMAP cache that differs from the loopback server., method: automated, reason: The report retains the signed artifact identity and the SQLite and server observations.}
