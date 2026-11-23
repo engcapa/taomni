@@ -12,7 +12,7 @@ use crate::mail::with_mail_db;
 use crate::state::AppState;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use taomni_mail_engine::filters::imap::FilterBodyQuery;
+use taomni_mail_api::imap_exchange::FilterBodyQuery;
 use taomni_mail_engine::filters::rules::FilterRulesAction;
 use taomni_mail_engine::filters::{
     CandidateSelection, FilterMessage, MailFilter, MailFilterRunResult, MessagePlan,

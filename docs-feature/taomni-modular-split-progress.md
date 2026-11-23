@@ -2,6 +2,8 @@
 
 ## 2026-11-23 当前进展
 
+- IMAP 页读取、增量同步、检索、正文预读和归档状态的协议结构移到 `taomni-mail-api`，既有字段和 IPC 入口保留。107 项 Rust 单测、基座编译与模块边界检查通过。SQLite 缓存实现仍待迁出。
+- Mail 导入导出的首轮三端 Browser 在取消后查服务器时失败。预置的 Archive 有两封邮件，用例原先错误地要求空文件夹。现核对两封原件及同步列表，原生实装选集继续运行。 [原始分片](https://github.com/engcapa/taomni/actions/runs/45085885699)
 - Mail 过滤规则匹配后经签名宿主读取原始 MIME 并发送。基座每次使用独立临时文件保存附件，发送返回后释放临时文件。TC-MODULES-096 核对实际 IMAP 原件读取、SMTP 收件人、原件标识及正文。TC-MAIL-FILTER-01 补充转发规则的保存断言。
 - Mail 0.1.36 的签名宿主接管 mbox/EML 导入和 mbox 导出的 IMAP 操作。导入继续显示成功和失败数量，连接中断时只为下一封邮件重建连接。导出按批读取原件，完成回执到达后再替换目标文件。TC-MAIL-IMPORT-01 核对启用模块后取消两个选择器，TC-MODULES-095 核对原生选择路径及导入、导出的内容。
 - `90770d5f8` 的四目标 Cargo 清单均已排除 SMTP 传输，并保留 Mail 的过渡引擎。已收取四份依赖树、Cargo 特性和前端构建摘要，G9 仍待邮件引擎迁出和最新实装载荷。 [核心清单](https://github.com/engcapa/taomni/actions/runs/45084264148)

@@ -21,7 +21,7 @@ use crate::imap_sync::{
 use crate::search::{ImapSearchRequest, search_imap_messages};
 use crate::tls::{MailConnectionSecurity, certificate_error_hint, tls_connector};
 use crate::{DownloadedMailAttachment, MailFolder, MailMessageCached, MailMessageHeader};
-use serde::{Deserialize, Serialize};
+pub use taomni_mail_api::imap_exchange::{ImapBodyReply, ImapBodyRequest};
 use taomni_mail_api::{ImapFlagUpdate, ImapFolderChange, RemoteDraftLocation};
 
 pub struct ImapConnection<'a> {
@@ -37,23 +37,6 @@ pub struct ImapConnection<'a> {
 pub enum ImapSession {
     Plain(Session<TcpStream>),
     Tls(Session<TlsStream<TcpStream>>),
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ImapBodyRequest {
-    pub account_id: String,
-    pub folder: String,
-    pub uid: u32,
-    pub body_max_bytes: u32,
-    pub save_original: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ImapBodyReply {
-    pub message: MailMessageCached,
-    pub original_size: Option<usize>,
 }
 
 /// Discard a session after the IMAP library detects an out-of-sequence reply.

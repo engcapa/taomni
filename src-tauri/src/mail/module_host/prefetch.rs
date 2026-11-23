@@ -4,12 +4,11 @@ use std::{sync::Arc, time::Duration};
 
 use taomni_mail_api::{
     HOST_REQUEST_TIMEOUT, PREFETCH_IMAP_BODIES,
-    imap_exchange::{ImapExchange, PrefetchBodies, read_body_frame, read_frame, write_frame},
+    imap_exchange::{
+        ImapBodyReply, ImapExchange, PrefetchBodies, read_body_frame, read_frame, write_frame,
+    },
 };
-use taomni_mail_engine::{
-    cache::{cache_body_if_current, pending_bodies},
-    imap_transport::ImapBodyReply,
-};
+use taomni_mail_engine::cache::{cache_body_if_current, pending_bodies};
 use taomni_plugin_stream::routed_tcp::Route;
 use tauri::State;
 

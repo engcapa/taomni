@@ -9,28 +9,6 @@ pub mod writer;
 pub use imap_chunks::{CHUNK, CONTENT_ERROR, fetch_imap_chunk};
 pub use transfer::download_imap_original;
 
-#[derive(serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub enum ArchiveQuery {
-    Folders {
-        account_id: String,
-    },
-    Headers(crate::imap_sync::HeaderStepRequest),
-    Chunk {
-        folder: String,
-        uid: u32,
-        offset: u64,
-    },
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ArchiveChunk {
-    pub uid_validity: u32,
-    pub reported_size: u64,
-    pub length: usize,
-}
-
 use std::io::{BufRead, BufReader, Read, Write};
 
 use flate2::{Compression, read::GzDecoder, write::GzEncoder};
@@ -38,7 +16,7 @@ use sha2::{Digest, Sha256};
 
 use metadata::AttachmentScan;
 
-pub use taomni_mail_api::archive::MessageObject;
+pub use taomni_mail_api::archive::{ArchiveChunk, ArchiveQuery, MessageObject};
 
 /// Encode into a staging writer. The archive owner handles publication.
 pub fn compress_message(

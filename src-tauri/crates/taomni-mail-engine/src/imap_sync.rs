@@ -12,7 +12,6 @@
 //! Every fetch here is planned as a set difference (server − cached), which is
 //! idempotent: an interrupted step is simply recomputed by the next call.
 
-mod body;
 mod folder_step;
 mod limits;
 mod model;
@@ -20,16 +19,16 @@ mod planning;
 mod protocol;
 mod round;
 
-pub use body::{BodySyncOutcome, BodySyncRequest, BodySyncTask};
 pub use folder_step::imap_sync_folder_step;
 pub use limits::FLAG_RECONCILE_WINDOW;
-pub use model::{
-    AppliedStep, FolderStepOutcome, FolderSyncState, HeaderPageOutcome, HeaderPageRequest,
-    HeaderStepRequest, MailFolderSyncResult, MailSyncMode, MailSyncRequestMode, StepParams,
-    Watermark, advance_state, step_result,
-};
+pub use model::{AppliedStep, StepParams, advance_state, step_result};
 pub use protocol::imap_has_capability;
-pub use round::{FolderRoundOutcome, FolderRoundRequest, folder_unchanged, sync_folder_round};
+pub use round::{folder_unchanged, sync_folder_round};
+pub use taomni_mail_api::imap_sync::{
+    BodySyncOutcome, BodySyncRequest, BodySyncTask, FolderRoundOutcome, FolderRoundRequest,
+    FolderStepOutcome, FolderSyncState, HeaderPageOutcome, HeaderPageRequest, HeaderStepRequest,
+    MailFolderSyncResult, MailSyncMode, MailSyncRequestMode, Watermark,
+};
 
 #[cfg(test)]
 mod tests;

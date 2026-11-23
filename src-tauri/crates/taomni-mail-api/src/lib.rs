@@ -11,8 +11,10 @@ pub mod archive;
 pub mod attachment_cache;
 pub mod imap_exchange;
 pub mod imap_mutation;
+pub mod imap_sync;
 pub mod message;
 pub mod pop3_exchange;
+pub mod search;
 
 pub const SLUG: &str = "mail";
 pub const LOCAL_DRAFTS: &str = "mail/local-drafts";

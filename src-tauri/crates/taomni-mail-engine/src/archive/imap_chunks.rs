@@ -2,7 +2,7 @@
 
 use std::io::{Read, Write};
 
-pub const CHUNK: usize = 256 * 1024;
+pub use taomni_mail_api::archive::IMAP_ARCHIVE_CHUNK_BYTES as CHUNK;
 pub const CONTENT_ERROR: &str = "MAIL_ARCHIVE_CONTENT: ";
 
 fn parse_chunk(mut response: &[u8], uid: u32, offset: u64) -> Result<(u64, Vec<u8>), String> {

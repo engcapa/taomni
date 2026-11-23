@@ -9,8 +9,8 @@ use taomni_mail_api::{
         sync::{SyncFrame, read_sync_frame, write_save_result},
         write_frame,
     },
+    imap_sync::{BodySyncOutcome, BodySyncRequest, BodySyncTask},
 };
-use taomni_mail_engine::imap_sync::{BodySyncOutcome, BodySyncRequest, BodySyncTask};
 use taomni_plugin_stream::routed_tcp::Route;
 
 use super::{PluginRegistry, ResolvedMailAccount, decode_imap_reply, invoke_with_incoming};

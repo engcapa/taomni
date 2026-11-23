@@ -5,9 +5,9 @@ use std::sync::Arc;
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     OPEN_IMAP_ARCHIVE, OPEN_IMAP_IMPORT,
+    archive::{ArchiveChunk, ArchiveQuery, IMAP_ARCHIVE_CHUNK_BYTES},
     imap_exchange::{ImapExchange, read_frame, write_body_frame, write_frame},
 };
-use taomni_mail_engine::archive::{ArchiveChunk, ArchiveQuery, CHUNK};
 use taomni_plugin_stream::routed_tcp::Route;
 use tokio::io::DuplexStream;
 
@@ -90,7 +90,7 @@ impl HostedImap {
         query: ArchiveQuery,
     ) -> Result<(u32, u64, Vec<u8>), String> {
         let receipt: ArchiveChunk = self.query(query).await?;
-        if receipt.length > CHUNK {
+        if receipt.length > IMAP_ARCHIVE_CHUNK_BYTES {
             return Err("Mail module returned an oversized archive chunk".into());
         }
         let bytes = read_frame(&mut self.peer)

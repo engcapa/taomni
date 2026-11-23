@@ -7810,6 +7810,7 @@ files:
   - src/stubs/mailServerStub.ts
   - src-tauri/src/mail/sync.rs
   - src-tauri/src/mail/mod.rs
+  - src-tauri/crates/taomni-mail-api/src/imap_sync.rs
   - src-tauri/crates/taomni-mail-engine/src/imap_transport.rs
 controls:
   - id: message-count
@@ -7901,6 +7902,7 @@ files:
   - src/lib/mail.ts
   - src/stubs/mailServerStub.ts
   - src-tauri/src/mail/search.rs
+  - src-tauri/crates/taomni-mail-api/src/search.rs
   - src-tauri/crates/taomni-mail-engine/src/search.rs
   - src-tauri/plugins/mail/src/imap_exchange.rs
 controls:

@@ -6,13 +6,10 @@ use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
     FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, FETCH_IMAP_RAW, HOST_REQUEST_TIMEOUT, IncomingTest,
     imap_exchange::{
-        AttachmentReceipt, AttachmentRequest, ImapExchange, RawMessageRequest, read_body_frame,
-        read_frame, write_frame,
+        AttachmentReceipt, AttachmentRequest, ImapBodyReply, ImapBodyRequest, ImapExchange,
+        RawMessageRequest, read_body_frame, read_frame, write_frame,
     },
-};
-use taomni_mail_engine::{
-    DownloadedMailAttachment, MailMessageCached,
-    imap_transport::{ImapBodyReply, ImapBodyRequest},
+    message::{DownloadedMailAttachment, MailMessageCached},
 };
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
 use tokio::io::AsyncReadExt;

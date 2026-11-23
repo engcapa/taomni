@@ -3,7 +3,6 @@
 use std::io::{Read, Write};
 
 use rusqlite::{Connection, Result as SqlResult, ToSql, params_from_iter};
-use serde::{Deserialize, Serialize};
 
 use crate::{
     MailMessageHeader,
@@ -12,68 +11,34 @@ use crate::{
     imap_messages::Mailbox,
 };
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum MailSearchField {
-    #[default]
-    All,
-    Subject,
-    Sender,
-    Recipients,
-    Body,
-}
+pub use taomni_mail_api::search::{ImapSearchRequest, MailSearchField, MailSearchQuery};
 
-impl MailSearchField {
-    fn fts_column(self) -> Option<&'static str> {
-        match self {
-            Self::All => None,
-            Self::Subject => Some("subject"),
-            Self::Sender => Some("sender"),
-            Self::Recipients => Some("recipients"),
-            Self::Body => Some("body"),
-        }
-    }
-
-    fn like_columns(self) -> &'static [&'static str] {
-        match self {
-            Self::All => &[
-                "m.subject",
-                "m.from_name",
-                "m.from_addr",
-                "m.to_json",
-                "m.cc_json",
-                "m.snippet",
-                "m.body_text",
-            ],
-            Self::Subject => &["m.subject"],
-            Self::Sender => &["m.from_name", "m.from_addr"],
-            Self::Recipients => &["m.to_json", "m.cc_json"],
-            Self::Body => &["m.snippet", "m.body_text"],
-        }
+fn fts_column(field: MailSearchField) -> Option<&'static str> {
+    match field {
+        MailSearchField::All => None,
+        MailSearchField::Subject => Some("subject"),
+        MailSearchField::Sender => Some("sender"),
+        MailSearchField::Recipients => Some("recipients"),
+        MailSearchField::Body => Some("body"),
     }
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MailSearchQuery {
-    #[serde(default)]
-    pub text: String,
-    /// `None` searches every cached folder of the account.
-    #[serde(default)]
-    pub folder: Option<String>,
-    #[serde(default)]
-    pub field: MailSearchField,
-    #[serde(default)]
-    pub unread_only: bool,
-    #[serde(default)]
-    pub flagged_only: bool,
-    #[serde(default)]
-    pub with_attachments: bool,
-    /// Only messages carrying this IMAP keyword (tag).
-    #[serde(default)]
-    pub keyword: Option<String>,
-    #[serde(default)]
-    pub limit: Option<u32>,
+fn like_columns(field: MailSearchField) -> &'static [&'static str] {
+    match field {
+        MailSearchField::All => &[
+            "m.subject",
+            "m.from_name",
+            "m.from_addr",
+            "m.to_json",
+            "m.cc_json",
+            "m.snippet",
+            "m.body_text",
+        ],
+        MailSearchField::Subject => &["m.subject"],
+        MailSearchField::Sender => &["m.from_name", "m.from_addr"],
+        MailSearchField::Recipients => &["m.to_json", "m.cc_json"],
+        MailSearchField::Body => &["m.snippet", "m.body_text"],
+    }
 }
 
 /// Split into terms, honouring "double quoted phrases".
@@ -141,7 +106,7 @@ pub fn search_cached_messages(
     if !long.is_empty() {
         let expr = long
             .iter()
-            .map(|term| match query.field.fts_column() {
+            .map(|term| match fts_column(query.field) {
                 Some(column) => format!("{column} : {}", fts_phrase(term)),
                 None => fts_phrase(term),
             })
@@ -153,7 +118,7 @@ pub fn search_cached_messages(
         values.push(Box::new(expr));
     }
     for term in short {
-        let columns = query.field.like_columns();
+        let columns = like_columns(query.field);
         let clause = columns
             .iter()
             .map(|column| format!("{column} LIKE ? ESCAPE '\\'"))
@@ -185,14 +150,6 @@ pub fn search_cached_messages(
         row_to_header,
     )?;
     rows.collect()
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ImapSearchRequest {
-    pub account_id: String,
-    pub folder: String,
-    pub query: MailSearchQuery,
 }
 
 /// IMAP SEARCH criteria for the text query (every term must match).

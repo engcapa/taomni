@@ -1,23 +1,10 @@
 use crate::storage::scan;
-use serde::Serialize;
 use std::sync::{
     Mutex,
     atomic::{AtomicBool, Ordering},
 };
 
-#[derive(Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ArchiveStatus {
-    pub phase: String,
-    pub folder: Option<String>,
-    pub saved: usize,
-    pub headers_synced: usize,
-    pub headers_total: Option<u32>,
-    pub total: usize,
-    pub bytes: u64,
-    pub total_bytes: Option<u64>,
-    pub error: Option<String>,
-}
+pub use taomni_mail_api::archive::ArchiveStatus;
 
 #[derive(Default)]
 pub struct ScanProgress {

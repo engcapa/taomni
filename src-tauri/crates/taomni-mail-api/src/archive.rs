@@ -5,7 +5,24 @@ use serde::{Deserialize, Serialize};
 use taomni_plugin_stream::routed_tcp::Endpoint;
 use tokio::io::{AsyncRead, AsyncReadExt};
 
+use crate::imap_sync::HeaderStepRequest;
+
 pub const ARCHIVE_FRAME_BYTES: usize = 64 * 1024;
+pub const IMAP_ARCHIVE_CHUNK_BYTES: usize = 256 * 1024;
+
+#[derive(Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveStatus {
+    pub phase: String,
+    pub folder: Option<String>,
+    pub saved: usize,
+    pub headers_synced: usize,
+    pub headers_total: Option<u32>,
+    pub total: usize,
+    pub bytes: u64,
+    pub total_bytes: Option<u64>,
+    pub error: Option<String>,
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -36,6 +53,28 @@ pub struct MessageObject {
     pub hash: String,
     pub raw_size: u64,
     pub has_attachments: bool,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub enum ArchiveQuery {
+    Folders {
+        account_id: String,
+    },
+    Headers(HeaderStepRequest),
+    Chunk {
+        folder: String,
+        uid: u32,
+        offset: u64,
+    },
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ArchiveChunk {
+    pub uid_validity: u32,
+    pub reported_size: u64,
+    pub length: usize,
 }
 
 pub async fn receive_encoding(

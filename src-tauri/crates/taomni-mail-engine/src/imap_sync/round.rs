@@ -1,35 +1,14 @@
 use std::io::{Read, Write};
 
-use serde::{Deserialize, Serialize};
-
 use crate::{
-    MailFolder,
     imap_folders::{FolderStatus, imap_folder_status},
     imap_messages::Mailbox,
 };
 
 use super::{
-    FolderStepOutcome, FolderSyncState, MailSyncMode, MailSyncRequestMode, StepParams,
-    advance_state, imap_has_capability, imap_sync_folder_step,
+    FolderRoundOutcome, FolderRoundRequest, FolderSyncState, MailSyncMode, MailSyncRequestMode,
+    StepParams, advance_state, imap_has_capability, imap_sync_folder_step,
 };
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct FolderRoundRequest {
-    pub folder: MailFolder,
-    pub state: FolderSyncState,
-    pub limit: usize,
-    pub reconcile: MailSyncRequestMode,
-    pub skip_unchanged: bool,
-}
-
-#[derive(Default, Serialize, Deserialize)]
-pub struct FolderRoundOutcome {
-    pub steps: Vec<FolderStepOutcome>,
-    pub pending: bool,
-    pub unchanged: Option<MailFolder>,
-    pub error: Option<String>,
-}
 
 /// Complete one folder of an account-wide refresh using a single IMAP session.
 /// The caller commits its completed steps before moving to the next folder.

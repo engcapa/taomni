@@ -2,11 +2,11 @@
 
 use std::sync::Arc;
 
-use taomni_mail_engine::MailMessageHeader;
-use taomni_mail_engine::search::{ImapSearchRequest, search_cached_messages, search_imap_messages};
+use taomni_mail_api::{message::MailMessageHeader, search::ImapSearchRequest};
+use taomni_mail_engine::search::{search_cached_messages, search_imap_messages};
 use tauri::State;
 
-pub use taomni_mail_engine::search::{MailSearchField, MailSearchQuery};
+pub use taomni_mail_api::search::{MailSearchField, MailSearchQuery};
 
 use super::{
     ActiveImapSession, ImapSessionOpts, MailAccountConfig, module_host, resolve_config,

@@ -1,12 +1,15 @@
 //! An IMAP operation has one socket for the server and one for request data.
 
-use std::io;
+use std::{
+    collections::{HashMap, HashSet},
+    io,
+};
 
 use serde::{Deserialize, Serialize};
 use taomni_plugin_stream::routed_tcp::Endpoint;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-use crate::IncomingTest;
+use crate::{IncomingTest, message::MailMessageCached};
 
 #[path = "imap_sync_stream.rs"]
 pub mod sync;
@@ -109,6 +112,33 @@ pub struct AttachmentReceipt {
     pub content_type: Option<String>,
     pub size: usize,
 }
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ImapBodyRequest {
+    pub account_id: String,
+    pub folder: String,
+    pub uid: u32,
+    pub body_max_bytes: u32,
+    pub save_original: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ImapBodyReply {
+    pub message: MailMessageCached,
+    pub original_size: Option<usize>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FilterBodyQuery {
+    pub folder: String,
+    pub uids: Vec<u32>,
+    pub needles: Vec<String>,
+}
+
+pub type BodyHits = HashMap<u32, HashSet<String>>;
 
 pub async fn read_frame(stream: &mut (impl AsyncRead + Unpin)) -> io::Result<Vec<u8>> {
     let size = stream.read_u32().await? as usize;

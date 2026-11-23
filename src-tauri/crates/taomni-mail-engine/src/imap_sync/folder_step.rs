@@ -1,10 +1,4 @@
 use super::limits::FLAG_RECONCILE_WINDOW;
-use super::model::FolderStepOutcome;
-use super::model::FolderSyncState;
-use super::model::MailSyncMode;
-use super::model::MailSyncRequestMode;
-use super::model::StepParams;
-use super::model::Watermark;
 use super::planning::plan_backfill;
 use super::planning::plan_fill_range;
 use super::planning::recent_window_start;
@@ -14,6 +8,9 @@ use super::protocol::imap_fetch_flags;
 use super::protocol::imap_fetch_flags_for_uids;
 use super::protocol::imap_search_older;
 use super::protocol::imap_search_uid_range;
+use super::{
+    FolderStepOutcome, FolderSyncState, MailSyncMode, MailSyncRequestMode, StepParams, Watermark,
+};
 use crate::imap_folders::decode_imap_modified_utf7;
 use crate::imap_messages::{Mailbox, imap_page_uids_newest_first, imap_unread_count};
 use crate::{MailFolder, MailMessageCached, now_ts};

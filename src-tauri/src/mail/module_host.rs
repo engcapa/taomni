@@ -46,15 +46,14 @@ use taomni_mail_api::{
     ImapFolderMutation, ImapFolderTree, IncomingTest, LIST_IMAP_UNREAD, MUTATE_IMAP_FOLDER,
     SEARCH_IMAP, SEND_SMTP, SET_IMAP_FLAGS, SLUG, SMTP_DELIVERY_UNKNOWN, SYNC_IMAP_BODIES,
     SYNC_IMAP_HEADERS, SYNC_IMAP_PAGE, SYNC_IMAP_ROUND, SmtpConnection, SmtpDelivery,
-    imap_exchange::{ImapExchange, read_frame, write_frame},
+    imap_exchange::{BodyHits, FilterBodyQuery, ImapExchange, read_frame, write_frame},
+    imap_sync::{
+        BodySyncOutcome, BodySyncTask, FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome,
+        HeaderPageOutcome, HeaderPageRequest, HeaderStepRequest,
+    },
+    search::ImapSearchRequest,
 };
 use taomni_mail_engine::delivery::PreparedMail;
-use taomni_mail_engine::filters::imap::{BodyHits, FilterBodyQuery};
-use taomni_mail_engine::imap_sync::{
-    BodySyncOutcome, BodySyncTask, FolderRoundOutcome, FolderRoundRequest, FolderStepOutcome,
-    HeaderPageOutcome, HeaderPageRequest, HeaderStepRequest,
-};
-use taomni_mail_engine::search::ImapSearchRequest;
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
 
 use crate::{

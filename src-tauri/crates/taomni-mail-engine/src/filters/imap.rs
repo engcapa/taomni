@@ -3,19 +3,9 @@ use std::{
     io::{Read, Write},
 };
 
-use serde::{Deserialize, Serialize};
+pub use taomni_mail_api::imap_exchange::{BodyHits, FilterBodyQuery};
 
 use crate::{imap_folders::quote_imap_string, imap_transport::ImapSession};
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct FilterBodyQuery {
-    pub folder: String,
-    pub uids: Vec<u32>,
-    pub needles: Vec<String>,
-}
-
-pub type BodyHits = HashMap<u32, HashSet<String>>;
 
 impl ImapSession {
     pub fn filter_body_hits(&mut self, query: &FilterBodyQuery) -> Result<BodyHits, String> {

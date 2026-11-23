@@ -1,7 +1,7 @@
-use taomni_mail_engine::{
-    cache::apply_folder_round,
-    imap_sync::{FolderRoundOutcome, FolderRoundRequest, HeaderPageOutcome, HeaderPageRequest},
+use taomni_mail_api::imap_sync::{
+    FolderRoundOutcome, FolderRoundRequest, HeaderPageOutcome, HeaderPageRequest,
 };
+use taomni_mail_engine::cache::apply_folder_round;
 
 use super::*;
 
