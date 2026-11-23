@@ -5,7 +5,7 @@ description: Native mode downloads an attachment from local IMAP and verifies th
 modes: [browser, native]
 covers: [F-FILEOPEN-1, F-MAIL-5]
 tags: [p0, file-open, mail, temporary-file, crash-regression]
-fixtures: [reset_db, file_open_mail]
+fixtures: [reset_db, file_open_files, file_open_mail]
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
