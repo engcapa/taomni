@@ -180,6 +180,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   });
   const syncOwner = useMailSynchronization({
     info,
+    cacheResetGenerationRef: cacheOwner.cacheResetGenerationRef,
     folderSnapshots: cacheOwner.folderSnapshots,
     foldersRef: cacheOwner.foldersRef,
     tabId,
@@ -218,6 +219,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const { idleEnabled, idleState } = useMailboxLifecycle({
     loadCachedMessages: cacheLoadingOwner.loadCachedMessages,
     initialSyncDoneRef: syncOwner.initialSyncDoneRef,
+    cacheResetGenerationRef: cacheOwner.cacheResetGenerationRef,
     foldersRef: cacheOwner.foldersRef,
     bodyWarmSeqRef: cacheOwner.bodyWarmSeqRef,
     bodyLoadSeqRef: cacheOwner.bodyLoadSeqRef,
@@ -328,6 +330,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setStatus,
     cacheOwner,
     selectionOwner,
+    searchOwner,
+    runCacheReset: syncOwner.runCacheReset,
   });
   const composerOwner = useMailComposer({
     info,

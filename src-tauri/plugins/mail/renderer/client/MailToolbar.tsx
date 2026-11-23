@@ -84,7 +84,7 @@ export function MailToolbar(viewProps: MailToolbarProps) {
             includeBodies: false,
             indicator: "sync",
           })}
-          disabled={syncing}
+          disabled={syncing || clearing}
           data-testid="mail-sync-button"
         >
           {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
@@ -257,7 +257,7 @@ export function MailToolbar(viewProps: MailToolbarProps) {
           type="button"
           className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5"
           onClick={handleClearCache}
-          disabled={clearing}
+          disabled={clearing || syncing}
           title="Clear this account cache"
         >
           {clearing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}

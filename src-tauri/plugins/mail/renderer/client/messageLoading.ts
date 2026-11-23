@@ -7,6 +7,7 @@ import type { MailSubscriptionSnapshots } from "./subscriptionSnapshots";
 
 
 export interface LoadCachedFoldersContext {
+  cacheResetGenerationRef: import("react").RefObject<number>;
   folderSnapshots: MailSubscriptionSnapshots;
   visibleRef: import("react").RefObject<boolean>;
   pendingCacheRefreshRef: import("react").RefObject<boolean>;
@@ -28,8 +29,11 @@ export function createLoadCachedFolders(controllerContext: LoadCachedFoldersCont
     controllerContext.setLoadingFolders(true);
     controllerContext.setError(null);
     const readRevision = controllerContext.folderSnapshots.capture();
+    const generation = controllerContext.cacheResetGenerationRef.current;
+    const current = () => generation === controllerContext.cacheResetGenerationRef.current;
     try {
       const listed = await mailListCachedFolders(controllerContext.info.sessionId);
+      if (!current()) return;
       const cached = controllerContext.folderSnapshots.merge(listed, readRevision);
       if (!controllerContext.visibleRef.current) {
         controllerContext.pendingCacheRefreshRef.current = true;
@@ -43,9 +47,9 @@ export function createLoadCachedFolders(controllerContext: LoadCachedFoldersCont
           : current,
       );
     } catch (e) {
-      controllerContext.setError(mailClientErrorMessage(e));
+      if (current()) controllerContext.setError(mailClientErrorMessage(e));
     } finally {
-      controllerContext.setLoadingFolders(false);
+      if (current()) controllerContext.setLoadingFolders(false);
     }
   };
 }

@@ -239,7 +239,7 @@ export function createSyncFolderNow(controllerContext: SyncFolderNowContext): (f
     indicator: SyncIndicator = "sync",
     notify = false,
   ) => {
-    if (controllerContext.syncInFlightRef.current) {
+    if (controllerContext.syncInFlightRef.current || controllerContext.manualSyncPendingRef.current) {
       if (indicator !== "none" && controllerContext.visibleRef.current) controllerContext.setStatus("Mail sync already running");
       return null;
     }
@@ -396,6 +396,7 @@ export function createSyncAllFolders(controllerContext: SyncAllFoldersContext): 
     const includeBodies = options.includeBodies ?? false;
     const activeBeforeSync = controllerContext.selectedFolderRef.current;
     const manual = !quiet && indicator !== "none";
+    if (quiet && controllerContext.manualSyncPendingRef.current) return null;
     if (manual) {
       controllerContext.setStatus(null);
       controllerContext.manualSyncPendingRef.current = true;

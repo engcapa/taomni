@@ -1,10 +1,77 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { expect, it } from "vitest";
-import type { MailMessageBody, MailMessageHeader, MailSyncAllResult } from "../../../../../../src/lib/mail";
+import { expect, it, vi } from "vitest";
+import type { MailFolderSyncResult, MailMessageBody, MailMessageHeader, MailSyncAllResult } from "../../../../../../src/lib/mail";
 import { MailClientTab } from "../../MailClientTab";
-import { folder, info, mailMocks, message, messageBody, renderMailbox, stepResult } from "./harness";
+import { eventMocks, folder, info, mailMocks, message, messageBody, renderMailbox, stepResult } from "./harness";
 
 export function registerMailCacheSynchronizationCases() {
+  it("discards an IDLE refresh queued before clearing the cache", async () => {
+    mailMocks.mailClearCache.mockImplementation(async () => {
+      mailMocks.mailListCachedFolders.mockResolvedValue([]);
+      mailMocks.mailListCachedMessages.mockResolvedValue([]);
+    });
+    renderMailbox();
+    await screen.findByTestId("mail-message-row");
+
+    vi.useFakeTimers();
+    try {
+      const notifyIdle = eventMocks.handlers.get("mail://idle")!;
+      act(() => notifyIdle({ payload: { accountId: info.sessionId, kind: "changed" } }));
+      await act(async () => fireEvent.click(screen.getByTitle("Clear this account cache")));
+      expect(screen.getByTestId("mail-client-tab")).toHaveTextContent("Mail cache cleared");
+
+      await act(async () => vi.advanceTimersByTimeAsync(500));
+      expect(mailMocks.mailSyncFolder).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("mail-message-row")).not.toBeInTheDocument();
+
+      mailMocks.mailSyncFolder.mockImplementation(async () => {
+        mailMocks.mailListCachedMessages.mockResolvedValue([message]);
+        return stepResult({ messages: [message], fetched: 1 });
+      });
+      act(() => notifyIdle({ payload: { accountId: info.sessionId, kind: "changed" } }));
+      await act(async () => vi.advanceTimersByTimeAsync(500));
+      expect(mailMocks.mailSyncFolder).toHaveBeenCalled();
+      expect(screen.getByTestId("mail-message-row")).toHaveTextContent(message.subject);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears the cache after an active IDLE writer and ignores an older cache page", async () => {
+    let finishSync!: (result: MailFolderSyncResult) => void;
+    let finishPage!: (page: MailMessageHeader[]) => void;
+    mailMocks.mailListCachedMessages.mockImplementationOnce(() => new Promise((resolve) => { finishPage = resolve; }));
+    mailMocks.mailSyncFolder.mockImplementationOnce(() => new Promise((resolve) => { finishSync = resolve; }));
+    mailMocks.mailClearCache.mockImplementation(async () => {
+      mailMocks.mailListCachedFolders.mockResolvedValue([]);
+      mailMocks.mailListCachedMessages.mockResolvedValue([]);
+    });
+    renderMailbox();
+    await waitFor(() => expect(finishPage).toBeDefined());
+
+    vi.useFakeTimers();
+    try {
+      const notifyIdle = eventMocks.handlers.get("mail://idle")!;
+      act(() => notifyIdle({ payload: { accountId: info.sessionId, kind: "changed" } }));
+      await act(async () => vi.advanceTimersByTimeAsync(400));
+      expect(finishSync).toBeDefined();
+
+      fireEvent.click(screen.getByTitle("Clear this account cache"));
+      expect(mailMocks.mailClearCache).not.toHaveBeenCalled();
+      await act(async () => {
+        finishSync(stepResult({ messages: [message], fetched: 1 }));
+        await vi.advanceTimersByTimeAsync(150);
+      });
+      expect(mailMocks.mailClearCache).toHaveBeenCalledOnce();
+      expect(screen.getByTestId("mail-client-tab")).toHaveTextContent("Mail cache cleared");
+
+      await act(async () => finishPage([message]));
+      expect(screen.queryByTestId("mail-message-row")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   for (const source of ["cache", "server"] as const) {
     it(`retains a folder-read notice when a ${source} body finishes afterward`, async () => {
       let finishBody!: (body: MailMessageBody) => void;

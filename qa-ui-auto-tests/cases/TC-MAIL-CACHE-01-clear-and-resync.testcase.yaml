@@ -21,6 +21,9 @@ steps:
 - click: 'button[title="Clear this account cache"]:enabled'
 - assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Mail cache cleared}
 - assert_count: {selector: '[data-testid="mail-message-row"]', equal: 0}
+- eval_readonly:
+    expression: >-
+      window.__taomniQaMail.observe(window.__taomniQaMail.accounts()[0], 'INBOX').cache.length === 0
 - mail_server_assert_folder_count: {folder: INBOX, has_subject: Cache reset 0001}
 - click: '[data-testid="mail-sync-button"]:enabled'
 - mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 30}
@@ -33,17 +36,18 @@ verification:
   requirements:
   - id: clear-and-recover
     requirement: Clearing the cached account empties its displayed list and the next sync reads the original message from the server.
-    actions: [6, 9, 12, 16, 19]
+    actions: [6, 9, 12, 17, 20]
     checkpoints:
     - {step: 11, expectation: The fixture message appears once before clearing.}
     - {step: 13, expectation: The account confirms that the cache was cleared.}
     - {step: 14, expectation: The local list is empty immediately after clearing.}
-    - {step: 15, expectation: The server still contains the fixture message.}
-    - {step: 17, expectation: The next sync rebuilds the list to match the server.}
-    - {step: 18, expectation: The rebuilt list contains precisely one fixture message.}
-    - {step: 20, expectation: The rebuilt message opens with its original body.}
-    - {step: 21, expectation: The flow reports no runtime errors.}
-    results: [11, 13, 14, 15, 17, 18, 20, 21]
+    - {step: 15, expectation: The fixture's local mailbox index is also empty.}
+    - {step: 16, expectation: The server still contains the fixture message.}
+    - {step: 18, expectation: The next sync rebuilds the list to match the server.}
+    - {step: 19, expectation: The rebuilt list contains precisely one fixture message.}
+    - {step: 21, expectation: The rebuilt message opens with its original body.}
+    - {step: 22, expectation: The flow reports no runtime errors.}
+    results: [11, 13, 14, 15, 16, 18, 19, 21, 22]
   visual:
   - check: The mailbox view reports the clear and displays the recovered message.
     method: automated

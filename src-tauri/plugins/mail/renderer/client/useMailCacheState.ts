@@ -34,6 +34,7 @@ export function useMailCacheState(context: UseMailCacheStateContext) {
   const messagesRef = useRef<MailMessageHeader[]>([]);
   const cacheRemovalVersionsRef = useRef(new Map<string, number>());
   const cacheRequestSeqRef = useRef(0);
+  const cacheResetGenerationRef = useRef(0);
   // Sync batches and cache reloads can finish before React commits the prior
   // render. Publish one current list for both async work and rendering; a
   // delayed effect must never overwrite a newer cache reload with old rows.
@@ -55,5 +56,5 @@ export function useMailCacheState(context: UseMailCacheStateContext) {
     selectedFolderRef.current = value;
     setSelectedFolder(value);
   }, []);
-  return { folders, folderSnapshots, selectedFolder, selectedFolderRef, messages, visibleRef, bodyWarmSeqRef, bodyLoadSeqRef, setLoadingFolders, setLoadingMessages, setLoadingMoreMessages, setBodyLoadingKey, setBodyWarming, bodyCache, body, pendingCacheRefreshRef, foldersRef, setFolders, updateSelectedFolder, setHasMoreMessages, cacheRemovalVersionsRef, cacheRequestSeqRef, messagesRef, setMessages, bodyCacheRef, setBodyCache, setBody, bodyRequestsRef, loadingMessages, loadingMoreMessages, hasMoreMessages, bodyLoadingKey, bodyWarming, loadingFolders };
+  return { folders, folderSnapshots, selectedFolder, selectedFolderRef, messages, visibleRef, bodyWarmSeqRef, bodyLoadSeqRef, setLoadingFolders, setLoadingMessages, setLoadingMoreMessages, setBodyLoadingKey, setBodyWarming, bodyCache, body, pendingCacheRefreshRef, foldersRef, setFolders, updateSelectedFolder, setHasMoreMessages, cacheRemovalVersionsRef, cacheRequestSeqRef, cacheResetGenerationRef, messagesRef, setMessages, bodyCacheRef, setBodyCache, setBody, bodyRequestsRef, loadingMessages, loadingMoreMessages, hasMoreMessages, bodyLoadingKey, bodyWarming, loadingFolders };
 }

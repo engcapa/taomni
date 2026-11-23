@@ -18,6 +18,7 @@ export function useMailCacheLoading(context: UseMailCacheLoadingContext) {
   const { cacheOwner, setError, info, pageSize, setStatus, searchOwner, selectionOwner } = context;
 
   const loadCachedFolders = useCallback(createLoadCachedFolders({
+    cacheResetGenerationRef: cacheOwner.cacheResetGenerationRef,
     visibleRef: cacheOwner.visibleRef,
     pendingCacheRefreshRef: cacheOwner.pendingCacheRefreshRef,
     setLoadingFolders: cacheOwner.setLoadingFolders,

@@ -5,7 +5,7 @@ import { folderLabel } from "../../../../../src/lib/mailFolders";
 import { mergeFolderMeta } from "../../../../../src/lib/mailSync";
 import { pushMailNotification } from "../../../../../src/lib/mail/rendererServices";
 import { NEW_MAIL_EXCLUDED_KINDS, folderMatchesSpecial } from "./folders";
-import { catchupStepSize, refreshBatchSize } from "./messages";
+import { catchupStepSize, delay, refreshBatchSize } from "./messages";
 import type { MailSubscriptionSnapshots } from "./subscriptionSnapshots";
 import {
   createQueueFolderCatchups,
@@ -19,6 +19,7 @@ import {
 
 export interface UseMailSynchronizationContext {
   folderSnapshots: MailSubscriptionSnapshots;
+  cacheResetGenerationRef: import("react").RefObject<number>;
   info: import("../../../../../src/types").MailTabInfo;
   foldersRef: import("react").RefObject<MailFolder[]>;
   tabId: string;
@@ -46,6 +47,7 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
   const {
     info,
     folderSnapshots,
+    cacheResetGenerationRef,
     foldersRef,
     tabId,
     visibleRef,
@@ -89,6 +91,28 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
     };
   }, [info.sessionId]);
   const folderSelectSeqRef = useRef(0);
+  const runCacheReset = useCallback(async (clear: () => Promise<void>) => {
+    cacheResetGenerationRef.current += 1;
+    syncGenerationRef.current += 1;
+    folderSelectSeqRef.current += 1;
+    backfillSeqRef.current += 1;
+    // Reserve the account while its current writer completes, then discard
+    // queued catch-up batches that were based on the old cache.
+    manualSyncPendingRef.current = true;
+    try {
+      while (syncInFlightRef.current) await delay(50);
+      syncInFlightRef.current = true;
+      try {
+        pendingCatchupsRef.current.folders.clear();
+        setBackfillProgress(null);
+        await clear();
+      } finally {
+        syncInFlightRef.current = false;
+      }
+    } finally {
+      manualSyncPendingRef.current = false;
+    }
+  }, [cacheResetGenerationRef]);
   const batchSize = useMemo(() => refreshBatchSize(info), [info.sync.maxFetchPerSync]);
   const catchupBatchSize = useMemo(() => catchupStepSize(info), [info.sync.maxFetchPerSync]);
 
@@ -120,9 +144,10 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
   /** Remote LIST on open so a new account shows every folder at once. */
   const refreshFolderTree = useCallback(async () => {
     const readRevision = folderSnapshots.capture();
+    const generation = cacheResetGenerationRef.current;
     try {
       const listed = await mailListFolders(info);
-      if (listed.length === 0) return;
+      if (generation !== cacheResetGenerationRef.current || listed.length === 0) return;
       // Keep counts/watermarks a concurrent sync may have just updated.
       const byName = new Map(foldersRef.current.map((entry) => [entry.name, entry]));
       const next = folderSnapshots.merge(listed.map((entry) => {
@@ -134,7 +159,7 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
     } catch (e) {
       console.debug("mail folder LIST failed", e);
     }
-  }, [folderSnapshots, info]);
+  }, [cacheResetGenerationRef, folderSnapshots, info]);
 
   /**
    * Run gap-free sync steps for one folder until the backend reports no more
@@ -277,5 +302,5 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
     updateSelectedFolder,
     warmRecentBodies,
   ]);
-  return { setSyncing, initialSyncDoneRef, syncFolderNow, refreshFolderTree, startBackfill, syncAllFolders, batchSize, quietPollSelectedAndInbox, syncInFlightRef, backfillSeqRef, setBackfillProgress, syncSelectedFolder, applySyncedFolder, runFolderSync, syncing, syncProgress, backfillProgress };
+  return { setSyncing, runCacheReset, initialSyncDoneRef, syncFolderNow, refreshFolderTree, startBackfill, syncAllFolders, batchSize, quietPollSelectedAndInbox, syncInFlightRef, backfillSeqRef, setBackfillProgress, syncSelectedFolder, applySyncedFolder, runFolderSync, syncing, syncProgress, backfillProgress };
 }

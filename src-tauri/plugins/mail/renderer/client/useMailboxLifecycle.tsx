@@ -8,6 +8,7 @@ import { messageKey } from "./messages";
 export interface UseMailboxLifecycleContext {
   loadCachedMessages: (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<import("./types").MailCachePageResult>;
   initialSyncDoneRef: import("react").RefObject<boolean>;
+  cacheResetGenerationRef: import("react").RefObject<number>;
   foldersRef: import("react").RefObject<MailFolder[]>;
   bodyWarmSeqRef: import("react").RefObject<number>;
   bodyLoadSeqRef: import("react").RefObject<number>;
@@ -49,6 +50,7 @@ export function useMailboxLifecycle(context: UseMailboxLifecycleContext) {
   const {
     loadCachedMessages,
     initialSyncDoneRef,
+    cacheResetGenerationRef,
     foldersRef,
     bodyWarmSeqRef,
     bodyLoadSeqRef,
@@ -130,12 +132,17 @@ export function useMailboxLifecycle(context: UseMailboxLifecycleContext) {
     if (!visible || !info.sync.onOpen || initialSyncDoneRef.current) return;
     initialSyncDoneRef.current = true;
     const folder = selectedFolder;
+    const generation = cacheResetGenerationRef.current;
     // Catch up everything that arrived while the tab was closed, then keep
     // backfilling older history for the full local header index.
     void syncFolderNow(folder, "sync", true)
-      .then(() => refreshFolderTree())
-      .then(() => startBackfill(folder));
-  }, [info.sync.onOpen, refreshFolderTree, selectedFolder, startBackfill, syncFolderNow, visible]);
+      .then(() => {
+        if (generation === cacheResetGenerationRef.current) return refreshFolderTree();
+      })
+      .then(() => {
+        if (generation === cacheResetGenerationRef.current) startBackfill(folder);
+      });
+  }, [cacheResetGenerationRef, info.sync.onOpen, refreshFolderTree, selectedFolder, startBackfill, syncFolderNow, visible]);
 
   // Quiet background poll: most ticks refresh selected folder (+ INBOX when
   // different) without remote LIST. Every 6th tick does a full-folder scan for
@@ -176,15 +183,15 @@ export function useMailboxLifecycle(context: UseMailboxLifecycleContext) {
     let disposed = false;
     let debounce: number | null = null;
     let unlisten: (() => void) | null = null;
-    const schedulePoll = (waitMs = 400) => {
+    const schedulePoll = (waitMs = 400, generation = cacheResetGenerationRef.current) => {
       if (debounce != null) window.clearTimeout(debounce);
       debounce = window.setTimeout(() => {
         debounce = null;
-        if (disposed) return;
+        if (disposed || generation !== cacheResetGenerationRef.current) return;
         // The quiet poll skips while another sync (open catch-up, backfill)
         // holds the lock; keep the push pending instead of dropping it.
         if (syncInFlightRef.current) {
-          schedulePoll(500);
+          schedulePoll(500, generation);
           return;
         }
         void quietPollRef.current();
@@ -211,7 +218,7 @@ export function useMailboxLifecycle(context: UseMailboxLifecycleContext) {
       unlisten?.();
       void mailIdleStop(accountId).catch(() => { });
     };
-  }, [idleEnabled, info.sessionId]);
+  }, [cacheResetGenerationRef, idleEnabled, info.sessionId]);
 
   useEffect(() => {
     if (availableMessages.length === 0) {
