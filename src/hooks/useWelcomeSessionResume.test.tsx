@@ -151,6 +151,77 @@ describe("useWelcomeSessionResume (V-07)", () => {
     await waitFor(() => expect(result.current.view.state).toBe("empty"));
   });
 
+  it("refreshes an active Home row when a background snapshot commit appears", async () => {
+    resumeIpcMocks.getWelcomeRunSnapshot.mockResolvedValue({
+      record: null,
+      legacyCandidate: null,
+      issue: null,
+    });
+    const { result } = renderHook(() => useWelcomeSessionResume(true, makeCallbacks()));
+    await waitFor(() => expect(result.current.view.state).toBe("empty"));
+
+    // The collector persisted a run after the one-shot activation read.
+    resumeIpcMocks.getWelcomeRunSnapshot.mockResolvedValue({
+      record: record([savedEntry("committed")]),
+      legacyCandidate: null,
+      issue: null,
+    });
+    await act(async () => result.current.refresh());
+
+    expect(result.current.view).toMatchObject({ state: "available" });
+    expect(resumeIpcMocks.getWelcomeRunSnapshot).toHaveBeenCalledTimes(2);
+  });
+
+  it("defers refresh reads while Home is hidden and reloads on activation", async () => {
+    resumeIpcMocks.getWelcomeRunSnapshot.mockResolvedValue({
+      record: record([savedEntry("a")]),
+      legacyCandidate: null,
+      issue: null,
+    });
+    const { result, rerender } = renderHook(
+      ({ active }) => useWelcomeSessionResume(active, makeCallbacks()),
+      { initialProps: { active: false } },
+    );
+    // Hidden Home does not read availability until it is activated.
+    act(() => result.current.refresh());
+    expect(resumeIpcMocks.getWelcomeRunSnapshot).not.toHaveBeenCalled();
+
+    await act(async () => rerender({ active: true }));
+    await waitFor(() => expect(result.current.view.state).toBe("available"));
+    expect(resumeIpcMocks.getWelcomeRunSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores an older read that resolves after a newer refresh", async () => {
+    resumeIpcMocks.getWelcomeRunSnapshot.mockResolvedValue({
+      record: null,
+      legacyCandidate: null,
+      issue: null,
+    });
+    const { result } = renderHook(() => useWelcomeSessionResume(true, makeCallbacks()));
+    await waitFor(() => expect(result.current.view.state).toBe("empty"));
+
+    const pending: Array<(value: {
+      record: RunSnapshotRecord | null;
+      legacyCandidate: SnapshotEntry | null;
+      issue: null;
+    }) => void> = [];
+    resumeIpcMocks.getWelcomeRunSnapshot.mockImplementation(
+      () => new Promise((resolve) => pending.push(resolve)),
+    );
+    const fresh = record([savedEntry("fresh")], "saved:fresh");
+    act(() => {
+      result.current.refresh();
+      result.current.refresh();
+    });
+    expect(pending).toHaveLength(2);
+
+    // The second (newer) refresh wins; the first response is stale.
+    await act(async () => pending[1]({ record: fresh, legacyCandidate: null, issue: null }));
+    await waitFor(() => expect(result.current.view).toMatchObject({ state: "available", record: fresh }));
+    await act(async () => pending[0]({ record: null, legacyCandidate: null, issue: null }));
+    expect(result.current.view).toMatchObject({ state: "available", record: fresh });
+  });
+
   it("re-reads and retries when clear races a newer snapshot commit", async () => {
     const initial = record([savedEntry("before-clear")]);
     const newer = { ...initial, revision: initial.revision + 1 };

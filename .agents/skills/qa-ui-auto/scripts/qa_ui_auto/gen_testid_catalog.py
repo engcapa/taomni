@@ -123,7 +123,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(rendered, encoding="utf-8")
+    # The catalog is a committed repository artifact with LF line endings, so
+    # the generator must not inherit a Windows CRLF conversion and rewrite
+    # every line of an otherwise one-entry diff.
+    target.write_text(rendered, encoding="utf-8", newline="\n")
     print(f"wrote {target} ({len(rendered.splitlines())} lines)")
     return 0
 

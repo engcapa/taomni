@@ -3617,6 +3617,10 @@ controls:
     selector: '[data-testid="vnc-reconnect"]'
     kind: interactive
     optional: true          # only on disconnected/error state
+  - id: reconnect-stop
+    selector: '[data-testid="vnc-reconnect-stop"]'
+    kind: interactive
+    optional: true          # cancels the automatic reconnect countdown in the disconnected card; TC-157 uses it to keep the reconnect state deterministic
   - id: unencrypted-continue
     selector: '[data-testid="vnc-unencrypted-continue"]'
     kind: interactive

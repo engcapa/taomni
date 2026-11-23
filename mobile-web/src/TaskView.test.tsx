@@ -74,12 +74,90 @@ it("keeps a second instruction blocked when a revision supersedes the post-send 
   await waitFor(() => expect(pending[0].signal?.aborted).toBe(true));
   expect(pending).toHaveLength(2);
   fireEvent.change(input, { target: { value: "second" } });
-  expect(screen.getByTestId("mobile-agent-send")).toBeDisabled();
-  fireEvent.submit(input.closest("form")!);
+  await waitFor(() => expect(screen.getByTestId("mobile-agent-send")).toBeEnabled());
+  fireEvent.click(screen.getByTestId("mobile-agent-send"));
+  await waitFor(() => expect(pending).toHaveLength(3));
+  expect(pending[1].signal?.aborted).toBe(true);
+  pending[2].resolve({ id: "thread:t", status: "running" });
+  await waitFor(() => expect(screen.getByTestId("mobile-task-error")).toHaveTextContent("当前轮次仍在运行"));
   expect(vi.mocked(request).mock.calls.filter(([, path]) => path.endsWith("/message"))).toHaveLength(1);
-  pending[1].resolve({ id: "thread:t", status: "running" });
   await waitFor(() => expect(screen.getByTestId("mobile-task-status")).toHaveTextContent("运行中"));
   expect(screen.getByTestId("mobile-agent-send")).toBeDisabled();
+});
+
+it("sends one instruction after an in-flight status refresh resolves", async () => {
+  const pending: { resolve: (value: unknown) => void; signal?: AbortSignal }[] = [];
+  let initial = true;
+  vi.mocked(request).mockImplementation(async (_instance, path, _body, signal) => {
+    if (path.endsWith("/message")) return {};
+    if (path.endsWith("/changes")) return { changes: [] };
+    if (initial) { initial = false; return { id: "thread:t", status: "idle" }; }
+    return new Promise((resolve, reject) => {
+      pending.push({ resolve, signal });
+      signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+    });
+  });
+  const instance: Instance = { id: "phone", endpoint: "https://pc.example", token: "t", deviceId: "d", label: "PC" };
+  const session = { id: "thread:t", title: "Task", kind: "agent" as const, status: "idle", summary: "" };
+  const { rerender } = render(<TaskView instance={instance} session={session} revision={0} />);
+  await waitFor(() => expect(screen.getByTestId("mobile-task-updated")).not.toHaveTextContent("—"));
+  rerender(<TaskView instance={instance} session={session} revision={1} />);
+  await waitFor(() => expect(pending).toHaveLength(1));
+  const input = screen.getByTestId("mobile-agent-input");
+  fireEvent.change(input, { target: { value: "继续" } });
+  const send = screen.getByTestId("mobile-agent-send");
+  expect(send).toBeEnabled();
+  fireEvent.click(send);
+  await waitFor(() => expect(pending).toHaveLength(2));
+  expect(pending[0].signal?.aborted).toBe(true);
+  pending[1].resolve({ id: "thread:t", status: "idle" });
+  await waitFor(() => expect(vi.mocked(request).mock.calls.filter(([, path]) => path.endsWith("/message"))).toHaveLength(1));
+  await waitFor(() => expect(pending).toHaveLength(3));
+  pending[2].resolve({ id: "thread:t", status: "idle" });
+  await waitFor(() => expect(input).toHaveValue(""));
+  expect(vi.mocked(request).mock.calls.filter(([, path]) => path.endsWith("/message"))).toHaveLength(1);
+});
+
+it("still sends with Ctrl/Cmd+Enter through the authoritative submit path", async () => {
+  vi.mocked(request).mockImplementation(async (_instance, path) => path.endsWith("/changes") ? { changes: [] } : { id: "thread:t", status: "idle" });
+  const instance: Instance = { id: "phone", endpoint: "https://pc.example", token: "t", deviceId: "d", label: "PC" };
+  render(<TaskView instance={instance} session={{ id: "thread:t", title: "Task", kind: "agent", status: "idle", summary: "" }} revision={0} />);
+  await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+  const input = screen.getByTestId("mobile-agent-input");
+  fireEvent.change(input, { target: { value: "继续" } });
+  fireEvent.keyDown(input, { key: "Enter", ctrlKey: true });
+  await waitFor(() => expect(vi.mocked(request).mock.calls.filter(([, path]) => path.endsWith("/message"))).toHaveLength(1));
+});
+
+it("sends nothing and reports why when the authoritative status is running", async () => {
+  const pending: { resolve: (value: unknown) => void; signal?: AbortSignal }[] = [];
+  let initial = true;
+  vi.mocked(request).mockImplementation(async (_instance, path, _body, signal) => {
+    if (path.endsWith("/message")) return {};
+    if (path.endsWith("/changes")) return { changes: [] };
+    if (initial) { initial = false; return { id: "thread:t", status: "idle" }; }
+    return new Promise((resolve, reject) => {
+      pending.push({ resolve, signal });
+      signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+    });
+  });
+  const instance: Instance = { id: "phone", endpoint: "https://pc.example", token: "t", deviceId: "d", label: "PC" };
+  const session = { id: "thread:t", title: "Task", kind: "agent" as const, status: "idle", summary: "" };
+  const { rerender } = render(<TaskView instance={instance} session={session} revision={0} />);
+  await waitFor(() => expect(screen.getByTestId("mobile-task-updated")).not.toHaveTextContent("—"));
+  rerender(<TaskView instance={instance} session={session} revision={1} />);
+  await waitFor(() => expect(pending).toHaveLength(1));
+  const input = screen.getByTestId("mobile-agent-input");
+  fireEvent.change(input, { target: { value: "继续" } });
+  fireEvent.click(screen.getByTestId("mobile-agent-send"));
+  await waitFor(() => expect(pending).toHaveLength(2));
+  expect(pending[0].signal?.aborted).toBe(true);
+  pending[1].resolve({ id: "thread:t", status: "running" });
+  await waitFor(() => expect(screen.getByTestId("mobile-task-error")).toHaveTextContent("当前轮次仍在运行"));
+  expect(vi.mocked(request).mock.calls.filter(([, path]) => path.endsWith("/message"))).toHaveLength(0);
+  await waitFor(() => expect(screen.getByTestId("mobile-task-status")).toHaveTextContent("运行中"));
+  expect(screen.getByTestId("mobile-task-error")).toBeVisible();
+  expect(input).toHaveValue("继续");
 });
 
 it("fails closed on an unreadable task status and lets the user retry before sending", async () => {
@@ -93,7 +171,11 @@ it("fails closed on an unreadable task status and lets the user retry before sen
   render(<TaskView instance={instance} session={{ id: "thread:t", title: "Task", kind: "agent", status: "idle", summary: "" }} revision={0} />);
   await screen.findByTestId("mobile-task-retry");
   fireEvent.change(screen.getByTestId("mobile-agent-input"), { target: { value: "retained draft" } });
-  expect(screen.getByTestId("mobile-agent-send")).toBeDisabled();
+  const send = screen.getByTestId("mobile-agent-send");
+  expect(send).toBeEnabled();
+  fireEvent.click(send);
+  await waitFor(() => expect(screen.getByTestId("mobile-task-error")).toHaveTextContent("连接失败"));
+  expect(vi.mocked(request).mock.calls.filter(([, path]) => path.endsWith("/message"))).toHaveLength(0);
   failed = false;
   fireEvent.click(screen.getByTestId("mobile-task-retry"));
   await waitFor(() => expect(screen.getByTestId("mobile-agent-send")).toBeEnabled());
