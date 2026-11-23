@@ -169,6 +169,8 @@ jobs:
           assert all("resources/vnc/" not in entry for entry in resources), "Core declares VNC module resources"
           PY
       - name: Build the release frontend and record actual chunk hashes
+        env:
+          TAURI_ENV_PLATFORM: linux
         shell: bash
         run: |
           pnpm install --frozen-lockfile
@@ -184,6 +186,7 @@ jobs:
           for (const path of Object.keys(manifest)) {
             assert(!/plugins\/(vnc|rdp)-client\/renderer\//.test(path), `Bundled remote desktop frontend ${path}`);
             assert(!path.includes('plugins/mfa/renderer/'), `Bundled MFA frontend ${path}`);
+            assert(!path.includes('plugins/mail/renderer/'), `Bundled Mail frontend ${path}`);
           }
           for (const [source, asset] of Object.entries(manifest)) {
             assert(!source.includes('plugins/sockscap/renderer/'), `Bundled SocksCap renderer ${source}`);

@@ -8,10 +8,10 @@ import { modularBoundaryViolations } from "./modular-boundaries.mjs";
 function fixture(t, manifest = "") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "taomni-capture-boundary-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const shared = ["taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api",
-    "taomni-rdp-client-engine", "taomni-mail-engine", "taomni-mfa-engine", "taomni-vnc-api",
+  const shared = ["taomni-asr-models", "taomni-local-voice-api", "taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api",
+    "taomni-rdp-client-engine", "taomni-mail-api", "taomni-mail-engine", "taomni-mfa-engine", "taomni-vnc-api",
     "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector", "taomni-screenshot-api",
-    "taomni-screenshot-ocr", "taomni-screenshot-recording", "taomni-server-process"];
+    "taomni-screenshot-ocr", "taomni-screenshot-recording", "taomni-server-process", "taomni-local-servers-engine", "taomni-pty"];
   for (const child of ["src/screenshot", "src/mfa", "src/mobile", "src/servers", "src/config",
     "crates/taomni-capture/src", ...shared.map(name => `crates/${name}/src`)]) {
     fs.mkdirSync(path.join(root, "src-tauri", child), { recursive: true });
@@ -123,6 +123,17 @@ test("Mail engine rejects dependencies on the desktop and host runtime", (t) => 
   const errors = modularBoundaryViolations(root).join("\n");
   assert.match(errors, /taomni-mail-engine\/Cargo.toml.*core links application\/plugin state/);
   assert.match(errors, /lib.rs: shared library must not import application\/plugin state/);
+});
+
+test("Mail protocol types allow the routed transport and exclude the engine", (t) => {
+  const root = fixture(t);
+  const api = "src-tauri/crates/taomni-mail-api";
+  const manifest = '[dependencies]\ntaomni-plugin-stream = { path = "../taomni-plugin-stream" }\n';
+  write(root, `${api}/Cargo.toml`, manifest);
+  write(root, `${api}/src/lib.rs`, "use taomni_plugin_stream::routed_tcp::Endpoint;\nconst MAX: usize = taomni_plugin_stream::MAX_PAYLOAD_BYTES;\n");
+  assert.deepEqual(modularBoundaryViolations(root), []);
+  write(root, `${api}/Cargo.toml`, `${manifest}engine = { package = "taomni-mail-engine", path = "../taomni-mail-engine" }\n`);
+  assert.match(modularBoundaryViolations(root).join("\n"), /taomni-mail-api.*engine links the Mail engine/);
 });
 
 test("Screenshot codecs stay independent of the desktop and the signed host", (t) => {

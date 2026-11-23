@@ -39,10 +39,11 @@ function sharedLibraryViolations(root) {
       }
     }
   }
-  for (const name of ["taomni-asr-models", "taomni-local-voice-api", "taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api", "taomni-rdp-client-engine", "taomni-mail-engine", "taomni-vnc-api", "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector", "taomni-screenshot-api", "taomni-screenshot-ocr", "taomni-screenshot-recording", "taomni-server-process", "taomni-local-servers-engine", "taomni-pty"]) {
+  for (const name of ["taomni-asr-models", "taomni-local-voice-api", "taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api", "taomni-rdp-client-engine", "taomni-mail-api", "taomni-mail-engine", "taomni-vnc-api", "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector", "taomni-screenshot-api", "taomni-screenshot-ocr", "taomni-screenshot-recording", "taomni-server-process", "taomni-local-servers-engine", "taomni-pty"]) {
     const directory = path.join(root, "src-tauri/crates", name);
     const manifest = fs.readFileSync(path.join(directory, "Cargo.toml"), "utf8");
-    const usesRoutedTcp = ["taomni-rdp-client-api", "taomni-screenshot-api", "taomni-local-voice-api"].includes(name);
+    const isMailApi = name === "taomni-mail-api";
+    const usesRoutedTcp = ["taomni-rdp-client-api", "taomni-screenshot-api", "taomni-local-voice-api", "taomni-mail-api"].includes(name);
     for (const match of manifest.matchAll(/\bpackage\s*=\s*"(tauri(?:-[^"\s]+)?|wry|taomni|taomni-plugin-[^"\s]+)"/g)) {
       errors.push(`${name}/Cargo.toml: aliased dependency links application/plugin package ${match[1]}`);
     }
@@ -62,10 +63,15 @@ function sharedLibraryViolations(root) {
       if (name === "taomni-file-uri" && !/(?:^|\.)dev-dependencies$/.test(section)) {
         errors.push(`${name}/Cargo.toml: URI conversion must have zero runtime/build dependencies`);
       }
+      if (isMailApi && (packageName === "taomni-mail-engine"
+        || resolvedPath === path.join(root, "src-tauri/crates/taomni-mail-engine"))) {
+        errors.push(`${name}/Cargo.toml: ${section}.${dependency} links the Mail engine`);
+      }
     }
     for (const filename of rustFiles(path.join(directory, "src"))) {
       let source = fs.readFileSync(filename, "utf8").replace(/\/\/[^\n]*/g, "");
       if (usesRoutedTcp) source = source.replace(/\btaomni_plugin_stream::routed_tcp::/g, "");
+      if (isMailApi) source = source.replace(/\btaomni_plugin_stream::MAX_PAYLOAD_BYTES\b/g, "");
       if (/\b(?:tauri(?:_[\w]+)?|wry|taomni_lib|taomni_plugin_[\w]+)::|\bcrate::(?:state|servers|rdp|config|vault)::/.test(source)) {
         errors.push(`${path.relative(root, filename)}: shared library must not import application/plugin state`);
       }
