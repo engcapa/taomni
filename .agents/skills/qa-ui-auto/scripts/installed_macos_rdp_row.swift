@@ -1,10 +1,9 @@
 import AppKit
 import ApplicationServices
 import ImageIO
-import Vision
 
-// WKWebView can omit the contents of a listbox option from its accessibility
-// tree. Locate the real label in an owned window capture before sending input.
+// WKWebView omits the server list options on the release runners. Verify the
+// stopped-status markers in the owned window before selecting its last row.
 func selectRdpRow(pid: pid_t, screenshot: URL) throws -> CGPoint? {
     guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
           let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
@@ -30,36 +29,36 @@ func selectRdpRow(pid: pid_t, screenshot: URL) throws -> CGPoint? {
           let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
     else { throw CheckFailure("The owned Local servers screenshot is unreadable") }
     let pixelScale = CGFloat(image.width) / bounds.width
-    let column = CGRect(x: 40 * pixelScale, y: 0, width: 145 * pixelScale, height: CGFloat(image.height)).integral
-    guard let cropped = image.cropping(to: column) else { throw CheckFailure("The Local servers label column is missing") }
-    let labels = try recognizedLabels(cropped)
-    let rdp = labels.filter { $0.0 == "RDP" }
-    guard rdp.count == 1,
-          let row = rdp.first?.1,
-          labels.contains(where: { $0.0.caseInsensitiveCompare("Local servers") == .orderedSame && $0.1.midY > row.midY })
-    else { return nil }
-    let point = CGPoint(x: bounds.minX + (column.minX + row.midX * column.width) / pixelScale,
-                        y: bounds.minY + (1 - row.midY) * bounds.height)
+    let rowCenters = (0..<10).map { 105 + CGFloat($0) * 30 }
+    guard rowCenters.allSatisfy({
+        isStoppedMarker(in: image, x: 55 * pixelScale, y: $0 * pixelScale)
+    }), let rdpRow = rowCenters.last else { return nil }
+    // The label column selects the row. Start/stop actions are farther right.
+    let point = CGPoint(x: bounds.minX + 78, y: bounds.minY + rdpRow)
     guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
           let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: point, mouseButton: .left),
           let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: point, mouseButton: .left)
     else { throw CheckFailure("The captured Local servers window lost input ownership") }
     down.setIntegerValueField(.mouseEventClickState, value: 1)
     up.setIntegerValueField(.mouseEventClickState, value: 1)
-    down.postToPid(pid)
-    up.postToPid(pid)
+    down.post(tap: .cghidEventTap)
+    up.post(tap: .cghidEventTap)
     return point
 }
 
-private func recognizedLabels(_ image: CGImage) throws -> [(String, CGRect)] {
-    let text = VNRecognizeTextRequest()
-    text.recognitionLevel = .accurate
-    text.recognitionLanguages = ["en-US"]
-    text.usesLanguageCorrection = false
-    text.minimumTextHeight = 0.005
-    try VNImageRequestHandler(cgImage: image, options: [:]).perform([text])
-    return (text.results ?? []).compactMap { line in
-        guard let match = line.topCandidates(1).first else { return nil }
-        return (match.string.trimmingCharacters(in: .whitespacesAndNewlines), line.boundingBox)
-    }
+private func isStoppedMarker(in image: CGImage, x: CGFloat, y: CGFloat) -> Bool {
+    let rectangle = CGRect(x: x.rounded(), y: y.rounded(), width: 1, height: 1)
+    guard let pixel = image.cropping(to: rectangle),
+          let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+          let context = CGContext(
+            data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+            space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+          ), let bytes = context.data?.assumingMemoryBound(to: UInt8.self)
+    else { return false }
+
+    context.draw(pixel, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+    // Both hosted screenshots use the stopped color from ServerRow.tsx.
+    return abs(Int(bytes[0]) - 148) <= 12
+        && abs(Int(bytes[1]) - 163) <= 12
+        && abs(Int(bytes[2]) - 184) <= 12
 }
