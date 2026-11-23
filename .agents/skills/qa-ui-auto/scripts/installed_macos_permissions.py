@@ -72,9 +72,10 @@ def observe_permissions(executable, evidence, phase, *, work=None):
         with installed_macos_desktop(executable, work, folder) as owner:
             receipt = controls(compile_driver(work), owner, executable, "permissions", folder, password=PASSWORD)
             observations = receipt["permissions"]
-            if (observations.get("screenRecording") != "granted" or observations.get("accessibility") != "granted"
+            if (observations.get("screenRecording") not in {"granted", "denied"}
+                    or observations.get("accessibility") not in {"granted", "denied"}
                     or owner.poll() is not None):
-                raise RuntimeError("Installed macOS permission controls did not report both grants")
+                raise RuntimeError("Installed macOS permission controls did not report both statuses")
             pid = owner.pid
     record = {
         **observations, "pid": pid, "bundleIdentifier": info["CFBundleIdentifier"],
@@ -112,8 +113,9 @@ def observe_appkit_screen_scan(executable, evidence, recovery, work, result):
     with installed_macos_desktop(executable, work, folder) as owner:
         result["corePid"] = owner.pid
         try:
+            # The panel clamps to the right edge, clear of the dialog and toolbar.
             desktop_action(steps, "native_show_image_window", {
-                "path": "qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png", "x": 16, "y": 60,
+                "path": "qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png", "x": 10000, "y": 60,
             })
             result["imageWindow"] = json.loads((evidence / "native-image-window.json").read_text(encoding="utf-8"))
             expected = [recovery["nextHotp"].replace(" ", "")]

@@ -29,6 +29,13 @@ def controls(driver, owner, executable, phase, evidence, **inputs):
     )
     if observed.returncode:
         (evidence / f"{phase}-error.log").write_text(observed.stderr, encoding="utf-8")
+        if phase in {"permissions", "mfa-before", "mfa-after", "screen-scan"} and owner.poll() is None:
+            try:
+                subprocess.run(["screencapture", "-x", str(evidence / f"{phase}-failure.png")],
+                               capture_output=True, timeout=10)
+            except (OSError, subprocess.TimeoutExpired):
+                # Keep the original accessibility failure even if capture is unavailable.
+                pass
         raise RuntimeError(f"Installed macOS {phase}: {observed.stderr.strip()}")
     receipt = json.loads(observed.stdout)
     if receipt["ownerPid"] != owner.pid or receipt["phase"] != phase:

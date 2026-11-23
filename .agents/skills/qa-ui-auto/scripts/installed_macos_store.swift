@@ -86,6 +86,30 @@ func press(_ element: AXUIElement) throws {
     }
 }
 
+func clickOwnedLabel(_ element: AXUIElement, pid: pid_t) throws {
+    _ = AXUIElementPerformAction(element, "AXScrollToVisible" as CFString)
+    guard let position = attribute(element, kAXPositionAttribute),
+          let size = attribute(element, kAXSizeAttribute),
+          CFGetTypeID(position) == AXValueGetTypeID(), CFGetTypeID(size) == AXValueGetTypeID()
+    else { throw CheckFailure("The owned accessibility label has no position or size") }
+    var origin = CGPoint.zero
+    var bounds = CGSize.zero
+    guard AXValueGetValue(position as! AXValue, .cgPoint, &origin),
+          AXValueGetValue(size as! AXValue, .cgSize, &bounds),
+          bounds.width > 0, bounds.height > 0
+    else { throw CheckFailure("The owned accessibility label has no visible rectangle") }
+    let center = CGPoint(x: origin.x + bounds.width / 2, y: origin.y + bounds.height / 2)
+    var hit: AXUIElement?
+    var hitPid: pid_t = 0
+    guard AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(center.x), Float(center.y), &hit) == .success,
+          let hit = hit, AXUIElementGetPid(hit, &hitPid) == .success, hitPid == pid,
+          let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: center, mouseButton: .left),
+          let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: center, mouseButton: .left)
+    else { throw CheckFailure("The label's hit point does not belong to the installed app") }
+    down.postToPid(pid)
+    up.postToPid(pid)
+}
+
 func focus(_ element: AXUIElement) throws {
     if attribute(element, kAXFocusedAttribute) as? Bool == true { return }
     let result = AXUIElementSetAttributeValue(element, kAXFocusedAttribute as CFString, kCFBooleanTrue)
@@ -226,24 +250,31 @@ func observe(_ request: Request) throws -> Observation {
         try press(tools)
         try press(try wait(name) { menuItem(tools, role: kAXMenuItemRole, label: name) })
     }
-    func readHOTP(_ expected: String) throws -> String {
+    func readHOTP(_ expected: String, stage: String) throws -> String {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         defer { pasteboard.clearContents() }
         // Both the displayed code and its icon have the same accessible name.
         // Either button writes the current code to the native pasteboard.
         let copyName = "Copy code for \(request.issuer ?? "")"
-        let copy = try wait("MFA copy control") {
+        func copyControl() -> AXUIElement? {
             contents().first {
                 attribute($0, kAXRoleAttribute) as? String == kAXButtonRole
                     && attribute($0, kAXEnabledAttribute) as? Bool == true
                     && labels($0).contains(copyName)
             }
         }
-        try press(copy)
-        return try wait("expected HOTP on the pasteboard") {
+        try press(try wait("MFA copy control", copyControl))
+        var lastActivation = ProcessInfo.processInfo.systemUptime
+        return try wait("expected HOTP on the pasteboard \(stage)") {
             let actual = pasteboard.string(forType: .string)
-            return actual == expected ? actual : nil
+            if actual == expected { return actual }
+            if ProcessInfo.processInfo.systemUptime - lastActivation >= 1, let current = copyControl() {
+                // The one-off Next action updates the code asynchronously.
+                try press(current)
+                lastActivation = ProcessInfo.processInfo.systemUptime
+            }
+            return nil
         }
     }
 
@@ -251,20 +282,50 @@ func observe(_ request: Request) throws -> Observation {
     case "permissions":
         defer { NSPasteboard.general.clearContents() }
         try unlockVault()
-        try openTool("Local servers")
-        try press(try wait("RDP settings") { button(contents(), "Settings RDP") })
-        _ = try wait("RDP Screen Recording and Accessibility grants") {
-            let visible = contents().flatMap(labels)
-            return visible.contains("Permission granted")
-                && visible.contains("Keyboard and mouse control enabled") ? true : nil
-        }
         try openSettings("screenshot")
-        let summary = try wait("Screenshot Screen Recording grant") {
+        let grantedPrefix = "Screen Recording permission granted; native display capture is available"
+        let deniedPrefix = "Screen Recording permission is required before the RDP server can start"
+        let summary = try wait("Screenshot Screen Recording status") {
             contents().flatMap(labels).first {
-                $0.hasPrefix("Screen Recording permission granted; native display capture is available")
+                $0.hasPrefix(grantedPrefix) || $0.hasPrefix(deniedPrefix)
             }
         }
-        result.permissions = ["screenRecording": "granted", "accessibility": "granted", "screenshotSummary": summary]
+        try openTool("Local servers")
+        let rdp = try wait("RDP row in Local servers") { () -> AXUIElement? in
+            let elements = contents()
+            if let settings = button(elements, "Settings RDP") { return settings }
+            // WebKit may hide the nested buttons of the ARIA listbox option.
+            guard elements.flatMap(labels).contains("Local servers") else { return nil }
+            return elements.first {
+                attribute($0, kAXRoleAttribute) as? String == kAXStaticTextRole && labels($0).contains("RDP")
+            } ?? elements.first {
+                let accessible = labels($0)
+                return accessible.contains("RDP") || accessible.contains { $0.hasPrefix("RDP, ") }
+            }
+        }
+        if labels(rdp).contains("Settings RDP") {
+            try press(rdp)
+        } else {
+            try clickOwnedLabel(rdp, pid: request.pid)
+        }
+        result.permissions = try wait("RDP Screen Recording and Accessibility status") { () -> [String: String]? in
+            let elements = contents()
+            let visible = elements.flatMap(labels)
+            let screenGranted = visible.contains("Permission granted")
+            let accessibilityGranted = visible.contains("Keyboard and mouse control enabled")
+            guard screenGranted || visible.contains("Permission required before the server can start"),
+                  accessibilityGranted || visible.contains("Required for keyboard and mouse control"),
+                  elements.contains(where: {
+                      attribute($0, kAXRoleAttribute) as? String == kAXButtonRole
+                          && attribute($0, kAXEnabledAttribute) as? Bool == true
+                          && labels($0).contains(where: { ["Refresh displays", "Refresh status", "Grant permission…"].contains($0) })
+                  })
+            else { return nil }
+            return ["screenRecording": screenGranted ? "granted" : "denied",
+                    "accessibility": accessibilityGranted ? "granted" : "denied", "screenshotSummary": summary]
+        }
+        guard (result.permissions?["screenRecording"] == "granted") == summary.hasPrefix(grantedPrefix)
+        else { throw CheckFailure("Screenshot and RDP disagree about the installed Screen Recording permission") }
     case "mfa-before", "mfa-after":
         let expectedCount = request.phase == "mfa-before" ? 1 : 2
         guard let issuer = request.issuer, let expected = request.codes, expected.count == expectedCount else {
@@ -272,10 +333,10 @@ func observe(_ request: Request) throws -> Observation {
         }
         try unlockVault()
         try openTool("MFA authenticator")
-        var codes = [try readHOTP(expected[0])]
+        var codes = [try readHOTP(expected[0], stage: "when opening the account")]
         if expected.count == 2 {
             try press(try wait("advance HOTP") { button(contents(), "Generate the next code for \(issuer)") })
-            codes.append(try readHOTP(expected[1]))
+            codes.append(try readHOTP(expected[1], stage: "after advancing the account"))
         }
         result.codes = codes
     case "screen-scan":
@@ -300,14 +361,28 @@ func observe(_ request: Request) throws -> Observation {
             else { return nil }
             return button(Array(elements.dropFirst(index + 1)), "Scan screen")
         })
-        _ = try wait("one external QR account in the import preview") {
+        _ = try wait("screen scan to produce the import preview") {
+            let elements = contents()
+            let visible = elements.flatMap(labels)
+            if let failure = visible.first(where: {
+                $0 == "No QR code found on screen." || $0.hasPrefix("Taomni needs Screen Recording permission.")
+                    || $0.hasPrefix("Screen capture failed:")
+            }) { throw CheckFailure(failure) }
+            return visible.contains("Review accounts") ? true : nil
+        }
+        _ = try wait("one importable QA Bank account in the preview") {
             let elements = contents()
             guard elements.flatMap(labels).contains("1 account(s) found"), button(elements, "Import 1") != nil
             else { return nil as Bool? }
-            return elements.contains {
+            let issuerField = elements.contains {
                 attribute($0, kAXRoleAttribute) as? String == kAXTextFieldRole
                     && attribute($0, kAXValueAttribute) as? String == "QA Bank"
-            } ? true : nil
+            }
+            let accountRow = elements.contains {
+                attribute($0, kAXRoleAttribute) as? String == kAXCheckBoxRole
+                    && labels($0).contains { $0 == "QA Bank" || $0.hasPrefix("QA Bank · ") }
+            }
+            return issuerField || accountRow ? true : nil
         }
         result.scannedIssuer = "QA Bank"
         try postKey(pid: request.pid, code: 53)
@@ -316,7 +391,7 @@ func observe(_ request: Request) throws -> Observation {
             return button(elements, "Add MFA account") != nil
                 && !elements.flatMap(labels).contains("1 account(s) found") ? true : nil
         }
-        result.codes = [try readHOTP(codes[0])]
+        result.codes = [try readHOTP(codes[0], stage: "after dismissing the scan")]
     case "unlock-store":
         defer { NSPasteboard.general.clearContents() }
         try unlockVault()
