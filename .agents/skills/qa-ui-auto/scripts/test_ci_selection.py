@@ -200,7 +200,8 @@ class SelectionTests(unittest.TestCase):
                     'TC-WS-052', 'TC-WS-053', 'TC-WS-054', 'TC-WS-056', 'TC-WS-057', 'TC-MOBILE-013',
                     'TC-FILE-OPEN-002', 'TC-FILE-OPEN-003', 'TC-FILE-OPEN-005', 'TC-FILE-OPEN-006',
                     'TC-FILE-OPEN-007', 'TC-FILE-OPEN-008', 'TC-FILE-OPEN-009', 'TC-FILE-OPEN-010', 'TC-FILE-OPEN-011', 'TC-FILE-OPEN-012',
-                    'TC-FILE-OPEN-013', 'TC-TAO-HOME-002', 'TC-EXPLORER-013', 'TC-FILE-OPEN-041', 'TC-FILE-OPEN-047'}
+                    'TC-FILE-OPEN-013', 'TC-TAO-HOME-002', 'TC-EXPLORER-013', 'TC-FILE-OPEN-041',
+                    'TC-FILE-OPEN-047', 'TC-MODULES-102'}
         for entry in native:
             with self.subTest(profile=entry['linux_profile']):
                 self.assertEqual(set(entry['selected_ids']), expected)

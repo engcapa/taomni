@@ -33,6 +33,7 @@ smoke:
 - TC-FILE-OPEN-005
 - TC-FILE-OPEN-006
 - TC-FILE-OPEN-047
+- TC-MODULES-102
 unavailable: {}
 requires_plugin:
   TC-FILE-OPEN-047: mail

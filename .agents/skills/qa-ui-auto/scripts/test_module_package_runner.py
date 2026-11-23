@@ -116,15 +116,19 @@ class OfficialPackageRunnerTests(unittest.TestCase):
         self.assertEqual(json.loads(values["build_matrix"])["include"][0]["target"], "aarch64-apple-darwin")
         self.assertEqual(self.roster_targets(values, "sign_matrix"), {"darwin-aarch64": False})
 
-    def test_vnc_server_has_its_own_package_selection(self):
+    def test_server_module_frontends_follow_their_own_package_targets(self):
         builds = {"include": [
             {"platform_key": "linux", "arch": "X64", "capabilities": ["signed-local-vnc"]},
-            {"platform_key": "windows", "arch": "X64", "capabilities": ["signed-vnc"]},
+            {"platform_key": "windows", "arch": "X64", "capabilities": ["signed-vnc", "signed-local-rdp"]},
+            {"platform_key": "macos", "arch": "ARM64", "capabilities": ["signed-local-servers"]},
         ]}
-        with tempfile.TemporaryDirectory() as directory:
-            values = self.admit("macos-26", Path(directory) / "output", json.dumps(builds), "vnc-server")
-        self.assertEqual(self.roster_targets(values, "sign_matrix"), {"linux-x86_64": False})
-        self.assertNotIn("frontend_artifact", values)
+        for slug, platform in (("vnc-server", "linux-x86_64"),
+                               ("rdp-server", "windows-x86_64"),
+                               ("servers", "darwin-aarch64")):
+            with self.subTest(slug=slug), tempfile.TemporaryDirectory() as directory:
+                values = self.admit("macos-26", Path(directory) / "output", json.dumps(builds), slug)
+                self.assertEqual(self.roster_targets(values, "sign_matrix"), {platform: False})
+                self.assertEqual(values["frontend_artifact"], f"qa-{slug}-frontend-test-vnc-{platform}")
 
     def test_parallel_desktop_client_builds_use_distinct_frontend_artifacts(self):
         for client in ("vnc", "rdp"):
