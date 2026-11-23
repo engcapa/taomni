@@ -22,6 +22,8 @@ TARGET = ROOT / "src-tauri/target/qa-ui-auto"
 MANIFEST = ROOT / "src-tauri/Cargo.toml"
 LOCK = MANIFEST.with_name("Cargo.lock")
 SHERPA = "sherpa-onnx-prebuilt"
+VENDOR_PREFIX = "src-tauri/vendor/"
+DEFAULT_VENDOR_MTIME_EPOCH = 1_600_000_000
 
 
 def cargo_manifests(root: Path) -> list[str]:
@@ -29,15 +31,87 @@ def cargo_manifests(root: Path) -> list[str]:
             if name.startswith("src-tauri/") and name.endswith("/Cargo.toml")]
 
 
-def cache_key(profile: str, runner: str) -> str:
+def vendor_manifests(root: Path) -> list[str]:
+    """Return the repository-relative manifests vendored under src-tauri/vendor."""
+    return [name for name in cargo_manifests(root) if name.startswith(VENDOR_PREFIX)]
+
+
+def vendor_packages(root: Path) -> set[str]:
+    """Return the package names declared by the vendored manifests."""
+    packages = set()
+    for name in vendor_manifests(root):
+        data = tomllib.loads((root / name).read_text(encoding="utf-8"))
+        package = data.get("package", {}).get("name")
+        if package:
+            packages.add(package)
+    return packages
+
+
+def vendor_cache_enabled() -> bool:
+    """Report whether the opt-in vendored Cargo dependency cache is active."""
+    return os.environ.get("QA_VENDOR_CACHE", "").strip().lower() in {"1", "true"}
+
+
+def vendor_mtime_epoch() -> int:
+    """Return the epoch applied to vendored sources, defaulting on invalid input."""
+    raw = os.environ.get("QA_VENDOR_MTIME_EPOCH", "").strip()
+    if not raw:
+        return DEFAULT_VENDOR_MTIME_EPOCH
+    try:
+        return int(raw)
+    except ValueError:
+        return DEFAULT_VENDOR_MTIME_EPOCH
+
+
+def _vendor_tree_files(root: Path) -> list[Path]:
+    """Return regular files below the vendor root, sorted by repository path."""
+    vendor = root / VENDOR_PREFIX.rstrip("/")
+    if not vendor.is_dir():
+        return []
+    paths = []
+    for directory, directories, names in os.walk(vendor):
+        directories.sort()
+        for name in sorted(names):
+            path = Path(directory) / name
+            if path.is_file():
+                paths.append(path)
+    return sorted(paths, key=lambda path: path.relative_to(root).as_posix())
+
+
+def vendor_tree_digest(root: Path | None = None) -> str:
+    """Return a stable digest of the vendored Cargo source tree.
+
+    The committed git tree is the preferred identity: it ignores untracked build
+    output and describes exactly the sources an archive was produced from.
+    Content hashing keeps the digest usable in tests and in checkouts where git
+    is unavailable or the directory is not a repository.
+    """
+    root = ROOT if root is None else root
+    try:
+        listing = subprocess.check_output(
+            ["git", "-C", str(root), "ls-tree", "-r", "HEAD", "--", VENDOR_PREFIX.rstrip("/")],
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        entries = [[path.relative_to(root).as_posix(), digest_file(path)]
+                   for path in _vendor_tree_files(root)]
+        return hashlib.sha256(json.dumps(entries, separators=(",", ":")).encode()).hexdigest()
+    return hashlib.sha256(listing).hexdigest()
+
+
+def cache_key(profile: str, runner: str, *, vendor_cache: bool | None = None,
+              root: Path | None = None) -> str:
+    """Return the branch archive key, adding vendored inputs only for the experiment."""
+    enabled = vendor_cache_enabled() if vendor_cache is None else vendor_cache
+    root = ROOT if root is None else root
     env = configured_environment()
-    files = cargo_manifests(ROOT) + [
+    files = cargo_manifests(root) + [
         "src-tauri/Cargo.lock", ".cargo/config", ".cargo/config.toml",
         "src-tauri/.cargo/config", "src-tauri/.cargo/config.toml",
         "rust-toolchain", "rust-toolchain.toml", "src-tauri/rust-toolchain", "src-tauri/rust-toolchain.toml",
     ]
     inputs = {
-        "manifests": fingerprint(ROOT, files),
+        "manifests": fingerprint(root, files),
         "profile": profile,
         "runner": runner,
         "image": env.get("ImageVersion") or env.get("IMAGEVERSION"),
@@ -48,12 +122,29 @@ def cache_key(profile: str, runner: str) -> str:
             "CFLAGS", "CXXFLAGS", "LIBCLANG_PATH", "PKG_CONFIG_PATH", "LIBRARY_PATH",
         } or key.startswith(("CARGO_PROFILE_", "BINDGEN_EXTRA_CLANG_ARGS", "CMAKE_"))},
     }
+    if enabled:
+        inputs["vendor"] = vendor_tree_digest(root)
+        inputs["vendor_cache"] = True
     digest = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
     return f"qa-cargo-dependencies-v1-{runner}-{profile}-{digest}"
 
 
-def local_units(root: Path) -> set[str]:
-    units = set()
+def _unit_names(names: set[str]) -> set[str]:
+    """Expand package and target names to their Cargo artifact spellings."""
+    units = set(names)
+    units |= {name.replace("-", "_") for name in units}
+    return units | {f"lib{name}" for name in units}
+
+
+def local_units(root: Path, *, include_vendor: bool = False) -> set[str]:
+    """Return Cargo units that must stay out of the dependency archive.
+
+    Vendored path dependencies are local while the vendor cache experiment is
+    disabled. Enabling it drops them even when they are also workspace members,
+    so Cargo can reuse their intermediates from the archive instead of
+    rebuilding them on every warm build.
+    """
+    units: set[str] = set()
     for name in cargo_manifests(root):
         data = tomllib.loads((root / name).read_text(encoding="utf-8"))
         package = data.get("package", {}).get("name")
@@ -62,8 +153,10 @@ def local_units(root: Path) -> set[str]:
         for target in [data.get("lib", {}), *data.get("bin", [])]:
             if "name" in target:
                 units.add(target["name"])
-    units |= {name.replace("-", "_") for name in units}
-    return units | {f"lib{name}" for name in units}
+    units = _unit_names(units)
+    if include_vendor:
+        units -= _unit_names(vendor_packages(root))
+    return units
 
 
 def _is_local_unit(filename: str, units: set[str]) -> bool:
@@ -153,10 +246,41 @@ def restore(source: Path, profile: str, *, target: Path, cargo_home: Path) -> bo
     return (target / SHERPA).is_dir()
 
 
-def main() -> None:
+def normalize_vendor_mtimes(root: Path, epoch: int) -> int:
+    """Pin the mtimes of vendored Cargo source files and return the file count.
+
+    Cargo treats a path dependency as dirty when a source mtime is newer than
+    the fingerprint restored from a cache archive. Only regular files change;
+    the executable bit and every other mode bit survive, directories are left
+    alone, and symlinks are never followed.
+    """
+    vendor = root / VENDOR_PREFIX.rstrip("/")
+    if not vendor.is_dir():
+        return 0
+    normalized = 0
+    for directory, directories, names in os.walk(vendor):
+        directories[:] = sorted(name for name in directories
+                                if not (Path(directory) / name).is_symlink())
+        for name in sorted(names):
+            path = Path(directory) / name
+            if path.is_symlink() or not path.is_file():
+                continue
+            os.utime(path, (epoch, epoch))
+            normalized += 1
+    return normalized
+
+
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("key", "pack", "restore"))
-    args = parser.parse_args()
+    parser.add_argument("operation", choices=("key", "pack", "restore", "normalize"))
+    args = parser.parse_args(argv)
+    if args.operation == "normalize":
+        if not vendor_cache_enabled():
+            print("qa-ui-auto: QA_VENDOR_CACHE is disabled; vendored Cargo mtimes were not changed")
+            return
+        count = normalize_vendor_mtimes(ROOT, vendor_mtime_epoch())
+        print(f"qa-ui-auto: normalized mtimes of {count} vendored Cargo files")
+        return
     profile = os.environ["QA_CARGO_PROFILE"]
     if profile not in {"debug", "release"}:
         parser.error("unsupported Cargo profile")
@@ -168,7 +292,8 @@ def main() -> None:
     directory = Path(os.environ["QA_CARGO_ARCHIVE"])
     cargo_home = Path(os.environ.get("CARGO_HOME") or Path.home() / ".cargo")
     if args.operation == "pack":
-        pack(directory, profile, target=TARGET, cargo_home=cargo_home, units=local_units(ROOT))
+        pack(directory, profile, target=TARGET, cargo_home=cargo_home,
+             units=local_units(ROOT, include_vendor=vendor_cache_enabled()))
     else:
         sherpa = restore(directory, profile, target=TARGET, cargo_home=cargo_home)
         with output.open("a", encoding="utf-8") as file:
