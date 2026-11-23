@@ -168,3 +168,54 @@ fn signed_mail_upgrade_starts_the_installed_host_with_retained_migrated_data() {
     );
     assert_eq!(fs::read(object).unwrap(), original);
 }
+
+#[test]
+#[ignore = "production-key Mail package and actual subprocesses on GitHub"]
+fn signed_mail_upgrade_reuses_data_restored_before_first_activation() {
+    let temp = tempfile::tempdir().unwrap();
+    let profile = temp.path().canonicalize().unwrap();
+    let legacy_directory = profile.join("legacy-custom");
+    legacy_profile(&profile, &legacy_directory);
+    let legacy = cached_mail(&profile.join("mail-cache"), "default", "stale inbox");
+    let legacy_custom = cached_mail(&legacy_directory, "custom", "legacy custom inbox");
+    let data = profile.join(MAIL_MIGRATION_TARGET);
+    let restored = cached_mail(&data, "default", "restored default inbox");
+    let plugins = profile.join("plugins");
+    retained_data::save(
+        &plugins,
+        &retained_data::discover(&plugins, OWNER, 1).unwrap(),
+    )
+    .unwrap();
+    let old_bytes = fs::read(&legacy).unwrap();
+    let custom_bytes = fs::read(&legacy_custom).unwrap();
+    let restored_bytes = fs::read(&restored).unwrap();
+    let [archive, signature] = signed_mail_files();
+    let package = verify_archive(&archive, &signature).unwrap();
+
+    let live = VaultHarness::open(temp);
+    assert!(provision::queue(&profile, &package).unwrap());
+    assert!(active_version(&profile).is_none());
+    let state = VaultHarness::open(close_profile(live));
+    assert!(!provision::queued(&profile).unwrap());
+    assert!(profile_committed(&profile).unwrap());
+    state.registry.scan().unwrap();
+    state.registry.set_enabled(OWNER, true).unwrap();
+    for (account, expected) in [
+        ("default", "restored default inbox"),
+        ("custom", "legacy custom inbox"),
+    ] {
+        let body = state
+            .registry
+            .invoke(
+                OWNER,
+                "mail_get_cached_body",
+                json!({"accountId":account,"folder":"INBOX","uid":9}),
+            )
+            .unwrap();
+        assert!(body["text"].as_str().unwrap().contains(expected));
+    }
+    state.registry.shutdown().unwrap();
+    assert_eq!(fs::read(legacy).unwrap(), old_bytes);
+    assert_eq!(fs::read(legacy_custom).unwrap(), custom_bytes);
+    assert_eq!(fs::read(restored).unwrap(), restored_bytes);
+}

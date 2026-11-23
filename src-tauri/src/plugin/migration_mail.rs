@@ -1,6 +1,7 @@
 //! First Mail activation from a verified package and an offline legacy profile.
 
 use std::{
+    collections::BTreeSet,
     fs, io,
     path::{Path, PathBuf},
 };
@@ -9,7 +10,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use taomni_mail_engine::{
     database::{configured_directory, mail_db_file_stem},
-    migration::{HostedMailboxData, LegacyMailbox, StagedMailData},
+    migration::{HostedMailboxData, LegacyMailbox, StagedMailData, read_legacy_mailbox},
 };
 use taomni_profile_locks::{
     LegacyUpgradeLease, PluginDataLease, PluginSlug, ProfileRestoreLease, ProfileRoot,
@@ -18,11 +19,13 @@ use taomni_sqlite_snapshot::SnapshotControl;
 
 use super::{
     CORE_API_VERSION, ModuleManifest, PluginKind, current_platform,
+    data_contract::PluginDataRoot,
     install::ModuleInstaller,
     migration::{
         LEGACY_SOURCE_VERSION, MAIL_MIGRATION_TARGET, MigrationItem, MigrationJournal,
         MigrationRunState, MigrationStepState, paths, source, valid_mail_commit,
     },
+    retained_data::{self, DataFileKind, RetainedDataLocator},
     verify::VerifiedPackage,
 };
 
@@ -30,6 +33,9 @@ const OWNER: &str = "mail";
 const LEGACY_DATABASE: &str = "taomni.db";
 const RECEIPT: &str = ".legacy-mail-upgrade.json";
 const TRANSACTION: &str = "mail-transaction.json";
+
+#[path = "migration_mail_restored.rs"]
+mod restored;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum MailUpgradeOutcome {
@@ -149,7 +155,26 @@ pub(super) fn execute_under_maintenance(
     } else {
         None
     };
-    let receipt = load_receipt(&data, manifest.data_schema_version, previous.as_deref())?;
+    let retained = retained_data::load(&plugins, OWNER)
+        .map_err(|error| error.to_string())?
+        .filter(|locator| !locator.files.is_empty());
+    if retained.is_some()
+        && pointer.active_version.is_none()
+        && let Some(transaction) = previous.as_deref()
+    {
+        restored::recover_before_activation(
+            &module,
+            &data,
+            transaction,
+            manifest.data_schema_version,
+        )?;
+    }
+    let receipt = load_receipt(
+        &data,
+        manifest.data_schema_version,
+        previous.as_deref(),
+        retained.is_some(),
+    )?;
     if let Some(active) = &pointer.active_version {
         if receipt.is_none() || active != &manifest.version {
             return Err("An existing Mail installation requires its normal update flow".into());
@@ -173,22 +198,27 @@ pub(super) fn execute_under_maintenance(
                 transaction
             }
         };
-        // The old application could have reopened after an interrupted
-        // attempt. Take a fresh snapshot before the first activation.
-        publish_data(
-            root,
-            &module,
-            &data,
-            &transaction,
-            receipt.is_some(),
-            HostedMailboxData {
-                drafts: manifest.commands.contains(taomni_mail_api::LOCAL_DRAFTS),
-                address_book: manifest.commands.contains(taomni_mail_api::ADDRESS_BOOK),
-                agenda: manifest.commands.contains(taomni_mail_api::CALDAV_AGENDA),
-                filter_rules: manifest.commands.contains(taomni_mail_api::FILTER_RULES),
-            },
-            control,
-        )?
+        let hosted = HostedMailboxData {
+            drafts: manifest.commands.contains(taomni_mail_api::LOCAL_DRAFTS),
+            address_book: manifest.commands.contains(taomni_mail_api::ADDRESS_BOOK),
+            agenda: manifest.commands.contains(taomni_mail_api::CALDAV_AGENDA),
+            filter_rules: manifest.commands.contains(taomni_mail_api::FILTER_RULES),
+        };
+        if let Some(retained) = &retained {
+            reuse_restored_data(root, &plugins, retained, &transaction, hosted, control)?
+        } else {
+            // The old application could have reopened after an interrupted
+            // attempt. Take a fresh snapshot before the first activation.
+            publish_data(
+                root,
+                &module,
+                &data,
+                &transaction,
+                receipt.is_some(),
+                hosted,
+                control,
+            )?
+        }
     };
     // Data is durable at the final location before selecting the verified
     // version. A failure here leaves a resumable data receipt.
@@ -213,6 +243,11 @@ pub(super) fn execute_under_maintenance(
     };
     journal.save_atomic(&journal_path)?;
     // The committed journal is authoritative even if housekeeping fails.
+    if retained.is_some()
+        && let Err(error) = restored::remove_preserved_data(&module, &receipt.transaction_id)
+    {
+        tracing::warn!(%error, "Could not remove the preserved Mail migration directory");
+    }
     let _ = fs::remove_file(transaction_path);
     Ok(MailUpgradeOutcome::Migrated)
 }
@@ -269,6 +304,7 @@ fn load_receipt(
     data: &Path,
     data_schema_version: u32,
     transaction: Option<&str>,
+    has_retained_data: bool,
 ) -> Result<Option<DataReceipt>, String> {
     match fs::symlink_metadata(data) {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
@@ -277,10 +313,11 @@ fn load_receipt(
     }
     let path = data.join(RECEIPT);
     if !paths::file_exists(&path)? {
-        if fs::read_dir(data)
-            .map_err(|error| error.to_string())?
-            .next()
-            .is_none()
+        if has_retained_data
+            || fs::read_dir(data)
+                .map_err(|error| error.to_string())?
+                .next()
+                .is_none()
         {
             return Ok(None);
         }
@@ -290,6 +327,11 @@ fn load_receipt(
     }
     let receipt: DataReceipt = paths::read_json_bounded(&path)?;
     if transaction != Some(receipt.transaction_id.as_str()) {
+        if has_retained_data {
+            // A portable backup can include its original activation receipt.
+            // Its transaction ID belongs to the source profile.
+            return Ok(None);
+        }
         return Err("Mail already has retained data from another installation".into());
     }
     if receipt.format_version != 1
@@ -301,6 +343,70 @@ fn load_receipt(
     Ok(Some(receipt))
 }
 
+fn reuse_restored_data(
+    profile: &Path,
+    plugins: &Path,
+    retained: &RetainedDataLocator,
+    transaction: &str,
+    hosted: HostedMailboxData,
+    control: &SnapshotControl,
+) -> Result<DataReceipt, String> {
+    if retained.data_schema_version != 1 {
+        return Err("The restored Mail data needs a compatible module version".into());
+    }
+    let mail_root = PluginDataRoot::open(plugins, OWNER).map_err(|error| error.to_string())?;
+    for file in &retained.files {
+        control.check().map_err(|error| error.to_string())?;
+        mail_root
+            .resolve_file(&file.path)
+            .map_err(|error| error.to_string())?;
+    }
+    let restored_mailboxes: BTreeSet<&str> = retained
+        .files
+        .iter()
+        .filter(|file| file.kind == DataFileKind::Sqlite)
+        .map(|file| file.path.as_str())
+        .collect();
+    let (mailboxes, source_fingerprint) =
+        snapshot_mailboxes(profile, control, &restored_mailboxes)?;
+    let mut missing = Vec::new();
+    for mailbox in mailboxes {
+        control.check().map_err(|error| error.to_string())?;
+        let filename = mailbox
+            .database
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or("Invalid Mail database filename")?;
+        if restored_mailboxes.contains(filename) {
+            let db = Connection::open_with_flags(
+                mail_root.data.join(filename),
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                    | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+            )
+            .map_err(|error| error.to_string())?;
+            db.prepare("SELECT uid FROM mail_messages WHERE account_id=?1 LIMIT 1")
+                .map_err(|error| error.to_string())?;
+        } else if read_legacy_mailbox(&mailbox.database, &mailbox.account_id, |_, _| Ok(()))?
+            .is_some()
+        {
+            missing.push(mailbox);
+        }
+    }
+    control.check().map_err(|error| error.to_string())?;
+    let receipt = DataReceipt {
+        format_version: 1,
+        transaction_id: transaction.to_owned(),
+        source_fingerprint,
+        data_schema_version: retained.data_schema_version,
+    };
+    if missing.is_empty() {
+        paths::write_json_durable(&mail_root.data.join(RECEIPT), &receipt)?;
+    } else {
+        restored::publish(&mail_root, plugins, &missing, hosted, &receipt, control)?;
+    }
+    Ok(receipt)
+}
+
 fn publish_data(
     profile: &Path,
     module: &Path,
@@ -310,19 +416,7 @@ fn publish_data(
     hosted: HostedMailboxData,
     control: &SnapshotControl,
 ) -> Result<DataReceipt, String> {
-    let database = profile.join(LEGACY_DATABASE);
-    if !paths::database_exists(&database)? {
-        return Err("The profile has no legacy Mail database".into());
-    }
-    let check = || control.check().map_err(|error| error.to_string());
-    let (mailboxes, source_fingerprint) = source::read_snapshot_checked(
-        &database,
-        |connection| read_mailboxes(profile, connection),
-        &check,
-    )?;
-    if mailboxes.is_empty() {
-        return Err("The profile has no legacy Mail accounts".into());
-    }
+    let (mailboxes, source_fingerprint) = snapshot_mailboxes(profile, control, &BTreeSet::new())?;
     let stage = StagedMailData::prepare(module, &mailboxes, hosted, control)?;
     let receipt = DataReceipt {
         format_version: 1,
@@ -332,7 +426,7 @@ fn publish_data(
     };
     let directory = stage.data();
     paths::write_json_durable(&directory.join(RECEIPT), &receipt)?;
-    check()?;
+    control.check().map_err(|error| error.to_string())?;
     let previous_copy = directory.with_file_name("previous-data");
     if replace_unactivated {
         fs::rename(target, &previous_copy).map_err(|error| error.to_string())?;
@@ -355,7 +449,31 @@ fn publish_data(
     Ok(receipt)
 }
 
-fn read_mailboxes(profile: &Path, connection: &Connection) -> Result<Vec<LegacyMailbox>, String> {
+fn snapshot_mailboxes(
+    profile: &Path,
+    control: &SnapshotControl,
+    restored_mailboxes: &BTreeSet<&str>,
+) -> Result<(Vec<LegacyMailbox>, String), String> {
+    let database = profile.join(LEGACY_DATABASE);
+    if !paths::database_exists(&database)? {
+        return Err("The profile has no legacy Mail database".into());
+    }
+    let snapshot = source::read_snapshot_checked(
+        &database,
+        |connection| read_mailboxes(profile, connection, restored_mailboxes),
+        &|| control.check().map_err(|error| error.to_string()),
+    )?;
+    if snapshot.0.is_empty() {
+        return Err("The profile has no legacy Mail accounts".into());
+    }
+    Ok(snapshot)
+}
+
+fn read_mailboxes(
+    profile: &Path,
+    connection: &Connection,
+    restored_mailboxes: &BTreeSet<&str>,
+) -> Result<Vec<LegacyMailbox>, String> {
     let mut query = connection
         .prepare("SELECT id, options_json FROM sessions WHERE session_type='Mail' ORDER BY id")
         .map_err(|error| format!("Read legacy Mail account settings: {error}"))?;
@@ -366,12 +484,13 @@ fn read_mailboxes(profile: &Path, connection: &Connection) -> Result<Vec<LegacyM
         let account_id: String = row.get(0).map_err(|error| error.to_string())?;
         let options: String = row.get(1).map_err(|error| error.to_string())?;
         let directory = configured_directory(&options, &default)?;
-        if directory != default {
+        let filename = format!("{}.db", mail_db_file_stem(&account_id));
+        if directory != default && !restored_mailboxes.contains(filename.as_str()) {
             paths::directory(&directory).map_err(|error| {
                 format!("The configured legacy Mail directory is unavailable: {error}")
             })?;
         }
-        let database = directory.join(format!("{}.db", mail_db_file_stem(&account_id)));
+        let database = directory.join(filename);
         mailboxes.push(LegacyMailbox {
             account_id,
             database,

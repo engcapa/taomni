@@ -6,10 +6,11 @@
 - 同批 Intel 与 ARM64 DMG 已通过实装升级、十模块自动安装、卸载 Mail 后重开保留九个模块、双向桌面与 headless 互斥和回退。复验使用 AppKit 操作 Vault 与模块商店，保存正常退出、版本指针和实际目录请求。 [macOS 双架构通过回执](https://github.com/engcapa/taomni/actions/runs/45102607432)
 - 批量 IMAP 的写前日志在读取 UID 和发送请求前获取邮箱的跨进程锁。搬迁存储目录共用该锁，待批量任务完成后可重试。三端 GitHub 协议作业都已回传实际子进程竞争测试，运行结果均为通过。 [三端协议及原始日志](https://github.com/engcapa/taomni/actions/runs/45097559179)
 - Mail 首次升级在激活前验证暂存归档原件的长度和 SHA-256。签名升级专项在 Linux、Windows 和 macOS ARM64 核对了错配原件拒绝、待迁移状态、修复后重试和实际宿主读取。TC-MODULES-052 追加的重试断言继续收取三端 Browser 分片。 [三端签名升级](https://github.com/engcapa/taomni/actions/runs/45100548185) · [桌面回归](https://github.com/engcapa/taomni/actions/runs/45101167122)
+- Mail 首次激活支持同时保留已还原的邮箱库并补入缺失账户的旧库。迁移在激活前保留原还原目录，中断后按本次 profile 数据版本恢复并重取旧库快照。六项迁移单测通过，覆盖目录替换前后中断、原库保留和完整备份复用。签名宿主新增读回两种来源的用例，待三端 GitHub 回执。
 - 合入主线 QA 加速后的签名 Mail 和完整崩溃回归通过，三端 18 个 Browser 与 Native 分片全部收齐。 [原始分片](https://github.com/engcapa/taomni/actions/runs/45096312584)
 - POP3 目录、正文回退、已读和标记、原件导入导出操作归入邮件引擎的本地邮箱实现。三项单测通过，TC-MAIL-POP3-01 补测重开后的实际正文。下一步是由签名 Mail 宿主接管邮箱库和 UIDL 状态。
 - `a74f13f25` 的基座构建清单已按 GitHub runner 回执复核 19 个文件的 SHA-256 和长度，包含四目标 Cargo 树、前端产物、资源和入口清单。Mail 的旧邮箱缓存仍在基座，正式候选需补齐裁剪后的清单和实际安装载荷。 [基座清单及回执](https://github.com/engcapa/taomni/actions/runs/45100401939)
-- G11 的 MSI、DMG 和 deb 检查将入口字符串扫描绑定到实际可执行文件与安装件的 SHA-256。扫描拒绝旧 VNC 入口参数。macOS 基座仍把共享参数传给已验证的 SocksCap 宿主，入口归属由基座与宿主的入口清单及实际启动回执核对。40 项验收工具单测通过，四目标安装件扫描待 GitHub 回执。
+- G11 在 `21752fbb0` 的四目标 MSI、DMG 和 deb 上完成入口字符串扫描，回执绑定实际可执行文件与安装件的 SHA-256。旧 VNC 入口参数在四目标均已移除。两个 macOS 构建都包含传给已验签 SocksCap 宿主的参数。入口清单记录了参数发送和解析各自的源码位置。 [四目标安装包](https://github.com/engcapa/taomni/actions/runs/45103262488) · [入口清单](https://github.com/engcapa/taomni/actions/runs/45103268093)
 - 默认基座也移出 POP3 协议和认证运行组件。已验证的 Mail 宿主负责连接，离线邮件、UIDL 记录和归档索引目前仍由原缓存路径持有。归档分页、筛选和清理回执移入共享 IPC 类型。精简版邮件引擎 75 项及完整版 83 项单测通过，默认和兼容基座编译通过。
 - `2a05b4dc7` 的三端 Native 各 28 项通过，含 TC-MODULES-095 的实际 EML 和 mbox 导入导出。`30b8d8528` 修正取消后原有邮件数量的核对，三端 Browser 各 26 项通过。 [实装导入导出](https://github.com/engcapa/taomni/actions/runs/45085885699) · [浏览器复跑](https://github.com/engcapa/taomni/actions/runs/45089950565)
 - Windows 签名 Mail 的 QA 构建日志显示 `pnpm.cmd` 将 Tauri 配置 JSON 在构建命令的 `&&` 处截断。改用临时配置文件，并将实际 Rust 特性记录在 QA 构建身份中。 [构建日志](https://github.com/engcapa/taomni/actions/runs/45092502660/job/137425376419)

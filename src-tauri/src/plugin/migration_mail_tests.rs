@@ -272,3 +272,111 @@ fn preserves_existing_module_data_and_never_activates_on_a_failed_copy() {
     assert!(active_version(&profile).is_none());
     assert!(target.read_dir().unwrap().next().is_none());
 }
+
+#[test]
+fn a_restored_mailbox_takes_precedence_over_the_legacy_source_at_first_activation() {
+    let temp = tempfile::tempdir().unwrap();
+    let profile = temp.path().canonicalize().unwrap();
+    let missing_custom = profile.join("previous-machine");
+    legacy_profile(&profile, &missing_custom);
+    let legacy = cached_mail(&profile.join("mail-cache"), "default", "legacy default");
+    let data = profile.join(MAIL_MIGRATION_TARGET);
+    let restored = [
+        cached_mail(&data, "default", "restored default"),
+        cached_mail(&data, "custom", "restored custom"),
+    ];
+    paths::write_json_durable(
+        &data.join(RECEIPT),
+        &DataReceipt {
+            format_version: 1,
+            transaction_id: uuid::Uuid::new_v4().to_string(),
+            source_fingerprint: "a".repeat(64),
+            data_schema_version: 1,
+        },
+    )
+    .unwrap();
+    let plugins = profile.join("plugins");
+    let locator = retained_data::discover(&plugins, OWNER, 1).unwrap();
+    retained_data::save(&plugins, &locator).unwrap();
+    let before = restored.each_ref().map(|path| fs::read(path).unwrap());
+    let legacy_before = fs::read(&legacy).unwrap();
+    let package = package();
+
+    assert_eq!(
+        execute(&profile, &package, &control()).unwrap(),
+        MailUpgradeOutcome::Migrated
+    );
+    assert_eq!(
+        execute(&profile, &package, &control()).unwrap(),
+        MailUpgradeOutcome::AlreadyMigrated
+    );
+    assert!(active_version(&profile).is_some());
+    assert_eq!(
+        restored.each_ref().map(|path| fs::read(path).unwrap()),
+        before
+    );
+    assert_eq!(fs::read(legacy).unwrap(), legacy_before);
+    assert!(!missing_custom.exists());
+}
+
+#[test]
+fn a_mixed_mail_restore_retries_from_the_original_data_until_first_activation() {
+    for published in [false, true] {
+        let temp = tempfile::tempdir().unwrap();
+        let profile = temp.path().canonicalize().unwrap();
+        let custom = tempfile::tempdir().unwrap();
+        let custom_root = custom.path().canonicalize().unwrap();
+        legacy_profile(&profile, &custom_root);
+        let legacy = cached_mail(&custom_root, "custom", "legacy custom");
+        let data = profile.join(MAIL_MIGRATION_TARGET);
+        let restored = cached_mail(&data, "default", "restored default");
+        let restored_bytes = fs::read(&restored).unwrap();
+        let plugins = profile.join("plugins");
+        let locator = retained_data::discover(&plugins, OWNER, 1).unwrap();
+        retained_data::save(&plugins, &locator).unwrap();
+        let migration = paths::create_directory(&profile, "migration").unwrap();
+        let transaction = uuid::Uuid::new_v4().to_string();
+        paths::write_json_durable(&migration.join(TRANSACTION), &transaction).unwrap();
+        reuse_restored_data(
+            &profile,
+            &plugins,
+            &locator,
+            &transaction,
+            HostedMailboxData::ALL,
+            &control(),
+        )
+        .unwrap();
+        let preserved = restored::saved_data(data.parent().unwrap(), &transaction).unwrap();
+        assert_eq!(
+            fs::read(preserved.join(restored.file_name().unwrap())).unwrap(),
+            restored_bytes
+        );
+        if !published {
+            // Interruption after moving the restored directory aside and
+            // before the replacement receives the final data path.
+            fs::remove_dir_all(&data).unwrap();
+        }
+        let source = Connection::open(&legacy).unwrap();
+        source.execute(
+            "UPDATE mail_messages SET body_text='updated before activation' WHERE account_id='custom'",
+            [],
+        ).unwrap();
+        drop(source);
+        let legacy_bytes = fs::read(&legacy).unwrap();
+        assert!(active_version(&profile).is_none());
+
+        assert_eq!(
+            execute(&profile, &package(), &control()).unwrap(),
+            MailUpgradeOutcome::Migrated
+        );
+        assert!(active_version(&profile).is_some());
+        assert!(!preserved.exists());
+        assert_eq!(fs::read(restored).unwrap(), restored_bytes);
+        assert_eq!(fs::read(&legacy).unwrap(), legacy_bytes);
+        let dest = Connection::open(data.join(legacy.file_name().unwrap())).unwrap();
+        let body = get_cached_body(&dest, "custom", "INBOX", 9)
+            .unwrap()
+            .unwrap();
+        assert_eq!(body.text.as_deref(), Some("updated before activation"));
+    }
+}

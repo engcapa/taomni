@@ -57,7 +57,7 @@ def main():
         listing_name = "legacy-mfa-selected-tests.txt"
     else:
         selected, evidence_name = "plugin::migration_mail::tests::signed::signed_mail_upgrade", "legacy-mail-migration"
-        expected_tests = 1
+        expected_tests = 2
         listing_name = "legacy-mail-selected-tests.txt"
     listing = subprocess.check_output([str(executable), selected, "--ignored", "--list"], text=True)
     (root / listing_name).write_text(listing, encoding="utf-8")
