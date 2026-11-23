@@ -33,11 +33,11 @@ steps:
 - reload_window: null
 - click: '[data-testid="side-tab-explorer"]'
 - wait_for: '[data-testid="explorer-platform-view"]'
-- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- wait_for: '[data-testid="explorer-tab"]'
 - press:
     key: Control+l
     macos_key: Meta+l
-    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    selector: '[data-testid="explorer-tab"]'
 - fill:
     selector: '[data-testid="explorer-address"]'
     value: ${fixture.file_open_root}
