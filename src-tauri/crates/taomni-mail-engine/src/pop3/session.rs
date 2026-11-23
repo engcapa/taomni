@@ -239,7 +239,7 @@ impl Pop3Session {
 
     /// QUIT commits DELE marks (RFC 1939 UPDATE state).
     pub fn quit(mut self) -> Result<(), String> {
-        each!(self, c => c.command("QUIT")).map(|_| ())
+        self.finish()
     }
 }
 
@@ -254,6 +254,10 @@ impl Pop3Mailbox for Pop3Session {
 
     fn dele(&mut self, number: u32) -> Result<(), String> {
         Pop3Session::dele(self, number)
+    }
+
+    fn finish(&mut self) -> Result<(), String> {
+        each!(self, c => c.command("QUIT")).map(|_| ())
     }
 }
 

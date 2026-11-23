@@ -18,12 +18,19 @@ use super::{MailHost, WAIT};
 
 const ORIGINAL: &[u8] = b"Subject: Routed POP3\r\n\r\n.Binary line \xff\r\n";
 
+#[derive(Clone, Copy)]
+enum Finish {
+    Disconnect,
+    Accepted,
+    Rejected,
+}
+
 pub(super) fn check_routed_sync(host: &mut MailHost) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
-    for commit in [false, true] {
+    for finish in [Finish::Disconnect, Finish::Accepted, Finish::Rejected] {
         std::thread::scope(|scope| {
             runtime.block_on(async {
                 let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
@@ -62,17 +69,24 @@ pub(super) fn check_routed_sync(host: &mut MailHost) {
                         serde_json::from_value::<Result<(), String>>(invoked.await.unwrap())
                             .unwrap()
                             .unwrap();
-                        reply::<()>(&mut peer).await;
+                        reply::<()>(&mut peer).await.unwrap();
                         let ids: Vec<(u32, String)> = request(&mut peer, Pop3Command::Uidl).await;
                         assert_eq!(ids, vec![(7, "routed-uidl".into())]);
                         request::<()>(&mut peer, Pop3Command::Retrieve { number: 7 }).await;
                         assert_eq!(read_body_frame(&mut peer).await.unwrap(), ORIGINAL);
                         request::<()>(&mut peer, Pop3Command::Delete { number: 7 }).await;
-                        if commit {
-                            request::<()>(&mut peer, Pop3Command::Quit).await;
+                        match finish {
+                            Finish::Disconnect => {}
+                            Finish::Accepted => request::<()>(&mut peer, Pop3Command::Quit).await,
+                            Finish::Rejected => {
+                                let error = send_command::<()>(&mut peer, Pop3Command::Quit)
+                                    .await
+                                    .unwrap_err();
+                                assert!(error.contains("deletion refused"), "{error}");
+                            }
                         }
                     };
-                    tokio::join!(synchronize, serve(listener, commit));
+                    tokio::join!(synchronize, serve(listener, finish));
                 })
                 .await
                 .expect("POP3 fixture completed before its deadline");
@@ -82,19 +96,24 @@ pub(super) fn check_routed_sync(host: &mut MailHost) {
 }
 
 async fn request<T: DeserializeOwned>(peer: &mut DuplexStream, command: Pop3Command) -> T {
+    send_command(peer, command).await.unwrap()
+}
+
+async fn send_command<T: DeserializeOwned>(
+    peer: &mut DuplexStream,
+    command: Pop3Command,
+) -> Result<T, String> {
     write_frame(peer, &serde_json::to_vec(&command).unwrap())
         .await
         .unwrap();
     reply(peer).await
 }
 
-async fn reply<T: DeserializeOwned>(peer: &mut DuplexStream) -> T {
-    serde_json::from_slice::<Result<T, String>>(&read_body_frame(peer).await.unwrap())
-        .unwrap()
-        .unwrap()
+async fn reply<T: DeserializeOwned>(peer: &mut DuplexStream) -> Result<T, String> {
+    serde_json::from_slice::<Result<T, String>>(&read_body_frame(peer).await.unwrap()).unwrap()
 }
 
-async fn serve(listener: TcpListener, commit: bool) {
+async fn serve(listener: TcpListener, finish: Finish) {
     let (socket, _) = listener.accept().await.unwrap();
     let mut socket = BufReader::new(socket);
     socket
@@ -121,14 +140,14 @@ async fn serve(listener: TcpListener, commit: bool) {
     }
     line.clear();
     let bytes = socket.read_line(&mut line).await.unwrap();
-    if commit {
-        assert_eq!(line, "QUIT\r\n");
-        socket
-            .get_mut()
-            .write_all(b"+OK committed\r\n")
-            .await
-            .unwrap();
-    } else {
-        assert_eq!(bytes, 0, "An interrupted transfer must close without QUIT");
-    }
+    let response = match finish {
+        Finish::Accepted => &b"+OK committed\r\n"[..],
+        Finish::Rejected => &b"-ERR deletion refused\r\n"[..],
+        Finish::Disconnect => {
+            assert_eq!(bytes, 0, "An interrupted transfer must close without QUIT");
+            return;
+        }
+    };
+    assert_eq!(line, "QUIT\r\n");
+    socket.get_mut().write_all(response).await.unwrap();
 }

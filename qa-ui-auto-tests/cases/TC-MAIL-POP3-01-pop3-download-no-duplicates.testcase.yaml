@@ -69,7 +69,7 @@ steps:
     timeout_sec: 60
 - assert_text:
     selector: '[data-testid="mail-client-tab"]'
-    contains: new headers across
+    contains: Synced 0 new headers across
     timeout_sec: 30
 - mail_server_assert_list_matches:
     timeout_sec: 30
@@ -135,7 +135,7 @@ verification:
     - step: 14
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
     - step: 17
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "new headers across", "timeout_sec": 30}}'
+      expectation: After both syncs finish, the repeat reports exactly zero new headers.
     - step: 18
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 30}}'
     - step: 20
@@ -144,6 +144,7 @@ verification:
       expectation: '{"assert_no_runtime_errors": null}'
     results:
     - 14
+    - 17
     - 18
     - 20
     - 21

@@ -40,6 +40,7 @@ steps:
 - wait_for: {selector: '[data-testid="mail-sync-button"]:not([disabled])', timeout_sec: 45}
 - mail_server_assert_list_matches: {timeout_sec: 45}
 - assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Signed-POP3 0001"]', equal: 1}
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'Synced 0 new headers across', timeout_sec: 30}
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
 - click: '[data-testid="module-action-disable-mail"]'
@@ -51,7 +52,7 @@ verification:
   requirements:
   - id: pop3-sync
     requirement: An installed Mail host reads a real POP3 inbox. Repeated sync keeps one local copy of the new message, which opens in the reader. Disabling Mail releases the host.
-    actions: [8, 10, 15, 19, 20, 22, 24, 30]
+    actions: [8, 10, 15, 19, 20, 22, 24, 31]
     checkpoints:
     - {step: 12, expectation: The verified host is installed and idle before the session opens.}
     - {step: 17, expectation: The initial local mailbox matches the fixture server.}
@@ -59,9 +60,10 @@ verification:
     - {step: 21, expectation: The local mailbox includes the newly delivered message.}
     - {step: 23, expectation: The reader renders the original message body.}
     - {step: 27, expectation: A repeat sync leaves exactly one copy of the new message.}
-    - {step: 32, expectation: Disabling Mail releases the host lease.}
-    - {step: 33, expectation: The workflow produces no runtime errors.}
-    results: [12, 17, 18, 21, 23, 27, 32, 33]
+    - {step: 28, expectation: The completed repeat sync reports zero newly downloaded headers.}
+    - {step: 33, expectation: Disabling Mail releases the host lease.}
+    - {step: 34, expectation: The workflow produces no runtime errors.}
+    results: [12, 17, 18, 21, 23, 27, 28, 33, 34]
   visual:
   - check: The opened message shows the body fetched from the server.
     method: automated

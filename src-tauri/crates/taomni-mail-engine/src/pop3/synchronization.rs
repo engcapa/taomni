@@ -14,6 +14,7 @@ pub trait Pop3Mailbox {
     fn uidl(&mut self) -> Result<Vec<(u32, String)>, String>;
     fn retr(&mut self, number: u32) -> Result<Vec<u8>, String>;
     fn dele(&mut self, number: u32) -> Result<(), String>;
+    fn finish(&mut self) -> Result<(), String>;
 }
 
 pub struct Pop3SyncOutcome {
@@ -55,14 +56,22 @@ pub fn sync_inbox(
     for number in &deletes {
         client.dele(*number)?;
     }
-    for (number, uidl) in &listing {
-        if deletes.contains(number) {
-            conn.execute(
-                "UPDATE mail_pop3_uidl SET deleted = 1 WHERE account_id = ?1 AND uidl = ?2",
-                params![account_id, uidl],
-            )
+    // The POP3 server commits DELE only after it accepts QUIT. Record local
+    // deletion receipts from that response, after durable message downloads.
+    client.finish()?;
+    if !deletes.is_empty() {
+        let tx = Transaction::new_unchecked(conn, TransactionBehavior::Immediate)
             .map_err(database_error)?;
+        for (number, uidl) in &listing {
+            if deletes.contains(number) {
+                tx.execute(
+                    "UPDATE mail_pop3_uidl SET deleted = 1 WHERE account_id = ?1 AND uidl = ?2",
+                    params![account_id, uidl],
+                )
+                .map_err(database_error)?;
+            }
         }
+        tx.commit().map_err(database_error)?;
     }
     let remaining = listing
         .iter()
@@ -160,6 +169,77 @@ mod tests {
         );
         let (_, keep) = plan_round(&listing, &known, 10, None, 1_000_000);
         assert!(keep.is_empty(), "no policy keeps everything on the server");
+    }
+
+    struct ServerRound {
+        accepts_quit: bool,
+        retrieved: usize,
+        requested_delete: bool,
+    }
+
+    impl Pop3Mailbox for ServerRound {
+        fn uidl(&mut self) -> Result<Vec<(u32, String)>, String> {
+            Ok(vec![(1, "uidl-1".into())])
+        }
+
+        fn retr(&mut self, _: u32) -> Result<Vec<u8>, String> {
+            self.retrieved += 1;
+            Ok(b"Subject: Retained message\r\n\r\nA durable POP3 copy".to_vec())
+        }
+
+        fn dele(&mut self, _: u32) -> Result<(), String> {
+            self.requested_delete = true;
+            Ok(())
+        }
+
+        fn finish(&mut self) -> Result<(), String> {
+            if self.accepts_quit {
+                Ok(())
+            } else {
+                Err("POP3 QUIT lost its connection".into())
+            }
+        }
+    }
+
+    #[test]
+    fn unconfirmed_quit_keeps_the_original_and_retries_deletion_without_redownloading() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::cache::init_mail_tables(&conn).unwrap();
+        let deleted = || {
+            conn.query_row(
+                "SELECT deleted FROM mail_pop3_uidl WHERE account_id='pop' AND uidl='uidl-1'",
+                [],
+                |row| row.get::<_, bool>(0),
+            )
+            .unwrap()
+        };
+        let mut dropped = ServerRound {
+            accepts_quit: false,
+            retrieved: 0,
+            requested_delete: false,
+        };
+        assert!(sync_inbox(&mut dropped, &conn, "pop", Some(0)).is_err());
+        assert!(dropped.requested_delete);
+        assert_eq!(dropped.retrieved, 1);
+        assert!(!deleted());
+        let originals = local_store::list_local_originals(&conn, "pop", "INBOX").unwrap();
+        assert_eq!(originals.len(), 1);
+
+        let mut retry = ServerRound {
+            accepts_quit: true,
+            retrieved: 0,
+            requested_delete: false,
+        };
+        let outcome = sync_inbox(&mut retry, &conn, "pop", Some(0)).unwrap();
+        assert!(retry.requested_delete);
+        assert_eq!(retry.retrieved, 0);
+        assert_eq!(outcome.deleted_on_server, 1);
+        assert!(outcome.messages.is_empty());
+        assert!(deleted());
+        assert_eq!(
+            local_store::list_local_originals(&conn, "pop", "INBOX").unwrap(),
+            originals
+        );
     }
 
     #[test]

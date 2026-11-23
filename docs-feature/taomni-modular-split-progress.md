@@ -2,6 +2,8 @@
 
 ## 2026-11-23 当前进展
 
+- `728a571ee` 的 18 个分片在汇总前收齐。Linux、Windows 和 macOS 每端通过 22 项 Browser 和 28 项 Native，覆盖 POP3 本地邮件、签名宿主和完整崩溃回归。合入 `main` 的 `66841d20f` 后继续使用加速的 QA 工作流。 [三端分片](https://github.com/engcapa/taomni/actions/runs/45103744500) · [主线合并](https://github.com/engcapa/taomni/commit/947f49e4e)
+- POP3 先提交本地邮件和 UIDL，再等服务器接受 `QUIT` 后记入删除结果。确认失败保留本地原件，重试删除时可复用已经下载的邮件。三项同步单测通过，宿主测试增加服务器拒绝 `QUIT` 的真实协议断言。TC-MAIL-POP3-01 和 TC-MODULES-076 检查重复同步完成后新增邮件数为零。
 - 用 `21752fbb0` 的联合构建重新验证 Linux deb 和 Windows MSI。两端从正式 0.5.12 升至 0.6.0，并在首装十模块后卸载 Mail。重启仍保留九个活跃模块和 Mail 的卸载记录。Linux 同批验证了原 MFA 数据、回退及强退后恢复。 [Linux](https://github.com/engcapa/taomni/actions/runs/45091470510) · [Windows](https://github.com/engcapa/taomni/actions/runs/45092445084/job/137424880022)
 - 同批 Intel 与 ARM64 DMG 已通过实装升级、十模块自动安装、卸载 Mail 后重开保留九个模块、双向桌面与 headless 互斥和回退。复验使用 AppKit 操作 Vault 与模块商店，保存正常退出、版本指针和实际目录请求。 [macOS 双架构通过回执](https://github.com/engcapa/taomni/actions/runs/45102607432)
 - 批量 IMAP 的写前日志在读取 UID 和发送请求前获取邮箱的跨进程锁。搬迁存储目录共用该锁，待批量任务完成后可重试。三端 GitHub 协议作业都已回传实际子进程竞争测试，运行结果均为通过。 [三端协议及原始日志](https://github.com/engcapa/taomni/actions/runs/45097559179)

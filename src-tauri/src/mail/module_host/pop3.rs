@@ -56,10 +56,6 @@ impl HostedPop3 {
         self.runtime
             .block_on(with_deadline(send_request(&mut self.peer, command)))
     }
-
-    pub(in crate::mail) fn quit(mut self) -> Result<(), String> {
-        self.request(Pop3Command::Quit)
-    }
 }
 
 impl Pop3Mailbox for HostedPop3 {
@@ -78,6 +74,10 @@ impl Pop3Mailbox for HostedPop3 {
 
     fn dele(&mut self, number: u32) -> Result<(), String> {
         self.request(Pop3Command::Delete { number })
+    }
+
+    fn finish(&mut self) -> Result<(), String> {
+        self.request(Pop3Command::Quit)
     }
 }
 

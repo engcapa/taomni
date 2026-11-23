@@ -55,9 +55,7 @@ async fn downloads_once_and_leaves_or_deletes() {
     let handle = tokio::runtime::Handle::current();
     let run = |conn: &Connection, leave: Option<u32>| {
         let mut client = Pop3Client::connect(&account, &handle).unwrap();
-        let outcome = sync_inbox(&mut client.session, conn, "pop", leave).unwrap();
-        client.quit().unwrap();
-        outcome
+        sync_inbox(&mut client.session, conn, "pop", leave).unwrap()
     };
 
     let first = tokio::task::block_in_place(|| run(&conn, None));

@@ -85,18 +85,14 @@ async fn download(
         };
         let outcome = if super::module_host::syncs_pop3(&registry) {
             let mut client = super::module_host::HostedPop3::open(registry, &account, handle)?;
-            let outcome = sync(&mut client)?;
-            client.quit()?;
-            outcome
+            sync(&mut client)?
         } else {
             #[cfg(not(any(test, feature = "legacy-mail-pop3")))]
             return Err(super::SIGNED_MAIL_CONNECTION_REQUIRED.into());
             #[cfg(any(test, feature = "legacy-mail-pop3"))]
             {
                 let mut client = Pop3Client::connect(&account, &handle)?;
-                let outcome = sync(&mut client.session)?;
-                client.quit()?;
-                outcome
+                sync(&mut client.session)?
             }
         };
         let new_unseen = outcome.messages.len();
