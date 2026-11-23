@@ -25,12 +25,8 @@ steps:
 - click: '[data-testid="mail-sync-button"]:enabled'
 - mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 30}
 - assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Cache reset 0001"]', equal: 1}
-- click: '[data-testid="mail-message-row"][data-subject="Cache reset 0001"]'
-- eval_readonly:
-    expression: >-
-      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent
-      ?? document.querySelector('.taomni-mail-reader-text')?.textContent ?? '').includes('Original message stays on the server')
-    timeout_sec: 20
+- dblclick: '[data-testid="mail-message-row"][data-subject="Cache reset 0001"]'
+- assert_text: {selector: '[data-testid="mail-reader-text"]', contains: Original message stays on the server, timeout_sec: 20}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed

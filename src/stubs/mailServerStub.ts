@@ -650,7 +650,10 @@ export function installStubMailQaControl(seed: Seed): void {
         const uid = folder.uidNext;
         folder.uidNext += 1;
         const message = templateMessage(accountId, folderName, uid, `${prefix} ${String(index + 1).padStart(4, "0")}`);
-        if (body !== null) message.snippet = body;
+        if (body !== null) {
+          message.snippet = body;
+          message.composedBody = { text: body, html: null };
+        }
         if (thread && ancestry.length > 0) {
           message.inReplyTo = ancestry[ancestry.length - 1];
           message.references = [...ancestry];

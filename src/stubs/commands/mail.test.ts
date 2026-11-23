@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MailMessageBody, MailMessageHeader } from "../../lib/mail";
+import { installStubMailQaControl, type StubMailQaControl } from "../mailServerStub";
 import { invokeMail } from "./mail";
 
 describe("browser mail Sent copy", () => {
@@ -29,5 +30,34 @@ describe("browser mail Sent copy", () => {
       uid: header?.uid,
     });
     expect(body).toMatchObject({ subject, text: textBody, html: htmlBody });
+  });
+});
+
+describe("browser mail cache recovery", () => {
+  it("reads the delivered plaintext after clearing and synchronizing the cache", async () => {
+    const accountId = "browser-cache-recovery";
+    const config = { sessionId: accountId };
+    const folder = "INBOX";
+    const text = `${"Delivered plaintext ".repeat(20)}Final line of the original`;
+    const qaWindow = window as Window & { __taomniQaMail?: StubMailQaControl };
+    installStubMailQaControl(() => ({ meta: [], messages: () => [] }));
+    const [uid] = qaWindow.__taomniQaMail!.deliver(
+      accountId,
+      folder,
+      1,
+      "Recovered original",
+      false,
+      null,
+      null,
+      false,
+      text,
+    );
+
+    await invokeMail("mail_sync_folder", { config, folder });
+    await invokeMail("mail_clear_cache", { accountId });
+    await invokeMail("mail_sync_folder", { config, folder });
+
+    const body = await invokeMail<MailMessageBody>("mail_get_message_body", { config, folder, uid });
+    expect(body).toMatchObject({ subject: "Recovered original 0001", text, html: null });
   });
 });
