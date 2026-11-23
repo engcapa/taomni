@@ -89,28 +89,27 @@ func focus(_ element: AXUIElement) throws {
     }
 }
 
-func postKey(pid: pid_t, code: CGKeyCode, flags: CGEventFlags = [], text: String? = nil) throws {
+func postKey(pid: pid_t, code: CGKeyCode, flags: CGEventFlags = []) throws {
     guard let down = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true),
           let up = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false)
     else { throw CheckFailure("Could not create the installed app key event") }
     down.flags = flags
     up.flags = flags
-    if let text {
-        Array(text.utf16).withUnsafeBufferPointer { chars in
-            down.keyboardSetUnicodeString(stringLength: chars.count, unicodeString: chars.baseAddress)
-        }
-    }
     down.postToPid(pid)
     up.postToPid(pid)
 }
 
-func typeText(_ value: String, into element: AXUIElement, pid: pid_t) throws {
-    // WKWebView inputs are controlled by React. Send text through the focused
-    // field so the product handles input events and enables its submit button.
+func pasteText(_ value: String, into element: AXUIElement, pid: pid_t) throws {
+    // The focused WebView field receives an ordinary paste event. The runner
+    // uses a synthetic Vault password and clears the pasteboard after entry.
     try focus(element)
-    for character in value {
-        try postKey(pid: pid, code: 0, text: String(character))
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    guard pasteboard.setString(value, forType: .string) else {
+        throw CheckFailure("Could not prepare text entry for the installed app")
     }
+    try postKey(pid: pid, code: 0, flags: .maskCommand)
+    try postKey(pid: pid, code: 9, flags: .maskCommand)
 }
 
 func storeAction(
@@ -165,10 +164,10 @@ func observe(_ request: Request) throws -> Observation {
     let app = AXUIElementCreateApplication(request.pid)
     AXUIElementSetMessagingTimeout(app, 3)
     let deadline = ProcessInfo.processInfo.systemUptime + 85
-    func wait<T>(_ description: String, _ probe: () -> T?) throws -> T {
+    func wait<T>(_ description: String, _ probe: () throws -> T?) throws -> T {
         while ProcessInfo.processInfo.systemUptime < deadline {
             guard !owned.isTerminated else { throw CheckFailure("App exited while waiting for \(description)") }
-            if let result = probe() { return result }
+            if let result = try probe() { return result }
             Thread.sleep(forTimeInterval: 0.2)
         }
         throw CheckFailure("Timed out waiting for \(description)")
@@ -183,17 +182,24 @@ func observe(_ request: Request) throws -> Observation {
     switch request.phase {
     case "unlock-store":
         guard let password = request.password else { throw CheckFailure("Missing the fixture password") }
+        defer { NSPasteboard.general.clearContents() }
         let field = try wait("vault unlock field") {
             contents().first { attribute($0, kAXSubroleAttribute) as? String == "AXSecureTextField" }
         }
-        try typeText(password, into: field, pid: request.pid)
-        try press(try wait("Vault Unlock button") { button(contents(), "Unlock") })
+        try pasteText(password, into: field, pid: request.pid)
+        _ = try wait("Vault Unlock button") { button(contents(), "Unlock") }
+        try postKey(pid: request.pid, code: 36)
         _ = try wait("the vault unlock field to close") {
             guard let visibleWindow = window() else { return nil as Bool? }
-            return nodes(visibleWindow)
+            let elements = nodes(visibleWindow)
+            if elements.contains(where: { labels($0).contains("Incorrect master password.") }) {
+                throw CheckFailure("The installed Vault rejected the fixture password")
+            }
+            return elements
                 .contains { attribute($0, kAXSubroleAttribute) as? String == "AXSecureTextField" }
                 ? nil : true
         }
+        NSPasteboard.general.clearContents()
         // AppKit's Settings shortcut uses Command and the comma key.
         try postKey(pid: request.pid, code: 43, flags: .maskCommand)
         let search = try wait("Settings search field") {
@@ -202,7 +208,7 @@ func observe(_ request: Request) throws -> Observation {
                     && labels($0).contains { $0.hasPrefix("Search settings") }
             }
         }
-        try typeText("module store", into: search, pid: request.pid)
+        try pasteText("module store", into: search, pid: request.pid)
         _ = try wait("Module Store") {
             contents().first { labels($0).contains("Module Store") }
         }
