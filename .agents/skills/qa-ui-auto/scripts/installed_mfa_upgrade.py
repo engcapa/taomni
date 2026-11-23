@@ -282,7 +282,7 @@ def execute(args):
             if args.rdp_probe:
                 from installed_rdp_baseline import measure
                 stages["rdpPerformance"] = measure(candidate, args.rdp_probe.resolve(strict=True),
-                                                   target["producerSource"], work, report)
+                                                   target["producerSource"], work, report, origin=origin)
             result["passed"] = True
     finally:
         write_json(report, "installed-mfa-upgrade.json", result)
