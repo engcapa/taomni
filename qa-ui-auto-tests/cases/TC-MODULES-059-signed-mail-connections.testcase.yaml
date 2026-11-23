@@ -209,6 +209,18 @@ steps:
 - mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 25}
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 2}
 - assert_no_runtime_errors: null
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-compose-open"]'
+- fill: {selector: '[data-testid="mail-recipient-to"] input', value: receiver@}
+- assert_text:
+    selector: '[data-testid="mail-recipient-suggestions"]'
+    contains: receiver@example.com
+    timeout_sec: 20
+- assert_pattern:
+    selector: '[data-testid="mail-recipient-suggestions"]'
+    regex: 'receiver@example\.com>?\s*sent\b'
+- click: '[role="dialog"][aria-label="New message"] [aria-label="Close dialog"]'
+- wait_for: {selector: '[data-testid="mail-compose-dialog"]', state: detached}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -354,6 +366,15 @@ verification:
     - {step: 181, expectation: Both existing account tabs remain open.}
     - {step: 182, expectation: Re-enabling produces no runtime errors.}
     results: [175, 179, 180, 181, 182]
+  - id: R15
+    requirement: The signed host preserves sent-recipient suggestions across disable and re-enable.
+    actions: [125, 174, 183, 184, 187]
+    checkpoints:
+    - {step: 185, expectation: The IMAP Inbox composer finds the recipient of the accepted message.}
+    - {step: 186, expectation: The matching address is marked as a sent recipient.}
+    - {step: 188, expectation: The composer closes normally.}
+    - {step: 189, expectation: The account remains usable without runtime errors.}
+    results: [185, 186, 188, 189]
   visual:
   - check: The Mail pane shows the connection results for both accounts.
     method: automated

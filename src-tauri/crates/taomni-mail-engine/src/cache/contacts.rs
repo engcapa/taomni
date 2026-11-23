@@ -2,8 +2,8 @@
 use crate::compose::parse_mailbox;
 use crate::{MailAddress, now_ts};
 use rusqlite::{Connection, Result as SqlResult, params};
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+pub use taomni_mail_api::contact_history::MailContactSuggestion;
 
 pub fn contact_email(address: &MailAddress) -> Option<String> {
     let email = address.address.as_deref()?.trim().to_lowercase();
@@ -73,7 +73,12 @@ pub fn upsert_contact(
 
 pub fn reindex_cached_contacts(conn: &Connection, account_id: &str) -> SqlResult<usize> {
     conn.execute(
-        "DELETE FROM mail_contacts WHERE account_id = ?1",
+        "DELETE FROM mail_contacts WHERE account_id = ?1 AND sent_count = 0",
+        params![account_id],
+    )?;
+    conn.execute(
+        "UPDATE mail_contacts SET received_count = 0, message_count = sent_count
+         WHERE account_id = ?1 AND sent_count > 0",
         params![account_id],
     )?;
 
@@ -132,7 +137,14 @@ pub fn reindex_cached_contacts(conn: &Connection, account_id: &str) -> SqlResult
     let mut insert = conn.prepare_cached(
         "INSERT INTO mail_contacts
          (account_id, email, name, first_seen_at, last_seen_at, message_count, sent_count, received_count, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?6, ?7)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?6, ?7)
+         ON CONFLICT(account_id, email) DO UPDATE SET
+            name = COALESCE(mail_contacts.name, excluded.name),
+            first_seen_at = MIN(mail_contacts.first_seen_at, excluded.first_seen_at),
+            last_seen_at = MAX(mail_contacts.last_seen_at, excluded.last_seen_at),
+            received_count = excluded.received_count,
+            message_count = mail_contacts.sent_count + excluded.received_count,
+            updated_at = excluded.updated_at",
     )?;
     for (email, (name, first, last, count)) in &contacts {
         insert.execute(params![
@@ -235,14 +247,4 @@ pub fn search_contacts(
         },
     )?;
     rows.collect()
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MailContactSuggestion {
-    pub name: Option<String>,
-    pub email: String,
-    pub source: String,
-    pub score: i64,
-    pub last_seen_at: Option<i64>,
 }

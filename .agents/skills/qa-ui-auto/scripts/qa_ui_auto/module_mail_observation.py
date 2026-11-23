@@ -111,8 +111,8 @@ def run(ctx, args):
         report["delivery"] = observe_delivery(phase)
         if phase == "imap-delivery":
             command = "mail/record-sent-contacts"
-            if command not in manifest["commands"]:
-                raise StepError("The signed Mail host does not record SMTP recipients")
+            if not {command, "mail/contact-history"} <= set(manifest["commands"]):
+                raise StepError("The signed Mail host does not provide sent-recipient history")
             report["delivery"]["sentContacts"] = {
                 "command": command,
                 **observe_sent_contact(plugins.parent / "mail-cache", "receiver@example.com"),

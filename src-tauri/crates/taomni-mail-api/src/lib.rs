@@ -16,6 +16,7 @@ pub mod body_cache;
 pub mod cache_query;
 pub mod calendar;
 pub mod compose;
+pub mod contact_history;
 pub mod filter_cache;
 pub mod folder_cache;
 pub mod imap_exchange;

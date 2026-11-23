@@ -130,6 +130,8 @@ steps:
     expect_truthy: true
     timeout_sec: 30
 - assert_no_runtime_errors: null
+- click: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 30}
 - click: '[data-testid="mail-client-tab"] [data-testid="mail-compose-open"]'
 - fill: {selector: '[data-testid="mail-recipient-to"] input', value: qa-sent-cont}
 - assert_text:
@@ -227,13 +229,14 @@ verification:
     - {step: 46, expectation: The deleted draft leaves the local list.}
     results: [20, 38, 45, 46]
   - id: R5
-    requirement: Sending makes the accepted recipient available in a new composer.
-    actions: [22, 55, 56, 58]
+    requirement: Sending makes the accepted recipient available in a new composer opened from the Inbox.
+    actions: [22, 55, 57, 58, 60]
     checkpoints:
-    - {step: 57, expectation: A partial address locates the recipient of the delivered message.}
-    - {step: 59, expectation: Closing the new composer leaves the mailbox ready.}
-    - {step: 60, expectation: Reopening and closing the composer leaves no runtime errors.}
-    results: [57, 59, 60]
+    - {step: 56, expectation: The visible mailbox is back on Inbox.}
+    - {step: 59, expectation: A partial address locates the recipient of the delivered message.}
+    - {step: 61, expectation: Closing the new composer leaves the mailbox ready.}
+    - {step: 62, expectation: Reopening and closing the composer leaves no runtime errors.}
+    results: [56, 59, 61, 62]
   visual:
   - check: 截图中状态栏显示已保存 Sent 副本，写信窗口已关闭。
     method: manual

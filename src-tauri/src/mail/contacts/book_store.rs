@@ -5,7 +5,11 @@ use crate::{
     state::AppState,
 };
 use serde::de::DeserializeOwned;
-use taomni_mail_api::{ADDRESS_BOOK, MailboxRequest, pop3_store::LocalMailboxAction};
+use taomni_mail_api::{
+    ADDRESS_BOOK, MailboxRequest,
+    contact_history::{ContactHistoryAction, MailContactSuggestion},
+    pop3_store::LocalMailboxAction,
+};
 use taomni_mail_engine::contacts::{
     handoff::{self, AddressBookImport},
     mailbox::BookAction,
@@ -73,7 +77,7 @@ pub(in crate::mail) async fn suggestions(
     account: &str,
     query: String,
     limit: u32,
-) -> Result<Vec<taomni_mail_engine::cache::MailContactSuggestion>, String> {
+) -> Result<Vec<MailContactSuggestion>, String> {
     use taomni_mail_engine::{
         cache::search_contacts,
         contacts::{merge_suggestions, search_recipient_suggestions},
@@ -93,14 +97,28 @@ pub(in crate::mail) async fn suggestions(
         },
     )
     .await?;
-    let collected = crate::mail::pop3_store::run(
+    let collected = crate::mail::pop3_store::with_account_owner(
         state,
         account,
         LocalMailboxAction::SearchContacts {
             query: query.clone(),
             limit,
         },
-        move |db, account| search_contacts(db, account, &query, limit),
+        async {
+            if module_host::manages_contact_history(&state.plugins) {
+                return module_host::contact_history(
+                    state.plugins.clone(),
+                    state.mail_db(account)?,
+                    account.to_owned(),
+                    ContactHistoryAction::Search { query, limit },
+                )
+                .await;
+            }
+            crate::mail::with_mail_db_async(state, account, move |db, account| {
+                search_contacts(db, account, &query, limit)
+            })
+            .await
+        },
     )
     .await?;
     Ok(merge_suggestions(book, collected, limit))

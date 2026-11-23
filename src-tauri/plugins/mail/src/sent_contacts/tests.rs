@@ -1,6 +1,9 @@
 use std::cell::Cell;
 
 use rusqlite::Connection;
+use taomni_mail_api::contact_history::{
+    ContactHistoryAction, ContactHistoryRequest, MailContactSuggestion,
+};
 use taomni_mail_engine::{
     cache::{init_mail_tables, search_contacts},
     database::mail_db_file_stem,
@@ -46,6 +49,27 @@ fn sent_contacts_commit_once_per_recipient_and_roll_back_on_cancellation() {
             .is_empty()
     );
     assert_eq!(record(request(), &|| Ok(())).unwrap(), 2);
+    let history = |action| ContactHistoryRequest {
+        account_id: account_id.into(),
+        database: database.clone(),
+        action,
+    };
+    for _ in 0..2 {
+        super::super::contact_history::apply(history(ContactHistoryAction::Reindex), &|| Ok(()))
+            .unwrap();
+    }
+    let suggestions = super::super::contact_history::apply(
+        history(ContactHistoryAction::Search {
+            query: "Blind".into(),
+            limit: 5,
+        }),
+        &|| Ok(()),
+    )
+    .unwrap();
+    let suggestions: Vec<MailContactSuggestion> = serde_json::from_value(suggestions).unwrap();
+    assert_eq!(suggestions.len(), 1);
+    assert_eq!(suggestions[0].email, "bcc@example.com");
+    assert_eq!(suggestions[0].source, "sent");
     let contacts = search_contacts(&db, account_id, "example.com", 10).unwrap();
     assert_eq!(contacts.len(), 2);
     let recorded_once: u32 = db

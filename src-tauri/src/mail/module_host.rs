@@ -15,6 +15,8 @@ mod cache_publication;
 mod cache_query;
 pub(super) use cache_query::{queries_account_cache, query_account_cache};
 mod compose;
+mod contact_history;
+pub(super) use contact_history::{contact_history, manages_contact_history};
 pub(super) mod imap_idle;
 mod mbox;
 pub(super) use archive_decoding::{decode_archive_attachment, decode_archive_original};

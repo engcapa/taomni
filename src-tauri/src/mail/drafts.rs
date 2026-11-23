@@ -1,4 +1,5 @@
 use super::*;
+use taomni_mail_api::contact_history::ContactHistoryAction;
 
 #[cfg(test)]
 pub(super) use taomni_mail_engine::drafts::{delete_mail_draft, list_mail_drafts, save_mail_draft};
@@ -46,17 +47,27 @@ pub async fn mail_index_cached_contacts(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
-    pop3_store::run(
+    pop3_store::with_account_owner(
         &state,
         &account_id,
         taomni_mail_api::pop3_store::LocalMailboxAction::ReindexContacts,
-        move |db, account_id| {
-            // Rebuilding once when opening a composer must be one transaction,
-            // not a durable SQLite commit for every address in the entire mailbox.
-            let tx = db.unchecked_transaction()?;
-            let count = reindex_cached_contacts(&tx, account_id)?;
-            tx.commit()?;
-            Ok(count)
+        async {
+            if module_host::manages_contact_history(&state.plugins) {
+                return module_host::contact_history(
+                    state.plugins.clone(),
+                    state.mail_db(&account_id)?,
+                    account_id.clone(),
+                    ContactHistoryAction::Reindex,
+                )
+                .await;
+            }
+            with_mail_db_async(&state, &account_id, |db, account_id| {
+                let tx = db.unchecked_transaction()?;
+                let count = reindex_cached_contacts(&tx, account_id)?;
+                tx.commit()?;
+                Ok(count)
+            })
+            .await
         },
     )
     .await
