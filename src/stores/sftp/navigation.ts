@@ -23,7 +23,7 @@ type Get = StoreApi<SftpStoreState>["getState"];
 
 /** One request owner for refresh, navigation and history; late reads cannot change a newer directory. */
 export function createPaneNavigation(set: Set, get: Get): Pick<SftpStoreState,
-  "refreshPane" | "navigate" | "navigateBack" | "navigateForward"> {
+  "refreshPane" | "navigate" | "navigateBack" | "navigateForward" | "restorePane"> {
   const load = async (id: string, side: PaneSide, path: string, historyIndex?: number, refresh = false) => {
     const attaching = side === "remote" ? inFlightAttaches.get(id) : inFlightLocalAttaches.get(id);
     if (attaching) {
@@ -94,6 +94,21 @@ export function createPaneNavigation(set: Set, get: Get): Pick<SftpStoreState,
     navigateForward: async (id, side) => {
       const pane = get().sessions[id]?.[side];
       if (pane && pane.historyIndex < pane.history.length - 1) await load(id, side, pane.history[pane.historyIndex + 1], pane.historyIndex + 1);
+    },
+    restorePane: async (id, side, navigation) => {
+      const history = navigation.history.filter((path) => path);
+      if (!history.length || !get().sessions[id]) return;
+      const index = Math.min(Math.max(navigation.historyIndex, 0), history.length - 1);
+      // Install the saved stack before loading so the load retains it and back
+      // and forward keep pointing at the pre-reconnect entries.
+      set((state) => {
+        const current = state.sessions[id];
+        if (!current || current[side].history.join("\0") === history.join("\0")) return state;
+        return { sessions: { ...state.sessions, [id]: {
+          ...current, [side]: { ...current[side], history, historyIndex: index },
+        } } };
+      });
+      await load(id, side, history[index], index);
     },
   };
 }

@@ -149,6 +149,58 @@ describe("sftpStore", () => {
     expect(vi.mocked(sftpAttach)).toHaveBeenCalledWith(opts);
   });
 
+  it("reconnect re-enters the navigated remote pane and keeps its history", async () => {
+    vi.mocked(sftpAttach).mockResolvedValue({ homeDir: "/home/test" });
+    vi.mocked(sftpListRemote).mockResolvedValue([]);
+
+    const opts = {
+      sessionId: "re-sid",
+      host: "example.com",
+      port: 22,
+      username: "user",
+      authMethod: "Password",
+      authData: "pass",
+    };
+    await useSftpStore.getState().attach(opts);
+    await useSftpStore.getState().navigate("re-sid", "remote", "/home/test/projects");
+    await useSftpStore.getState().navigate("re-sid", "remote", "/home/test/projects/app");
+    const before = useSftpStore.getState().sessions["re-sid"].remote;
+    expect(before.path).toBe("/home/test/projects/app");
+    expect(before.history).toEqual(["/home/test", "/home/test/projects", "/home/test/projects/app"]);
+    expect(before.historyIndex).toBe(2);
+
+    await useSftpStore.getState().reconnect("re-sid");
+    const after = useSftpStore.getState().sessions["re-sid"].remote;
+    expect(after.path).toBe("/home/test/projects/app");
+    expect(after.history).toEqual(["/home/test", "/home/test/projects", "/home/test/projects/app"]);
+    expect(after.historyIndex).toBe(2);
+    await useSftpStore.getState().navigateBack("re-sid", "remote");
+    expect(useSftpStore.getState().sessions["re-sid"].remote.path).toBe("/home/test/projects");
+  });
+
+  it("reconnect at the server home keeps the single attach listing", async () => {
+    vi.mocked(sftpAttach).mockResolvedValue({ homeDir: "/home/test" });
+    vi.mocked(sftpListRemote).mockResolvedValue([]);
+
+    await useSftpStore.getState().attach({
+      sessionId: "home-sid",
+      host: "example.com",
+      port: 22,
+      username: "user",
+      authMethod: "Password",
+      authData: "pass",
+    });
+    vi.mocked(sftpListRemote).mockClear();
+    await useSftpStore.getState().reconnect("home-sid");
+
+    const home = useSftpStore.getState().sessions["home-sid"].remote;
+    expect(home.path).toBe("/home/test");
+    expect(home.history).toEqual(["/home/test"]);
+    expect(home.historyIndex).toBe(0);
+    // attach lists home once per attach; the restore path must not list again.
+    expect(vi.mocked(sftpListRemote)).toHaveBeenCalledTimes(1);
+  });
+
   it("escalates connection errors on remote navigation to session level error", async () => {
     vi.mocked(sftpListRemote).mockRejectedValue(new Error("socket closed"));
 

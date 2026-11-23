@@ -12,7 +12,7 @@ import {
   loadInitialListing,
   WINDOWS_DRIVES_ROOT,
 } from "./sftp/listing";
-import { type SftpStoreState } from "./sftp/model";
+import { type PaneNavigation, type PaneSide, type SftpStoreState } from "./sftp/model";
 import { createLocalAttachment } from "./sftp/localAttachment";
 import { createPaneNavigation, invalidatePaneRequests } from "./sftp/navigation";
 
@@ -300,8 +300,23 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
     if (!session || !session.connectionOpts) {
       throw new Error("No connection credentials cached for this session");
     }
+    // Reconnect re-attaches the channel, and attach installs each pane at the
+    // server home. Capture the user's position first so a transport restart
+    // does not silently move them out of the directory they were working in.
+    const position: Record<PaneSide, PaneNavigation> = {
+      remote: { history: [...session.remote.history], historyIndex: session.remote.historyIndex },
+      local: { history: [...session.local.history], historyIndex: session.local.historyIndex },
+    };
     await get().detach(sessionId).catch(() => { });
     await get().attach(session.connectionOpts);
+    for (const side of ["remote", "local"] as const) {
+      const saved = position[side];
+      const pane = get().sessions[sessionId]?.[side];
+      // Only re-enter a pane the user had actually navigated away from; home
+      // was already loaded by attach and must not be listed twice.
+      if (!pane || saved.history.length < 2 || pane.path === saved.history[saved.historyIndex]) continue;
+      await get().restorePane(sessionId, side, saved);
+    }
   },
 }));
 
