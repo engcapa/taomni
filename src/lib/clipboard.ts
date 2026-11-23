@@ -126,6 +126,24 @@ export async function readText(): Promise<string> {
   return (await readTextResult()).text;
 }
 
+/**
+ * Read text for *paste* commands that must not silently lose the clipboard.
+ *
+ * The webview Clipboard API can resolve or reject differently per WebView and
+ * focus/permission state: WebView2 (Windows) has been observed rejecting reads
+ * while the page still looks focused, and it can report an empty string when a
+ * different native backend succeeds. Pasting therefore asks both owners: keep
+ * a non-empty webview result, otherwise retry through the native command
+ * before treating the clipboard as empty. This never fabricates text — the
+ * native read still reports a genuinely empty/unavailable clipboard.
+ */
+export async function readPasteText(): Promise<string> {
+  const webview = await readTextResult();
+  if (webview.text) return webview.text;
+  const native = await readNativeTextResult();
+  return native.text || webview.text;
+}
+
 export type ClipboardFilesReadResult = { ok: true; paths: string[] } | { ok: false; message: string };
 
 export async function readFilesResult(): Promise<ClipboardFilesReadResult> {

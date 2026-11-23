@@ -15914,6 +15914,9 @@ controls:
   - id: viewer-close-keep-draft
     selector: '[data-testid="viewer-close-keep-draft"]'
     kind: interactive
+  - id: viewer-close-error
+    selector: '[data-testid="viewer-close-error"]'
+    kind: display
   - id: viewer-close-cancel
     selector: '[data-testid="viewer-close-cancel"]'
     kind: interactive
@@ -16743,6 +16746,21 @@ controls:
   - id: notepad-menu-edit
     selector: '[data-testid="notepad-menu-edit"]'
     kind: interactive
+  - id: notepad-menu-item-edit-paste
+    selector: '[data-testid="notepad-menu-item-edit.paste"]'
+    kind: interactive
+  - id: notepad-menu-item-edit-clipboard-history
+    selector: '[data-testid="notepad-menu-item-edit.clipboardHistory"]'
+    kind: interactive
+  - id: notepad-clipboard-history-dialog
+    selector: '[data-testid="notepad-clipboard-history-dialog"]'
+    kind: display
+  - id: notepad-clipboard-history-empty
+    selector: '[data-testid="notepad-clipboard-history-empty"]'
+    kind: display
+  - id: notepad-clipboard-history-item
+    selector: '[data-testid="notepad-clipboard-history-item-0"]'
+    kind: interactive
   - id: notepad-menu-item-file-toggle-readonly
     selector: '[data-testid="notepad-menu-item-file.toggleReadonly"]'
     kind: interactive
@@ -16815,6 +16833,9 @@ controls:
   - id: notepad-find-bar
     selector: '[data-testid="notepad-find-bar"]'
     kind: display
+  - id: notepad-find-all-current
+    selector: '[data-testid="notepad-find-all-current"]'
+    kind: interactive
   - id: np-find-input
     selector: '[data-testid="np-find-input"]'
     kind: interactive

@@ -15,6 +15,12 @@ TEXT = "File open original\nSecond line\n中文\n"
 SAVED = "File open saved\nSecond line\n中文\n"
 SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><script>window.FILE_OPEN_SVG_UNSAFE=true</script><rect width="120" height="80" fill="#2563eb" onload="alert(1)"/><image href="https://example.invalid/tracker.png"/></svg>\n'
 SVG_SAVED = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="#16a34a"/></svg>\n'
+# Editable text just above the 512 KiB localStorage draft cap, so "keep draft"
+# must fall back to the native Notepad snapshot / browser stub backup store.
+DRAFT_LARGE = "".join(
+    f"Draft recovery line {index:05d} - The quick brown fox jumps over the lazy dog.\n"
+    for index in range(10_000)
+)
 MARKDOWN = "# File open Markdown\n\n**Rendered bold** and `inline code`.\n\nMath: $x^2$ and $$\\frac{1}{2}$$.\n\n## Details\n\n![Original](assets/pixel.png)\n\n- [ ] First task\n\n```mermaid\nflowchart LR\n  Explorer --> OpenFile --> Viewer\n```\n"
 HTML = '''<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="assets/local.css"></head><body><h1>File open HTML</h1><div id="resource">Local resource</div><img id="pixel" src="assets/pixel.png"><a href="next.html">Next local page</a><a href="https://example.invalid/external">External browser</a><script>
 window.addEventListener("load", function () {
@@ -42,6 +48,7 @@ def setup(ctx: Any) -> None:
     root = ctx.values["platform_workspace_root"] + "/file-open-" + uuid4().hex[:10]
     files = {
         "notes.txt": TEXT.encode(), "recovery.txt": b"Recovery disk original\n", "retry.txt": b"Retry original\n",
+        "draft-large.txt": DRAFT_LARGE.encode(),
         "binary.txt": b"\x00\xff\x00binary", "unsafe.svg": SVG.encode(), "live.md": MARKDOWN.encode(),
         "report.html": HTML.encode(), "next.html": b"<!doctype html><h1>Next local page</h1>",
         "assets/local.css": b"#resource { color: rgb(12, 34, 56); }", "assets/pixel.png": PNG,
@@ -64,6 +71,7 @@ def setup(ctx: Any) -> None:
     ctx.values.update({
         "file_open_root": root, "file_open_workspace": workspace(root),
         "file_open_saved_sha": hashlib.sha256(SAVED.encode()).hexdigest(),
+        "file_open_draft_large_sha": hashlib.sha256(DRAFT_LARGE.encode()).hexdigest(),
         "file_open_original_sha": hashlib.sha256(TEXT.encode()).hexdigest(),
         "file_open_svg_original_sha": hashlib.sha256(SVG.encode()).hexdigest(),
         "file_open_svg_saved_sha": hashlib.sha256(SVG_SAVED.encode()).hexdigest(),

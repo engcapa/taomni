@@ -1,0 +1,132 @@
+id: TC-NP-105
+title: Native Notepad paste/copy/cut cross the real OS clipboard through keyboard and Edit menu
+description: >-
+  AC-17 native slice: the packaged Notepad workbench must consume and publish the
+  real OS clipboard. An independent host clipboard oracle (PowerShell/.NET on
+  Windows, AppKit JXA on macOS, xclip on Linux) plants deterministic text; the
+  keyboard paste shortcut must insert it through the production editor, an
+  Edit > Paste command must insert the current OS text through the command
+  registry, select-all copy must publish the exact buffer to the OS clipboard,
+  and cut must publish and remove it. This is the regression boundary for the
+  Windows WebView2 case where the renderer Clipboard API read fails/denies and
+  Ctrl+V silently did nothing; browser stubs cannot establish it.
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+- macOS
+covers:
+- F-NOTEPAD-1
+tags:
+- p0
+- notepad
+- clipboard
+- native
+- regression
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-notepad-native-clipboard
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab-new-notepad"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="notepad-workbench"]'
+- click: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Control+End
+    macos_key: Meta+ArrowDown
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- type: alpha
+# Plant independent OS clipboard text (outside the app) and drive the real
+# keyboard paste shortcut the users reported as broken on Windows.
+- host_clipboard:
+    action: set
+    kind: text
+    text: |-
+      NATIVE-PASTE-ONE
+      LINE-TWO
+- press:
+    key: Mod+v
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- wait: 0.5
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - alphaNATIVE-PASTE-ONE
+    - LINE-TWO
+# The Edit > Paste registry command must insert the current OS clipboard text.
+- click: '[data-testid="notepad-menu-edit"]'
+- wait_for: '[data-testid="notepad-menu-item-edit.paste"]'
+- click: '[data-testid="notepad-menu-item-edit.paste"]'
+- wait: 0.5
+- assert_text:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    contains: NATIVE-PASTE-ONE
+# Select-all copy must publish the real buffer to the OS clipboard, verified by
+# an independent reader rather than the product's own state.
+- press:
+    key: Mod+a
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Mod+c
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- wait: 0.5
+- host_clipboard:
+    action: assert
+    kind: text
+    contains: NATIVE-PASTE-ONE
+    timeout_sec: 10
+# Cut publishes the selected text and removes it from the buffer.
+- host_clipboard:
+    action: set
+    kind: text
+    text: CUT-MARKER-UNIQUE
+- press:
+    key: Mod+a
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Mod+x
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- wait: 0.5
+- host_clipboard:
+    action: assert
+    kind: text
+    contains: NATIVE-PASTE-ONE
+    timeout_sec: 10
+- assert_text_equals:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    equals: ''
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The real keyboard paste shortcut inserts independent OS clipboard text into the native Notepad editor.
+    actions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    checkpoints:
+    - {step: 13, expectation: The keyboard paste inserted the exact OS clipboard lines at the caret.}
+    results: [13]
+  - id: R2
+    requirement: The Edit menu Paste command inserts the current real OS clipboard text through the production registry.
+    actions: [14, 15, 16, 17]
+    checkpoints:
+    - {step: 18, expectation: The menu command inserted the OS clipboard text again.}
+    results: [18]
+  - id: R3
+    requirement: Select-all copy publishes the buffer to the OS clipboard and cut publishes then removes it.
+    actions: [19, 20, 21, 22, 23, 24, 25, 26, 27]
+    checkpoints:
+    - {step: 28, expectation: The buffer is empty after cut.}
+    - {step: 29, expectation: The workflow raised no uncaught runtime errors.}
+    results: [28, 29]
+  visual:
+  - check: Selection rendering during copy/cut is not pixel-verified here.
+    method: not-applicable
+    reason: Notepad dark selection contrast is covered by the dedicated Notepad selection case.
+  native:
+  - check: Real OS clipboard read/write plus native WebView shortcut delivery on Linux, Windows and macOS.
+    method: automated
+    reason: host_clipboard is an independent OS oracle on all three native platforms; browser uses a stub.

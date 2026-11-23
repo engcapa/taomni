@@ -1,10 +1,10 @@
 {
   "version": 1,
   "totals": {
-    "features_with_controls": 110,
-    "required": 2111,
-    "covered_required": 1842,
-    "shallow": 62,
+    "features_with_controls": 114,
+    "required": 2313,
+    "covered_required": 2030,
+    "shallow": 61,
     "orphans": 10
   },
   "features": {
@@ -510,12 +510,12 @@
     },
     "F-WS-1": {
       "required": 34,
-      "covered_required": 16,
+      "covered_required": 17,
       "shallow": 0
     },
     "F-WS-2": {
-      "required": 114,
-      "covered_required": 87,
+      "required": 138,
+      "covered_required": 111,
       "shallow": 5
     },
     "F-WS-3": {
@@ -549,14 +549,34 @@
       "shallow": 5
     },
     "F-EXPLORER-1": {
-      "required": 109,
-      "covered_required": 61,
+      "required": 146,
+      "covered_required": 91,
       "shallow": 1
     },
     "F-FILEOPEN-1": {
-      "required": 234,
-      "covered_required": 158,
-      "shallow": 1
+      "required": 242,
+      "covered_required": 167,
+      "shallow": 0
+    },
+    "F-NOTEPAD-1": {
+      "required": 65,
+      "covered_required": 50,
+      "shallow": 0
+    },
+    "F-NOTEPAD-2": {
+      "required": 23,
+      "covered_required": 23,
+      "shallow": 0
+    },
+    "F-NOTEPAD-3": {
+      "required": 22,
+      "covered_required": 22,
+      "shallow": 0
+    },
+    "F-NOTEPAD-4": {
+      "required": 31,
+      "covered_required": 31,
+      "shallow": 0
     }
   }
 }
