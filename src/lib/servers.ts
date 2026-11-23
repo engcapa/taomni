@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { isTauriRuntime } from "./runtime";
 
 export type ServerType =
   | "ssh"
@@ -28,7 +27,7 @@ export interface ServerConfig {
 
 export function serverSettingsNeedVault(type: ServerType, config: ServerConfig): boolean {
   return (type === "vnc" || type === "ssh" || type === "ftp") &&
-    isTauriRuntime() && config.removePassword !== true &&
+    config.removePassword !== true &&
     (Boolean(config.password) || Boolean(config.passwordRef) || config.credentialMigrationRequired === true);
 }
 

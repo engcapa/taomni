@@ -5,8 +5,8 @@ description: >-
   single `servers` tab across Linux, Windows, and macOS: opens via Global Command
   Palette, configures HTTP on 127.0.0.1:28489, starts the real in-process HTTP
   server and observes listening log output, preserves running status and live logs
-  across Home/tab switches, applies an updated port (28490) through on-demand
-  vault setup and observes the restart warning, stops the server, clears logs,
+  across Home/tab switches, applies the updated HTTP port (28490) and observes the
+  restart warning without requiring another service's Vault, stops the server, clears logs,
   closes without a discard prompt, and reopens to verify persisted settings and
   cleared log state.
 covers:
@@ -84,20 +84,8 @@ steps:
     selector: '[data-testid="server-field-port"]'
     value: '28490'
 - click: '[data-testid="servers-dialog-apply"]'
-- wait_for:
-    selector: '[data-testid="vault-setup-dialog"]'
-    timeout_sec: 15
-- fill:
-    selector: '[data-testid="vault-setup-pw1"]'
-    value: qa-servers-vault-123
-- fill:
-    selector: '[data-testid="vault-setup-pw2"]'
-    value: qa-servers-vault-123
-- click: '[data-testid="vault-setup-confirm"]'
-- wait_for:
-    selector: '[data-testid="vault-setup-dialog"]'
-    state: detached
-    timeout_sec: 15
+- wait_for: '[data-testid="servers-dialog-apply"]:enabled'
+- assert_not_visible: '[data-testid="vault-setup-dialog"]'
 - assert_text:
     selector: '[data-testid="server-log"]'
     contains: Restart server to apply port change
@@ -200,83 +188,82 @@ verification:
     - 30
     - 31
   - id: R2
-    requirement: Applying an edited port on a running HTTP server completes on-demand vault setup, logs the restart hint, stops cleanly, and clears logs.
+    requirement: Applying an edited port on a running HTTP server saves the HTTP configuration, logs the restart hint, stops cleanly, and clears logs.
     actions:
     - 32
     - 33
-    - 35
-    - 36
     - 37
-    - 40
-    - 44
+    - 41
     checkpoints:
     - step: 34
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-dialog\"]", "timeout_sec": 15}}'
-    - step: 38
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-dialog\"]", "state": "detached", "timeout_sec": 15}}'
-    - step: 39
+      expectation: Apply finishes saving the selected HTTP service.
+    - step: 35
+      expectation: Applying HTTP settings does not open the Vault setup dialog.
+    - step: 36
       expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "Restart server to apply port change", "timeout_sec": 10}}'
-    - step: 41
+    - step: 38
       expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-http\"][data-status=\"stopped\"]", "timeout_sec": 20}}'
-    - step: 43
+    - step: 40
       expectation: '{"assert_disabled": "[data-testid=\"server-row-http-stop\"]"}'
-    - step: 45
+    - step: 42
       expectation: '{"assert_disabled": "[data-testid=\"server-log-clear\"]"}'
     results:
-    - 39
-    - 41
-    - 43
-    - 45
+    - 34
+    - 35
+    - 36
+    - 38
+    - 40
+    - 42
   - id: R3
     requirement: After Apply, Cancel closes immediately without a discard prompt, reopening preserves the saved 28490 port and cleared log, and closing via tab-close detaches cleanly.
     actions:
-    - 46
+    - 43
+    - 47
+    - 49
     - 50
     - 52
-    - 53
-    - 55
-    - 61
+    - 58
     checkpoints:
-    - step: 47
+    - step: 44
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
-    - step: 48
+    - step: 45
       expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 49
+    - step: 46
       expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
-    - step: 54
+    - step: 51
       expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
-    - step: 57
+    - step: 54
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "28490"}}'
-    - step: 58
+    - step: 55
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-bind-address\"]", "name": "value", "equals": "127.0.0.1"}}'
-    - step: 59
+    - step: 56
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-row-http\"]", "name": "data-status", "equals": "stopped"}}'
-    - step: 60
+    - step: 57
       expectation: '{"assert_disabled": "[data-testid=\"server-log-clear\"]"}'
-    - step: 62
+    - step: 59
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
-    - step: 63
+    - step: 60
       expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
-    - step: 64
+    - step: 61
       expectation: '{"assert_no_runtime_errors": null}'
     results:
-    - 48
-    - 49
+    - 45
+    - 46
+    - 54
+    - 55
+    - 56
     - 57
-    - 58
-    - 59
     - 60
-    - 63
-    - 64
+    - 61
   - id: HTTP
     requirement: The native HTTP listener returns the configured document and closes on Stop.
-    actions: [14, 15, 16, 17, 40]
+    actions: [14, 15, 16, 17, 37]
     checkpoints:
     - {step: 21, expectation: An independent HTTP request returns the fixture file with the exact bytes.}
-    - {step: 42, expectation: A new connection to the configured address is refused after Stop.}
-    results: [21, 42]
+    - {step: 39, expectation: A new connection to the configured address is refused after Stop.}
+    results: [21, 39]
   visual:
-  - check: HTTP server configuration, running status indicator, server log output, and vault setup prompt render inside the single servers tab on Linux, Windows, and macOS.
+  - check: HTTP server configuration, running status and server log output render inside the single servers tab on Linux, Windows and macOS.
     method: not-applicable
     reason: Verified natively across desktop WebViews through live control state, port binding, and layout visibility checks rather than static screenshot diffing.
   native:
