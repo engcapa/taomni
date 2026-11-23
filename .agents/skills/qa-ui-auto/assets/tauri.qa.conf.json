@@ -3,7 +3,7 @@
   "productName": "Taomni QA",
   "mainBinaryName": "taomni",
   "build": {
-    "features": ["legacy-vnc-client", "legacy-rdp-client", "legacy-rdp-server", "legacy-local-servers", "legacy-screenshot-media", "legacy-mfa", "legacy-mail-imap", "legacy-mail-smtp"],
+    "features": ["legacy-vnc-client", "legacy-rdp-client", "legacy-rdp-server", "legacy-local-servers", "legacy-screenshot-media", "legacy-mfa", "legacy-mail-imap", "legacy-mail-pop3", "legacy-mail-smtp"],
     "beforeBuildCommand": "pnpm build:mobile && pnpm exec vite build --mode qa && bash scripts/bundle-krb5-macos.sh stage"
   }
 }

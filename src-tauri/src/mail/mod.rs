@@ -11,8 +11,8 @@
 //! onto a plain OS thread when a Tokio runtime is already current, to avoid
 //! nested-runtime drop panics in debug builds.
 
-#[cfg(not(any(test, feature = "legacy-mail-imap")))]
-const SIGNED_IMAP_REQUIRED: &str =
+#[cfg(not(any(test, all(feature = "legacy-mail-imap", feature = "legacy-mail-pop3"))))]
+const SIGNED_MAIL_CONNECTION_REQUIRED: &str =
     "Install or update the Mail module and enable it to connect to this mailbox";
 
 #[cfg(any(test, feature = "legacy-mail-imap"))]
@@ -25,7 +25,7 @@ macro_rules! legacy_imap {
 #[cfg(not(any(test, feature = "legacy-mail-imap")))]
 macro_rules! legacy_imap {
     ($operation:block) => {
-        Err(String::from($crate::mail::SIGNED_IMAP_REQUIRED))
+        Err(String::from($crate::mail::SIGNED_MAIL_CONNECTION_REQUIRED))
     };
 }
 

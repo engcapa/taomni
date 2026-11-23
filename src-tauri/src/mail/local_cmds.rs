@@ -5,7 +5,9 @@ use std::collections::HashMap;
 
 use tauri::State;
 
-use super::pop3::{self, Pop3Client};
+use super::pop3;
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
+use super::pop3::Pop3Client;
 use super::sync::{MailFolderSyncResult, MailSyncMode};
 use super::{
     MailAccountConfig, MailDeleteResult, MailDownloadAttachmentResult, MailFlagResult, MailFolder,
@@ -46,11 +48,16 @@ pub(super) async fn test_connection(
     if super::module_host::checks_incoming(&state.plugins) {
         super::module_host::check_incoming(state.plugins.clone(), &account).await?;
     } else {
-        let incoming = account.clone();
-        let handle = tokio::runtime::Handle::current();
-        tokio::task::spawn_blocking(move || Pop3Client::connect(&incoming, &handle)?.quit())
-            .await
-            .map_err(|error| format!("POP3 test task failed: {error}"))??;
+        #[cfg(not(any(test, feature = "legacy-mail-pop3")))]
+        return Err(super::SIGNED_MAIL_CONNECTION_REQUIRED.into());
+        #[cfg(any(test, feature = "legacy-mail-pop3"))]
+        {
+            let incoming = account.clone();
+            let handle = tokio::runtime::Handle::current();
+            tokio::task::spawn_blocking(move || Pop3Client::connect(&incoming, &handle)?.quit())
+                .await
+                .map_err(|error| format!("POP3 test task failed: {error}"))??;
+        }
     }
     let smtp_ok = super::module_host::test_smtp(state.plugins.clone(), &account)
         .await
@@ -85,10 +92,15 @@ async fn download(
             client.quit()?;
             outcome
         } else {
-            let mut client = Pop3Client::connect(&account, &handle)?;
-            let outcome = sync(&mut client.session)?;
-            client.quit()?;
-            outcome
+            #[cfg(not(any(test, feature = "legacy-mail-pop3")))]
+            return Err(super::SIGNED_MAIL_CONNECTION_REQUIRED.into());
+            #[cfg(any(test, feature = "legacy-mail-pop3"))]
+            {
+                let mut client = Pop3Client::connect(&account, &handle)?;
+                let outcome = sync(&mut client.session)?;
+                client.quit()?;
+                outcome
+            }
         };
         let new_unseen = outcome.messages.len();
         let headers = outcome.messages.into_iter().map(|m| m.header).collect();

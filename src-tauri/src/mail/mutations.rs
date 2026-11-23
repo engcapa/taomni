@@ -91,7 +91,7 @@ pub(super) fn run_cached(
     };
     #[cfg(not(any(test, feature = "legacy-mail-imap")))]
     if session.hosted.is_none() {
-        return Err(String::from(SIGNED_IMAP_REQUIRED));
+        return Err(String::from(SIGNED_MAIL_CONNECTION_REQUIRED));
     }
     run_mutation(
         db,

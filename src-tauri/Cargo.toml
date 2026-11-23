@@ -333,6 +333,7 @@ legacy-local-servers = ["dep:taomni-local-servers-engine"]
 legacy-screenshot-media = ["dep:taomni-screenshot-ocr", "dep:taomni-screenshot-recording"]
 legacy-mfa = ["dep:taomni-mfa-engine"]
 legacy-mail-imap = ["dep:imap", "taomni-mail-engine/imap-runtime"]
+legacy-mail-pop3 = ["taomni-mail-engine/pop3-runtime"]
 legacy-mail-smtp = ["taomni-mail-engine/legacy-smtp"]
 # Dedicated hosted test harness: use the production pinned key on every thread
 # instead of the normal unit-fixture key. Production verification is unchanged.
@@ -448,7 +449,7 @@ gtk = "0.18.2"
 
 [dev-dependencies]
 imap = "2.4.1"
-taomni-mail-engine = { path = "crates/taomni-mail-engine", features = ["imap-runtime"], default-features = false }
+taomni-mail-engine = { path = "crates/taomni-mail-engine", features = ["imap-runtime", "pop3-runtime"], default-features = false }
 taomni-mfa-engine = { path = "crates/taomni-mfa-engine" }
 # Cargo enables the helper when building integration tests. Tauri enumerates
 # only enabled binary targets when it assembles a desktop installer.

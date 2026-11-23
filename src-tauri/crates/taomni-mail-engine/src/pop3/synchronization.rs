@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use rusqlite::{Connection, Transaction, TransactionBehavior, params};
 
-use super::{Pop3Session, local_store, plan_round};
+use super::local_store;
 use crate::{MailMessageCached, now_ts};
 
 /// Messages fetched per sync call. The consumer repeats while mail remains.
@@ -14,20 +14,6 @@ pub trait Pop3Mailbox {
     fn uidl(&mut self) -> Result<Vec<(u32, String)>, String>;
     fn retr(&mut self, number: u32) -> Result<Vec<u8>, String>;
     fn dele(&mut self, number: u32) -> Result<(), String>;
-}
-
-impl Pop3Mailbox for Pop3Session {
-    fn uidl(&mut self) -> Result<Vec<(u32, String)>, String> {
-        Pop3Session::uidl(self)
-    }
-
-    fn retr(&mut self, number: u32) -> Result<Vec<u8>, String> {
-        Pop3Session::retr(self, number)
-    }
-
-    fn dele(&mut self, number: u32) -> Result<(), String> {
-        Pop3Session::dele(self, number)
-    }
 }
 
 pub struct Pop3SyncOutcome {
@@ -90,6 +76,35 @@ pub fn sync_inbox(
     })
 }
 
+/// Plan one sync round from the server listing and the remembered UIDLs.
+/// Returns (numbers to download, numbers to delete on the server).
+pub fn plan_round(
+    listing: &[(u32, String)],
+    known: &HashMap<String, i64>,
+    limit: usize,
+    leave_days: Option<u32>,
+    now: i64,
+) -> (Vec<(u32, String)>, Vec<u32>) {
+    let fetch: Vec<(u32, String)> = listing
+        .iter()
+        .filter(|(_, id)| !known.contains_key(id))
+        .take(limit)
+        .cloned()
+        .collect();
+    let deletes = match leave_days {
+        None => Vec::new(),
+        Some(days) => {
+            let cutoff = now - i64::from(days) * 86_400;
+            listing
+                .iter()
+                .filter(|(_, id)| known.get(id).is_some_and(|fetched| *fetched <= cutoff))
+                .map(|(number, _)| *number)
+                .collect()
+        }
+    };
+    (fetch, deletes)
+}
+
 fn known_messages(conn: &Connection, account_id: &str) -> rusqlite::Result<HashMap<String, i64>> {
     let mut query =
         conn.prepare("SELECT uidl, fetched_at FROM mail_pop3_uidl WHERE account_id = ?1")?;
@@ -126,6 +141,26 @@ fn database_error(error: rusqlite::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn plans_new_downloads_and_expired_deletes() {
+        let listing = vec![
+            (1, "a".to_string()),
+            (2, "b".to_string()),
+            (3, "c".to_string()),
+        ];
+        let known: HashMap<String, i64> =
+            [("a".to_string(), 0), ("b".to_string(), 1_000_000)].into();
+        let (fetch, deletes) = plan_round(&listing, &known, 10, Some(7), 1_000_000);
+        assert_eq!(fetch, vec![(3, "c".to_string())]);
+        assert_eq!(
+            deletes,
+            vec![1],
+            "only mail downloaded more than 7 days ago"
+        );
+        let (_, keep) = plan_round(&listing, &known, 10, None, 1_000_000);
+        assert!(keep.is_empty(), "no policy keeps everything on the server");
+    }
 
     #[test]
     fn download_rolls_back_original_header_and_receipt_together() {

@@ -103,8 +103,10 @@ pub(super) mod fake {
 
 use super::MailAccountConfig;
 
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
 mod limits;
 
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
 mod connection;
 
 #[cfg(test)]
@@ -119,6 +121,7 @@ pub(super) fn is_pop3(config: &MailAccountConfig) -> bool {
     config.incoming == super::MailIncomingProtocol::Pop3
 }
 
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
 pub(super) use connection::Pop3Client;
 
 pub(super) use taomni_mail_engine::pop3::sync_inbox;
