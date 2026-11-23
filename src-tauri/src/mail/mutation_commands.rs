@@ -1,5 +1,9 @@
 use super::*;
-use taomni_mail_api::{ImapFlagUpdate, imap_flag_cache::ImapFlagCacheAction};
+use taomni_mail_api::{
+    ImapFlagUpdate,
+    archive_scan::{ArchiveScanAction, POP3_CLEAR_ERROR},
+    imap_flag_cache::ImapFlagCacheAction,
+};
 
 #[tauri::command]
 pub async fn mail_mark_read(
@@ -46,26 +50,38 @@ pub async fn mail_clear_cache(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    if pop3_store::is_hosted(&state, &account_id).await?
-        || with_mail_db(&state, &account_id, |db| {
-            pop3::has_local_store(db, &account_id)
-        })?
-    {
-        return Err("This POP3 account keeps its mail only on this computer; clearing the cache would delete it.".into());
+    if pop3_store::is_hosted(&state, &account_id).await? {
+        return Err(POP3_CLEAR_ERROR.into());
     }
     #[cfg(any(test, feature = "legacy-mail-imap"))]
     state.legacy.mail.mail_imap_pool.invalidate(&account_id);
-    with_mail_db(&state, &account_id, |db| {
-        db.execute(
-            "DELETE FROM mail_messages WHERE account_id = ?1",
-            params![account_id],
-        )?;
-        db.execute(
-            "DELETE FROM mail_folders WHERE account_id = ?1",
-            params![account_id],
-        )?;
-        Ok(())
+    if module_host::owns_archive_scan(&state.plugins) {
+        return module_host::run_archive_scan(
+            state.plugins.clone(),
+            state.mail_db(&account_id)?,
+            account_id,
+            ArchiveScanAction::ClearCache,
+        )
+        .await;
+    }
+
+    tokio::task::spawn_blocking({
+        let cache = state.mail_db(&account_id)?;
+        move || {
+            let db = cache.lock()?;
+            let tx = db
+                .unchecked_transaction()
+                .map_err(|error| error.to_string())?;
+            if pop3::has_local_store(&tx, &account_id).map_err(|error| error.to_string())? {
+                return Err(POP3_CLEAR_ERROR.into());
+            }
+            taomni_mail_engine::cache::clear_cached_account(&tx, &account_id)
+                .map_err(|error| error.to_string())?;
+            tx.commit().map_err(|error| error.to_string())
+        }
     })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]

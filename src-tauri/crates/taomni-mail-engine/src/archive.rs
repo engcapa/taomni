@@ -3,6 +3,7 @@
 mod imap_chunks;
 mod metadata;
 pub mod progress;
+pub mod scan_store;
 pub mod scanner;
 mod transfer;
 pub mod writer;

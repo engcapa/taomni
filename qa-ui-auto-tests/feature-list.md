@@ -7738,6 +7738,9 @@ controls:
   - id: sync-button
     selector: '[data-testid="mail-sync-button"]'
     kind: interactive
+  - id: clear-account-cache
+    selector: 'button[title="Clear this account cache"]'
+    kind: interactive
   - id: test-connection
     selector: '[data-testid="mail-test-connection"]'
     kind: interactive
@@ -7751,6 +7754,7 @@ controls:
 -->
 
 - 手工刷新、打开自动刷新和定时刷新默认只同步 headers；headers 写入缓存并重新加载列表后界面即可继续操作。
+- 签名 Mail 宿主清除当前 IMAP 账户的文件夹与邮件头索引，保留离线原件、归档暂停状态和服务端邮件。TC-MAIL-CACHE-01 核对浏览器的清空和刷新重建，TC-MODULES-070 检查签名宿主提交后的实际 SQLite 状态及原件。
 - 邮件工具栏的连接测试在已启用的 Mail 宿主中完成 IMAP 或 POP3 登录和 SMTP 认证。TC-MODULES-059 验证签名宿主与真实协议，TC-MAIL-POP3-01 覆盖连接、重复同步、重开和标记本地文件夹为已读。TC-MODULES-076 核对实际邮件正文、已验签宿主持有的 POP3 UIDL 与原件，以及停用后保留的数据。两条 POP3 用例都核对重复同步完成后新增邮件数为零。
 - Sessions 与 Workspace 使用同一个 Mail 模块入口。已启用的签名前端提供账户和统一收件箱。TC-MODULES-059 比对实际宿主与前端摘要，TC-MODULES-060 覆盖两个标签的启用和停用。
 - 最近正文缓存按 `bodyRecentLimit` 从已缓存的邮件头中选取候选，由 Mail 宿主用独立 IMAP 连接以每文件夹最多四封为一批读取，随后写入原生磁盘缓存。TC-MODULES-068 核对真实 IMAP 连接与缓存读取，TC-MODULES-069 验证独立预取进度和预取期间手动打开邮件。 签名宿主提交前核对当前邮箱代际和已有正文，前台打开的解码结果也由宿主写入缓存。
@@ -8892,6 +8896,7 @@ files:
   - src-tauri/src/mail/archive_query.rs
   - src-tauri/src/mail/archive/local_commands.rs
   - src-tauri/plugins/mail/src/archive_cleanup.rs
+  - src-tauri/plugins/mail/src/archive_scan.rs
   - src-tauri/src/mail/archive_metadata.rs
   - src-tauri/src/mail/message_source.rs
   - src-tauri/plugins/mail/renderer/client/MailSourceDialog.tsx

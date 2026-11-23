@@ -1,6 +1,6 @@
 id: TC-MODULES-070
 title: Signed Mail archives complete originals after pausing and resuming
-description: Disable Mail during a live archive scan, re-enable it and pause and resume complete storage, then read and search the custom local archive and export the selected attachment after deleting the messages on the server. Compare the original and exported bytes with the fixture. Cancel cleanup, then confirm removal of exactly one saved original.
+description: Disable Mail during a live archive scan, re-enable it and pause and resume complete storage, then read and search the custom local archive and export the selected attachment after deleting the messages on the server. Compare the original and exported bytes with the fixture. Cancel cleanup, then confirm removal of exactly one saved original. Clear the live cache and verify the remaining original and paused state survive.
 covers: [F-Modules-1, F-MAIL-23]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
@@ -185,6 +185,19 @@ steps:
 - assert_signed_mail_host: archive-cleaned
 - click: '[data-testid="mail-archive-close"]'
 - assert_no_runtime_errors: null
+- click: 'button[title="Clear this account cache"]:enabled'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Mail cache cleared}
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    empty_live: true
+    paused: true
+    full: {INBOX: 1}
+- assert_signed_mail_host: cache-cleared
+- click: '[data-testid="mail-archive-open"]'
+- assert_count: {selector: '[data-testid="mail-archive-row"]', equal: 1}
+- assert_text: {selector: '[data-testid="mail-archive-row"]', contains: Complete INBOX 1}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -244,6 +257,17 @@ verification:
     - {step: 105, expectation: The verified Mail host declares archive cleanup and still holds its writer lease.}
     - {step: 107, expectation: Cleanup finishes without runtime errors.}
     results: [93, 96, 97, 100, 103, 104, 105, 107]
+  - id: clear-live-cache
+    requirement: The signed host clears the live index and keeps the remaining verified archive original and persisted pause.
+    actions: [108, 112]
+    checkpoints:
+    - {step: 109, expectation: The toolbar reports that the cache was cleared.}
+    - {step: 110, expectation: SQLite has no live folders or headers and the paused archive still contains the verified original.}
+    - {step: 111, expectation: The installed signed host declares archive-state and cache maintenance and holds the writer lease.}
+    - {step: 113, expectation: The reopened archive manager lists one original.}
+    - {step: 114, expectation: The retained original has the expected subject.}
+    - {step: 115, expectation: The workflow reports no runtime errors.}
+    results: [109, 110, 111, 113, 114, 115]
   visual:
   - check: The Mail pane displays downloading, paused and completed as the scan runs.
     method: automated

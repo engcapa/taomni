@@ -11,7 +11,6 @@ use crate::{
     pop3::local_store::local_raw,
     storage::{self, FullMessageMode, query::ArchiveKey, scan},
 };
-use rusqlite::params;
 use std::collections::HashSet;
 
 const ARCHIVE_BATCH: usize = 100;
@@ -125,7 +124,7 @@ impl ArchiveMailbox<'_> {
         condstore: bool,
         failures: &mut ContentFailures,
     ) -> Result<(), String> {
-        let (id, handle, job) = (self.account, self.database, self.progress);
+        let (id, job) = (self.account, self.progress);
         let stores_full = stores_full(settings, folder);
         let mut request = MailSyncRequestMode::Auto;
         let mut headers_complete = false;
@@ -141,10 +140,7 @@ impl ArchiveMailbox<'_> {
         loop {
             job.update(|_| {})?;
             if !headers_complete {
-                let snapshot = {
-                    let db = handle.lock().map_err(|e| e.to_string())?;
-                    cache::load_folder_sync_state(&db, id, folder).map_err(|e| e.to_string())?
-                };
+                let snapshot = self.scan_store.folder_state(id, folder)?;
                 job.update(|status| {
                     status.phase = "headers".into();
                     status.headers_synced = snapshot.cached_uids.len();
@@ -167,26 +163,16 @@ impl ArchiveMailbox<'_> {
                 if !step.more && !step.watermark.complete {
                     request = MailSyncRequestMode::Backfill;
                 }
-                let synced = {
-                    let db = handle.lock().map_err(|e| e.to_string())?;
-                    // The archive's index is complete regardless of recent-body cache limits.
-                    let settings = MailCacheSettings {
-                        header_limit_per_folder: 0,
-                        header_retention_days: 0,
-                        ..settings.clone()
-                    };
-                    cache::apply_folder_step(&db, id, &step, &settings, started)
-                        .map_err(|e| e.to_string())?;
-                    db.query_row(
-                        "SELECT COUNT(*) FROM mail_messages WHERE account_id=?1 AND folder=?2",
-                        params![id, folder],
-                        |row| row.get::<_, u32>(0),
-                    )
-                    .map_err(|e| e.to_string())?
-                };
+                let headers_total = step.folder.total;
+                let synced = self.scan_store.commit_headers(
+                    id,
+                    step,
+                    settings.body_recent_limit,
+                    started,
+                )?;
                 job.update(|status| {
                     status.headers_synced = synced as usize;
-                    status.headers_total = step.folder.total;
+                    status.headers_total = headers_total;
                 })?;
             }
             if !stores_full {
@@ -195,10 +181,7 @@ impl ArchiveMailbox<'_> {
                 }
                 continue;
             }
-            let (validity, targets) = {
-                let db = handle.lock().map_err(|e| e.to_string())?;
-                scan::pending_imap(&db, id, folder).map_err(|error| error.to_string())?
-            };
+            let (validity, targets) = self.scan_store.pending(id, folder)?;
             let newly_discovered = targets
                 .iter()
                 .filter(|uid| discovered.insert((validity, **uid)))
@@ -229,18 +212,17 @@ impl ArchiveMailbox<'_> {
         targets: Vec<u32>,
         failures: &mut ContentFailures,
     ) -> Result<(), String> {
-        let (id, handle, job) = (self.account, self.database, self.progress);
+        let (id, job) = (self.account, self.progress);
         for uid in targets {
             match self.download_one(imap, folder, uid, validity) {
                 Ok(()) => job.update(|status| status.saved += 1)?,
                 Err(error) if error.starts_with("MAIL_ARCHIVE_GONE:") => {
-                    let db = handle.lock().map_err(|e| e.to_string())?;
                     let key = ArchiveKey {
                         folder: folder.into(),
                         uid,
                         uid_validity: validity,
                     };
-                    scan::skip(&db, id, &key).map_err(|error| error.to_string())?;
+                    self.scan_store.skip(id, &key)?;
                     job.update(|status| status.total = status.total.saturating_sub(1))?;
                 }
                 Err(error) if error.starts_with(CONTENT_ERROR) => {

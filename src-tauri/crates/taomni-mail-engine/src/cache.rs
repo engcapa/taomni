@@ -53,5 +53,13 @@ pub fn init_mail_tables(conn: &Connection) -> SqlResult<()> {
     schema::migrate_calendar_tables(conn)
 }
 
+/// Remove only the synchronized IMAP message and folder index. The caller
+/// owns the transaction and checks that this account is not a local mailbox.
+pub fn clear_cached_account(conn: &Connection, account: &str) -> SqlResult<()> {
+    conn.execute("DELETE FROM mail_messages WHERE account_id=?1", [account])?;
+    conn.execute("DELETE FROM mail_folders WHERE account_id=?1", [account])?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests;

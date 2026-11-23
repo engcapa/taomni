@@ -1,10 +1,13 @@
 use super::{lifetime::ArchiveStatus, owned, worker};
 use crate::{
-    mail::{MailAccountConfig, coordination, pop3_store, storage, with_mail_db_async},
+    mail::{MailAccountConfig, coordination, module_host, pop3_store, storage, with_mail_db_async},
     state::AppState,
 };
 use std::{path::Path, sync::atomic::Ordering};
-use taomni_mail_api::pop3_store::LocalArchiveAction;
+use taomni_mail_api::{
+    archive_scan::{ArchiveScanAction, ArchiveScanStatus},
+    pop3_store::LocalArchiveAction,
+};
 use taomni_mail_engine::storage::scan;
 use tauri::{AppHandle, Manager, State};
 
@@ -38,6 +41,15 @@ pub async fn mail_archive_status(
             owned::run(&state, &account_id, LocalArchiveAction::Paused).await?,
             false,
         )
+    } else if module_host::owns_archive_scan(&state.plugins) {
+        let status: ArchiveScanStatus = module_host::run_archive_scan(
+            state.plugins.clone(),
+            state.mail_db(&account_id)?,
+            account_id.clone(),
+            ArchiveScanAction::Status,
+        )
+        .await?;
+        (status.paused, status.shared)
     } else {
         with_mail_db_async(&state, &account_id, |db, account| {
             let paused = scan::is_paused(db, account)?;
@@ -100,6 +112,15 @@ pub async fn mail_archive_pause(
     state.legacy.mail.mail_archive.pause_account(&account_id)?;
     if pop3_store::is_hosted(&state, &account_id).await? {
         return owned::run(&state, &account_id, LocalArchiveAction::Pause).await;
+    }
+    if module_host::owns_archive_scan(&state.plugins) {
+        return module_host::run_archive_scan(
+            state.plugins.clone(),
+            state.mail_db(&account_id)?,
+            account_id,
+            ArchiveScanAction::Pause,
+        )
+        .await;
     }
     with_mail_db_async(&state, &account_id, scan::pause).await
 }

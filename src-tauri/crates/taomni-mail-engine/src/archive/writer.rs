@@ -1,5 +1,8 @@
 use super::{MessageObject, compress_message};
-use super::{download_imap_original, progress::ScanProgress, scanner::ArchiveConnection};
+use super::{
+    download_imap_original, progress::ScanProgress, scan_store::ArchiveScanStore,
+    scanner::ArchiveConnection,
+};
 use crate::{
     database::MailDatabase,
     storage::{self, query::ArchiveKey, scan},
@@ -59,6 +62,7 @@ pub struct ArchiveMailbox<'a> {
     pub database: &'a MailDatabase,
     pub progress: &'a ScanProgress,
     pub encoder: &'a dyn OriginalEncoder,
+    pub scan_store: &'a dyn ArchiveScanStore,
 }
 
 impl ArchiveMailbox<'_> {

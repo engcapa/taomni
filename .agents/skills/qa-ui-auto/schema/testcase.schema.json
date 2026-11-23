@@ -488,6 +488,7 @@
             "include_mail": {
               "type": "boolean"
             },
+            "empty_live": {"type": "boolean"},
             "partial_files": {
               "type": "integer",
               "minimum": 0
@@ -1005,7 +1006,7 @@
         },
         "assert_signed_mail_host": {
           "oneOf": [
-            {"enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "pop3-sync", "pop3-saved", "pop3-reopened", "pop3-retained", "archive-published", "archive-cleaned", "outbox-queued", "outbox-retained", "outbox-sent", "responses", "contact-saved", "contact-retained", "contact-deleted", "attachment-saved", "attachment-reopened", "agenda-written", "agenda-retained", "filter-saved", "filter-retained", "imap-mutations", "imap-mbox", "imap-forward", "imap-cache", "disabled"]},
+            {"enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "pop3-sync", "pop3-saved", "pop3-reopened", "pop3-retained", "archive-published", "archive-cleaned", "cache-cleared", "outbox-queued", "outbox-retained", "outbox-sent", "responses", "contact-saved", "contact-retained", "contact-deleted", "attachment-saved", "attachment-reopened", "agenda-written", "agenda-retained", "filter-saved", "filter-retained", "imap-mutations", "imap-mbox", "imap-forward", "imap-cache", "disabled"]},
             {
               "type": "object",
               "additionalProperties": false,

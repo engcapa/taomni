@@ -11262,7 +11262,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-mail"
-version = "0.1.47"
+version = "0.1.48"
 dependencies = [
  "libc",
  "rusqlite",

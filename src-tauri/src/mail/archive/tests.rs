@@ -34,6 +34,7 @@ fn mailbox<'a>(
         database,
         progress,
         encoder: &LocalEncoder,
+        scan_store: database.as_ref(),
     }
 }
 

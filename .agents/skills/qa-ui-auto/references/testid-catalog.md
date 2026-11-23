@@ -2071,6 +2071,7 @@
 ## mail/sync (F-MAIL-3)
 
 - `[data-testid="mail-sync-button"]` — interactive — F-MAIL-3.sync-button
+- `button[title="Clear this account cache"]` — interactive — F-MAIL-3.clear-account-cache
 - `[data-testid="mail-test-connection"]` — interactive — F-MAIL-3.test-connection
 - `[data-testid="mail-body-warming-progress"]` — display [optional] — F-MAIL-3.body-warming-progress
 - `[data-testid="mail-mark-folder-read"]` — interactive — F-MAIL-3.mark-folder-read

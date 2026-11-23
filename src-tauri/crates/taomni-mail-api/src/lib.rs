@@ -9,6 +9,7 @@ use zeroize::Zeroizing;
 
 pub mod archive;
 pub mod archive_index;
+pub mod archive_scan;
 pub mod attachment_cache;
 pub mod body_cache;
 pub mod cache_query;

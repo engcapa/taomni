@@ -10,6 +10,7 @@ mod archive_decoding;
 mod archive_encoding;
 mod archive_index;
 mod archive_publication;
+mod archive_scan;
 mod attachment_cache;
 mod body_cache;
 mod cache_query;
@@ -98,6 +99,7 @@ fn host_config() -> HostConfig {
                 PREFETCH_IMAP_BODIES,
                 taomni_mail_api::ENCODE_ARCHIVE_ORIGINAL,
                 taomni_mail_api::archive::PUBLISH_IMAP_ARCHIVE,
+                taomni_mail_api::archive_scan::IMAP_ARCHIVE_SCAN_STATE,
                 taomni_mail_api::DECODE_ARCHIVE_ORIGINAL,
                 taomni_mail_api::DECODE_ARCHIVE_ATTACHMENT,
                 taomni_mail_api::archive_index::QUERY_ARCHIVE_INDEX,
@@ -165,6 +167,11 @@ impl PluginHandler for Handler {
                 let endpoint = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(archive_publication::publish(&self.io, operation, endpoint)?)
+            }
+            taomni_mail_api::archive_scan::IMAP_ARCHIVE_SCAN_STATE => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(archive_scan::serve(&self.io, operation, endpoint)?)
             }
             taomni_mail_api::DECODE_ARCHIVE_ORIGINAL => {
                 let request = serde_json::from_value(params.unwrap_or_default())
