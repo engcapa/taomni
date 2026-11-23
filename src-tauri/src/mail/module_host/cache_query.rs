@@ -6,8 +6,8 @@ use serde::de::DeserializeOwned;
 use taomni_mail_api::{
     HOST_REQUEST_TIMEOUT,
     cache_query::{
-        CacheQuery, CacheQueryRequest, MAX_CACHE_QUERY_BYTES, MAX_CACHE_REPLY_BYTES,
-        QUERY_ACCOUNT_CACHE, READ_IMAP_CACHED_BODY,
+        CacheQuery, CacheQueryRequest, MAX_CACHE_QUERY_BYTES, QUERY_ACCOUNT_CACHE,
+        READ_IMAP_CACHED_BODY,
     },
     imap_exchange::{read_bounded_body_frame, write_body_frame},
 };
@@ -31,6 +31,7 @@ pub(in crate::mail) async fn query_account_cache<T: DeserializeOwned + Send + 's
     query: CacheQuery,
 ) -> Result<T, String> {
     let method = query.host_method();
+    let reply_limit = query.reply_limit();
     let encoded = tokio::task::spawn_blocking(move || {
         let database = canonical_cache_database(&cache)?;
         serde_json::to_vec(&CacheQueryRequest {
@@ -50,7 +51,7 @@ pub(in crate::mail) async fn query_account_cache<T: DeserializeOwned + Send + 's
     let transfer = async {
         let response = async {
             write_body_frame(&mut peer, &encoded).await?;
-            read_bounded_body_frame(&mut peer, MAX_CACHE_REPLY_BYTES).await
+            read_bounded_body_frame(&mut peer, reply_limit).await
         }
         .await;
         // If the host closes a rejected transfer, preserve the RPC error

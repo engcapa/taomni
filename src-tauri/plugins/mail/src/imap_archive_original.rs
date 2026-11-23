@@ -42,6 +42,9 @@ pub(super) fn serve(
     let request: ImapArchiveRequest = serde_json::from_slice(&bytes)
         .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
     validate_account(&request.account_id)?;
+    if request.folder.trim().is_empty() || request.uid == 0 {
+        return Err(RpcError::from_code(ErrorCode::InvalidParams));
+    }
     operation.check_current()?;
     let Some(original) = open(&request)? else {
         return send(runtime, operation, &mut peer, None, tokio::io::empty());
