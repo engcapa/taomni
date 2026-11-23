@@ -24,16 +24,11 @@ jobs:
       PYTHONPATH: .agents/skills/qa-ui-auto/scripts
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: ./.github/actions/qa-runtime
         with:
-          version: 10
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+          mode: native
+      - name: Verify QA runner imports
+        run: python -m qa_ui_auto run --help
       - uses: dtolnay/rust-toolchain@stable
       - uses: arduino/setup-protoc@v3
         with:
@@ -60,8 +55,6 @@ jobs:
           Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $driverZip
           Expand-Archive -LiteralPath $driverZip -DestinationPath $driverDir -Force
           $driverDir >> $env:GITHUB_PATH
-      - run: pnpm install --frozen-lockfile
-      - run: pip install pyyaml jsonschema
       - run: cargo install tauri-driver --locked
       - name: Windows input reentrancy regression
         if: runner.os == 'Windows'
