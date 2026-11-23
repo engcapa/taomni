@@ -74,8 +74,12 @@ export function verifyTagRefs(remoteRefs, tag, source) {
 }
 
 export function verifyCandidateReceipt(receipt, selection) {
-  const fields = ["repository", "sourceSha", "runId", "runAttempt", "version", "modules"];
+  const fields = ["repository", "sourceSha", "runId", "version", "modules"];
+  // GitHub retains successful job artifacts when only failed jobs are rerun.
+  const updaterAttempt = receipt.runAttempt;
   if (receipt.schema !== CANDIDATE_SCHEMA
+      || typeof updaterAttempt !== "string" || !/^[1-9]\d*$/.test(updaterAttempt)
+      || Number(updaterAttempt) > Number(selection.runAttempt)
       || fields.some((field) => !isDeepStrictEqual(receipt[field], selection[field]))) {
     throw new Error("Candidate receipt does not bind this producer, attempt, version and module selection");
   }
@@ -185,12 +189,14 @@ async function main([operation, directory], env) {
   } else if (operation === "verify") {
     const selection = readJson(join(directory, "selection.json"));
     const updater = join(directory, "updater");
-    verifyCandidateReceipt(readJson(join(updater, "receipt.json")), selection);
+    const updaterReceipt = readJson(join(updater, "receipt.json"));
+    verifyCandidateReceipt(updaterReceipt, selection);
     const certificate = verifyMacosBuilds("core-bundles", selection, env.MACOS_SIGNING_CERT_SHA1);
     await reuseCoreAssets(updater, "updater-assets");
     const modules = await verifyModuleAssets("signed-module-artifacts", selection, certificate);
     writeJson(join(directory, "verified-assets.json"), {
-      selection, core: Object.fromEntries(readChecksums(join(updater, "SHA256SUMS"))), modules,
+      selection, updaterRunAttempt: updaterReceipt.runAttempt,
+      core: Object.fromEntries(readChecksums(join(updater, "SHA256SUMS"))), modules,
     });
   } else {
     throw new Error("Usage: node scripts/verify-release-candidate.mjs <operation> <directory>");

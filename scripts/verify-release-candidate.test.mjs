@@ -55,7 +55,7 @@ test("requires every available architecture and rejects a provisional publicatio
     /Invalid stable release manifest/);
 });
 
-test("binds the tag and receipt to the source, package selection and exact attempt", () => {
+test("binds the tag and receipt to the source, version, module selection and run", () => {
   const tag = `v${version}`;
   verifyTagRefs("", tag, source);
   verifyTagRefs(`${source}\trefs/tags/${tag}\n`, tag, source);
@@ -65,9 +65,13 @@ test("binds the tag and receipt to the source, package selection and exact attem
   const receipt = { schema: "taomni.release-candidate.v1", repository, sourceSha: source, runId, runAttempt: "2",
     version, modules: ["mail"] };
   verifyCandidateReceipt(receipt, record);
-  assert.throws(() => verifyCandidateReceipt({ ...receipt, runAttempt: "1" }, record), /does not bind/);
+  verifyCandidateReceipt({ ...receipt, runAttempt: "1" }, record);
+  assert.throws(() => verifyCandidateReceipt({ ...receipt, runId: "41", runAttempt: "1" }, record), /does not bind/);
   assert.throws(() => verifyCandidateReceipt({ ...receipt, modules: [] }, record), /does not bind/);
   assert.throws(() => verifyCandidateReceipt({ ...receipt, version: "0.5.12" }, record), /does not bind/);
+  for (const runAttempt of ["3", "0", "01", "-1", "1.0", "1\n", "", 1, undefined]) {
+    assert.throws(() => verifyCandidateReceipt({ ...receipt, runAttempt }, record), /does not bind/);
+  }
 });
 
 function fixture(t) {
@@ -101,10 +105,10 @@ test("reuses exact installer and manifest bytes and rejects missing or replaced 
   await assert.rejects(reuseCoreAssets(evidence, staged), /asset filenames differ/);
 });
 
-test("release staging records selected module bytes and requires the candidate production signing mode", (t) => {
+test("release staging verifies bytes retained across retry attempts and requires production signing", (t) => {
   const { root, put } = fixture(t);
   const selection = selectCandidate(candidate);
-  const receipt = { ...selection, schema: "taomni.release-candidate.v1" };
+  const receipt = { ...selection, schema: "taomni.release-candidate.v1", runAttempt: "1" };
   put("release-candidate/selection.json", selection);
   put("release-candidate/updater/receipt.json", receipt);
   const macos = { sourceSha: source, signingMode: "self-signed", certificateSha1: certificate, staticKerberos: false };
@@ -125,9 +129,11 @@ test("release staging records selected module bytes and requires the candidate p
     "verify", "release-candidate"], { cwd: root, env: { ...process.env, MACOS_SIGNING_CERT_SHA1: certificate }, encoding: "utf8" });
   const result = verify();
   assert.equal(result.status, 0, result.stderr);
-  const { modules } = JSON.parse(readFileSync(join(root, "release-candidate", "verified-assets.json"), "utf8"));
-  assert.equal(modules[0].artifactId, 105);
-  assert.equal(modules[0].signatureSha256, checksum("unchanged detached signature"));
+  const verified = JSON.parse(readFileSync(join(root, "release-candidate", "verified-assets.json"), "utf8"));
+  assert.equal(verified.selection.runAttempt, "2");
+  assert.equal(verified.updaterRunAttempt, "1");
+  assert.equal(verified.modules[0].artifactId, 105);
+  assert.equal(verified.modules[0].signatureSha256, checksum("unchanged detached signature"));
   put(`${pkgPath}/signed-module/${archive}`, "changed package");
   assert.match(verify().stderr, /Candidate module package differs/);
   const arm = `core-bundles/taomni-${version}-macos-aarch64/macos-build-identity.json`;
