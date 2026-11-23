@@ -1,6 +1,6 @@
 id: TC-MODULES-070
 title: Signed Mail archives complete originals after pausing and resuming
-description: Disable Mail during a live archive scan, re-enable it and pause and resume complete storage, then read and search the custom local archive and export the selected attachment after deleting the messages on the server. Compare the original and exported bytes with the fixture.
+description: Disable Mail during a live archive scan, re-enable it and pause and resume complete storage, then read and search the custom local archive and export the selected attachment after deleting the messages on the server. Compare the original and exported bytes with the fixture. Cancel cleanup, then confirm removal of exactly one saved original.
 covers: [F-Modules-1, F-MAIL-23]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
@@ -115,7 +115,7 @@ steps:
     headers:
       INBOX: 2
       Archive: 2
-- assert_signed_mail_host: running
+- assert_signed_mail_host: archive-published
 - mail_server_expunge_newest: {folder: INBOX, count: 2}
 - click: '[data-testid="mail-sync-button"]'
 - mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 60}
@@ -151,6 +151,40 @@ steps:
 - assert_text: {selector: '[data-testid="mail-archive-results"]', contains: of 0 messages, timeout_sec: 30}
 - click: '[data-testid="mail-archive-close"]'
 - assert_no_runtime_errors: null
+- click: '[data-testid="mail-archive-open"]'
+- wait_for:
+    selector: '[data-testid="mail-archive-row"] input[aria-label="Select Complete INBOX 0"]'
+    timeout_sec: 30
+- set_check:
+    selector: '[data-testid="mail-archive-row"] input[aria-label="Select Complete INBOX 0"]'
+    checked: true
+- click: '[data-testid="mail-archive-cleanup"]'
+- assert_text: {selector: '[data-testid="mail-archive-confirm"]', contains: 'Remove 1 local originals?'}
+- click: '[data-testid="mail-archive-confirm-cancel"]'
+- assert_not_visible: '[data-testid="mail-archive-confirm"]'
+- assert_count: {selector: '[data-testid="mail-archive-row"]', equal: 2}
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    paused: false
+    full: {INBOX: 2}
+    headers: {INBOX: 0, Archive: 2}
+- click: '[data-testid="mail-archive-cleanup"]'
+- click: '[data-testid="mail-archive-confirm-remove"]'
+- assert_text: {selector: '[data-testid="mail-archive-notice"]', contains: Removed 1 local originals. Server messages kept.}
+- assert_not_visible: '[data-testid="mail-archive-row"] input[aria-label="Select Complete INBOX 0"]'
+- assert_count: {selector: '[data-testid="mail-archive-row"]', equal: 1}
+- assert_text: {selector: '[data-testid="mail-archive-row"]', contains: Complete INBOX 1}
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    partial_files: 0
+    paused: true
+    full: {INBOX: 1}
+    headers: {INBOX: 0, Archive: 2}
+- assert_signed_mail_host: archive-cleaned
+- click: '[data-testid="mail-archive-close"]'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -162,7 +196,7 @@ verification:
     - {step: 59, expectation: The scan reports that it paused.}
     - {step: 61, expectation: The resumed transfer finishes the scan.}
     - {step: 62, expectation: Gzip originals and SQLite metadata match the fixture. Resume clears the persisted pause and removes partial transfer files.}
-    - {step: 63, expectation: The verified Mail host and renderer own the enabled module.}
+    - {step: 63, expectation: The verified Mail host declares archive publication and holds the Mail writer lease.}
     results: [39, 59, 61, 62, 63]
   - id: read-after-server-removal
     requirement: Local originals and their attachments remain readable after both messages have been removed from IMAP.
@@ -197,6 +231,19 @@ verification:
     - {step: 86, expectation: A query with no matching subject shows an empty page.}
     - {step: 88, expectation: Repeated archive queries finish without runtime errors.}
     results: [84, 86, 88]
+  - id: archive-cleanup-confirmation
+    requirement: The signed Mail host keeps originals when cleanup is cancelled. Confirming a new preview removes the selected local original and pauses full storage.
+    actions: [89, 91, 92, 94, 98, 99, 106]
+    checkpoints:
+    - {step: 93, expectation: The confirmation previews only the selected original.}
+    - {step: 96, expectation: Cancelling the confirmation retains both visible originals.}
+    - {step: 97, expectation: Cancelling leaves both gzip originals on disk and leaves storage active.}
+    - {step: 100, expectation: Confirming a new preview reports removal of one local original.}
+    - {step: 103, expectation: The unselected original remains visible.}
+    - {step: 104, expectation: Disk contains only the remaining verified MIME original and storage is paused.}
+    - {step: 105, expectation: The verified Mail host declares archive cleanup and still holds its writer lease.}
+    - {step: 107, expectation: Cleanup finishes without runtime errors.}
+    results: [93, 96, 97, 100, 103, 104, 105, 107]
   visual:
   - check: The Mail pane displays downloading, paused and completed as the scan runs.
     method: automated

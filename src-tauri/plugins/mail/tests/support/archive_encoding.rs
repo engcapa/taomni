@@ -5,16 +5,19 @@ use taomni_mail_api::{
     DECODE_ARCHIVE_ATTACHMENT, DECODE_ARCHIVE_ORIGINAL, ENCODE_ARCHIVE_ORIGINAL,
     archive::{
         ARCHIVE_FRAME_BYTES, ArchiveAttachmentDecoding, ArchiveDecoding, ArchiveEncoding,
-        receive_encoding,
+        PUBLISH_IMAP_ARCHIVE, PublishArchiveOriginal, receive_encoding,
     },
     archive_index::{
-        ArchiveIndexAction, ArchiveIndexRequest, ArchiveIndexSource, ArchivePage, ArchiveQuery,
-        QUERY_ARCHIVE_INDEX, SearchField,
+        ArchiveIndexAction, ArchiveIndexRequest, ArchiveIndexSource, ArchiveKey, ArchivePage,
+        ArchiveQuery, ArchiveSelection, CLEANUP_ARCHIVE_INDEX, CleanupPreview, QUERY_ARCHIVE_INDEX,
+        SearchField,
     },
-    imap_exchange::{read_body_frame, write_body_frame, write_frame},
+    imap_exchange::{read_body_frame, read_frame, write_body_frame, write_frame},
     message::MailMessageBody,
 };
-use taomni_mail_engine::archive::verify_message;
+use taomni_mail_engine::{
+    archive::verify_message, cache::init_mail_tables, database::mail_db_file_stem, storage,
+};
 use taomni_plugin_stream::routed_tcp::Route;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -69,6 +72,7 @@ pub(super) fn check(host: &mut MailHost) {
         verify_message(gzip.as_slice(), &object.hash, object.raw_size, &mut decoded).unwrap();
         assert_eq!(decoded, raw);
     }
+    check_publication(host, &io);
 }
 
 pub(super) fn check_decoding(host: &mut MailHost) {
@@ -137,8 +141,6 @@ pub(super) fn check_decoding(host: &mut MailHost) {
     assert_eq!(response.result, Some(json!({"Ok": null})));
     assert_eq!(attachment, b"bytes");
 
-    let (_route, exchange, mut peer) = io.block_on(Route::pair()).unwrap();
-    let sent = host.write_request(QUERY_ARCHIVE_INDEX, serde_json::to_value(exchange).unwrap());
     let request = ArchiveIndexRequest {
         account_id: ACCOUNT.into(),
         source: ArchiveIndexSource::ModuleData,
@@ -151,7 +153,23 @@ pub(super) fn check_decoding(host: &mut MailHost) {
             offset: 200,
         },
     };
-    let page: ArchivePage = io.block_on(async {
+    let page: ArchivePage = request_index(host, &io, QUERY_ARCHIVE_INDEX, request);
+    assert_eq!(page.offset, 0);
+    assert_eq!(page.total, 1);
+    assert_eq!(page.folders, ["INBOX"]);
+    assert_eq!(page.entries[0].entry.uid, 9);
+    assert_eq!(page.entries[0].entry.stored_at, ARCHIVED_AT);
+}
+
+fn request_index<T: serde::de::DeserializeOwned>(
+    host: &mut MailHost,
+    io: &tokio::runtime::Runtime,
+    method: &str,
+    request: ArchiveIndexRequest,
+) -> T {
+    let (_route, exchange, mut peer) = io.block_on(Route::pair()).unwrap();
+    let sent = host.write_request(method, serde_json::to_value(exchange).unwrap());
+    let reply = io.block_on(async {
         tokio::time::timeout(WAIT, async {
             assert_eq!(peer.read_u8().await.unwrap(), 1);
             write_frame(&mut peer, &serde_json::to_vec(&request).unwrap())
@@ -168,9 +186,98 @@ pub(super) fn check_decoding(host: &mut MailHost) {
     let response = host.read_response();
     assert_eq!(response.id, Some(sent));
     assert_eq!(response.result, Some(json!({"Ok": null})));
-    assert_eq!(page.offset, 0);
-    assert_eq!(page.total, 1);
-    assert_eq!(page.folders, ["INBOX"]);
-    assert_eq!(page.entries[0].entry.uid, 9);
-    assert_eq!(page.entries[0].entry.stored_at, ARCHIVED_AT);
+    reply
+}
+
+fn check_publication(host: &mut MailHost, io: &tokio::runtime::Runtime) {
+    let cache = tempfile::tempdir().unwrap();
+    let account = "signed-archive-fixture";
+    let path = cache
+        .path()
+        .canonicalize()
+        .unwrap()
+        .join(format!("{}.db", mail_db_file_stem(account)));
+    let db = rusqlite::Connection::open(&path).unwrap();
+    init_mail_tables(&db).unwrap();
+    let root = storage::account_root(&db, account).unwrap();
+    let raw = b"Subject: External cache archive\r\n\r\nComplete original";
+    let key = ArchiveKey {
+        folder: "Archive".into(),
+        uid: 41,
+        uid_validity: 23,
+    };
+    let (_temporary, staged) = storage::prepare(&root, &raw[..], || Ok(()))
+        .unwrap()
+        .stage()
+        .unwrap();
+    let (_route, endpoint, mut peer) = io.block_on(Route::pair()).unwrap();
+    let sent = host.write_request(
+        PUBLISH_IMAP_ARCHIVE,
+        serde_json::to_value(endpoint).unwrap(),
+    );
+    let request = PublishArchiveOriginal {
+        account_id: account.into(),
+        cache_database: path.clone(),
+        key: key.clone(),
+        staged,
+    };
+    io.block_on(async {
+        tokio::time::timeout(WAIT, async {
+            assert_eq!(peer.read_u8().await.unwrap(), 1);
+            write_frame(&mut peer, &serde_json::to_vec(&request).unwrap())
+                .await
+                .unwrap();
+            let reply = read_frame(&mut peer).await.unwrap();
+            serde_json::from_slice::<Result<(), String>>(&reply)
+                .unwrap()
+                .unwrap();
+        })
+        .await
+        .unwrap();
+    });
+    let response = host.read_response();
+    assert_eq!(response.id, Some(sent));
+    assert_eq!(response.result, Some(json!({"Ok": null})));
+    let file = storage::open(&db, account, "Archive", 41).unwrap().unwrap();
+    assert_eq!(file.read().unwrap(), raw);
+    let cleanup = |action| ArchiveIndexRequest {
+        account_id: account.into(),
+        source: ArchiveIndexSource::AccountCache {
+            database: path.clone(),
+        },
+        action,
+    };
+    let preview: CleanupPreview = request_index(
+        host,
+        io,
+        CLEANUP_ARCHIVE_INDEX,
+        cleanup(ArchiveIndexAction::Preview {
+            selection: ArchiveSelection {
+                query: None,
+                keys: vec![key],
+                excluded: Vec::new(),
+            },
+        }),
+    );
+    assert_eq!(preview.count, 1);
+    assert!(
+        storage::open(&db, account, "Archive", 41)
+            .unwrap()
+            .is_some()
+    );
+    let removed: u64 = request_index(
+        host,
+        io,
+        CLEANUP_ARCHIVE_INDEX,
+        cleanup(ArchiveIndexAction::Cleanup {
+            token: preview.token,
+        }),
+    );
+    assert_eq!(removed, 1);
+    assert!(
+        storage::open(&db, account, "Archive", 41)
+            .unwrap()
+            .is_none()
+    );
+    assert!(storage::scan::is_paused(&db, account).unwrap());
 }

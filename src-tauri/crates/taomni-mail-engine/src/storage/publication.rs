@@ -11,6 +11,9 @@ use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
+use taomni_mail_api::archive::StagedArchiveOriginal;
+
+const TEMPORARY_ORIGINAL_PREFIX: &str = ".archive-original-";
 
 pub fn store(
     db: &Connection,
@@ -44,8 +47,10 @@ pub fn prepare_with(
     encode: impl FnOnce(&mut File) -> Result<MessageObject, String>,
 ) -> Result<PreparedMessage, String> {
     fs::create_dir_all(root.join("objects")).map_err(|e| e.to_string())?;
-    let mut temp =
-        tempfile::NamedTempFile::new_in(root.join("objects")).map_err(|e| e.to_string())?;
+    let mut temp = tempfile::Builder::new()
+        .prefix(TEMPORARY_ORIGINAL_PREFIX)
+        .tempfile_in(root.join("objects"))
+        .map_err(|e| e.to_string())?;
     let MessageObject {
         hash,
         raw_size,
@@ -62,6 +67,84 @@ pub fn prepare_with(
         hash,
         raw_size,
         has_attachments,
+    })
+}
+
+impl PreparedMessage {
+    /// Keep a cleanup guard in the caller while the host publishes the verified gzip.
+    pub fn stage(self) -> Result<(tempfile::TempPath, StagedArchiveOriginal), String> {
+        let Self {
+            temp,
+            hash,
+            raw_size,
+            has_attachments,
+        } = self;
+        let filename = temp
+            .path()
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or("Invalid staged Mail archive filename")?
+            .to_owned();
+        let stored_size = temp
+            .as_file()
+            .metadata()
+            .map_err(|error| error.to_string())?
+            .len();
+        let original = StagedArchiveOriginal {
+            filename,
+            stored_size,
+            object: MessageObject {
+                hash,
+                raw_size,
+                has_attachments,
+            },
+        };
+        Ok((temp.into_temp_path(), original))
+    }
+}
+
+/// Reopen only the application-owned staging file in this account's archive.
+pub fn open_staged_original(
+    db: &Connection,
+    account: &str,
+    original: StagedArchiveOriginal,
+    open_file: impl FnOnce(&Path) -> Result<File, String>,
+) -> Result<PreparedMessage, String> {
+    let ending = original
+        .filename
+        .strip_prefix(TEMPORARY_ORIGINAL_PREFIX)
+        .filter(|ending| {
+            !ending.is_empty() && ending.bytes().all(|byte| byte.is_ascii_alphanumeric())
+        })
+        .ok_or("Invalid staged Mail archive filename")?;
+    let root = account_root(db, account)?;
+    object_path(&root, &original.object.hash)?;
+    let directory = root.join("objects");
+    for path in [&root, &directory] {
+        let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+        if !metadata.is_dir() || metadata.is_symlink() {
+            return Err("Mail archive staging must be in the account storage directory".into());
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::MetadataExt;
+            if metadata.file_attributes() & 0x400 != 0 {
+                return Err("Mail archive staging must be in the account storage directory".into());
+            }
+        }
+    }
+    let path = directory.join(format!("{TEMPORARY_ORIGINAL_PREFIX}{ending}"));
+    let file = open_file(&path)?;
+    let size = file.metadata().map_err(|error| error.to_string())?.len();
+    if size != original.stored_size {
+        return Err("Staged Mail archive size changed".into());
+    }
+    let temp = tempfile::TempPath::try_from_path(path).map_err(|error| error.to_string())?;
+    Ok(PreparedMessage {
+        temp: tempfile::NamedTempFile::from_parts(file, temp),
+        hash: original.object.hash,
+        raw_size: original.object.raw_size,
+        has_attachments: original.object.has_attachments,
     })
 }
 

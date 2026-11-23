@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 pub const QUERY_ARCHIVE_INDEX: &str = "mail/query-archive-index";
+pub const CLEANUP_ARCHIVE_INDEX: &str = "mail/cleanup-archive-index";
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -26,6 +27,9 @@ pub enum ArchiveIndexSource {
 pub enum ArchiveIndexAction {
     Find { query: ArchiveQuery, offset: u32 },
     List { offset: u32 },
+    Preview { selection: ArchiveSelection },
+    Cleanup { token: String },
+    Remove { entries: Vec<ArchiveEntry> },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

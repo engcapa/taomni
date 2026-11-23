@@ -244,6 +244,16 @@ pub fn preview(
     })
 }
 pub fn remove_preview(db: &Connection, account: &str, token: &str) -> Result<u64, String> {
+    remove_preview_with(db, account, token, || Ok(()))
+}
+
+pub fn remove_preview_with(
+    db: &Connection,
+    account: &str,
+    token: &str,
+    check: impl Fn() -> Result<(), String>,
+) -> Result<u64, String> {
+    check()?;
     preview_tables(db)?;
     let tx = db.unchecked_transaction().map_err(|e| e.to_string())?;
     let (count,current):(i64,i64)=tx.query_row("SELECT COUNT(*),COUNT(m.uid) FROM archive_preview p LEFT JOIN mail_full_messages m ON m.account_id=p.account AND m.folder=p.folder AND m.uid_validity=p.uid_validity AND m.uid=p.uid AND m.sha256=p.sha256 WHERE p.token=? AND p.account=?",params![token,account],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
@@ -259,6 +269,7 @@ pub fn remove_preview(db: &Connection, account: &str, token: &str) -> Result<u64
     tx.execute("DELETE FROM mail_full_messages AS m WHERE m.account_id=? AND EXISTS(SELECT 1 FROM archive_preview p WHERE p.token=? AND p.account=m.account_id AND p.folder=m.folder AND p.uid_validity=m.uid_validity AND p.uid=m.uid AND p.sha256=m.sha256)",params![account,token]).map_err(|e|e.to_string())?;
     tx.execute("DELETE FROM archive_preview WHERE token=?", [token])
         .map_err(|e| e.to_string())?;
+    check()?;
     tx.commit().map_err(|e| e.to_string())?;
     collect_garbage(db, account)?;
     Ok(count as u64)

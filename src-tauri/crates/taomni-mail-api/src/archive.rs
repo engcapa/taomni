@@ -1,12 +1,13 @@
 //! Framed output of a signed host encoding one selected MIME original.
-use std::{io::Write, time::Duration};
+use std::{io::Write, path::PathBuf, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use taomni_plugin_stream::routed_tcp::Endpoint;
 use tokio::io::{AsyncRead, AsyncReadExt};
 
-use crate::imap_sync::HeaderStepRequest;
+use crate::{archive_index::ArchiveKey, imap_sync::HeaderStepRequest};
 
+pub const PUBLISH_IMAP_ARCHIVE: &str = "mail/publish-imap-archive";
 pub const ARCHIVE_FRAME_BYTES: usize = 64 * 1024;
 pub const IMAP_ARCHIVE_CHUNK_BYTES: usize = 256 * 1024;
 
@@ -45,6 +46,23 @@ pub struct ArchiveDecoding {
 pub struct ArchiveAttachmentDecoding {
     pub exchange: Endpoint,
     pub attachment_index: usize,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PublishArchiveOriginal {
+    pub account_id: String,
+    pub cache_database: PathBuf,
+    pub key: ArchiveKey,
+    pub staged: StagedArchiveOriginal,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct StagedArchiveOriginal {
+    pub filename: String,
+    pub stored_size: u64,
+    pub object: MessageObject,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

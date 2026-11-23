@@ -3,6 +3,8 @@
 mod archive;
 mod archive_decoding;
 mod archive_encoding;
+mod archive_index;
+mod archive_publication;
 pub(super) mod attachment_cache;
 mod body_sync;
 mod compose;
@@ -22,8 +24,9 @@ mod prefetch;
 mod responses;
 pub(super) use responses::send_response;
 
-pub(super) use archive::{
-    HostedImap, archives_imap, imports_imap, queries_archive_index, query_archive_index,
+pub(super) use archive::{HostedImap, archives_imap, imports_imap};
+pub(super) use archive_index::{
+    cleans_archive_index, cleanup_archive_index, queries_archive_index, query_archive_index,
 };
 pub(super) use compose::compose_message;
 pub(super) use downloads::{fetch_imap_attachment, fetch_imap_body, fetch_imap_raw};

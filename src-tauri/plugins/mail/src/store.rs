@@ -12,6 +12,7 @@ use taomni_plugin_api::{ErrorCode, RpcError, services::SafeRelativePath};
 pub(super) struct Store {
     profile: PathBuf,
     creation: std::sync::Mutex<()>,
+    pub(super) archive_cleanup: super::archive_cleanup::ArchivePreviews,
     pub(super) archive_previews:
         std::sync::Mutex<std::collections::HashMap<String, (Connection, std::time::Instant)>>,
 }
@@ -21,6 +22,7 @@ impl Store {
         Self {
             profile: profile.to_owned(),
             creation: std::sync::Mutex::new(()),
+            archive_cleanup: Default::default(),
             archive_previews: Default::default(),
         }
     }
@@ -242,7 +244,7 @@ pub(super) fn open_database(path: &Path) -> Result<Connection, RpcError> {
     connect(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
 }
 
-fn connect(path: &Path, mode: OpenFlags) -> Result<Connection, RpcError> {
+pub(super) fn connect(path: &Path, mode: OpenFlags) -> Result<Connection, RpcError> {
     for sidecar in sidecars(path) {
         regular(&sidecar)?;
     }

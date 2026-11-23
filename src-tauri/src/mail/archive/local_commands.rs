@@ -6,7 +6,7 @@ use crate::mail::{
     with_mail_db_async, with_mail_original,
 };
 use crate::state::AppState;
-use std::io::Read;
+use serde::de::DeserializeOwned;
 use std::path::Path;
 use taomni_mail_api::archive_index::ArchiveIndexAction;
 use taomni_mail_api::pop3_store::LocalArchiveAction;
@@ -58,6 +58,14 @@ pub async fn mail_archive_preview_cleanup(
         )
         .await;
     }
+    if module_host::cleans_archive_index(&state.plugins) {
+        return cleanup_in_host(
+            &state,
+            &account_id,
+            ArchiveIndexAction::Preview { selection },
+        )
+        .await;
+    }
     with_mail_db_async(&state, &account_id, move |db, account| {
         archive_query::preview(db, account, &selection).map_err(storage::as_sql_error)
     })
@@ -75,6 +83,9 @@ pub async fn mail_archive_cleanup(
     state.legacy.mail.mail_archive.pause_account(&account_id)?;
     if pop3_store::is_hosted(&state, &account_id).await? {
         return owned::run(&state, &account_id, LocalArchiveAction::Cleanup { token }).await;
+    }
+    if module_host::cleans_archive_index(&state.plugins) {
+        return cleanup_in_host(&state, &account_id, ArchiveIndexAction::Cleanup { token }).await;
     }
     with_mail_db_async(&state, &account_id, move |db, account| {
         archive_query::remove_preview(db, account, &token).map_err(storage::as_sql_error)
@@ -191,9 +202,26 @@ pub async fn mail_archive_remove(
     if pop3_store::is_hosted(&state, &account_id).await? {
         return owned::run(&state, &account_id, LocalArchiveAction::Remove { entries }).await;
     }
+    if module_host::cleans_archive_index(&state.plugins) {
+        return cleanup_in_host(&state, &account_id, ArchiveIndexAction::Remove { entries }).await;
+    }
     with_mail_db_async(&state, &account_id, move |db, account| {
         scan::pause(db, account)?;
         storage::remove_entries(db, account, &entries).map_err(storage::as_sql_error)
     })
+    .await
+}
+
+async fn cleanup_in_host<T: DeserializeOwned + Send + 'static>(
+    state: &AppState,
+    account: &str,
+    action: ArchiveIndexAction,
+) -> Result<T, String> {
+    module_host::cleanup_archive_index(
+        state.plugins.clone(),
+        account.to_owned(),
+        state.mail_db(account)?,
+        action,
+    )
     .await
 }

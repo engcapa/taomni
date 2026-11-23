@@ -1,12 +1,15 @@
 //! The official Mail host. The profile lease belongs to the SDK, and the
 //! mailbox store uses only paths derived from that profile and account IDs.
 
+mod account_cache;
 mod address_book;
 mod agenda;
 mod archive;
+mod archive_cleanup;
 mod archive_decoding;
 mod archive_encoding;
 mod archive_index;
+mod archive_publication;
 mod attachment_cache;
 mod commands;
 mod compose;
@@ -81,9 +84,11 @@ fn host_config() -> HostConfig {
                 FETCH_IMAP_BODY,
                 PREFETCH_IMAP_BODIES,
                 taomni_mail_api::ENCODE_ARCHIVE_ORIGINAL,
+                taomni_mail_api::archive::PUBLISH_IMAP_ARCHIVE,
                 taomni_mail_api::DECODE_ARCHIVE_ORIGINAL,
                 taomni_mail_api::DECODE_ARCHIVE_ATTACHMENT,
                 taomni_mail_api::archive_index::QUERY_ARCHIVE_INDEX,
+                taomni_mail_api::archive_index::CLEANUP_ARCHIVE_INDEX,
                 OPEN_IMAP_ARCHIVE,
                 OPEN_IMAP_IMPORT,
                 EXPORT_IMAP_MBOX,
@@ -142,6 +147,11 @@ impl PluginHandler for Handler {
     ) -> Result<Value, RpcError> {
         operation.check_current()?;
         let result = match method {
+            taomni_mail_api::archive::PUBLISH_IMAP_ARCHIVE => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(archive_publication::publish(&self.io, operation, endpoint)?)
+            }
             taomni_mail_api::DECODE_ARCHIVE_ORIGINAL => {
                 let request = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
@@ -351,6 +361,20 @@ impl PluginHandler for Handler {
                     &self.store,
                     operation,
                     endpoint,
+                )?)
+            }
+            taomni_mail_api::archive_index::CLEANUP_ARCHIVE_INDEX => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(archive_index::exchange(
+                    &self.io,
+                    operation,
+                    endpoint,
+                    |input| {
+                        self.store
+                            .archive_cleanup
+                            .run(input, &|| operation.check_current())
+                    },
                 )?)
             }
             OPEN_IMAP_MUTATIONS => {

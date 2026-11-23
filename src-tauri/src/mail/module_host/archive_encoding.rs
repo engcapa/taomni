@@ -10,10 +10,17 @@ use std::{
 use sha2::{Digest, Sha256};
 use taomni_mail_api::{
     ENCODE_ARCHIVE_ORIGINAL, HOST_REQUEST_TIMEOUT,
-    archive::{ARCHIVE_FRAME_BYTES, ArchiveEncoding, receive_encoding},
+    archive::{ARCHIVE_FRAME_BYTES, ArchiveEncoding, PUBLISH_IMAP_ARCHIVE, receive_encoding},
+    archive_index::ArchiveKey,
 };
-use taomni_mail_engine::archive::{
-    MessageObject, progress::ScanProgress, verify_encoded_original, writer::OriginalEncoder,
+use taomni_mail_engine::{
+    archive::{
+        MessageObject,
+        progress::ScanProgress,
+        verify_encoded_original,
+        writer::{ArchiveMailbox, OriginalEncoder},
+    },
+    storage::PreparedMessage,
 };
 use taomni_plugin_stream::routed_tcp::Route;
 use tokio::{
@@ -74,6 +81,24 @@ impl OriginalEncoder for ArchiveEncoder<'_> {
         output.rewind().map_err(|e| e.to_string())?;
         verify_encoded_original(output, &object, &checksum, size, || progress.update(|_| {}))?;
         Ok(object)
+    }
+
+    fn publish_imap(
+        &self,
+        mailbox: &ArchiveMailbox<'_>,
+        target: &ArchiveKey,
+        prepared: PreparedMessage,
+    ) -> Result<(), String> {
+        if !supports(self.registry, PUBLISH_IMAP_ARCHIVE) {
+            return mailbox.publish_prepared(target, prepared);
+        }
+        super::archive_publication::publish(
+            self.runtime,
+            self.registry.clone(),
+            mailbox,
+            target,
+            prepared,
+        )
     }
 }
 

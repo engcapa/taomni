@@ -12,10 +12,11 @@ pub mod scan;
 mod tests;
 
 pub use cleanup::{
-    as_sql_error, collect_garbage, remove_entries, snapshot_objects, snapshot_objects_with,
+    as_sql_error, collect_garbage, remove_entries, remove_entries_with, snapshot_objects,
+    snapshot_objects_with,
 };
 pub(crate) use index::object_path;
 pub use index::{account_root, init_tables, lookup};
 pub use model::{ArchiveEntry, FullMessage, FullMessageMode, PreparedMessage};
-pub use publication::{prepare, prepare_with, publish, store};
+pub use publication::{open_staged_original, prepare, prepare_with, publish, store};
 pub use reading::{OpenMessage, list, open, open_entry, open_with};

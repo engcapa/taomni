@@ -12,12 +12,24 @@ pub fn remove_entries(
     account: &str,
     entries: &[ArchiveEntry],
 ) -> Result<usize, String> {
+    remove_entries_with(db, account, entries, || Ok(()))
+}
+
+pub fn remove_entries_with(
+    db: &Connection,
+    account: &str,
+    entries: &[ArchiveEntry],
+    check: impl Fn() -> Result<(), String>,
+) -> Result<usize, String> {
+    check()?;
     let tx = db.unchecked_transaction().map_err(|e| e.to_string())?;
     for entry in entries {
+        check()?;
         tx.execute("DELETE FROM mail_full_messages WHERE account_id=?1 AND folder=?2 AND uid_validity=?3 AND uid=?4",params![account,entry.folder,entry.uid_validity,entry.uid]).map_err(|e|e.to_string())?;
         tx.execute("INSERT OR IGNORE INTO mail_archive_skipped(account_id,folder,uid_validity,uid) VALUES(?1,?2,?3,?4)",params![account,entry.folder,entry.uid_validity,entry.uid]).map_err(|e|e.to_string())?;
         tx.execute("UPDATE mail_messages SET body_text=NULL,body_html=NULL,body_cached_at=NULL WHERE account_id=?1 AND folder=?2 AND uid=?3",params![account,entry.folder,entry.uid]).map_err(|e|e.to_string())?;
     }
+    check()?;
     tx.commit().map_err(|e| e.to_string())?;
     collect_garbage(db, account)
 }

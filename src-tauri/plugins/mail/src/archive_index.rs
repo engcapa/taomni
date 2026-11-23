@@ -22,6 +22,15 @@ pub(super) fn query(
     operation: &Operation,
     endpoint: Endpoint,
 ) -> Result<Result<(), String>, RpcError> {
+    exchange(runtime, operation, endpoint, |input| execute(store, &input))
+}
+
+pub(super) fn exchange(
+    runtime: &Runtime,
+    operation: &Operation,
+    endpoint: Endpoint,
+    run: impl FnOnce(ArchiveIndexRequest) -> Result<Vec<u8>, RpcError>,
+) -> Result<Result<(), String>, RpcError> {
     let (mut peer, _) = match runtime.block_on(operation.while_current(endpoint.connect()))? {
         Ok(pair) => pair,
         Err(error) => return Ok(Err(error.to_string())),
@@ -35,7 +44,7 @@ pub(super) fn query(
     let input = serde_json::from_slice::<ArchiveIndexRequest>(&request)
         .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
     operation.check_current()?;
-    let result = execute(store, &input)?;
+    let result = run(input)?;
     operation.check_current()?;
     Ok(runtime
         .block_on(operation.while_current(write_body_frame(&mut peer, &result)))?
@@ -49,6 +58,7 @@ fn execute(store: &Store, input: &ArchiveIndexRequest) -> Result<Vec<u8>, RpcErr
             encode(storage::query::query(db, account, query, *offset))
         }
         ArchiveIndexAction::List { offset } => encode(storage::list(db, account, *offset)),
+        _ => Err(RpcError::from_code(ErrorCode::InvalidParams)),
     };
     match &input.source {
         ArchiveIndexSource::AccountCache { database } => {
@@ -79,7 +89,7 @@ fn open_account_cache(database: &Path, account: &str) -> Result<Connection, RpcE
     open_database(database)
 }
 
-fn encode<T: Serialize>(result: Result<T, String>) -> Result<Vec<u8>, RpcError> {
+pub(super) fn encode<T: Serialize>(result: Result<T, String>) -> Result<Vec<u8>, RpcError> {
     serde_json::to_vec(&result).map_err(|_| RpcError::from_code(ErrorCode::InternalError))
 }
 

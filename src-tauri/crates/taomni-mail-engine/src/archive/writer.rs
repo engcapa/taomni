@@ -29,6 +29,15 @@ pub trait OriginalEncoder {
         output: &mut File,
         progress: &ScanProgress,
     ) -> Result<MessageObject, String>;
+
+    fn publish_imap(
+        &self,
+        mailbox: &ArchiveMailbox<'_>,
+        target: &ArchiveKey,
+        prepared: storage::PreparedMessage,
+    ) -> Result<(), String> {
+        mailbox.publish_prepared(target, prepared)
+    }
 }
 
 pub struct LocalEncoder;
@@ -62,6 +71,14 @@ impl ArchiveMailbox<'_> {
         storage::prepare_with(root, |output| {
             self.encoder.encode(input, size, output, self.progress)
         })
+    }
+
+    pub fn publish_prepared(
+        &self,
+        target: &ArchiveKey,
+        prepared: storage::PreparedMessage,
+    ) -> Result<(), String> {
+        publish_original(self.database, self.account, target, prepared, self.progress)
     }
 
     pub fn download_one(
@@ -100,7 +117,7 @@ impl ArchiveMailbox<'_> {
                     status.total_bytes = Some(size);
                 })?;
                 let prepared = self.prepare(&root, &mut raw, size)?;
-                publish_original(handle, id, &message, prepared, job)
+                self.encoder.publish_imap(self, &message, prepared)
             },
         )
     }
