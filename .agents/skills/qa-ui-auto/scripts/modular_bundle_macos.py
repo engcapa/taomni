@@ -14,7 +14,7 @@ import subprocess
 import tarfile
 import tempfile
 
-from modular_bundle_inventory import digest, tree_sample, write_json
+from modular_bundle_inventory import digest, retired_module_arguments, tree_sample, write_json
 
 
 def run(command: list[str], output: Path, *, required: bool = True) -> dict:
@@ -83,6 +83,7 @@ def inspect(directory: Path, identity: dict, output: Path) -> None:
         app = work / 'copied/Taomni.app'
         run(['ditto', str(applications[0]), str(app)], output / 'dmg-copy.log')
         evidence['app'] = app_identity(app, identity['version'])
+        evidence['retiredModuleArguments'] = retired_module_arguments(app / 'Contents/MacOS/taomni')
         evidence['payload'] = tree_sample(app)
         architectures = subprocess.check_output(
             ['lipo', '-archs', str(app / 'Contents/MacOS/taomni')], text=True).strip()

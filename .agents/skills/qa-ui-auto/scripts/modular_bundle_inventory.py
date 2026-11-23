@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from mmap import ACCESS_READ, mmap
 from pathlib import Path
 import re
 import subprocess
@@ -23,6 +24,8 @@ TARGETS = {
 
 RUNNERS = {'linux-x86_64': 'ubuntu-22.04', 'windows-x86_64': 'windows-latest',
            'darwin-aarch64': 'macos-15', 'darwin-x86_64': 'macos-15-intel'}
+
+RETIRED_MODULE_ARGUMENTS = ('--vnc-special-key-hook', '--sockscap-redirector-bridge')
 
 
 def plan_targets(value: str, *, upgrade_desktop: bool = False, macos_arm_runner: str = 'macos-15') -> dict:
@@ -143,6 +146,12 @@ def tree_sample(root: Path) -> dict:
             'symlinks': links}
 
 
+def retired_module_arguments(executable: Path) -> dict:
+    with executable.open('rb') as stream, mmap(stream.fileno(), 0, access=ACCESS_READ) as contents:
+        return {argument: contents.find(argument.encode('ascii')) >= 0
+                for argument in RETIRED_MODULE_ARGUMENTS}
+
+
 def validate_payload(target: str, evidence: dict) -> None:
     if target not in TARGETS:
         raise ValueError('unknown bundle target')
@@ -179,6 +188,21 @@ def record_payload_receipt(target: str, directory: Path) -> None:
     if sorted(files, key=lambda row: (-row['bytes'], row['path']))[:25] != sample['largestFiles']:
         raise ValueError('core payload file inventory differs from its largest-file sample')
 
+    if target.startswith('darwin-'):
+        executable_path = 'Contents/MacOS/taomni'
+        executable_hash = evidence.get('app', {}).get('executableSha256')
+    else:
+        executable_path = 'taomni.exe' if target == 'windows-x86_64' else 'usr/bin/taomni'
+        executable_hash = evidence.get('executableSha256')
+    matching = [row for row in files if
+                (row['path'].casefold() if target == 'windows-x86_64' else row['path']) == executable_path]
+    executable = matching[0] if len(matching) == 1 else None
+    if not executable or executable['sha256'] != executable_hash:
+        raise ValueError('core entrypoint scan does not identify the inventoried executable')
+    retired = evidence.get('retiredModuleArguments')
+    if retired != dict.fromkeys(RETIRED_MODULE_ARGUMENTS, False):
+        raise ValueError(f'core executable still declares a retired module argument or lacks a complete scan: {retired}')
+
     baseline = json.loads((directory / 'bundle-baseline.json').read_text(encoding='utf-8'))
     if baseline['target'] != target:
         raise ValueError('core payload source target differs from the inspected package')
@@ -191,6 +215,7 @@ def record_payload_receipt(target: str, directory: Path) -> None:
         'toolingSource': baseline['toolingSource'], 'runner': runner,
         'rawArtifact': f'modular-bundle-{target}-{baseline["producerRun"]}/{name}',
         'rawSha256': digest(raw), 'regularFiles': len(files),
+        'executableSha256': executable_hash, 'retiredModuleArguments': retired,
     })
 
 
@@ -217,6 +242,7 @@ def linux_metadata(directory: Path, output: Path, version: str) -> dict:
             raise ValueError('expected an actual taomni executable in Debian payload')
         write_json(output / 'linux-payload.json', {
             'scope': 'deb-extracted-payload', 'executableSha256': digest(binary),
+            'retiredModuleArguments': retired_module_arguments(binary),
             'payload': tree_sample(payload), 'applicationLaunched': False,
             'installedUpgradeEstablished': False, 'systemTrustEstablished': False,
         })
@@ -238,6 +264,8 @@ def main() -> None:
     payload.add_argument('--directory', type=Path, required=True)
     tree = commands.add_parser('sample-tree')
     tree.add_argument('--root', type=Path, required=True)
+    entrypoints = commands.add_parser('retired-module-arguments')
+    entrypoints.add_argument('--executable', type=Path, required=True)
     validate = commands.add_parser('validate-source')
     for key in ('run', 'artifacts', 'out', 'github-output'):
         validate.add_argument(f'--{key}', type=Path, required=True)
@@ -264,6 +292,9 @@ def main() -> None:
         return
     if args.command == 'sample-tree':
         print(json.dumps(tree_sample(args.root)))
+        return
+    if args.command == 'retired-module-arguments':
+        print(json.dumps(retired_module_arguments(args.executable)))
         return
     if args.command == 'validate-payload':
         record_payload_receipt(args.target, args.directory)

@@ -9,7 +9,10 @@ import tarfile
 import tempfile
 import unittest
 
-from modular_bundle_inventory import digest, inventory, plan_targets, record_payload_receipt, tree_sample, validate_payload, validate_source
+from modular_bundle_inventory import (
+    RETIRED_MODULE_ARGUMENTS, digest, inventory, plan_targets, record_payload_receipt,
+    retired_module_arguments, tree_sample, validate_payload, validate_source,
+)
 from modular_bundle_macos import app_identity, extract_updater
 
 
@@ -148,6 +151,9 @@ class BundleFileTests(unittest.TestCase):
         payload.mkdir()
         for i in range(30):
             (payload / f'file-{i}').write_bytes(b'x' * (i + 1))
+        executable = payload / 'usr/bin/taomni'
+        executable.parent.mkdir(parents=True)
+        executable.write_bytes(b'core entry points: --headless --ssh-stdio-forward')
         sample = tree_sample(payload)
         self.assertEqual(len(sample['largestFiles']), 25)
         self.assertEqual(sample['files'][0]['sha256'], digest(payload / 'file-0'))
@@ -155,16 +161,33 @@ class BundleFileTests(unittest.TestCase):
         runner = {'runId': '999', 'imageVersion': 'image-test'}
         (self.root / 'runner.json').write_text(json.dumps(runner))
         raw = self.root / 'linux-payload.json'
-        raw.write_text(json.dumps({'payload': sample}))
+        evidence = {
+            'payload': sample, 'executableSha256': digest(executable),
+            'retiredModuleArguments': retired_module_arguments(executable),
+        }
+        raw.write_text(json.dumps(evidence))
         record_payload_receipt('linux-x86_64', self.root)
         receipt = json.loads((self.root / 'core-payload-receipt.json').read_text())
         self.assertEqual(receipt['producerSource'], SOURCE)
         self.assertEqual(receipt['runner'], runner)
         self.assertEqual(receipt['rawSha256'], digest(raw))
         self.assertEqual(receipt['package'], next(f for f in baseline['files'] if f['name'].endswith('.deb')))
-        raw.write_text(json.dumps({'payload': {**sample, 'files': sample['files'][1:]}}))
+        self.assertEqual(receipt['executableSha256'], digest(executable))
+        self.assertEqual(receipt['retiredModuleArguments'], dict.fromkeys(RETIRED_MODULE_ARGUMENTS, False))
+        raw.write_text(json.dumps({**evidence, 'payload': {**sample, 'files': sample['files'][1:]}}))
         with self.assertRaisesRegex(ValueError, 'incomplete'):
             record_payload_receipt('linux-x86_64', self.root)
+        raw.write_text(json.dumps({**evidence, 'executableSha256': '0' * 64}))
+        with self.assertRaisesRegex(ValueError, 'inventoried executable'):
+            record_payload_receipt('linux-x86_64', self.root)
+        for argument in RETIRED_MODULE_ARGUMENTS:
+            executable.write_bytes(b'\0' + argument.encode('ascii') + b'\0')
+            raw.write_text(json.dumps({
+                'payload': tree_sample(payload), 'executableSha256': digest(executable),
+                'retiredModuleArguments': retired_module_arguments(executable),
+            }))
+            with self.subTest(argument=argument), self.assertRaisesRegex(ValueError, argument):
+                record_payload_receipt('linux-x86_64', self.root)
 
     def test_macos_and_windows_use_their_actual_package_families(self):
         targets = {
