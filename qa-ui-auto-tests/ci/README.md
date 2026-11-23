@@ -279,6 +279,19 @@ IDs, missing diff refs, unsupported explicit scope, changed inputs or selected
 skips fail. Pure documentation changes can yield an explicit zero-execution
 report. No empty execution is presented as six-platform success.
 
+### Opt-in credentials
+
+Cases whose fixture needs a credential a hosted runner intentionally does not
+hold (`tao_real_provider`, the real commercial provider probes) are opt-in.
+`policy.yaml` maps such a fixture to the variables that satisfy it, with optional
+per-case overrides for a case that pins one provider. When none of the variables
+is set at plan time the case becomes a **declared capability gap** instead of a
+runnable case: no shard is provisioned for it, the summary reports it under
+"Declared capability gaps", and the strict gate does not treat the resulting
+runtime skip as a failure. Export the variables to plan and run those cases
+locally or in a dedicated job. Explicitly selecting an unmet opt-in case still
+fails planning, so a requested case can never silently turn into a gap.
+
 Reusable caller example (opt in from a separate business flow):
 
 ```yaml

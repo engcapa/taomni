@@ -345,5 +345,87 @@ export function registerMainLayoutLayout1Cases() {
         confirmedCwd: "/work/repo",
       });
     });
+
+    it("refreshes the Home restore row when a commit lands while Home is active", async () => {
+      act(() => useAppStore.getState().setActiveSideTab("home"));
+      await waitFor(
+        () => expect(screen.getByTestId("welcome-restore-status")).toHaveAttribute("data-state", "empty"),
+      );
+      const commitsBefore = (commitWelcomeRunSnapshot as ReturnType<typeof vi.fn>).mock.calls.length;
+
+      // Opening a whitelist local terminal keeps Home visible while the
+      // collector persists the run in the background.
+      await act(async () => {
+        useAppStore.setState({
+          tabs: [
+            { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+            {
+              id: "local-home",
+              type: "terminal",
+              title: "bash",
+              closable: true,
+              localShell: { id: "/bin/bash", name: "bash" },
+            },
+          ],
+          activeTabId: "local-home",
+        });
+      });
+      await waitFor(() => {
+        const props = terminalPanelMock.props.find((candidate) => candidate.tabId === "local-home");
+        expect(props?.onCwdChange).toBeTruthy();
+      });
+      // The snapshot exists once the commit is applied; the one-shot
+      // activation read already resolved to "empty".
+      vi.mocked(getWelcomeRunSnapshot).mockResolvedValue({
+        record: {
+          schemaVersion: 1,
+          revision: 9,
+          runSequence: 1,
+          batchId: "home-live",
+          committedAtMs: 1,
+          entries: [{
+            kind: "local-terminal",
+            identity: "local:local-home",
+            displayName: "bash",
+            shellId: "/bin/bash",
+            shellArgs: [],
+            confirmedCwd: "/work/repo",
+          }],
+          activeIdentity: "local:local-home",
+        },
+        legacyCandidate: null,
+        issue: null,
+      });
+      await act(async () => {
+        terminalPanelMock.props
+          .filter((candidate) => candidate.tabId === "local-home")
+          .at(-1)
+          ?.onCwdChange?.("/work/repo");
+      });
+
+      await waitFor(
+        () => expect((commitWelcomeRunSnapshot as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(commitsBefore),
+        { timeout: 4000 },
+      );
+      await waitFor(
+        () => expect(screen.getByTestId("welcome-restore-status")).toHaveAttribute("data-state", "available"),
+        { timeout: 4000 },
+      );
+    });
+
+    it("keeps the Home restore row empty when nothing is restorable", async () => {
+      act(() => useAppStore.getState().setActiveSideTab("home"));
+      await waitFor(
+        () => expect(screen.getByTestId("welcome-restore-status")).toHaveAttribute("data-state", "empty"),
+      );
+      const readsBefore = vi.mocked(getWelcomeRunSnapshot).mock.calls.length;
+      const commitsBefore = (commitWelcomeRunSnapshot as ReturnType<typeof vi.fn>).mock.calls.length;
+      // Welcome alone produces no run snapshot, so no refresh may turn the
+      // row into a stale "available".
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      expect(commitWelcomeRunSnapshot).toHaveBeenCalledTimes(commitsBefore);
+      expect(vi.mocked(getWelcomeRunSnapshot).mock.calls.length).toBe(readsBefore);
+      expect(screen.getByTestId("welcome-restore-status")).toHaveAttribute("data-state", "empty");
+    });
   });
 }

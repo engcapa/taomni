@@ -469,7 +469,22 @@ class NativeClickHoverTest(TestCase):
         with patch('native_pointer.time.monotonic', side_effect=[0, 0, 6]), \
                 patch('native_pointer.prepare_pointer_target', return_value={'x': 3, 'y': 4}):
             with self.assertRaisesRegex(WebDriverError, 'moved during pointer preparation'):
+                prepare_click_target(self.session, self.origin, timeout=5)
+
+    def test_late_round_reports_motion_instead_of_an_impossible_stability_window(self):
+        self.session.request.side_effect = [None, {'x': 1, 'y': 2, 'ready': True}]
+        with patch('native_pointer.time.monotonic', side_effect=[0, 0, 11.5]), \
+                patch('native_pointer.prepare_pointer_target', return_value={'x': 3, 'y': 4}) as prepare:
+            with self.assertRaisesRegex(WebDriverError, 'moved during pointer preparation'):
                 prepare_click_target(self.session, self.origin)
+        prepare.assert_called_once()
+
+    def test_default_preparation_budget_tolerates_a_slow_hosted_round(self):
+        point = {'x': 9, 'y': 8}
+        self.session.request.side_effect = [None, {**point, 'ready': True}]
+        with patch('native_pointer.time.monotonic', side_effect=[0, 0, 8]), \
+                patch('native_pointer.prepare_pointer_target', return_value=point):
+            self.assertEqual(prepare_click_target(self.session, self.origin), point)
 
     def test_driver_input_failure_is_never_replayed(self):
         self.session.request.side_effect = WebDriverError('pointer transport failed')

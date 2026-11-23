@@ -1,6 +1,6 @@
 id: TC-WS-002
-title: Four primary modes and one bottom chat entry
-description: The primary rail is Home, Workspaces, Sessions and Tools; Home launch actions remain available. Crew is retained on Home and in global search.
+title: Five primary modes and one bottom chat entry
+description: The primary rail is Home, Workspaces, Sessions, Explorer and Tools; Home launch actions remain available. Crew is retained on Home and in global search.
 modes:
 - browser
 - native
@@ -32,6 +32,7 @@ steps:
     - nav-mode-home
     - nav-mode-workspaces
     - side-tab-sessions
+    - side-tab-explorer
     - side-tab-tools
 - click: '[data-testid="nav-mode-home"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
@@ -55,8 +56,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Four primary modes have the requested order, the duplicate top robot is absent, one bottom chat entry remains and Home, Workspaces, Sessions
-      and Tools navigation works.
+    requirement: Five primary modes have the requested order, the duplicate top robot is absent, one bottom chat entry remains and Home, Workspaces, Sessions,
+      Explorer and Tools navigation works.
     actions:
     - 11
     - 16
@@ -79,7 +80,7 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"sidebar-rail\"] [data-testid=\"side-tab-tools\"]"}'
     - step: 10
       expectation: '{"assert_items": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"rail-mode-group\"] button", "attribute": "data-testid",
-        "equals": ["nav-mode-home", "nav-mode-workspaces", "side-tab-sessions", "side-tab-tools"]}}'
+        "equals": ["nav-mode-home", "nav-mode-workspaces", "side-tab-sessions", "side-tab-explorer", "side-tab-tools"]}}'
     - step: 12
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
     - step: 13
@@ -121,7 +122,7 @@ verification:
     method: manual
     reason: Inspect the retained screenshots; functional assertions do not establish visual matching.
   native:
-  - check: Four primary modes have the requested order, the duplicate top robot is absent, one bottom chat entry remains and Home, Workspaces, Sessions
-      and Tools navigation works.
+  - check: Five primary modes have the requested order, the duplicate top robot is absent, one bottom chat entry remains and Home, Workspaces, Sessions,
+      Explorer and Tools navigation works.
     method: automated
     reason: Runs the isolated packaged application and explicitly asserts real native effects.

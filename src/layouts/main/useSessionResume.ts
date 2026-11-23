@@ -258,6 +258,7 @@ export function useSessionResume(context: UseSessionResumeContext) {
 
   const commitRunSnapshotNow = useCallback(createCommitRunSnapshotNow({
     welcomeRestoreViewRef,
+    welcomeRestoreInstanceRef,
     buildRunSnapshotEntries,
     snapshotFingerprintRef,
     runBatchIdRef,
@@ -280,5 +281,15 @@ export function useSessionResume(context: UseSessionResumeContext) {
   useEffect(() => {
     commitRunSnapshotSoon();
   }, [tabs, activeTabId, terminalCwds, commitRunSnapshotSoon]);
+
+  // A pending debounce must not commit a snapshot or refresh the Home row
+  // after the layout unmounts.
+  useEffect(() => () => {
+    if (snapshotCommitTimerRef.current != null) {
+      window.clearTimeout(snapshotCommitTimerRef.current);
+      snapshotCommitTimerRef.current = null;
+    }
+  }, []);
+
   return { welcomeRestore, resolveResumeWaiterForTab, cancelResumeWaiter, cancelAllResumeWaiters, resumeWaitersRef, resumeWaiterBySessionRef, resumeWaiterByTabRef, resumeSettleTimersRef, restoreFailedLocalTabsRef, runBatchIdRef, snapshotFingerprintRef, snapshotRevisionRef, snapshotCommitTimerRef };
 }

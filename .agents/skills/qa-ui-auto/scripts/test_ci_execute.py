@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from ci_execute import _classify_runner_result, _prepare_runtime
+from ci_execute import _classify_runner_result, _prepare_runtime, native_webdriver_config
 
 
 class ExecuteRuntimeTests(unittest.TestCase):
@@ -98,6 +98,22 @@ class ExecuteOutcomeTests(unittest.TestCase):
 
             self.assertEqual(result["exit_code"], 1)
             self.assertIn("identity is unstable", result["error"])
+
+
+class NativeWebdriverConfigTests(unittest.TestCase):
+    def test_hosted_macos_native_states_a_startup_budget_for_the_app_bridge(self):
+        self.assertEqual(native_webdriver_config({"mode": "native"}, "Darwin"),
+                         {"startup_timeout": 60})
+
+    def test_windows_native_records_the_logged_msedgedriver_wrapper(self):
+        self.assertEqual(native_webdriver_config({"mode": "native"}, "Windows", "C:/qa/webview-driver.cmd"),
+                         {"native_driver": "C:/qa/webview-driver.cmd"})
+
+    def test_linux_native_and_browser_shards_keep_the_defaults(self):
+        self.assertEqual(native_webdriver_config({"mode": "native"}, "Linux"), {})
+        for system in ("Windows", "Darwin", "Linux"):
+            with self.subTest(system=system):
+                self.assertEqual(native_webdriver_config({"mode": "browser"}, system, "C:/driver"), {})
 
 
 if __name__ == "__main__":
