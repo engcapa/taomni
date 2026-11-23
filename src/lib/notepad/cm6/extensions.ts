@@ -1,7 +1,7 @@
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
-import { drawSelection, EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from "@codemirror/view";
+import { drawSelection, EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { createBookmarksAndHistoryExtension } from "./bookmarksAndHistory";
 import { createColumnSelectionExtension } from "./columnSelection";
 import { createMarksExtension } from "./marksAndTokens";
@@ -52,6 +52,56 @@ export function buildNotepadTheme(fontSizePx: number): Extension {
       color: "var(--taomni-text-muted)",
       userSelect: "none",
     },
+    // The workbench does not enable CodeMirror's dark facet, so its baseTheme
+    // light selection fills (#d7d4f0 focused / #d9d9d9 unfocused) would clash
+    // with the app's dark notepad text token (#e6eaf0) and wash the selected
+    // text out. Use the same app selection tokens as the Markdown source
+    // editor (viewer.css `--editor-sel*`) so both editors look identical.
+    "& > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground": {
+      backgroundColor: "var(--taomni-editor-selection-unfocused-bg, rgba(37, 99, 235, 0.14)) !important",
+    },
+    "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
+      backgroundColor: "var(--taomni-editor-selection-bg, rgba(37, 99, 235, 0.26)) !important",
+    },
+    "::selection": {
+      backgroundColor: "var(--taomni-editor-selection-bg, rgba(37, 99, 235, 0.26))",
+    },
+    // Same contract as the Markdown source editor for search-match decorators:
+    // amber tokens stay distinguishable from the blue selection fill.
+    ".cm-selectionMatch": {
+      backgroundColor: "var(--taomni-editor-selection-match-bg, rgba(245, 158, 11, 0.24))",
+      outline: "1px solid var(--taomni-editor-selection-match-border, rgba(245, 158, 11, 0.58))",
+      borderRadius: "2px",
+    },
+    ".cm-selectionMatch.cm-selectionMatch-main": {
+      backgroundColor: "transparent",
+      outline: "none",
+    },
+    // Active line and active gutter fills paint above the drawSelection layer,
+    // so while a range is selected they would tint the last selected line and
+    // break the even fill. The plugin below toggles this class.
+    "&.np-selection-active .cm-activeLine, &.np-selection-active .cm-activeLineGutter": {
+      backgroundColor: "transparent !important",
+    },
+  });
+}
+
+function syncSelectionActiveClass(view: EditorView): void {
+  view.dom.classList.toggle(
+    "np-selection-active",
+    view.state.selection.ranges.some((range) => !range.empty),
+  );
+}
+
+/** Keep the active-line occluder suppressed only while a real range is selected. */
+function createSelectionActiveExtension(): Extension {
+  return ViewPlugin.fromClass(class {
+    constructor(view: EditorView) {
+      syncSelectionActiveClass(view);
+    }
+    update(update: ViewUpdate) {
+      if (update.selectionSet || update.docChanged) syncSelectionActiveClass(update.view);
+    }
   });
 }
 
@@ -83,6 +133,7 @@ export function buildNotepadExtensions(options: {
     compartments.lineNumbers.of(options.showLineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : []),
     highlightActiveLine(),
     drawSelection(),
+    createSelectionActiveExtension(),
     history(),
     compartments.tabSize.of([EditorState.tabSize.of(tabSize), indentUnit.of(" ".repeat(tabSize))]),
     compartments.readOnly.of(EditorState.readOnly.of(options.readOnly)),

@@ -375,13 +375,17 @@
 .np-mark-style-5 {
   background: rgba(34, 197, 94, 0.26);
 }
+/* Find highlights paint inside the content above CodeMirror's drawSelection
+   layer. Use the shared amber match tokens (same as the Markdown source editor)
+   so they stay distinguishable when they fall inside a blue text selection,
+   in both app themes. */
 .np-search-all-match {
-  background: rgba(250, 204, 21, 0.28);
+  background-color: var(--taomni-editor-selection-match-bg, rgba(245, 158, 11, 0.24));
   border-radius: 2px;
 }
 .np-search-active-match {
-  outline: 1.5px solid var(--taomni-accent, #2563eb);
-  background: rgba(59, 130, 246, 0.24);
+  outline: 1.5px solid var(--taomni-editor-selection-match-border, rgba(245, 158, 11, 0.58));
+  background-color: var(--taomni-editor-selection-match-bg, rgba(245, 158, 11, 0.24));
 }
 
 /* Column ruler & indent guides (pure CSS overlay without DOM text mutation) */
