@@ -1,0 +1,178 @@
+id: TC-NP-008
+title: Notepad selection uses the shared editor selection tokens in light and dark app themes
+description: >-
+  Regression for the reported dark-theme defect where selected text in the Notepad
+  workbench was painted with CodeMirror's light baseTheme fill (#d7d4f0) instead of
+  the app selection tokens, washing out the selected text. The case pins the light
+  theme, selects text in the real Notepad CodeMirror view and asserts the focused
+  selection fill uses the light editor selection token, then switches to the dark
+  theme and asserts the unfocused and focused selection fills use the dark tokens
+  and that the dark notepad text token still paints the selected text. Find All
+  matches must stay distinguishable through the amber match tokens while a range
+  is selected. This is renderer evidence (Chromium); WebKit theming differences
+  are not claimed here.
+modes:
+- browser
+covers:
+- F-NOTEPAD-1
+tags:
+- p1
+- notepad
+- theme
+- selection
+- regression
+fixtures:
+- reset_db
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+# reset_db leaves the app theme at "system"; the first cycle press pins light.
+- click: '[data-testid="theme-cycle"]'
+- eval_readonly:
+    expression: document.documentElement.getAttribute('data-app-theme') === 'light'
+    expect_truthy: true
+    timeout_sec: 5
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab-new-notepad"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="notepad-workbench"]'
+- click: '[data-testid="viewer-editor"] .cm-content'
+- type: Selection contrast probe text
+- press:
+    key: Control+Home
+    macos_key: Meta+ArrowUp
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+# Focused light selection must resolve the light editor selection token, not
+# CodeMirror's default #d7d4f0 lavender.
+- eval_readonly:
+    expression: >-
+      /^rgba\(37,\s*99,\s*235,\s*0\.26\)$/.test(getComputedStyle(document.querySelector('.cm-selectionBackground')).backgroundColor)
+    expect_truthy: true
+    timeout_sec: 8
+- screenshot: notepad-light-selection.png
+# Second cycle press pins the dark theme. The rail button takes focus, so the
+# retained range must paint with the unfocused dark token first.
+- click: '[data-testid="theme-cycle"]'
+- eval_readonly:
+    expression: document.documentElement.getAttribute('data-app-theme') === 'dark'
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: >-
+      /^rgba\(92,\s*143,\s*214,\s*0\.22\)$/.test(getComputedStyle(document.querySelector('.cm-selectionBackground')).backgroundColor)
+    expect_truthy: true
+    timeout_sec: 8
+# Refocus the editor and rebuild a range: the focused dark token must win, and
+# the notepad text token must stay readable.
+- click: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Control+Home
+    macos_key: Meta+ArrowUp
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    key: Shift+ArrowRight
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- eval_readonly:
+    expression: >-
+      /^rgba\(92,\s*143,\s*214,\s*0\.4\)$/.test(getComputedStyle(document.querySelector('.cm-selectionBackground')).backgroundColor)
+    expect_truthy: true
+    timeout_sec: 8
+- eval_readonly:
+    expression: >-
+      getComputedStyle(document.querySelector('.np-workbench')).color === 'rgb(230, 234, 240)'
+    expect_truthy: true
+    timeout_sec: 5
+- screenshot: notepad-dark-selection.png
+# Find All matches keep the shared amber match tokens in the dark theme, so they
+# remain distinguishable from the blue selection fill while a range is selected.
+- click: '[data-testid="notepad-tool-find"]'
+- wait_for: '[data-testid="notepad-find-bar"]'
+- fill:
+    selector: '[data-testid="np-find-input"]'
+    value: contrast
+- click: '[data-testid="notepad-find-all-current"]'
+- eval_readonly:
+    expression: >-
+      /^rgba\(225,\s*177,\s*75,\s*0\.3\)$/.test(getComputedStyle(document.querySelector('.np-search-all-match')).backgroundColor)
+    expect_truthy: true
+    timeout_sec: 8
+- click: '[data-testid="np-find-close"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: In the light app theme a focused Notepad range paints with the shared light editor selection token.
+    actions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    checkpoints:
+    - {step: 20, expectation: The focused light selection background equals the light editor selection token.}
+    results: [20]
+  - id: R2
+    requirement: In the dark app theme both the unfocused and focused Notepad range paints with the dark editor selection tokens over readable dark text.
+    actions: [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+    checkpoints:
+    - {step: 24, expectation: The retained unfocused range painted the dark unfocused token.}
+    - {step: 35, expectation: The refocused range painted the focused dark token.}
+    - {step: 36, expectation: The dark notepad text token still paints the selected text.}
+    results: [24, 35, 36]
+  - id: R3
+    requirement: Find All highlights remain distinguishable through the shared amber match token while the dark selection range is retained.
+    actions: [37, 38, 39, 40, 41]
+    checkpoints:
+    - {step: 42, expectation: The find match background equals the dark editor selection match token.}
+    - {step: 44, expectation: The workflow raised no uncaught runtime errors.}
+    results: [42, 44]
+  visual:
+  - check: Light and dark notepad selection screenshots retained for contrast review.
+    method: manual
+    reason: Computed selection/text token colors are asserted automatically; pixel fidelity and perceived contrast need human review.
+  native:
+  - check: WebKitGTK/WKWebView notepad selection theming.
+    method: external
+    reason: This browser case proves the Chromium renderer contract; native notepad theming shares CSS tokens but is not asserted here.

@@ -1,0 +1,107 @@
+id: TC-FILE-OPEN-046
+title: Markdown Live browse keeps the rendered text selection after the context menu takes focus
+description: >-
+  Regression for the reported WebKit live-mode defect: in Markdown Live browse mode
+  (non-editing) a rendered-text selection is visible, but right-clicking opened the
+  app context menu, whose focus move made WebKit clear the document selection — the
+  highlight disappeared while Copy still used the captured text, and Source mode was
+  unaffected because CodeMirror paints its own selection layer. This case opens a
+  real markdown file in Live mode, selects a rendered word with a real double click,
+  opens the app context menu with a real right click, and asserts a non-empty
+  document selection while the menu is open and after Escape. Chromium keeps the
+  range itself, so this is native WebKit evidence (Linux WebKitGTK, macOS WKWebView).
+modes:
+- native
+native_platforms:
+- Linux
+- macOS
+covers:
+- F-FILEOPEN-1
+tags:
+- p0
+- markdown
+- selection
+- native
+- regression
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-markdown-live-selection
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    key: Control+l
+    macos_key: Meta+l
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- wait_for: '[data-testid="explorer-file-row"][data-name="live.md"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
+- wait_for: '[data-testid="markdown-editor"][data-mode="live"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-editor"]'
+    name: data-editing
+    equals: 'false'
+- wait_for: '[data-testid="viewer-editor"] .fv-md-rendered-block strong'
+# A real double click selects a rendered word through the WebView's native
+# selection (Live browse mode has no CodeMirror selection layer).
+- dblclick: '[data-testid="viewer-editor"] .fv-md-rendered-block strong'
+- eval_readonly:
+    expression: >-
+      document.getSelection().rangeCount >= 1 && document.getSelection().toString().length > 0
+    expect_truthy: true
+    timeout_sec: 8
+# Right-click inside the rendered surface: the app menu must open and the
+# selection highlight must survive the menu focus move (WebKit clears it).
+- right_click: '[data-testid="viewer-editor"] .fv-md-rendered-block strong'
+- wait_for: '[data-testid="markdown-live-context-menu"]'
+- eval_readonly:
+    expression: >-
+      document.getSelection().rangeCount >= 1 && document.getSelection().toString().length > 0
+    expect_truthy: true
+    timeout_sec: 8
+- screenshot: markdown-live-menu-open-selection.png
+# Escape closes the menu; the same range must stay visibly selected afterwards.
+- press: Escape
+- assert_not_visible: '[data-testid="markdown-live-context-menu"]'
+- eval_readonly:
+    expression: >-
+      document.getSelection().rangeCount >= 1 && document.getSelection().toString().length > 0
+    expect_truthy: true
+    timeout_sec: 8
+- screenshot: markdown-live-selection-restored.png
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A real double click selects rendered Live text and the selection appears, then stays non-empty while the app right-click menu has focus.
+    actions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18]
+    checkpoints:
+    - {step: 16, expectation: The rendered word was selected through the native WebView selection.}
+    - {step: 19, expectation: The selection stayed non-empty while the context menu owned focus.}
+    results: [16, 19]
+  - id: R2
+    requirement: Escape closes the live context menu and the same rendered-text selection remains visible.
+    actions: [20, 21, 22]
+    checkpoints:
+    - {step: 23, expectation: The selection is still non-empty after the menu closed.}
+    - {step: 25, expectation: The workflow raised no uncaught runtime errors.}
+    results: [23, 25]
+  visual:
+  - check: Screenshots retain the menu-open and post-Escape selection state.
+    method: manual
+    reason: The decisive assertion is the DOM selection state; screenshots support human confirmation of the highlight.
+  native:
+  - check: Real WebKitGTK (Linux) and WKWebView (macOS) selection/focus behaviour with the shipped app.
+    method: automated
+    reason: Chromium browser mode cannot reproduce the WebKit focus-driven selection clearing; native mode uses the packaged app.
