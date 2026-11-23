@@ -71,7 +71,10 @@ fn identity_overrides_from_and_reply_to() {
         request_read_receipt: false,
     };
     let message = build_send_message(&sample_resolved_account(), &request).unwrap();
-    assert_eq!(message.sender().unwrap(), "support@example.com");
+    assert_eq!(
+        message.envelope.sender.as_deref(),
+        Some("support@example.com")
+    );
     let raw = String::from_utf8(message.bytes).unwrap();
     assert!(raw.contains("From: Support <support@example.com>"), "{raw}");
     assert!(raw.contains("Reply-To: help@example.com"), "{raw}");

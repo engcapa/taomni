@@ -1,14 +1,14 @@
 use std::time::Duration;
 
-use crate::delivery::PreparedMail;
 use lettre::transport::smtp::{
     authentication::{Credentials, Mechanism},
     client::Tls,
     response::Response,
 };
 use lettre::{SmtpTransport, Transport};
+use taomni_mail_api::compose::PreparedMail;
 
-use super::send_error;
+use super::{send_error, smtp_envelope};
 
 use crate::imap_auth::MailAuthMode;
 use crate::tls::{MailConnectionSecurity, smtp_tls_parameters};
@@ -54,8 +54,12 @@ impl SmtpClient {
     }
 
     pub fn send_prepared(&self, message: &PreparedMail) -> Result<Response, String> {
+        let envelope = smtp_envelope(
+            message.envelope.sender.as_deref(),
+            &message.envelope.recipients,
+        )?;
         self.0
-            .send_raw(&message.envelope, &message.bytes)
+            .send_raw(&envelope, &message.bytes)
             .map_err(|error| send_error(&error.to_string()))
     }
 

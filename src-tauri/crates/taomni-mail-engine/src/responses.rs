@@ -6,11 +6,12 @@ use lettre::{
     message::{Mailbox, MultiPart, SinglePart, header::ContentType},
 };
 use serde::{Deserialize, Serialize};
+use taomni_mail_api::compose::PreparedMail;
 
 use crate::{
     calendar::{MailInvite, build_reply_ics, partstat_of},
     compose::parse_mailbox,
-    delivery::PreparedMail,
+    delivery::{prepare_message, prepare_with_envelope},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -61,7 +62,7 @@ impl ResponseRequest {
                 let envelope = Envelope::new(Some(from), vec![to]).map_err(|e| e.to_string())?;
                 let bytes = build_mdn(me, name, recipient, receipt, receipt.automatic, self.stamp)
                     .into_bytes();
-                Ok(PreparedMail { envelope, bytes })
+                Ok(prepare_with_envelope(&envelope, bytes))
             }
         }
     }
@@ -116,7 +117,7 @@ fn invitation(
                 ),
         )
         .map_err(|e| format!("failed to build invitation reply: {e}"))?;
-    Ok(message.into())
+    Ok(prepare_message(message))
 }
 
 fn header_safe(value: &str) -> String {
@@ -211,8 +212,11 @@ mod tests {
                 .unwrap()
                 .prepare()
                 .unwrap();
-            assert_eq!(message.sender().as_deref(), Some("reader@example.com"));
-            assert_eq!(message.recipients(), ["chair@example.com"]);
+            assert_eq!(
+                message.envelope.sender.as_deref(),
+                Some("reader@example.com")
+            );
+            assert_eq!(message.envelope.recipients, ["chair@example.com"]);
             let parsed = mail_parser::MessageParser::default()
                 .parse(&message.bytes)
                 .unwrap();

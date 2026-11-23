@@ -89,3 +89,76 @@ pub struct ComposeEnvelope {
     pub sender: Option<String>,
     pub recipients: Vec<String>,
 }
+
+/// Prepared RFC 5322 bytes paired with the envelope provided by the composer.
+pub struct PreparedMail {
+    pub envelope: ComposeEnvelope,
+    pub bytes: Vec<u8>,
+}
+
+pub fn validate_send_request(request: &MailSendRequest) -> Result<(), String> {
+    if request.to.is_empty() && request.cc.is_empty() && request.bcc.is_empty() {
+        return Err("at least one recipient is required".into());
+    }
+    if request.subject.trim().is_empty() {
+        return Err("email subject is required".into());
+    }
+    if request
+        .text_body
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or("")
+        .is_empty()
+        && request
+            .html_body
+            .as_deref()
+            .map(str::trim)
+            .unwrap_or("")
+            .is_empty()
+    {
+        return Err("email body is required".into());
+    }
+    for (index, attachment) in request.attachments.iter().enumerate() {
+        if attachment.path.trim().is_empty() {
+            return Err(format!("attachment #{} path is required", index + 1));
+        }
+        if attachment.inline {
+            let content_id = attachment
+                .content_id
+                .as_deref()
+                .map(str::trim)
+                .unwrap_or("");
+            if content_id.is_empty() {
+                return Err(format!(
+                    "inline attachment #{} Content-ID is required",
+                    index + 1
+                ));
+            }
+            if content_id
+                .chars()
+                .any(|ch| matches!(ch, '<' | '>' | '\r' | '\n' | '\0'))
+            {
+                return Err(format!(
+                    "inline attachment #{} Content-ID contains invalid characters",
+                    index + 1
+                ));
+            }
+            let content_type = attachment
+                .content_type
+                .as_deref()
+                .map(str::trim)
+                .unwrap_or("");
+            if !content_type
+                .get(..content_type.len().min(6))
+                .unwrap_or("")
+                .eq_ignore_ascii_case("image/")
+            {
+                return Err(format!(
+                    "inline attachment #{} must have an image/* content type",
+                    index + 1
+                ));
+            }
+        }
+    }
+    Ok(())
+}

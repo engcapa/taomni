@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 use taomni_mail_api::{
     COMPOSE_MESSAGE, HOST_REQUEST_TIMEOUT,
-    compose::{ComposeEnvelope, ComposeRequest, MailSendRequest, MessageBuildOptions},
+    compose::{
+        ComposeEnvelope, ComposeRequest, MailSendRequest, MessageBuildOptions, PreparedMail,
+    },
     imap_exchange::{read_body_frame, write_body_frame},
 };
-use taomni_mail_engine::delivery::PreparedMail;
 use taomni_plugin_stream::routed_tcp::Route;
 use tokio::io::AsyncReadExt;
 
@@ -73,7 +74,10 @@ pub(in crate::mail) async fn compose_message(
         let bytes = read_body_frame(&mut peer)
             .await
             .map_err(|error| error.to_string())?;
-        PreparedMail::from_parts(envelope, bytes)
+        if envelope.recipients.is_empty() {
+            return Err("Mail compose result has no envelope recipients".into());
+        }
+        Ok(PreparedMail { envelope, bytes })
     };
     let ((), prepared) = tokio::time::timeout(HOST_REQUEST_TIMEOUT, async {
         tokio::try_join!(

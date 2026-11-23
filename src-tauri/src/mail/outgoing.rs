@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use taomni_mail_api::RemoteDraftLocation;
+use taomni_mail_api::{RemoteDraftLocation, compose::PreparedMail};
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 use taomni_mail_engine::imap_outgoing::{store_remote_draft, store_sent_copy};
 use tauri::State;
@@ -67,13 +67,7 @@ pub(super) async fn prepare_send(
     account: &ResolvedMailAccount,
     request: MailSendRequest,
     remote_draft: Option<RemoteDraftLocation>,
-) -> Result<
-    (
-        taomni_mail_engine::delivery::PreparedMail,
-        Option<PendingSentCopy>,
-    ),
-    String,
-> {
+) -> Result<(PreparedMail, Option<PendingSentCopy>), String> {
     let message_id = new_message_id(&account.config.email_address);
     let save_copy = save_sent_copy_enabled(&account.config);
     let copy = if save_copy {

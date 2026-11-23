@@ -11,6 +11,22 @@ mod legacy;
 pub use legacy::{SmtpClient, SmtpEndpoint};
 
 use crate::tls::certificate_error_hint;
+#[cfg(any(feature = "legacy-smtp", feature = "routed-smtp"))]
+use lettre::address::Envelope;
+
+#[cfg(any(feature = "legacy-smtp", feature = "routed-smtp"))]
+fn smtp_envelope(sender: Option<&str>, recipients: &[String]) -> Result<Envelope, String> {
+    let sender = sender
+        .map(str::parse)
+        .transpose()
+        .map_err(|error| format!("Invalid SMTP sender: {error}"))?;
+    let recipients = recipients
+        .iter()
+        .map(|recipient| recipient.parse())
+        .collect::<Result<_, _>>()
+        .map_err(|error| format!("Invalid SMTP recipient: {error}"))?;
+    Envelope::new(sender, recipients).map_err(|error| error.to_string())
+}
 
 fn send_error(error: &str) -> String {
     let lower = error.to_ascii_lowercase();

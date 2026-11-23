@@ -164,7 +164,11 @@ jobs:
               assert all("pop3-runtime" not in ",".join(features).split(",") for features in engine_features), f"{target}: the core includes the desktop POP3 transport"
               mail_features = Path(f"gate-inventory/mail-compose-features-{target}.txt").read_text()
               lettre = [line.split()[2:] for line in mail_features.splitlines() if line.startswith("lettre ")]
-              assert all("smtp-transport" not in ",".join(features).split(",") for features in lettre), f"{target}: the core includes the desktop SMTP transport"
+              # Earlier signed Mail packages accept prebuilt bytes. The core
+              # keeps the builder for that compatibility path.
+              assert all(set(",".join(features).split(",")) - {""} <= {"builder"} for features in lettre), (
+                  f"{target}: the core links Lettre features beyond the compatible MIME builder"
+              )
           resources = json.loads(Path("src-tauri/tauri.windows.conf.json").read_text())["bundle"]["resources"]
           assert all("resources/vnc/" not in entry for entry in resources), "Core declares VNC module resources"
           PY

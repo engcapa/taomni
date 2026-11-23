@@ -4,11 +4,11 @@ use std::path::Path;
 #[cfg(feature = "legacy-mail-smtp")]
 use super::{DEFAULT_TIMEOUT_SECS, Duration, ProxyForward, mail_effective_endpoint};
 
-use taomni_mail_api::compose::ComposeAttachment;
+use taomni_mail_api::compose::{ComposeAttachment, PreparedMail};
+pub(super) use taomni_mail_api::compose::{MessageBuildOptions, validate_send_request};
 use taomni_mail_engine::compose::{MailSender, ResolvedSendAttachment, build_message};
-pub(super) use taomni_mail_engine::compose::{MessageBuildOptions, validate_send_request};
 
-use taomni_mail_engine::delivery::PreparedMail;
+use taomni_mail_engine::delivery::prepare_message;
 #[cfg(feature = "legacy-mail-smtp")]
 use taomni_mail_engine::smtp::{SmtpClient, SmtpEndpoint};
 
@@ -69,7 +69,7 @@ pub(super) fn build_send_message_with(
         display_name: account.config.display_name.as_deref(),
         reply_to: account.config.reply_to.as_deref(),
     };
-    build_message(sender, request, options, read_send_attachments).map(PreparedMail::from)
+    build_message(sender, request, options, read_send_attachments).map(prepare_message)
 }
 
 pub(super) fn read_send_attachments(

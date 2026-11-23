@@ -69,6 +69,7 @@ use std::{
 };
 
 use serde::{Serialize, de::DeserializeOwned};
+use taomni_mail_api::compose::PreparedMail;
 use taomni_mail_api::{
     CHECK_INCOMING, CHECK_OUTGOING, FETCH_IMAP_ATTACHMENT, FETCH_IMAP_BODY, FETCH_IMAP_RAW,
     FolderSubscription, HOST_REQUEST_TIMEOUT, IMAP_FOLDER_TREE, ImapFlagUpdate, ImapFolderChange,
@@ -82,7 +83,6 @@ use taomni_mail_api::{
     },
     search::ImapSearchRequest,
 };
-use taomni_mail_engine::delivery::PreparedMail;
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
 
 use crate::{
@@ -390,8 +390,7 @@ pub(super) async fn send_smtp(
         return Err("Enable or update Mail in the module store to send mail".into());
     }
     let (_route, connection) = bind_smtp(account).await?;
-    let sender = message.sender();
-    let recipients = message.recipients();
+    let taomni_mail_api::compose::ComposeEnvelope { sender, recipients } = message.envelope;
     let mime_length = message.bytes.len() as u64;
     let (_offer, mime_source) = Route::offer_bytes(message.bytes)
         .await

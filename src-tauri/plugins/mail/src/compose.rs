@@ -1,11 +1,11 @@
 use serde_json::to_vec;
 use taomni_mail_api::{
-    compose::{ComposeEnvelope, ComposeRequest},
+    compose::ComposeRequest,
     imap_exchange::{read_body_frame, write_body_frame},
 };
 use taomni_mail_engine::{
     compose::{MailSender, ResolvedSendAttachment, build_message},
-    delivery::PreparedMail,
+    delivery::prepare_message,
 };
 use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_plugin_sdk::Operation;
@@ -61,12 +61,9 @@ pub(super) fn prepare(
             .map_err(|error| error.message)?
             .map_err(|error| error.to_string())
     })
-    .map(PreparedMail::from);
+    .map(prepare_message);
     operation.check_current()?;
-    let envelope = message.as_ref().map(|message| ComposeEnvelope {
-        sender: message.sender(),
-        recipients: message.recipients(),
-    });
+    let envelope = message.as_ref().map(|message| &message.envelope);
     let reply = to_vec(&envelope).map_err(|_| RpcError::from_code(ErrorCode::InternalError))?;
     Ok(runtime
         .block_on(while_current(operation, async {

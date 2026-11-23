@@ -15,6 +15,7 @@ use lettre::transport::smtp::{
     extension::ClientId,
     response::Response,
 };
+use taomni_mail_api::compose::PreparedMail;
 use taomni_mail_api::{SMTP_DELIVERY_UNKNOWN, SmtpConnection, SmtpDelivery};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, ReadBuf},
@@ -22,6 +23,7 @@ use tokio::{
 };
 use tokio_native_tls::{TlsConnector, TlsStream};
 
+use super::smtp_envelope;
 use crate::{
     imap_auth::MailAuthMode,
     tls::{MailConnectionSecurity, smtp_tls_parameters, tls_connector},
@@ -44,21 +46,7 @@ pub async fn check_routed_connection(
 }
 
 pub async fn send_routed_message(request: SmtpDelivery) -> Result<Response, String> {
-    let envelope = Envelope::new(
-        request
-            .sender
-            .as_deref()
-            .map(str::parse)
-            .transpose()
-            .map_err(|error| format!("Invalid SMTP sender: {error}"))?,
-        request
-            .recipients
-            .iter()
-            .map(|recipient| recipient.parse())
-            .collect::<Result<_, _>>()
-            .map_err(|error| format!("Invalid SMTP recipient: {error}"))?,
-    )
-    .map_err(|error| error.to_string())?;
+    let envelope = smtp_envelope(request.sender.as_deref(), &request.recipients)?;
     let (source, _) = request.mime_source.connect().await?;
     let mut mime = Vec::new();
     source
@@ -74,9 +62,13 @@ pub async fn send_routed_message(request: SmtpDelivery) -> Result<Response, Stri
 
 pub async fn send_prepared_response(
     connection: &SmtpConnection,
-    message: &crate::delivery::PreparedMail,
+    message: &PreparedMail,
 ) -> Result<Response, String> {
-    deliver(connection, &message.envelope, &message.bytes).await
+    let envelope = smtp_envelope(
+        message.envelope.sender.as_deref(),
+        &message.envelope.recipients,
+    )?;
+    deliver(connection, &envelope, &message.bytes).await
 }
 
 async fn deliver(
