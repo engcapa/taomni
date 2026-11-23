@@ -1043,6 +1043,11 @@ def main(argv: list[str] | None = None) -> int:
         },
         "cases": results,
     }
+    if ci_entry:
+        summary["runner_image"] = {
+            "label": ci_entry["runner"], "image": env.get("ImageOS"),
+            "version": env.get("ImageVersion"), "architecture": env.get("RUNNER_ARCH"),
+        }
     if mode == "native":
         if ci_entry and ci_entry.get("desktop"):
             summary["desktop_identity"] = cfg.get("desktop", {})

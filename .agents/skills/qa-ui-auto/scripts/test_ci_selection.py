@@ -53,6 +53,16 @@ class ModuleProfileSelectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "matching Release Bundle run ID"):
             make_plan(args(scope="selected", tags="crash-regression", module_profile="full"))
 
+    def test_full_roster_covers_the_native_rdp_performance_case(self):
+        performance = "TC-RDPS-PERF-01-performance-budget"
+        plan = make_plan(args(scope="selected", tags="crash-regression", module_profile="full",
+                              modes="native", first_release_run="123",
+                              modular_rdp_p95=True, case_ids=performance))
+        entries = [e for e in plan["entries"] if performance in e["selected_ids"]]
+        self.assertEqual({e["platform_key"] for e in entries}, {"linux", "windows", "macos"})
+        self.assertTrue(all("full-module-profile" in e["capabilities"] for e in entries))
+        self.assertTrue(plan["modular_rdp_p95"])
+
 
 class MacosRunnerSelectionTests(unittest.TestCase):
     def test_macos_26_arm64_recovery_keeps_cases_crash_selection_and_release_architecture(self):

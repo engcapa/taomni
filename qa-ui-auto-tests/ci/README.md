@@ -36,6 +36,10 @@ fresh registry after the per-case reset, and checks the enabled versions before
 the case starts. Summary and runner receipts bind the observed versions and the
 package digests to the case results. These paths share the signed-Mail QA build
 recipe. Use the installed package workflow for the actual release-binary inventory.
+For the signed RDP Server performance check, add
+`case_ids=TC-RDPS-PERF-01-performance-budget` and `modular_rdp_p95=true` to
+the full profile run. The native receipt records the runner image, candidate
+RDP Server package digest and its active version with the case results.
 
 The modular refactor also uses `qa-modular-upgrade.yml` with an exact `head`.
 It runs the shared capture library checks for the four release targets, real

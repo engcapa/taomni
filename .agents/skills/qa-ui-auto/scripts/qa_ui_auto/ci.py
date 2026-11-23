@@ -247,10 +247,9 @@ def make_plan(args, *, cases=None, features=None) -> dict:
     installation = {}
     requires_plugin = {}
     if installation_profile != "default":
-        if (installation_profile not in {"core-only", "full"}
-                or (scope, wanted_tags) != ("selected", {"crash-regression"})
-                or requested or wanted_features):
-            raise ValueError("module_profile requires selected scope with only the crash-regression tag")
+        if (installation_profile not in {"core-only", "full"} or scope != "selected"
+                or "crash-regression" not in wanted_tags):
+            raise ValueError("module_profile requires selected scope with the crash-regression tag")
         if installation_profile == "core-only" and release_run:
             raise ValueError("core-only profile cannot consume a signed release roster")
         if installation_profile == "full" and "native" in modes and (not release_run.isdigit() or int(release_run) < 1):
