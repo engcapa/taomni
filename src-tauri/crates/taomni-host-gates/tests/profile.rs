@@ -1,5 +1,7 @@
 //! Ownership must be held by the real host, independently of its core process.
 //! Compile locally; execute ignored scenarios only on GitHub hosted runners.
+#[path = "support/profile_rpc.rs"]
+mod profile_rpc;
 mod support;
 
 use std::{
@@ -43,6 +45,17 @@ impl Fixture {
         PluginSlug::parse("hello-plugin").unwrap()
     }
 
+    fn commands() -> Vec<String> {
+        serde_json::from_value(
+            serde_json::from_str::<serde_json::Value>(include_str!(
+                "../../../plugins/hello-plugin/module.json"
+            ))
+            .unwrap()["commands"]
+                .clone(),
+        )
+        .unwrap()
+    }
+
     fn start(&self) -> Result<HostProcess, HostProcessError> {
         self.start_generation(Self::generation())
     }
@@ -58,15 +71,7 @@ impl Fixture {
             "0.1.0",
             &host,
             host.parent().unwrap(),
-            &serde_json::from_str::<serde_json::Value>(include_str!(
-                "../../../plugins/hello-plugin/module.json"
-            ))
-            .unwrap()["commands"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|command| command.as_str().unwrap().to_owned())
-                .collect::<Vec<_>>(),
+            &Self::commands(),
             &[],
             support::config(),
             None,

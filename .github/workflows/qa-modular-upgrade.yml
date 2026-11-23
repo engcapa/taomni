@@ -427,7 +427,7 @@ jobs:
         run: |
           python - <<'PY' > modular-evidence/service-selection.txt
           import subprocess
-          for target, expected in {"services": 9, "lifecycle": 7, "activation": 3, "cleanup": 2, "profile": 5, "snapshot": 4, "mfa": 5, "mfa_snapshot": 2}.items():
+          for target, expected in {"services": 9, "lifecycle": 7, "activation": 3, "cleanup": 2, "profile": 6, "snapshot": 4, "mfa": 5, "mfa_snapshot": 2}.items():
               listing = subprocess.check_output([
                   "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml", "-p", "taomni-host-gates",
                   "--test", target, "--locked", "--", "--ignored", "--list",
