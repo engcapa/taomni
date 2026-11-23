@@ -57,6 +57,7 @@
     "mail/decode-archive-attachment",
     "mail/query-archive-index",
     "mail/cleanup-archive-index",
+    "mail/open-archive-original",
     "mail/open-pop3-sync",
     "mail/sync-pop3-round",
     "mail/local-pop3-mailbox",

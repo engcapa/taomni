@@ -14,19 +14,21 @@ pub(super) fn decode(
     request: ArchiveDecoding,
 ) -> Result<Result<(), String>, RpcError> {
     transform(runtime, operation, request.exchange, |raw| {
-        let body = cached_to_body(
-            parse_body_message(
-                &request.account_id,
-                &request.folder,
-                request.uid,
-                Some(raw.len() as u32),
-                raw,
-                raw.len(),
-            ),
-            "archive",
-        );
-        serde_json::to_vec(&body).map_err(|_| RpcError::from_code(ErrorCode::InternalError))
+        encode_body(&request.account_id, &request.folder, request.uid, raw)
     })
+}
+
+pub(super) fn encode_body(
+    account: &str,
+    folder: &str,
+    uid: u32,
+    raw: &[u8],
+) -> Result<Vec<u8>, RpcError> {
+    let body = cached_to_body(
+        parse_body_message(account, folder, uid, Some(raw.len() as u32), raw, raw.len()),
+        "archive",
+    );
+    serde_json::to_vec(&body).map_err(|_| RpcError::from_code(ErrorCode::InternalError))
 }
 
 pub(super) fn attachment(

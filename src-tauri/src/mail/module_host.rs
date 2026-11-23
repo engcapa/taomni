@@ -4,6 +4,7 @@ mod archive;
 mod archive_decoding;
 mod archive_encoding;
 mod archive_index;
+mod archive_original;
 mod archive_publication;
 mod archive_scan;
 pub(super) mod attachment_cache;
@@ -18,6 +19,9 @@ pub(super) mod imap_idle;
 mod mbox;
 pub(super) use archive_decoding::{decode_archive_attachment, decode_archive_original};
 pub(super) use archive_encoding::ArchiveEncoder;
+pub(super) use archive_original::{
+    export_archive_original, opens_archive_original, read_archive_original,
+};
 pub(super) use archive_scan::{HostedArchiveScan, owns_archive_scan, run_archive_scan};
 mod downloads;
 mod filter_cache;

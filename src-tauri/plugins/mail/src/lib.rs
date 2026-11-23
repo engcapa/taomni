@@ -9,6 +9,7 @@ mod archive_cleanup;
 mod archive_decoding;
 mod archive_encoding;
 mod archive_index;
+mod archive_original;
 mod archive_publication;
 mod archive_scan;
 mod attachment_cache;
@@ -104,6 +105,7 @@ fn host_config() -> HostConfig {
                 taomni_mail_api::DECODE_ARCHIVE_ATTACHMENT,
                 taomni_mail_api::archive_index::QUERY_ARCHIVE_INDEX,
                 taomni_mail_api::archive_index::CLEANUP_ARCHIVE_INDEX,
+                taomni_mail_api::archive_original::OPEN_ARCHIVE_ORIGINAL,
                 OPEN_IMAP_ARCHIVE,
                 OPEN_IMAP_IMPORT,
                 EXPORT_IMAP_MBOX,
@@ -413,6 +415,11 @@ impl PluginHandler for Handler {
                     operation,
                     endpoint,
                 )?)
+            }
+            taomni_mail_api::archive_original::OPEN_ARCHIVE_ORIGINAL => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(archive_original::serve(&self.io, operation, endpoint)?)
             }
             taomni_mail_api::archive_index::CLEANUP_ARCHIVE_INDEX => {
                 let endpoint = serde_json::from_value(params.unwrap_or_default())

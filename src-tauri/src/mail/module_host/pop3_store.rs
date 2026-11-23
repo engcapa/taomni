@@ -13,10 +13,11 @@ use taomni_mail_api::{
     },
 };
 use taomni_plugin_stream::routed_tcp::Route;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::time::timeout;
 
-use super::{PluginRegistry, ResolvedMailAccount, bind_incoming, invoke};
+use super::{
+    PluginRegistry, ResolvedMailAccount, archive_original::save_export, bind_incoming, invoke,
+};
 
 pub(in crate::mail) async fn run<T: DeserializeOwned + Send + 'static>(
     registry: Arc<PluginRegistry>,
@@ -84,16 +85,6 @@ pub(in crate::mail) async fn export(
     attachment_index: Option<usize>,
     target: &Path,
 ) -> Result<(), String> {
-    let parent = target
-        .parent()
-        .filter(|path| !path.as_os_str().is_empty())
-        .unwrap_or(Path::new("."));
-    tokio::fs::create_dir_all(parent)
-        .await
-        .map_err(|e| e.to_string())?;
-    let staging = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
-    let mut file = tokio::fs::File::from_std(staging.reopen().map_err(|e| e.to_string())?);
-    let (_route, endpoint, mut peer) = Route::pair().await.map_err(|e| e.to_string())?;
     let request = MailboxRequest {
         account_id: account,
         action: LocalMailboxAction::Archive(LocalArchiveAction::Export {
@@ -102,27 +93,5 @@ pub(in crate::mail) async fn export(
         }),
     };
     let encoded = serde_json::to_vec(&request).map_err(|e| e.to_string())?;
-    let exchange = async {
-        write_body_frame(&mut peer, &encoded).await?;
-        let length = peer.read_u64().await?;
-        let copied = tokio::io::copy(&mut peer.take(length), &mut file).await?;
-        if length != copied {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                "Incomplete archived original",
-            ));
-        }
-        file.flush().await?;
-        file.sync_all().await
-    };
-    timeout(HOST_REQUEST_TIMEOUT, async {
-        tokio::try_join!(invoke::<(), _>(registry, LOCAL_MAILBOX, endpoint), async {
-            exchange.await.map_err(|e| e.to_string())
-        })
-    })
-    .await
-    .map_err(|_| "Mail archive export timed out".to_string())??;
-    drop(file);
-    staging.persist(target).map_err(|e| e.error.to_string())?;
-    Ok(())
+    save_export(registry, LOCAL_MAILBOX, encoded, target).await
 }

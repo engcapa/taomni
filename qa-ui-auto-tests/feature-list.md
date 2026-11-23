@@ -8895,6 +8895,8 @@ files:
   - src-tauri/src/mail/archive.rs
   - src-tauri/src/mail/archive_query.rs
   - src-tauri/src/mail/archive/local_commands.rs
+  - src-tauri/src/mail/module_host/archive_original.rs
+  - src-tauri/plugins/mail/src/archive_original.rs
   - src-tauri/plugins/mail/src/archive_cleanup.rs
   - src-tauri/plugins/mail/src/archive_scan.rs
   - src-tauri/src/mail/archive_metadata.rs
@@ -9089,6 +9091,7 @@ controls:
 - Mail 签名宿主用独立 IMAP 连接读取归档邮件头和分段原件。TC-MODULES-070 验证停用时归档任务释放本机文件锁、重新启用后恢复扫描、暂停续传，以及服务端删除后的本地正文和附件摘要。TC-MODULES-060 检查停用后隐藏归档入口，重新启用后在原标签中打开。TC-MAIL-STORAGE-01 核对导出后仍可再次保存同一附件。TC-MAIL-STORAGE-06 验证清理后保持暂停，恢复后打开保留的原件并检查 EML 导出入口。
 - 签名 Mail 宿主通过只读 SQLite 查询当前账户的归档索引。TC-MODULES-070 核对服务器删除邮件后自选目录的搜索结果。TC-MAIL-STORAGE-08 核对重开归档后的邮件数量。
 - Mail 签名宿主发布已校验的 IMAP 完整原件并提交归档索引。TC-MODULES-070 核对签名命令、暂停续传和磁盘摘要。TC-MAIL-STORAGE-01 覆盖重开归档后查找已保存的邮件。
+- 签名 Mail 宿主读取归档原件，并流式返回 EML 和附件。TC-MODULES-070 核对清空实时缓存后仍能打开并导出保留原件，保存的 EML 和附件与原始摘要一致。TC-MAIL-STORAGE-01 检查取消 EML 导出后可从同一个预览重试。
 - Mail 签名宿主管理本地归档的清理预览和确认。TC-MODULES-070 核对取消后保留两封、确认后仅移除所选原件，以及磁盘上的剩余原件和暂停状态。TC-MAIL-STORAGE-01 核对取消和重新确认的选择状态。
 - IMAP 原件以实际字节范围与 EOF 确认完整性，兼容不准确的 RFC822.SIZE；空正文或错误范围保留明确的文件夹/UID 错误，不阻塞其它可读取邮件，也不把失败项永久跳过。`TC-MAIL-STORAGE-03` 通过真实 Retry 和独立 MIME/附件校验覆盖恢复流程。
 - IMAP 全部/仅选中/排除文件夹均保留其它文件夹的摘要。后台暂停保留可续传片段，普通删除/远端消失保留归档，主动清理才物理删除最后引用。

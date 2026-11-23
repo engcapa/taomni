@@ -1,9 +1,6 @@
 //! Full originals and cleanup belong to the same account as the POP3 ledger.
 
-use std::{
-    io::{Seek, Write},
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use taomni_mail_api::{
     archive_index::{ArchiveEntry, ArchiveKey},
@@ -18,10 +15,10 @@ use taomni_mail_engine::{
 };
 use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_plugin_sdk::Operation;
-use tokio::{io::AsyncWriteExt, net::TcpStream, runtime::Runtime};
+use tokio::{net::TcpStream, runtime::Runtime};
 
 use super::{Store, encode, unavailable};
-use crate::incoming::while_current;
+use crate::archive_original::send_export;
 
 pub(super) fn execute(
     store: &Store,
@@ -98,27 +95,7 @@ pub(super) fn export(
     store.require_pop3_owner(account)?;
     let db = store.open_writable_mailbox(account)?;
     let original = storage::open_entry(&db, account, entry).map_err(invalid_state)?;
-    let mut staging = tempfile::tempfile().map_err(|_| unavailable())?;
-    let check = || operation.check_current().map_err(|error| error.message);
-    let length = if let Some(index) = attachment_index {
-        let raw = original.read_with(check).map_err(invalid_state)?;
-        let file = taomni_mail_engine::extract_attachment(&raw, index).map_err(invalid_state)?;
-        staging.write_all(&file.bytes).map_err(|_| unavailable())?;
-        file.bytes.len() as u64
-    } else {
-        original
-            .copy_verified(&mut staging, check)
-            .map_err(invalid_state)?
-    };
-    staging.rewind().map_err(|_| unavailable())?;
-    let mut file = tokio::fs::File::from_std(staging);
-    runtime
-        .block_on(while_current(operation, async {
-            peer.write_u64(length).await?;
-            tokio::io::copy(&mut file, peer).await
-        }))?
-        .map_err(|_| unavailable())?;
-    Ok(Ok(()))
+    send_export(runtime, operation, original, attachment_index, peer)
 }
 
 fn save(

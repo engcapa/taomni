@@ -1,6 +1,6 @@
 id: TC-MODULES-070
 title: Signed Mail archives complete originals after pausing and resuming
-description: Disable Mail during a live archive scan, re-enable it and pause and resume complete storage, then read and search the custom local archive and export the selected attachment after deleting the messages on the server. Compare the original and exported bytes with the fixture. Cancel cleanup, then confirm removal of exactly one saved original. Clear the live cache and verify the remaining original and paused state survive.
+description: Disable Mail during a live archive scan, re-enable it and pause and resume complete storage, then read and search the custom local archive and export the selected attachment after deleting the messages on the server. Compare the original and exported bytes with the fixture. Cancel cleanup, then confirm removal of exactly one saved original. Clear the live cache, reopen the retained original, and verify the exact bytes of the exported EML.
 covers: [F-Modules-1, F-MAIL-23]
 tags: [modules, mail, native-boundary, p1]
 modes: [native]
@@ -198,6 +198,18 @@ steps:
 - assert_count: {selector: '[data-testid="mail-archive-row"]', equal: 1}
 - assert_text: {selector: '[data-testid="mail-archive-row"]', contains: Complete INBOX 1}
 - assert_no_runtime_errors: null
+- click: '[data-testid="mail-archive-read"]'
+- click: '[data-testid="mail-archive-preview"] [data-testid="mail-body-mode-plain"]'
+- assert_text: {selector: '[data-testid="mail-archive-preview"]', contains: Offline body Complete INBOX 1}
+- native_file_dialog:
+    kind: save
+    action: choose
+    trigger: '[data-testid="mail-archive-export"]'
+    path: ${fixture.mail_storage_a}/retained-original.eml
+- assert_text: {selector: '[data-testid="mail-archive-notice"]', contains: retained-original.eml}
+- assert_file_sha256: {path: '${fixture.mail_storage_a}/retained-original.eml', equals: '${fixture.mail_archive_retained_eml_sha256}'}
+- assert_signed_mail_host: archive-original
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -268,6 +280,16 @@ verification:
     - {step: 114, expectation: The retained original has the expected subject.}
     - {step: 115, expectation: The workflow reports no runtime errors.}
     results: [109, 110, 111, 113, 114, 115]
+  - id: signed-archive-original
+    requirement: The signed host opens the retained original and exports the complete MIME after the live cache is cleared.
+    actions: [116, 117, 119]
+    checkpoints:
+    - {step: 118, expectation: The retained original still renders its plaintext body.}
+    - {step: 120, expectation: The archive manager reports the chosen EML destination.}
+    - {step: 121, expectation: The exported EML matches the raw fixture bytes for the retained message.}
+    - {step: 122, expectation: The installed host and frontend match the signed input and the host declares the original-reading capability.}
+    - {step: 123, expectation: Reading and exporting the original produce no runtime errors.}
+    results: [118, 120, 121, 122, 123]
   visual:
   - check: The Mail pane displays downloading, paused and completed as the scan runs.
     method: automated

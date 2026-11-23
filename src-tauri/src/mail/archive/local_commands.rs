@@ -130,6 +130,11 @@ pub async fn mail_archive_read(
     if pop3_store::is_hosted(&state, &account_id).await? {
         return owned::run(&state, &account_id, LocalArchiveAction::Read { entry }).await;
     }
+    if module_host::opens_archive_original(&state.plugins) {
+        let cache = state.mail_db(&account_id)?;
+        return module_host::read_archive_original(state.plugins.clone(), cache, account_id, entry)
+            .await;
+    }
     let folder = entry.folder.clone();
     let uid = entry.uid;
     let original = with_mail_original(&state, &account_id, move |db, account| {
@@ -157,6 +162,18 @@ pub async fn mail_archive_export(
         )
         .await;
     }
+    if module_host::opens_archive_original(&state.plugins) {
+        let cache = state.mail_db(&account_id)?;
+        return module_host::export_archive_original(
+            state.plugins.clone(),
+            cache,
+            account_id,
+            entry,
+            None,
+            Path::new(&target_path),
+        )
+        .await;
+    }
     let original = with_mail_original(&state, &account_id, move |db, account| {
         storage::open_entry(db, account, &entry)
     })
@@ -175,6 +192,18 @@ pub async fn mail_archive_attachment(
     if pop3_store::is_hosted(&state, &account_id).await? {
         return module_host::pop3_store::export(
             state.plugins.clone(),
+            account_id,
+            entry,
+            Some(attachment_index),
+            Path::new(&target_path),
+        )
+        .await;
+    }
+    if module_host::opens_archive_original(&state.plugins) {
+        let cache = state.mail_db(&account_id)?;
+        return module_host::export_archive_original(
+            state.plugins.clone(),
+            cache,
             account_id,
             entry,
             Some(attachment_index),

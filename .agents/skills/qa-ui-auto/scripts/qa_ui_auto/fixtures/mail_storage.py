@@ -44,7 +44,10 @@ def setup(ctx: Any) -> None:
                        f"--qa-full\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=complete.bin\r\n"
                        f"Content-Transfer-Encoding: base64\r\n\r\n").encode() + base64.encodebytes(attachment).replace(b"\n", b"\r\n") + b"\r\n--qa-full--\r\n"
                 uid = server.state.append_raw(folder_name, raw, [])
-                expected[f"{folder_name}/{uid}"] = {"sha256": hashlib.sha256(raw).hexdigest(), "rawSize": len(raw), "attachmentSha256": attachment_digest}
+                raw_sha = hashlib.sha256(raw).hexdigest()
+                expected[f"{folder_name}/{uid}"] = {"sha256": raw_sha, "rawSize": len(raw), "attachmentSha256": attachment_digest}
+                if ctx.case_id == "TC-MODULES-070" and folder_name == "INBOX" and index == 1:
+                    ctx.values["mail_archive_retained_eml_sha256"] = raw_sha
     (root / "expected.json").write_text(json.dumps(expected), encoding="utf-8")
 
 
