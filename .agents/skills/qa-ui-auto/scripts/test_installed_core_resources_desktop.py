@@ -90,14 +90,16 @@ class DesktopResourceTests(unittest.TestCase):
         saved, = self.root.glob(".taomni-startup-*/original/taomni.db")
         self.assertEqual(saved.read_bytes(), b"upgrade data")
 
-    def test_macos_rejects_a_readiness_receipt_for_a_different_pid(self):
+    def test_macos_readiness_requires_the_owned_status_bar(self):
         owner = Mock(pid=29)
         owner.poll.return_value = None
-        received = SimpleNamespace(returncode=0, stdout='{"ownerPid":19,"control":"Tools"}', stderr="")
-        with patch("installed_core_resources_desktop.installed_macos_desktop", return_value=nullcontext(owner)), patch(
-            "installed_core_resources_desktop.subprocess.run", return_value=received,
-        ), patch("installed_core_resources_desktop.sample_rss") as rss:
-            with self.assertRaisesRegex(RuntimeError, "Unexpected macOS readiness receipt"):
-                macos_observation(self.root / "probe", self.executable, self.work, self.evidence)
-            rss.assert_not_called()
-        self.assertEqual((self.evidence / "readiness.stdout.txt").read_text(), received.stdout)
+        for payload in ({"ownerPid": 19, "statusMarker": "X11:"}, {"ownerPid": 29, "control": "Tools"}):
+            with self.subTest(receipt=payload):
+                received = SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr="")
+                with patch("installed_core_resources_desktop.installed_macos_desktop", return_value=nullcontext(owner)), patch(
+                    "installed_core_resources_desktop.subprocess.run", return_value=received,
+                ), patch("installed_core_resources_desktop.sample_rss") as rss:
+                    with self.assertRaisesRegex(RuntimeError, "Unexpected macOS readiness receipt"):
+                        macos_observation(self.root / "probe", self.executable, self.work, self.evidence)
+                    rss.assert_not_called()
+                self.assertEqual((self.evidence / "readiness.stdout.txt").read_text(), received.stdout)

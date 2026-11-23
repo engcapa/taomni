@@ -12,7 +12,11 @@ func children(_ node: AXUIElement) -> [AXUIElement] {
     return attribute(node, kAXChildrenAttribute) as? [AXUIElement] ?? []
 }
 
-func hasReadyControl(_ window: AXUIElement) -> Bool {
+// Both the 0.5.12 and modular desktop layouts render this status segment.
+// The macOS Tools entry belongs to the system menu outside the WebView.
+let statusMarker = "X11:"
+
+func hasStatusBar(_ window: AXUIElement) -> Bool {
     guard attribute(window, kAXMinimizedAttribute) as? Bool != true else { return false }
     var pending = [(node: window, web: false)]
     var seen = 0
@@ -20,9 +24,9 @@ func hasReadyControl(_ window: AXUIElement) -> Bool {
         seen += 1
         let role = attribute(item.node, kAXRoleAttribute) as? String
         let web = item.web || role == "AXWebArea"
-        if web && role == kAXButtonRole && attribute(item.node, kAXEnabledAttribute) as? Bool == true {
-            let labels = [kAXTitleAttribute, kAXDescriptionAttribute, kAXHelpAttribute]
-            if labels.contains(where: { attribute(item.node, $0) as? String == "Tools" }) {
+        if web && role == kAXStaticTextRole {
+            let labels = [kAXValueAttribute, kAXTitleAttribute, kAXDescriptionAttribute]
+            if labels.contains(where: { attribute(item.node, $0) as? String == statusMarker }) {
                 return true
             }
         }
@@ -44,6 +48,7 @@ let expected = URL(fileURLWithPath: CommandLine.arguments[2]).resolvingSymlinksI
 let app = AXUIElementCreateApplication(pid)
 AXUIElementSetMessagingTimeout(app, 1)
 let deadline = ProcessInfo.processInfo.systemUptime + 70
+var activated = false
 while ProcessInfo.processInfo.systemUptime < deadline {
     if let running = NSRunningApplication(processIdentifier: pid),
        let executable = running.executableURL {
@@ -51,9 +56,12 @@ while ProcessInfo.processInfo.systemUptime < deadline {
             fail("Readiness probe resolved a different installed executable")
         }
         guard !running.isTerminated else { fail("Installed application exited during startup") }
+        if !activated {
+            activated = running.activate(options: [.activateIgnoringOtherApps])
+        }
         let windows = attribute(app, kAXWindowsAttribute) as? [AXUIElement] ?? []
-        if !running.isHidden, windows.contains(where: hasReadyControl) {
-            let receipt: [String: Any] = ["ownerPid": pid, "control": "Tools"]
+        if !running.isHidden, windows.contains(where: hasStatusBar) {
+            let receipt: [String: Any] = ["ownerPid": pid, "statusMarker": statusMarker]
             let data = try JSONSerialization.data(withJSONObject: receipt)
             FileHandle.standardOutput.write(data)
             exit(0)
@@ -61,4 +69,4 @@ while ProcessInfo.processInfo.systemUptime < deadline {
     }
     Thread.sleep(forTimeInterval: 0.1)
 }
-fail("Timed out waiting for the installed window's Tools button inside its WebView")
+fail("Timed out waiting for the installed window's X11 status inside its WebView")

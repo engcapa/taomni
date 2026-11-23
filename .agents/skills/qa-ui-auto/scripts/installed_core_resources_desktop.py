@@ -21,7 +21,7 @@ from qa_ui_auto.native_steps import NativeStepContext
 
 READINESS = {
     "Windows": "Launch the installed app and its owned EdgeDriver, then wait for the visible status bar",
-    "Darwin": "Launch the installed app, then wait for the Tools button inside its main window's AXWebArea",
+    "Darwin": "Launch the installed app, then wait for the X11 status segment in the window's AXWebArea",
 }
 
 
@@ -86,7 +86,7 @@ def macos_observation(driver, executable, work, evidence):
         if observed.returncode or owner.poll() is not None:
             raise RuntimeError(f"Installed macOS app did not reach UI readiness: {observed.stderr.strip()}")
         receipt = json.loads(observed.stdout)
-        if receipt != {"ownerPid": owner.pid, "control": "Tools"}:
+        if receipt != {"ownerPid": owner.pid, "statusMarker": "X11:"}:
             raise RuntimeError("Unexpected macOS readiness receipt")
         return sample(psutil.Process(owner.pid), executable, ready)
 
