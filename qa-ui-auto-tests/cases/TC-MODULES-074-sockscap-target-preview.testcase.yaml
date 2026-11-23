@@ -71,6 +71,11 @@ steps:
 - click: '[data-testid="confirm-dialog-confirm"]'
 - wait_for: '[data-testid="module-action-install-sockscap"]'
 - assert_count: {selector: '[data-testid="module-action-uninstall-sockscap"]', equal: 0}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+- assert_count: {selector: '[data-testid="sockscap-start"]', equal: 0}
 verification:
   review: reviewed
   requirements:
@@ -110,13 +115,15 @@ verification:
     - {step: 56, expectation: The same preview rule is available after re-enabling the module.}
     results: [35, 42, 43, 44, 45, 49, 51, 52, 56]
   - id: uninstall
-    requirement: Confirmed uninstall returns the preview store entry to its installable state.
-    actions: [58, 59, 60, 62]
+    requirement: Confirmed uninstall returns the preview store entry to its installable state and removes the capture controls.
+    actions: [58, 59, 60, 62, 65, 66, 67]
     checkpoints:
     - {step: 61, expectation: The store asks the user to confirm uninstall.}
     - {step: 63, expectation: Installation is available again after uninstall.}
     - {step: 64, expectation: The uninstall action is absent from the entry.}
-    results: [61, 63, 64]
+    - {step: 68, expectation: Reopening the original tool shows the missing module state.}
+    - {step: 69, expectation: The uninstalled module exposes no capture start control.}
+    results: [61, 63, 64, 68, 69]
   visual:
   - check: The detail displays the requested host alongside the decision and rule.
     method: automated

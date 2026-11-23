@@ -1,5 +1,31 @@
 use super::*;
 
+fn admit_capture_module(enabled: Option<bool>, legacy_allowed: bool) -> Result<bool, String> {
+    match enabled {
+        Some(true) => Ok(true),
+        None if legacy_allowed => Ok(false),
+        _ => Err("Install and enable the SocksCap module before starting capture".into()),
+    }
+}
+
+#[cfg(test)]
+mod admission_tests {
+    use super::admit_capture_module;
+
+    #[test]
+    fn release_capture_requires_an_enabled_module() {
+        assert_eq!(admit_capture_module(Some(true), false), Ok(true));
+        assert!(admit_capture_module(Some(false), false).is_err());
+        assert!(admit_capture_module(None, false).is_err());
+    }
+
+    #[test]
+    fn qa_legacy_capture_cannot_override_a_disabled_module() {
+        assert_eq!(admit_capture_module(None, true), Ok(false));
+        assert!(admit_capture_module(Some(false), true).is_err());
+    }
+}
+
 /// Route upstream requests through the active SocksCap module whenever it is installed.
 pub fn init_xray_manager(_app: &AppHandle, state: &AppState) {
     let manager = Arc::new(core::XrayManager::new(state.plugins.clone()));
@@ -77,6 +103,12 @@ pub async fn sockscap_start(
         .sockscap
         .begin_activation(&state.plugins)
         .await?;
+    let hosted = admit_capture_module(
+        state.plugins.get(taomni_sockscap_api::SLUG).map(|record| {
+            record.state == crate::plugin::LifecycleState::Enabled && record.reason.is_none()
+        }),
+        cfg!(debug_assertions) || crate::is_qa_identifier(&app.config().identifier),
+    )?;
     #[cfg(target_os = "macos")]
     let startup = state.legacy.sockscap.macos_start.start()?;
     #[cfg(not(target_os = "linux"))]
@@ -120,12 +152,6 @@ pub async fn sockscap_start(
 
     let activation_lock = ModuleLock::try_acquire_for_app(&app, "sockscap", "global", "SocksCap")?;
     let journals = recovery::JournalLocations::load(&state.core.paths.data)?;
-    let hosted = state
-        .plugins
-        .get(taomni_sockscap_api::SLUG)
-        .is_some_and(|record| {
-            record.state == crate::plugin::LifecycleState::Enabled && record.reason.is_none()
-        });
     let journal_path = journals.for_start(hosted);
 
     {

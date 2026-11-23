@@ -52,13 +52,18 @@ steps:
 - click: '[data-testid="confirm-dialog-confirm"]'
 - wait_for: '[data-testid="module-action-install-sockscap"]'
 - assert_signed_windows_capture: uninstalled
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+- assert_count: {selector: '[data-testid="sockscap-start"]', equal: 0}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: trusted-windows-capture
     requirement: Windows validates the signed files before launching the helper and releases the helper when its owning module is disabled.
-    actions: [6, 8, 12, 15, 16, 18, 21, 24, 26, 29, 31, 36, 38, 40, 42]
+    actions: [6, 8, 12, 15, 16, 18, 21, 24, 26, 29, 31, 36, 38, 40, 42, 45, 46, 47]
     checkpoints:
     - {step: 7, expectation: The module came from the signed archive.}
     - {step: 14, expectation: The signed host holds the process writer lease.}
@@ -71,8 +76,10 @@ verification:
     - {step: 37, expectation: The existing desktop shows the disabled module state.}
     - {step: 43, expectation: The store offers installation again after uninstall completes.}
     - {step: 44, expectation: The version and staged runtime are gone and the retained configuration digest matches.}
-    - {step: 45, expectation: Capture startup and cleanup leave the renderer usable.}
-    results: [7, 14, 19, 20, 22, 23, 28, 33, 37, 43, 44, 45]
+    - {step: 48, expectation: Reopening the tool shows the missing module state.}
+    - {step: 49, expectation: The uninstalled module exposes no capture start control.}
+    - {step: 50, expectation: Capture startup and cleanup leave the renderer usable.}
+    results: [7, 14, 19, 20, 22, 23, 28, 33, 37, 43, 44, 48, 49, 50]
   visual:
   - check: The capture panel displays the integrity error.
     method: automated

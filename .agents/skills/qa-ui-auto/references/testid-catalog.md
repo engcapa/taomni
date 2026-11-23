@@ -2969,6 +2969,7 @@
   ↳ `[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
   ↳ `[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
   ↳ `[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
+  ↳ `[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]` — alias
   ↳ `[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
   ↳ `[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
 - `[data-testid="plugin-tab-error"]` — display — F-Modules-1.plugin-tab-error

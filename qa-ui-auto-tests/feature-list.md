@@ -411,6 +411,7 @@ controls:
       - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
       - '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
       - '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
       - '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
       - '[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
     kind: display
@@ -9349,7 +9350,7 @@ controls:
 - 提供全局/按应用 TCP 路由、上游代理、GFWList、规则 dry-run、状态与流量统计的控制面板。
 - 启用 SocksCap 后，Tools 标签加载模块前端和样式，测试目标在独立宿主计算实际决策并显示命中的规则。TC-MODULES-073 核对旧配置与规则进入签名宿主，停用再启用后继续命中同一规则。TC-MODULES-074 在 Browser 从停用占位进入商店，在同一标签验证启用、试算、再次停用及恢复试算。
 - TC-MODULES-080 从 macOS 原生面板启动针对单个程序的捕获，在等待系统批准时从商店停用。核对签名宿主、桥接进程、上游启动器、私有套接字、写锁和恢复记录。
-- TC-MODULES-085 从 Windows 原生面板启动捕获，核对 WinDivert 损坏拒绝和提权辅助进程的宿主归属。停用后验证宿主退出、转发监听端口关闭和恢复日志清理，卸载后核对保留配置与版本目录。TC-MODULES-074 覆盖预览商店的确认卸载和安装入口。
+- TC-MODULES-085 从 Windows 原生面板启动捕获，核对 WinDivert 损坏拒绝和提权辅助进程的宿主归属。停用后验证宿主退出、转发监听端口关闭和恢复日志清理，卸载后核对保留配置与版本目录。TC-MODULES-074 和 TC-MODULES-085 验证卸载后重新打开工具时显示安装入口，捕获启动按钮已移除。
 - TC-MODULES-081 从邮件地址簿新增联系人并停用模块，逐阶段核对签名宿主、模块邮箱库中的联系人和旧缓存。重新启用后从写信界面选择联系人，再从地址簿删除同一条记录。
 - TC-MODULES-083 从保存的账户打开附件，复核签名 Mail 模块写入的实际文件、关闭后删除的查看器副本及再次打开时的服务器请求数。TC-MAIL-STORAGE-01 核对该账户的附件缓存开关保存后恢复。
 - TC-MODULES-075 验证上游 UUID 保存时的 Vault 设置、取消和续办。TC-MODULES-072 验证签名代理链接导入在完成首次 Vault 设置后继续保存端点。
