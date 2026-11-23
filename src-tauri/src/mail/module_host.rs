@@ -16,6 +16,7 @@ pub(super) use local_mailbox::local_mailbox;
 mod imap_outgoing;
 mod mutations;
 mod pop3;
+mod pop3_round;
 mod prefetch;
 mod responses;
 pub(super) use responses::send_response;
@@ -30,6 +31,7 @@ pub(super) use imap_outgoing::{
 pub(super) use mbox::{export_imap_mbox, exports_imap_mbox};
 pub(super) use mutations::HostedMutations;
 pub(super) use pop3::{HostedPop3, syncs_pop3};
+pub(super) use pop3_round::{run_pop3_round, runs_pop3_rounds};
 pub(super) use prefetch::{prefetch_imap_bodies, prefetches_imap_bodies};
 
 use std::{

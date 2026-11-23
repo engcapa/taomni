@@ -18,6 +18,7 @@ mod local_drafts;
 mod mailbox;
 mod mbox_export;
 mod outgoing;
+mod pop3_round;
 mod pop3_sync;
 mod prefetch;
 mod snapshot;
@@ -85,6 +86,7 @@ fn host_config() -> HostConfig {
                 EXPORT_IMAP_MBOX,
                 OPEN_IMAP_MUTATIONS,
                 OPEN_POP3_SYNC,
+                taomni_mail_api::SYNC_POP3_ROUND,
                 FETCH_IMAP_ATTACHMENT,
                 SNAPSHOT_PREPARE_METHOD,
                 SNAPSHOT_METHOD,
@@ -350,6 +352,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(mbox_export::start(&self.io, operation, input)?)
+            }
+            taomni_mail_api::SYNC_POP3_ROUND => {
+                let request = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(pop3_round::start(&self.io, operation, request)?)
             }
             OPEN_POP3_SYNC => {
                 let input = serde_json::from_value(params.unwrap_or_default())

@@ -23,7 +23,7 @@ def run(ctx, args):
     signed = getattr(owner, "signed_mail", None)
     phase = args.get("phase") if isinstance(args, dict) else args
     active = {
-        "folder-tree", "folder-changes", "running", "imap-delivery", "pop3-delivery",
+        "folder-tree", "folder-changes", "running", "imap-delivery", "pop3-delivery", "pop3-sync",
         "attachment-saved", "attachment-reopened", "agenda-written", "filter-saved",
         "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source",
         "imap-prefetch", "imap-mutations", "imap-mbox", "imap-forward", "outbox-queued", "outbox-sent",
@@ -93,6 +93,16 @@ def run(ctx, args):
         if "mail/compose-message" not in manifest["commands"]:
             raise StepError("The installed Mail version does not assemble messages in its host")
         report["delivery"] = observe_delivery(phase)
+    if phase == "pop3-sync":
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        if "mail/sync-pop3-round" not in manifest["commands"]:
+            raise StepError("The installed Mail version does not run complete POP3 rounds")
+        server = mail_fake_server.ACTIVE.state
+        with server.lock:
+            commands = [command for command in server.log if command.startswith("POP3 ")]
+        if any(command not in commands for command in ("POP3 UIDL", "POP3 RETR", "POP3 QUIT")):
+            raise StepError("The POP3 fixture did not observe a complete mailbox round")
+        report["pop3Commands"] = commands
     if phase in {"filter-saved", "filter-retained"}:
         if owner.case_id != "TC-MODULES-092":
             raise StepError("Filter storage requires the signed filter case")

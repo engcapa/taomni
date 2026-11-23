@@ -1,12 +1,10 @@
 //! POP3 retrieval and durable local inbox updates.
 
-use std::collections::HashMap;
-use std::ops::Deref;
+use std::collections::{HashMap, HashSet};
 
-use rusqlite::{Connection, Transaction, TransactionBehavior, params};
-
-use super::local_store;
-use crate::{MailMessageCached, now_ts};
+use super::Pop3Ledger;
+use crate::now_ts;
+pub use taomni_mail_api::pop3_exchange::Pop3SyncOutcome;
 
 /// Messages fetched per sync call. The consumer repeats while mail remains.
 const FETCH_BATCH: usize = 50;
@@ -18,23 +16,12 @@ pub trait Pop3Mailbox {
     fn finish(&mut self) -> Result<(), String>;
 }
 
-pub struct Pop3SyncOutcome {
-    pub messages: Vec<MailMessageCached>,
-    pub remaining: usize,
-    pub deleted_on_server: usize,
-}
-
-pub fn sync_inbox<D: Deref<Target = Connection>>(
+pub fn sync_inbox(
     client: &mut dyn Pop3Mailbox,
-    database: impl Fn() -> Result<D, String>,
-    account_id: &str,
+    ledger: &dyn Pop3Ledger,
     leave_days: Option<u32>,
 ) -> Result<Pop3SyncOutcome, String> {
-    let known = {
-        let conn = database()?;
-        local_store::ensure_local_folders(&conn, account_id).map_err(database_error)?;
-        known_messages(&conn, account_id).map_err(database_error)?
-    };
+    let known = ledger.known_messages()?;
     let listing = client.uidl()?;
     let now = now_ts();
     let (fetch, mut deletes) = plan_round(&listing, &known, FETCH_BATCH, leave_days, now);
@@ -42,10 +29,7 @@ pub fn sync_inbox<D: Deref<Target = Connection>>(
         let mut messages = Vec::new();
         for (number, uidl) in &fetch {
             let raw = client.retr(*number)?;
-            let conn = database()?;
-            if let Some(message) =
-                commit_download(&conn, account_id, uidl, now, &raw).map_err(database_error)?
-            {
+            if let Some(message) = ledger.save_message(uidl, now, &raw)? {
                 messages.push(message);
             }
             if leave_days == Some(0) {
@@ -55,9 +39,7 @@ pub fn sync_inbox<D: Deref<Target = Connection>>(
         Ok::<_, String>(messages)
     })();
     // Earlier messages may be committed even when a later RETR fails.
-    let refreshed = database().and_then(|conn| {
-        local_store::refresh_counts(&conn, account_id, "INBOX").map_err(database_error)
-    });
+    let refreshed = ledger.refresh_counts();
     let messages = downloaded?;
     refreshed?;
     for number in &deletes {
@@ -67,19 +49,13 @@ pub fn sync_inbox<D: Deref<Target = Connection>>(
     // deletion receipts from that response, after durable message downloads.
     client.finish()?;
     if !deletes.is_empty() {
-        let conn = database()?;
-        let tx = Transaction::new_unchecked(&conn, TransactionBehavior::Immediate)
-            .map_err(database_error)?;
-        for (number, uidl) in &listing {
-            if deletes.contains(number) {
-                tx.execute(
-                    "UPDATE mail_pop3_uidl SET deleted = 1 WHERE account_id = ?1 AND uidl = ?2",
-                    params![account_id, uidl],
-                )
-                .map_err(database_error)?;
-            }
-        }
-        tx.commit().map_err(database_error)?;
+        let numbers: HashSet<_> = deletes.iter().copied().collect();
+        let uidls: Vec<_> = listing
+            .iter()
+            .filter(|(number, _)| numbers.contains(number))
+            .map(|(_, uidl)| uidl.as_str())
+            .collect();
+        ledger.confirm_deletions(&uidls)?;
     }
     let remaining = listing
         .iter()
@@ -122,42 +98,11 @@ pub fn plan_round(
     (fetch, deletes)
 }
 
-fn known_messages(conn: &Connection, account_id: &str) -> rusqlite::Result<HashMap<String, i64>> {
-    let mut query =
-        conn.prepare("SELECT uidl, fetched_at FROM mail_pop3_uidl WHERE account_id = ?1")?;
-    query
-        .query_map([account_id], |row| Ok((row.get(0)?, row.get(1)?)))?
-        .collect()
-}
-
-fn commit_download(
-    conn: &Connection,
-    account_id: &str,
-    uidl: &str,
-    now: i64,
-    raw: &[u8],
-) -> rusqlite::Result<Option<MailMessageCached>> {
-    let tx = Transaction::new_unchecked(conn, TransactionBehavior::Immediate)?;
-    let inserted = tx.execute(
-        "INSERT INTO mail_pop3_uidl (account_id, uidl, fetched_at) VALUES (?1, ?2, ?3)
-         ON CONFLICT(account_id, uidl) DO NOTHING",
-        params![account_id, uidl, now],
-    )?;
-    if inserted == 0 {
-        return Ok(None);
-    }
-    let message = local_store::insert_local(&tx, account_id, "INBOX", raw, &[])?;
-    tx.commit()?;
-    Ok(Some(message))
-}
-
-fn database_error(error: rusqlite::Error) -> String {
-    error.to_string()
-}
-
 #[cfg(test)]
 mod tests {
+    use super::super::{local_store, sqlite_ledger};
     use super::*;
+    use rusqlite::Connection;
     use std::sync::Mutex;
 
     #[test]
@@ -221,6 +166,7 @@ mod tests {
         crate::cache::init_mail_tables(&conn).unwrap();
         let db = Mutex::new(conn);
         let database = || db.lock().map_err(|error| error.to_string());
+        let ledger = sqlite_ledger(database, "pop");
         let deleted = || {
             let connection = database().unwrap();
             connection
@@ -237,7 +183,7 @@ mod tests {
             retrieved: 0,
             requested_delete: false,
         };
-        assert!(sync_inbox(&mut dropped, database, "pop", Some(0)).is_err());
+        assert!(sync_inbox(&mut dropped, &ledger, Some(0)).is_err());
         assert!(dropped.requested_delete);
         assert_eq!(dropped.retrieved, 1);
         assert!(!deleted());
@@ -251,7 +197,7 @@ mod tests {
             retrieved: 0,
             requested_delete: false,
         };
-        let outcome = sync_inbox(&mut retry, database, "pop", Some(0)).unwrap();
+        let outcome = sync_inbox(&mut retry, &ledger, Some(0)).unwrap();
         assert!(retry.requested_delete);
         assert_eq!(retry.retrieved, 0);
         assert_eq!(outcome.deleted_on_server, 1);
@@ -267,32 +213,26 @@ mod tests {
     fn download_rolls_back_original_header_and_receipt_together() {
         let conn = Connection::open_in_memory().unwrap();
         crate::cache::init_mail_tables(&conn).unwrap();
-        local_store::ensure_local_folders(&conn, "pop").unwrap();
+        let ledger = sqlite_ledger(|| Ok(&conn), "pop");
+        assert!(ledger.known_messages().unwrap().is_empty());
         conn.execute_batch(
             "CREATE TRIGGER reject_original BEFORE INSERT ON mail_local_raw
              BEGIN SELECT RAISE(ABORT, 'fixture failure'); END;",
         )
         .unwrap();
         let raw = b"From: sender@example.test\r\nSubject: Retried message\r\n\r\nBody";
-        assert!(commit_download(&conn, "pop", "uidl-1", 100, raw).is_err());
-        assert!(known_messages(&conn, "pop").unwrap().is_empty());
+        assert!(ledger.save_message("uidl-1", 100, raw).is_err());
+        assert!(ledger.known_messages().unwrap().is_empty());
         let headers: i64 = conn
             .query_row("SELECT COUNT(*) FROM mail_messages", [], |row| row.get(0))
             .unwrap();
         assert_eq!(headers, 0);
 
         conn.execute_batch("DROP TRIGGER reject_original").unwrap();
-        let header = commit_download(&conn, "pop", "uidl-1", 101, raw)
-            .unwrap()
-            .unwrap()
-            .header;
+        let header = ledger.save_message("uidl-1", 101, raw).unwrap().unwrap();
         assert_eq!(header.subject, "Retried message");
-        assert!(
-            commit_download(&conn, "pop", "uidl-1", 102, raw)
-                .unwrap()
-                .is_none()
-        );
-        assert_eq!(known_messages(&conn, "pop").unwrap()["uidl-1"], 101);
+        assert!(ledger.save_message("uidl-1", 102, raw).unwrap().is_none());
+        assert_eq!(ledger.known_messages().unwrap()["uidl-1"], 101);
         assert_eq!(
             local_store::read_local_raw(&conn, "pop", "INBOX", header.uid)
                 .unwrap()

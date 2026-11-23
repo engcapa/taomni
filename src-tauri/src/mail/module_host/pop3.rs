@@ -81,7 +81,9 @@ impl Pop3Mailbox for HostedPop3 {
     }
 }
 
-async fn with_deadline<T>(work: impl Future<Output = Result<T, String>>) -> Result<T, String> {
+pub(super) async fn with_deadline<T>(
+    work: impl Future<Output = Result<T, String>>,
+) -> Result<T, String> {
     tokio::time::timeout(HOST_REQUEST_TIMEOUT, work)
         .await
         .map_err(|_| "Mail module POP3 request timed out".to_owned())?

@@ -24,7 +24,7 @@ steps:
 - click: '[data-testid="qc-submit"]'
 - wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
 - mail_server_assert_list_matches: {timeout_sec: 60}
-- assert_signed_mail_host: running
+- assert_signed_mail_host: pop3-sync
 - mail_server_deliver: {count: 1, prefix: Signed-POP3}
 - click: '[data-testid="mail-sync-button"]:not([disabled])'
 - mail_server_assert_list_matches: {timeout_sec: 60}
@@ -56,7 +56,7 @@ verification:
     checkpoints:
     - {step: 12, expectation: The verified host is installed and idle before the session opens.}
     - {step: 17, expectation: The initial local mailbox matches the fixture server.}
-    - {step: 18, expectation: The signed host holds the writer lease during use.}
+    - {step: 18, expectation: 'The signed host holds the writer lease and the fixture sees UIDL, RETR and QUIT.'}
     - {step: 21, expectation: The local mailbox includes the newly delivered message.}
     - {step: 23, expectation: The reader renders the original message body.}
     - {step: 27, expectation: A repeat sync leaves exactly one copy of the new message.}

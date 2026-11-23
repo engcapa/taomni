@@ -47,6 +47,8 @@ mod imap_idle;
 mod local_mailbox;
 #[path = "support/pop3.rs"]
 mod pop3;
+#[path = "support/pop3_round.rs"]
+mod pop3_round;
 #[path = "support/smtp.rs"]
 mod smtp;
 
@@ -357,6 +359,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     imap::check_routed_sent_copy(&mut host);
     imap::check_routed_draft(&mut host);
     pop3::check_routed_sync(&mut host);
+    pop3_round::check_sync_round(&mut host);
     snapshot_cache(&mut host, &context, &profile, &filename, &attachment);
     let folders = host.call("mail_list_cached_folders", json!({"accountId":ACCOUNT}));
     assert_eq!(folders[0]["name"], "INBOX");

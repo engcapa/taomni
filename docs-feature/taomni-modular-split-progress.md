@@ -2,6 +2,8 @@
 
 ## 2026-11-23 当前进展
 
+- Mail 0.1.38 的已验签宿主执行整轮 POP3 同步和服务端删除确认。基座在账户范围内保存原件与 UIDL，宿主收到保存回执才继续对应的删除操作。宿主用例覆盖服务器拒绝 QUIT、已保存原件读回和重试不重复下载。TC-MODULES-076 补查实际 UIDL、RETR 和 QUIT。三项同步单测、两项 QA 观察单测、基座和宿主测试编译、受影响 Rust 包格式、模块边界及 QA 审计检查通过。
+- `56a6b6dfd` 的 Mail 宿主协议专项三端通过，含 MIME 组装、附件字节、Bcc 和拒绝无效地址。Windows 及 macOS 的原件迁移测试也通过。修复浏览器桩后的 `48da72f5c` 已收齐六片 Browser 回执，三端的 Sent 正文检查通过，Native 分片继续回收。 [协议专项](https://github.com/engcapa/taomni/actions/runs/45111828684) · [Browser 回归](https://github.com/engcapa/taomni/actions/runs/45113493191)
 - POP3 同步通过每账户操作锁保护服务端事务和原件入库，SQLite 锁在等待服务器回复时释放。邮箱文件夹树同步、订阅和变更的本地写入归入邮件引擎，订阅刷新部分失败后回滚整批。邮件引擎 88 项单测通过。Browser 的 Sent 正文检查发现浏览器桩只保存摘要，桩现在保留并读回完整正文。 [Browser 原始分片](https://github.com/engcapa/taomni/actions/runs/45111208500)
 - `0c2dda5d3` 的 12 个 Browser 和 Native 分片均已收齐。Linux、Windows、macOS 每端 22 项 Browser 和 28 项 Native 通过，覆盖 Mail 升级、断点恢复和完整崩溃回归。 [三端升级回归](https://github.com/engcapa/taomni/actions/runs/45107495296)
 - Mail 0.1.37 的签名宿主组装 SMTP、Sent 和服务器草稿使用的 MIME。基座在宿主验证邮件字段后提供已选附件的字节。SMTP 与 IMAP Sent 副本使用同一 Message-ID，Bcc 收件人保留在实际投递信封中。TC-MODULES-059 核对 SMTP 和 Sent 的正文及标识，TC-MAIL-SEND-01 在 Browser 和 Native 打开已保存的副本。真实宿主用例增加二进制附件、Bcc 及无效地址断言。

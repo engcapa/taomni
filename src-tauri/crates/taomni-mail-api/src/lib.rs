@@ -48,6 +48,7 @@ pub const OPEN_IMAP_MUTATIONS: &str = "mail/open-imap-mutations";
 pub const OPEN_IMAP_IMPORT: &str = "mail/open-imap-import";
 pub const EXPORT_IMAP_MBOX: &str = "mail/export-imap-mbox";
 pub const OPEN_POP3_SYNC: &str = "mail/open-pop3-sync";
+pub const SYNC_POP3_ROUND: &str = "mail/sync-pop3-round";
 pub const FETCH_IMAP_ATTACHMENT: &str = "mail/fetch-imap-attachment";
 pub const SEND_RESPONSE: &str = "mail/send-response";
 pub const SEND_SMTP: &str = "mail/send-smtp";

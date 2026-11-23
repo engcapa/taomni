@@ -125,4 +125,4 @@ pub(super) fn is_pop3(config: &MailAccountConfig) -> bool {
 #[cfg(any(test, feature = "legacy-mail-pop3"))]
 pub(super) use connection::Pop3Client;
 
-pub(super) use taomni_mail_engine::pop3::sync_inbox;
+pub(super) use taomni_mail_engine::pop3::{sqlite_ledger, sync_inbox};

@@ -80,10 +80,14 @@ async fn download(
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
         let _local = gate.lock().map_err(|error| error.to_string())?;
+        let ledger = pop3::sqlite_ledger(|| db.lock(), &account_id);
         let sync = |mailbox: &mut dyn taomni_mail_engine::pop3::Pop3Mailbox| {
-            pop3::sync_inbox(mailbox, || db.lock(), &account_id, leave_days)
+            pop3::sync_inbox(mailbox, &ledger, leave_days)
         };
-        let outcome = if super::module_host::syncs_pop3(&registry) {
+        let outcome = if super::module_host::runs_pop3_rounds(&registry) {
+            let _mutation = db.mutation_lease()?;
+            super::module_host::run_pop3_round(registry, &account, handle, &ledger)?
+        } else if super::module_host::syncs_pop3(&registry) {
             let _mutation = db.mutation_lease()?;
             let mut client = super::module_host::HostedPop3::open(registry, &account, handle)?;
             sync(&mut client)?
@@ -98,8 +102,7 @@ async fn download(
             }
         };
         let new_unseen = outcome.messages.len();
-        let headers = outcome.messages.into_iter().map(|m| m.header).collect();
-        Ok((headers, new_unseen, outcome.remaining))
+        Ok((outcome.messages, new_unseen, outcome.remaining))
     })
     .await
     .map_err(|e| format!("POP3 sync task failed: {e}"))?
