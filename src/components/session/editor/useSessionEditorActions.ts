@@ -1,4 +1,4 @@
-import { type ClipboardEvent } from "react";
+import { type ClipboardEvent, useRef } from "react";
 import type { SessionConfig } from "../../../lib/ipc";
 import { selectFilePath, selectFolderPath, selectPrivateKeyFile } from "../../../lib/ipc";
 import { DEFAULT_NETWORK_SETTINGS } from "../../../lib/networkSettings";
@@ -30,6 +30,7 @@ export interface UseSessionEditorActionsContext {
 
 export function useSessionEditorActions(context: UseSessionEditorActionsContext) {
   const { form, session, onClose, defaultGroupPath } = context;
+  const newMailAccountId = useRef<string | undefined>(undefined);
 
   const handleProtoChange = (p: Proto) => {
     form.setProto(p);
@@ -184,7 +185,11 @@ export function useSessionEditorActions(context: UseSessionEditorActionsContext)
     mailOauthClientSecret: form.mailForm.mailOauthClientSecret,
     oss: form.oss,
     setOss: form.setOss,
-    buildConfig,
+    buildConfig: (overrides) => {
+      if (!form.isMail || form.isEdit) return buildConfig(overrides);
+      newMailAccountId.current ??= crypto.randomUUID();
+      return buildConfig({ ...overrides, id: newMailAccountId.current });
+    },
     buildOptionsJson,
     mailOauthTokenRef: form.mailForm.mailOauthTokenRef,
     mailOauthExpiresAt: form.mailForm.mailOauthExpiresAt,

@@ -22,7 +22,8 @@ const LIST_CONTACTS: &str = "mail_list_address_book";
 const SAVE_CONTACT: &str = "mail_save_address_book_entry";
 const DELETE_CONTACT: &str = "mail_delete_address_book_entry";
 const SEARCH_CONTACTS: &str = "mail_search_contacts";
-pub(super) const METHODS: [&str; 11] = [
+pub(super) const METHODS: [&str; 12] = [
+    taomni_mail_api::INITIALIZE_IMAP_MAILBOX,
     taomni_mail_api::IMAP_MAILBOX_OWNER,
     LIST_FOLDERS,
     LIST_MESSAGES,
@@ -118,6 +119,14 @@ pub(super) fn invoke(
     check: &dyn Fn() -> Result<(), RpcError>,
 ) -> Result<Value, RpcError> {
     match method {
+        taomni_mail_api::INITIALIZE_IMAP_MAILBOX => {
+            let input: Account = decode(params)?;
+            encode(super::imap_initialization::initialize(
+                store,
+                &input.account_id,
+                check,
+            )?)
+        }
         taomni_mail_api::IMAP_MAILBOX_OWNER => {
             let input: Account = decode(params)?;
             encode(store.owns_imap_cache(&input.account_id)?)

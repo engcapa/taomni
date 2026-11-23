@@ -29,6 +29,7 @@ pub mod search;
 
 pub const SLUG: &str = "mail";
 pub const IMAP_MAILBOX_OWNER: &str = "mail/imap-mailbox-owner";
+pub const INITIALIZE_IMAP_MAILBOX: &str = "mail/initialize-imap-mailbox";
 pub const LOCAL_DRAFTS: &str = "mail/local-drafts";
 pub const ADDRESS_BOOK: &str = "mail/address-book";
 pub const CALDAV_AGENDA: &str = "mail/caldav-agenda";

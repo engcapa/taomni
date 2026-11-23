@@ -24,6 +24,7 @@ mod folder_cache;
 mod imap_body_sync;
 mod imap_exchange;
 mod imap_idle;
+mod imap_initialization;
 mod incoming;
 mod index_cache;
 mod local_drafts;

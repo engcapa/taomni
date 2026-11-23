@@ -1,5 +1,6 @@
 //! Desktop integration for mail storage and cache relocation.
 
+mod fresh_imap;
 mod relocation;
 
 #[cfg(test)]

@@ -1,0 +1,59 @@
+id: TC-MAIL-CACHE-02
+title: A new IMAP account stays unique through its first save and a settings edit
+description: Create a saved IMAP account with its default storage setting, edit its name and reopen it. The mailbox synchronizes and the settings edit leaves a single session.
+covers: [F-MAIL-1, F-MAIL-5, F-MAIL-23]
+tags: [mail, p1]
+modes: [browser]
+fixtures: [reset_db, mail_server]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill: {selector: 'input[aria-label="IMAP server"]', value: '${fixture.mail_host}'}
+- select_option: {selector: '[data-testid="mail-imap-security"]', value: None}
+- fill: {selector: 'input[aria-label="IMAP port"]', value: '${fixture.mail_imap_port}'}
+- fill: {selector: 'input[aria-label="Mail email or username"]', value: qa@example.com}
+- fill: {selector: 'input[aria-label="Mail password or app password token"]', value: qa-pass}
+- fill: {selector: 'input[aria-label="SMTP server"]', value: '${fixture.mail_host}'}
+- select_option: {selector: '[data-testid="mail-smtp-security"]', value: None}
+- fill: {selector: 'input[aria-label="SMTP port"]', value: '${fixture.mail_smtp_port}'}
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: QA owned IMAP}
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-fresh-imap-password
+- wait_for: {selector: '[data-testid="session-editor"]', state: detached, timeout_sec: 45}
+- assert_count: {selector: '[data-testid="session-tree-item"][data-session-name="QA owned IMAP"]', equal: 1}
+- click: '[data-testid="session-tree-item"][data-session-name="QA owned IMAP"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: QA renamed IMAP}
+- click: '[data-testid="session-save"]'
+- wait_for: {selector: '[data-testid="session-editor"]', state: detached}
+- assert_count: {selector: '[data-testid="session-tree-item"][data-session-name="QA owned IMAP"]', equal: 0}
+- assert_count: {selector: '[data-testid="session-tree-item"][data-session-name="QA renamed IMAP"]', equal: 1}
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA renamed IMAP"]'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 40}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: first-save
+    requirement: Creating and editing the Mail account preserves one session which can open and synchronize.
+    actions: [4, 6, 17, 19, 23, 26, 27, 31]
+    checkpoints:
+    - {step: 21, expectation: The initial save adds one account.}
+    - {step: 29, expectation: The old name is gone after saving the edit.}
+    - {step: 30, expectation: Exactly one renamed session appears.}
+    - {step: 32, expectation: The renamed account opens and its cached list matches the server.}
+    - {step: 33, expectation: The account saves and opens without runtime errors.}
+    results: [21, 29, 30, 32, 33]
+  visual:
+  - {check: The session tree shows one account before and after a name change., method: automated, reason: The case counts the original and renamed session entries.}
+  native:
+  - {check: Module-owned SQLite database and signed host., method: not-applicable, reason: TC-MODULES-101 checks the native storage and package.}

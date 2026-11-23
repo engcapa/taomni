@@ -35,17 +35,10 @@ pub fn save_mail_session(
     state: &crate::state::AppState,
     config: &crate::session::models::SessionConfig,
 ) -> Result<(), String> {
-    if state.has_owned_imap_mailbox(&config.id)? {
-        let main_db = state.core.db.lock().map_err(|e| e.to_string())?;
-        let original =
-            crate::session::db::get_session(&main_db, &config.id).map_err(|e| e.to_string())?;
-        let legacy_root = state.mail_cache_root();
-        if configured_directory(&original.options_json, legacy_root)?
-            != configured_directory(&config.options_json, legacy_root)?
-        {
-            return Err("This migrated mailbox is stored by the Mail module. Keep the original directory to retain access from earlier versions.".into());
-        }
-        return crate::session::db::save_session(&main_db, config).map_err(|e| e.to_string());
+    let target_root = configured_directory(&config.options_json, state.mail_cache_root())?;
+    let _save = super::fresh_imap::reserve_save(state, &config.id)?;
+    if super::fresh_imap::save(state, config, &target_root)? {
+        return Ok(());
     }
     if super::super::pop3_store::receipt_exists(state.plugins.root(), &config.id)? {
         // Account settings retain the old directory for rollback. The signed
@@ -53,7 +46,6 @@ pub fn save_mail_session(
         let main_db = state.core.db.lock().map_err(|e| e.to_string())?;
         return crate::session::db::save_session(&main_db, config).map_err(|e| e.to_string());
     }
-    let target_root = configured_directory(&config.options_json, state.mail_cache_root())?;
     let _changes = state
         .legacy
         .mail

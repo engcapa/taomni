@@ -14,7 +14,7 @@ pub(super) struct Store {
     pub(super) mutation_activity: std::sync::Arc<tokio::sync::RwLock<()>>,
     pub(super) mutation_snapshot: std::sync::Mutex<Option<tokio::sync::OwnedRwLockWriteGuard<()>>>,
     profile: PathBuf,
-    creation: std::sync::Mutex<()>,
+    pub(super) creation: std::sync::Mutex<()>,
     pub(super) archive_cleanup: super::archive_cleanup::ArchivePreviews,
     pub(super) archive_previews:
         std::sync::Mutex<std::collections::HashMap<String, (Connection, std::time::Instant)>>,
@@ -76,19 +76,7 @@ impl Store {
         if !create {
             return Ok(T::default());
         }
-        // Partially initialized files stay outside the signed backup paths.
-        let module = root.parent().ok_or_else(unavailable)?;
-        let temporary = tempfile::NamedTempFile::new_in(module).map_err(|_| unavailable())?;
-        let mut db = connect(temporary.path(), OpenFlags::SQLITE_OPEN_READ_WRITE)?;
-        taomni_mail_engine::cache::init_mail_tables(&db).map_err(|_| unavailable())?;
-        let changed = apply_change(&mut db, check, change)?;
-        db.close().map_err(|_| unavailable())?;
-        temporary.as_file().sync_all().map_err(|_| unavailable())?;
-        check()?;
-        temporary
-            .persist_noclobber(path)
-            .map_err(|_| unavailable())?;
-        Ok(changed)
+        create_database(&path, check, change)
     }
 
     fn database_path(&self, account_id: &str) -> Result<Option<PathBuf>, RpcError> {
@@ -138,7 +126,7 @@ impl Store {
         }
     }
 
-    fn data_root(&self, create: bool) -> Result<Option<PathBuf>, RpcError> {
+    pub(super) fn data_root(&self, create: bool) -> Result<Option<PathBuf>, RpcError> {
         checked_directory(&self.profile, Path::new("plugins/mail/data"), create)
     }
 
@@ -234,8 +222,31 @@ pub(super) fn validate_account(account_id: &str) -> Result<(), RpcError> {
     Ok(())
 }
 
-fn database_for(root: &Path, account_id: &str) -> PathBuf {
+pub(super) fn database_for(root: &Path, account_id: &str) -> PathBuf {
     root.join(format!("{}.db", mail_db_file_stem(account_id)))
+}
+
+/// Partially initialized files stay outside the signed backup paths.
+pub(super) fn create_database<T>(
+    path: &Path,
+    check: &dyn Fn() -> Result<(), RpcError>,
+    change: impl FnOnce(&Connection) -> Result<T, RpcError>,
+) -> Result<T, RpcError> {
+    let module = path
+        .parent()
+        .and_then(Path::parent)
+        .ok_or_else(unavailable)?;
+    let temporary = tempfile::NamedTempFile::new_in(module).map_err(|_| unavailable())?;
+    let mut db = connect(temporary.path(), OpenFlags::SQLITE_OPEN_READ_WRITE)?;
+    taomni_mail_engine::cache::init_mail_tables(&db).map_err(|_| unavailable())?;
+    let changed = apply_change(&mut db, check, change)?;
+    db.close().map_err(|_| unavailable())?;
+    temporary.as_file().sync_all().map_err(|_| unavailable())?;
+    check()?;
+    temporary
+        .persist_noclobber(path)
+        .map_err(|_| unavailable())?;
+    Ok(changed)
 }
 
 pub(super) fn apply_change<T>(
@@ -275,7 +286,7 @@ pub(super) fn connect(path: &Path, mode: OpenFlags) -> Result<Connection, RpcErr
     Ok(db)
 }
 
-fn check_missing_sidecars(path: &Path) -> Result<(), RpcError> {
+pub(super) fn check_missing_sidecars(path: &Path) -> Result<(), RpcError> {
     for sidecar in sidecars(path) {
         if regular(&sidecar)? {
             return Err(unavailable());
@@ -314,7 +325,7 @@ pub(super) fn unavailable() -> RpcError {
     RpcError::new(ErrorCode::InvalidState, "MAIL_STORE_UNAVAILABLE")
 }
 
-fn regular(path: &Path) -> Result<bool, RpcError> {
+pub(super) fn regular(path: &Path) -> Result<bool, RpcError> {
     match fs::symlink_metadata(path) {
         Ok(metadata) => check_file(&metadata).map(|()| true),
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),

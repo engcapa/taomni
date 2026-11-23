@@ -8899,6 +8899,8 @@ files:
   - src-tauri/plugins/mail/src/archive_original.rs
   - src-tauri/plugins/mail/src/archive_cleanup.rs
   - src-tauri/plugins/mail/src/archive_scan.rs
+  - src-tauri/src/mail/storage/fresh_imap.rs
+  - src-tauri/plugins/mail/src/imap_initialization.rs
   - src-tauri/src/mail/archive_metadata.rs
   - src-tauri/src/mail/message_source.rs
   - src-tauri/plugins/mail/renderer/client/MailSourceDialog.tsx

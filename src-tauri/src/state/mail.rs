@@ -11,6 +11,7 @@ pub(crate) struct MailRuntime {
     // Each account's database is separate from taomni.db and other accounts.
     cache_root: PathBuf,
     databases: Mutex<HashMap<(String, bool), MailDbHandle>>,
+    route_gates: Mutex<HashMap<String, Arc<Mutex<()>>>>,
     mutation_gates: Mutex<HashMap<String, Arc<Mutex<()>>>>,
     pop3_owner_gates: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     pub(crate) migrated: Result<bool, String>,
@@ -26,6 +27,7 @@ impl MailRuntime {
             // MailDatabase creates the selected account directory when it opens storage.
             cache_root: profile.join("mail-cache"),
             databases: Mutex::new(HashMap::new()),
+            route_gates: Mutex::new(HashMap::new()),
             mutation_gates: Mutex::new(HashMap::new()),
             pop3_owner_gates: Mutex::new(HashMap::new()),
             migrated: crate::plugin::migration_mail::profile_committed(profile),
@@ -53,12 +55,32 @@ impl MailRuntime {
             .clone()
     }
 
+    pub(crate) fn route_gate(&self, account_id: &str) -> Arc<Mutex<()>> {
+        self.route_gates
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .entry(account_id.to_owned())
+            .or_default()
+            .clone()
+    }
+
+    pub(crate) fn uses_legacy_handle(&self, account_id: &str) -> Result<bool, String> {
+        let key = (mail_db_file_stem(account_id), false);
+        Ok(self
+            .databases
+            .lock()
+            .map_err(|error| error.to_string())?
+            .contains_key(&key))
+    }
+
     pub(crate) fn database(
         &self,
         registry: &PluginRegistry,
         account_id: &str,
         load_options: impl FnOnce() -> Result<Option<String>, String>,
     ) -> Result<MailDbHandle, String> {
+        let routing = self.route_gate(account_id);
+        let _route = routing.lock().map_err(|error| error.to_string())?;
         let stem = mail_db_file_stem(account_id);
         let owned = owned_database(registry.root(), account_id)?;
         if owned.is_some() {
@@ -101,11 +123,9 @@ fn require_owner_support(registry: &PluginRegistry) -> Result<(), String> {
     let active = registry
         .get(SLUG)
         .filter(|entry| entry.state == LifecycleState::Enabled)
-        .ok_or("Enable the Mail module to open this migrated IMAP mailbox")?;
+        .ok_or("Enable the Mail module to open this IMAP mailbox")?;
     if !active.manifest.commands.contains(IMAP_MAILBOX_OWNER) {
-        return Err(
-            "Update the Mail module in Module Store to open this migrated IMAP mailbox".into(),
-        );
+        return Err("Update the Mail module in Module Store to open this IMAP mailbox".into());
     }
     Ok(())
 }

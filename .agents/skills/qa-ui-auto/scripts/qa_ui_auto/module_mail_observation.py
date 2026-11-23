@@ -27,7 +27,7 @@ def run(ctx, args):
         "attachment-saved", "attachment-reopened", "agenda-written", "filter-saved", "archive-published",
         "archive-cleaned", "archive-original", "cache-cleared", "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source",
         "imap-prefetch", "imap-mutations", "imap-mbox", "imap-forward", "imap-cache",
-        "outbox-queued", "outbox-sent",
+        "outbox-queued", "outbox-sent", "imap-account-created", "imap-account-synced",
     }
     retained = {"outbox-retained", "contact-retained", "agenda-retained", "filter-retained", "pop3-retained"}
     active.update({"pop3-saved", "pop3-reopened"})
@@ -59,6 +59,15 @@ def run(ctx, args):
     report = {"phase": phase, "sourceSha": receipt["sourceSha"], "platform": receipt["platform"],
               "packageSha256": receipt["sha256"], "hostSha256": digest,
               "frontendSha256": frontend_digest, "writerLease": observed}
+    if phase in {"imap-account-created", "imap-account-synced"}:
+        from .module_mail_initialization import observe
+
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        if owner.case_id != "TC-MODULES-101" or "mail/initialize-imap-mailbox" not in manifest["commands"]:
+            raise StepError("The installed package must declare new IMAP account initialization")
+        identity = observe(plugins.parent, phase, signed.get("freshImapAccount"))
+        signed["freshImapAccount"] = identity
+        report["imapAccount"] = identity
     if phase in {"folder-tree", "folder-changes"}:
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
         if "mail/update-imap-folder-cache" not in manifest["commands"]:
