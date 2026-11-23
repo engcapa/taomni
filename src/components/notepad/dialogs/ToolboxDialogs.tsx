@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Copy, X } from "lucide-react";
 import { notepadHash } from "../../../lib/notepad/ipc";
+import { writeText } from "../../../lib/clipboard";
 import { runMimeTransform } from "../../../lib/notepad/transforms/mime";
 import { useViewerLabels } from "../../viewer/viewerLabels";
 
@@ -122,7 +123,7 @@ export function ToolboxDialogs({
               <button
                 type="button"
                 className="np-btn"
-                onClick={() => void navigator.clipboard?.writeText(hashHex)}
+                onClick={() => void writeText(hashHex)}
                 title={label("复制", "Copy")}
               >
                 <Copy size={13} />

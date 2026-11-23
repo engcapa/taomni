@@ -8,6 +8,7 @@ import { notepadListDirTextFiles } from "../../lib/notepad/ipc";
 import { loadValidatedMacros, normalizeMacroSteps } from "../../lib/notepad/macro/macroManager";
 import { NotepadBackupManager } from "../../lib/notepad/persistence/backupManager";
 import { documentPathKey, isUntitledKey } from "../../lib/openFile/pathIdentity";
+import { writeText } from "../../lib/clipboard";
 import { VIEWER_TEXT_HARD_LIMIT, type ViewerDocument } from "../../lib/viewer";
 import { useRecentFilesStore } from "../../stores/app/recentFiles";
 import { useDocumentStore } from "../../stores/documentStore";
@@ -570,7 +571,7 @@ export function NotepadEditor({
         onClearMarks={() => store.clearMarks(docKey)}
         onCopyMarked={() => {
           const txt = extractMarkedMatchesText(document.content, docState.marks);
-          void navigator.clipboard?.writeText(txt).catch(() => undefined);
+          void writeText(txt).catch((error: unknown) => onError(String(error)));
           setFindStatus(
             txt
               ? label(`已复制 ${txt.split("\n").length} 条标记文本。`, `Copied ${txt.split("\n").length} marked match(es).`)
