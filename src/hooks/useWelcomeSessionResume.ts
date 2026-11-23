@@ -92,6 +92,11 @@ export interface RestoreCallbacks {
 
 export interface UseWelcomeSessionResumeResult {
   view: RestoreViewState;
+  /**
+   * Re-read restore availability now. Background run-snapshot commits call
+   * this once they are applied; it is a no-op while Home is hidden because
+   * activation already reloads.
+   */
   refresh: () => void;
   startRestore: () => void;
   retryFailed: () => void;
@@ -121,12 +126,20 @@ export function useWelcomeSessionResume(
   const [outcomes, setOutcomes] = useState<EntryOutcome[]>([]);
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
+  /** Latest Home visibility; gates background snapshot refresh notifications. */
+  const activeRef = useRef(active);
+  activeRef.current = active;
 
   const operationRef = useRef<{ id: string; cancelled: boolean } | null>(null);
   /** Identities owned by failed/cancelled entries: never collect them. */
   const suppressedIdentitiesRef = useRef<Set<string>>(new Set());
   const recordRef = useRef<RunSnapshotRecord | null>(null);
   const revisionRef = useRef<number>(0);
+  /**
+   * Read sequence guard: an activation read and a commit-triggered refresh can
+   * overlap, and the older response must never overwrite the newer state.
+   */
+  const loadSeqRef = useRef<number>(0);
 
   const isIdentitySuppressed = useCallback((identity: string): boolean => {
     return (
@@ -137,8 +150,10 @@ export function useWelcomeSessionResume(
   }, []);
 
   const load = useCallback(async (force = false) => {
+    const seq = ++loadSeqRef.current;
     try {
       const response = await getWelcomeRunSnapshot();
+      if (seq !== loadSeqRef.current) return; // superseded by a newer read
       if (response.issue) {
         // Storage/schema problems are always surfaced, but never clobber a
         // running operation mid-flight.
@@ -197,9 +212,21 @@ export function useWelcomeSessionResume(
       recordRef.current = null;
       setView({ state: "empty" });
     } catch (error) {
+      if (seq !== loadSeqRef.current) return; // superseded by a newer read
       setView({ state: "unavailable", reason: "storage", message: String(error) });
     }
   }, []);
+
+  /**
+   * Re-read availability for the Home row. The run-snapshot collector calls
+   * this after applying a background commit: Home may already be visible, in
+   * which case the one-shot activation read is stale. Hidden Home reloads on
+   * activation, so skip the read to avoid redundant IPC while working.
+   */
+  const refresh = useCallback(() => {
+    if (!activeRef.current) return;
+    void load();
+  }, [load]);
 
   useEffect(() => {
     if (active) void load();
@@ -412,6 +439,9 @@ export function useWelcomeSessionResume(
   }, []);
 
   const clearRecord = useCallback(async () => {
+    // A commit-triggered refresh may still be in flight; its pre-clear read
+    // must not resurrect the record after the user cleared it.
+    loadSeqRef.current += 1;
     try {
       let expectedRevision = revisionRef.current || undefined;
       for (let attempt = 0; ; attempt += 1) {
@@ -447,7 +477,7 @@ export function useWelcomeSessionResume(
 
   return {
     view,
-    refresh: () => void load(),
+    refresh,
     startRestore,
     retryFailed,
     cancelRestore,
