@@ -19,8 +19,7 @@ pub(super) use taomni_mail_engine::imap_outgoing::imap_append;
 use super::{ActiveImapSession, ImapSessionOpts, MailImapPool, with_imap_session};
 use super::{
     MailAccountConfig, MailDraft, MailProvider, MailSendAttachment, MailSendRequest,
-    MessageBuildOptions, ResolvedMailAccount, build_send_message_with, draft_store, module_host,
-    resolve_config,
+    MessageBuildOptions, ResolvedMailAccount, draft_store, module_host, resolve_config,
 };
 use crate::state::AppState;
 
@@ -63,9 +62,10 @@ pub(super) struct PendingSentCopy {
 
 /// Prepare local MIME before SMTP; once SMTP accepts, only the independent
 /// copy task may fail. Such a failure must never cause the caller to resend.
-pub(super) fn prepare_send(
+pub(super) async fn prepare_send(
+    registry: Arc<crate::plugin::PluginRegistry>,
     account: &ResolvedMailAccount,
-    request: &MailSendRequest,
+    request: MailSendRequest,
     remote_draft: Option<RemoteDraftLocation>,
 ) -> Result<
     (
@@ -78,28 +78,32 @@ pub(super) fn prepare_send(
     let save_copy = save_sent_copy_enabled(&account.config);
     let copy = if save_copy {
         Some(
-            build_send_message_with(
+            module_host::compose_message(
+                registry.clone(),
                 account,
-                request,
-                &MessageBuildOptions {
+                request.clone(),
+                MessageBuildOptions {
                     message_id: Some(message_id.clone()),
                     keep_bcc: true,
                     self_envelope: false,
                 },
-            )?
+            )
+            .await?
             .bytes,
         )
     } else {
         None
     };
-    let message = build_send_message_with(
+    let message = module_host::compose_message(
+        registry,
         account,
         request,
-        &MessageBuildOptions {
+        MessageBuildOptions {
             message_id: Some(message_id),
             ..MessageBuildOptions::default()
         },
-    )?;
+    )
+    .await?;
     let pending = (copy.is_some() || remote_draft.is_some())
         .then_some(PendingSentCopy { copy, remote_draft });
     Ok((message, pending))
@@ -195,15 +199,17 @@ pub async fn mail_store_remote_draft(
     let account = resolve_config(&state, config)?;
     let previous = draft.remote_location();
     let message_id = new_message_id(&account.config.email_address);
-    let bytes = build_send_message_with(
+    let bytes = module_host::compose_message(
+        state.plugins.clone(),
         &account,
-        &draft_send_request(&draft),
-        &MessageBuildOptions {
+        draft_send_request(&draft),
+        MessageBuildOptions {
             message_id: Some(message_id.clone()),
             keep_bcc: true,
             self_envelope: true,
         },
-    )?
+    )
+    .await?
     .bytes;
     let location = if module_host::stores_remote_drafts(&state.plugins) {
         module_host::store_remote_draft(

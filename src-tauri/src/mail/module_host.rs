@@ -5,6 +5,7 @@ mod archive_decoding;
 mod archive_encoding;
 pub(super) mod attachment_cache;
 mod body_sync;
+mod compose;
 pub(super) mod imap_idle;
 mod mbox;
 pub(super) use archive_decoding::{decode_archive_attachment, decode_archive_original};
@@ -20,6 +21,7 @@ mod responses;
 pub(super) use responses::send_response;
 
 pub(super) use archive::{HostedImap, archives_imap, imports_imap};
+pub(super) use compose::compose_message;
 pub(super) use downloads::{fetch_imap_attachment, fetch_imap_body, fetch_imap_raw};
 pub(super) use imap_outgoing::{
     discard_remote_draft, discards_remote_drafts, store_remote_draft, store_sent_copy,

@@ -88,6 +88,11 @@ def run(ctx, args):
         if "mail/send-response" not in manifest["commands"]:
             raise StepError("The installed Mail version does not implement reply delivery")
         report["responses"] = observe_responses()
+    if phase in {"imap-delivery", "pop3-delivery"}:
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        if "mail/compose-message" not in manifest["commands"]:
+            raise StepError("The installed Mail version does not assemble messages in its host")
+        report["delivery"] = observe_delivery(phase)
     if phase in {"filter-saved", "filter-retained"}:
         if owner.case_id != "TC-MODULES-092":
             raise StepError("Filter storage requires the signed filter case")
@@ -127,6 +132,36 @@ def run(ctx, args):
             signed["queuedDraft"] = observation
     (ctx.case_dir / f"signed-mail-{phase}.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return f"Mail {version} host lease verified ({phase})"
+
+
+def observe_delivery(phase):
+    is_imap = phase == "imap-delivery"
+    subject = "Revised signed IMAP delivery" if is_imap else "Signed host POP3 delivery"
+    body = f"{'IMAP' if is_imap else 'POP3'} message from the signed Mail host"
+    state = mail_fake_server.ACTIVE.state
+    parser = BytesParser(policy=policy.default)
+    with state.lock:
+        deliveries = [
+            (mail["to"], parser.parsebytes(mail["raw"])) for mail in state.smtp_messages
+        ]
+        copies = [parser.parsebytes(mail.raw) for mail in state.folders["Sent"].messages.values()]
+    matches = [(to, message) for to, message in deliveries if message["Subject"] == subject]
+    if len(matches) != 1 or matches[0][0] != ["receiver@example.com"]:
+        raise StepError(f"SMTP did not receive exactly one {subject!r} for its intended recipient")
+    message = matches[0][1]
+    mime_body = message.get_body()
+    if mime_body is None or body not in mime_body.get_content() or not message["Message-ID"]:
+        raise StepError("The delivered MIME is missing its body or Message-ID")
+    report = {"subject": subject, "messageId": str(message["Message-ID"]), "recipients": matches[0][0]}
+    if is_imap:
+        matches = [copy for copy in copies if copy["Subject"] == subject]
+        if len(matches) != 1 or matches[0]["Message-ID"] != message["Message-ID"]:
+            raise StepError("The IMAP Sent copy and SMTP delivery differ in Message-ID")
+        sent_body = matches[0].get_body()
+        if sent_body is None or body not in sent_body.get_content():
+            raise StepError("The IMAP Sent copy is missing the delivered body")
+        report["matchingSentCopy"] = True
+    return report
 
 
 def observe_mutations():

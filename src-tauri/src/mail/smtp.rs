@@ -4,9 +4,8 @@ use std::path::Path;
 #[cfg(feature = "legacy-mail-smtp")]
 use super::{DEFAULT_TIMEOUT_SECS, Duration, ProxyForward, mail_effective_endpoint};
 
-use taomni_mail_engine::compose::{
-    MailSender, ResolvedSendAttachment, attachment_content_type, build_message,
-};
+use taomni_mail_api::compose::ComposeAttachment;
+use taomni_mail_engine::compose::{MailSender, ResolvedSendAttachment, build_message};
 pub(super) use taomni_mail_engine::compose::{MessageBuildOptions, validate_send_request};
 
 use taomni_mail_engine::delivery::PreparedMail;
@@ -80,37 +79,56 @@ pub(super) fn read_send_attachments(
         .iter()
         .enumerate()
         .map(|(index, attachment)| {
-            let raw_path = attachment.path.trim();
-            if raw_path.is_empty() {
-                return Err(format!("attachment #{} path is required", index + 1));
-            }
-            let path = Path::new(raw_path);
-            let bytes = std::fs::read(path)
-                .map_err(|e| format!("failed to read attachment {}: {e}", path.display()))?;
-            let name = attachment
-                .name
-                .as_deref()
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .map(ToOwned::to_owned)
-                .or_else(|| {
-                    path.file_name()
-                        .and_then(|name| name.to_str())
-                        .map(ToOwned::to_owned)
-                })
-                .unwrap_or_else(|| format!("attachment-{}", index + 1));
+            let metadata = attachment_metadata(attachment, index);
             Ok(ResolvedSendAttachment {
-                name,
-                content_type: attachment_content_type(attachment.content_type.as_deref()),
-                bytes,
-                inline: attachment.inline,
-                content_id: attachment
-                    .content_id
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .map(ToOwned::to_owned),
+                name: metadata.name,
+                content_type: metadata.content_type,
+                bytes: read_attachment_bytes(attachment, index)?,
+                inline: metadata.inline,
+                content_id: metadata.content_id,
             })
         })
         .collect()
+}
+
+pub(super) fn attachment_metadata(
+    attachment: &MailSendAttachment,
+    index: usize,
+) -> ComposeAttachment {
+    let path = Path::new(attachment.path.trim());
+    let name = attachment
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .or_else(|| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(ToOwned::to_owned)
+        })
+        .unwrap_or_else(|| format!("attachment-{}", index + 1));
+    ComposeAttachment {
+        name,
+        content_type: attachment.content_type.clone(),
+        inline: attachment.inline,
+        content_id: attachment
+            .content_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned),
+    }
+}
+
+pub(super) fn read_attachment_bytes(
+    attachment: &MailSendAttachment,
+    index: usize,
+) -> Result<Vec<u8>, String> {
+    let raw_path = attachment.path.trim();
+    if raw_path.is_empty() {
+        return Err(format!("attachment #{} path is required", index + 1));
+    }
+    let path = Path::new(raw_path);
+    std::fs::read(path).map_err(|e| format!("failed to read attachment {}: {e}", path.display()))
 }

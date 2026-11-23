@@ -12,8 +12,8 @@ use super::sync::{MailFolderSyncResult, MailSyncMode};
 use super::{
     MailAccountConfig, MailDeleteResult, MailDownloadAttachmentResult, MailFlagResult, MailFolder,
     MailMarkReadResult, MailMessageBody, MailMoveResult, MailSendRequest, MailSendResult,
-    MailSyncAllResult, MailTestConnectionResult, MessageBuildOptions, build_send_message_with,
-    extract_attachment, now_ts, resolve_config, upsert_sent_contacts, with_mail_db,
+    MailSyncAllResult, MailTestConnectionResult, MessageBuildOptions, extract_attachment, now_ts,
+    resolve_config, upsert_sent_contacts, with_mail_db,
 };
 use crate::state::AppState;
 
@@ -336,31 +336,29 @@ pub(super) async fn send(
 ) -> Result<MailSendResult, String> {
     let account = resolve_config(state, config)?;
     let account_id = account.config.session_id.clone();
-    let request_for_task = request.clone();
-    let (message, copy, account) = tokio::task::spawn_blocking(move || {
-        let message_id = super::outgoing::new_message_id(&account.config.email_address);
-        let message = build_send_message_with(
-            &account,
-            &request_for_task,
-            &MessageBuildOptions {
-                message_id: Some(message_id.clone()),
-                ..MessageBuildOptions::default()
-            },
-        )?;
-        let copy = build_send_message_with(
-            &account,
-            &request_for_task,
-            &MessageBuildOptions {
-                message_id: Some(message_id),
-                keep_bcc: true,
-                self_envelope: false,
-            },
-        )
-        .map(|message| message.bytes);
-        Ok::<_, String>((message, copy, account))
-    })
+    let message_id = super::outgoing::new_message_id(&account.config.email_address);
+    let message = super::module_host::compose_message(
+        state.plugins.clone(),
+        &account,
+        request.clone(),
+        MessageBuildOptions {
+            message_id: Some(message_id.clone()),
+            ..MessageBuildOptions::default()
+        },
+    )
+    .await?;
+    let copy = super::module_host::compose_message(
+        state.plugins.clone(),
+        &account,
+        request.clone(),
+        MessageBuildOptions {
+            message_id: Some(message_id),
+            keep_bcc: true,
+            self_envelope: false,
+        },
+    )
     .await
-    .map_err(|e| format!("mail send task failed: {e}"))??;
+    .map(|message| message.bytes);
     let response = super::module_host::send_smtp(state.plugins.clone(), &account, message).await?;
     let mut result = MailSendResult {
         accepted: true,

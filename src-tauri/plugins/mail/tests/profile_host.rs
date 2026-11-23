@@ -33,6 +33,8 @@ use taomni_sqlite_snapshot::SnapshotControl;
 mod archive_encoding;
 #[path = "support/attachment_cache.rs"]
 mod attachment_cache;
+#[path = "support/compose.rs"]
+mod compose;
 #[path = "support/imap.rs"]
 mod imap;
 #[path = "support/imap_body_sync.rs"]
@@ -338,6 +340,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     let mut host = MailHost::spawn(&profile, &context);
     host.handshake(&context);
     smtp::check_routed_smtp(&mut host);
+    compose::check_composition(&mut host);
     imap::check_routed_body(&mut host);
     imap::check_routed_prefetch(&mut host);
     imap::check_routed_header_pages(&mut host);

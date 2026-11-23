@@ -7887,7 +7887,7 @@ controls:
 - 回复/全部回复发送 `In-Reply-To` 与 `References`（转发开启新会话），Thunderbird/Gmail 可将回复归入原会话；同步时缓存每封邮件的 `In-Reply-To`/`References`（schema v3）。
 - 列表“Threads”切换按邮件头严格线程化（不按主题猜测），会话折叠为最新一封并显示数量与未读数，展开后按回复层级缩进；开关按查看者保存在 localStorage。
 - SMTP 接受后立即反馈，Sent 副本结果通过独立提示显示；事件先于发送响应到达、或随后刷新邮箱，都不会覆盖副本结果。
-- 启用的 Mail 宿主负责 SMTP 连通性检查和发送，并在接受后把 IMAP 副本写入 Sent、清理服务器草稿。TC-MODULES-059 检查实际 SMTP 收信、IMAP Sent 和 Drafts 主题、POP3 的本地 Sent 及停用后发送和连通性检查入口消失。TC-MODULES-078 检查停用后隐藏写信入口及重新启用后发件箱继续发送。TC-MAIL-SEND-01 在 Browser 和 Native 核对草稿、副本的主题和 SMTP 正文。
+- 启用的 Mail 宿主负责组装 MIME、SMTP 连通性检查和发送，并在接受后把 IMAP 副本写入 Sent、清理服务器草稿。TC-MODULES-059 比对实际 SMTP 投递和 IMAP Sent 的正文与 Message-ID，并检查 POP3 本地 Sent 和停用后的入口。TC-MODULES-078 检查停用后隐藏写信入口及重新启用后发件箱继续发送。TC-MAIL-SEND-01 在 Browser 和 Native 打开 Sent 副本核对正文。
 - 发信成功后按账户设置把带 Bcc 的副本 APPEND 到 Sent（SPECIAL-USE 优先，找不到时按名称，缺失时创建）；Gmail/Outlook 默认不重复保存。副本失败不影响“已发送”，状态栏提示原因。
 - 手工保存草稿时，Mail 签名宿主把草稿 APPEND 到服务器 Drafts，并按 Message-ID 找回 UID 后替换旧副本。编辑和自动保存保留上一份服务器草稿的位置。TC-MAIL-SEND-01 与 TC-MODULES-059 检查替换、发送和显式删除后的服务器状态。
 

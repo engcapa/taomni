@@ -118,6 +118,17 @@ steps:
 - click: '[role="dialog"][aria-label="Drafts and templates"] [aria-label="Close dialog"]'
 - assert_no_runtime_errors: null
 - screenshot: mail-send-01-sent-copy.png
+- click: '[data-testid="mail-folder-row"][data-folder-name="Sent"]'
+- wait_for: '[data-testid="mail-message-row"][data-subject="Revised draft and sent copy"]'
+- press: {selector: '[data-testid="mail-message-row"][data-subject="Revised draft and sent copy"]', key: Enter}
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent
+      ?? document.querySelector('.taomni-mail-reader-text')?.textContent
+      ?? '').includes('Stored on the server for other clients')
+    expect_truthy: true
+    timeout_sec: 30
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -152,6 +163,8 @@ verification:
     actions:
     - 22
     - 27
+    - 50
+    - 52
     checkpoints:
     - step: 23
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached"}}'
@@ -169,6 +182,10 @@ verification:
       expectation: SMTP receives the composed text body as well as the subject.
     - step: 48
       expectation: Sending and the subsequent refresh leave no runtime errors.
+    - step: 53
+      expectation: Opening the Sent copy renders the composed text body.
+    - step: 54
+      expectation: Opening the Sent copy leaves no runtime errors.
     results:
     - 29
     - 24
@@ -177,6 +194,8 @@ verification:
     - 31
     - 32
     - 48
+    - 53
+    - 54
   - id: R3
     requirement: Quick Connect 默认目录的完整原件下载必须完成，不能在发送成功时遗漏后台归档发布错误；覆盖 Windows 长存储路径。
     actions:

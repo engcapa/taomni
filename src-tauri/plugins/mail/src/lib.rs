@@ -8,6 +8,7 @@ mod archive_decoding;
 mod archive_encoding;
 mod attachment_cache;
 mod commands;
+mod compose;
 mod filter_rules;
 mod imap_body_sync;
 mod imap_exchange;
@@ -59,6 +60,7 @@ fn host_config() -> HostConfig {
                 IMAP_FOLDER_TREE,
                 MUTATE_IMAP_FOLDER,
                 SEND_SMTP,
+                taomni_mail_api::COMPOSE_MESSAGE,
                 taomni_mail_api::SEND_RESPONSE,
                 STORE_IMAP_SENT,
                 STORE_IMAP_DRAFT,
@@ -218,6 +220,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(outgoing::check(&self.io, operation, input)?)
+            }
+            taomni_mail_api::COMPOSE_MESSAGE => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(compose::prepare(&self.io, operation, endpoint)?)
             }
             SEND_SMTP => {
                 let input = serde_json::from_value(params.unwrap_or_default())

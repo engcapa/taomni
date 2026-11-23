@@ -2,7 +2,7 @@
 
 use lettre::Message;
 use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart, header::ContentType};
-use serde::Deserialize;
+pub use taomni_mail_api::compose::{MailSendAttachment, MailSendRequest, MessageBuildOptions};
 
 use crate::{clean_message_id, thread_references};
 
@@ -10,42 +10,6 @@ pub struct MailSender<'a> {
     pub email_address: &'a str,
     pub display_name: Option<&'a str>,
     pub reply_to: Option<&'a str>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MailSendRequest {
-    pub to: Vec<String>,
-    #[serde(default)]
-    pub cc: Vec<String>,
-    #[serde(default)]
-    pub bcc: Vec<String>,
-    pub subject: String,
-    #[serde(default)]
-    pub text_body: Option<String>,
-    #[serde(default)]
-    pub html_body: Option<String>,
-    #[serde(default)]
-    pub attachments: Vec<MailSendAttachment>,
-    /// Message id this message replies to (brackets optional).
-    #[serde(default)]
-    pub in_reply_to: Option<String>,
-    /// Thread ancestry, oldest first (brackets optional).
-    #[serde(default)]
-    pub references: Vec<String>,
-    /// Local draft whose server copy (Drafts folder) should be removed after
-    /// a successful send.
-    #[serde(default)]
-    pub draft_id: Option<String>,
-    /// `From:` of a non-default identity ("Name <addr>"); `None` = account.
-    #[serde(default)]
-    pub from: Option<String>,
-    /// Reply-To of that identity (overrides the account Reply-To).
-    #[serde(default)]
-    pub reply_to: Option<String>,
-    /// Ask for a read receipt (RFC 8098 `Disposition-Notification-To`).
-    #[serde(default)]
-    pub request_read_receipt: bool,
 }
 
 /// `Disposition-Notification-To` (RFC 8098); lettre has no typed header.
@@ -64,32 +28,6 @@ impl lettre::message::header::Header for DispositionNotificationTo {
     fn display(&self) -> lettre::message::header::HeaderValue {
         lettre::message::header::HeaderValue::new(Self::name(), self.0.clone())
     }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MailSendAttachment {
-    pub path: String,
-    #[serde(default)]
-    pub name: Option<String>,
-    #[serde(default)]
-    pub content_type: Option<String>,
-    #[serde(default)]
-    pub inline: bool,
-    #[serde(default)]
-    pub content_id: Option<String>,
-}
-
-/// Knobs for the stored copies of a message (Sent copy, server draft).
-#[derive(Debug, Default)]
-pub struct MessageBuildOptions {
-    /// Explicit `Message-ID` (with brackets) so the SMTP message and its
-    /// stored copy share one id and the copy can be found again.
-    pub message_id: Option<String>,
-    /// Keep the `Bcc` header (Sent copies do, like Thunderbird).
-    pub keep_bcc: bool,
-    /// Drafts may have no recipients: address the envelope to the sender.
-    pub self_envelope: bool,
 }
 
 pub fn build_message(
@@ -214,7 +152,7 @@ pub fn build_message(
 
 pub struct ResolvedSendAttachment {
     pub name: String,
-    pub content_type: ContentType,
+    pub content_type: Option<String>,
     pub bytes: Vec<u8>,
     pub inline: bool,
     pub content_id: Option<String>,
@@ -257,19 +195,23 @@ fn build_related_body<'a>(
             )
         })?;
         related = related.singlepart(
-            Attachment::new_inline_with_name(content_id.to_string(), attachment.name.clone())
-                .body(attachment.bytes.clone(), attachment.content_type.clone()),
+            Attachment::new_inline_with_name(content_id.to_string(), attachment.name.clone()).body(
+                attachment.bytes.clone(),
+                attachment_content_type(attachment.content_type.as_deref()),
+            ),
         );
     }
     Ok(related)
 }
 
 fn regular_attachment_part(attachment: &ResolvedSendAttachment) -> SinglePart {
-    Attachment::new(attachment.name.clone())
-        .body(attachment.bytes.clone(), attachment.content_type.clone())
+    Attachment::new(attachment.name.clone()).body(
+        attachment.bytes.clone(),
+        attachment_content_type(attachment.content_type.as_deref()),
+    )
 }
 
-pub fn attachment_content_type(value: Option<&str>) -> ContentType {
+fn attachment_content_type(value: Option<&str>) -> ContentType {
     let fallback = "application/octet-stream";
     let candidate = value
         .map(str::trim)
@@ -395,7 +337,7 @@ mod tests {
                 assert_eq!(attachments[0].path, "attachment.pdf");
                 Ok(vec![ResolvedSendAttachment {
                     name: "report.pdf".into(),
-                    content_type: attachment_content_type(Some("application/pdf")),
+                    content_type: Some("application/pdf".into()),
                     bytes: b"attachment content".to_vec(),
                     inline: false,
                     content_id: None,

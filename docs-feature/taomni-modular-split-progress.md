@@ -2,6 +2,8 @@
 
 ## 2026-11-23 当前进展
 
+- Mail 0.1.37 的签名宿主组装 SMTP、Sent 和服务器草稿使用的 MIME。基座在宿主验证邮件字段后提供已选附件的字节。SMTP 与 IMAP Sent 副本使用同一 Message-ID，Bcc 收件人保留在实际投递信封中。TC-MODULES-059 核对 SMTP 和 Sent 的正文及标识，TC-MAIL-SEND-01 在 Browser 和 Native 打开已保存的副本。真实宿主用例增加二进制附件、Bcc 及无效地址断言。
+- `0c2dda5d3` 的签名 Mail 迁移在 Linux、Windows 和 macOS ARM64 各通过两项，覆盖保留还原库、补入缺失账户并由安装后的宿主读回原件。另一次协议回归在 Windows 和 macOS 的原件重试测试末尾遇到临时路径格式差异，测试统一了路径再比较原件。 [签名迁移](https://github.com/engcapa/taomni/actions/runs/45106630096) · [协议回归](https://github.com/engcapa/taomni/actions/runs/45108781147)
 - `728a571ee` 的 18 个分片在汇总前收齐。Linux、Windows 和 macOS 每端通过 22 项 Browser 和 28 项 Native，覆盖 POP3 本地邮件、签名宿主和完整崩溃回归。合入 `main` 的 `66841d20f` 后继续使用加速的 QA 工作流。 [三端分片](https://github.com/engcapa/taomni/actions/runs/45103744500) · [主线合并](https://github.com/engcapa/taomni/commit/947f49e4e)
 - POP3 先提交本地邮件和 UIDL，再等服务器接受 `QUIT` 后记入删除结果。确认失败保留本地原件，重试删除时可复用已经下载的邮件。三项同步单测通过，宿主测试增加服务器拒绝 `QUIT` 的真实协议断言。TC-MAIL-POP3-01 和 TC-MODULES-076 检查重复同步完成后新增邮件数为零。
 - 用 `21752fbb0` 的联合构建重新验证 Linux deb 和 Windows MSI。两端从正式 0.5.12 升至 0.6.0，并在首装十模块后卸载 Mail。重启仍保留九个活跃模块和 Mail 的卸载记录。Linux 同批验证了原 MFA 数据、回退及强退后恢复。 [Linux](https://github.com/engcapa/taomni/actions/runs/45091470510) · [Windows](https://github.com/engcapa/taomni/actions/runs/45092445084/job/137424880022)

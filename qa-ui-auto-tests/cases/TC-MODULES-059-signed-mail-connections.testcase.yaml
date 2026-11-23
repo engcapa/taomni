@@ -236,7 +236,7 @@ verification:
     - {step: 152, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
     results: [111, 112, 152]
   - id: R3
-    requirement: The signature-verified package delivers from both account types, stores an IMAP Sent copy and removes the server draft.
+    requirement: The signature-verified package composes and delivers from both account types, stores an IMAP Sent copy with the same body and Message-ID, and removes the server draft.
     actions: [113, 114, 115, 116, 117, 118, 125, 153, 154, 155, 156, 157, 158]
     checkpoints:
     - {step: 120, expectation: IMAP Drafts contains the composed subject before sending.}
