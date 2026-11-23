@@ -118,8 +118,7 @@ class BuildPipelineTests(unittest.TestCase):
         jobs = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']
         for platform in ('linux', 'windows', 'macos'):
             dependencies = ['plan', f'build-{platform}', 'signed-modular-packages']
-            modules = ['mfa', 'vnc', 'rdp'] if platform in ('linux', 'macos') else ['vnc', 'rdp']
-            for module in modules:
+            for module in ('mfa', 'vnc', 'rdp'):
                 signer = f'signed-{module}-{platform}'
                 dependencies.append(signer)
                 self.assertIn(signer, jobs['summarize']['needs'])
