@@ -30,17 +30,21 @@ steps:
 - mail_server_deliver: {count: 205, prefix: Cached page}
 - mail_server_deliver: {folder: Archive, count: 1, prefix: Cache-only citation}
 - click: '[data-testid="mail-sync-button"]:enabled'
-- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: new headers across, timeout_sec: 45}
+- wait_for: {selector: '[data-testid="mail-message-row"][data-subject="Cached page 0205"]', timeout_sec: 45}
 - wait_for: {selector: '[data-testid="mail-message-count"][data-count="200"][data-has-more="true"]', timeout_sec: 30}
 - assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Seed 0001"]', equal: 0}
 - assert_visible: '[data-testid="mail-load-more"]'
 - mail_server_assert_list_matches: {timeout_sec: 30}
 - assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Seed 0001"]', equal: 1}
 - assert_count: {selector: '[data-testid="mail-message-row"]', equal: 235}
-- mail_server_expunge_newest: {folder: Archive, count: 1}
-- mail_server_assert_folder_count: {folder: Archive, equals: 0, exists: true}
 - select_option: {selector: '[data-testid="mail-search-scope"]', value: all}
 - select_option: {selector: '[data-testid="mail-search-field"]', value: subject}
+- fill: {selector: '[data-testid="mail-search-input"]', value: Cache-only citation 0001}
+- wait_for: {selector: '[data-testid="mail-message-row"][data-subject="Cache-only citation 0001"]', timeout_sec: 30}
+- fill: {selector: '[data-testid="mail-search-input"]', value: ''}
+- wait_for: {selector: '[data-testid="mail-message-row"][data-subject="Cache-only citation 0001"]', state: detached}
+- mail_server_expunge_newest: {folder: Archive, count: 1}
+- mail_server_assert_folder_count: {folder: Archive, equals: 0, exists: true}
 - fill: {selector: '[data-testid="mail-search-input"]', value: Cache-only citation 0001}
 - wait_for: '[data-testid="mail-message-row"][data-subject="Cache-only citation 0001"]'
 - assert_text: {selector: '[data-testid="mail-message-folder"]', contains: Archive}
@@ -62,25 +66,28 @@ verification:
     - {step: 12, expectation: The installed host and frontend match the signed package before its writer lease starts.}
     - {step: 17, expectation: Quick Connect opens the signed Mail tab.}
     - {step: 18, expectation: The folder tree contains Archive.}
+    - {step: 23, expectation: The newest delivered inbox header is visible after synchronization.}
     - {step: 24, expectation: The first page shows 200 headers with an older page available.}
     - {step: 25, expectation: The oldest original header is beyond the first page.}
     - {step: 27, expectation: Loading the next page completes the inbox list.}
     - {step: 28, expectation: The oldest original header appears exactly once.}
     - {step: 29, expectation: The two pages contain 235 rendered headers.}
-    results: [12, 17, 18, 24, 25, 27, 28, 29]
+    results: [12, 17, 18, 23, 24, 25, 27, 28, 29]
   - id: signed-cache-search
     requirement: The local index returns a cached result that has disappeared from the server.
-    actions: [30, 32, 33, 34, 39, 41]
+    actions: [30, 31, 32, 34, 36, 38, 43, 45]
     checkpoints:
-    - {step: 31, expectation: The IMAP fixture has no messages in Archive.}
-    - {step: 35, expectation: The all-folders search returns the cached header.}
-    - {step: 36, expectation: The result identifies Archive as its folder.}
-    - {step: 37, expectation: The cache returns exactly one match.}
-    - {step: 40, expectation: Current-folder search removes the Archive result.}
-    - {step: 42, expectation: The IMAP search finds no matching message in INBOX.}
-    - {step: 43, expectation: The receipt ties the installed cache command and host digests to the on-disk header and the server state.}
-    - {step: 44, expectation: The renderer reports no runtime errors.}
-    results: [31, 35, 36, 37, 40, 42, 43, 44]
+    - {step: 33, expectation: The Archive header has reached the local index before the fixture deletes it.}
+    - {step: 35, expectation: Clearing the query removes the Archive result from the pane.}
+    - {step: 37, expectation: The IMAP fixture has no messages in Archive.}
+    - {step: 39, expectation: A new all-folders search returns the retained cached header.}
+    - {step: 40, expectation: The result identifies Archive as its folder.}
+    - {step: 41, expectation: The cache returns exactly one match.}
+    - {step: 44, expectation: Current-folder search removes the Archive result.}
+    - {step: 46, expectation: The IMAP search finds no matching message in INBOX.}
+    - {step: 47, expectation: The receipt ties the installed cache command and host digests to the on-disk header and the server state.}
+    - {step: 48, expectation: The renderer reports no runtime errors.}
+    results: [33, 35, 37, 39, 40, 41, 44, 46, 47, 48]
   visual:
   - {check: The cached result displays its Archive label., method: automated, reason: The runner checks the exact subject and the visible folder label.}
   native:
