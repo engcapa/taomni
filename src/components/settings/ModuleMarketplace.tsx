@@ -85,7 +85,7 @@ export function ModuleMarketplace() {
           {legacyPending && release?.legacyRestartRequired?.includes(entry.id)
             && <p>{t("plugins.marketMailRestartRequired")}</p>}
           {legacyPending && release?.legacyImportFailed?.includes(entry.id)
-            && <p role="alert">{t("plugins.marketMailImportFailed")}</p>}
+            && <p role="alert" data-testid="module-marketplace-mail-import-failed">{t("plugins.marketMailImportFailed")}</p>}
           {state.errors[entry.id] && <p data-testid="module-marketplace-action-error" role="alert" className="my-2 text-red-500">{state.errors[entry.id]}</p>}
           <div className="mt-2 flex gap-2">
             {legacyPending && !installedVersion ? <button type="button" data-testid="module-marketplace-provision" className="taomni-btn"

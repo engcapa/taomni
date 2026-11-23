@@ -110,6 +110,51 @@ fn captures_wal_and_originals_from_custom_storage_without_changing_the_source() 
 }
 
 #[test]
+fn a_replaced_archive_original_cannot_be_published_and_the_upgrade_can_retry() {
+    let legacy = tempfile::tempdir().unwrap();
+    let staging = tempfile::tempdir().unwrap();
+    let mailbox = mailbox(legacy.path(), ACCOUNT);
+    let db = Connection::open(&mailbox.database).unwrap();
+    init_mail_tables(&db).unwrap();
+    let entry = storage::store(&db, ACCOUNT, "INBOX", 3, 1, ORIGINAL).unwrap();
+    let path = object_path(&storage::account_root(&db, ACCOUNT).unwrap(), &entry.hash).unwrap();
+    drop(db);
+    let original_object = fs::read(&path).unwrap();
+    let source_database = fs::read(&mailbox.database).unwrap();
+    let mut mismatched_object = Vec::new();
+    crate::archive::compress_message(
+        &vec![b'x'; ORIGINAL.len()][..],
+        &mut mismatched_object,
+        || Ok(()),
+    )
+    .unwrap();
+    fs::write(&path, &mismatched_object).unwrap();
+
+    let prepare = || {
+        StagedMailData::prepare(
+            staging.path(),
+            std::slice::from_ref(&mailbox),
+            HostedMailboxData::ALL,
+            &control(),
+        )
+    };
+    let error = prepare().err().expect("a different original must fail");
+    assert!(error.contains("checksum verification failed"), "{error}");
+    assert_eq!(staging.path().read_dir().unwrap().count(), 0);
+    assert_eq!(fs::read(&mailbox.database).unwrap(), source_database);
+    assert_eq!(fs::read(&path).unwrap(), mismatched_object);
+
+    fs::write(&path, &original_object).unwrap();
+    let staged = prepare().unwrap();
+    assert_eq!(staged.mailbox_count(), 1);
+    let relative = path.strip_prefix(legacy.path()).unwrap();
+    assert_eq!(
+        fs::read(staged.data().join(relative)).unwrap(),
+        original_object
+    );
+}
+
+#[test]
 fn follows_a_relocated_mailbox_and_rejects_a_missing_relocation_target() {
     let legacy = tempfile::tempdir().unwrap();
     let custom = tempfile::tempdir().unwrap();

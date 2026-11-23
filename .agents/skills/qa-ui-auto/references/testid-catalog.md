@@ -2848,6 +2848,7 @@
 - `[data-testid="module-release-later"]` — interactive — F-Modules-1.module-release-later
 - `[data-testid="module-release-legacy"]` — display [optional] — F-Modules-1.module-release-legacy
 - `[data-testid="module-marketplace-provision"]` — interactive [optional] — F-Modules-1.module-marketplace-provision
+- `[data-testid="module-marketplace-mail-import-failed"]` — display — F-Modules-1.module-marketplace-mail-import-failed
 - `[data-testid="module-marketplace-review"]` — interactive — F-Modules-1.module-marketplace-review
 - `[data-testid="module-marketplace-download"]` — interactive — F-Modules-1.module-marketplace-download
 - `[data-testid="module-network-settings"]` — display — F-Modules-1.module-network-settings

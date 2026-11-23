@@ -29,12 +29,15 @@ steps:
 - seed_storage: {key: taomni.preview.marketplace.v1, value: '"legacy-mail-failed"'}
 - click: '[data-testid="module-marketplace-refresh"]'
 - assert_text:
-    selector: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-mail"]'
+    selector: '[data-testid="module-marketplace-mail-import-failed"]'
     contains: Mail import failed. Resume installation in Module Store.
+- assert_count: {selector: '[data-testid="module-marketplace-installed"]', equal: 0}
 - click: '[data-testid="module-marketplace-provision"]'
 - assert_text:
     selector: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-mail"]'
     contains: Mail will import data from the previous version the next time Taomni opens.
+- assert_count: {selector: '[data-testid="module-marketplace-mail-import-failed"]', equal: 0}
+- assert_count: {selector: '[data-testid="module-marketplace-installed"]', equal: 0}
 - assert_no_runtime_errors: null
 - screenshot: mail-provision-restart-browser.png
 verification:
@@ -51,16 +54,19 @@ verification:
     results: [7, 8, 13, 14]
   - id: R2
     requirement: An unsuccessful import shows the retry state. Resuming installation prepares Mail for the next start.
-    actions: [15, 16, 18]
+    actions: [15, 16, 19]
     checkpoints:
     - {step: 17, expectation: The Mail card displays the import failure and recovery message.}
-    - {step: 19, expectation: Resuming installation restores the next-start message.}
-    - {step: 20, expectation: No renderer runtime errors occurred.}
-    results: [17, 19, 20]
+    - {step: 18, expectation: The failed import leaves Mail pending.}
+    - {step: 20, expectation: Resuming installation restores the next-start message.}
+    - {step: 21, expectation: The Mail card clears the previous error after the retry.}
+    - {step: 22, expectation: The next-start state still has no installed version.}
+    - {step: 23, expectation: No renderer runtime errors occurred.}
+    results: [17, 18, 20, 21, 22, 23]
   native:
   - check: Starting the desktop with a closed profile applies the verified package and opens migrated mail.
     method: not-applicable
-    reason: The signed Mail migration workflow runs the real startup and installed process.
+    reason: The signed Mail migration workflow checks rejection of a damaged archive and reads the restored original from the installed host after retry.
   visual:
   - check: The next-start message appears within the Mail module card.
     method: manual

@@ -2,6 +2,7 @@
 use std::process::{Command, Output};
 
 use serde_json::Value;
+use taomni_mail_engine::{archive::compress_message, storage};
 
 use super::*;
 use crate::plugin::{migration_mail_provision as provision, test_services::VaultHarness};
@@ -75,6 +76,18 @@ fn signed_mail_upgrade_starts_the_installed_host_with_retained_migrated_data() {
         cached_mail(&profile.join("mail-cache"), "default", "old default inbox"),
         cached_mail(&custom_root, "custom", "old custom inbox"),
     ];
+    let raw = b"Subject: Migrated archive\r\n\r\nOriginal from custom storage\r\n";
+    let db = Connection::open(&caches[1]).unwrap();
+    let saved = storage::store(&db, "custom", "INBOX", 9, 1, raw.as_slice()).unwrap();
+    let object = storage::account_root(&db, "custom")
+        .unwrap()
+        .join("objects")
+        .join(&saved.hash[..2])
+        .join(format!("{}.eml.gz", saved.hash));
+    drop(db);
+    let original = fs::read(&object).unwrap();
+    let mut replacement = Vec::new();
+    compress_message(&vec![b'x'; raw.len()][..], &mut replacement, || Ok(())).unwrap();
     let before = caches.each_ref().map(|path| fs::read(path).unwrap());
 
     let state = VaultHarness::open(temp);
@@ -89,6 +102,18 @@ fn signed_mail_upgrade_starts_the_installed_host_with_retained_migrated_data() {
     assert!(active_version(&profile).is_none());
     // Keep the TempDir owned while releasing the active profile leases.
     let root = close_profile(state);
+    fs::write(&object, &replacement).unwrap();
+    let rejected = provision::apply_before_startup(&profile).unwrap_err();
+    assert!(
+        rejected.contains("checksum verification failed"),
+        "{rejected}"
+    );
+    assert_eq!(provision::queued_failure(&profile).unwrap(), Some(true));
+    assert!(active_version(&profile).is_none());
+    assert!(!profile.join("plugins/mail/data").exists());
+    assert_eq!(fs::read(&object).unwrap(), replacement);
+    fs::write(&object, &original).unwrap();
+
     let state = VaultHarness::open(root);
     assert!(!provision::queued(&profile).unwrap());
     let journal = MigrationJournal::load(&profile.join("migration/journal.json")).unwrap();
@@ -98,7 +123,7 @@ fn signed_mail_upgrade_starts_the_installed_host_with_retained_migrated_data() {
     state.registry.set_enabled(OWNER, true).unwrap();
     for (account, expected) in [
         ("default", "old default inbox"),
-        ("custom", "old custom inbox"),
+        ("custom", "Original from custom storage"),
     ] {
         let value = state
             .registry
@@ -141,4 +166,5 @@ fn signed_mail_upgrade_starts_the_installed_host_with_retained_migrated_data() {
         caches.each_ref().map(|path| fs::read(path).unwrap()),
         before
     );
+    assert_eq!(fs::read(object).unwrap(), original);
 }

@@ -130,6 +130,9 @@ controls:
     selector: '[data-testid="module-marketplace-provision"]'
     kind: interactive
     optional: true # signed transfer interruption is also covered by shared download controls
+  - id: module-marketplace-mail-import-failed
+    selector: '[data-testid="module-marketplace-mail-import-failed"]'
+    kind: display
   - id: module-marketplace-review
     selector: '[data-testid="module-marketplace-review"]'
     kind: interactive

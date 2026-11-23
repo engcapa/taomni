@@ -15,7 +15,7 @@ use taomni_sqlite_snapshot::{
     SnapshotControl, SnapshotOptions, SnapshotOutcome, snapshot_existing,
 };
 
-use crate::{database::mail_db_file_stem, storage::object_path};
+use crate::{archive::verify_message_with, database::mail_db_file_stem, storage::object_path};
 
 pub struct LegacyMailbox {
     pub account_id: String,
@@ -259,11 +259,13 @@ fn copy_originals(
     let source = source_root.join(format!("{stem}.mail"));
     let target = target_root.join(format!("{stem}.mail"));
     let mut query = database
-        .prepare("SELECT DISTINCT sha256 FROM mail_full_messages WHERE account_id=?1")
+        .prepare("SELECT DISTINCT sha256, raw_size FROM mail_full_messages WHERE account_id=?1")
         .map_err(string_error)?;
     let mut objects = query.query([account]).map_err(string_error)?;
     while let Some(row) = objects.next().map_err(string_error)? {
         let hash: String = row.get(0).map_err(string_error)?;
+        let raw_size = u64::try_from(row.get::<_, i64>(1).map_err(string_error)?)
+            .map_err(|_| "Invalid size of the saved email")?;
         let previous = object_path(&source, &hash)?;
         let prefix = source.join("objects");
         for path in [&source, &prefix, &prefix.join(&hash[..2])] {
@@ -271,7 +273,11 @@ fn copy_originals(
                 return Err("A saved original email is missing from the legacy store".into());
             }
         }
-        copy_file(&previous, &object_path(&target, &hash)?, control)?;
+        let staged = object_path(&target, &hash)?;
+        copy_file(&previous, &staged, control)?;
+        verify_message_with(open_file(&staged)?, &hash, raw_size, io::sink(), || {
+            check(control)
+        })?;
     }
     Ok(())
 }
