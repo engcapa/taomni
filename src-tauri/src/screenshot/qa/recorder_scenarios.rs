@@ -433,6 +433,7 @@ pub async fn screenshot_qa_recorder(
     app: AppHandle,
     format: String,
     expect_signed_renderer: Option<bool>,
+    expect_cancel: Option<bool>,
 ) -> Result<String, String> {
     ensure_qa(&app)?;
     let _cleanup = ScenarioCleanup(app.clone());
@@ -488,6 +489,16 @@ pub async fn screenshot_qa_recorder(
     let bar = wait_window(&app, super::super::RECORDER_LABEL, Duration::from_secs(10))
         .await
         .map_err(|e| format!("{e:#}"))?;
+    if expect_cancel == Some(true) {
+        return cancel_recorder(
+            &app,
+            &bar,
+            &started.recording_id,
+            &output,
+            expect_signed_renderer,
+        )
+        .await;
+    }
     let geometry = capture_surfaces(&app, &display, region, super::super::RECORDER_LABEL, true)
         .await
         .map_err(|e| e.to_string())?;
@@ -586,5 +597,63 @@ pub async fn screenshot_qa_recorder(
         json!({ "page":info,"clip":clip,"barClosed":closed,"mainHidden":main_hidden,"mainRestored":restored,
         "selectionLayerEntry":selection_layer_entry,"selectionLayerClosed":selection_layer_closed,
         "gifCopied":copied,"previewRetained":preview_retained,"tempRemoved":output_removed,"format":format,"originalComparison":content,"artifact":artifact,"captureGeometry":geometry }),
+    ))
+}
+
+async fn cancel_recorder(
+    app: &AppHandle,
+    bar: &WebviewWindow,
+    recording_id: &str,
+    output: &std::path::Path,
+    expect_signed_renderer: Option<bool>,
+) -> Result<String, String> {
+    let page = run_js(
+        bar,
+        r#"
+          const q = id => document.querySelector('[data-testid="' + id + '"]');
+          for (let i = 0; i < 100; i++) {
+            if (q('screenshot-recorder-stop')?.disabled === false &&
+                q('screenshot-recorder-cancel')?.disabled === false) {
+              return { renderer: q('screenshot-recorder')?.dataset.renderer,
+                       previewOpen: !!q('screenshot-recorder-preview') };
+            }
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          throw new Error('Active recorder controls did not become ready');
+        "#,
+        Duration::from_secs(15),
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+    bar.eval("document.querySelector('[data-testid=\"screenshot-recorder-cancel\"]').click()")
+        .map_err(|error| error.to_string())?;
+    let closed = wait_closed(app, super::super::RECORDER_LABEL, Duration::from_secs(15)).await;
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while std::time::Instant::now() < deadline
+        && (!main_visible(app) || super::super::runtime::tool_state().session_lease.is_some())
+    {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let idle = super::super::screenshot_current_recording()
+        .await?
+        .is_none();
+    let temp_removed =
+        super::super::record::output_path(recording_id).is_none() && !output.exists();
+    let lease_released = super::super::session::SessionLease::acquire()?.is_some();
+    let restored = main_visible(app);
+    let renderer_ok =
+        expect_signed_renderer != Some(true) || page["renderer"] == json!("signed-module");
+    Ok(report(
+        renderer_ok
+            && page["previewOpen"] == json!(false)
+            && closed
+            && idle
+            && temp_removed
+            && lease_released
+            && restored,
+        json!({
+            "page": page, "barClosed": closed, "mainRestored": restored,
+            "tempRemoved": temp_removed, "idle": idle, "leaseReleased": lease_released,
+        }),
     ))
 }

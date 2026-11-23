@@ -65,6 +65,12 @@ steps:
 - assert_not_visible: '[data-testid="screenshot-recorder"]'
 - eval_readonly:
     expression: JSON.stringify(window.__taomniStubScreenshotCalls).split('"cmd":"screenshot_stop_recording"').length === 2 && window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_cancel_recording"
+- click: '[data-testid="system-screenshot"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- assert_visible: '[data-testid="screenshot-base-image"]'
+- press: Escape
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -91,14 +97,17 @@ verification:
     results: [23, 24, 25]
   - id: R3
     requirement: MP4 start dispatches its requested format and fullscreen geometry, then cancel closes it without invoking stop or pretending to decode an MP4.
-    actions: [26, 28, 30, 31, 35]
+    actions: [26, 28, 30, 31, 35, 39, 42]
     checkpoints:
     - {step: 32, expectation: The request reaches an initialized recorder.}
     - {step: 33, expectation: The MP4 entry sends mp4 with 400x300 fullscreen dimensions.}
     - {step: 34, expectation: No decoded preview is claimed before cancel.}
     - {step: 37, expectation: Cancel unmounts the recorder.}
     - {step: 38, expectation: Only the GIF flow stopped; MP4 sent cancel instead.}
-    results: [32, 33, 34, 37, 38]
+    - {step: 41, expectation: A new screenshot loads after cancelling the recorder.}
+    - {step: 43, expectation: Escape closes the new capture and returns to the app.}
+    - {step: 44, expectation: 'The complete save, cancel and reopen sequence has no renderer errors.'}
+    results: [32, 33, 34, 37, 38, 41, 43, 44]
   visual:
   - check: Public record entries route into running and completed renderer states.
     method: automated

@@ -35,15 +35,47 @@ pub async fn screenshot_qa_ocr_redact(
         );
         let recognition_error = ocr.err();
         let redaction_error = boxes.err();
+        // Mimic a second instance owning the capture lock. Module admission
+        // must report the disabled encoder before touching the desktop.
+        let lease = super::super::session::SessionLease::acquire()?
+            .ok_or("The clean screenshot scenario already held the capture lease")?;
+        let recording_error = super::super::screenshot_start_recording(
+            app.clone(),
+            Some(display.id),
+            Some(region.0),
+            Some(region.1),
+            Some(region.2),
+            Some(region.3),
+            "gif".into(),
+            None,
+        )
+        .await
+        .err();
+        drop(lease);
+        let recorder_idle = super::super::screenshot_current_recording()
+            .await?
+            .is_none()
+            && app
+                .get_webview_window(super::super::RECORDER_LABEL)
+                .is_none();
         let ok = artifact.is_some()
             && recognition_error.as_deref() == Some(expected)
             && redaction_error.as_deref() == Some(expected)
             && !probe.ocr_available
             && !probe.mp4_available
-            && probe.ocr_hint.as_deref() == Some(expected);
+            && probe.ocr_hint.as_deref() == Some(expected)
+            && recording_error.as_deref() == Some(super::super::record::MODULE_UNAVAILABLE)
+            && recorder_idle;
         return Ok(report(
             ok,
-            json!({"artifact":artifact,"recognitionError":recognition_error,"redactionError":redaction_error,"probe":probe}),
+            json!({
+                "artifact": artifact,
+                "recognitionError": recognition_error,
+                "redactionError": redaction_error,
+                "recordingError": recording_error,
+                "recorderIdle": recorder_idle,
+                "probe": probe,
+            }),
         ));
     }
     let (ocr, boxes) = (ocr?, boxes?);

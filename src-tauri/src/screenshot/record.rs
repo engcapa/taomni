@@ -29,7 +29,11 @@ pub use lifetime::{
 pub(crate) use lifetime::output_path;
 
 pub(super) use lifetime::{Recording, take_for_recovery};
-pub(super) use module_encoder::available as module_recording_available;
+#[cfg(debug_assertions)]
+pub(super) use module_encoder::MODULE_UNAVAILABLE;
+pub(super) use module_encoder::{
+    available as module_recording_available, selected as select_recording_encoder,
+};
 
 pub use taomni_screenshot_api::{ClipInfo, RecordFormat, RecordingInfo};
 

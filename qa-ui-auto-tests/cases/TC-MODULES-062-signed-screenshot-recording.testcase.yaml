@@ -1,6 +1,6 @@
 id: TC-MODULES-062
 title: Signed Screenshot host encodes GIF and MP4 recordings
-description: Install the matching signed package, finish two recordings in the same desktop process and verify their decoded frames and timestamps.
+description: Install the matching signed package, finish GIF and MP4 recordings in the same desktop process, verify decoded frames and timestamps, then cancel another recording.
 covers: [F-Modules-1, F27.1]
 tags: [modules, screenshot, recording, native-boundary, p1]
 modes: [native]
@@ -23,6 +23,8 @@ steps:
 - native_screenshot_scenario: {scenario: recorder, format: gif, signed_renderer: true}
 - assert_signed_screenshot_host: running
 - native_screenshot_scenario: {scenario: recorder, format: mp4, signed_renderer: true}
+- native_screenshot_scenario: {scenario: recorder-cancel, format: gif, signed_renderer: true}
+- assert_signed_screenshot_host: running
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
 - click: '[data-testid="module-action-disable-screenshot"]'
@@ -34,16 +36,23 @@ verification:
   requirements:
   - id: encode-recordings
     requirement: The installed signed host encodes real captured frames in both formats and releases its lease on disable.
-    actions: [7, 9, 12, 18]
+    actions: [7, 9, 12, 20]
     checkpoints:
     - {step: 8, expectation: The normal installer verified and selected the signed package.}
     - {step: 11, expectation: The host was idle before the first recording.}
     - {step: 13, expectation: 'The signed recorder renders the GIF preview. Decoded pixels and timestamps match the source and Done removes the temporary recording.'}
     - {step: 14, expectation: The selected signed host held the writer lease after encoding.}
     - {step: 15, expectation: The same host completes an MP4 with source-matched frames and native preview cleanup.}
-    - {step: 20, expectation: Disabling the module released the host lease.}
-    - {step: 21, expectation: The settings and recorder lifecycle produced no runtime errors.}
-    results: [8, 11, 13, 14, 15, 20, 21]
+    - {step: 22, expectation: Disabling the module released the host lease.}
+    - {step: 23, expectation: The settings and recorder lifecycle produced no runtime errors.}
+    results: [8, 11, 13, 14, 15, 22, 23]
+  - id: cancel-signed-recording
+    requirement: Cancelling a running recording closes the recorder, deletes its temporary file and releases the desktop capture lease.
+    actions: [16]
+    checkpoints:
+    - {step: 16, expectation: 'The signed recorder was active. Cancel removes its output and session, restores the main window and frees the capture lease.'}
+    - {step: 17, expectation: The verified module remains available for subsequent recording requests.}
+    results: [16, 17]
   visual:
   - check: Recorder controls, decoded source pixels and preview lifecycle.
     method: automated

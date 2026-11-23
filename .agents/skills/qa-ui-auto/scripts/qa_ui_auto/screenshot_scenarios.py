@@ -21,6 +21,7 @@ SCENARIOS = {
     "overlay-copy": "screenshot_qa_overlay_copy",
     "record": "screenshot_qa_record",
     "recorder": "screenshot_qa_recorder",
+    "recorder-cancel": "screenshot_qa_recorder",
     "pin": "screenshot_qa_pin",
     "pin-tools": "screenshot_qa_pin_tools",
     "pin-arrangement": "screenshot_qa_pin_arrangement",
@@ -63,16 +64,19 @@ def run_scenario(ctx, args):
         params["expectDisabled"] = True
     if scenario == "ocr-offline-module":
         params["expectOffline"] = True
+    recorder = scenario in {"recorder", "recorder-cancel"}
+    if scenario == "recorder-cancel":
+        params["expectCancel"] = True
     if "signed_renderer" in args:
-        if args["signed_renderer"] is not True or scenario != "recorder":
-            raise StepError("native_screenshot_scenario: signed_renderer applies only to recorder")
+        if args["signed_renderer"] is not True or not recorder:
+            raise StepError("native_screenshot_scenario: signed_renderer requires a recorder scenario")
         params["expectSignedRenderer"] = True
-    if scenario in {"record", "recorder", "macos-capture-source"}:
+    if recorder or scenario in {"record", "macos-capture-source"}:
         if args.get("format") not in {"gif", "mp4"}:
-            raise StepError("native_screenshot_scenario: record/recorder/macos-capture-source requires gif or mp4")
+            raise StepError(f"native_screenshot_scenario: {scenario} requires format gif or mp4")
         params["format"] = args["format"]
     elif "format" in args:
-        raise StepError("native_screenshot_scenario: format only applies to record/recorder/macos-capture-source")
+        raise StepError(f"native_screenshot_scenario: {scenario} does not accept format")
     if scenario == "record":
         secs = args.get("secs", 3)
         if isinstance(secs, bool) or not isinstance(secs, int) or not 1 <= secs <= 8:

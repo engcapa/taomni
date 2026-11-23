@@ -10,14 +10,15 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt, DuplexStream};
 
 use crate::plugin::{LifecycleState, PluginRegistry};
 
-pub(super) fn selected(registry: &PluginRegistry) -> anyhow::Result<bool> {
+pub(in crate::screenshot) const MODULE_UNAVAILABLE: &str =
+    "Install and enable the Screenshot module in Settings → Module Store before recording.";
+
+pub(in crate::screenshot) fn selected(registry: &PluginRegistry) -> anyhow::Result<bool> {
     let Some(module) = registry.get(SLUG) else {
         return legacy_recording();
     };
     if module.state != LifecycleState::Enabled {
-        bail!(
-            "Install and enable the Screenshot module in Settings → Module Store before recording."
-        );
+        bail!(MODULE_UNAVAILABLE);
     }
     // An installed OCR-only module predates recording support.
     if module.manifest.commands.contains(START_RECORDING) {
@@ -33,9 +34,7 @@ fn legacy_recording() -> anyhow::Result<bool> {
     if cfg!(any(test, feature = "legacy-screenshot-media")) {
         Ok(false)
     } else {
-        bail!(
-            "Install and enable the Screenshot module in Settings → Module Store before recording."
-        );
+        bail!(MODULE_UNAVAILABLE);
     }
 }
 

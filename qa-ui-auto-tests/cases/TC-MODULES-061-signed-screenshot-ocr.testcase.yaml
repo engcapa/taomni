@@ -46,12 +46,12 @@ verification:
     - {step: 15, expectation: The signed renderer and local WASM assets recognize the actual fixture text and produce word geometry.}
     results: [8, 11, 13, 14, 15]
   - id: disable
-    requirement: Disabling Screenshot releases the host lease while native screen capture remains available.
+    requirement: Disabling Screenshot releases the host lease. Native capture remains available, and recording directs the user to the module store before acquiring the desktop.
     actions: [18, 21]
     checkpoints:
     - {step: 19, expectation: The module is available to enable again.}
     - {step: 20, expectation: The installed host released its native writer lease.}
-    - {step: 22, expectation: Native capture succeeds and OCR requests report how to enable the module.}
+    - {step: 22, expectation: 'Native capture succeeds. OCR, redaction and recording identify the module store while another capture owns the lease. No recorder window opens.'}
     - {step: 23, expectation: The rejected requests leave the host stopped.}
     - {step: 24, expectation: The restored main window has no runtime errors.}
     results: [19, 20, 22, 23, 24]
