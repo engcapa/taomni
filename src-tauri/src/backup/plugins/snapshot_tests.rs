@@ -9,7 +9,7 @@ use std::{fs, path::Path};
 use taomni_profile_locks::{PluginDataLease, PluginSlug, ProfileRoot};
 
 #[test]
-fn mail_only_backup_captures_owned_pop3_rows_and_applies_archive_selections() {
+fn mail_only_backup_recognizes_owned_imap_and_pop3_and_applies_archive_selections() {
     let harness = VaultHarness::new();
     harness.initialize();
     let path = harness.root.path().join("plugins/mail/data");
@@ -29,6 +29,18 @@ fn mail_only_backup_captures_owned_pop3_rows_and_applies_archive_selections() {
     .unwrap();
     taomni_mail_engine::storage::store(&db, account, "INBOX", 1, 1, original.as_slice()).unwrap();
     write(&path.join("attachments/attachment.bin"), b"attachment");
+    drop(db);
+
+    let imap = "module-imap";
+    let imap_stem = taomni_mail_engine::database::mail_db_file_stem(imap);
+    let imap_name = format!("{imap_stem}.db");
+    let imap_path = path.join(&imap_name);
+    let db = rusqlite::Connection::open(&imap_path).unwrap();
+    taomni_mail_engine::cache::init_mail_tables(&db).unwrap();
+    let imap_message =
+        taomni_mail_engine::parse_body_message(imap, "INBOX", 1, None, original, 1024);
+    taomni_mail_engine::cache::upsert_message(&db, &imap_message).unwrap();
+    taomni_mail_engine::imap_ownership::mark_owned(&path, imap).unwrap();
     drop(db);
 
     let staging = tempfile::tempdir().unwrap();
@@ -54,6 +66,30 @@ fn mail_only_backup_captures_owned_pop3_rows_and_applies_archive_selections() {
         assert_eq!(result.datasets.len(), 1);
         let dataset = &result.datasets[0];
         assert_eq!(dataset.slug, "mail");
+        let covered = dataset
+            .owned_mailbox_names()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            covered,
+            [format!("{stem}.db"), imap_name.clone()]
+                .into_iter()
+                .collect()
+        );
+        let imap_snapshot = result
+            .files
+            .iter()
+            .find(|file| file.archive_path == format!("plugins/mail/data/{imap_name}"))
+            .unwrap();
+        let module_data = imap_snapshot.disk_path.parent().unwrap();
+        assert_eq!(
+            taomni_mail_engine::imap_ownership::database(module_data, imap).unwrap(),
+            Some(imap_snapshot.disk_path.clone())
+        );
+        let restored_imap = rusqlite::Connection::open(&imap_snapshot.disk_path).unwrap();
+        let body = taomni_mail_engine::cache::get_cached_body(&restored_imap, imap, "INBOX", 1)
+            .unwrap()
+            .unwrap();
+        assert!(body.text.as_deref().unwrap().contains("Raw POP3 bytes"));
         assert!(
             dataset
                 .files

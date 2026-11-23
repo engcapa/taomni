@@ -1,13 +1,16 @@
 use super::{AppState, MailDbHandle};
+use crate::plugin::{LifecycleState, PluginRegistry, data_contract::PluginDataRoot};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use taomni_mail_api::{IMAP_MAILBOX_OWNER, SLUG};
 pub(crate) use taomni_mail_engine::database::mail_db_file_stem;
+use taomni_mail_engine::{database::MailDatabase, imap_ownership};
 
 pub(crate) struct MailRuntime {
     // Each account's database is separate from taomni.db and other accounts.
     cache_root: PathBuf,
-    databases: Mutex<HashMap<String, MailDbHandle>>,
+    databases: Mutex<HashMap<(String, bool), MailDbHandle>>,
     mutation_gates: Mutex<HashMap<String, Arc<Mutex<()>>>>,
     pop3_owner_gates: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     pub(crate) migrated: Result<bool, String>,
@@ -52,24 +55,59 @@ impl MailRuntime {
 
     pub(crate) fn database(
         &self,
+        registry: &PluginRegistry,
         account_id: &str,
         load_options: impl FnOnce() -> Result<Option<String>, String>,
     ) -> Result<MailDbHandle, String> {
         let stem = mail_db_file_stem(account_id);
+        let owned = owned_database(registry.root(), account_id)?;
+        if owned.is_some() {
+            require_owner_support(registry)?;
+        }
+        let key = (stem.clone(), owned.is_some());
         let mut dbs = self.databases.lock().map_err(|e| e.to_string())?;
-        if let Some(db) = dbs.get(&stem) {
+        if let Some(db) = dbs.get(&key) {
             return Ok(Arc::clone(db));
         }
 
-        let configured = load_options()?
-            .map(|options| crate::mail::storage::configured_directory(&options, &self.cache_root))
-            .transpose()?
-            .unwrap_or_else(|| self.cache_root.clone());
-        let path = configured.join(format!("{stem}.db"));
-        let handle = Arc::new(crate::mail::coordination::mailbox_database(path));
-        dbs.insert(stem, Arc::clone(&handle));
+        let handle = Arc::new(match owned {
+            Some(path) => MailDatabase::new_owned(path),
+            None => {
+                let configured = load_options()?
+                    .map(|options| {
+                        crate::mail::storage::configured_directory(&options, &self.cache_root)
+                    })
+                    .transpose()?
+                    .unwrap_or_else(|| self.cache_root.clone());
+                crate::mail::coordination::mailbox_database(configured.join(format!("{stem}.db")))
+            }
+        });
+        dbs.insert(key, Arc::clone(&handle));
         Ok(handle)
     }
+}
+
+fn owned_database(plugins: &Path, account: &str) -> Result<Option<PathBuf>, String> {
+    match std::fs::symlink_metadata(plugins) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.to_string()),
+        Ok(_) => (),
+    }
+    let data = PluginDataRoot::open(plugins, SLUG).map_err(|error| error.to_string())?;
+    imap_ownership::database(&data.data, account).map_err(|error| error.to_string())
+}
+
+fn require_owner_support(registry: &PluginRegistry) -> Result<(), String> {
+    let active = registry
+        .get(SLUG)
+        .filter(|entry| entry.state == LifecycleState::Enabled)
+        .ok_or("Enable the Mail module to open this migrated IMAP mailbox")?;
+    if !active.manifest.commands.contains(IMAP_MAILBOX_OWNER) {
+        return Err(
+            "Update the Mail module in Module Store to open this migrated IMAP mailbox".into(),
+        );
+    }
+    Ok(())
 }
 
 impl AppState {
@@ -77,8 +115,12 @@ impl AppState {
         &self.legacy.mail.cache_root
     }
 
+    pub(crate) fn has_owned_imap_mailbox(&self, account_id: &str) -> Result<bool, String> {
+        Ok(owned_database(self.plugins.root(), account_id)?.is_some())
+    }
+
     pub fn mail_db(&self, account_id: &str) -> Result<MailDbHandle, String> {
-        self.legacy.mail.database(account_id, || {
+        self.legacy.mail.database(&self.plugins, account_id, || {
             let db = self.core.db.lock().map_err(|error| error.to_string())?;
             Ok(crate::session::db::get_session(&db, account_id)
                 .ok()

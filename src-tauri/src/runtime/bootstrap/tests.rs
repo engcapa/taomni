@@ -47,7 +47,7 @@ fn construction_is_explicit_and_preserves_lazy_optional_data_and_mail_identity()
         .state
         .legacy
         .mail
-        .database("unknown-account", || {
+        .database(&boot.state.plugins, "unknown-account", || {
             panic!("A cached handle must not reload session options")
         })
         .unwrap();

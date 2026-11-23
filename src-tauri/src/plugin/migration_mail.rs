@@ -203,6 +203,9 @@ pub(super) fn execute_under_maintenance(
             address_book: manifest.commands.contains(taomni_mail_api::ADDRESS_BOOK),
             agenda: manifest.commands.contains(taomni_mail_api::CALDAV_AGENDA),
             filter_rules: manifest.commands.contains(taomni_mail_api::FILTER_RULES),
+            imap_cache: manifest
+                .commands
+                .contains(taomni_mail_api::IMAP_MAILBOX_OWNER),
             pop3_cache: [
                 taomni_mail_api::pop3_store::LOCAL_MAILBOX,
                 taomni_mail_api::pop3_store::SYNC_OWNED_MAILBOX,
@@ -394,11 +397,18 @@ fn reuse_restored_data(
             .map_err(|error| error.to_string())?;
             db.prepare("SELECT uid FROM mail_messages WHERE account_id=?1 LIMIT 1")
                 .map_err(|error| error.to_string())?;
-            if hosted.pop3_cache && mailbox.pop3 {
-                restored_pop3.push(mailbox.account_id);
+            if mailbox.pop3 {
+                if hosted.pop3_cache {
+                    restored_pop3.push(mailbox.account_id);
+                }
+            } else {
+                // Older retained snapshots can include draft data and a stale
+                // IMAP index. Preserve the files and any existing owner receipt.
+                taomni_mail_engine::imap_ownership::database(&mail_root.data, &mailbox.account_id)
+                    .map_err(|error| error.to_string())?;
             }
-        } else if read_legacy_mailbox(&mailbox.database, &mailbox.account_id, |_, _| Ok(()))?
-            .is_some()
+        } else if (hosted.imap_cache && !mailbox.pop3)
+            || read_legacy_mailbox(&mailbox.database, &mailbox.account_id, |_, _| Ok(()))?.is_some()
         {
             missing.push(mailbox);
         }

@@ -242,10 +242,7 @@ fn create_backup_locked(
     let owned_mailboxes = protected
         .datasets
         .iter()
-        .filter(|dataset| dataset.slug == taomni_mail_api::SLUG)
-        .flat_map(|dataset| &dataset.files)
-        .filter_map(|file| file.path.strip_suffix(".pop3-owner"))
-        .map(|stem| format!("{stem}.db"))
+        .flat_map(super::plugins::contracts::PluginDataSet::owned_mailbox_names)
         .collect::<std::collections::HashSet<_>>();
     staged_files.extend(protected.files);
 

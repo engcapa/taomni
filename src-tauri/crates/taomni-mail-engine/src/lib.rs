@@ -22,6 +22,7 @@ pub mod imap_messages;
 #[cfg(feature = "imap-runtime")]
 pub mod imap_mutations;
 pub mod imap_outgoing;
+pub mod imap_ownership;
 #[cfg(feature = "imap-runtime")]
 pub mod imap_parts;
 pub mod imap_sync;

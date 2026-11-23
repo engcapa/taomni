@@ -131,3 +131,22 @@ fn payloads_and_datasets_must_match_and_legacy_cannot_hide_plugin_data() {
             .contains("requires vault.db")
     );
 }
+
+#[test]
+fn imap_ownership_receipt_requires_the_matching_sqlite_snapshot() {
+    let receipt = ("account.imap-owner", PluginDataFileKind::File);
+    let data = dataset("mail", &[receipt]);
+    assert!(data.validate().is_err());
+    let data = dataset("mail", &[receipt, ("account.db", PluginDataFileKind::File)]);
+    assert!(data.validate().is_err());
+
+    let data = dataset(
+        "mail",
+        &[receipt, ("account.db", PluginDataFileKind::Sqlite)],
+    );
+    data.validate().unwrap();
+    assert_eq!(
+        data.owned_mailbox_names().collect::<Vec<_>>(),
+        ["account.db"]
+    );
+}

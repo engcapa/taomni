@@ -32,6 +32,7 @@ pub struct HostedMailboxData {
     pub agenda: bool,
     pub filter_rules: bool,
     pub pop3_cache: bool,
+    pub imap_cache: bool,
 }
 
 impl HostedMailboxData {
@@ -41,6 +42,7 @@ impl HostedMailboxData {
         agenda: true,
         filter_rules: true,
         pop3_cache: true,
+        imap_cache: true,
     };
 }
 
@@ -108,8 +110,21 @@ fn stage_account(
     if mailbox.database.file_name() != Some(OsStr::new(&filename)) {
         return Err("Legacy Mail source does not belong to the account".into());
     }
+    let owns_imap = hosted.imap_cache && !mailbox.pop3;
     let Some(source) = resolve_database(&mailbox.database, &filename, control)? else {
-        return Ok(false);
+        if !owns_imap {
+            return Ok(false);
+        }
+        let destination = target.join(filename);
+        if metadata(&destination)?.is_some() {
+            return Err("Duplicate legacy Mail account".into());
+        }
+        let db = Connection::open(&destination).map_err(string_error)?;
+        crate::cache::init_mail_tables(&db).map_err(string_error)?;
+        sync_account_database(db, &destination)?;
+        crate::imap_ownership::mark_owned(target, &mailbox.account_id).map_err(string_error)?;
+        check(control)?;
+        return Ok(true);
     };
     let source_root = source.parent().ok_or("Invalid legacy Mail database path")?;
     let destination = target.join(filename);
@@ -152,17 +167,24 @@ fn stage_account(
     if hosted.filter_rules {
         crate::filters::rules::mark_owned(&db, &mailbox.account_id).map_err(string_error)?;
     }
-    db.close().map_err(|(_, error)| string_error(error))?;
-    OpenOptions::new()
-        .write(true)
-        .open(destination)
-        .and_then(|file| file.sync_all())
-        .map_err(string_error)?;
+    sync_account_database(db, &destination)?;
+    if owns_imap {
+        crate::imap_ownership::mark_owned(target, &mailbox.account_id).map_err(string_error)?;
+    }
     if hosted.pop3_cache && mailbox.pop3 {
         crate::pop3::ownership::mark_owned(target, &mailbox.account_id).map_err(string_error)?;
     }
     check(control)?;
     Ok(true)
+}
+
+fn sync_account_database(db: Connection, path: &Path) -> Result<(), String> {
+    db.close().map_err(|(_, error)| string_error(error))?;
+    OpenOptions::new()
+        .write(true)
+        .open(path)
+        .and_then(|file| file.sync_all())
+        .map_err(string_error)
 }
 
 fn resolve_database(

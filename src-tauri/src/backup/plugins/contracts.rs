@@ -62,6 +62,19 @@ impl PluginDataSet {
         format!("plugins/{}/data/{relative}", self.slug)
     }
 
+    pub(crate) fn owned_mailbox_names(&self) -> impl Iterator<Item = String> + '_ {
+        self.files
+            .iter()
+            .filter(|_| self.slug == taomni_mail_api::SLUG)
+            .filter_map(|file| {
+                file.path.strip_suffix(".pop3-owner").or_else(|| {
+                    file.path
+                        .strip_suffix(taomni_mail_engine::imap_ownership::RECEIPT_SUFFIX)
+                })
+            })
+            .map(|stem| format!("{stem}.db"))
+    }
+
     pub(crate) fn validate(&self) -> Result<(), String> {
         PluginSlug::parse(&self.slug).map_err(|_| "Invalid plugin backup owner")?;
         if self.data_schema_version == 0 || self.files.is_empty() || self.files.len() > 16_384 {
@@ -97,6 +110,28 @@ impl PluginDataSet {
                     return Err("Plugin backup file conflicts with a directory".into());
                 }
                 parent = next;
+            }
+        }
+        if self.slug == taomni_mail_api::SLUG {
+            let sqlite: BTreeSet<_> = self
+                .files
+                .iter()
+                .filter(|file| file.kind == PluginDataFileKind::Sqlite)
+                .map(|file| file.path.as_str())
+                .collect();
+            for file in &self.files {
+                if let Some(stem) = file
+                    .path
+                    .strip_suffix(taomni_mail_engine::imap_ownership::RECEIPT_SUFFIX)
+                    && (file.kind != PluginDataFileKind::File
+                        || stem.contains('/')
+                        || !sqlite.contains(format!("{stem}.db").as_str()))
+                {
+                    return Err(
+                        "A Mail IMAP ownership receipt requires its account database snapshot"
+                            .into(),
+                    );
+                }
             }
         }
         for file in self

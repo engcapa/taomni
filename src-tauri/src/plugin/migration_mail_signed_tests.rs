@@ -121,10 +121,36 @@ fn signed_mail_upgrade_starts_the_installed_host_with_retained_migrated_data() {
 
     state.registry.scan().unwrap();
     state.registry.set_enabled(OWNER, true).unwrap();
+    let runtime = crate::state::MailRuntime::new(&profile);
     for (account, expected) in [
         ("default", "old default inbox"),
         ("custom", "Original from custom storage"),
     ] {
+        let target = profile.join(MAIL_MIGRATION_TARGET);
+        assert_eq!(
+            state
+                .registry
+                .invoke(
+                    OWNER,
+                    taomni_mail_api::IMAP_MAILBOX_OWNER,
+                    json!({"accountId": account})
+                )
+                .unwrap(),
+            json!(true)
+        );
+        let handle = runtime
+            .database(&state.registry, account, || {
+                panic!("do not load the old path")
+            })
+            .unwrap();
+        assert_eq!(
+            Path::new(handle.lock().unwrap().path().unwrap())
+                .canonicalize()
+                .unwrap()
+                .parent()
+                .unwrap(),
+            target
+        );
         let value = state
             .registry
             .invoke(
@@ -176,7 +202,11 @@ fn signed_mail_upgrade_reuses_data_restored_before_first_activation() {
     let profile = temp.path().canonicalize().unwrap();
     let legacy_directory = profile.join("legacy-custom");
     legacy_profile(&profile, &legacy_directory);
-    let legacy = cached_mail(&profile.join("mail-cache"), "default", "stale inbox");
+    let legacy = cached_mail(
+        &profile.join("mail-cache"),
+        "default",
+        "current legacy inbox",
+    );
     let legacy_custom = cached_mail(&legacy_directory, "custom", "legacy custom inbox");
     let data = profile.join(MAIL_MIGRATION_TARGET);
     let restored = cached_mail(&data, "default", "restored default inbox");
@@ -200,6 +230,57 @@ fn signed_mail_upgrade_reuses_data_restored_before_first_activation() {
     assert!(profile_committed(&profile).unwrap());
     state.registry.scan().unwrap();
     state.registry.set_enabled(OWNER, true).unwrap();
+    let runtime = crate::state::MailRuntime::new(&profile);
+    assert_eq!(
+        state
+            .registry
+            .invoke(
+                OWNER,
+                taomni_mail_api::IMAP_MAILBOX_OWNER,
+                json!({"accountId": "default"})
+            )
+            .unwrap(),
+        json!(false)
+    );
+    let handle = runtime
+        .database(&state.registry, "default", || Ok(None))
+        .unwrap();
+    assert_eq!(
+        Path::new(
+            handle
+                .lock_for_snapshot(&tokio_util::sync::CancellationToken::new())
+                .unwrap()
+                .path()
+                .unwrap()
+        )
+        .canonicalize()
+        .unwrap(),
+        legacy
+    );
+    assert_eq!(
+        state
+            .registry
+            .invoke(
+                OWNER,
+                taomni_mail_api::IMAP_MAILBOX_OWNER,
+                json!({"accountId": "custom"})
+            )
+            .unwrap(),
+        json!(true)
+    );
+    let handle = runtime
+        .database(&state.registry, "custom", || {
+            panic!("do not load the old path")
+        })
+        .unwrap();
+    assert_eq!(
+        Path::new(handle.lock().unwrap().path().unwrap())
+            .canonicalize()
+            .unwrap()
+            .parent()
+            .unwrap(),
+        data
+    );
     for (account, expected) in [
         ("default", "restored default inbox"),
         ("custom", "legacy custom inbox"),

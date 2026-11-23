@@ -78,8 +78,13 @@ fn captures_wal_and_originals_from_custom_storage_without_changing_the_source() 
         &control(),
     )
     .unwrap();
-    assert_eq!(staged.mailbox_count(), 1);
+    assert_eq!(staged.mailbox_count(), 2);
     let target = staged.data();
+    assert!(
+        crate::imap_ownership::database(&target, "unused")
+            .unwrap()
+            .is_some()
+    );
     let dest = Connection::open_with_flags(
         target.join(format!("{stem}.db")),
         OpenFlags::SQLITE_OPEN_READ_ONLY,
@@ -237,8 +242,9 @@ fn bad_second_account_discards_the_first_snapshot_and_can_be_retried() {
         )
         .unwrap()
         .mailbox_count(),
-        1
+        2
     );
+    assert!(!mailboxes[1].database.exists());
 }
 
 #[cfg(unix)]
@@ -370,4 +376,34 @@ fn only_staging_for_a_host_that_takes_draft_ownership_marks_the_mailbox() {
         );
     }
     assert_eq!(fs::read(&source.database).unwrap(), original);
+}
+
+#[test]
+fn imap_owner_receipt_selects_complete_module_data_and_survives_missing_legacy_cache() {
+    let legacy = tempfile::tempdir().unwrap();
+    let staging = tempfile::tempdir().unwrap();
+    let mailbox = mailbox(legacy.path(), ACCOUNT);
+    let stage = StagedMailData::prepare(
+        staging.path(),
+        &[mailbox],
+        HostedMailboxData::ALL,
+        &control(),
+    )
+    .unwrap();
+    let directory = stage.data();
+    let database = crate::imap_ownership::database(&directory, ACCOUNT)
+        .unwrap()
+        .unwrap();
+    assert!(!legacy.path().join(database.file_name().unwrap()).exists());
+    let handle = crate::database::MailDatabase::new_owned(database.clone());
+    let db = handle.lock().unwrap();
+    let messages = crate::cache::list_cached_messages(&db, ACCOUNT, "INBOX", 10, 0).unwrap();
+    assert!(messages.is_empty());
+    drop(db);
+
+    let elsewhere = legacy.path().join(database.file_name().unwrap());
+    crate::database::write_redirect(&database, &elsewhere).unwrap();
+    assert!(crate::imap_ownership::database(&directory, ACCOUNT).is_err());
+    assert!(handle.lock().is_err());
+    assert!(!elsewhere.exists());
 }

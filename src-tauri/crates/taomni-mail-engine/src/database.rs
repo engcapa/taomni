@@ -105,6 +105,7 @@ type InitializeSchema = fn(&Connection) -> rusqlite::Result<()>;
 pub struct MailDatabase {
     connection: Mutex<MailConnection>,
     initialize_schema: InitializeSchema,
+    owned: bool,
 }
 
 impl MailDatabase {
@@ -118,6 +119,15 @@ impl MailDatabase {
                 generation: None,
             }),
             initialize_schema,
+            owned: false,
+        }
+    }
+
+    /// The offline migration has already initialized the installed module's database.
+    pub fn new_owned(path: PathBuf) -> Self {
+        Self {
+            owned: true,
+            ..Self::new(path, |_| Ok(()))
         }
     }
 
@@ -171,10 +181,17 @@ impl MailDatabase {
         if let Some(connection) = inner.connection.as_ref() {
             inner.path = PathBuf::from(connection.path().ok_or("Mail storage has no disk path")?);
         }
+        if self.owned {
+            crate::imap_ownership::require_database(&inner.path)
+                .map_err(|error| format!("Open owned IMAP mailbox: {error}"))?;
+        }
         for _ in 0..32 {
             let lock = ProcessLock::access_cancellable(&inner.path, cancel)?;
             let redirect = redirect_path(&inner.path);
-            if redirect.exists() {
+            if self.owned {
+                crate::imap_ownership::require_database(&inner.path)
+                    .map_err(|error| format!("Open owned IMAP mailbox: {error}"))?;
+            } else if redirect.exists() {
                 let target: PathBuf =
                     serde_json::from_slice(&fs::read(redirect).map_err(|e| e.to_string())?)
                         .map_err(|e| format!("Read mailbox relocation: {e}"))?;
@@ -198,8 +215,16 @@ impl MailDatabase {
                 inner.generation = generation;
             }
             if inner.connection.is_none() {
-                let db = Connection::open(&inner.path)
-                    .map_err(|e| format!("Open mail database: {e}"))?;
+                let db = if self.owned {
+                    use rusqlite::OpenFlags;
+                    Connection::open_with_flags(
+                        &inner.path,
+                        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+                    )
+                } else {
+                    Connection::open(&inner.path)
+                }
+                .map_err(|e| format!("Open mail database: {e}"))?;
                 db.busy_timeout(Duration::from_secs(3))
                     .map_err(|e| e.to_string())?;
                 inner.connection = Some(db);

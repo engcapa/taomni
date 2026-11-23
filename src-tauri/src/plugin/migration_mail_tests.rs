@@ -166,6 +166,12 @@ fn installs_and_records_default_and_custom_mail_data_for_a_verified_package() {
         mail.source_fingerprint,
         snapshot.source_fingerprints["taomni.db"]
     );
+    let registry = crate::plugin::PluginRegistry::new(profile.join("plugins"));
+    registry.scan().unwrap();
+    let runtime = crate::state::MailRuntime::new(&profile);
+    let rejected = runtime.database(&registry, "default", || panic!("do not read the old path"));
+    assert!(rejected.err().unwrap().contains("Enable the Mail module"));
+    registry.set_enabled(OWNER, true).unwrap();
     for (account, source, text) in [
         ("default", &default_path, "default cache"),
         ("custom", &custom_path, "custom cache"),
@@ -173,7 +179,15 @@ fn installs_and_records_default_and_custom_mail_data_for_a_verified_package() {
         let path = profile
             .join(MAIL_MIGRATION_TARGET)
             .join(source.file_name().unwrap());
-        let db = Connection::open(path).unwrap();
+        assert_eq!(
+            taomni_mail_engine::imap_ownership::database(path.parent().unwrap(), account).unwrap(),
+            Some(path.clone())
+        );
+        let handle = runtime
+            .database(&registry, account, || panic!("do not read the old path"))
+            .unwrap();
+        let db = handle.lock().unwrap();
+        assert_eq!(Path::new(db.path().unwrap()).canonicalize().unwrap(), path);
         let value = get_cached_body(&db, account, "INBOX", 9).unwrap().unwrap();
         assert!(value.text.unwrap().contains(text));
         assert!(taomni_mail_engine::draft_import::is_owned(&db, account).unwrap());
@@ -296,6 +310,7 @@ fn a_restored_mailbox_takes_precedence_over_the_legacy_source_at_first_activatio
     )
     .unwrap();
     let plugins = profile.join("plugins");
+    taomni_mail_engine::imap_ownership::mark_owned(&data, "custom").unwrap();
     let locator = retained_data::discover(&plugins, OWNER, 1).unwrap();
     retained_data::save(&plugins, &locator).unwrap();
     let before = restored.each_ref().map(|path| fs::read(path).unwrap());
@@ -317,6 +332,15 @@ fn a_restored_mailbox_takes_precedence_over_the_legacy_source_at_first_activatio
     );
     assert_eq!(fs::read(legacy).unwrap(), legacy_before);
     assert!(!missing_custom.exists());
+    assert!(
+        taomni_mail_engine::imap_ownership::database(&data, "default")
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        taomni_mail_engine::imap_ownership::database(&data, "custom").unwrap(),
+        Some(restored[1].clone())
+    );
 }
 
 #[test]
@@ -379,4 +403,52 @@ fn a_mixed_mail_restore_retries_from_the_original_data_until_first_activation() 
             .unwrap();
         assert_eq!(body.text.as_deref(), Some("updated before activation"));
     }
+}
+
+#[test]
+fn older_packages_keep_the_live_legacy_mailbox_even_with_a_migrated_copy() {
+    let temp = tempfile::tempdir().unwrap();
+    let profile = temp.path().canonicalize().unwrap();
+    let custom = profile.join("custom");
+    legacy_profile(&profile, &custom);
+    let old = cached_mail(&custom, "custom", "the earlier core owns this cache");
+    let mut manifest = package().manifest().clone();
+    assert!(
+        manifest
+            .commands
+            .remove(taomni_mail_api::IMAP_MAILBOX_OWNER)
+    );
+    manifest.version = "0.1.48".into();
+    execute(&profile, &verified_package(&manifest), &control()).unwrap();
+
+    let staged = profile.join(MAIL_MIGRATION_TARGET);
+    assert!(staged.join(old.file_name().unwrap()).exists());
+    assert!(
+        taomni_mail_engine::imap_ownership::database(&staged, "custom")
+            .unwrap()
+            .is_none()
+    );
+
+    let registry = crate::plugin::PluginRegistry::new(profile.join("plugins"));
+    registry.scan().unwrap();
+    registry.set_enabled(OWNER, true).unwrap();
+    let runtime = crate::state::MailRuntime::new(&profile);
+    let handle = runtime
+        .database(&registry, "custom", || {
+            Ok(Some(json!({"mailStorageDirectory": custom}).to_string()))
+        })
+        .unwrap();
+    assert_eq!(
+        Path::new(handle.lock().unwrap().path().unwrap())
+            .canonicalize()
+            .unwrap(),
+        old
+    );
+
+    // A later owner-capable app must wait for a compatible installed module.
+    taomni_mail_engine::imap_ownership::mark_owned(&staged, "custom").unwrap();
+    let result = runtime.database(&registry, "custom", || {
+        panic!("do not use the cached legacy handle")
+    });
+    assert!(result.err().unwrap().contains("Update the Mail module"));
 }

@@ -109,6 +109,16 @@ impl Store {
         connect(&path, OpenFlags::SQLITE_OPEN_READ_WRITE)
     }
 
+    pub(super) fn owns_imap_cache(&self, account: &str) -> Result<bool, RpcError> {
+        validate_account(account)?;
+        let Some(root) = self.data_root(false)? else {
+            return Ok(false);
+        };
+        taomni_mail_engine::imap_ownership::database(&root, account)
+            .map(|database| database.is_some())
+            .map_err(|_| unavailable())
+    }
+
     pub(super) fn pop3_data(&self, account: &str) -> Result<PathBuf, RpcError> {
         let path = self.database_path(account)?.ok_or_else(unavailable)?;
         path.parent().map(Path::to_owned).ok_or_else(unavailable)
