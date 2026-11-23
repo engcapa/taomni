@@ -230,18 +230,6 @@ jobs:
           github-token: ${{ github.token }}
           path: first-release-input/packages
           merge-multiple: false
-      - name: Install the matching Windows WebView2 driver
-        if: inputs.first_release && runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $runtimeRoot = "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application"
-          $runtime = Get-ChildItem -LiteralPath $runtimeRoot -Directory | Where-Object Name -Match '^\d+\.\d+\.\d+\.\d+$' | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
-          if (-not $runtime) { throw 'WebView2 runtime unavailable' }
-          $zip = Join-Path $env:RUNNER_TEMP 'first-release-edgedriver.zip'
-          $driver = Join-Path $env:RUNNER_TEMP 'first-release-edgedriver'
-          Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
-          Expand-Archive -LiteralPath $zip -DestinationPath $driver
-          $driver >> $env:GITHUB_PATH
       - name: Fetch the platform's pinned legacy installer
         if: inputs.upgrade_desktop
         env:

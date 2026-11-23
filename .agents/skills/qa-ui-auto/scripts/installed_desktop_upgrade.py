@@ -152,7 +152,7 @@ def execute(args):
     def measure_core(label, executable):
         try:
             resources[label] = sample_desktop(
-                ctx, executable, profile, work / "core-resources", report / "core-resources", label,
+                executable, profile, work / "core-resources", report / "core-resources", label,
             )
         except ProfileRestoreError:
             raise

@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from installed_core_resources_desktop import (
-    ProfileRestoreError, fresh_profiles, macos_observation, sample_desktop,
+    ProfileRestoreError, fresh_profiles, macos_observation, sample_desktop, windows_observation,
 )
 
 
@@ -31,7 +31,7 @@ class DesktopResourceTests(unittest.TestCase):
     def test_three_windows_attempts_use_fresh_profiles_and_keep_original_data(self):
         samples = iter([(1200, 300), (1300, 400), (900, 500)])
 
-        def observe(ctx, executable, attempt, receipt):
+        def observe(executable, attempt, receipt):
             self.assertEqual(executable, self.executable)
             self.assertEqual(list(self.profile.iterdir()), [])
             self.database.write_text(attempt.name, encoding="utf-8")
@@ -41,7 +41,7 @@ class DesktopResourceTests(unittest.TestCase):
         with patch("installed_core_resources_desktop.platform.system", return_value="Windows"), patch(
             "installed_core_resources_desktop.windows_observation", side_effect=observe,
         ) as launch:
-            result = sample_desktop(None, self.executable, self.profile, self.work, self.evidence, "candidate")
+            result = sample_desktop(self.executable, self.profile, self.work, self.evidence, "candidate")
 
         self.assertEqual(launch.call_count, 3)
         self.assertEqual(result["medianReadyMs"], 1200)
@@ -56,7 +56,7 @@ class DesktopResourceTests(unittest.TestCase):
         with patch("installed_core_resources_desktop.platform.system", return_value="Windows"), patch(
             "installed_core_resources_desktop.windows_observation", return_value=wrong_profile,
         ), self.assertRaisesRegex(RuntimeError, "isolated production profile"):
-            sample_desktop(None, self.executable, self.profile, self.work, self.evidence, "candidate")
+            sample_desktop(self.executable, self.profile, self.work, self.evidence, "candidate")
         self.assertEqual(self.database.read_bytes(), b"upgrade data")
 
     def test_rejects_module_activation_and_restores_the_upgrade_profile(self):
@@ -70,7 +70,7 @@ class DesktopResourceTests(unittest.TestCase):
         with patch("installed_core_resources_desktop.platform.system", return_value="Windows"), patch(
             "installed_core_resources_desktop.windows_observation", side_effect=observe,
         ), self.assertRaisesRegex(RuntimeError, "installed module"):
-            sample_desktop(None, self.executable, self.profile, self.work, self.evidence, "candidate")
+            sample_desktop(self.executable, self.profile, self.work, self.evidence, "candidate")
         self.assertEqual(self.database.read_bytes(), b"upgrade data")
         self.assertFalse((self.profile / "plugins").exists())
 
@@ -99,7 +99,24 @@ class DesktopResourceTests(unittest.TestCase):
                 with patch("installed_core_resources_desktop.installed_macos_desktop", return_value=nullcontext(owner)), patch(
                     "installed_core_resources_desktop.subprocess.run", return_value=received,
                 ), patch("installed_core_resources_desktop.sample_rss") as rss:
-                    with self.assertRaisesRegex(RuntimeError, "Unexpected macOS readiness receipt"):
+                    with self.assertRaisesRegex(RuntimeError, "Unexpected desktop readiness receipt"):
                         macos_observation(self.root / "probe", self.executable, self.work, self.evidence)
                     rss.assert_not_called()
                 self.assertEqual((self.evidence / "readiness.stdout.txt").read_text(), received.stdout)
+
+    def test_windows_samples_the_pid_observed_by_ui_automation(self):
+        owner = Mock(pid=29)
+        owner.poll.return_value = None
+        received = SimpleNamespace(returncode=0, stdout='{"ownerPid":29,"statusMarker":"X11:"}', stderr="")
+        with patch("installed_core_resources_desktop.installed_windows_desktop", return_value=nullcontext(owner)), patch(
+            "installed_core_resources_desktop.subprocess.run", return_value=received,
+        ) as probe, patch("installed_core_resources_desktop.psutil.Process") as process, patch(
+            "installed_core_resources_desktop.sample_rss", return_value=[10, 20, 30],
+        ) as rss:
+            process.return_value.pid = owner.pid
+            result = windows_observation(self.executable, self.work, self.evidence / "windows")
+        command = probe.call_args.args[0]
+        self.assertEqual(Path(command[5]).name, "installed_core_ready_windows.ps1")
+        self.assertEqual(command[6:], ["-OwnerId", "29"])
+        rss.assert_called_once_with(process.return_value, self.executable)
+        self.assertEqual(result["rssBytes"], [10, 20, 30])

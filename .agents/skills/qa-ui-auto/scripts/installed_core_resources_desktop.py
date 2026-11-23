@@ -13,14 +13,12 @@ import psutil
 
 from installed_core_resources import record_comparison, sample_rss, summarize
 from installed_macos_store import installed_macos_desktop
-from installed_windows_webview import installed_webview
+from installed_windows_mfa import installed_windows_desktop
 from modular_bundle_inventory import write_json
-from qa_ui_auto.fixtures.module_legacy_mfa import desktop_action, element
-from qa_ui_auto.native_steps import NativeStepContext
 
 
 READINESS = {
-    "Windows": "Launch the installed app and its owned EdgeDriver, then wait for the visible status bar",
+    "Windows": "Launch the installed app, then observe the visible X11 status segment with UI Automation",
     "Darwin": "Launch the installed app, then wait for the X11 status segment in the window's AXWebArea",
 }
 
@@ -54,13 +52,14 @@ def fresh_profiles(profile):
         shutil.rmtree(staging)
 
 
-def windows_observation(ctx, executable, work, evidence):
+def windows_observation(executable, work, evidence):
+    evidence.mkdir()
+    script = Path(__file__).with_name("installed_core_ready_windows.ps1")
     started = time.monotonic_ns()
-    with installed_webview(executable, work / "webview", evidence, 75) as (driver, session):
-        desktop_action(NativeStepContext(session, evidence, ctx.cfg), "wait_for", element("status-bar"))
-        ready = time.monotonic_ns() - started
-        owner = psutil.Process(driver.application_process.pid)
-        return sample(owner, executable, ready)
+    with installed_windows_desktop(executable, work, evidence, "startup") as owner:
+        command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Sta", "-File", str(script),
+                   "-OwnerId", str(owner.pid)]
+        return observe_status(command, owner, executable, evidence, started)
 
 
 def compile_macos_probe(work, evidence):
@@ -76,19 +75,20 @@ def compile_macos_probe(work, evidence):
 def macos_observation(driver, executable, work, evidence):
     started = time.monotonic_ns()
     with installed_macos_desktop(executable, work, evidence) as owner:
-        observed = subprocess.run(
-            [str(driver), str(owner.pid), str(executable)],
-            capture_output=True, text=True, encoding="utf-8", timeout=80,
-        )
-        ready = time.monotonic_ns() - started
-        (evidence / "readiness.stdout.txt").write_text(observed.stdout, encoding="utf-8")
-        (evidence / "readiness.stderr.txt").write_text(observed.stderr, encoding="utf-8")
-        if observed.returncode or owner.poll() is not None:
-            raise RuntimeError(f"Installed macOS app did not reach UI readiness: {observed.stderr.strip()}")
-        receipt = json.loads(observed.stdout)
-        if receipt != {"ownerPid": owner.pid, "statusMarker": "X11:"}:
-            raise RuntimeError("Unexpected macOS readiness receipt")
-        return sample(psutil.Process(owner.pid), executable, ready)
+        command = [str(driver), str(owner.pid), str(executable)]
+        return observe_status(command, owner, executable, evidence, started)
+
+
+def observe_status(command, owner, executable, evidence, started):
+    observed = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", timeout=85)
+    ready = time.monotonic_ns() - started
+    (evidence / "readiness.stdout.txt").write_text(observed.stdout, encoding="utf-8")
+    (evidence / "readiness.stderr.txt").write_text(observed.stderr, encoding="utf-8")
+    if observed.returncode or owner.poll() is not None:
+        raise RuntimeError(f"Installed app did not reach desktop status: {observed.stderr.strip()}")
+    if json.loads(observed.stdout) != {"ownerPid": owner.pid, "statusMarker": "X11:"}:
+        raise RuntimeError("Unexpected desktop readiness receipt")
+    return sample(psutil.Process(owner.pid), executable, ready)
 
 
 def sample(owner, executable, ready_ns):
@@ -99,7 +99,7 @@ def sample(owner, executable, ready_ns):
     }
 
 
-def sample_desktop(ctx, executable, profile, work, evidence, label):
+def sample_desktop(executable, profile, work, evidence, label):
     system = platform.system()
     if system not in READINESS:
         raise RuntimeError("Expected a Windows or macOS production install")
@@ -112,7 +112,7 @@ def sample_desktop(ctx, executable, profile, work, evidence, label):
             return macos_observation(driver, executable, attempt, receipt)
     else:
         def observe(attempt, receipt):
-            return windows_observation(ctx, executable, attempt, receipt)
+            return windows_observation(executable, attempt, receipt)
 
     samples = []
     with fresh_profiles(profile) as staging:
