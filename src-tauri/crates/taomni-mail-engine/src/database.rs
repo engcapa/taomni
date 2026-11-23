@@ -131,6 +131,21 @@ impl MailDatabase {
         }
     }
 
+    /// Resolve the host's SQLite path without opening a module-owned database
+    /// in the desktop. Legacy accounts still follow or initialize their cache.
+    pub fn canonical_host_path(&self) -> Result<PathBuf, String> {
+        if self.owned {
+            let inner = self.connection.lock().map_err(|error| error.to_string())?;
+            crate::imap_ownership::require_database(&inner.path)
+                .map_err(|error| format!("Open owned IMAP mailbox: {error}"))?;
+            return inner.path.canonicalize().map_err(|error| error.to_string());
+        }
+        let db = self.lock()?;
+        Path::new(db.path().ok_or("Mail storage has no disk path")?)
+            .canonicalize()
+            .map_err(|error| error.to_string())
+    }
+
     pub fn lock(&self) -> Result<MailGuard<'_>, String> {
         self.lock_cancellable(&tokio_util::sync::CancellationToken::new())
     }
@@ -297,6 +312,24 @@ pub fn mail_db_file_stem(account_id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolving_a_hosted_mailbox_does_not_open_sqlite_in_the_caller() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("mail.db");
+        drop(Connection::open(&path).unwrap());
+        let database = MailDatabase::new_owned(path.clone());
+        assert_eq!(
+            database.canonical_host_path().unwrap(),
+            path.canonicalize().unwrap()
+        );
+        assert!(database.connection.lock().unwrap().connection.is_none());
+        assert!(!path.with_extension("access.lock").exists());
+
+        write_redirect(&path, &directory.path().join("elsewhere/mail.db")).unwrap();
+        assert!(database.canonical_host_path().is_err());
+        assert!(database.connection.lock().unwrap().connection.is_none());
+    }
 
     #[test]
     fn snapshot_leaves_schema_initialization_for_the_first_operational_access() {

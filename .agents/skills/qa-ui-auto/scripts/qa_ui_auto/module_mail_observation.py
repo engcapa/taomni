@@ -26,7 +26,7 @@ def run(ctx, args):
         "folder-tree", "folder-changes", "running", "imap-delivery", "pop3-delivery", "pop3-sync",
         "attachment-saved", "attachment-reopened", "agenda-written", "filter-saved", "archive-published",
         "archive-cleaned", "archive-original", "cache-cleared", "contact-saved", "contact-deleted", "responses", "imap-search", "imap-flags", "imap-source",
-        "imap-prefetch", "imap-mutations", "imap-mbox", "imap-forward", "imap-cache",
+        "imap-prefetch", "imap-mutations", "imap-mbox", "imap-forward", "imap-cache", "imap-cached-body",
         "outbox-queued", "outbox-sent", "imap-account-created", "imap-account-synced",
     }
     retained = {"outbox-retained", "contact-retained", "agenda-retained", "filter-retained", "pop3-retained"}
@@ -196,6 +196,17 @@ def run(ctx, args):
         if "mail/publish-imap-body-cache" not in manifest["commands"]:
             raise StepError("The installed Mail host does not publish the IMAP body cache")
         report["prefetch"] = observe_prefetch(args, plugins.parent / "mail-cache")
+    if phase in {"imap-prefetch", "archive-published"} and owner.case_id in {"TC-MODULES-068", "TC-MODULES-070"}:
+        signed["cachedBodyFetches"] = inbox_body_fetches()
+    if phase == "imap-cached-body":
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        command = "mail/read-imap-cached-body"
+        if command not in manifest["commands"]:
+            raise StepError("The signed Mail host does not read cached IMAP bodies")
+        fetches = inbox_body_fetches()
+        if fetches != signed.get("cachedBodyFetches"):
+            raise StepError("Opening the cached body sent another IMAP body request")
+        report["cachedBody"] = {"command": command, **fetches}
     if phase == "imap-mutations":
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
         if owner.case_id != "TC-MAIL-BULK-03" or "mail/run-imap-mutation-job" not in manifest["commands"]:
@@ -224,6 +235,26 @@ def run(ctx, args):
             signed["queuedDraft"] = observation
     (ctx.case_dir / f"signed-mail-{phase}.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return f"Mail {version} host lease verified ({phase})"
+
+
+def inbox_body_fetches():
+    state = mail_fake_server.ACTIVE.state
+    with state.lock:
+        uid = max(state.folders["INBOX"].messages)
+        commands = [
+            event["command"].upper()
+            for event in state.fetch_events + state.fetch_inflight
+            if event["folder"] == "INBOX"
+        ]
+    reads = [
+        command for command in commands
+        if command.startswith(f"UID FETCH {uid} ")
+        and ("BODY.PEEK[" in command or "BODY[" in command or "RFC822)" in command)
+        and "[HEADER" not in command
+    ]
+    if not reads:
+        raise StepError("The fixture did not observe the initial INBOX body fetch")
+    return {"uid": uid, "bodyFetchCount": len(reads)}
 
 
 def observe_imap_index(root, subject, *, folder="INBOX"):

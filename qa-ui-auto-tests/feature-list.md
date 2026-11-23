@@ -7733,6 +7733,8 @@ files:
   - src/lib/mail.ts
   - src-tauri/src/mail/mod.rs
   - src-tauri/src/mail/message_body.rs
+  - src-tauri/src/mail/module_host/cache_query.rs
+  - src-tauri/plugins/mail/src/cache_query.rs
   - src-tauri/src/mail/module_host/prefetch.rs
   - src-tauri/plugins/mail/src/prefetch.rs
   - src-tauri/src/mail/imap_transport.rs
@@ -7761,7 +7763,7 @@ controls:
 - 邮件工具栏的连接测试在已启用的 Mail 宿主中完成 IMAP 或 POP3 登录和 SMTP 认证。TC-MODULES-059 验证签名宿主与真实协议，TC-MAIL-POP3-01 覆盖连接、重复同步、重开和标记本地文件夹为已读。TC-MODULES-076 核对实际邮件正文、已验签宿主持有的 POP3 UIDL 与原件，以及停用后保留的数据。两条 POP3 用例都核对重复同步完成后新增邮件数为零。
 - Sessions 与 Workspace 使用同一个 Mail 模块入口。已启用的签名前端提供账户和统一收件箱。TC-MODULES-059 比对实际宿主与前端摘要，TC-MODULES-060 覆盖两个标签的启用和停用。
 - 最近正文缓存按 `bodyRecentLimit` 从已缓存的邮件头中选取候选，由 Mail 宿主用独立 IMAP 连接以每文件夹最多四封为一批读取，随后写入原生磁盘缓存。TC-MODULES-068 核对真实 IMAP 连接与缓存读取，TC-MODULES-069 验证独立预取进度和预取期间手动打开邮件。 签名宿主提交前核对当前邮箱代际和已有正文，前台打开的解码结果也由宿主写入缓存。
-- 邮件正文读取按 `folder:uid` 缓存在前端内存中；点击已缓存正文优先使用内存/SQLite，自动标记已读不再等待正文加载完成。
+- 邮件正文按 `folder:uid` 缓存在前端内存中。签名 Mail 宿主从完整归档或 SQLite 读取未命中内存的正文，自动标记已读无需等待正文加载。TC-MODULES-068 核对关闭并重开账户后读到已预热的正文，且没有再次发起 IMAP 正文请求。TC-MAIL-CACHE-02 核对浏览器会话改名和重开账户后的正文。
 - 已启用的 Mail 宿主读取并解码用户打开的未缓存正文，保留大邮件分段和额外 EML 副本。TC-MODULES-059/060 检查实际阅读区，Mail 宿主协议用例核对解析后的内容及服务器原始字节。
 - 整个 IMAP 文件夹标记已读先查询服务器 UNSEEN，涵盖未下载历史；每批最多 250 个 UID，批间释放账号连接锁，网络断连只重试幂等标记。
 - 标记、移动、删除的 SQLite 写入使用后台线程中的批量事务；本地搜索也在后台线程执行。
@@ -8877,7 +8879,7 @@ controls:
 
 ### 13.23 完整邮件存储、本地归档与目录迁移
 
-Mail 宿主从旧库的归档记录返回保存时间。只有 POP3 原件时，读取正文不生成缓存时间。归档和本地原件的内容、时间字段及重开后的结果由 `profile_host` 跨进程用例核对，Browser 和 Native 归档操作由 `TC-MAIL-STORAGE-01/02` 覆盖。
+Mail 宿主从旧库的归档记录返回保存时间。只有 POP3 原件时，读取正文不生成缓存时间。归档和本地原件的内容、时间字段及重开后的结果由 `profile_host` 跨进程用例核对，Browser 和 Native 归档操作由 `TC-MAIL-STORAGE-01/02` 覆盖。TC-MODULES-070 检查普通账户阅读器从自定义归档加载正文和附件名，核对 IMAP 正文请求数。
 
 查看原文和保存 EML 优先读取已归档的原件。启用的签名 Mail 宿主从 IMAP 读取未归档的 MIME 原件，由核心保存到用户选定的位置。TC-MODULES-059 检查真实 IMAP 原文与本机保存的 EML 文件，TC-MODULES-060 检查 Browser 的原文对话框和导出内容。
 
@@ -8938,6 +8940,9 @@ controls:
     kind: interactive
   - id: mail-cache-enabled
     selector: '[data-testid="mail-cache-enabled"]'
+    kind: interactive
+  - id: mail-recent-body-limit
+    selector: 'input[aria-label="Mail recent body limit"]'
     kind: interactive
   - id: mail-sync-interval
     selector: 'input[aria-label="Mail sync interval minutes"]'

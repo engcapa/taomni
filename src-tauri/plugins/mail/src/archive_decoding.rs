@@ -1,6 +1,7 @@
 use taomni_mail_api::{
     archive::{ArchiveAttachmentDecoding, ArchiveDecoding},
     imap_exchange::{read_body_frame, write_body_frame},
+    message::MailMessageBody,
 };
 use taomni_mail_engine::{cache::cached_to_body, extract_attachment, parse_body_message};
 use taomni_plugin_api::{ErrorCode, RpcError};
@@ -24,11 +25,15 @@ pub(super) fn encode_body(
     uid: u32,
     raw: &[u8],
 ) -> Result<Vec<u8>, RpcError> {
-    let body = cached_to_body(
+    serde_json::to_vec(&archived_body(account, folder, uid, raw))
+        .map_err(|_| RpcError::from_code(ErrorCode::InternalError))
+}
+
+pub(super) fn archived_body(account: &str, folder: &str, uid: u32, raw: &[u8]) -> MailMessageBody {
+    cached_to_body(
         parse_body_message(account, folder, uid, Some(raw.len() as u32), raw, raw.len()),
         "archive",
-    );
-    serde_json::to_vec(&body).map_err(|_| RpcError::from_code(ErrorCode::InternalError))
+    )
 }
 
 pub(super) fn attachment(

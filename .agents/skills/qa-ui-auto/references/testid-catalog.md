@@ -2010,6 +2010,7 @@
 - `[data-testid="mail-storage-mode"]` — interactive — F-MAIL-23.mail-storage-mode
 - `[data-testid="mail-cache-attachments"]` — interactive — F-MAIL-23.mail-cache-attachments
 - `[data-testid="mail-cache-enabled"]` — interactive — F-MAIL-23.mail-cache-enabled
+- `input[aria-label="Mail recent body limit"]` — interactive — F-MAIL-23.mail-recent-body-limit
 - `input[aria-label="Mail sync interval minutes"]` — interactive — F-MAIL-23.mail-sync-interval
 - `input[aria-label="Mail max fetch per sync"]` — interactive — F-MAIL-23.mail-sync-fetch-limit
 - `[data-testid="mail-storage-folders"]` — interactive — F-MAIL-23.mail-storage-folders

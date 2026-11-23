@@ -1,4 +1,4 @@
-//! Send account folders, message pages and local search results from read-only SQLite.
+//! Read account folders, message pages, search results and cached bodies for the desktop.
 
 use std::io::{self, Write};
 
@@ -9,8 +9,9 @@ use taomni_mail_api::{
         MAX_CACHED_MESSAGE_PAGE,
     },
     imap_exchange::{read_bounded_body_frame, write_body_frame},
+    message::MailMessageBody,
 };
-use taomni_mail_engine::{cache, search::search_cached_messages};
+use taomni_mail_engine::{cache, search::search_cached_messages, storage};
 use taomni_plugin_api::{ErrorCode, RpcError, services::CoreServiceError};
 use taomni_plugin_sdk::Operation;
 use taomni_plugin_stream::{CancellationToken, routed_tcp::Endpoint};
@@ -18,12 +19,14 @@ use tokio::runtime::Runtime;
 
 use super::{
     account_cache::lock_account_cache,
-    store::{open_database, unavailable, validate_account},
+    archive_decoding::archived_body,
+    store::{open_database, open_snapshot_file, unavailable, validate_account},
 };
 
 pub(super) fn serve(
     runtime: &Runtime,
     operation: &Operation,
+    method: &str,
     endpoint: Endpoint,
 ) -> Result<Result<(), String>, RpcError> {
     let (mut peer, _) = match runtime.block_on(operation.while_current(endpoint.connect()))? {
@@ -35,8 +38,11 @@ pub(super) fn serve(
             operation.while_current(read_bounded_body_frame(&mut peer, MAX_CACHE_QUERY_BYTES)),
         )?
         .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
-    let request = serde_json::from_slice(&request)
+    let request: CacheQueryRequest = serde_json::from_slice(&request)
         .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+    if request.query.host_method() != method {
+        return Err(RpcError::from_code(ErrorCode::InvalidParams));
+    }
     let reply = runtime.block_on(async {
         let cancellation = CancellationToken::new();
         let mut task = tokio::task::spawn_blocking({
@@ -61,14 +67,6 @@ fn execute(
     request: CacheQueryRequest,
     cancellation: CancellationToken,
 ) -> Result<Vec<u8>, RpcError> {
-    fn check(token: &CancellationToken) -> Result<(), RpcError> {
-        if token.is_cancelled() {
-            Err(CoreServiceError::Cancelled.into_rpc_error())
-        } else {
-            Ok(())
-        }
-    }
-
     let CacheQueryRequest {
         account_id,
         database,
@@ -76,7 +74,7 @@ fn execute(
     } = request;
     validate_account(&account_id)?;
     check(&cancellation)?;
-    let _access = lock_account_cache(&database, &account_id)
+    let access = lock_account_cache(&database, &account_id)
         .map_err(|error| RpcError::new(ErrorCode::InvalidState, error))?;
     check(&cancellation)?;
     let db = open_database(&database)?;
@@ -107,6 +105,43 @@ fn execute(
             search_cached_messages(&db, &account_id, &query),
             &cancellation,
         ),
+        CacheQuery::Body {
+            folder,
+            uid,
+            cache_enabled,
+        } => {
+            let original = storage::open_with(&db, &account_id, &folder, uid, |path| {
+                open_snapshot_file(path).map_err(|error| error.message)
+            })
+            .map_err(|error| RpcError::new(ErrorCode::InvalidState, error))?;
+            if let Some(original) = original {
+                // The open file stays valid if cleanup or relocation removes its
+                // directory entry. MIME verification leaves the account unlocked.
+                drop(db);
+                drop(access);
+                let raw =
+                    original.read_with(|| check(&cancellation).map_err(|error| error.message));
+                check(&cancellation)?;
+                let raw = raw.map_err(|error| RpcError::new(ErrorCode::InvalidState, error))?;
+                let body = archived_body(&account_id, &folder, uid, &raw);
+                serialize_result(Ok(Some(body)), &cancellation)
+            } else {
+                let cached = if cache_enabled {
+                    cache::get_cached_body(&db, &account_id, &folder, uid)
+                } else {
+                    Ok(None::<MailMessageBody>)
+                };
+                serialize_result(cached, &cancellation)
+            }
+        }
+    }
+}
+
+fn check(token: &CancellationToken) -> Result<(), RpcError> {
+    if token.is_cancelled() {
+        Err(CoreServiceError::Cancelled.into_rpc_error())
+    } else {
+        Ok(())
     }
 }
 
@@ -114,9 +149,7 @@ fn serialize_result<T: Serialize>(
     result: rusqlite::Result<T>,
     cancellation: &CancellationToken,
 ) -> Result<Vec<u8>, RpcError> {
-    if cancellation.is_cancelled() {
-        return Err(CoreServiceError::Cancelled.into_rpc_error());
-    }
+    check(cancellation)?;
     let rows = result.map_err(|_| unavailable())?;
     encode(&rows, MAX_CACHE_REPLY_BYTES as usize)
 }

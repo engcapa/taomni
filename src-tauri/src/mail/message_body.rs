@@ -1,6 +1,6 @@
 //! Read cached bodies or fetch and decode them through the signed Mail host.
 
-use taomni_mail_api::body_cache::ImapBodyCacheSource;
+use taomni_mail_api::{body_cache::ImapBodyCacheSource, cache_query::CacheQuery};
 
 use super::*;
 
@@ -78,30 +78,7 @@ async fn get_message_body(
         return local_cmds::get_body(&state, &config.session_id, folder.trim(), uid).await;
     }
     let account_id = config.session_id.clone();
-    let cache_folder = folder.clone();
-    let cache_enabled = config.cache.enabled;
-    let (original, cached) = with_mail_db_async(&state, &account_id, move |db, account| {
-        let original =
-            storage::open(db, account, &cache_folder, uid).map_err(storage::as_sql_error)?;
-        let cached = if original.is_none() && cache_enabled {
-            get_cached_body(db, account, &cache_folder, uid)?
-        } else {
-            None
-        };
-        Ok((original, cached))
-    })
-    .await?;
-    if let Some(original) = original {
-        return module_host::decode_archive_original(
-            state.plugins.clone(),
-            original,
-            account_id,
-            folder,
-            uid,
-        )
-        .await;
-    }
-    if let Some(body) = cached {
+    if let Some(body) = cached_imap_body(&state, &config, &folder, uid).await? {
         return Ok(body);
     }
 
@@ -138,6 +115,64 @@ async fn get_message_body(
     }
 
     Ok(cached_to_body(message, "remote"))
+}
+
+async fn cached_imap_body(
+    state: &State<'_, AppState>,
+    config: &MailAccountConfig,
+    folder: &str,
+    uid: u32,
+) -> Result<Option<MailMessageBody>, String> {
+    let account_id = &config.session_id;
+    let cache_enabled = config.cache.enabled;
+    if module_host::reads_imap_cached_body(&state.plugins) {
+        let body: Option<MailMessageBody> = module_host::query_account_cache(
+            state.plugins.clone(),
+            state.mail_db(account_id)?,
+            account_id.clone(),
+            CacheQuery::Body {
+                folder: folder.to_owned(),
+                uid,
+                cache_enabled,
+            },
+        )
+        .await?;
+        if body.as_ref().is_some_and(|body| {
+            body.account_id != *account_id
+                || body.folder != folder
+                || body.uid != uid
+                || !(body.source == "archive" || (cache_enabled && body.source == "cache"))
+        }) {
+            return Err("Mail module returned another cached message".into());
+        }
+        return Ok(body);
+    }
+
+    // Preserve interoperability with signed hosts predating this command.
+    let cache_folder = folder.to_owned();
+    let (original, cached) = with_mail_db_async(state, account_id, move |db, account| {
+        let original =
+            storage::open(db, account, &cache_folder, uid).map_err(storage::as_sql_error)?;
+        let cached = if original.is_none() && cache_enabled {
+            get_cached_body(db, account, &cache_folder, uid)?
+        } else {
+            None
+        };
+        Ok((original, cached))
+    })
+    .await?;
+    if let Some(original) = original {
+        return module_host::decode_archive_original(
+            state.plugins.clone(),
+            original,
+            account_id.clone(),
+            folder.to_owned(),
+            uid,
+        )
+        .await
+        .map(Some);
+    }
+    Ok(cached)
 }
 
 async fn fetch_host_body(

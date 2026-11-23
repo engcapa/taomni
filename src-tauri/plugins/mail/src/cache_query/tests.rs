@@ -48,6 +48,42 @@ fn add(db: &Connection, account: &str, folder: &str, uid: u32, subject: &str) {
 }
 
 #[test]
+fn reads_the_archived_original_before_the_optional_body_cache() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = database(&directory.path().canonicalize().unwrap(), ACCOUNT);
+    let db = Connection::open(&path).unwrap();
+    init_mail_tables(&db).unwrap();
+    add(&db, ACCOUNT, "INBOX", 3, "Cached copy");
+    add(&db, ACCOUNT, "INBOX", 4, "Cached only");
+    add(&db, "other-account", "INBOX", 5, "Other account");
+    let raw = b"Subject: Exact original\r\n\r\nOriginal offline mail\r\n";
+    storage::store(&db, ACCOUNT, "INBOX", 3, 9, &raw[..]).unwrap();
+
+    let read = |uid, cache_enabled| {
+        call::<Option<MailMessageBody>>(
+            &path,
+            CacheQuery::Body {
+                folder: "INBOX".into(),
+                uid,
+                cache_enabled,
+            },
+        )
+    };
+    for cache_enabled in [false, true] {
+        let body = read(3, cache_enabled).unwrap();
+        assert_eq!(body.account_id, ACCOUNT);
+        assert_eq!(body.folder, "INBOX");
+        assert_eq!(body.uid, 3);
+        assert_eq!(body.source, "archive");
+        assert_eq!(body.subject, "Exact original");
+        assert!(body.text.unwrap().contains("Original offline mail"));
+    }
+    assert_eq!(read(4, true).unwrap().source, "cache");
+    assert!(read(4, false).is_none());
+    assert!(read(5, true).is_none());
+}
+
+#[test]
 fn reads_account_scoped_folders_message_pages_and_search_from_current_wal() {
     let directory = tempfile::tempdir().unwrap();
     let path = database(&directory.path().canonicalize().unwrap(), ACCOUNT);

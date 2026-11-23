@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{pop3_store::LocalMailboxAction, search::MailSearchQuery};
 
 pub const QUERY_ACCOUNT_CACHE: &str = "mail/query-account-cache";
+pub const READ_IMAP_CACHED_BODY: &str = "mail/read-imap-cached-body";
 pub const MAX_CACHE_QUERY_BYTES: u64 = 1024 * 1024;
 pub const MAX_CACHE_REPLY_BYTES: u64 = taomni_plugin_stream::MAX_PAYLOAD_BYTES as u64;
 pub const MAX_CACHED_MESSAGE_PAGE: u32 = 1_000;
@@ -29,6 +30,20 @@ pub enum CacheQuery {
         offset: u32,
     },
     Search(MailSearchQuery),
+    Body {
+        folder: String,
+        uid: u32,
+        cache_enabled: bool,
+    },
+}
+
+impl CacheQuery {
+    pub fn host_method(&self) -> &'static str {
+        match self {
+            Self::Body { .. } => READ_IMAP_CACHED_BODY,
+            _ => QUERY_ACCOUNT_CACHE,
+        }
+    }
 }
 
 impl From<CacheQuery> for LocalMailboxAction {
@@ -45,6 +60,7 @@ impl From<CacheQuery> for LocalMailboxAction {
                 offset,
             },
             CacheQuery::Search(query) => Self::Search(query),
+            CacheQuery::Body { folder, uid, .. } => Self::Body { folder, uid },
         }
     }
 }

@@ -89,8 +89,5 @@ pub(super) async fn query_account_cache<T: DeserializeOwned + Send + 'static>(
 pub(super) fn canonical_cache_database(
     cache: &crate::state::MailDbHandle,
 ) -> Result<PathBuf, String> {
-    let db = cache.lock()?;
-    Path::new(db.path().ok_or("Mail storage has no disk path")?)
-        .canonicalize()
-        .map_err(|error| error.to_string())
+    cache.canonical_host_path()
 }

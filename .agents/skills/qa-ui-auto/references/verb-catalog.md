@@ -576,6 +576,10 @@ Native-only protocol oracle. Optional `no_move`, `count_rejected`, and `copied`
 assert capability routing, a real provider count rejection, and unique COPY count.
 Always rejects duplicate source copies or mailbox-wide EXPUNGE.
 
+`assert_signed_mail_host: imap-cached-body` checks the signed cached-body command
+and compares the fixture's newest INBOX body-fetch count before and after opening
+the persisted body in TC-MODULES-068 or TC-MODULES-070.
+
 `TC-MAIL-BULK-03` also uses `assert_signed_mail_host: imap-mutations` to record the
 installed package identity, writer lease, COPY attempts, STORE commands and
 targeted expunges in the signed Mail report.

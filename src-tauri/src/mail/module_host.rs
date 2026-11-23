@@ -13,7 +13,7 @@ pub(super) use body_cache::{publish_body_cache, publishes_body_cache};
 mod body_sync;
 mod cache_publication;
 mod cache_query;
-pub(super) use cache_query::{queries_account_cache, query_account_cache};
+pub(super) use cache_query::{queries_account_cache, query_account_cache, reads_imap_cached_body};
 mod compose;
 mod contact_history;
 pub(super) use contact_history::{contact_history, manages_contact_history};
