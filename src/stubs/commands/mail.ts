@@ -103,7 +103,8 @@ export const mailStubSeed: MailStubSeed = (accountId) => ({
 });
 
 export function stubMailBody(accountId: string, folder: string, uid: number) {
-  const header = stubMailFindHeader(accountId, mailStubSeed, folder, uid)
+  const stored = stubMailFindHeader(accountId, mailStubSeed, folder, uid);
+  const header = stored
     ?? stubMailMessages(accountId, folder).find((message) => message.uid === uid)
     ?? stubMailMessages(accountId, folder)[0];
   const html = uid === 89
@@ -118,8 +119,8 @@ export function stubMailBody(accountId: string, folder: string, uid: number) {
     uid: header.uid,
     messageId: header.messageId,
     subject: header.subject,
-    text,
-    html,
+    text: stored?.composedBody ? stored.composedBody.text : text,
+    html: stored?.composedBody ? stored.composedBody.html : html,
     snippet: header.snippet,
     attachments: header.attachments,
     rawSize: header.rawSize,
@@ -438,6 +439,7 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
         to?: string[];
         subject?: string;
         textBody?: string | null;
+        htmlBody?: string | null;
         inReplyTo?: string | null;
         references?: string[];
         draftId?: string | null;
@@ -451,6 +453,7 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
         to: (request.to ?? []).map((address) => ({ name: address, address })),
         from: { name: "Preview User", address: "user@example.com" },
         snippet: (request.textBody ?? "").slice(0, 200),
+        composedBody: { text: request.textBody ?? null, html: request.htmlBody ?? null },
         inReplyTo: request.inReplyTo?.replace(/^<|>$/g, "") ?? null,
         references: (request.references ?? []).map((id) => id.replace(/^<|>$/g, "")),
       });
@@ -579,6 +582,7 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
         subject: draft.subject,
         flags: ["\\Draft", "\\Seen"],
         snippet: draft.textBody.slice(0, 200),
+        composedBody: { text: draft.textBody || null, html: draft.htmlBody || null },
       });
       const stored = { ...draft, remoteDraftFolder: "Drafts", remoteDraftUid: uid };
       saveMailDrafts(drafts.map((item) => (item === draft ? stored : item)));

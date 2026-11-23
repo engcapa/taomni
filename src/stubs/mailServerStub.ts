@@ -28,6 +28,7 @@ type StubMailHeader = {
   snippet: string;
   rawSize: number;
   bodyCached: boolean;
+  composedBody?: { text: string | null; html: string | null };
   inReplyTo?: string | null;
   references?: string[];
   listUnsubscribe?: { uris: string[]; oneClick: boolean } | null;
