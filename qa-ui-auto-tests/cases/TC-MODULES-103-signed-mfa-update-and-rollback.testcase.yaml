@@ -1,0 +1,168 @@
+id: TC-MODULES-103
+title: Signed MFA switches versions and retains its account in the original desktop process
+description: >-
+  Install an independently compiled MFA prerelease and create a real HOTP account.
+  Download the current signed build from the loopback module catalog. Switch and
+  roll back both while disabled and while running. Exercise recovery from a signed
+  package whose declared version intentionally fails the production handshake.
+  Uninstall and explicitly reinstall, then reopen the same account. The native
+  checks record the original desktop process, successive host processes, their
+  signed bytes, writer ownership and the encrypted account in the module database.
+covers: [F-Modules-1, F-MFA-1, F-MFA-2, F-WS-3]
+tags: [modules, mfa, marketplace, lifecycle, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, module_signed_mfa_archive, module_marketplace, release_build_required]
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- module_marketplace_probe: {phase: source}
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mfa_previous_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mfa_previous_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-mfa"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mfa"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mfa-lifecycle-profile
+- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
+- click: '[data-testid="mfa-add"]'
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: MFA lifecycle HOTP}
+- fill: {selector: '[data-testid="mfa-add-secret"]', value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ}
+- click: '[data-testid="mfa-add-advanced"]'
+- select_option: {selector: '[data-testid="mfa-add-kind"]', value: hotp}
+- click: '[data-testid="mfa-add-submit"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 755 224, timeout_sec: 30}
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082}
+- assert_signed_mfa_lifecycle: old-enabled
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-disable-mfa"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-enable-mfa"]:enabled'
+- assert_signed_mfa_lifecycle: old-disabled
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-update"]'
+- click: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-download"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: {selector: '[data-testid="module-download-task"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-review"]'
+- assert_text: {selector: '[data-testid="confirm-dialog-message"]', contains: '${fixture.mfa_current_version}'}
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
+- assert_signed_mfa_lifecycle: updated-disabled
+- click: '[data-testid="module-action-rollback-mfa"]'
+- assert_text: {selector: '[data-testid="module-action-rollback-mfa"]:enabled', contains: '${fixture.mfa_current_version}'}
+- assert_signed_mfa_lifecycle: rolled-back-disabled
+- press: {selector: '[data-testid="module-action-enable-mfa"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mfa"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tab-item"][data-tab-type="mfa"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082}
+- assert_signed_mfa_lifecycle: old-reenabled
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-update"]'
+- click: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-review"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
+- assert_signed_mfa_lifecycle: updated-enabled
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tab-item"][data-tab-type="mfa"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082}
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 359 152}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mfa_failed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mfa_failed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="failed"]', timeout_sec: 45}
+- assert_text: {selector: '[data-testid="module-offline-error"]', contains: 'Plugin permission denied'}
+- assert_signed_mfa_lifecycle: failed-update
+- click: '[data-testid="module-action-rollback-mfa"]'
+- assert_text: {selector: '[data-testid="module-action-rollback-mfa"]:enabled', contains: '${fixture.mfa_current_version}'}
+- assert_signed_mfa_lifecycle: rolled-back-enabled
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tab-item"][data-tab-type="mfa"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 359 152}
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 969 429}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-uninstall-mfa"]:enabled', key: Enter}
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-mfa"]'
+- assert_visible: '[data-testid="module-data-retained-mfa"]'
+- assert_signed_mfa_lifecycle: uninstalled
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tab-item"][data-tab-type="mfa"]'
+- wait_for: '[data-plugin-slug="mfa"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+- assert_count: {selector: '[data-testid="mfa-account-code"]', equal: 0}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mfa_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mfa_signed_signature_text}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-mfa"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mfa"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tab-item"][data-tab-type="mfa"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 969 429}
+- assert_signed_mfa_lifecycle: reinstalled
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: disabled-update-and-rollback
+    requirement: Update and roll back the disabled MFA module without starting its host or changing the original account.
+    actions: [10, 12, 18, 25, 27, 32, 35, 37, 38, 40, 42, 45, 48, 51]
+    checkpoints:
+    - {step: 29, expectation: The installed prerelease runs the signed host and saves the original account at counter one.}
+    - {step: 34, expectation: Disable releases the original host process and the writer lease.}
+    - {step: 36, expectation: The signed module catalog offers the current version for the installed prerelease.}
+    - {step: 41, expectation: Verified package review identifies the version pending approval.}
+    - {step: 44, expectation: The approved package becomes active while the module remains disabled.}
+    - {step: 47, expectation: Rollback selects the prerelease while preserving the disabled preference and account.}
+    - {step: 53, expectation: Re-enabling the prerelease starts a new host and reopens the same account.}
+    results: [29, 34, 36, 41, 44, 47, 53]
+  - id: enabled-update-and-failed-handshake
+    requirement: Replace a running MFA host, recover after handshake rejection and roll back in the same desktop process.
+    actions: [56, 58, 59, 63, 65, 69, 70, 71, 75, 79, 81]
+    checkpoints:
+    - {step: 61, expectation: The old host has exited and the current signed host already owns the writer lease.}
+    - {step: 66, expectation: The current host advances the original account to counter two.}
+    - {step: 73, expectation: The install form reports why the replacement failed.}
+    - {step: 74, expectation: The failing package reached verified staging and a replacement of the working host already owns the original account.}
+    - {step: 77, expectation: Rollback starts the signed prerelease and releases the current host without replacing the desktop.}
+    - {step: 82, expectation: The rolled-back host advances the original account to counter three.}
+    results: [61, 66, 73, 74, 77, 82]
+  - id: retained-uninstall-and-reinstall
+    requirement: Remove version files and the active host on uninstall, then reuse the original account after explicitly reinstalling MFA.
+    actions: [85, 86, 91, 96, 97, 98, 100, 103]
+    checkpoints:
+    - {step: 88, expectation: Settings identifies that user data has been retained.}
+    - {step: 89, expectation: "Version directories are gone, the lease is free and the data locator owns the original encrypted account."}
+    - {step: 92, expectation: The open manager tab identifies the missing module.}
+    - {step: 99, expectation: The explicit signed reinstall completes successfully.}
+    - {step: 105, expectation: The new host reuses the original encrypted account and counter on the same desktop.}
+    - {step: 106, expectation: The complete lifecycle leaves no renderer runtime errors.}
+    results: [88, 89, 92, 99, 105, 106]
+  visual:
+  - check: The signed catalog offers the MFA version and the offline form displays the handshake failure.
+    method: automated
+    reason: The case exercises both visible product paths and checks their status controls.
+  native:
+  - check: Verify the OS process lineage and identity, writer lease, package hashes and actual MFA database at each transition.
+    method: automated
+    reason: Browser preview cannot establish native package trust, host replacement, or encrypted data retention.

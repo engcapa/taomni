@@ -13,6 +13,8 @@ from unittest.mock import patch
 
 import yaml
 
+from qa_ui_auto.module_qa_versions import lifecycle_versions
+
 ROOT = Path(__file__).resolve().parents[4]
 PLATFORMS = ["linux-x86_64", "windows-x86_64", "darwin-aarch64", "darwin-x86_64"]
 
@@ -74,7 +76,7 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
         }))
         return payload
 
-    def guard(self, root, module, platform, legacy_roster="false"):
+    def guard(self, root, module, platform, legacy_roster="false", lifecycle="false"):
         workflow = yaml.safe_load((ROOT / ".github/workflows/qa-modular-packages.yml").read_text())
         guard = next(step["run"] for step in workflow["jobs"]["sign"]["steps"]
                      if step.get("name", "").startswith("Restrict QA signing"))
@@ -86,7 +88,7 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
             shutil.copyfile(ROOT / "scripts" / helper, scripts / helper)
         with chdir(root), patch.object(sys, "path", list(sys.path)), patch.dict(os.environ, {
             "QA_MODULE": module, "MODULE_PLATFORM": platform, "MODULE_SOURCE_SHA": "a" * 40,
-            "MODULE_LEGACY_ROSTER": legacy_roster,
+            "MODULE_LEGACY_ROSTER": legacy_roster, "MODULE_LIFECYCLE": lifecycle,
         }):
             exec(compile(source, "trusted-workflow-payload-guard", "exec"), {})
 
@@ -160,6 +162,30 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
             path.write_text(json.dumps({**manifest, "version": "3.0.0"}))
             with self.assertRaisesRegex(AssertionError, "trusted official contract"):
                 self.guard(root, "hello-plugin", "linux-x86_64")
+
+    def test_mfa_lifecycle_requires_distinct_previous_host_bytes_and_fixed_version(self):
+        for platform in PLATFORMS:
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                current = self.seed(root, "mfa", platform)
+                manifest = json.loads((current / "module.json").read_text())
+                host_name = manifest["entry"]["host"]
+                previous_version, failed_version = lifecycle_versions("mfa", manifest["version"])
+                previous = root / "candidate/unsigned-previous"
+                shutil.copytree(current, previous)
+                previous_manifest = previous / "module.json"
+                previous_manifest.write_text(json.dumps({**manifest, "version": previous_version}))
+                with self.assertRaisesRegex(AssertionError, "independently compiled"):
+                    self.guard(root, "mfa", platform, lifecycle="true")
+                (previous / host_name).write_bytes(b"distinct older MFA host fixture")
+                previous_manifest.write_text(json.dumps({**manifest, "version": "3.0.0"}))
+                with self.assertRaisesRegex(AssertionError, "trusted official contract"):
+                    self.guard(root, "mfa", platform, lifecycle="true")
+                previous_manifest.write_text(json.dumps({**manifest, "version": previous_version}))
+                self.guard(root, "mfa", platform, lifecycle="true")
+                failure = root / "candidate/handshake-failure"
+                self.assertEqual(json.loads((failure / "module.json").read_text())["version"], failed_version)
+                self.assertEqual((failure / host_name).read_bytes(), (current / host_name).read_bytes())
 
     def test_first_upgrade_roster_requires_the_trusted_mfa_payload(self):
         for platform in PLATFORMS:

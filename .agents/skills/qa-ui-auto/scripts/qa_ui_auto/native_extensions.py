@@ -34,6 +34,8 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("assert_vnc_key_helper")(assert_vnc_key_helper)
     from .module_mail_observation import run as assert_signed_mail_host
     register_verb("assert_signed_mail_host")(assert_signed_mail_host)
+    from .module_mfa_lifecycle_observation import run as assert_signed_mfa_lifecycle
+    register_verb("assert_signed_mfa_lifecycle")(assert_signed_mfa_lifecycle)
     from .module_sockscap_observation import run as assert_signed_sockscap_host, resource_fixture
     from .sockscap_redirector_observation import run as assert_signed_redirector_bridge
     register_verb("assert_signed_redirector_bridge")(assert_signed_redirector_bridge)

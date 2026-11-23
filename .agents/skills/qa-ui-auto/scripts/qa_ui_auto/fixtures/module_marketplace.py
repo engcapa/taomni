@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import threading
 
+from ..module_qa_versions import MFA_LIFECYCLE_CASE
 from .module_download import plugin_root
 from .module_signed_archive import load_artifact
 from . import module_first_release
@@ -65,7 +66,7 @@ class Origin:
         self.thread.join(timeout=5)
 
 
-def fixture_files(root, receipt, *, opt_in=False):
+def fixture_files(root, receipt, *, opt_in=False, include_tampered=True):
     if Path(receipt["archive"]).name != receipt["archive"]:
         raise RuntimeError("Signed package filename must stay inside its artifact directory")
     # Each case serves only the signed releases it exercises.
@@ -94,7 +95,7 @@ def fixture_files(root, receipt, *, opt_in=False):
         signature = files["/" + name + ".minisig"].decode()
         if f"trusted comment: file={name} sourceSha={receipt['sourceSha']}" not in signature.splitlines():
             raise RuntimeError("Signed catalog source identity differs from the native QA binary")
-    if opt_in:
+    if opt_in or not include_tampered:
         return files
     # Adversarial input keeps the original valid signature and modifies the
     # signed bytes. The actual application's pinned verifier must reject it.
@@ -109,6 +110,11 @@ def setup(ctx):
     if (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("module_marketplace requires the native pinned verifier")
     plugin_root(ctx)  # validate run-owned isolation before opening any service
+    if ctx.case_id == MFA_LIFECYCLE_CASE:
+        receipt = ctx.mfa_lifecycle["current"]
+        files = fixture_files(Path(os.environ["QA_SIGNED_MFA_ROOT"]), receipt, include_tampered=False)
+        ctx.module_marketplace = Origin(files, Path(ctx.case_dir) / "module-marketplace-requests.json")
+        return
     receipt = json.loads((Path(ctx.case_dir) / "official-module-fixture.json").read_text())
     opt_in = ctx.case_id == "TC-MODULES-045"
     files = fixture_files(Path(os.environ["QA_SIGNED_MODULE_ROOT"]), receipt, opt_in=opt_in)

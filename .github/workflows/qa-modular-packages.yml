@@ -111,6 +111,7 @@ jobs:
                         'ai-voice-local': 'signed-local-voice', 'sockscap': 'signed-sockscap',
                         'screenshot': 'signed-screenshot'}[os.environ['QA_MODULE']]
           roster = set()
+          lifecycle = set()
           if raw := os.environ.get('PACKAGE_NATIVE_BUILDS'):
               document = json.loads(raw)
               if not isinstance(document, dict) or not isinstance(document.get('include'), list):
@@ -124,16 +125,19 @@ jobs:
                       requested.add(platform)
                       if capability == 'signed-module' and 'signed-roster' in build['capabilities']:
                           roster.add(platform)
+                      if capability == 'signed-mfa' and 'signed-mfa-lifecycle' in build['capabilities']:
+                          lifecycle.add(platform)
               if not requested:
                   raise SystemExit('No signed module target selected')
               targets = [target for target in targets if target['platform'] in requested]
           for target in targets:
               target['legacy_roster'] = target['platform'] in roster
+              target['lifecycle'] = capability == 'signed-module' or target['platform'] in lifecycle
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
               output.write(f'runner={runner}\n')
               output.write('build_matrix=' + json.dumps({'include': targets}, separators=(',', ':')) + '\n')
               output.write('sign_matrix=' + json.dumps({'include': [
-                  {'platform': target['platform'], 'legacy_roster': target['legacy_roster']} for target in targets
+                  {name: target[name] for name in ('platform', 'legacy_roster', 'lifecycle')} for target in targets
               ]}, separators=(',', ':')) + '\n')
               suffix = '-'.join(target['platform'] for target in targets)
               if os.environ['QA_MODULE'] in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
@@ -266,32 +270,46 @@ jobs:
         env:
           MODULE_TARGET: ${{ matrix.target }}
         run: python scripts/sockscap_windows_resource.py src-tauri/plugins/sockscap unsigned-module --helper "src-tauri/target/$MODULE_TARGET/release/sockscap-helper.exe"
-      - name: Build the previous hello protocol version for the lifecycle test
-        if: env.QA_MODULE == 'hello-plugin'
+      - name: Compile the previous host version for the native lifecycle test
+        if: matrix.lifecycle
         env:
           MODULE_TARGET: ${{ matrix.target }}
+          MODULE_PACKAGE: ${{ needs.source.outputs.host_package }}
         run: |
           python - <<'PY'
-          import pathlib
-          files = [pathlib.Path('src-tauri/plugins/hello-plugin/Cargo.toml'), pathlib.Path('src-tauri/Cargo.lock')]
-          old = 'name = "taomni-hello-plugin"\nversion = "0.1.0"'
-          new = old.replace('0.1.0', '0.0.9')
-          for path in files:
-              text = path.read_text(encoding='utf-8')
-              assert text.count(old) == 1, f'Expected one hello version in {path}'
-              path.write_text(text.replace(old, new), encoding='utf-8')
-          PY
-          cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin --bin taomni-hello-plugin --release --target "$MODULE_TARGET" --locked
-          python - <<'PY'
-          import json, os, pathlib, shutil
+          import json, os, pathlib, shutil, subprocess, sys
+          sys.path.insert(0, '.agents/skills/qa-ui-auto/scripts')
+          from qa_ui_auto.module_qa_versions import lifecycle_versions
+
+          slug, package, target = (os.environ[key] for key in ('QA_MODULE', 'MODULE_PACKAGE', 'MODULE_TARGET'))
+          manifest_path = pathlib.Path('unsigned-module/module.json')
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          current = manifest['version']
+          previous_version, _ = lifecycle_versions(slug, current)
+          old = f'name = "{package}"\nversion = "{current}"'.encode()
+          new = f'name = "{package}"\nversion = "{previous_version}"'.encode()
+          sources = [pathlib.Path('src-tauri/plugins') / slug / 'Cargo.toml', pathlib.Path('src-tauri/Cargo.lock')]
+          originals = {source: source.read_bytes() for source in sources}
+          try:
+              for source, content in originals.items():
+                  # core.autocrlf may change tracked file endings on Windows.
+                  delimiter = b'\r\n' if b'\r\n' in content else b'\n'
+                  old_marker, new_marker = (marker.replace(b'\n', delimiter) for marker in (old, new))
+                  if content.count(old_marker) != 1:
+                      raise RuntimeError(f'Expected one {package} version in {source}')
+                  source.write_bytes(content.replace(old_marker, new_marker))
+              subprocess.run(['cargo', 'build', '--manifest-path', 'src-tauri/Cargo.toml', '-p', package,
+                              '--bin', package, '--release', '--target', target, '--locked'], check=True)
+          finally:
+              for source, content in originals.items():
+                  source.write_bytes(content)
+
           previous = pathlib.Path('unsigned-previous')
-          shutil.copytree('unsigned-module', previous)
-          path = previous / 'module.json'
-          manifest = json.loads(path.read_text(encoding='utf-8'))
-          manifest['version'] = '0.0.9'
-          path.write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+          shutil.copytree(manifest_path.parent, previous)
+          manifest['version'] = previous_version
+          (previous / 'module.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
           host = manifest['entry']['host']
-          shutil.copyfile(pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release' / host, previous / host)
+          shutil.copyfile(pathlib.Path('src-tauri/target') / target / 'release' / host, previous / host)
           PY
       - uses: actions/upload-artifact@v4
         with:
@@ -338,10 +356,13 @@ jobs:
           MODULE_PLATFORM: ${{ matrix.platform }}
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
           MODULE_LEGACY_ROSTER: ${{ matrix.legacy_roster }}
+          MODULE_LIFECYCLE: ${{ matrix.lifecycle }}
         run: |
           python - <<'PY'
-          import json, os, pathlib, shutil, sys
+          import filecmp, json, os, pathlib, shutil, sys
           sys.path.insert(0, 'scripts')
+          sys.path.insert(0, '.agents/skills/qa-ui-auto/scripts')
+          from qa_ui_auto.module_qa_versions import lifecycle_versions
           from local_voice_runtime import runtime_files, verify_runtime
           import sockscap_redirector_resource as redirector
           import sockscap_windows_resource as windows_capture
@@ -395,15 +416,18 @@ jobs:
           if os.environ['MODULE_LEGACY_ROSTER'] == 'true':
               assert module == 'hello-plugin'
               check_payload('mfa', 'unsigned-roster-mfa')
-          if module == 'hello-plugin':
-              assert expected['version'] == '0.1.0', 'Update the lifecycle fixture versions together'
-              check_payload(module, 'unsigned-previous', '0.0.9')
+          if module == 'hello-plugin' or os.environ['MODULE_LIFECYCLE'] == 'true':
+              previous_version, failing_version = lifecycle_versions(module, expected['version'])
+              check_payload(module, 'unsigned-previous', previous_version)
+              if module == 'mfa':
+                  binary = expected['entry']['host']
+                  assert not filecmp.cmp(root / 'unsigned-module' / binary, root / 'unsigned-previous' / binary, shallow=False), 'Previous MFA host must be independently compiled'
               # This signed test input deliberately changes only the declared
               # version. The binary will reject the host handshake, exercising
               # recovery through the actual installer and verified registry.
               failing = root / 'handshake-failure'
               shutil.copytree(root / 'unsigned-module', failing)
-              (failing / 'module.json').write_text(json.dumps({**expected, 'version': '0.1.1'}), encoding='utf-8')
+              (failing / 'module.json').write_text(json.dumps({**expected, 'version': failing_version}), encoding='utf-8')
           PY
       - uses: actions/download-artifact@v4
         if: needs.source.outputs.frontend_artifact != ''
@@ -415,7 +439,14 @@ jobs:
         env:
           MODULE_SOURCE: ${{ needs.source.outputs.sha }}
           FRONTEND_TOOLING: ${{ github.workflow_sha }}
-        run: python scripts/stage-vnc-frontend.py trusted-desktop-frontend candidate/unsigned-module "$MODULE_SOURCE" "$FRONTEND_TOOLING" "$QA_MODULE"
+          MODULE_LIFECYCLE: ${{ matrix.lifecycle }}
+        run: |
+          python scripts/stage-vnc-frontend.py trusted-desktop-frontend candidate/unsigned-module "$MODULE_SOURCE" "$FRONTEND_TOOLING" "$QA_MODULE"
+          if [[ "$MODULE_LIFECYCLE" == 'true' ]]; then
+            for variant in unsigned-previous handshake-failure; do
+              python scripts/stage-vnc-frontend.py trusted-desktop-frontend "candidate/$variant" "$MODULE_SOURCE" "$FRONTEND_TOOLING" "$QA_MODULE"
+            done
+          fi
       - uses: actions/download-artifact@v4
         if: matrix.legacy_roster
         with:
@@ -455,9 +486,15 @@ jobs:
         env:
           MODULE_PLATFORM: ${{ matrix.platform }}
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+          MODULE_LIFECYCLE: ${{ matrix.lifecycle }}
         run: |
           export MODULE_SLUG="$QA_MODULE"
           bash scripts/sign-macos-module-host.sh "candidate/unsigned-module/taomni-plugin-$MODULE_SLUG" macos-signing
+          if [[ "$MODULE_LIFECYCLE" == 'true' ]]; then
+            host="taomni-plugin-$MODULE_SLUG"
+            bash scripts/sign-macos-module-host.sh "candidate/unsigned-previous/$host" macos-signing/previous
+            cp "candidate/unsigned-module/$host" "candidate/handshake-failure/$host"
+          fi
       - name: Sign and independently verify against the production pinned public key
         if: env.QA_MODULE == 'hello-plugin' || env.QA_MODULE == 'mfa'
         env:
@@ -466,6 +503,7 @@ jobs:
           MODULE_PLATFORM: ${{ matrix.platform }}
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
           MODULE_LEGACY_ROSTER: ${{ matrix.legacy_roster }}
+          MODULE_LIFECYCLE: ${{ matrix.lifecycle }}
         run: |
           scripts/plugin-package/target/release/taomni-plugin-package \
             --payload candidate/unsigned-module --platform "$MODULE_PLATFORM" \
@@ -477,7 +515,7 @@ jobs:
               --output signed-module/legacy-roster-mfa --source-sha "$MODULE_SOURCE_SHA" \
               --qa-catalog true --qa-roster-root signed-module
           fi
-          if [[ "$QA_MODULE" == "hello-plugin" ]]; then
+          if [[ "$MODULE_LIFECYCLE" == 'true' ]]; then
             for pair in 'unsigned-previous previous' 'handshake-failure handshake-failure'; do
               read -r payload destination <<< "$pair"
               scripts/plugin-package/target/release/taomni-plugin-package \

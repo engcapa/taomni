@@ -14,6 +14,7 @@ from qa_ui_auto.behavior_contract import is_check
 from qa_ui_auto.ci import capabilities
 from qa_ui_auto.fixtures import sockscap_legacy
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_key, setup, setup_mfa
+from qa_ui_auto.module_qa_versions import MFA_LIFECYCLE_CASE
 from qa_ui_auto.module_signed_observation import check, validate
 from qa_ui_auto.steps import StepError
 from qa_ui_auto.testcase import load_case
@@ -120,6 +121,7 @@ class OfficialModuleArtifactTests(unittest.TestCase):
         self.assertEqual(case.modes, ["native"])
         self.assertIn("signed-mfa", capabilities([case], "native"))
         self.assertNotIn("signed-module", capabilities([case], "native"))
+        self.assertNotIn("signed-mfa-lifecycle", capabilities([case], "native"))
         self.assertNotIn("signed-mfa", capabilities([case], "browser"))
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -130,6 +132,12 @@ class OfficialModuleArtifactTests(unittest.TestCase):
                 load_artifact(root, "a" * 40, "linux-x86_64")
         with self.assertRaisesRegex(RuntimeError, "registered native upgrade case"):
             setup_mfa(SimpleNamespace(case_id=case.id, cfg={"app": {"mode": "browser"}}))
+
+    def test_native_mfa_lifecycle_requests_its_two_extra_signed_inputs(self):
+        case = load_case(next((ROOT / "qa-ui-auto-tests/cases").glob(MFA_LIFECYCLE_CASE + "-*")))
+        self.assertIn("signed-mfa", capabilities([case], "native"))
+        self.assertIn("signed-mfa-lifecycle", capabilities([case], "native"))
+        self.assertNotIn("signed-mfa-lifecycle", capabilities([case], "browser"))
 
     def test_native_oracle_does_not_accept_a_plausible_registry_without_real_ping(self):
         record = {"state": "enabled", "reason": None}
@@ -186,6 +194,11 @@ class OfficialModuleArtifactTests(unittest.TestCase):
         self.assertEqual(macos_host["run"].splitlines(), [
             'export MODULE_SLUG="$QA_MODULE"',
             'bash scripts/sign-macos-module-host.sh "candidate/unsigned-module/taomni-plugin-$MODULE_SLUG" macos-signing',
+            'if [[ "$MODULE_LIFECYCLE" == \'true\' ]]; then',
+            '  host="taomni-plugin-$MODULE_SLUG"',
+            '  bash scripts/sign-macos-module-host.sh "candidate/unsigned-previous/$host" macos-signing/previous',
+            '  cp "candidate/unsigned-module/$host" "candidate/handshake-failure/$host"',
+            'fi',
         ])
         self.assertLess(signing.index(macos_identity), signing.index(macos_host))
         for step in package_steps:

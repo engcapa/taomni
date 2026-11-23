@@ -17,6 +17,7 @@ import yaml
 from .feature_catalog import load_features
 from .linux_profiles import DEFAULT_LINUX_PROFILE, LINUX_PROFILES, profile_support
 from . import module_profile
+from .module_qa_versions import MFA_LIFECYCLE_CASE
 from .nightly import (DEFAULT_SAMPLE_PERCENT, DEFAULT_WINDOWS_NIGHTS, WEEKDAYS,
                       night_label, platforms_for_night, select as nightly_select,
                       windows_enabled)
@@ -117,6 +118,8 @@ def capabilities(cases, mode: str) -> list[str]:
                 result.update({"signed-module", "signed-roster"})
             if "module_signed_mfa_archive" in fixtures:
                 result.add("signed-mfa")
+                if case.id == MFA_LIFECYCLE_CASE:
+                    result.add("signed-mfa-lifecycle")
             if "module_signed_mail_archive" in fixtures:
                 result.add("signed-mail")
             elif {"mail_server", "mail_storage", "file_open_mail"} & fixtures:

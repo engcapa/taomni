@@ -21,6 +21,7 @@ import zipfile
 from native_build import QA_APP_ID
 from tauri_webdriver import native_isolation_env
 
+from ..module_qa_versions import MFA_LIFECYCLE_CASE, lifecycle_versions
 from .module_mfa_restore import CASE_ID as MFA_RESTORE_CASE
 from .backup_policy import isolated_data_root
 
@@ -103,7 +104,7 @@ def setup(ctx):
 
 
 def setup_mfa(ctx):
-    if ctx.case_id not in {"TC-MODULES-038", "TC-MODULES-039", "TC-MODULES-044", "TC-MODULES-090", MFA_RESTORE_CASE} or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    if ctx.case_id not in {"TC-MODULES-038", "TC-MODULES-039", "TC-MODULES-044", "TC-MODULES-090", MFA_RESTORE_CASE, MFA_LIFECYCLE_CASE} or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Signed MFA input requires its registered native upgrade case")
     raw = os.environ.get("QA_SIGNED_MFA_ROOT")
     if not raw:
@@ -126,6 +127,41 @@ def setup_mfa(ctx):
             mfa_signed_frontend_sha256=receipt["frontendSha256"],
             mfa_module_database=(root / "data/mfa.db").as_posix(),
         )
+    if ctx.case_id == MFA_LIFECYCLE_CASE:
+        setup_mfa_lifecycle(ctx, Path(raw), owned, receipt, archive)
+
+
+def setup_mfa_lifecycle(ctx, artifact_root, owned, current, current_archive):
+    previous, failing = lifecycle_versions("mfa", current["version"])
+    manifests = {"current": current}
+    binaries = {"current": mfa_host_digest(current_archive, current["platform"])}
+    for label, directory, version in (("previous", "previous", previous), ("failed", "handshake-failure", failing)):
+        receipt, archive, signature, _ = load_artifact(
+            artifact_root / directory, current["sourceSha"], current["platform"], "mfa", version=version,
+        )
+        with zipfile.ZipFile(archive) as package, package.open("frontend/index.js") as frontend:
+            receipt["frontendSha256"] = hashlib.file_digest(frontend, "sha256").hexdigest()
+        if receipt["frontendSha256"] != current["frontendSha256"]:
+            raise RuntimeError("The MFA QA variant changed the approved frontend bytes")
+        binaries[label] = mfa_host_digest(archive, receipt["platform"])
+        manifests[label] = receipt
+        destination = owned / archive.name
+        shutil.copyfile(archive, destination)
+        ctx.values.update({f"mfa_{label}_archive": destination.as_posix(), f"mfa_{label}_signature": signature,
+                           f"mfa_{label}_version": version})
+    if binaries["previous"] == binaries["current"] or binaries["failed"] != binaries["current"]:
+        raise RuntimeError("MFA lifecycle inputs must contain two independently built host versions and one version mismatch")
+    for label, receipt in manifests.items():
+        receipt["hostSha256"] = binaries[label]
+    ctx.mfa_lifecycle = manifests
+    ctx.values["mfa_current_version"] = current["version"]
+    (owned / "lifecycle-provenance.json").write_text(json.dumps(manifests, indent=2) + "\n", encoding="utf-8")
+
+
+def mfa_host_digest(archive, target):
+    host = "taomni-plugin-mfa.exe" if target == "windows-x86_64" else "taomni-plugin-mfa"
+    with zipfile.ZipFile(archive) as package, package.open(host) as binary:
+        return hashlib.file_digest(binary, "sha256").hexdigest()
 
 
 def setup_vnc(ctx):

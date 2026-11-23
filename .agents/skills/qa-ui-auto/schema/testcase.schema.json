@@ -984,6 +984,10 @@
           "enum": ["idle", "running", "disabled"],
           "description": "Native signed Screenshot case only. Match the installed host to the signed archive and observe its writer lease."
         },
+        "assert_signed_mfa_lifecycle": {
+          "enum": ["old-enabled", "old-disabled", "updated-disabled", "rolled-back-disabled", "old-reenabled", "updated-enabled", "failed-update", "rolled-back-enabled", "uninstalled", "reinstalled"],
+          "description": "Verify installed MFA version hashes, live host and desktop process identities, writer ownership, and the original retained HOTP account."
+        },
         "assert_signed_vnc_daemon": {
           "enum": ["idle", "running", "backup", "stopped", "disabled"],
           "description": "Verify the signed VNC server host's installed bytes, lease and local daemon endpoint."

@@ -9,7 +9,8 @@ description: >-
   session without a configured RD Gateway username shows the gateway validation error.
   The migration imports legacy pins and records the new pin in the module database.
   The reconnected signed viewer also measures the input-to-decoded-frame delay.
-covers: [F-Modules-1, F9.7, F-RdpServer-1]
+  The saved session then reconnects in a detached WebView and back in the original window.
+covers: [F-Modules-1, F9.7, F-RdpServer-1, F-Detach-1]
 tags: [modules, rdp-client, rdp-server, lifecycle, native-boundary, p1]
 modes: [native]
 fixtures: [reset_db, module_upgrade, module_signed_rdp_archive, rdp_server_required, system_rdp_running, release_build_required]
@@ -99,6 +100,28 @@ steps:
 - assert_json_file: {path: target-state.json, timeout_sec: 20, expect: {flips: {min: 2}}}
 - assert_signed_rdp_latency: null
 - assert_no_runtime_errors: null
+- click: '[data-testid="titlebar-actions-more"][aria-expanded="false"]'
+- click: '[data-testid="rdp-detach"]'
+- switch_window: {selector: '[data-testid="detached-session-window"][data-detached-kind="rdp"]'}
+- wait_for: '[data-testid="rdp-panel"][data-frontend-source*="/__taomni_plugins__/rdp-client/${fixture.rdp_signed_version}/frontend/index.js"]'
+- assert_text: {selector: '[data-testid="rdp-status"]', contains: 'CredSSP/NLA', timeout_sec: 60}
+- eval_readonly:
+    expression: "document.querySelector('.rdp-panel canvas')?.getContext('2d')?.getImageData(280, 240, 1, 1).data[3] === 255"
+    timeout_sec: 30
+- assert_count: {selector: '[data-testid="confirm-dialog"]', equal: 0}
+- assert_no_runtime_errors: null
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    close_with: '[data-testid="detached-reattach"]'
+- wait_for: '[data-testid="rdp-panel"][data-frontend-source*="/__taomni_plugins__/rdp-client/${fixture.rdp_signed_version}/frontend/index.js"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="rdp"]', equal: 1}
+- click: '[data-testid="titlebar-actions-more"]'
+- assert_text: {selector: '[data-testid="rdp-status"]', contains: 'CredSSP/NLA', timeout_sec: 60}
+- eval_readonly:
+    expression: "document.querySelector('.rdp-panel canvas')?.getContext('2d')?.getImageData(280, 240, 1, 1).data[3] === 255"
+    timeout_sec: 30
+- assert_count: {selector: '[data-testid="confirm-dialog"]', equal: 0}
+- assert_no_runtime_errors: null
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
@@ -154,27 +177,41 @@ verification:
     - {step: 76, expectation: Forty target clicks yield at least 36 measured signed viewer frames and a p95 at or below 130 ms.}
     - {step: 77, expectation: The native renderer has no uncaught runtime errors.}
     results: [60, 61, 62, 69, 73, 75, 76, 77]
+  - id: detached-signed-viewer
+    requirement: The separate WebView and the reattached tab reconnect through the same signed RDP renderer and retained certificate.
+    actions: [78, 79, 80, 86, 89]
+    checkpoints:
+    - {step: 81, expectation: The detached WebView loads the exact installed signed frontend path.}
+    - {step: 83, expectation: The detached WebView paints a frame from the real RDP server.}
+    - {step: 84, expectation: The existing pin avoids a new certificate prompt in the separate window.}
+    - {step: 85, expectation: The separate viewer has no uncaught renderer errors.}
+    - {step: 87, expectation: The reattached tab loads the same signed frontend.}
+    - {step: 88, expectation: Reattachment restores exactly one RDP tab in the original window.}
+    - {step: 91, expectation: The reattached tab paints frames from the same saved session.}
+    - {step: 92, expectation: The returning tab still accepts the original pin.}
+    - {step: 93, expectation: The detachment lifecycle leaves the original renderer healthy.}
+    results: [81, 83, 84, 85, 87, 88, 91, 92, 93]
   - id: R3
     requirement: The signed viewer reports an invalid gateway using its normal connection workflow.
-    actions: [78, 79, 80, 81, 83, 84, 85, 86, 89, 90, 92, 93]
+    actions: [94, 95, 96, 97, 99, 100, 101, 102, 105, 106, 108, 109]
     checkpoints:
-    - {step: 94, expectation: The signed renderer shows the missing gateway username error.}
-    - {step: 95, expectation: The gateway validation produces no uncaught renderer errors.}
-    results: [94, 95]
+    - {step: 110, expectation: The signed renderer shows the missing gateway username error.}
+    - {step: 111, expectation: The gateway validation produces no uncaught renderer errors.}
+    results: [110, 111]
   - id: R4
     requirement: A signed installation imports old certificate decisions and records newly accepted certificates in the module store.
     actions: [6, 8, 46]
     checkpoints:
-    - {step: 96, expectation: "The native profile preserves the legacy rows and contains the import receipt and the new module-owned pin."}
-    results: [96]
+    - {step: 112, expectation: "The native profile preserves the legacy rows and contains the import receipt and the new module-owned pin."}
+    results: [112]
   - id: retained-rdp-sessions
     requirement: Upgrading with a verified RDP viewer records the existing core sessions and keeps VNC pending.
-    actions: [97, 98, 100]
+    actions: [113, 114, 116]
     checkpoints:
-    - {step: 102, expectation: The refreshed recommendations include the missing VNC viewer and omit the verified RDP viewer.}
-    - {step: 103, expectation: The original RDP session and committed pin import are preserved in their respective stores.}
-    - {step: 104, expectation: The refreshed upgrade view has no runtime errors.}
-    results: [102, 103, 104]
+    - {step: 118, expectation: The refreshed recommendations include the missing VNC viewer and omit the verified RDP viewer.}
+    - {step: 119, expectation: The original RDP session and committed pin import are preserved in their respective stores.}
+    - {step: 120, expectation: The refreshed upgrade view has no runtime errors.}
+    results: [118, 119, 120]
   visual:
   - check: The signed viewer and the disabled state appear in the saved tab.
     method: automated

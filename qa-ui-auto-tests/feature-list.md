@@ -104,6 +104,8 @@ controls:
   - id: module-marketplace-update
     selector: '[data-testid="module-marketplace-update"]'
     kind: display
+    aliases:
+    - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-update"]'
   - id: module-marketplace-new
     selector: '[data-testid="module-marketplace-new"]'
     kind: display
@@ -136,9 +138,13 @@ controls:
   - id: module-marketplace-review
     selector: '[data-testid="module-marketplace-review"]'
     kind: interactive
+    aliases:
+    - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-review"]'
   - id: module-marketplace-download
     selector: '[data-testid="module-marketplace-download"]'
     kind: interactive
+    aliases:
+    - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-download"]'
   - id: module-network-settings
     selector: '[data-testid="module-network-settings"]'
     kind: display
@@ -345,6 +351,8 @@ controls:
   - id: module-action-rollback-hello-plugin
     selector: '[data-testid="module-action-rollback-hello-plugin"]'
     kind: interactive
+    aliases:
+    - '[data-testid="module-action-rollback-mfa"]'
   - id: module-action-enable-hello-plugin
     selector: '[data-testid="module-action-enable-hello-plugin"]'
     kind: interactive
@@ -380,6 +388,7 @@ controls:
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
     aliases:
+    - '[data-testid="module-action-uninstall-mfa"]'
     - '[data-testid="module-action-uninstall-mail"]'
     - '[data-testid="module-action-uninstall-sockscap"]'
     - '[data-testid="module-action-uninstall-${fixture.module_roster_remove}"]'
@@ -410,6 +419,7 @@ controls:
     aliases:
       - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
       - '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="mfa"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
       - '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
       - '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
       - '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
