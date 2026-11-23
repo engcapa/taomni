@@ -132,3 +132,6 @@ output
 
 # Generated standalone mobile PWA, embedded by build.rs
 src-tauri/resources/mobile-web/
+
+# Local QA capacity-gate probe output (qa-ui-auto CI runs write it in its own job).
+capacity-gate.json
