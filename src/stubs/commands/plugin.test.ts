@@ -32,7 +32,11 @@ describe("browser plugin boundary", () => {
     setCrashRegressionModuleProfile(versions);
     const records = await invokePlugin<PluginRecord[]>("plugin_list");
     expect(records).toHaveLength(frozenRoster.length);
-    expect(Object.fromEntries(records.map(({ manifest }) => [manifest.slug, manifest.version]))).toEqual(versions);
+    const installed = records.map(({ manifest }) => {
+      if (!manifest) throw new Error("Missing manifest for an installed crash-regression module");
+      return [manifest.slug, manifest.version];
+    });
+    expect(Object.fromEntries(installed)).toEqual(versions);
     expect(records.every(({ lifecycle }) => lifecycle === "enabled")).toBe(true);
     setCrashRegressionModuleProfile({});
     expect(await invokePlugin("plugin_list")).toEqual([]);
