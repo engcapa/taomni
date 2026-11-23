@@ -18,7 +18,7 @@ fn mailbox_keeps_original_identity_across_move_and_archive_cleanup() {
     use LocalMailboxAction::*;
 
     let directory = tempfile::tempdir().unwrap();
-    let store = Store::new(directory.path());
+    let store = Store::new(&directory.path().canonicalize().unwrap());
     let _: () = call(&store, Initialize);
     let raw = b"Subject: Local message\r\n\r\nPop3 body \x80\xff\r\n";
     let count: usize = call(

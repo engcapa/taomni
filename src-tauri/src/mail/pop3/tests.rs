@@ -1,6 +1,6 @@
 use super::connection::Pop3Client;
 use super::local_raw;
-use super::sync_inbox;
+use super::{sqlite_ledger, sync_inbox};
 use crate::mail::MailAccountConfig;
 use crate::mail::MailAuthMode;
 use crate::mail::ResolvedMailAccount;
@@ -65,14 +65,19 @@ async fn downloads_once_and_leaves_or_deletes() {
 
     let first = tokio::task::block_in_place(|| run(&conn, None));
     assert_eq!(first.messages.len(), 2);
-    let body = local_raw(&conn, "pop", "INBOX", first.messages[0].header.uid)
+    let body = local_raw(&conn, "pop", "INBOX", first.messages[0].uid)
         .unwrap()
         .unwrap();
     assert!(
         String::from_utf8_lossy(&body).contains("\r\n.leading dot line\r\n"),
         "dot-unstuffed"
     );
-    assert!(first.messages.iter().any(|m| m.header.subject == "two"));
+    assert!(
+        first
+            .messages
+            .iter()
+            .any(|message| message.subject == "two")
+    );
 
     // AC-65: a second sync downloads nothing again.
     state
@@ -82,7 +87,7 @@ async fn downloads_once_and_leaves_or_deletes() {
         .push(("u3".into(), raw("three")));
     let second = tokio::task::block_in_place(|| run(&conn, None));
     assert_eq!(second.messages.len(), 1);
-    assert_eq!(second.messages[0].header.subject, "three");
+    assert_eq!(second.messages[0].subject, "three");
     let total: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM mail_messages WHERE account_id = 'pop' AND folder = 'INBOX'",
