@@ -118,8 +118,8 @@ fn check_delivery(host: &mut MailHost, runtime: &Runtime, scenario: Scenario) {
 }
 
 fn check_response(host: &mut MailHost, runtime: &Runtime, scenario: Scenario) {
-    use taomni_mail_api::{MimeUpload, SEND_RESPONSE, SmtpResponse};
     use taomni_mail_api::responses::{MailResponse, Receipt, ResponseRequest};
+    use taomni_mail_api::{MimeUpload, SEND_RESPONSE, SmtpResponse};
 
     let (listener, _route, connection) = runtime.block_on(setup());
     let bytes = serde_json::to_vec(&ResponseRequest {

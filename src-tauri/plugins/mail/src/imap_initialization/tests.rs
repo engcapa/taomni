@@ -8,9 +8,10 @@ use super::*;
 #[test]
 fn first_initialization_is_idempotent_and_protects_existing_legacy_data() {
     let profile = tempfile::tempdir().unwrap();
-    let store = Store::new(profile.path());
+    let root = profile.path().canonicalize().unwrap();
+    let store = Store::new(&root);
     assert!(initialize(&store, "new", &|| Ok(())).unwrap());
-    let path = profile.path().join("plugins/mail/data");
+    let path = root.join("plugins/mail/data");
     let new = imap_ownership::database(&path, "new").unwrap().unwrap();
     let db = Connection::open(&new).unwrap();
     upsert_folder(
@@ -49,7 +50,8 @@ fn first_initialization_is_idempotent_and_protects_existing_legacy_data() {
 #[test]
 fn retry_completes_an_account_interrupted_before_receipt_publication() {
     let profile = tempfile::tempdir().unwrap();
-    let store = Store::new(profile.path());
+    let root = profile.path().canonicalize().unwrap();
+    let store = Store::new(&root);
     let checks = Cell::new(0);
     let result = initialize(&store, "retry", &|| {
         checks.set(checks.get() + 1);
@@ -60,7 +62,7 @@ fn retry_completes_an_account_interrupted_before_receipt_publication() {
         }
     });
     assert!(result.is_err());
-    let path = profile.path().join("plugins/mail/data");
+    let path = root.join("plugins/mail/data");
     assert!(database_for(&path, "retry").exists());
     assert!(imap_ownership::database(&path, "retry").unwrap().is_none());
     assert!(initialize(&store, "retry", &|| Ok(())).unwrap());
@@ -70,14 +72,15 @@ fn retry_completes_an_account_interrupted_before_receipt_publication() {
 #[test]
 fn concurrent_requests_publish_one_empty_mailbox() {
     let profile = tempfile::tempdir().unwrap();
-    let store = Store::new(profile.path());
+    let root = profile.path().canonicalize().unwrap();
+    let store = Store::new(&root);
     std::thread::scope(|scope| {
         let first = scope.spawn(|| initialize(&store, "concurrent", &|| Ok(())).unwrap());
         let second = scope.spawn(|| initialize(&store, "concurrent", &|| Ok(())).unwrap());
         assert!(first.join().unwrap());
         assert!(second.join().unwrap());
     });
-    let data = profile.path().join("plugins/mail/data");
+    let data = root.join("plugins/mail/data");
     assert!(
         imap_ownership::database(&data, "concurrent")
             .unwrap()
