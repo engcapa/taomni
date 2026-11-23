@@ -5,13 +5,20 @@ import { ContextMenu, type ContextMenuCloseReason } from "../../ContextMenu";
 import { useViewerLabels } from "../viewerLabels";
 import { loadedMarkdownImage, MARKDOWN_DIAGRAM_SELECTOR } from "./diagramModel";
 
+interface SelectionSnapshot {
+  startContainer: Node;
+  startOffset: number;
+  endContainer: Node;
+  endOffset: number;
+}
+
 interface LiveMenuState {
   x: number;
   y: number;
   text: string;
   surface: HTMLElement;
-  /** Cloned DOM ranges captured at the right click, before the menu takes focus. */
-  ranges: Range[];
+  /** DOM boundary points captured at the right click, before the menu takes focus. */
+  ranges: SelectionSnapshot[];
 }
 
 function ownsTarget(surface: HTMLElement, target: EventTarget | null): boolean {
@@ -27,15 +34,40 @@ function selectedText(surface: HTMLElement): string {
   return selection.toString();
 }
 
-function selectedRanges(surface: HTMLElement): Range[] {
+function selectedRanges(surface: HTMLElement): SelectionSnapshot[] {
   const selection = surface.ownerDocument.getSelection();
   if (!selection || selection.isCollapsed || !selection.rangeCount
     || !surface.contains(selection.anchorNode) || !surface.contains(selection.focusNode)) return [];
-  const ranges: Range[] = [];
+  const ranges: SelectionSnapshot[] = [];
   for (let index = 0; index < selection.rangeCount; index += 1) {
-    ranges.push(selection.getRangeAt(index).cloneRange());
+    const range = selection.getRangeAt(index);
+    ranges.push({
+      startContainer: range.startContainer,
+      startOffset: range.startOffset,
+      endContainer: range.endContainer,
+      endOffset: range.endOffset,
+    });
   }
   return ranges;
+}
+
+function nodeLength(node: Node): number {
+  return node.nodeType === Node.TEXT_NODE
+    ? (node as Text).data.length
+    : node.childNodes.length;
+}
+
+function snapshotRange(snapshot: SelectionSnapshot): Range | null {
+  const { startContainer, endContainer } = snapshot;
+  if (!startContainer.isConnected || !endContainer.isConnected) return null;
+  try {
+    const range = startContainer.ownerDocument!.createRange();
+    range.setStart(startContainer, Math.min(snapshot.startOffset, nodeLength(startContainer)));
+    range.setEnd(endContainer, Math.min(snapshot.endOffset, nodeLength(endContainer)));
+    return range;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -48,13 +80,14 @@ function selectedRanges(surface: HTMLElement): Range[] {
  * affected. Chromium keeps the native range; there, and whenever the user
  * already made a new selection, leave the live selection alone.
  */
-function restoreSelection(surface: HTMLElement, ranges: Range[], expectedText: string): boolean {
-  if (!ranges.length) return false;
+function restoreSelection(surface: HTMLElement, snapshots: SelectionSnapshot[], expectedText: string): boolean {
+  if (!snapshots.length) return false;
   const selection = surface.ownerDocument.getSelection();
   if (!selection || (!selection.isCollapsed && selection.rangeCount > 0)) return false;
-  const usable = ranges.filter((range) => range.startContainer.isConnected
-    && range.endContainer.isConnected
-    && surface.contains(range.startContainer) && surface.contains(range.endContainer));
+  const usable = snapshots
+    .filter((snapshot) => surface.contains(snapshot.startContainer) && surface.contains(snapshot.endContainer))
+    .map(snapshotRange)
+    .filter((range): range is Range => range !== null);
   if (!usable.length) return false;
   selection.removeAllRanges();
   for (const range of usable) selection.addRange(range);
@@ -64,6 +97,18 @@ function restoreSelection(surface: HTMLElement, ranges: Range[], expectedText: s
     return false;
   }
   return true;
+}
+
+/**
+ * Re-apply captured boundary points across the focus/selection task boundaries
+ * WebKit uses when the context menu takes focus. Bounded retries only: a
+ * restore is a no-op once a non-empty selection exists, and detached ranges
+ * are ignored.
+ */
+function scheduleRangeRestore(surface: HTMLElement, snapshots: SelectionSnapshot[], text: string): void {
+  for (const delay of [0, 50, 150]) {
+    window.setTimeout(() => { restoreSelection(surface, snapshots, text); }, delay);
+  }
 }
 
 export function MarkdownLiveMenu({ root, enabled, onError }: {
@@ -84,9 +129,10 @@ export function MarkdownLiveMenu({ root, enabled, onError }: {
     skipRestoreRef.current = false;
     if (!previous || !restore) return;
     const { surface, ranges, text } = previous;
-    // MenuSurface returns focus on unmount in a microtask; run after it so the
-    // focus move cannot clear the range again while the menu is closing.
-    window.setTimeout(() => { restoreSelection(surface, ranges, text); }, 0);
+    // MenuSurface returns focus on unmount in a microtask and WebKit may
+    // deliver the resulting selection clearing in a later task, so retry a few
+    // bounded times instead of assuming one ordering.
+    scheduleRangeRestore(surface, ranges, text);
   }, []);
 
   useEffect(() => {
@@ -131,18 +177,30 @@ export function MarkdownLiveMenu({ root, enabled, onError }: {
     };
   }, [root, enabled, closeMenu]);
 
-  // The menu focuses itself right after mounting. Re-apply the captured ranges
-  // once its focus effect has run (and once more after the engine's selection
-  // change task) so the highlight survives while the menu stays open.
+  // The menu focuses itself right after mounting. Re-apply the captured range
+  // a few bounded times and whenever the engine reports the selection was
+  // cleared while the menu owns focus, so the highlight survives independent
+  // of the focus/selection ordering (WebKit clears it after focusing the menu;
+  // Chromium keeps it and the restore is then a no-op).
   useEffect(() => {
     if (!menu?.ranges.length) return undefined;
     const { surface, ranges, text } = menu;
-    const restore = () => { restoreSelection(surface, ranges, text); };
-    const frame = window.requestAnimationFrame(restore);
-    const timer = window.setTimeout(restore, 0);
+    const restoreIfCleared = () => {
+      if (skipRestoreRef.current || !menuRef.current) return;
+      const selection = surface.ownerDocument.getSelection();
+      if (selection && !selection.isCollapsed && selection.rangeCount > 0) return;
+      // Restore immediately (the menu focus may already have cleared the range)
+      // and keep bounded retries for engines that clear it in a later task.
+      restoreSelection(surface, ranges, text);
+      scheduleRangeRestore(surface, ranges, text);
+    };
+    const frame = window.requestAnimationFrame(restoreIfCleared);
+    const timers = [0, 50, 150].map((delay) => window.setTimeout(restoreIfCleared, delay));
+    surface.ownerDocument.addEventListener("selectionchange", restoreIfCleared);
     return () => {
       window.cancelAnimationFrame(frame);
-      window.clearTimeout(timer);
+      timers.forEach((timer) => window.clearTimeout(timer));
+      surface.ownerDocument.removeEventListener("selectionchange", restoreIfCleared);
     };
   }, [menu]);
 
