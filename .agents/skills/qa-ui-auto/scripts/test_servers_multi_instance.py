@@ -91,10 +91,11 @@ class ServersMultiInstanceTest(unittest.TestCase):
         with TemporaryDirectory() as directory:
             peer = Path(directory) / "peer"
             linux = servers_multi_instance.build_peer_shared_data_env(
-                {"XDG_DATA_HOME": "/qa/primary/data"},
+                {"NEWMOB_DATA_DIR": "/qa/primary/profile", "XDG_DATA_HOME": "/qa/primary/data"},
                 peer,
                 system="Linux",
             )
+            self.assertEqual(linux["NEWMOB_DATA_DIR"], "/qa/primary/profile")
             self.assertEqual(linux["XDG_DATA_HOME"], "/qa/primary/data")
             self.assertEqual(linux["TAOMNI_QA_WEBVIEW_DIR"], str((peer / "native-webview").resolve()))
 
@@ -116,6 +117,10 @@ class ServersMultiInstanceTest(unittest.TestCase):
 
             with self.assertRaises(StepError):
                 servers_multi_instance.build_peer_shared_data_env({}, peer, system="Linux")
+            with self.assertRaisesRegex(StepError, "NEWMOB_DATA_DIR"):
+                servers_multi_instance.build_peer_shared_data_env(
+                    {"XDG_DATA_HOME": "/qa/primary/data"}, peer, system="Linux",
+                )
 
     def test_windows_session_uses_qa_webview_dir_override(self):
         with patch.object(native.platform, "system", return_value="Windows"), \
@@ -364,7 +369,10 @@ class ServersMultiInstanceTest(unittest.TestCase):
                 cfg={"app": {"native_binary": "/tmp/taomni"}, "webdriver": {"port": 4444, "native_port": 4445}},
             )
             with (
-                patch.dict(os.environ, {"XDG_DATA_HOME": "/qa/primary/data"}),
+                patch.dict(os.environ, {
+                    "NEWMOB_DATA_DIR": "/qa/primary/profile",
+                    "XDG_DATA_HOME": "/qa/primary/data",
+                }),
                 patch.object(servers_multi_instance.platform, "system", return_value="Linux"),
                 patch.object(servers_multi_instance, "free_ports", return_value=(4550, 4551)),
                 patch("tauri_webdriver.NativeHarness", _FakeHarness),
@@ -375,10 +383,15 @@ class ServersMultiInstanceTest(unittest.TestCase):
                 captured_harness_kwargs["shared_data_env"]["XDG_DATA_HOME"],
                 "/qa/primary/data",
             )
+            self.assertEqual(
+                captured_harness_kwargs["shared_data_env"]["NEWMOB_DATA_DIR"],
+                "/qa/primary/profile",
+            )
             self.assertEqual(captured_harness_kwargs["cfg"]["webdriver"]["port"], 4550)
             self.assertEqual(captured_harness_kwargs["cfg"]["webdriver"]["native_port"], 4551)
             evidence = json.loads((case_dir / "servers-multi-instance.json").read_text(encoding="utf-8"))
             self.assertEqual(evidence["mode"], "native")
+            self.assertEqual(evidence["sharedDataRoot"], "/qa/primary/profile")
             self.assertEqual(evidence["blockedMessage"], "Locked by primary")
             self.assertEqual(evidence["primaryBlockedMessage"], "Locked by peer")
 
