@@ -1,6 +1,6 @@
 //! Journal bounded IMAP mutations before issuing non-idempotent requests.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, path::Path};
 
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use taomni_mail_api::imap_mutation::{
 
 use crate::{
     cache::{init_mail_tables, remove_cached_messages},
-    database::MailDatabase,
+    database::{MAIL_MUTATION_LOCK, MailDatabase, ProcessLock},
     now_ts,
 };
 
@@ -443,6 +443,14 @@ pub fn run_mutation(
         all,
         operation_id,
     } = request;
+    // Resolve relocation under the cache lock before taking this account's
+    // operation lease. The lease covers network replies and journal commits.
+    let _mutation = {
+        let conn = db.lock()?;
+        let path = conn.path().ok_or("Mail storage has no disk path")?;
+        ProcessLock::try_at(Path::new(path), MAIL_MUTATION_LOCK)?
+            .ok_or("Another Taomni instance is changing this mailbox. Retry once the other operation finishes")?
+    };
     let existing_request = if let Some(id) = &operation_id {
         let conn = db.lock().map_err(|e| e.to_string())?;
         init(&conn)?;
@@ -503,3 +511,6 @@ pub fn run_mutation(
     }
     Ok(job.result(None, None))
 }
+
+#[cfg(test)]
+mod tests;

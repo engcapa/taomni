@@ -2,6 +2,7 @@ use rusqlite::Connection;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use taomni_mail_engine::database::{MAIL_MUTATION_LOCK, ProcessLock};
 
 pub use taomni_mail_engine::database::configured_directory;
 
@@ -72,6 +73,8 @@ pub(in crate::mail) fn relocate(
     if source_root == target_root {
         return persist_settings();
     }
+    let _mutation = ProcessLock::try_at(&source, MAIL_MUTATION_LOCK)?
+        .ok_or("Mail operations are in progress. Wait for them to finish before moving storage")?;
     let stem = crate::state::mail_db_file_stem(account);
     let target_db = target_root.join(format!("{stem}.db"));
     let _target_lock = super::super::coordination::ProcessLock::access(&target_db)?;

@@ -3,6 +3,7 @@ use super::{FullMessageMode, account_root, read, store, stores_full};
 use rusqlite::Connection;
 use std::fs;
 use std::path::Path;
+use taomni_mail_engine::database::{MAIL_MUTATION_LOCK, ProcessLock};
 
 #[test]
 fn relocation_switches_the_existing_connection_and_rolls_back_publication_failure() {
@@ -21,6 +22,20 @@ fn relocation_switches_the_existing_connection_and_rolls_back_publication_failur
         super::super::parts::attachment_cache_path(source.path(), &stem, "INBOX", 1, "2");
     fs::create_dir_all(attachment.parent().unwrap()).unwrap();
     fs::write(&attachment, b"cached attachment").unwrap();
+    let mutation = ProcessLock::try_at(&source_path, MAIL_MUTATION_LOCK)
+        .unwrap()
+        .unwrap();
+    let blocked = relocate(&mut db, "qa", target.path(), || {
+        panic!("settings must stay unchanged while the account lease is held");
+    })
+    .unwrap_err();
+    assert!(
+        blocked.contains("Mail operations are in progress"),
+        "{blocked}"
+    );
+    assert_eq!(read(&db, "qa", "INBOX", 1).unwrap().unwrap(), raw);
+    assert!(!target.path().join(format!("{stem}.db")).exists());
+    drop(mutation);
     assert!(
         relocate(&mut db, "qa", target.path(), || Err(
             "settings save failed".into()

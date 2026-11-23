@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
+pub const MAIL_MUTATION_LOCK: &str = "mutation";
+
 pub fn configured_directory(options: &str, default: &Path) -> Result<PathBuf, String> {
     let options: serde_json::Value = serde_json::from_str(options).map_err(|e| e.to_string())?;
     let directory = options
