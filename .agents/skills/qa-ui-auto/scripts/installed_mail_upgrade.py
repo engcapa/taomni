@@ -23,7 +23,7 @@ ACCOUNT_NAME = "Installed legacy IMAP"
 ACCOUNT_ROW = element("session-tree-item") + f'[data-session-name="{ACCOUNT_NAME}"]'
 LEGACY_PREFIX = "Legacy installed message"
 LEGACY_SUBJECT = f"{LEGACY_PREFIX} 0001"
-LEGACY_BODY = "Cached mail created by the installed 0.5.12 application."
+LEGACY_BODY = "Cached mail created by the installed monolithic application."
 NEW_PREFIX = "Post-upgrade installed message"
 NEW_SUBJECT = f"{NEW_PREFIX} 0001"
 MAIL_ID = "taomni-plugin-mail"

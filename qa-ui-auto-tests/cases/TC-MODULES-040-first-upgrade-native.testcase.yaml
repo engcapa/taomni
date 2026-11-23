@@ -1,6 +1,6 @@
 id: TC-MODULES-040
 title: First upgrade installs the signed release roster and remembers a module removal
-description: The pinned 0.5.12 monolithic app creates and reopens an isolated profile containing one SSH session.
+description: The pinned monolithic app creates and reopens an isolated profile containing one SSH session.
   The main window automatically installs the signed roster for this platform. A selected joint release supplies
   the frozen business roster and the user removes Mail. The focused fixture supplies Hello and MFA and removes Hello.
   Restarting preserves the removal and each remaining module's original signed version.

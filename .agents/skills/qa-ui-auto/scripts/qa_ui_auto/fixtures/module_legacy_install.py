@@ -9,7 +9,7 @@ from .backup_policy import isolated_data_root
 from .module_upgrade import input_sessions
 from ..legacy_install import install
 from ..legacy_process import initialize_profile
-from ..legacy_release import FIRST_UPGRADE_VERSION, RELEASE_VERSION
+from ..legacy_release import RELEASE_VERSION, first_upgrade_version
 
 
 def retained_manifest(data):
@@ -59,7 +59,7 @@ def setup(ctx):
     work = Path(ctx.report_root).resolve() / "_workdirs" / ctx.case_id / "legacy-install"
     if work.resolve() != work:
         raise RuntimeError("Legacy installation refuses a linked work directory")
-    version = FIRST_UPGRADE_VERSION if ctx.case_id == "TC-MODULES-040" else RELEASE_VERSION
+    version = first_upgrade_version() if ctx.case_id == "TC-MODULES-040" else RELEASE_VERSION
     executable, evidence = install(ctx.case_dir, work, version=version, shared_msi_directory=work.parents[1] / "legacy-msi")
     initialize_profile(executable, data, work, evidence, "old-first-start")
     rows = input_sessions(ctx.case_id == "TC-MODULES-027")

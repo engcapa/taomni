@@ -25,6 +25,7 @@ on:
       first_release:
         type: boolean
         default: false
+      first_release_version: {type: string, default: ''}
       include_linux_inventory:
         type: boolean
         default: false
@@ -123,6 +124,8 @@ jobs:
       SAMPLE_SOURCE: ${{ inputs.package_source }}
       SAMPLE_VERSION: ${{ inputs.package_version }}
       SAMPLE_TARGET: ${{ matrix.target }}
+      FIRST_RELEASE: ${{ inputs.first_release }}
+      QA_FIRST_UPGRADE_VERSION: ${{ inputs.first_release_version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -241,8 +244,12 @@ jobs:
         if: inputs.upgrade_desktop && runner.os != 'Linux'
         env:
           GH_TOKEN: ${{ github.token }}
-          OLD_VERSION: ${{ inputs.first_release && '0.5.12' || '0.5.10' }}
-        run: python -m qa_ui_auto.legacy_release legacy-input --version "$OLD_VERSION"
+        run: |
+          args=()
+          if [[ "$FIRST_RELEASE" == true ]]; then
+            args+=(--first-upgrade)
+          fi
+          python -m qa_ui_auto.legacy_release legacy-input "${args[@]}"
       - uses: actions/download-artifact@v4
         if: inputs.upgrade_desktop && !inputs.first_release && runner.os != 'Linux'
         with:
@@ -252,7 +259,6 @@ jobs:
         if: inputs.upgrade_desktop && runner.os != 'Linux'
         env:
           SAMPLE_MACOS_HARDENED_MFA: ${{ inputs.macos_hardened_mfa }}
-          FIRST_RELEASE: ${{ inputs.first_release }}
           MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
         run: |
           args=(--signed signed-mfa-input)

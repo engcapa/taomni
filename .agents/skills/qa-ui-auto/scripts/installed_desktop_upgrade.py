@@ -23,7 +23,7 @@ from qa_ui_auto.fixtures.module_signed_archive import platform_key
 from qa_ui_auto.fixtures.module_upgrade import input_sessions
 from qa_ui_auto.legacy_install import command, macos_install, windows_install
 from qa_ui_auto.legacy_process import initialize_profile
-from qa_ui_auto.legacy_release import FIRST_UPGRADE_VERSION, RELEASE_VERSION, selected_asset, verify_asset
+from qa_ui_auto.legacy_release import RELEASE_VERSION, first_upgrade_version, selected_asset, verify_asset
 
 
 def install(package, slot, evidence, version):
@@ -121,7 +121,7 @@ def execute(args):
         raise RuntimeError("Actual installer replacement requires its owned GitHub-hosted runner")
     identity = json.loads(args.identity.read_text(encoding="utf-8"))
     version = identity["version"]
-    old_version = FIRST_UPGRADE_VERSION if args.first_release else RELEASE_VERSION
+    old_version = first_upgrade_version() if args.first_release else RELEASE_VERSION
     if identity["target"] != platform_key() or version == old_version:
         raise RuntimeError("Choose a candidate package for this platform and a distinct version")
     package, observed = select_candidate(args.candidate.resolve(strict=True), identity)

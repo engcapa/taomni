@@ -8,6 +8,7 @@ on:
       package_source: {type: string, required: true}
       package_version: {type: string, required: true}
       first_release: {type: boolean, default: false}
+      first_release_version: {type: string, default: ''}
       verify_relocation: {type: boolean, default: false}
       verify_rdp_perf: {type: boolean, default: false}
       signed_run: {type: string, default: ''}
@@ -86,6 +87,9 @@ jobs:
     if: ${{ !cancelled() && needs.package.result == 'success' && (needs.signed-mfa.result == 'success' || needs.signed-mfa.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
+    env:
+      FIRST_RELEASE: ${{ inputs.first_release }}
+      QA_FIRST_UPGRADE_VERSION: ${{ inputs.first_release_version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -147,8 +151,12 @@ jobs:
       - name: Stage the pinned legacy deb
         env:
           GH_TOKEN: ${{ github.token }}
-          OLD_VERSION: ${{ inputs.first_release && '0.5.12' || '0.5.10' }}
-        run: python -m qa_ui_auto.legacy_release legacy-input --version "$OLD_VERSION"
+        run: |
+          args=()
+          if [[ "$FIRST_RELEASE" == true ]]; then
+            args+=(--first-upgrade)
+          fi
+          python -m qa_ui_auto.legacy_release legacy-input "${args[@]}"
       - name: Build the standalone release RDP probe
         if: inputs.verify_rdp_perf
         run: |
@@ -160,7 +168,6 @@ jobs:
           sha256sum src-tauri/target/release/rdp-probe > installed-mfa-evidence/rdp-probe/sha256.txt
       - name: Exercise apt replacement, signed module migration and rollback
         env:
-          FIRST_RELEASE: ${{ inputs.first_release }}
           VERIFY_RELOCATION: ${{ inputs.verify_relocation }}
           VERIFY_RDP_PERF: ${{ inputs.verify_rdp_perf }}
         run: |

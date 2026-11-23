@@ -25,7 +25,7 @@ from qa_ui_auto.fixtures.module_legacy_mfa import (
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact
 from qa_ui_auto.legacy_install import linux_install
 from qa_ui_auto.legacy_process import MODE_LEASE_DENIAL, headless_command, initialize_profile, observe_same_profile_contender
-from qa_ui_auto.legacy_release import FIRST_UPGRADE_VERSION, RELEASE_VERSION, selected_asset, verify_asset
+from qa_ui_auto.legacy_release import RELEASE_VERSION, first_upgrade_version, selected_asset, verify_asset
 
 def inspect_accounts(ctx, executable, work, evidence, phase, code, *, next_code=None):
     with installed_desktop(ctx, executable, work / "desktop", evidence, phase) as (driver, session):
@@ -205,7 +205,7 @@ def execute(args):
             or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"):
         raise RuntimeError("Installed Linux replacement requires the owned GitHub-hosted runner")
     target = json.loads(args.identity.read_text(encoding="utf-8"))
-    old_version = FIRST_UPGRADE_VERSION if args.first_release else RELEASE_VERSION
+    old_version = first_upgrade_version() if args.first_release else RELEASE_VERSION
     if target["target"] != "linux-x86_64" or target["version"] == old_version:
         raise RuntimeError("Choose a Linux candidate with a distinct installer version")
     bundled = inventory(args.candidate.resolve(strict=True), target)

@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from qa_ui_auto.legacy_release import ASSETS, download_asset, selected_asset, verify_asset
+from qa_ui_auto.legacy_release import ASSETS, download_asset, first_upgrade_version, main, selected_asset, verify_asset
 from qa_ui_auto.legacy_process import sanitized_output
 from qa_ui_auto.legacy_install import install
 from qa_ui_auto.fixtures.module_legacy_install import insert_business_rows, retained_manifest, session_rows
@@ -19,19 +19,47 @@ from qa_ui_auto.fixtures.module_upgrade import input_sessions
 
 
 class PinnedReleaseTests(unittest.TestCase):
-    def test_first_upgrade_pins_the_last_monolith_for_all_release_platforms(self):
+    def test_each_monolith_has_distinct_pinned_installers_for_all_release_platforms(self):
         for system, arch in [("Linux", "x64"), ("Windows", "x64"), ("Darwin", "arm64"), ("Darwin", "x64")]:
             machine = "x86_64" if arch == "x64" else "aarch64"
             with self.subTest(system=system, machine=machine):
-                first = selected_asset(system, machine, version="0.5.12")
-                old = selected_asset(system, machine)
-                self.assertIn("_0.5.12_", first.name)
-                self.assertGreater(first.size, 0)
-                self.assertNotEqual(first.asset_id, old.asset_id)
-                self.assertNotEqual(first.sha256, old.sha256)
-                self.assertRegex(first.sha256, "^[0-9a-f]{64}$")
+                pins = []
+                for version in ("0.5.10", "0.5.12", "0.5.13"):
+                    asset = selected_asset(system, machine, version=version)
+                    self.assertIn(f"_{version}_", asset.name)
+                    self.assertGreater(asset.size, 0)
+                    self.assertRegex(asset.sha256, "^[0-9a-f]{64}$")
+                    pins.append(asset)
+                self.assertEqual(len({asset.asset_id for asset in pins}), 3)
+                self.assertEqual(len({asset.sha256 for asset in pins}), 3)
         with self.assertRaisesRegex(RuntimeError, "No pinned"):
             selected_asset("Linux", "x86_64", version="latest")
+
+    def test_first_upgrade_defaults_to_current_and_only_accepts_pinned_monoliths(self):
+        cases = (("", "0.5.13"), ("0.5.12", "0.5.12"), ("0.5.13", "0.5.13"))
+        for requested, expected in cases:
+            with self.subTest(requested=requested), patch.dict(
+                    "os.environ", {"QA_FIRST_UPGRADE_VERSION": requested}):
+                self.assertEqual(first_upgrade_version(), expected)
+        for requested in ("latest", "0.5.10", "0.6.0"):
+            with self.subTest(requested=requested), patch.dict(
+                    "os.environ", {"QA_FIRST_UPGRADE_VERSION": requested}):
+                with self.assertRaisesRegex(RuntimeError, "No pinned first-upgrade"):
+                    first_upgrade_version()
+
+    def test_staging_uses_the_same_override_as_the_first_upgrade_fixture(self):
+        with (
+            patch.dict("os.environ", {"QA_FIRST_UPGRADE_VERSION": "0.5.12", "GH_TOKEN": "test-token"}),
+            patch("qa_ui_auto.legacy_release.platform.system", return_value="Linux"),
+            patch("qa_ui_auto.legacy_release.platform.machine", return_value="x86_64"),
+            patch("qa_ui_auto.legacy_release.download_asset") as download,
+            patch("builtins.print"),
+        ):
+            for flags, version in ((["--first-upgrade"], first_upgrade_version()), ([], "0.5.10")):
+                with self.subTest(flags=flags), patch("sys.argv", ["legacy_release", "legacy-input", *flags]):
+                    main()
+                    download.assert_called_with(Path("legacy-input"), selected_asset(version=version),
+                                                token="test-token")
 
     def test_only_explicit_supported_release_architectures_are_accepted(self):
         self.assertIs(selected_asset("Windows", "AMD64"), ASSETS[("Windows", "x64")])

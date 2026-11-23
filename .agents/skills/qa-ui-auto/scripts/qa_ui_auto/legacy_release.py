@@ -36,8 +36,9 @@ ASSETS = {
 }
 
 
-FIRST_UPGRADE_VERSION = "0.5.12"
-FIRST_UPGRADE_ASSETS = {
+FIRST_UPGRADE_VERSION = "0.5.13"
+FIRST_UPGRADE_VERSIONS = (FIRST_UPGRADE_VERSION, "0.5.12")
+ASSETS_0_5_12 = {
     ("Linux", "x64"): ReleaseAsset(
         778338425, "Taomni_0.5.12_amd64.deb", 111121038,
         "eacf3848a7378d590a7e9724912824d8affcb69b484d060927db0809cce09f3e"),
@@ -51,10 +52,32 @@ FIRST_UPGRADE_ASSETS = {
         778338688, "Taomni_0.5.12_x64.dmg", 107200003,
         "78088495bc7cb2a9a8d44bc4dd74b7a96e5352a4e0c3a7f70f68c0b1cc306660"),
 }
+ASSETS_0_5_13 = {
+    ("Linux", "x64"): ReleaseAsset(
+        784345275, "Taomni_0.5.13_amd64.deb", 110933198,
+        "73e8c7e7d48aea1d3c95156cbf66c63fce55316fc4e3232035bad275fbd43164"),
+    ("Windows", "x64"): ReleaseAsset(
+        784346039, "Taomni_0.5.13_x64_en-US.msi", 97116160,
+        "52d8df192c8d55e3c252600eed6394596ed04c0f5ffd063ec31504a1b5453adc"),
+    ("Darwin", "arm64"): ReleaseAsset(
+        784344768, "Taomni_0.5.13_aarch64.dmg", 100877734,
+        "34221d943df68e979d0c6116b7b43ac1230d84095be128e0b02d6717682b354d"),
+    ("Darwin", "x64"): ReleaseAsset(
+        784345691, "Taomni_0.5.13_x64.dmg", 106995715,
+        "5ae9e9430e1cb1a7dc6c3bb440a7ed3af97042f627fdfe1635cd1abd73ad6b82"),
+}
 RELEASES = {
     RELEASE_VERSION: (RELEASE_ID, ASSETS),
-    FIRST_UPGRADE_VERSION: (454210401, FIRST_UPGRADE_ASSETS),
+    "0.5.12": (454210401, ASSETS_0_5_12),
+    "0.5.13": (455671999, ASSETS_0_5_13),
 }
+
+
+def first_upgrade_version():
+    version = os.environ.get("QA_FIRST_UPGRADE_VERSION") or FIRST_UPGRADE_VERSION
+    if version not in FIRST_UPGRADE_VERSIONS:
+        raise RuntimeError(f"No pinned first-upgrade installer for version {version!r}")
+    return version
 
 
 def selected_asset(system=None, machine=None, *, version=RELEASE_VERSION):
@@ -123,12 +146,15 @@ def download_asset(directory, asset, *, token=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
-    parser.add_argument("--version", choices=RELEASES, default=RELEASE_VERSION)
+    inputs = parser.add_mutually_exclusive_group()
+    inputs.add_argument("--version", choices=RELEASES, default=RELEASE_VERSION)
+    inputs.add_argument("--first-upgrade", action="store_true",
+                        help="Use the pinned first-upgrade baseline selected by QA_FIRST_UPGRADE_VERSION")
     args = parser.parse_args()
     token = os.environ.get("GH_TOKEN")
     if not token:
         raise SystemExit("Provide the hosted installer staging directory and a read-only GH_TOKEN")
-    asset = selected_asset(version=args.version)
+    asset = selected_asset(version=first_upgrade_version() if args.first_upgrade else args.version)
     download_asset(args.directory, asset, token=token)
     print(f"Verified {asset.name} (asset {asset.asset_id}, SHA-256 {asset.sha256})")
 

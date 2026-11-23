@@ -853,7 +853,7 @@ jobs:
             python -m qa_ui_auto.legacy_release qa-ui-auto-report/legacy-installer-input
           fi
           if [[ "$FIRST_UPGRADE_MONOLITH" == true ]]; then
-            python -m qa_ui_auto.legacy_release qa-ui-auto-report/legacy-installer-input --version 0.5.12
+            python -m qa_ui_auto.legacy_release qa-ui-auto-report/legacy-installer-input --first-upgrade
           fi
           python -c 'import os; from pathlib import Path; Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8").write("QA_LEGACY_INSTALLER_DIR=" + str(Path("qa-ui-auto-report/legacy-installer-input").resolve()) + "\n")'
       - name: Download this invocation's verified native runtime

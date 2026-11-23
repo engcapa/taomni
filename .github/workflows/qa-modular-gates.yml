@@ -31,7 +31,7 @@ on:
         type: string
         default: all
       first_release:
-        description: Verify the 0.5.12 upgrade using the signed module roster from the candidate build
+        description: Verify the pinned monolith upgrade using the signed module roster from the candidate build
         type: boolean
         default: false
 
