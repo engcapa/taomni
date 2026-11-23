@@ -25,15 +25,30 @@ pub(super) async fn load(
     app: &AppHandle,
     registry: &Arc<PluginRegistry>,
 ) -> Result<Option<CompiledRules>, String> {
-    let hosted = hosted(registry)?;
-    if hosted {
+    if hosted(registry)? {
         let current: Option<RuleCache> = exchange(registry, RULES, RulesRequest::Read).await?;
-        if let Some(cache) = current {
-            return tokio::task::spawn_blocking(move || cache.compile().map(Some))
-                .await
-                .map_err(|error| error.to_string())?;
-        }
+        let cache = match current {
+            Some(cache) => Some(cache),
+            None => adopt_missing(app, registry).await?,
+        };
+        return tokio::task::spawn_blocking(move || {
+            cache.as_ref().map(RuleCache::compile).transpose()
+        })
+        .await
+        .map_err(|error| error.to_string())?;
     }
+    let legacy = super::rules_dir(app)?;
+    tokio::task::spawn_blocking(move || {
+        source::load_legacy(&legacy).and_then(|cache| cache.compile().ok())
+    })
+    .await
+    .map_err(|error| error.to_string())
+}
+
+pub(super) async fn adopt_missing(
+    app: &AppHandle,
+    registry: &Arc<PluginRegistry>,
+) -> Result<Option<RuleCache>, String> {
     let legacy = super::rules_dir(app)?;
     let previous = tokio::task::spawn_blocking(move || source::load_legacy(&legacy))
         .await
@@ -41,15 +56,11 @@ pub(super) async fn load(
     let Some(previous) = previous else {
         return Ok(None);
     };
-    if !hosted {
-        return Ok(previous.compile().ok());
-    }
     let adopted: Option<RuleCache> =
         exchange(registry, RULES, RulesRequest::Adopt(previous)).await?;
-    let cache = adopted.ok_or("SocksCap did not return the adopted rule cache")?;
-    tokio::task::spawn_blocking(move || cache.compile().map(Some))
-        .await
-        .map_err(|error| error.to_string())?
+    adopted
+        .map(Some)
+        .ok_or_else(|| "SocksCap did not return the adopted rule cache".into())
 }
 
 pub(super) async fn refresh(

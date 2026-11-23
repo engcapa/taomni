@@ -12,7 +12,8 @@ use taomni_plugin_api::{
 };
 use taomni_plugin_sdk::{HostConfig, Operation, PluginHandler, SnapshotProvider};
 use taomni_sockscap_api::{
-    COMMANDS, PARSE_SHARE_LINK, RULES, SETTINGS, TEST_TARGET, policy::TargetRuleProbe, share_link,
+    COMMANDS, PARSE_SHARE_LINK, RULES, SETTINGS, TEST_SAVED_TARGET, TEST_TARGET,
+    policy::TargetRuleProbe, share_link,
 };
 
 fn main() -> io::Result<()> {
@@ -116,6 +117,13 @@ impl PluginHandler for Host {
                 return self
                     .settings
                     .exchange_rules(&self.runtime, operation, endpoint);
+            }
+            TEST_SAVED_TARGET => {
+                let endpoint = serde_json::from_value(params)
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                return self
+                    .settings
+                    .exchange_saved_target(&self.runtime, operation, endpoint);
             }
             PARSE_SHARE_LINK => {
                 let input = params

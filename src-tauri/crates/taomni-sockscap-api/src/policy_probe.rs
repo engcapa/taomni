@@ -27,6 +27,34 @@ pub struct TargetTestResult {
     pub matched_rule: Option<String>,
 }
 
+/// Evaluate the target against the signed host's profile-owned settings.
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SavedTargetRequest {
+    pub host: String,
+    pub port: u16,
+    /// The core has checked whether a missing rules file can be imported.
+    /// Existing module rules always take priority.
+    pub legacy_rules_checked: bool,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(
+    tag = "status",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub enum SavedTargetReply {
+    Adopt {
+        settings_missing: bool,
+        rules_missing: bool,
+    },
+    Evaluated {
+        result: TargetTestResult,
+    },
+}
+
 impl TargetRuleProbe {
     pub fn for_config(
         config: &SocksCapConfig,

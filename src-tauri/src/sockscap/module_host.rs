@@ -5,11 +5,13 @@ use std::sync::Arc;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use taomni_sockscap_api::{
-    PARSE_SHARE_LINK, SLUG, TEST_TARGET,
-    policy::{TargetRuleProbe, TargetTestResult},
+    PARSE_SHARE_LINK, SLUG, TEST_SAVED_TARGET, TEST_TARGET,
+    policy::{SavedTargetReply, SavedTargetRequest, TargetRuleProbe, TargetTestResult},
     share_link::{self, ParsedShareLink},
 };
+use tauri::AppHandle;
 
+use super::{module_rules, module_settings};
 use crate::plugin::{LifecycleState, PluginRegistry};
 
 pub(super) async fn parse_share_link(
@@ -38,6 +40,44 @@ pub(super) async fn test_target(
         return Ok(probe.evaluate());
     }
     invoke(registry, TEST_TARGET, payload).await
+}
+
+/// Returns no result only for packages that predate host-owned evaluation.
+pub(super) async fn test_saved_target(
+    app: &AppHandle,
+    registry: &Arc<PluginRegistry>,
+    host: &str,
+    port: u16,
+) -> Result<Option<TargetTestResult>, String> {
+    if !supports(registry, TEST_SAVED_TARGET) {
+        return Ok(None);
+    }
+    let mut request = SavedTargetRequest {
+        host: host.into(),
+        port,
+        legacy_rules_checked: false,
+    };
+    let (settings_missing, rules_missing) =
+        match module_settings::exchange(registry, TEST_SAVED_TARGET, &request).await? {
+            SavedTargetReply::Evaluated { result } => return Ok(Some(result)),
+            SavedTargetReply::Adopt {
+                settings_missing,
+                rules_missing,
+            } => (settings_missing, rules_missing),
+        };
+    if settings_missing {
+        module_settings::load(app, registry).await?;
+    }
+    if rules_missing {
+        module_rules::adopt_missing(app, registry).await?;
+        request.legacy_rules_checked = true;
+    }
+    match module_settings::exchange(registry, TEST_SAVED_TARGET, request).await? {
+        SavedTargetReply::Evaluated { result } => Ok(Some(result)),
+        SavedTargetReply::Adopt { .. } => {
+            Err("SocksCap settings are unavailable after adoption".into())
+        }
+    }
 }
 
 fn supports(registry: &PluginRegistry, command: &str) -> bool {

@@ -246,7 +246,11 @@ pub async fn sockscap_test_target(
         .sockscap
         .begin_activation(&state.plugins)
         .await?;
-    // Ensure rules are loaded into the orchestrator for dry-run.
+    if let Some(result) = module_host::test_saved_target(&app, &state.plugins, &host, port).await? {
+        return Ok(result);
+    }
+
+    // Older modules evaluate a probe built from the desktop's current settings.
     {
         let mut orch = state.legacy.sockscap.orch.write().await;
         if orch.rules().is_none() {

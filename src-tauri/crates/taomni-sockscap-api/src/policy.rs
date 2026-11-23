@@ -419,4 +419,4 @@ mod tests;
 #[path = "policy_probe.rs"]
 mod probe;
 
-pub use probe::{TargetRuleProbe, TargetTestResult};
+pub use probe::{SavedTargetReply, SavedTargetRequest, TargetRuleProbe, TargetTestResult};

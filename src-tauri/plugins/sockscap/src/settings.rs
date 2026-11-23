@@ -10,6 +10,7 @@ use taomni_plugin_stream::{length_prefixed, routed_tcp::Endpoint};
 use taomni_sockscap_api::{
     CONFIG_PATH, RULES_PATH, RulesRequest, SettingsRequest, SocksCapConfig,
     gfwlist_rules::RuleCache,
+    policy::{SavedTargetReply, SavedTargetRequest, TargetRuleProbe},
 };
 use tokio::runtime::Runtime;
 
@@ -92,6 +93,36 @@ impl Settings {
     ) -> Result<serde_json::Value, RpcError> {
         transfer(io, operation, endpoint, |request| {
             self.apply_rules(request, || check_publish(operation))
+        })
+    }
+
+    fn test_saved_target(&self, request: SavedTargetRequest) -> Result<SavedTargetReply, String> {
+        let config: Option<SocksCapConfig> = self.file.load().map_err(|error| error.to_string())?;
+        let cache: Option<RuleCache> = self.rules.load().map_err(|error| error.to_string())?;
+        let settings_missing = config.is_none();
+        let rules_missing = cache.is_none() && !request.legacy_rules_checked;
+        let Some(mut config) = config.filter(|_| !rules_missing) else {
+            return Ok(SavedTargetReply::Adopt {
+                settings_missing,
+                rules_missing,
+            });
+        };
+        config.normalize();
+        let rules = cache.as_ref().map(RuleCache::compile).transpose()?;
+        let result =
+            TargetRuleProbe::for_config(&config, rules.as_ref(), request.host, request.port)
+                .evaluate();
+        Ok(SavedTargetReply::Evaluated { result })
+    }
+
+    pub(super) fn exchange_saved_target(
+        &self,
+        io: &Runtime,
+        operation: &Operation,
+        endpoint: Endpoint,
+    ) -> Result<serde_json::Value, RpcError> {
+        transfer(io, operation, endpoint, |request| {
+            self.test_saved_target(request)
         })
     }
 }
@@ -273,5 +304,81 @@ mod tests {
                 .match_host("proxied.example.test"),
             taomni_sockscap_api::gfwlist_rules::RuleMatch::Proxy { .. }
         ));
+    }
+
+    #[test]
+    fn saved_target_uses_persisted_rules_and_only_requests_adoption_for_missing_files() {
+        use taomni_sockscap_api::{Decision, UserRule, UserRuleAction, gfwlist_rules::GfwListMeta};
+
+        let profile = tempfile::tempdir().unwrap();
+        let settings = Settings::new(profile.path());
+        let test_target = |host: &str, legacy_rules_checked| {
+            settings.test_saved_target(SavedTargetRequest {
+                host: host.into(),
+                port: 443,
+                legacy_rules_checked,
+            })
+        };
+        assert!(matches!(
+            test_target("persisted.example.test", false).unwrap(),
+            SavedTargetReply::Adopt {
+                settings_missing: true,
+                rules_missing: true
+            }
+        ));
+
+        let mut config = legacy("upstream.example.test");
+        config.user_rules.push(UserRule {
+            pattern: "blocked.example.test".into(),
+            action: UserRuleAction::Block,
+            comment: String::new(),
+        });
+        settings
+            .apply(SettingsRequest::Adopt(config), || Ok(()))
+            .unwrap();
+        assert!(matches!(
+            test_target("persisted.example.test", false).unwrap(),
+            SavedTargetReply::Adopt {
+                settings_missing: false,
+                rules_missing: true
+            }
+        ));
+        assert!(matches!(
+            test_target("blocked.example.test", true).unwrap(),
+            SavedTargetReply::Evaluated { result }
+                if result.decision == Decision::Block
+                    && result.matched_rule.as_deref() == Some("blocked.example.test")
+        ));
+
+        settings
+            .apply_rules(
+                RulesRequest::Adopt(RuleCache {
+                    raw: "||persisted.example.test\n".into(),
+                    meta: GfwListMeta {
+                        source: "fixture".into(),
+                        rule_count: 0,
+                        skipped: 0,
+                        last_refresh: None,
+                        etag: None,
+                    },
+                }),
+                || Ok(()),
+            )
+            .unwrap();
+        assert!(matches!(
+            test_target("persisted.example.test", false).unwrap(),
+            SavedTargetReply::Evaluated { result }
+                if result.decision == Decision::Proxy
+                    && result.matched_rule.as_deref() == Some("||persisted.example.test")
+        ));
+        assert!(matches!(
+            test_target("127.0.0.1", false).unwrap(),
+            SavedTargetReply::Evaluated { result } if result.decision == Decision::Direct
+        ));
+
+        let rules = profile.path().join(RULES_PATH);
+        fs::write(&rules, b"corrupt rules").unwrap();
+        assert!(test_target("persisted.example.test", true).is_err());
+        assert_eq!(fs::read(rules).unwrap(), b"corrupt rules");
     }
 }

@@ -1,6 +1,6 @@
 id: TC-MODULES-074
 title: Enabling SocksCap mounts its target preview in the existing Tools tab
-description: Enable the module through its disabled tab, check the target and matching rule, then return to the retained tab through the overview after disabling it.
+description: Enable the module through its disabled tab, check matching and non-matching targets, then return to the retained tab through the overview after disabling it.
 covers: [F-Sockscap-1, F-Modules-1]
 tags: [modules, sockscap, p1]
 modes: [browser]
@@ -64,6 +64,12 @@ steps:
 - click: '[data-testid="sockscap-test-target"]'
 - assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Matched rule: ||stub'}
 - click: '[data-testid="sockscap-test-detail-close"]'
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: direct.example.test}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'direct.example.test:443'}
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Decision: direct'}
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Matched rule: -'}
+- click: '[data-testid="sockscap-test-detail-close"]'
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
 - click: '[data-testid="module-action-uninstall-sockscap"]'
@@ -102,7 +108,7 @@ verification:
     results: [29, 31, 32, 33, 34]
   - id: reenable
     requirement: Users can reopen the capture panel after disabling and enabling its module in the same desktop.
-    actions: [36, 37, 39, 40, 41, 46, 47, 48, 50, 53, 54, 55]
+    actions: [36, 37, 39, 40, 41, 46, 47, 48, 50, 53, 54, 55, 58, 59]
     checkpoints:
     - {step: 35, expectation: Capture cannot be started from the disabled tool.}
     - {step: 42, expectation: The original tool displays the enabled panel again.}
@@ -113,17 +119,20 @@ verification:
     - {step: 51, expectation: Closing the result leaves the preview usable.}
     - {step: 52, expectation: The preview still shows capture as stopped after the lifecycle change and probe.}
     - {step: 56, expectation: The same preview rule is available after re-enabling the module.}
-    results: [35, 42, 43, 44, 45, 49, 51, 52, 56]
+    - {step: 60, expectation: The result shows the new target and default port.}
+    - {step: 61, expectation: A target with no matching rule uses the direct decision.}
+    - {step: 62, expectation: The former matched rule is absent from the new result.}
+    results: [35, 42, 43, 44, 45, 49, 51, 52, 56, 60, 61, 62]
   - id: uninstall
     requirement: Confirmed uninstall returns the preview store entry to its installable state and removes the capture controls.
-    actions: [58, 59, 60, 62, 65, 66, 67]
+    actions: [64, 65, 66, 68, 71, 72, 73]
     checkpoints:
-    - {step: 61, expectation: The store asks the user to confirm uninstall.}
-    - {step: 63, expectation: Installation is available again after uninstall.}
-    - {step: 64, expectation: The uninstall action is absent from the entry.}
-    - {step: 68, expectation: Reopening the original tool shows the missing module state.}
-    - {step: 69, expectation: The uninstalled module exposes no capture start control.}
-    results: [61, 63, 64, 68, 69]
+    - {step: 67, expectation: The store asks the user to confirm uninstall.}
+    - {step: 69, expectation: Installation is available again after uninstall.}
+    - {step: 70, expectation: The uninstall action is absent from the entry.}
+    - {step: 74, expectation: Reopening the original tool shows the missing module state.}
+    - {step: 75, expectation: The uninstalled module exposes no capture start control.}
+    results: [67, 69, 70, 74, 75]
   visual:
   - check: The detail displays the requested host alongside the decision and rule.
     method: automated

@@ -42,6 +42,7 @@ pub use settings::SocksCapConfig;
 pub const SLUG: &str = "sockscap";
 pub const PARSE_SHARE_LINK: &str = "sockscap/parse-share-link";
 pub const TEST_TARGET: &str = "sockscap/test-target";
+pub const TEST_SAVED_TARGET: &str = "sockscap/test-saved-target";
 pub const SETTINGS: &str = "sockscap/settings";
 pub const CONFIG_PATH: &str = "plugins/sockscap/data/config.json";
 pub const RULES: &str = "sockscap/rules";
@@ -58,9 +59,10 @@ pub struct XrayProcesses {
     pub children: Vec<u32>,
 }
 pub const REDIRECTOR_BRIDGE_ARG: &str = "--sockscap-redirector-bridge";
-pub const COMMANDS: [&str; 6] = [
+pub const COMMANDS: [&str; 7] = [
     PARSE_SHARE_LINK,
     TEST_TARGET,
+    TEST_SAVED_TARGET,
     SETTINGS,
     RULES,
     RUNTIME_INFO,

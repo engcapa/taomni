@@ -1,6 +1,6 @@
 id: TC-MODULES-073
 title: Signed SocksCap evaluates an existing routing rule in Test Target
-description: Install the signed module, verify the migrated profile and saved rules through Test Target, and reopen the saved rules after re-enabling SocksCap.
+description: Install the signed module, verify the migrated profile and saved rules through Test Target, and reopen the saved rules after re-enabling SocksCap. Then change only the isolated module rule file and check that the running host uses the current file.
 covers: [F-Sockscap-1, F-Modules-1]
 tags: [modules, sockscap, native-boundary, p1]
 modes: [native]
@@ -57,6 +57,20 @@ steps:
 - assert_signed_sockscap_host: running
 - click: '[data-testid="sockscap-test-detail-close"]'
 - assert_no_runtime_errors: null
+- host_write_file:
+    path: '${fixture.sockscap_module_rules}'
+    text: '{"raw":"[AutoProxy 0.2.9]\n||module-only.example.test\n","meta":{"source":"file:qa-module-rules","ruleCount":1,"skipped":1,"lastRefresh":"2026-01-01T00:00:00Z"}}'
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: module-only.example.test}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Decision: proxy'}
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Matched rule: ||module-only.example.test'}
+- click: '[data-testid="sockscap-test-detail-close"]'
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: proxied.example.test}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Decision: direct'}
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Matched rule: -'}
+- assert_file_sha256: {path: '${fixture.sockscap_legacy_rules}', equals: '${fixture.sockscap_legacy_rules_sha256}'}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -85,11 +99,22 @@ verification:
     - {step: 47, expectation: The signed host owns its native writer lease.}
     - {step: 49, expectation: Re-enabling and evaluating the cached rule produce no runtime errors.}
     results: [24, 25, 26, 29, 30, 36, 46, 47, 49]
+  - id: current-module-rules
+    requirement: An active signed host evaluates the current module rule file after the desktop has already evaluated the former rule.
+    actions: [50, 51, 52, 55, 56, 57]
+    checkpoints:
+    - {step: 53, expectation: The rule found only in the module file enables proxy routing.}
+    - {step: 54, expectation: The current rule file supplies the displayed match.}
+    - {step: 58, expectation: The target that matched the previous file now routes directly.}
+    - {step: 59, expectation: The previous rule is absent from the current result.}
+    - {step: 60, expectation: The original legacy rule file still has its initial digest.}
+    - {step: 61, expectation: Repeated previews complete without runtime errors.}
+    results: [53, 54, 58, 59, 60, 61]
   visual:
   - check: The dry-run dialog displays the decision and matched rule.
     method: automated
     reason: The visible dialog is checked after clicking the normal action.
   native:
-  - check: The verified host holds the writer lease after the targeted request.
+  - check: The verified host holds the writer lease and reads its current policy from the module data directory.
     method: automated
-    reason: The test reads the adopted file and checks the active writer lease. Linux launch-only mode lacks this panel control.
+    reason: The test checks the writer lease and the result of evaluating a module-only rule during an active host lifetime. Linux launch-only mode lacks this panel control.
