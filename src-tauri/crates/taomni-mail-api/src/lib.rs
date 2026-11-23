@@ -1,4 +1,4 @@
-//! Core-to-host mail connection contract. The token grants access to one
+//! Core-to-host Mail RPC contracts. A connection token grants access to one
 //! destination selected by the core, and the TLS name remains the real server.
 
 use std::time::Duration;
@@ -55,6 +55,13 @@ pub const STORE_IMAP_DRAFT: &str = "mail/store-imap-draft";
 pub const DISCARD_IMAP_DRAFT: &str = "mail/discard-imap-draft";
 pub const HOST_REQUEST_TIMEOUT: Duration = Duration::from_secs(70);
 pub const SMTP_DELIVERY_UNKNOWN: &str = "SMTP delivery status unknown";
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MailboxRequest<A> {
+    pub account_id: String,
+    pub action: A,
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -222,6 +229,17 @@ pub struct ImapFolderMutation {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mailbox_request_preserves_the_installed_host_wire_shape() {
+        let stored = serde_json::json!({
+            "accountId": "account",
+            "action": {"operation": "list"}
+        });
+        let request: MailboxRequest<serde_json::Value> =
+            serde_json::from_value(stored.clone()).unwrap();
+        assert_eq!(serde_json::to_value(request).unwrap(), stored);
+    }
 
     #[test]
     fn preserved_session_values_load_after_moving_the_connection_types() {

@@ -2,10 +2,9 @@ use std::sync::Arc;
 
 use serde::{Serialize, de::DeserializeOwned};
 use taomni_mail_api::{
-    HOST_REQUEST_TIMEOUT,
+    HOST_REQUEST_TIMEOUT, MailboxRequest,
     imap_exchange::{read_body_frame, write_body_frame},
 };
-use taomni_mail_engine::database::MailboxRequest;
 use taomni_plugin_stream::routed_tcp::Route;
 use tokio::io::AsyncReadExt;
 

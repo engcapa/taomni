@@ -102,13 +102,6 @@ struct MailConnection {
 
 type InitializeSchema = fn(&Connection) -> rusqlite::Result<()>;
 
-#[derive(serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct MailboxRequest<A> {
-    pub account_id: String,
-    pub action: A,
-}
-
 pub struct MailDatabase {
     connection: Mutex<MailConnection>,
     initialize_schema: InitializeSchema,

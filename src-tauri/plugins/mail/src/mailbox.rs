@@ -1,8 +1,10 @@
 //! One-use bulk transfer for account data that has moved to the Mail host.
 use rusqlite::Connection;
 use serde::de::DeserializeOwned;
-use taomni_mail_api::imap_exchange::{read_body_frame, write_body_frame};
-use taomni_mail_engine::database::MailboxRequest;
+use taomni_mail_api::{
+    MailboxRequest,
+    imap_exchange::{read_body_frame, write_body_frame},
+};
 use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_plugin_sdk::Operation;
 use taomni_plugin_stream::routed_tcp::Endpoint;

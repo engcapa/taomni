@@ -1,10 +1,7 @@
-use taomni_mail_api::FILTER_RULES;
-use taomni_mail_engine::{
-    database::MailboxRequest,
-    filters::{
-        MailFilter, ensure_filter_mark,
-        rules::{self, FilterRulesAction, FilterRulesImport, FilterRulesReply},
-    },
+use taomni_mail_api::{FILTER_RULES, MailboxRequest};
+use taomni_mail_engine::filters::{
+    MailFilter, ensure_filter_mark,
+    rules::{self, FilterRulesAction, FilterRulesImport, FilterRulesReply},
 };
 
 use crate::{

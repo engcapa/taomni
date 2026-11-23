@@ -5,13 +5,10 @@ use crate::{
     state::AppState,
 };
 use serde::de::DeserializeOwned;
-use taomni_mail_api::ADDRESS_BOOK;
-use taomni_mail_engine::{
-    contacts::{
-        handoff::{self, AddressBookImport},
-        mailbox::BookAction,
-    },
-    database::MailboxRequest,
+use taomni_mail_api::{ADDRESS_BOOK, MailboxRequest};
+use taomni_mail_engine::contacts::{
+    handoff::{self, AddressBookImport},
+    mailbox::BookAction,
 };
 
 pub(super) async fn run<T: DeserializeOwned + Send + 'static>(

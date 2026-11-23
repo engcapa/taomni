@@ -1,4 +1,5 @@
-use taomni_mail_engine::{agenda::AgendaAction, database::MailboxRequest};
+use taomni_mail_api::MailboxRequest;
+use taomni_mail_engine::agenda::AgendaAction;
 use taomni_plugin_api::RpcError;
 
 use super::store::{Store, unavailable};

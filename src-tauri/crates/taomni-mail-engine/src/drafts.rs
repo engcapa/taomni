@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::now_ts;
 
-pub type DraftRequest = crate::database::MailboxRequest<DraftAction>;
+pub type DraftRequest = taomni_mail_api::MailboxRequest<DraftAction>;
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "camelCase", deny_unknown_fields)]

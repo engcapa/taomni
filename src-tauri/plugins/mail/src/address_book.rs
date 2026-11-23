@@ -1,7 +1,5 @@
-use taomni_mail_engine::{
-    contacts::{ContactWriteError, mailbox::BookAction},
-    database::MailboxRequest,
-};
+use taomni_mail_api::MailboxRequest;
+use taomni_mail_engine::contacts::{ContactWriteError, mailbox::BookAction};
 use taomni_plugin_api::{ErrorCode, RpcError};
 
 use super::store::{Store, unavailable};

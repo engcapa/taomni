@@ -1,4 +1,5 @@
-use taomni_mail_engine::{database::MailboxRequest, filters::rules::FilterRulesAction};
+use taomni_mail_api::MailboxRequest;
+use taomni_mail_engine::filters::rules::FilterRulesAction;
 use taomni_plugin_api::RpcError;
 
 use super::store::{Store, unavailable};
