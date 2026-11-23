@@ -9,6 +9,8 @@ on:
       max_parallel: {type: number, default: 8}
       run_rdp_unit_contracts: {type: boolean, default: true}
       workspace_stage_trace: {type: boolean, default: false}
+      vendor_cache: {type: boolean, default: false}
+      trusted_cache: {type: boolean, default: true}
 permissions:
   contents: read
   actions: read
@@ -38,6 +40,9 @@ jobs:
       QA_CARGO_PROFILE: ${{ matrix.profile }}
       QA_CARGO_RUNNER: ${{ matrix.runner }}
       QA_CARGO_ARCHIVE: qa-build-output/cargo-dependencies
+      QA_VENDOR_CACHE: ${{ (inputs.operation == 'build' || inputs.operation == 'contracts') && inputs.vendor_cache && '1' || '' }}
+      QA_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      QA_TRUSTED_CACHE: ${{ inputs.trusted_cache && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -201,13 +206,13 @@ jobs:
       - name: Cargo dependency archive key
         id: branch-cargo-key
         if: >-
-          env.QA_BRANCH_ARTIFACTS == 'true' && matrix.mode == 'native' &&
+          matrix.mode == 'native' &&
           ((inputs.operation == 'build' && steps.reusable-runtime.outputs.available != 'true') ||
           (inputs.operation == 'contracts' && runner.os == 'Linux'))
         run: python .agents/skills/qa-ui-auto/scripts/ci_cargo_artifact.py key
       - name: Find retained Cargo dependencies on the dispatch branch
         id: branch-cargo
-        if: steps.branch-cargo-key.outputs.name != ''
+        if: steps.branch-cargo-key.outputs.name != '' && env.QA_BRANCH_ARTIFACTS == 'true'
         uses: ./.github/actions/qa-branch-artifact
         with:
           name: ${{ steps.branch-cargo-key.outputs.name }}
@@ -222,9 +227,31 @@ jobs:
           path: ${{ env.QA_CARGO_ARCHIVE }}
           run-id: ${{ steps.branch-cargo.outputs.run-id }}
           github-token: ${{ github.token }}
-      - name: Restore branch Cargo dependencies
+      - name: Find trusted Cargo dependencies on the default branch
+        id: trusted-cargo
+        if: >-
+          env.QA_TRUSTED_CACHE == 'true' && steps.branch-cargo-key.outputs.name != '' &&
+          steps.branch-cargo.outputs.run-id == ''
+        uses: ./.github/actions/qa-branch-artifact
+        with:
+          name: ${{ steps.branch-cargo-key.outputs.name }}
+          trusted: 'true'
+          default-branch: ${{ env.QA_DEFAULT_BRANCH }}
+          events: schedule,workflow_dispatch,push
+      - name: Retrieve the trusted Cargo dependencies
+        id: trusted-cargo-download
+        if: steps.trusted-cargo.outputs.run-id != ''
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.branch-cargo-key.outputs.name }}
+          path: ${{ env.QA_CARGO_ARCHIVE }}
+          run-id: ${{ steps.trusted-cargo.outputs.run-id }}
+          github-token: ${{ github.token }}
+      - name: Restore Cargo dependencies
         id: branch-cargo-restore
-        if: steps.branch-cargo-download.outcome == 'success'
+        if: steps.branch-cargo-download.outcome == 'success' || steps.trusted-cargo-download.outcome == 'success'
         run: python .agents/skills/qa-ui-auto/scripts/ci_cargo_artifact.py restore
       - uses: swatinem/rust-cache@v2
         id: rust-cache
@@ -240,7 +267,7 @@ jobs:
           cache-targets: true
           # An interrupted build must not reserve the immutable dependency key.
           cache-on-failure: false
-          save-if: ${{ !(runner.os == 'Linux' && inputs.operation == 'contracts') && steps.branch-cargo-key.outputs.name == '' }}
+          save-if: ${{ !(runner.os == 'Linux' && inputs.operation == 'contracts') && steps.branch-cargo-restore.outcome != 'success' }}
       - name: Rust dependency cache miss
         if: >-
           inputs.operation == 'build' && steps.reusable-runtime.outputs.available != 'true' &&
@@ -280,6 +307,9 @@ jobs:
       - name: Linux backup credential service
         if: (runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'secret-service')) && inputs.operation == 'run'
         run: sudo apt-get update && sudo apt-get install -y gnome-keyring libsecret-tools libglib2.0-bin
+      - name: Normalize vendored Cargo source mtimes
+        if: env.QA_VENDOR_CACHE == '1' && (inputs.operation == 'build' || inputs.operation == 'contracts')
+        run: python .agents/skills/qa-ui-auto/scripts/ci_cargo_artifact.py normalize
       - name: Windows build tools (Perl)
         if: runner.os == 'Windows' && matrix.mode == 'native' && inputs.operation == 'build' && steps.reusable-runtime.outputs.available != 'true'
         shell: pwsh
@@ -555,12 +585,14 @@ jobs:
         with:
           path: qa-build-output/reusable-runtime
           key: ${{ steps.reusable-key.outputs.key }}
-      - name: Package Cargo dependencies for this branch
+      - name: Package Cargo dependencies
         id: pack-branch-cargo
-        if: inputs.operation == 'build' && steps.branch-cargo-key.outputs.name != '' && steps.branch-cargo.outputs.run-id == ''
+        if: >-
+          inputs.operation == 'build' && steps.branch-cargo-key.outputs.name != '' &&
+          steps.branch-cargo.outputs.run-id == '' && steps.trusted-cargo.outputs.run-id == ''
         continue-on-error: true
         run: python .agents/skills/qa-ui-auto/scripts/ci_cargo_artifact.py pack
-      - name: Retain Cargo dependencies for this branch
+      - name: Retain Cargo dependencies
         if: steps.pack-branch-cargo.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@v4
@@ -568,7 +600,9 @@ jobs:
           name: ${{ steps.branch-cargo-key.outputs.name }}
           path: ${{ env.QA_CARGO_ARCHIVE }}
           if-no-files-found: error
-          retention-days: 1
+          # Long enough to feed the next nightly and a following workday of
+          # branch dispatches without keeping per-merge duplicates alive.
+          retention-days: 3
           compression-level: 0
       - name: Retain native build diagnostics
         if: always() && inputs.operation == 'build'

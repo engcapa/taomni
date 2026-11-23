@@ -14,29 +14,23 @@ from pathlib import Path
 from native_build import QA_APP_ID
 from tauri_webdriver import native_isolation_env
 
-PROVIDERS = {
-    "opencode-go": ("OPENCODE", "https://opencode.ai/zen/go/v1", "deepseek-v4.1-flash", "opencode-go"),
-    "deepseek-app": ("DEEPSEEK", "https://api.deepseek.com", "deepseek-flash", "deepseek-messages"),
-    "agnes": ("AGNES", "https://apihub.agnes-ai.com/v1", "agnes-2.5-pro-beta", "openai-compat"),
-}
+from ..real_provider import PROVIDERS, key_for
 
 
 def setup(ctx):
     if ctx.cfg["app"]["mode"] != "native":
         from . import FixtureSkip
         raise FixtureSkip("tao_real_provider requires native mode")
-    provider_id = os.environ.get("TAOMNI_QA_TAO_PROVIDER", "opencode-go" if os.environ.get("TAOMNI_QA_OPENCODE_KEY") or os.environ.get("TAOMNI_QA_OPENCODE_KEY_FILE") else "deepseek-app")
-    if provider_id not in PROVIDERS:
-        raise ValueError("Unsupported real Tao provider")
+    try:
+        provider_id, key = key_for()
+    except ValueError:
+        raise
+    except OSError as exc:
+        raise ValueError(f"real Tao provider key file unreadable: {exc}") from exc
     env_name, base_url, model, runtime = PROVIDERS[provider_id]
-    key_env = "TAOMNI_QA_" + env_name + "_KEY"
-    key = os.environ.get(key_env, "").strip()
-    key_file = os.environ.get(key_env + "_FILE", "").strip()
-    if not key and key_file:
-        key = Path(key_file).read_text(encoding="utf-8-sig").strip()
     if not key:
         from . import FixtureSkip
-        raise FixtureSkip(key_env + " is unset; real-provider QA is opt-in")
+        raise FixtureSkip("TAOMNI_QA_" + env_name + "_KEY is unset; real-provider QA is opt-in")
     expected = native_isolation_env(Path(ctx.report_root).resolve())
     root = Path(expected.get("NEWMOB_CONFIG_DIR") or expected["XDG_CONFIG_HOME"])
     if expected.get("NEWMOB_CONFIG_DIR"):

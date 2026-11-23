@@ -52,6 +52,31 @@ GitHub only registers `workflow_dispatch` on the default branch. Publishing the
 new file on a feature branch alone is insufficient. Branch validation can use a
 temporary branch-specific caller; do not merge that temporary push trigger.
 
+### Nightly coverage policy
+
+Scheduled runs (19:17 UTC, i.e. the small hours in Beijing) apply the tier-B
+coverage policy to native entries. Each platform keeps the crash-regression
+suite and every case that cannot run on the other native platforms; the fully
+shared remainder is split into five deterministic windows by case ID and only
+one window (20%) runs per night, so every shared case still executes once per
+five nights. Browser entries stay complete. The policy is recorded in
+`selection.json` under `nightly` (night label, weekday, window, selected and
+deferred IDs), so a night can be reproduced locally with
+`QA_NIGHTLY_POLICY=true QA_NIGHT_LABEL=YYYY-MM-DD python -m qa_ui_auto.ci plan`.
+
+Windows only runs on Friday, Saturday and Sunday **evenings** (Beijing). The
+night label is the UTC date of the nominal trigger, so Friday evening is the
+run that starts Saturday 03:17 Beijing. Other nights plan `linux,macos` only:
+no Windows browser, native shards or producer are scheduled. Override the gate
+with `QA_WINDOWS_NIGHTS` (comma-separated weekday names) or simulate a night on
+a manual dispatch with `nightly_policy=true` plus `night_label=YYYY-MM-DD`.
+
+Cases that need an opt-in commercial provider (`tao_real_provider`) are
+deferred at planning time when no `TAOMNI_QA_*_KEY`/`*_KEY_FILE` is configured.
+They appear in `opt_in_deferred` and the summary instead of failing or skipping
+after runners were provisioned. Set a supported key to execute them; explicit
+`selected` runs still execute requested cases regardless.
+
 ### Shards and reusable native builds
 
 `shards=auto` schedules up to four runners per platform/mode/Linux desktop
@@ -82,11 +107,29 @@ verified independently. Imports preserve original identity and executable modes
 and never compile the app. Local build-cache verification remains unchanged.
 
 Each platform releases its consumers as soon as its own producer completes.
+macOS browser shards use their own matrix (`max-parallel: 3`) so native shards
+win the scarce account-wide macOS slots; scheduled runs also wait up to 20
+minutes for earlier same-workflow runs before planning (fail-open).
 Native matrices list longer estimated shards first. Rust RDP/dual-display
 contracts run once in a separate Ubuntu 22.04 job; the root Rust test binary
 uses the union of selected filters in one invocation. Tool contracts also run
 outside planning. Both contract jobs remain required by the final workflow
 result, including when all UI cases passed.
+
+When a dispatch branch has no retained artifact, build and contract producers
+also read the matching Cargo dependency archive published by the trusted
+default branch (completed `schedule`, `workflow_dispatch` or `push` runs only).
+A reusable archive saves a cold dependency compile even on a brand-new branch;
+the artifact key still covers manifests, toolchain, runner image and compile
+environment, and each restore is checksum-validated. Archives are retained for
+three days so the next nightly and the following workday can reuse them.
+
+The opt-in `vendor_cache=true` dispatch input enables the vendored Cargo
+dependency experiment: the archive key adds a digest of `src-tauri/vendor`,
+vendored path dependencies are no longer excluded from the archive, and their
+source mtimes are normalized before compiling so restored fingerprints stay
+fresh. It is off by default and intended for matched A/B runs; see
+`docs-feature/qa-ui-auto-platform-nightly-coverage-and-cache-design.md`.
 
 When the runtime misses, Cargo can still restore matching compiled dependencies.
 Linux contracts read the producer's Rust cache. The Windows helper contracts

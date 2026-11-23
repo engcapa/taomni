@@ -104,7 +104,8 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertIn('-sockscap', rust_cache['with']['shared-key'])
         self.assertIn("!(runner.os == 'Linux' && inputs.operation == 'contracts')", str(rust_cache['with']['save-if']))
         self.assertNotIn('lookup-only', rust_cache['with'])
-        self.assertIn("steps.branch-cargo-key.outputs.name == ''", rust_cache['with']['save-if'])
+        self.assertIn("steps.branch-cargo-restore.outcome != 'success'", rust_cache['with']['save-if'])
+        self.assertNotIn('steps.branch-cargo-key.outputs.name', rust_cache['with']['save-if'])
         self.assertNotIn('Configure Windows fast linker (lld-link)', names)
         self.assertIn('Configure Linux fast linker (lld)', names)
         build_step = next(s for s in steps if s.get('name') == 'Build and export the verified native runtime')
@@ -185,3 +186,72 @@ class BuildPipelineTests(unittest.TestCase):
                 self.assertEqual(built, binary)
                 check = native_build.check_build(release=True)
                 self.assertTrue(check['reusable'], check)
+
+
+class NightlyAndCachePipelineTests(unittest.TestCase):
+    def setUp(self):
+        self.platforms = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())
+        self.entry = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
+
+    def step(self, workflow, name):
+        return next(step for step in workflow['jobs']['entry']['steps'] if step.get('name') == name)
+
+    def test_schedule_policy_and_capacity_gate_are_wired(self):
+        plan_job = self.platforms['jobs']['plan']
+        gate = plan_job['steps'][0]
+        self.assertEqual(gate['name'], 'Wait for earlier QA platform runs')
+        self.assertIn("github.event_name == 'schedule'", gate['if'])
+        self.assertIn('qa_capacity_gate.py', gate['run'])
+        self.assertEqual(gate['env']['QA_GATE_MAX_WAIT_SECONDS'], '1200')
+        plan = next(step for step in plan_job['steps'] if step.get('id') == 'plan')
+        self.assertIn("github.event_name == 'schedule'", plan['env']['QA_NIGHTLY_POLICY'])
+        self.assertIn('inputs.nightly_policy', plan['env']['QA_NIGHTLY_POLICY'])
+        self.assertEqual(plan['env']['QA_NIGHT_LABEL'], '${{ inputs.night_label }}')
+        outputs = plan_job['outputs']
+        self.assertEqual(outputs['macos_browser_matrix'], '${{ steps.plan.outputs.macos_browser_matrix }}')
+        self.assertEqual(outputs['has_macos_browser'], '${{ steps.plan.outputs.has_macos_browser }}')
+
+    def test_macos_browser_shards_are_scheduled_separately_with_a_smaller_cap(self):
+        jobs = self.platforms['jobs']
+        browser = jobs['execute-browser']['with']
+        self.assertEqual(browser['matrix'], '${{ needs.plan.outputs.browser_matrix }}')
+        macos = jobs['execute-macos-browser']
+        self.assertEqual(macos['with']['max_parallel'], 3)
+        self.assertEqual(macos['with']['matrix'], '${{ needs.plan.outputs.macos_browser_matrix }}')
+        self.assertEqual(macos['if'], "needs.plan.outputs.has_macos_browser == 'true'")
+        self.assertIn('execute-macos-browser', jobs['summarize']['needs'])
+
+    def test_trusted_default_branch_cargo_lookup_precedes_a_cold_build(self):
+        steps = self.entry['jobs']['entry']['steps']
+        key = self.step(self.entry, 'Cargo dependency archive key')
+        self.assertNotIn('QA_BRANCH_ARTIFACTS', key['if'])
+        branch = self.step(self.entry, 'Find retained Cargo dependencies on the dispatch branch')
+        self.assertIn("env.QA_BRANCH_ARTIFACTS == 'true'", branch['if'])
+        trusted = self.step(self.entry, 'Find trusted Cargo dependencies on the default branch')
+        self.assertEqual(trusted['with']['trusted'], 'true')
+        self.assertEqual(trusted['with']['default-branch'], '${{ env.QA_DEFAULT_BRANCH }}')
+        self.assertIn("steps.branch-cargo.outputs.run-id == ''", trusted['if'])
+        self.assertIn("env.QA_TRUSTED_CACHE == 'true'", trusted['if'])
+        self.assertIn('trusted_cache:', (ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())
+        download = self.step(self.entry, 'Retrieve the trusted Cargo dependencies')
+        self.assertEqual(download['with']['run-id'], '${{ steps.trusted-cargo.outputs.run-id }}')
+        restore = self.step(self.entry, 'Restore Cargo dependencies')
+        self.assertIn('steps.branch-cargo-download.outcome', restore['if'])
+        self.assertIn('steps.trusted-cargo-download.outcome', restore['if'])
+        pack = self.step(self.entry, 'Package Cargo dependencies')
+        self.assertIn("steps.trusted-cargo.outputs.run-id == ''", pack['if'])
+        upload = next(step for step in steps if step.get('name') == 'Retain Cargo dependencies')
+        self.assertEqual(upload['with']['retention-days'], 3)
+        entry_env = self.entry['jobs']['entry']['env']
+        self.assertEqual(entry_env['QA_DEFAULT_BRANCH'], '${{ github.event.repository.default_branch }}')
+
+    def test_vendor_cache_experiment_is_callable_and_off_by_default(self):
+        env = self.entry['jobs']['entry']['env']
+        self.assertIn('inputs.vendor_cache', env['QA_VENDOR_CACHE'])
+        normalize = self.step(self.entry, 'Normalize vendored Cargo source mtimes')
+        self.assertIn("env.QA_VENDOR_CACHE == '1'", normalize['if'])
+        self.assertIn('ci_cargo_artifact.py normalize', normalize['run'])
+        calls = {name: self.platforms['jobs'][name]['with'] for name in
+                 ('build-linux', 'build-windows', 'build-macos', 'native-contracts')}
+        for name, call in calls.items():
+            self.assertIn('inputs.vendor_cache', call['vendor_cache'], name)
