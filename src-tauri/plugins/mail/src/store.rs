@@ -10,6 +10,9 @@ use taomni_mail_engine::database::mail_db_file_stem;
 use taomni_plugin_api::{ErrorCode, RpcError, services::SafeRelativePath};
 
 pub(super) struct Store {
+    // Drained by the snapshot barrier before it reads module data.
+    pub(super) mutation_activity: std::sync::Arc<tokio::sync::RwLock<()>>,
+    pub(super) mutation_snapshot: std::sync::Mutex<Option<tokio::sync::OwnedRwLockWriteGuard<()>>>,
     profile: PathBuf,
     creation: std::sync::Mutex<()>,
     pub(super) archive_cleanup: super::archive_cleanup::ArchivePreviews,
@@ -20,6 +23,8 @@ pub(super) struct Store {
 impl Store {
     pub(super) fn new(profile: &Path) -> Self {
         Self {
+            mutation_activity: Default::default(),
+            mutation_snapshot: Default::default(),
             profile: profile.to_owned(),
             creation: std::sync::Mutex::new(()),
             archive_cleanup: Default::default(),

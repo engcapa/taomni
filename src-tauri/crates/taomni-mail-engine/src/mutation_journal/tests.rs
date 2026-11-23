@@ -92,3 +92,52 @@ fn account_lease_precedes_network_replies_and_releases_after_the_operation() {
             .is_some()
     );
 }
+
+#[test]
+fn a_reopened_writer_keeps_an_uncertain_copy_from_replaying() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("mail.db");
+    let request = || MutationJobRequest {
+        account_id: "account",
+        endpoint: "test-mail:143:account",
+        folder: "INBOX",
+        target: "Archive",
+        uids: vec![17],
+        kind: Kind::Copy,
+        all: false,
+        operation_id: Some("copy-job".into()),
+    };
+    struct Transport {
+        copies: usize,
+    }
+    impl MutationSession for Transport {
+        fn with_session<T>(
+            &mut self,
+            mut operation: impl FnMut(&mut SendMutation<'_>) -> Result<T, String>,
+        ) -> Result<T, String> {
+            operation(&mut |request| match request {
+                MutationRequest::Select { .. } => Ok(MutationReply::Selected {
+                    validity: 7,
+                    move_supported: true,
+                    uidplus: true,
+                }),
+                MutationRequest::Copy { .. } => {
+                    self.copies += 1;
+                    Err(MutationError::unavailable("response lost after COPY"))
+                }
+                _ => panic!("unexpected mutation command"),
+            })
+        }
+    }
+
+    for expected_copies in [1, 0] {
+        let db = MailDatabase::new(path.clone(), init_mail_tables);
+        let lease = db.mutation_lease().unwrap();
+        let mut transport = Transport { copies: 0 };
+        let receipt = run_mutation_under_lease(&db, &mut transport, request(), lease).unwrap();
+        assert_eq!(transport.copies, expected_copies);
+        assert_eq!(receipt.operation_id, "copy-job");
+        assert_eq!(receipt.uncertain_uids, [17]);
+        assert!(!receipt.retryable);
+    }
+}

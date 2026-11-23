@@ -15,6 +15,7 @@ mod body_cache;
 mod cache_query;
 mod commands;
 mod compose;
+mod filter_cache;
 mod filter_rules;
 mod flag_cache;
 mod folder_cache;
@@ -26,6 +27,7 @@ mod index_cache;
 mod local_drafts;
 mod mailbox;
 mod mbox_export;
+mod mutation_jobs;
 mod outgoing;
 mod pop3_round;
 mod pop3_store;
@@ -65,6 +67,7 @@ fn host_config() -> HostConfig {
                 taomni_mail_api::ADDRESS_BOOK,
                 taomni_mail_api::CALDAV_AGENDA,
                 taomni_mail_api::FILTER_RULES,
+                taomni_mail_api::filter_cache::IMAP_FILTER_CACHE,
                 taomni_mail_api::ATTACHMENT_CACHE,
                 CHECK_INCOMING,
                 CHECK_OUTGOING,
@@ -103,6 +106,7 @@ fn host_config() -> HostConfig {
                 OPEN_IMAP_IMPORT,
                 EXPORT_IMAP_MBOX,
                 OPEN_IMAP_MUTATIONS,
+                taomni_mail_api::imap_mutation::RUN_IMAP_MUTATION_JOB,
                 OPEN_POP3_SYNC,
                 taomni_mail_api::SYNC_POP3_ROUND,
                 taomni_mail_api::pop3_store::LOCAL_MAILBOX,
@@ -293,6 +297,11 @@ impl PluginHandler for Handler {
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(folder_cache::serve(&self.io, operation, endpoint)?)
             }
+            taomni_mail_api::filter_cache::IMAP_FILTER_CACHE => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(filter_cache::serve(&self.io, operation, endpoint)?)
+            }
             SYNC_IMAP_HEADERS => {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
@@ -410,6 +419,16 @@ impl PluginHandler for Handler {
                             .archive_cleanup
                             .run(input, &|| operation.check_current())
                     },
+                )?)
+            }
+            taomni_mail_api::imap_mutation::RUN_IMAP_MUTATION_JOB => {
+                let input = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(mutation_jobs::start(
+                    &self.io,
+                    operation,
+                    input,
+                    self.store.mutation_activity.clone(),
                 )?)
             }
             OPEN_IMAP_MUTATIONS => {

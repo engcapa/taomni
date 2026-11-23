@@ -63,13 +63,13 @@ verification:
     - {step: 32, expectation: The subject-only match remains in the server inbox.}
     - {step: 33, expectation: The visible inbox matches the server after filtering.}
     - {step: 34, expectation: The remaining new message appears once in the inbox.}
-    - {step: 35, expectation: The signed host holds the writer lease and has saved the complete rule under module data.}
+    - {step: 35, expectation: The signed host holds its writer lease while persisting the rule and advancing the INBOX watermark in the current UID generation.}
     results: [12, 17, 26, 31, 32, 33, 34, 35]
   - id: retained-rule
     requirement: Disabling Mail releases the writer and preserves the saved rule.
     actions: [36, 37, 38]
     checkpoints:
-    - {step: 40, expectation: The module database still contains the identical rule and the host has released its writer lease.}
+    - {step: 40, expectation: The saved rule and its exact UID watermark survive disable after the host releases its writer lease.}
     - {step: 41, expectation: The renderer reports no runtime errors.}
     results: [40, 41]
   visual:

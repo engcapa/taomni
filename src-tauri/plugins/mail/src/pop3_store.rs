@@ -20,7 +20,7 @@ use taomni_mail_engine::{
         cached_header, list_cached_messages, reindex_cached_contacts, search_contacts,
         upsert_sent_contacts,
     },
-    filters::set_filter_mark,
+    filters::{ensure_filter_mark, set_filter_mark},
     pop3::{local_store, sqlite_ledger, sync_inbox},
     search::search_cached_messages,
 };
@@ -211,6 +211,10 @@ fn mutate(db: &Connection, account: &str, action: LocalMailboxAction) -> Result<
                 &index::candidates(db, account, &folder, incoming, uids)
                     .map_err(|_| unavailable())?,
             );
+        }
+        InitializeFilterMark { folder } => {
+            ensure_filter_mark(db, account, &folder).map_err(|_| unavailable())?;
+            return encode(&());
         }
         AdvanceFilterMark { folder, uid } => {
             set_filter_mark(db, account, &folder, uid).map_err(|_| unavailable())?;

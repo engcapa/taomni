@@ -1,6 +1,34 @@
 //! Bounded IMAP operations on a single authorized mailbox connection.
 
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
+use taomni_plugin_stream::routed_tcp::Endpoint;
+
+use crate::IncomingTest;
+
+pub const RUN_IMAP_MUTATION_JOB: &str = "mail/run-imap-mutation-job";
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OpenImapMutationJob {
+    pub connection: IncomingTest,
+    pub exchange: Endpoint,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ImapMutationJob {
+    pub account_id: String,
+    pub database: PathBuf,
+    pub server_identity: String,
+    pub folder: String,
+    pub target: String,
+    pub uids: Vec<u32>,
+    pub kind: MutationKind,
+    pub all: bool,
+    pub operation_id: Option<String>,
+}
 
 // Even sparse ten-digit UIDs stay below a 4 KiB command-line limit.
 pub const UID_BATCH_SIZE: usize = 250;
@@ -66,7 +94,7 @@ pub enum MutationKind {
     Delete,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MutationProgress {
     pub operation_id: String,

@@ -9,8 +9,8 @@ mod planning;
 pub mod rules;
 
 pub use cache::{
-    CandidateSelection, ensure_filter_mark, filter_mark, load_candidates, load_filters,
-    migrate_filter_tables, set_filter_mark, store_filters,
+    CandidateSelection, advance_filter_mark, ensure_filter_mark, filter_mark, load_candidates,
+    load_filters, migrate_filter_tables, select_filter_candidates, set_filter_mark, store_filters,
 };
 pub use model::{
     FilterMessage, MailFilter, MailFilterAction, MailFilterActionKind, MailFilterCondition,

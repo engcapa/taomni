@@ -175,6 +175,55 @@ pub fn load_candidates(
     Ok(out)
 }
 
+/// Capture candidates and their UID generation in the same account transaction.
+pub fn select_filter_candidates(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    incoming: bool,
+    uids: Option<Vec<u32>>,
+) -> SqlResult<taomni_mail_api::filter_cache::FilterCandidates> {
+    use taomni_mail_api::filter_cache::FilterCandidates;
+
+    let uid_validity = folder_uid_validity(conn, account_id, folder)?;
+    let selection = if incoming {
+        match filter_mark(conn, account_id, folder)? {
+            Some(mark) => CandidateSelection::Above(mark),
+            None => {
+                ensure_filter_mark(conn, account_id, folder)?;
+                return Ok(FilterCandidates {
+                    uid_validity,
+                    messages: Vec::new(),
+                });
+            }
+        }
+    } else {
+        uids.map_or(CandidateSelection::All, CandidateSelection::Uids)
+    };
+    let messages = load_candidates(conn, account_id, folder, &selection)?;
+    Ok(FilterCandidates {
+        uid_validity,
+        messages,
+    })
+}
+
+/// A late run must neither move a newer watermark back nor tag a reused UID
+/// from a mailbox that has changed UIDVALIDITY since filtering began.
+pub fn advance_filter_mark(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    uid: u32,
+    uid_validity: Option<u32>,
+) -> SqlResult<()> {
+    if folder_uid_validity(conn, account_id, folder)? == uid_validity
+        && filter_mark(conn, account_id, folder)?.is_none_or(|mark| mark < uid)
+    {
+        set_filter_mark(conn, account_id, folder, uid)?;
+    }
+    Ok(())
+}
+
 pub enum CandidateSelection {
     Above(u32),
     All,

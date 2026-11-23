@@ -11,7 +11,7 @@ use taomni_mail_api::imap_mutation::{
 
 use crate::{
     cache::{init_mail_tables, remove_cached_messages},
-    database::MailDatabase,
+    database::{MailDatabase, ProcessLock},
     now_ts,
 };
 
@@ -433,6 +433,17 @@ pub fn run_mutation(
     session: &mut impl MutationSession,
     request: MutationJobRequest<'_>,
 ) -> Result<Progress, String> {
+    let lease = db.mutation_lease()?;
+    run_mutation_under_lease(db, session, request, lease)
+}
+
+/// The signed host obtains this lease while validating the granted database.
+pub fn run_mutation_under_lease(
+    db: &MailDatabase,
+    session: &mut impl MutationSession,
+    request: MutationJobRequest<'_>,
+    _lease: ProcessLock,
+) -> Result<Progress, String> {
     let MutationJobRequest {
         account_id,
         endpoint,
@@ -443,7 +454,6 @@ pub fn run_mutation(
         all,
         operation_id,
     } = request;
-    let _mutation = db.mutation_lease()?;
     let existing_request = if let Some(id) = &operation_id {
         let conn = db.lock().map_err(|e| e.to_string())?;
         init(&conn)?;

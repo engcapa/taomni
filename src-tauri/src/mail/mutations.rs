@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::{plugin::PluginRegistry, state::MailDbHandle};
+use taomni_mail_api::imap_mutation::ImapMutationJob;
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 use taomni_mail_api::imap_mutation::{MutationError, MutationReply, MutationRequest};
 use taomni_mail_engine::mutation_journal::{
@@ -78,6 +79,25 @@ pub(super) fn run_cached(
         account.config.imap.port,
         account.imap_username
     );
+    if let Some(registry) = registry.filter(|registry| module_host::owns_mutation_journal(registry))
+    {
+        let database = super::cache_access::canonical_cache_database(db)?;
+        return runtime.block_on(module_host::run_owned_job(
+            registry,
+            account,
+            ImapMutationJob {
+                account_id: account_id.clone(),
+                database,
+                server_identity: endpoint,
+                folder: folder.into(),
+                target: target.into(),
+                uids,
+                kind,
+                all,
+                operation_id,
+            },
+        ));
+    }
     let mut session = DesktopSession {
         #[cfg(any(test, feature = "legacy-mail-imap"))]
         pool,

@@ -9,9 +9,15 @@ use super::store::{Store, open_database, open_snapshot_file, unavailable};
 
 impl SnapshotProvider for Store {
     fn freeze(&self, operation: &Operation) -> Result<(), RpcError> {
-        // All Mail access is on the SDK actor. There are no background
-        // writers to drain before it pauses business requests.
-        operation.check_current()
+        let activity = loop {
+            operation.check_current()?;
+            if let Ok(lease) = self.mutation_activity.clone().try_write_owned() {
+                break lease;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        };
+        *self.mutation_snapshot.lock().map_err(|_| unavailable())? = Some(activity);
+        Ok(())
     }
 
     fn export(
@@ -43,5 +49,9 @@ impl SnapshotProvider for Store {
         Ok(())
     }
 
-    fn resume(&self) {}
+    fn resume(&self) {
+        if let Ok(mut lease) = self.mutation_snapshot.lock() {
+            lease.take();
+        }
+    }
 }

@@ -13,6 +13,7 @@ pub mod attachment_cache;
 pub mod body_cache;
 pub mod cache_query;
 pub mod compose;
+pub mod filter_cache;
 pub mod folder_cache;
 pub mod imap_exchange;
 pub mod imap_flag_cache;

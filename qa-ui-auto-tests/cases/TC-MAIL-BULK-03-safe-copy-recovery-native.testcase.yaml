@@ -323,7 +323,7 @@ verification:
         selected''}}'
     - step: 70
       expectation: '{''mail_server_assert_mutations'': {''no_move'': True, ''copied'': 9}}'
-    - {step: 71, expectation: The signed Mail report records three STORE attempts and two UID EXPUNGE commands.}
+    - {step: 71, expectation: The signed Mail report binds STORE and UID EXPUNGE attempts to complete and uncertain journal entries.}
     - {step: 72, expectation: The renderer reports no runtime errors.}
     results:
     - 56

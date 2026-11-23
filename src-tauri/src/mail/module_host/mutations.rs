@@ -4,10 +4,19 @@ use std::{sync::Arc, time::Duration};
 
 use taomni_mail_api::{
     HOST_REQUEST_TIMEOUT, OPEN_IMAP_MUTATIONS,
-    imap_mutation::{MutationError, MutationReply, MutationRequest},
+    imap_exchange::{read_body_frame, write_frame},
+    imap_mutation::{
+        ImapMutationJob, MutationError, MutationProgress, MutationReply, MutationRequest,
+        OpenImapMutationJob, RUN_IMAP_MUTATION_JOB,
+    },
 };
 
-use super::{HostedImap, PluginRegistry, ResolvedMailAccount, supports};
+use taomni_plugin_stream::routed_tcp::Route;
+
+use super::{
+    HostedImap, PluginRegistry, ResolvedMailAccount, bind_incoming, decode_imap_reply, invoke,
+    supports,
+};
 
 pub(in crate::mail) struct HostedMutations<'a> {
     registry: &'a Arc<PluginRegistry>,
@@ -53,4 +62,34 @@ impl<'a> HostedMutations<'a> {
             .map_err(MutationError::unavailable)?
         })
     }
+}
+
+pub(in crate::mail) async fn run_owned_job(
+    registry: &Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    request: ImapMutationJob,
+) -> Result<MutationProgress, String> {
+    let (_incoming, connection) = bind_incoming(account).await?;
+    let (_exchange, exchange, mut peer) = Route::pair().await.map_err(|error| error.to_string())?;
+    let request = serde_json::to_vec(&request).map_err(|error| error.to_string())?;
+    invoke::<(), _>(
+        registry.clone(),
+        RUN_IMAP_MUTATION_JOB,
+        OpenImapMutationJob {
+            connection,
+            exchange,
+        },
+    )
+    .await?;
+    write_frame(&mut peer, &request)
+        .await
+        .map_err(|error| error.to_string())?;
+    let reply = read_body_frame(&mut peer)
+        .await
+        .map_err(|error| error.to_string())?;
+    decode_imap_reply(reply).await
+}
+
+pub(in crate::mail) fn owns_mutation_journal(registry: &PluginRegistry) -> bool {
+    supports(registry, RUN_IMAP_MUTATION_JOB)
 }

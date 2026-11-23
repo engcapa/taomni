@@ -136,10 +136,16 @@ def run(ctx, args):
         from .module_mail_filters import observe
 
         report["filter"] = observe(module / "data", plugins.parent / "mail-cache")
+        manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
+        if "mail/imap-filter-cache" not in manifest["commands"]:
+            raise StepError("The signed Mail host does not own the IMAP filter watermark")
+        report["filterWatermark"] = observe_filter_watermark(plugins.parent / "mail-cache")
         if phase == "filter-saved":
             signed["filter"] = report["filter"]
-        elif report["filter"] != signed.get("filter"):
-            raise StepError("Disabling Mail changed the saved filter")
+            signed["filterWatermark"] = report["filterWatermark"]
+        elif (report["filter"] != signed.get("filter")
+              or report["filterWatermark"] != signed.get("filterWatermark")):
+            raise StepError("Disabling Mail changed the saved filter or its watermark")
     if phase == "imap-cache":
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
         command = "mail/query-account-cache"
@@ -172,9 +178,10 @@ def run(ctx, args):
         report["prefetch"] = observe_prefetch(args, plugins.parent / "mail-cache")
     if phase == "imap-mutations":
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
-        if owner.case_id != "TC-MAIL-BULK-03" or "mail/open-imap-mutations" not in manifest["commands"]:
-            raise StepError("The installed Mail version does not provide the signed mutation connection")
+        if owner.case_id != "TC-MAIL-BULK-03" or "mail/run-imap-mutation-job" not in manifest["commands"]:
+            raise StepError("The installed Mail version does not own the mutation journal")
         report["mutations"] = observe_mutations()
+        report["mutationJournal"] = observe_mutation_journal(plugins.parent / "mail-cache")
     if phase == "imap-mbox":
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
         commands = {"mail/open-imap-import", "mail/export-imap-mbox"}
@@ -290,6 +297,55 @@ def observe_delivery(phase):
             raise StepError("The IMAP Sent copy is missing the delivered body")
         report["matchingSentCopy"] = True
     return report
+
+
+def observe_filter_watermark(root):
+    databases = sorted(root.glob("*.db"))
+    if len(databases) != 1:
+        raise StepError(f"Expected one IMAP filter cache, found {len(databases)}")
+    database = databases[0]
+    ordinary(database)
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=1)) as db:
+            rows = db.execute(
+                """SELECT w.high_uid, w.uid_validity, f.uid_validity, m.uid
+                   FROM mail_filter_marks w
+                   JOIN mail_folders f ON f.account_id=w.account_id AND f.name=w.folder
+                   JOIN mail_messages m ON m.account_id=w.account_id AND m.folder=w.folder
+                   WHERE w.folder='INBOX' AND m.subject='invoice marker 0001'"""
+            ).fetchall()
+        if len(rows) == 1:
+            high, validity, current, retained = rows[0]
+            if validity is not None and validity == current and high == retained:
+                return {"database": database.name, "uidValidity": validity, "highUid": high}
+        time.sleep(.1)
+    raise StepError("The filter watermark did not advance to the retained message's UID generation")
+
+
+def observe_mutation_journal(root):
+    databases = sorted(root.glob("*.db"))
+    if len(databases) != 1:
+        raise StepError(f"Expected one IMAP mutation database, found {len(databases)}")
+    database = databases[0]
+    ordinary(database)
+    with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as db:
+        rows = db.execute("SELECT folder, finished, payload FROM mail_mutation_jobs ORDER BY id").fetchall()
+    jobs = []
+    for folder, finished, payload in rows:
+        job = json.loads(payload)
+        items = job["items"]
+        if len(items) != 3 or len({item["uid"] for item in items}) != 3 or not job["validity"]:
+            raise StepError("The mutation journal does not retain the expected UID generation or items")
+        jobs.append((folder, bool(finished), sorted({item["stage"] for item in items})))
+    expected = sorted([
+        ("INBOX", True, ["Complete"]),
+        ("INBOX", False, ["CopyUncertain"]),
+        ("Archive", True, ["Complete"]),
+    ])
+    if sorted(jobs) != expected:
+        raise StepError(f"The mutation journal did not retain confirmed and uncertain outcomes: {jobs}")
+    return {"database": database.name, "jobs": jobs}
 
 
 def observe_mutations():

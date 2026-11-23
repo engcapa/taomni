@@ -1,11 +1,11 @@
-use taomni_mail_api::{FILTER_RULES, MailboxRequest};
+use taomni_mail_api::{FILTER_RULES, MailboxRequest, filter_cache::FilterCacheAction};
 use taomni_mail_engine::filters::{
     MailFilter, ensure_filter_mark,
     rules::{self, FilterRulesAction, FilterRulesImport, FilterRulesReply},
 };
 
 use crate::{
-    mail::{local_storage, mail_db_task, module_host},
+    mail::{local_storage, mail_db_task, module_host, pop3_store},
     state::AppState,
 };
 
@@ -70,12 +70,33 @@ async fn finish(
     if writes {
         // UIDVALIDITY and its filter mark share the live message cache.
         // Saving a rule only affects arrivals after this baseline.
-        mail_db_task(
-            state.mail_db(account)?,
-            account.to_owned(),
-            |db, account| ensure_filter_mark(db, account, "INBOX"),
-        )
-        .await?;
+        let cache_support = module_host::owns_imap_filter_cache(&state.plugins);
+        if cache_support && pop3_store::is_hosted(state, account).await? {
+            pop3_store::hosted::<()>(
+                state,
+                account,
+                taomni_mail_api::pop3_store::LocalMailboxAction::InitializeFilterMark {
+                    folder: "INBOX".into(),
+                },
+            )
+            .await?;
+        } else if cache_support {
+            module_host::imap_filter_cache(
+                state,
+                account,
+                FilterCacheAction::Baseline {
+                    folder: "INBOX".into(),
+                },
+            )
+            .await?;
+        } else {
+            mail_db_task(
+                state.mail_db(account)?,
+                account.to_owned(),
+                |db, account| ensure_filter_mark(db, account, "INBOX"),
+            )
+            .await?;
+        }
     }
     Ok(rules)
 }

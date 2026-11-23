@@ -113,6 +113,14 @@ steps:
 - click: '[data-testid="mail-filter-save"]'
 - wait_for: '[data-testid="mail-filter-row"][data-filter-name="QA forwarding rule"]'
 - click: '[data-testid="mail-filters-close"]'
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"][data-active="true"]'
+    contains: new headers across
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="mail-message-row"][data-subject="invoice marker 0001"]'
+    equal: 1
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -173,11 +181,13 @@ verification:
     results: [34, 39, 40, 41]
   - id: R4
     requirement: The filter editor accepts a forwarding recipient and saves the rule.
-    actions: [43, 44, 45, 46, 47, 48, 49, 51]
+    actions: [43, 44, 45, 46, 47, 48, 49, 51, 52]
     checkpoints:
     - {step: 50, expectation: The saved forwarding rule is listed.}
-    - {step: 52, expectation: Saving and closing the rule editor reports no runtime errors.}
-    results: [50, 52]
+    - {step: 53, expectation: A repeat sync completes after closing the rule editor.}
+    - {step: 54, expectation: The subject-only match appears exactly once after a repeat sync.}
+    - {step: 55, expectation: Saving and applying the rules reports no runtime errors.}
+    results: [50, 53, 54, 55]
   visual:
   - check: 截图中 INBOX 列表保留只匹配主题的邮件和 Keep 0001。
     method: manual

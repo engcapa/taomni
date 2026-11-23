@@ -18,6 +18,8 @@ mod mbox;
 pub(super) use archive_decoding::{decode_archive_attachment, decode_archive_original};
 pub(super) use archive_encoding::ArchiveEncoder;
 mod downloads;
+mod filter_cache;
+pub(super) use filter_cache::{imap_filter_cache, owns_imap_filter_cache};
 mod flag_cache;
 pub(super) use flag_cache::{publish_imap_flags, publishes_imap_flags};
 mod folder_cache;
@@ -46,7 +48,7 @@ pub(super) use imap_outgoing::{
     stores_remote_drafts,
 };
 pub(super) use mbox::{export_imap_mbox, exports_imap_mbox};
-pub(super) use mutations::HostedMutations;
+pub(super) use mutations::{HostedMutations, owns_mutation_journal, run_owned_job};
 pub(super) use pop3::{HostedPop3, syncs_pop3};
 pub(super) use pop3_round::{run_pop3_round, runs_pop3_rounds};
 pub(super) use prefetch::{prefetch_imap_bodies, prefetches_imap_bodies};

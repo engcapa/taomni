@@ -58,6 +58,9 @@ pub enum LocalMailboxAction {
         folder: String,
         uid: u32,
     },
+    InitializeFilterMark {
+        folder: String,
+    },
     SearchIndex {
         bodies: bool,
     },
