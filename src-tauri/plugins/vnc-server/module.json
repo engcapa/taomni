@@ -6,7 +6,7 @@
   "version": "0.1.1",
   "coreApiVersion": "1",
   "kind": "local-server",
-  "status": "provisional",
+  "status": "stable",
   "platforms": ["linux-x86_64", "windows-x86_64", "darwin-aarch64", "darwin-x86_64"],
   "entry": { "host": "taomni-plugin-vnc-server", "protocol": 1 },
   "tabs": [],
