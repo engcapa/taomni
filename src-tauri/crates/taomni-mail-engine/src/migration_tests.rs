@@ -147,7 +147,9 @@ fn a_replaced_archive_original_cannot_be_published_and_the_upgrade_can_retry() {
     fs::write(&path, &original_object).unwrap();
     let staged = prepare().unwrap();
     assert_eq!(staged.mailbox_count(), 1);
-    let relative = path.strip_prefix(legacy.path()).unwrap();
+    let original_path = path.canonicalize().unwrap();
+    let legacy_root = legacy.path().canonicalize().unwrap();
+    let relative = original_path.strip_prefix(&legacy_root).unwrap();
     assert_eq!(
         fs::read(staged.data().join(relative)).unwrap(),
         original_object
