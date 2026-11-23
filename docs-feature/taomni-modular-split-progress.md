@@ -2,7 +2,9 @@
 
 ## 2026-11-23 当前进展
 
-- 用 `21752fbb0` 的联合构建重新验证 Linux deb 和 Windows MSI。两端从正式 0.5.12 升至 0.6.0，并在首装十模块后卸载 Mail。重启仍保留九个活跃模块和 Mail 的卸载记录。Linux 同批验证了原 MFA 数据、回退及强退后恢复。两个 macOS 目标继续收取。 [Linux](https://github.com/engcapa/taomni/actions/runs/45091470510) · [Windows 与 macOS](https://github.com/engcapa/taomni/actions/runs/45092445084)
+- 用 `21752fbb0` 的联合构建重新验证 Linux deb 和 Windows MSI。两端从正式 0.5.12 升至 0.6.0，并在首装十模块后卸载 Mail。重启仍保留九个活跃模块和 Mail 的卸载记录。Linux 同批验证了原 MFA 数据、回退及强退后恢复。 [Linux](https://github.com/engcapa/taomni/actions/runs/45091470510) · [Windows](https://github.com/engcapa/taomni/actions/runs/45092445084/job/137424880022)
+- 同批 Intel DMG 已完成安装替换和原配置启动。正式包沿主线限制 WebDriver 为隔离 QA 应用，旧升级脚本在首装界面启动时等不到 WebDriver。演练改用 AppKit 辅助功能操作正式安装件，检查实际进程、商店模块状态、卸载确认和正常退出，随后从磁盘与目录请求核对保留结果。双架构 GitHub 复验待执行。 [Intel 原始回执](https://github.com/engcapa/taomni/actions/runs/45092445084/job/137424879985)
+- 批量 IMAP 的写前日志在读取 UID 和发送请求前获取邮箱的跨进程锁。搬迁存储目录共用该锁，待批量任务完成后可重试。Rust 单测核对锁持有和释放，实际子进程竞争通过 GitHub 协议工作流执行。
 - 默认基座也移出 POP3 协议和认证运行组件。已验证的 Mail 宿主负责连接，离线邮件、UIDL 记录和归档索引目前仍由原缓存路径持有。归档分页、筛选和清理回执移入共享 IPC 类型。精简版邮件引擎 75 项及完整版 83 项单测通过，默认和兼容基座编译通过。
 - `2a05b4dc7` 的三端 Native 各 28 项通过，含 TC-MODULES-095 的实际 EML 和 mbox 导入导出。`30b8d8528` 修正取消后原有邮件数量的核对，三端 Browser 各 26 项通过。 [实装导入导出](https://github.com/engcapa/taomni/actions/runs/45085885699) · [浏览器复跑](https://github.com/engcapa/taomni/actions/runs/45089950565)
 - Windows 签名 Mail 的 QA 构建日志显示 `pnpm.cmd` 将 Tauri 配置 JSON 在构建命令的 `&&` 处截断。改用临时配置文件，并将实际 Rust 特性记录在 QA 构建身份中。 [构建日志](https://github.com/engcapa/taomni/actions/runs/45092502660/job/137425376419)

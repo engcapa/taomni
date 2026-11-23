@@ -52,6 +52,13 @@ def exercise(ctx, executable, work, profile, evidence, origin, *, environment=No
                 from installed_windows_store import exercise_stage
                 exercise_stage(executable, work, profile, evidence, origin, label, removed, stage, enrollment)
                 continue
+            if platform.system() == "Darwin":
+                from installed_macos_store import exercise_stage
+                exercise_stage(
+                    executable, work, profile, evidence, origin, label, removed, stage, enrollment,
+                    environment or {},
+                )
+                continue
             with installed_desktop(ctx, executable, work / "desktop", evidence, label,
                                    environment=environment, timeout=300) as (driver, session):
                 steps = unlock_vault(ctx, session, evidence)
