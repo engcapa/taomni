@@ -174,7 +174,7 @@ steps:
     full: {INBOX: 2}
     headers: {INBOX: 0, Archive: 2}
 - assert_no_runtime_errors: null
-- assert_signed_mail_host: running
+- assert_signed_mail_host: archive-original
 - click: '[data-testid="mail-archive-open"]'
 - fill: {selector: '[data-testid="mail-archive-search"]', value: Complete INBOX}
 - assert_text: {selector: '[data-testid="mail-archive-results"]', contains: of 2 messages, timeout_sec: 30}
@@ -283,7 +283,7 @@ verification:
     - {step: 93, expectation: The exported file matches the original attachment digest.}
     - {step: 95, expectation: Both originals and attachments still match the fixture digests after their live headers disappear.}
     - {step: 96, expectation: The workflow finishes without runtime errors.}
-    - {step: 97, expectation: The signed host still owns the mailbox after decoding the original.}
+    - {step: 97, expectation: The verified Mail host declares `mail/open-archive-original` and still holds the writer lease after decoding the saved body and attachment.}
     results: [82, 85, 87, 89, 92, 93, 95, 96, 97]
   - id: archive-module-lifecycle
     requirement: Disabling Mail releases the active archive worker and retains its tab for automatic resume after re-enabling.

@@ -148,7 +148,7 @@ async fn cached_imap_body(
         return Ok(body);
     }
 
-    // Preserve interoperability with signed hosts predating this command.
+    // Hosts predating the cache query accept a verified original for decoding.
     let cache_folder = folder.to_owned();
     let (original, cached) = with_mail_db_async(state, account_id, move |db, account| {
         let original =

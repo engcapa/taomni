@@ -55,24 +55,17 @@ pub async fn mail_download_attachment(
                 size: receipt.size,
             });
         }
-    } else if let Some(original) =
-        message_source::open_legacy_original(&state, &config.session_id, &folder, uid).await?
-    {
-        return decode_mail_original(move || {
-            let raw = original.read()?;
-            let attachment = match section.as_deref() {
-                Some(section) => extract_attachment_section(&raw, section),
-                None => extract_attachment(&raw, attachment_index),
-            }?;
-            let path = write_attachment_file(&target_path, &attachment.bytes)?;
-            Ok(MailDownloadAttachmentResult {
-                path,
-                name: attachment.name,
-                content_type: attachment.content_type,
-                size: attachment.bytes.len(),
-            })
+    } else {
+        let folder = folder.clone();
+        let archived = with_mail_db_async(&state, &config.session_id, move |db, account| {
+            storage::lookup(db, account, &folder, uid)
+                .map(|entry| entry.is_some())
+                .map_err(storage::as_sql_error)
         })
-        .await;
+        .await?;
+        if archived {
+            return Err(SIGNED_MAIL_ARCHIVE_REQUIRED.into());
+        }
     }
     let account = resolve_config(&state, config)?;
     // Resolve cache paths from the shared DB handle on each I/O operation,

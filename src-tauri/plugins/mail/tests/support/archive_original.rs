@@ -1,24 +1,40 @@
 use std::path::Path;
 
-use serde_json::{Value, json};
+use serde::Serialize;
+use serde_json::json;
 use taomni_mail_api::{
     archive_index::ArchiveEntry,
-    archive_original::{ArchiveOriginalRequest, OPEN_ARCHIVE_ORIGINAL},
-    imap_exchange::{read_body_frame, write_body_frame},
+    archive_original::{
+        ArchiveOriginalRequest, ImapArchiveAction, ImapArchiveRequest, OPEN_ARCHIVE_ORIGINAL,
+        READ_IMAP_ARCHIVE,
+    },
+    imap_exchange::{AttachmentReceipt, read_body_frame, write_body_frame},
+    message::MailMessageBody,
     pop3_store::LocalArchiveAction,
 };
 use taomni_plugin_stream::routed_tcp::Route;
+use tokio::io::{AsyncReadExt, DuplexStream};
 
 use super::{ACCOUNT, ARCHIVED_AT, MailHost, WAIT};
 
+pub(super) const ORIGINAL: &str = concat!(
+    "Subject: Original\r\nMIME-Version: 1.0\r\n",
+    "Content-Type: multipart/mixed; boundary=migrated\r\n\r\n",
+    "--migrated\r\nContent-Type: text/plain\r\n\r\nComplete migrated message\r\n",
+    "--migrated\r\nContent-Type: application/octet-stream\r\n",
+    "Content-Disposition: attachment; filename=original.bin\r\n",
+    "Content-Transfer-Encoding: base64\r\n\r\nAH+A/w==\r\n",
+    "--migrated--\r\n",
+);
+const ATTACHMENT: &[u8] = &[0x00, 0x7f, 0x80, 0xff];
+
 pub(super) fn check(host: &mut MailHost, database: &Path) {
-    let raw = b"Subject: Original\r\n\r\nComplete migrated message\r\n";
     let entry = ArchiveEntry {
         folder: "INBOX".into(),
         uid: 9,
         uid_validity: 1,
         subject: "Original".into(),
-        raw_size: raw.len() as u64,
+        raw_size: ORIGINAL.len() as u64,
         stored_size: 0,
         stored_at: ARCHIVED_AT,
     };
@@ -29,35 +45,85 @@ pub(super) fn check(host: &mut MailHost, database: &Path) {
             entry: entry.clone(),
         },
     );
-    let body: Value = serde_json::from_slice(&reply).unwrap();
-    assert_eq!(body["accountId"], ACCOUNT);
-    assert_eq!(body["folder"], "INBOX");
-    assert_eq!(body["uid"], 9);
-    assert_eq!(body["source"], "archive");
-    assert!(
-        body["text"]
-            .as_str()
-            .unwrap()
-            .contains("Complete migrated message")
+    let body: MailMessageBody = serde_json::from_slice(&reply).unwrap();
+    assert_eq!(body.account_id, ACCOUNT);
+    assert_eq!(body.folder, "INBOX");
+    assert_eq!(body.uid, 9);
+    assert_eq!(body.source, "archive");
+    assert_eq!(
+        body.text.as_deref().map(str::trim),
+        Some("Complete migrated message")
     );
+    assert_eq!(body.attachments.len(), 1);
+    assert_eq!(body.attachments[0].name.as_deref(), Some("original.bin"));
     let exported = transfer(
         host,
         database,
         LocalArchiveAction::Export {
-            entry,
+            entry: entry.clone(),
             attachment_index: None,
         },
     );
-    assert_eq!(exported, raw);
+    assert_eq!(exported, ORIGINAL.as_bytes());
+    let attachment = transfer(
+        host,
+        database,
+        LocalArchiveAction::Export {
+            entry,
+            attachment_index: Some(0),
+        },
+    );
+    assert_eq!(attachment, ATTACHMENT);
+
+    for (index, section) in [(0, None), (42, Some("2".into()))] {
+        exchange(
+            host,
+            READ_IMAP_ARCHIVE,
+            ImapArchiveRequest {
+                account_id: ACCOUNT.into(),
+                database: database.into(),
+                folder: "INBOX".into(),
+                uid: 9,
+                action: ImapArchiveAction::Attachment { index, section },
+            },
+            async |mut peer| {
+                let header = read_body_frame(&mut peer).await.unwrap();
+                let receipt: Option<AttachmentReceipt> = serde_json::from_slice(&header).unwrap();
+                let receipt = receipt.unwrap();
+                assert_eq!(receipt.name.as_deref(), Some("original.bin"));
+                assert_eq!(
+                    receipt.content_type.as_deref(),
+                    Some("application/octet-stream")
+                );
+                assert_eq!(receipt.size, ATTACHMENT.len());
+                let mut bytes = Vec::new();
+                peer.read_to_end(&mut bytes).await.unwrap();
+                assert_eq!(bytes, ATTACHMENT);
+            },
+        );
+    }
 }
 
 fn transfer(host: &mut MailHost, database: &Path, action: LocalArchiveAction) -> Vec<u8> {
-    let request = serde_json::to_vec(&ArchiveOriginalRequest {
-        account_id: ACCOUNT.into(),
-        database: database.into(),
-        action,
-    })
-    .unwrap();
+    exchange(
+        host,
+        OPEN_ARCHIVE_ORIGINAL,
+        ArchiveOriginalRequest {
+            account_id: ACCOUNT.into(),
+            database: database.into(),
+            action,
+        },
+        async |mut peer| read_body_frame(&mut peer).await.unwrap(),
+    )
+}
+
+fn exchange<T>(
+    host: &mut MailHost,
+    method: &str,
+    request: impl Serialize,
+    read: impl AsyncFnOnce(DuplexStream) -> T,
+) -> T {
+    let request = serde_json::to_vec(&request).unwrap();
     let io = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -65,20 +131,16 @@ fn transfer(host: &mut MailHost, database: &Path, action: LocalArchiveAction) ->
     std::thread::scope(|scope| {
         io.block_on(async {
             let (_route, endpoint, mut peer) = Route::pair().await.unwrap();
-            let call = scope.spawn(move || {
-                host.call(
-                    OPEN_ARCHIVE_ORIGINAL,
-                    serde_json::to_value(endpoint).unwrap(),
-                )
-            });
-            let bytes = tokio::time::timeout(WAIT, async {
+            let call =
+                scope.spawn(move || host.call(method, serde_json::to_value(endpoint).unwrap()));
+            let reply = tokio::time::timeout(WAIT, async {
                 write_body_frame(&mut peer, &request).await.unwrap();
-                read_body_frame(&mut peer).await.unwrap()
+                read(peer).await
             })
             .await
             .unwrap();
             assert_eq!(call.join().unwrap(), json!({"Ok": null}));
-            bytes
+            reply
         })
     })
 }

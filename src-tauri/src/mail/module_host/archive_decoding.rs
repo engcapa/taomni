@@ -9,13 +9,11 @@ use taomni_mail_api::{
     imap_exchange::{read_body_frame, write_body_frame},
     message::MailMessageBody,
 };
-use taomni_mail_engine::{
-    cache::cached_to_body, extract_attachment, parse_body_message, storage::OpenMessage,
-};
+use taomni_mail_engine::storage::OpenMessage;
 use taomni_plugin_stream::routed_tcp::{Endpoint, Route};
 
 use super::{PluginRegistry, invoke, supports};
-use crate::mail::decode_mail_original;
+use crate::mail::{SIGNED_MAIL_ARCHIVE_REQUIRED, decode_mail_original};
 
 pub(in crate::mail) async fn decode_archive_original(
     registry: Arc<PluginRegistry>,
@@ -24,23 +22,6 @@ pub(in crate::mail) async fn decode_archive_original(
     folder: String,
     uid: u32,
 ) -> Result<MailMessageBody, String> {
-    if !supports(&registry, DECODE_ARCHIVE_ORIGINAL) {
-        return decode_mail_original(move || {
-            let raw = original.read()?;
-            Ok(cached_to_body(
-                parse_body_message(
-                    &account_id,
-                    &folder,
-                    uid,
-                    Some(raw.len() as u32),
-                    &raw,
-                    raw.len(),
-                ),
-                "archive",
-            ))
-        })
-        .await;
-    }
     let reply = transfer_original(registry, original, DECODE_ARCHIVE_ORIGINAL, |exchange| {
         ArchiveDecoding {
             exchange,
@@ -69,13 +50,6 @@ pub(in crate::mail) async fn decode_archive_attachment(
     original: OpenMessage,
     attachment_index: usize,
 ) -> Result<Vec<u8>, String> {
-    if !supports(&registry, DECODE_ARCHIVE_ATTACHMENT) {
-        return decode_mail_original(move || {
-            let raw = original.read()?;
-            Ok(extract_attachment(&raw, attachment_index)?.bytes)
-        })
-        .await;
-    }
     transfer_original(registry, original, DECODE_ARCHIVE_ATTACHMENT, |exchange| {
         ArchiveAttachmentDecoding {
             exchange,
@@ -91,6 +65,9 @@ async fn transfer_original<P: Serialize + Send + 'static>(
     method: &'static str,
     request: impl FnOnce(Endpoint) -> P,
 ) -> Result<Vec<u8>, String> {
+    if !supports(&registry, method) {
+        return Err(SIGNED_MAIL_ARCHIVE_REQUIRED.into());
+    }
     let raw = decode_mail_original(move || original.read()).await?;
     let (_route, exchange, mut peer) = Route::pair().await.map_err(|error| error.to_string())?;
     let transfer = async move {
@@ -111,4 +88,37 @@ async fn transfer_original<P: Serialize + Send + 'static>(
     .await
     .map_err(|_| "Decoding the archived message timed out".to_owned())??;
     Ok(reply)
+}
+
+#[cfg(test)]
+mod tests {
+    use rusqlite::Connection;
+    use taomni_mail_engine::{cache::init_mail_tables, storage};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn an_archive_without_a_compatible_host_reports_the_update_and_retains_the_original() {
+        let profile = tempfile::tempdir().unwrap();
+        let root = profile.path().canonicalize().unwrap();
+        let registry = Arc::new(PluginRegistry::new(root.join("plugins")));
+        let account = "archive-test";
+        let folder = "INBOX";
+        let uid = 3;
+        let raw = b"Subject: Saved from the monolith\r\n\r\nOriginal body\r\n";
+        let db = Connection::open(root.join("mail.db")).unwrap();
+        init_mail_tables(&db).unwrap();
+        storage::store(&db, account, folder, uid, 1, &raw[..]).unwrap();
+        let open = || storage::open(&db, account, folder, uid).unwrap().unwrap();
+
+        let body =
+            decode_archive_original(registry.clone(), open(), account.into(), folder.into(), uid)
+                .await;
+        assert_eq!(body.err().as_deref(), Some(SIGNED_MAIL_ARCHIVE_REQUIRED));
+        assert_eq!(
+            decode_archive_attachment(registry, open(), 0).await,
+            Err(SIGNED_MAIL_ARCHIVE_REQUIRED.into())
+        );
+        assert_eq!(open().read().unwrap(), raw);
+    }
 }

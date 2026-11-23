@@ -15,6 +15,9 @@
 const SIGNED_MAIL_CONNECTION_REQUIRED: &str =
     "Install or update the Mail module and enable it to connect to this mailbox";
 
+const SIGNED_MAIL_ARCHIVE_REQUIRED: &str =
+    "Install or update the Mail module in Module Store and enable it to read this archive";
+
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 macro_rules! legacy_imap {
     ($operation:block) => {

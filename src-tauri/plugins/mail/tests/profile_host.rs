@@ -305,8 +305,15 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
             &parse_body_message(ACCOUNT, "INBOX", 9, None, raw, 1024),
         )
         .unwrap();
-        let original = b"Subject: Original\r\n\r\nComplete migrated message\r\n";
-        storage::store(&db, ACCOUNT, "INBOX", 9, 1, &original[..]).unwrap();
+        storage::store(
+            &db,
+            ACCOUNT,
+            "INBOX",
+            9,
+            1,
+            archive_original::ORIGINAL.as_bytes(),
+        )
+        .unwrap();
         db.execute(
             "UPDATE mail_full_messages SET stored_at = ?1 WHERE account_id = ?2 AND uid = 9",
             rusqlite::params![ARCHIVED_AT, ACCOUNT],
