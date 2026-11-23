@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RdpCaptureProbe, ServerConfig } from "../../../lib/servers";
-import { RdpSettings } from "./RdpSettings";
+import type { RdpCaptureProbe, ServerConfig } from "../../../../src/lib/servers";
+import RdpSettings from "./RdpSettings";
 
 const mocks = vi.hoisted(() => ({
   platform: "macos" as "macos" | "windows",
@@ -10,11 +10,11 @@ const mocks = vi.hoisted(() => ({
   >(),
 }));
 
-vi.mock("../../../lib/runtime", () => ({
+vi.mock("../../../../src/lib/runtime", () => ({
   getAppPlatform: () => mocks.platform,
 }));
 
-vi.mock("../../../lib/servers", () => ({
+vi.mock("../../../../src/lib/servers", () => ({
   probeRdpCapture: mocks.probe,
 }));
 

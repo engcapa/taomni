@@ -38,6 +38,7 @@ jobs:
             mfa) dependencies=(src/lib/mfa) ;;
             screenshot) dependencies=(vite-plugins/screenshotOcr.ts scripts/stage-vnc-frontend.py) ;;
             sockscap) dependencies=(src/lib/sockscap src/lib/sockscap.ts src/lib/sessionPaths.ts src/lib/sockscapPreflight.ts) ;;
+            rdp-server|vnc-server|servers) dependencies=(vite-plugins/serverSettings.ts src/lib/servers) ;;
             *) echo 'Unknown module frontend' >&2; exit 1 ;;
           esac
           git diff --quiet HEAD "${MODULE_SOURCE}^{commit}" -- \

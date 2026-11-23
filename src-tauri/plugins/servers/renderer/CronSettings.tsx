@@ -1,6 +1,6 @@
-import { useT } from "../../../lib/i18n";
-import type { ServerConfig } from "../../../lib/servers";
-import { PathField, TextField } from "../fields";
+import { useT } from "../../../../src/lib/i18n";
+import type { ServerConfig } from "../../../../src/lib/servers";
+import { PathField, TextField } from "../../../../src/components/servers/fields";
 
 interface Props {
   config: ServerConfig;

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { useT } from "../../../lib/i18n";
+import { useT } from "../../../../src/lib/i18n";
 import {
   probeRdpCapture,
   type RdpCaptureProbe,
   type ServerConfig,
-} from "../../../lib/servers";
-import { getAppPlatform } from "../../../lib/runtime";
+} from "../../../../src/lib/servers";
+import { getAppPlatform } from "../../../../src/lib/runtime";
 import {
   CheckboxField,
   FieldNote,
@@ -14,7 +14,7 @@ import {
   PasswordField,
   SelectField,
   TextField,
-} from "../fields";
+} from "../../../../src/components/servers/fields";
 import { SystemRdpCard } from "./SystemRdpCard";
 
 /** Per-direction clipboard tiers (design DEC-10); the backend defaults to "all". */
@@ -36,7 +36,7 @@ interface Props {
  * server shares this machine's desktop with RDP clients (mstsc / FreeRDP).
  * Platform capability note reflects capture backend status (R0 honesty).
  */
-export function RdpSettings({ config, onChange }: Props) {
+export default function RdpSettings({ config, onChange }: Props) {
   const t = useT();
   const username = typeof config.username === "string" ? config.username : "";
   const password = typeof config.password === "string" ? config.password : "";

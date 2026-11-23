@@ -81,6 +81,7 @@ jobs:
       version: ${{ steps.source.outputs.version }}
       matrix: ${{ steps.source.outputs.matrix }}
       macos_runner: ${{ steps.source.outputs.macos_runner }}
+      built_frontend: ${{ steps.source.outputs.built_frontend }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -139,6 +140,8 @@ jobs:
           if not declared or declared - {target['platform'] for target in targets}:
               raise SystemExit('manifest must declare supported production release targets')
           targets = [target for target in targets if target['platform'] in declared]
+          built_frontend = slug in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
+                                   'rdp-server', 'vnc-server', 'servers'}
           output = os.environ['GITHUB_OUTPUT']
           with open(output, 'a', encoding='utf-8') as stream:
               stream.write(f"sha={subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()}\n")
@@ -146,10 +149,11 @@ jobs:
               stream.write(f'slug={slug}\npackage={package}\nversion={manifest["version"]}\n')
               stream.write('matrix=' + json.dumps({'include': targets}, separators=(',', ':')) + '\n')
               stream.write(f'macos_runner={macos_runner}\n')
+              stream.write(f'built_frontend={str(built_frontend).lower()}\n')
           PY
 
   desktop-frontend:
-    if: needs.source.outputs.slug == 'vnc-client' || needs.source.outputs.slug == 'rdp-client' || needs.source.outputs.slug == 'mail' || needs.source.outputs.slug == 'mfa' || needs.source.outputs.slug == 'screenshot' || needs.source.outputs.slug == 'sockscap'
+    if: needs.source.outputs.built_frontend == 'true'
     needs: source
     uses: ./.github/workflows/build-vnc-frontend.yml
     with:
@@ -214,6 +218,7 @@ jobs:
           MODULE_PLATFORM: ${{ matrix.platform }}
           MODULE_SLUG: ${{ needs.source.outputs.slug }}
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+          BUILT_FRONTEND: ${{ needs.source.outputs.built_frontend }}
         run: |
           python - <<'PY'
           import json, os, pathlib, shutil, sys
@@ -239,7 +244,7 @@ jobs:
               helper = 'taomni-vnc-key-helper.exe'
               shutil.copyfile(binaries / helper, payload / helper)
           frontend = manifest.get('entry', {}).get('frontend')
-          if frontend and slug not in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap'}:
+          if frontend and os.environ['BUILT_FRONTEND'] != 'true':
               source_frontend = source / pathlib.Path(frontend).parent
               shutil.copytree(source_frontend, payload / source_frontend.relative_to(source))
           pathlib.Path('candidate-source.json').write_text(json.dumps({
@@ -272,7 +277,7 @@ jobs:
   sign:
     name: Sign ${{ needs.source.outputs.slug }} (${{ matrix.platform }})
     needs: [source, build, desktop-frontend]
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'engcapa/taomni' && needs.build.result == 'success' && (needs.desktop-frontend.result == 'success' || (needs.source.outputs.slug != 'vnc-client' && needs.source.outputs.slug != 'rdp-client' && needs.source.outputs.slug != 'mail' && needs.source.outputs.slug != 'mfa' && needs.source.outputs.slug != 'screenshot' && needs.source.outputs.slug != 'sockscap' && needs.desktop-frontend.result == 'skipped')) }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'engcapa/taomni' && needs.build.result == 'success' && (needs.desktop-frontend.result == 'success' || (needs.source.outputs.built_frontend == 'false' && needs.desktop-frontend.result == 'skipped')) }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.source.outputs.matrix) }}
@@ -339,12 +344,12 @@ jobs:
                   stream.write(f'host={host}\n')
           PY
       - uses: actions/download-artifact@v4
-        if: needs.source.outputs.slug == 'vnc-client' || needs.source.outputs.slug == 'rdp-client' || needs.source.outputs.slug == 'mail' || needs.source.outputs.slug == 'mfa' || needs.source.outputs.slug == 'screenshot' || needs.source.outputs.slug == 'sockscap'
+        if: needs.source.outputs.built_frontend == 'true'
         with:
           name: release-desktop-frontend-${{ needs.source.outputs.slug }}-${{ github.run_id }}
           path: trusted-desktop-frontend
       - name: Stage the verified module frontend bytes
-        if: needs.source.outputs.slug == 'vnc-client' || needs.source.outputs.slug == 'rdp-client' || needs.source.outputs.slug == 'mail' || needs.source.outputs.slug == 'mfa' || needs.source.outputs.slug == 'screenshot' || needs.source.outputs.slug == 'sockscap'
+        if: needs.source.outputs.built_frontend == 'true'
         env:
           MODULE_SOURCE: ${{ needs.source.outputs.sha }}
           FRONTEND_TOOLING: ${{ github.workflow_sha }}

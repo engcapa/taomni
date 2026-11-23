@@ -1,6 +1,6 @@
-import { useT } from "../../../lib/i18n";
-import type { ServerConfig } from "../../../lib/servers";
-import { CheckboxField, PasswordField } from "../fields";
+import { useT } from "../../../../src/lib/i18n";
+import type { ServerConfig } from "../../../../src/lib/servers";
+import { CheckboxField, PasswordField } from "../../../../src/components/servers/fields";
 
 interface Props {
   config: ServerConfig;
@@ -8,7 +8,7 @@ interface Props {
 }
 
 /** VNC server form: access password, view-only mode, shared-desktop toggle. */
-export function VncSettings({ config, onChange }: Props) {
+export default function VncSettings({ config, onChange }: Props) {
   const t = useT();
   const password = typeof config.password === "string" ? config.password : "";
   const retainedPassword = Boolean(config.passwordRef) || config.credentialMigrationRequired === true;

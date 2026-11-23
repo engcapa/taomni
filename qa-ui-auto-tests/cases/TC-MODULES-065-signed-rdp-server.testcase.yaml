@@ -24,6 +24,8 @@ steps:
 - fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
 - click: '[data-testid="global-search-result"][data-result-id="servers"]'
 - click: '[data-testid="server-row-rdp"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="rdp-server"][data-plugin-version="${fixture.server_settings_module_version}"] [data-testid="rdp-field-username"]', timeout_sec: 25}
+- assert_file_sha256: {path: '${fixture.server_settings_frontend}', equals: '${fixture.server_settings_frontend_sha256}'}
 - wait_for: '[data-testid="rdp-field-username"]'
 - assert_attribute: {selector: '[data-testid="server-field-port"]', name: value, equals: '${env.QA_RDP_PORT}'}
 - assert_attribute: {selector: '[data-testid="server-field-bind-address"]', name: value, equals: '127.0.0.1'}
@@ -87,21 +89,23 @@ verification:
   requirements:
   - id: signed-rdp-server
     requirement: The signed host serves a native RDP session using the migrated settings. The host captures the desktop and delivers remote input. Disabling the module releases its listener without restarting the core.
-    actions: [7, 9, 15, 25, 26, 27, 32, 34, 36, 45, 50, 56]
+    actions: [7, 9, 15, 27, 28, 29, 34, 36, 38, 47, 52, 58]
     checkpoints:
+    - {step: 17, expectation: The loaded RDP settings form is inside the active signed module version.}
+    - {step: 18, expectation: The installed form entry exactly matches the SHA-256 in the verified archive fixture.}
     - {step: 8, expectation: The normal offline installer selected the trusted candidate.}
     - {step: 11, expectation: Module data holds the migrated settings and the original row remains available for rollback.}
-    - {step: 18, expectation: The form shows the migrated port.}
-    - {step: 22, expectation: The form hides the legacy password.}
-    - {step: 35, expectation: The real loopback client uses the legacy password and decodes actual desktop frames.}
-    - {step: 36, expectation: The client sees frame updates after sending remote input.}
-    - {step: 37, expectation: The independent desktop window receives the ten input events.}
-    - {step: 39, expectation: The signed host owns the writer lease and its settings now point to Vault.}
-    - {step: 47, expectation: The running module backs up its settings and TLS files with Vault.}
-    - {step: 52, expectation: The listener and write lease have been released while the data files remain.}
-    - {step: 57, expectation: The original server row shows stopped.}
-    - {step: 58, expectation: The local server and module store complete the workflow without runtime errors.}
-    results: [8, 11, 18, 22, 35, 36, 37, 39, 47, 52, 57, 58]
+    - {step: 20, expectation: The form shows the migrated port.}
+    - {step: 24, expectation: The form hides the legacy password.}
+    - {step: 37, expectation: The real loopback client uses the legacy password and decodes actual desktop frames.}
+    - {step: 38, expectation: The client sees frame updates after sending remote input.}
+    - {step: 39, expectation: The independent desktop window receives the ten input events.}
+    - {step: 41, expectation: The signed host owns the writer lease and its settings now point to Vault.}
+    - {step: 49, expectation: The running module backs up its settings and TLS files with Vault.}
+    - {step: 54, expectation: The listener and write lease have been released while the data files remain.}
+    - {step: 59, expectation: The original server row shows stopped.}
+    - {step: 60, expectation: The local server and module store complete the workflow without runtime errors.}
+    results: [8, 11, 17, 18, 20, 24, 37, 38, 39, 41, 49, 54, 59, 60]
   visual:
   - check: The client decodes a real desktop image and Local servers reflects the lifecycle.
     method: automated

@@ -1,5 +1,5 @@
-import { useT } from "../../../lib/i18n";
-import type { ServerConfig } from "../../../lib/servers";
+import { useT } from "../../../../src/lib/i18n";
+import type { ServerConfig } from "../../../../src/lib/servers";
 import {
   CheckboxField,
   FieldNote,
@@ -7,7 +7,7 @@ import {
   PathField,
   SelectField,
   TextField,
-} from "../fields";
+} from "../../../../src/components/servers/fields";
 import { LocalServerPassword } from "./LocalServerPassword";
 
 interface Props {

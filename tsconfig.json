@@ -17,5 +17,5 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "src-tauri/plugins/vnc-client/renderer", "src-tauri/plugins/mail/renderer", "src-tauri/plugins/sockscap/renderer"]
+  "include": ["src", "src-tauri/plugins/vnc-client/renderer", "src-tauri/plugins/mail/renderer", "src-tauri/plugins/sockscap/renderer", "src-tauri/plugins/rdp-server/renderer"]
 }

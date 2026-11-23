@@ -199,6 +199,14 @@ def setup_screenshot(ctx):
 VNC_SERVER_CASE = "TC-MODULES-063"
 
 
+def server_settings_provenance(ctx, receipt, frontend):
+    receipt["frontendSha256"] = hashlib.sha256(frontend).hexdigest()
+    installed = isolated_data_root(ctx) / "plugins" / receipt["slug"] / "versions" / receipt["version"]
+    ctx.values.update(server_settings_frontend=(installed / "frontend/index.js").as_posix(),
+                      server_settings_frontend_sha256=receipt["frontendSha256"],
+                      server_settings_module_version=receipt["version"])
+
+
 def setup_vnc_server(ctx):
     if ctx.case_id != VNC_SERVER_CASE or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Signed VNC Server input requires its registered native case")
@@ -207,11 +215,10 @@ def setup_vnc_server(ctx):
     if not raw:
         raise RuntimeError(f"{setting} is required to locate the signed artifact")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    manifest = Path(__file__).resolve().parents[6] / "src-tauri/plugins/vnc-server/module.json"
-    version = json.loads(manifest.read_text(encoding="utf-8"))["version"]
-    info, archive, signature, _ = load_artifact(
-        Path(raw), source, platform_key(), "vnc-server", version=version,
+    info, archive, signature, frontend = load_artifact(
+        Path(raw), source, platform_key(), "vnc-server", version=None,
     )
+    server_settings_provenance(ctx, info, frontend)
     host = "taomni-plugin-vnc-server.exe" if platform.system() == "Windows" else "taomni-plugin-vnc-server"
     with zipfile.ZipFile(archive) as package, package.open(host) as binary:
         info["hostSha256"] = hashlib.file_digest(binary, "sha256").hexdigest()
@@ -252,11 +259,10 @@ def setup_rdp_server(ctx):
     if not raw:
         raise RuntimeError("QA_SIGNED_RDP_SERVER_ROOT is required to locate the signed artifact")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    manifest = Path(__file__).resolve().parents[6] / "src-tauri/plugins/rdp-server/module.json"
-    package_version = json.loads(manifest.read_text(encoding="utf-8"))["version"]
-    receipt, archive, signature, _ = load_artifact(
-        Path(raw), source, platform_key(), "rdp-server", version=package_version,
+    receipt, archive, signature, frontend = load_artifact(
+        Path(raw), source, platform_key(), "rdp-server", version=None,
     )
+    server_settings_provenance(ctx, receipt, frontend)
     host = "taomni-plugin-rdp-server.exe" if platform.system() == "Windows" else "taomni-plugin-rdp-server"
     with zipfile.ZipFile(archive) as package, package.open(host) as binary:
         receipt["hostSha256"] = hashlib.file_digest(binary, "sha256").hexdigest()
@@ -301,11 +307,10 @@ def setup_servers(ctx):
     if not raw:
         raise RuntimeError("QA_SIGNED_SERVERS_ROOT is required to locate the signed artifact")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    manifest = Path(__file__).resolve().parents[6] / "src-tauri/plugins/servers/module.json"
-    version = json.loads(manifest.read_text(encoding="utf-8"))["version"]
-    info, archive, signature, _ = load_artifact(
-        Path(raw), source, platform_key(), "servers", version=version,
+    info, archive, signature, frontend = load_artifact(
+        Path(raw), source, platform_key(), "servers", version=None,
     )
+    server_settings_provenance(ctx, info, frontend)
     host = "taomni-plugin-servers.exe" if platform.system() == "Windows" else "taomni-plugin-servers"
     with zipfile.ZipFile(archive) as package, package.open(host) as binary:
         info["hostSha256"] = hashlib.file_digest(binary, "sha256").hexdigest()

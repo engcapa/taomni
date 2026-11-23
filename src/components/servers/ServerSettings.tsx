@@ -1,19 +1,9 @@
-import type { ReactNode } from "react";
-import { SERVER_DEFS, type ServerType } from "../../lib/servers";
+import { SERVER_DEFS } from "../../lib/servers";
 import { useServersStore } from "../../stores/serversStore";
 import { useT } from "../../lib/i18n";
 import { CommonSettings } from "./CommonSettings";
 import { ServerOutputLog } from "./ServerOutputLog";
-import { SshSettings } from "./settings/SshSettings";
-import { FtpSettings } from "./settings/FtpSettings";
-import { TftpSettings } from "./settings/TftpSettings";
-import { HttpSettings } from "./settings/HttpSettings";
-import { TelnetSettings } from "./settings/TelnetSettings";
-import { VncSettings } from "./settings/VncSettings";
-import { NfsSettings } from "./settings/NfsSettings";
-import { CronSettings } from "./settings/CronSettings";
-import { IperfSettings } from "./settings/IperfSettings";
-import { RdpSettings } from "./settings/RdpSettings";
+import { ModuleServerSettings } from "./ModuleServerSettings";
 
 /**
  * Right-hand panel: a header describing the selected server, the shared
@@ -30,8 +20,6 @@ export function ServerSettings() {
   const onChange = (patch: Parameters<typeof patchConfig>[1]) =>
     patchConfig(selectedServer, patch);
 
-  const specific = renderSpecificForm(selectedServer, config, onChange);
-
   return (
     <div
       data-testid="server-settings"
@@ -46,40 +34,9 @@ export function ServerSettings() {
 
       <CommonSettings def={def} config={config} onChange={onChange} />
 
-      {specific}
+      <ModuleServerSettings serverType={selectedServer} config={config} onChange={onChange} />
 
       <ServerOutputLog serverType={selectedServer} />
     </div>
   );
-}
-
-function renderSpecificForm(
-  type: ServerType,
-  config: ReturnType<typeof useServersStore.getState>["configs"][ServerType],
-  onChange: (patch: Record<string, unknown>) => void,
-): ReactNode {
-  switch (type) {
-    case "ssh":
-      return <SshSettings config={config} onChange={onChange} />;
-    case "ftp":
-      return <FtpSettings config={config} onChange={onChange} />;
-    case "tftp":
-      return <TftpSettings config={config} onChange={onChange} />;
-    case "http":
-      return <HttpSettings config={config} onChange={onChange} />;
-    case "telnet":
-      return <TelnetSettings config={config} onChange={onChange} />;
-    case "vnc":
-      return <VncSettings config={config} onChange={onChange} />;
-    case "nfs":
-      return <NfsSettings config={config} onChange={onChange} />;
-    case "cron":
-      return <CronSettings config={config} onChange={onChange} />;
-    case "iperf":
-      return <IperfSettings config={config} onChange={onChange} />;
-    case "rdp":
-      return <RdpSettings config={config} onChange={onChange} />;
-    default:
-      return null;
-  }
 }

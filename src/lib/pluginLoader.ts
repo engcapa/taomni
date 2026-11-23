@@ -74,6 +74,9 @@ export async function loadPluginFrontend<Props = PluginFrontendProps>(
       if (manifest.slug === "mail") url = "/src-tauri/plugins/mail/renderer/MailView.tsx";
       if (manifest.slug === "mfa") url = "/src-tauri/plugins/mfa/renderer/MfaView.tsx";
       if (manifest.slug === "sockscap") url = "/src-tauri/plugins/sockscap/renderer/SocksCapViewEntry.tsx";
+      if (manifest.slug === "rdp-server") url = "/src-tauri/plugins/rdp-server/renderer/RdpSettings.tsx";
+      if (manifest.slug === "vnc-server") url = "/src-tauri/plugins/vnc-server/renderer/VncSettings.tsx";
+      if (manifest.slug === "servers") url = "/src-tauri/plugins/servers/renderer/LocalServerSettings.tsx";
     }
     if (manifest.slug === "vnc-client") {
       const { installVncViewerHost } = await import("./vnc/viewerHost");
@@ -94,6 +97,10 @@ export async function loadPluginFrontend<Props = PluginFrontendProps>(
     if (manifest.slug === "sockscap") {
       const { installSocksCapRendererHost } = await import("./sockscap/rendererHost");
       installSocksCapRendererHost();
+    }
+    if (manifest.slug === "servers" || manifest.slug === "rdp-server" || manifest.slug === "vnc-server") {
+      const { installServerSettingsRendererHost } = await import("./servers/rendererHost");
+      installServerSettingsRendererHost();
     }
     // A fragment changes ESM identity for retry/reactivation without changing
     // the signed resource path or allowing a query through the native protocol.

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { useT } from "../../../lib/i18n";
+import { useT } from "../../../../src/lib/i18n";
 import {
   openSystemRdpSettings,
   probeSystemRdp,
   type ServerConfig,
   type SystemRdpStatus,
-} from "../../../lib/servers";
-import { FieldNote, FormRow } from "../fields";
+} from "../../../../src/lib/servers";
+import { FieldNote, FormRow } from "../../../../src/components/servers/fields";
 
 interface Props {
   config: ServerConfig;

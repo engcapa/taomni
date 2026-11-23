@@ -25,6 +25,9 @@ src-tauri/frameworks/
 /src-tauri/plugins/mail/dist/
 /src-tauri/plugins/mfa/dist/
 /src-tauri/plugins/screenshot/dist/
+/src-tauri/plugins/servers/dist/
+/src-tauri/plugins/rdp-server/dist/
+/src-tauri/plugins/vnc-server/dist/
 
 
 # =============================================================================

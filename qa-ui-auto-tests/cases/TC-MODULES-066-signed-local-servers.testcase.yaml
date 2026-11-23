@@ -23,6 +23,8 @@ steps:
 - fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
 - click: '[data-testid="global-search-result"][data-result-id="servers"]'
 - click: '[data-testid="server-row-http"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="servers"][data-plugin-version="${fixture.server_settings_module_version}"] [data-testid="server-field-http-root-dir"]', timeout_sec: 25}
+- assert_file_sha256: {path: '${fixture.server_settings_frontend}', equals: '${fixture.server_settings_frontend_sha256}'}
 - wait_for: {selector: '[data-testid="server-field-port"][value="28489"]', timeout_sec: 10}
 - assert_attribute: {selector: '[data-testid="server-field-bind-address"]', name: value, equals: '127.0.0.1'}
 - assert_attribute: {selector: '[data-testid="server-field-http-root-dir"]', name: value, equals: '${fixture.local_servers_http_root}'}
@@ -59,26 +61,33 @@ steps:
 - fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
 - click: '[data-testid="global-search-result"][data-result-id="servers"]'
 - wait_for: '[data-testid="server-row-http"][data-status="stopped"]'
+- click: '[data-testid="server-row-http"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="servers"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_not_visible: '[data-testid="server-field-http-root-dir"]'
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: signed-servers
     requirement: The module imports legacy settings, serves HTTP and SSH, and closes both listeners when disabled in the same app session.
-    actions: [7, 9, 14, 19, 21, 25, 29, 38, 43, 50]
+    actions: [7, 9, 14, 21, 23, 27, 31, 40, 45, 52, 54]
     checkpoints:
     - {step: 8, expectation: The normal offline form accepts the verified package.}
-    - {step: 16, expectation: The loaded HTTP form shows the exact migrated listening port.}
-    - {step: 18, expectation: The form shows the original HTTP document root.}
-    - {step: 24, expectation: The form hides the legacy password.}
-    - {step: 31, expectation: An independent SSH client uses the legacy password to read the original document and run a PTY command.}
-    - {step: 32, expectation: HTTP serves the expected file and the signed host owns the settings with a Vault reference.}
-    - {step: 40, expectation: The running module backs up its own settings and SSH identity together with Vault.}
-    - {step: 45, expectation: Disabling releases the writer lease and the HTTP listener.}
-    - {step: 46, expectation: A new SSH connection is also refused.}
-    - {step: 51, expectation: Local servers shows HTTP stopped.}
-    - {step: 52, expectation: The same application session remains usable.}
-    results: [8, 16, 18, 24, 31, 32, 40, 45, 46, 51, 52]
+    - {step: 16, expectation: The loaded HTTP settings form is inside the active signed module version.}
+    - {step: 17, expectation: The installed form entry exactly matches the SHA-256 in the verified archive fixture.}
+    - {step: 18, expectation: The loaded HTTP form shows the exact migrated listening port.}
+    - {step: 20, expectation: The form shows the original HTTP document root.}
+    - {step: 26, expectation: The form hides the legacy password.}
+    - {step: 33, expectation: An independent SSH client uses the legacy password to read the original document and run a PTY command.}
+    - {step: 34, expectation: HTTP serves the expected file and the signed host owns the settings with a Vault reference.}
+    - {step: 42, expectation: The running module backs up its own settings and SSH identity together with Vault.}
+    - {step: 47, expectation: Disabling releases the writer lease and the HTTP listener.}
+    - {step: 48, expectation: A new SSH connection is also refused.}
+    - {step: 53, expectation: Local servers shows HTTP stopped.}
+    - {step: 55, expectation: The selected service directs the user to the disabled module.}
+    - {step: 56, expectation: The optional settings form has been unloaded.}
+    - {step: 57, expectation: The same application session remains usable.}
+    results: [8, 16, 17, 18, 20, 26, 33, 34, 42, 47, 48, 53, 55, 56, 57]
   visual:
   - check: The HTTP row reports the actual lifecycle.
     method: automated

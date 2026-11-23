@@ -191,6 +191,7 @@ jobs:
             assert(!/plugins\/(vnc|rdp)-client\/renderer\//.test(path), `Bundled remote desktop frontend ${path}`);
             assert(!path.includes('plugins/mfa/renderer/'), `Bundled MFA frontend ${path}`);
             assert(!path.includes('plugins/mail/renderer/'), `Bundled Mail frontend ${path}`);
+            assert(!/plugins\/(?:rdp-server|vnc-server|servers)\/renderer\//.test(path), `Bundled server settings frontend ${path}`);
           }
           for (const [source, asset] of Object.entries(manifest)) {
             assert(!source.includes('plugins/sockscap/renderer/'), `Bundled SocksCap renderer ${source}`);

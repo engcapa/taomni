@@ -39,6 +39,7 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     __TAOMNI_BUNDLED_MAIL_RENDERER__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview && !isTauriBuild)),
     __TAOMNI_BUNDLED_MFA_RENDERER__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview && !isTauriBuild)),
     __TAOMNI_BUNDLED_SOCKSCAP_RENDERER__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview && !isTauriBuild)),
+    __TAOMNI_BUNDLED_SERVER_SETTINGS__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview && !isTauriBuild)),
     __TAOMNI_BUNDLED_SCREENSHOT_MEDIA__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview)),
     // Screenshot overlay startup marks (P0-0b): read by native QA only.
     __TAOMNI_QA_OVERLAY_TIMING__: JSON.stringify(mode === "qa"),

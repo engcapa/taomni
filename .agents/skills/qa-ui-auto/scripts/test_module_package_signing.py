@@ -55,7 +55,8 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
                               for name, content in assets.items()},
                 }))
         frontend = manifest["entry"].get("frontend")
-        if frontend and module not in {"vnc-client", "rdp-client", "mail", "mfa", "screenshot", "sockscap"}:
+        if frontend and module not in {"vnc-client", "rdp-client", "mail", "mfa", "screenshot", "sockscap",
+                                       "rdp-server", "vnc-server", "servers"}:
             shutil.copytree(ROOT / "src-tauri/plugins" / module / "frontend", trusted / "frontend")
             shutil.copytree(trusted / "frontend", payload / "frontend")
         (payload / "module.json").write_text(json.dumps(manifest))
@@ -222,7 +223,7 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
 
     def test_official_panels_stage_only_the_matching_trusted_renderer(self):
         stage_frontend = runpy.run_path(str(ROOT / "scripts/stage-vnc-frontend.py"))["stage_frontend"]
-        for slug in ("mail", "mfa", "sockscap"):
+        for slug in ("mail", "mfa", "sockscap", "rdp-server", "vnc-server", "servers"):
             with self.subTest(slug=slug), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 payload = self.seed(root, slug, "linux-x86_64")

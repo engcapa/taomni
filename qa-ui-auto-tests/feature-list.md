@@ -6052,19 +6052,17 @@ controls:
 id: F-Servers-1
 status: done
 area: servers
-components: [ServersPanel, ServersTabBlockedDialog, ServerList, ServerRow, ServerSettings, CommonSettings, ServerOutputLog, fields]
+components: [ServersPanel, ServersTabBlockedDialog, ServerList, ServerRow, ServerSettings, ModuleServerSettings, CommonSettings, ServerOutputLog, fields]
 files:
   - src/components/servers/ServersPanel.tsx
   - src/components/servers/ServersTabBlockedDialog.tsx
   - src/components/servers/ServerList.tsx
   - src/components/servers/ServerRow.tsx
   - src/components/servers/ServerSettings.tsx
+  - src/components/servers/ModuleServerSettings.tsx
   - src/components/servers/CommonSettings.tsx
-  - src/components/servers/settings/HttpSettings.tsx
-  - src/components/servers/settings/SshSettings.tsx
-  - src/components/servers/settings/LocalServerPassword.tsx
-  - src/components/servers/settings/FtpSettings.tsx
-  - src/components/servers/settings/VncSettings.tsx
+  - src-tauri/plugins/servers/renderer/
+  - src-tauri/plugins/vnc-server/renderer/
   - src/components/servers/ServerOutputLog.tsx
   - src/components/servers/fields.tsx
   - src/lib/servers.ts
@@ -6256,9 +6254,9 @@ controls:
 - 输出/状态分别通过 `server://output/<type>` / `server://status/<type>` 事件流推送；后端 `ServerRegistry` 另按类型保留最近 500 行输出（`list_server_logs`），重新打开页签可恢复日志，清空按钮同时清空后端历史（`clear_server_log`）；Apply 保存所有 dirty 配置，对运行中且端口已改的服务器提示 `Restart server to apply port change`；有未保存修改时 Cancel 会确认丢弃，切换到其他页签再切回会保留未保存草稿
 - i18n key 在 `servers.*`（en / zh-CN 双语）；前端 store 为 `serversStore`，IPC + 类型 + `SERVER_DEFS` 在 `src/lib/servers.ts`，单实例页签协调逻辑在 `src/lib/serversTab.ts`
 - **e2e 测试覆盖**：`TC-SERVERS-001-tab-singleton-browser`、`TC-auto-F-Servers-1-servers-dialog` 覆盖浏览器单实例页签及跨上下文互斥，`TC-SERVERS-002-tab-singleton-native` 覆盖原生双进程 OS `ModuleLock` 与热路由切换，`TC-SERVERS-003-tab-functional-native` 核对真实 HTTP 文件内容、停止后端口关闭、日志、热改端口提示及配置持久化。
-- VNC 由签名 `vnc-server` 宿主启动和监督系统 daemon。Linux X11 的 `TC-MODULES-063` 验证离线安装、真实回环连接、停止及禁用后的端口与租约释放。`TC-MODULES-064` 在 Browser 核对端口、绑定地址、密码及两个选项的保存和恢复。
+- VNC 由签名 `vnc-server` 宿主启动和监督系统 daemon。Linux X11 的 `TC-MODULES-063` 核对已安装表单文件的 SHA-256，再验证真实回环连接、停止及禁用后的端口与租约释放。`TC-MODULES-064` 在 Browser 从模块入口核对端口、绑定地址、密码及两个选项的保存和恢复。
 - TC-SERVERS-004 从 Local servers 启动真实 SSH 监听器。独立客户端验证鉴权、SFTP 文件内容、PTY 命令完成和停止后的端口关闭。
-- TC-MODULES-066 验证签名模块接管原 HTTP 和 SSH 设置，原口令经 Vault 续用，停用后同时关闭两个监听。TC-SERVERS-004 及 066 核对 PTY 输出与零和非零退出码。TC-SERVERS-005 验证 Browser 设置保存、重开和明确移除凭据。
+- TC-MODULES-066 核对签名表单的 SHA-256、原 HTTP 和 SSH 设置及原 Vault 口令，停用后同时关闭两个监听。TC-SERVERS-004 及 066 核对 PTY 输出与零和非零退出码。TC-SERVERS-005 验证 Browser 从模块入口保存、重开和明确移除凭据。
 
 ### 22.2 RDP Server（与 Windows 远程桌面对齐）🚧
 
@@ -6270,7 +6268,8 @@ components: [RdpSettings, CommonSettings, ServerRow, fields, RdpServerApprovalBr
 files:
   - src-tauri/crates/taomni-capture/src/engine/
   - src-tauri/crates/taomni-capture/src/permissions.rs
-  - src/components/servers/settings/RdpSettings.tsx
+  - src-tauri/plugins/rdp-server/renderer/
+  - src/components/servers/ModuleServerSettings.tsx
   - src/components/servers/CommonSettings.tsx
   - src/components/servers/ServerRow.tsx
   - src/components/servers/fields.tsx
@@ -6401,7 +6400,7 @@ controls:
 - `TC-RDPJ-02-joint-clipboard-no-echo` 保留联合客户端/服务端 Unicode 文本与无回环校验；`TC-RDPJ-03-deferred-clipboard-publication` 在 macOS 真实 AppKit 中分离类型声明与数据发布（间隔至少 1.2 秒、同一 changeCount），校验迟到文本不会丢失，公告不超过两次、六秒无回环并正常停止。空快照每秒复核一次；非空稳定快照保持廉价变更标记检查。
 - CI：`rdp_server_required` → capability `rdp`；`system_rdp_running`（Windows 系统远程桌面运行中）→ `rdp`；`release_build_required`（性能用例）→ `release`（该条目改用 release QA 构建）；音频/TermService 基线/xrdp 参考服务器分别为 `audio`/`rdp-baseline`/`xrdp`
 - Windows：NAT-01/PERF-01 三端运行，Windows 上经 `platform_choice` 在系统远程桌面提示中选 Taomni；系统远程桌面分支由 TC-RDPS-NAT-06 覆盖，TermService 基线由 TC-RDPS-PERF-02 测量
-- TC-MODULES-065 安装签名模块后读取旧 RDP 设置和 Vault 凭据，验证原生图像、远程输入、设置与 TLS 备份，以及停用后的监听和写租约回收。macOS 保存宿主签名和 Gatekeeper 原始结果。TC-RDPS-UI-03 覆盖 Browser 保存凭据引用及重开后的密码输入框。
+- TC-MODULES-065 核对签名表单的 SHA-256，再验证旧 RDP 设置、Vault 凭据、原生图像、远程输入、设置与 TLS 备份，以及停用后的监听和写租约回收。macOS 保存宿主签名和 Gatekeeper 原始结果。TC-RDPS-UI-03 覆盖 Browser 模块表单中的凭据引用、剪贴板级别与音频设置。
 - 声音（RDPSND 播放）：服务器回采本机默认输出（Windows WASAPI loopback、Linux PipeWire sink monitor），按客户端格式重采样为 PCM 下发；macOS 13+ 用 ScreenCaptureKit 系统音频（排除 Taomni 自身声音）；TC-RDPS-NAT-04 在宿主播放单音、由探针经 RDPSND 接收并判定频率。CI `audio`：Linux 为 PipeWire null sink，Windows 为 VB-CABLE，macOS 为 BlackHole 虚拟设备
 
 ---

@@ -18,6 +18,7 @@ declare const __TAOMNI_BUNDLED_RDP_VIEWER__: boolean;
 declare const __TAOMNI_BUNDLED_MAIL_RENDERER__: boolean;
 declare const __TAOMNI_BUNDLED_MFA_RENDERER__: boolean;
 declare const __TAOMNI_BUNDLED_SOCKSCAP_RENDERER__: boolean;
+declare const __TAOMNI_BUNDLED_SERVER_SETTINGS__: boolean;
 declare const __TAOMNI_BUNDLED_SCREENSHOT_MEDIA__: boolean;
 /** Screenshot overlay startup marks (`window.__TAOMNI_OVERLAY_TIMING__`): QA bundle only. */
 declare const __TAOMNI_QA_OVERLAY_TIMING__: boolean;

@@ -23,7 +23,7 @@ class PluginRenderBoundary extends Component<{ children: ReactNode; fallback: (e
 type TabLocator = Pick<Tab, "id" | "plugin">;
 
 export function PluginTabPane<Props extends object = Record<never, never>>({ tab, active, importer, onOpenSettings,
-  componentProps, unavailableActions,
+  componentProps, unavailableActions, className = "flex h-full min-h-0 flex-col overflow-auto",
 }: {
   tab: TabLocator;
   active: boolean;
@@ -31,6 +31,7 @@ export function PluginTabPane<Props extends object = Record<never, never>>({ tab
   onOpenSettings?: () => void;
   componentProps?: Props;
   unavailableActions?: ReactNode;
+  className?: string;
 }) {
   const t = useT();
   const state = usePluginFrontendStore();
@@ -98,7 +99,7 @@ export function PluginTabPane<Props extends object = Record<never, never>>({ tab
     content = <p data-testid="plugin-tab-loading" role="status" className="m-auto p-6 text-[13px]">{t("plugins.loading")}</p>;
   }
   return <section data-testid="plugin-tab-panel" data-plugin-slug={slug} data-plugin-kind={kind}
-    data-plugin-version={record?.manifest?.version ?? ""} className="flex h-full min-h-0 flex-col overflow-auto">
+    data-plugin-version={record?.manifest?.version ?? ""} className={className}>
     {content}
   </section>;
 }

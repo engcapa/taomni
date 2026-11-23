@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => ({
     __TAOMNI_BUNDLED_MAIL_RENDERER__: JSON.stringify(true),
     __TAOMNI_BUNDLED_MFA_RENDERER__: JSON.stringify(true),
     __TAOMNI_BUNDLED_SOCKSCAP_RENDERER__: JSON.stringify(true),
+    __TAOMNI_BUNDLED_SERVER_SETTINGS__: JSON.stringify(true),
     __TAOMNI_QA_OVERLAY_TIMING__: JSON.stringify(true),
   },
   test: {

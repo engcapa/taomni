@@ -11312,7 +11312,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-rdp-server"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "libc",
  "serde",
@@ -11366,7 +11366,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-servers"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -11452,7 +11452,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-vnc-server"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
