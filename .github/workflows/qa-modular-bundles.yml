@@ -264,6 +264,12 @@ jobs:
           if [[ "$FIRST_RELEASE" == true ]]; then
             args=(--first-release first-release-input)
           fi
+          if [[ "$FIRST_RELEASE" == true && "$RUNNER_OS" == macOS ]]; then
+            osascript -l JavaScript .agents/skills/qa-ui-auto/scripts/ci_macos_consent.js \
+              > bundle-evidence/macos-fixture-consent.log 2>&1 &
+            consent_pid=$!
+            trap 'kill "$consent_pid" 2>/dev/null || true; wait "$consent_pid" 2>/dev/null || true' EXIT
+          fi
           if [[ "$SAMPLE_MACOS_HARDENED_MFA" == true ]]; then
             args+=(--macos-hardened-mfa)
           fi

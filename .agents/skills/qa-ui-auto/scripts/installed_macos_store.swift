@@ -370,10 +370,18 @@ func observe(_ request: Request) throws -> Observation {
             }) { throw CheckFailure(failure) }
             return visible.contains("Review accounts") ? true : nil
         }
-        _ = try wait("one importable QA Bank account in the preview") {
+        _ = try wait("one duplicate QA Bank account in the preview") {
             let elements = contents()
-            guard elements.flatMap(labels).contains("1 account(s) found"), button(elements, "Import 1") != nil
-            else { return nil as Bool? }
+            let visible = elements.flatMap(labels)
+            let importDisabled = elements.contains {
+                attribute($0, kAXRoleAttribute) as? String == kAXButtonRole
+                    && attribute($0, kAXEnabledAttribute) as? Bool == false
+                    && labels($0).contains("Import 0")
+            }
+            // The external QR uses the same RFC HOTP secret as the migrated account.
+            guard visible.contains("1 account(s) found"), visible.contains("Already added"), importDisabled else {
+                return nil as Bool?
+            }
             let issuerField = elements.contains {
                 attribute($0, kAXRoleAttribute) as? String == kAXTextFieldRole
                     && attribute($0, kAXValueAttribute) as? String == "QA Bank"
