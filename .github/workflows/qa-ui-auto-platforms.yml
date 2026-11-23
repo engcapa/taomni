@@ -70,9 +70,9 @@ on:
         description: Native shared-case sample percent per rotation window (1-100; empty = 20)
         type: string
       vendor_cache:
-        description: Opt-in vendored Cargo dependency cache experiment (build/contracts only)
-        type: boolean
-        default: false
+        description: Vendored Cargo dependency cache experiment, enabled by default (true/false)
+        type: string
+        default: 'true'
       trusted_cache:
         description: Reuse Cargo dependency archives from the trusted default branch (true/false)
         type: string
@@ -97,7 +97,7 @@ on:
       nightly_policy: {type: boolean, default: false}
       night_label: {type: string, default: ''}
       nightly_sample_percent: {type: string, default: ''}
-      vendor_cache: {type: boolean, default: false}
+      vendor_cache: {type: string, default: 'true'}
       trusted_cache: {type: string, default: 'true'}
   pull_request:
     paths:
@@ -356,7 +356,7 @@ jobs:
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: build
-      vendor_cache: ${{ inputs.vendor_cache || false }}
+      vendor_cache: ${{ inputs.vendor_cache }}
       trusted_cache: ${{ inputs.trusted_cache }}
 
   execute-linux-native:
@@ -379,7 +379,7 @@ jobs:
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: build
-      vendor_cache: ${{ inputs.vendor_cache || false }}
+      vendor_cache: ${{ inputs.vendor_cache }}
       trusted_cache: ${{ inputs.trusted_cache }}
 
   execute-windows-native:
@@ -402,7 +402,7 @@ jobs:
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: build
-      vendor_cache: ${{ inputs.vendor_cache || false }}
+      vendor_cache: ${{ inputs.vendor_cache }}
       trusted_cache: ${{ inputs.trusted_cache }}
 
   execute-macos-native:
@@ -427,7 +427,7 @@ jobs:
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: contracts
-      vendor_cache: ${{ inputs.vendor_cache || false }}
+      vendor_cache: ${{ inputs.vendor_cache }}
       trusted_cache: ${{ inputs.trusted_cache }}
       run_rdp_unit_contracts: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts }}
 

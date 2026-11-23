@@ -13,7 +13,7 @@ PLATFORMS = ("Linux", "Windows", "macOS")
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 NOMINAL_UTC_HOUR = 19
 NOMINAL_UTC_MINUTE = 17
-DEFAULT_WINDOWS_NIGHTS = "fri,sat,sun"
+DEFAULT_WINDOWS_NIGHTS = "sat,sun,mon"
 DEFAULT_SAMPLE_PERCENT = 20
 MAX_LABEL_SKEW = dt.timedelta(hours=36)
 

@@ -250,13 +250,16 @@ class NightlyAndCachePipelineTests(unittest.TestCase):
         entry_env = self.entry['jobs']['entry']['env']
         self.assertEqual(entry_env['QA_DEFAULT_BRANCH'], '${{ github.event.repository.default_branch }}')
 
-    def test_vendor_cache_experiment_is_callable_and_off_by_default(self):
+    def test_vendor_cache_experiment_is_enabled_by_default_and_can_be_disabled(self):
         env = self.entry['jobs']['entry']['env']
-        self.assertIn('inputs.vendor_cache', env['QA_VENDOR_CACHE'])
+        self.assertIn("inputs.vendor_cache != 'false'", env['QA_VENDOR_CACHE'])
+        self.assertIn("inputs.operation == 'build'", env['QA_VENDOR_CACHE'])
         normalize = self.step(self.entry, 'Normalize vendored Cargo source mtimes')
         self.assertIn("env.QA_VENDOR_CACHE == '1'", normalize['if'])
         self.assertIn('ci_cargo_artifact.py normalize', normalize['run'])
         calls = {name: self.platforms['jobs'][name]['with'] for name in
                  ('build-linux', 'build-windows', 'build-macos', 'native-contracts')}
         for name, call in calls.items():
-            self.assertIn('inputs.vendor_cache', call['vendor_cache'], name)
+            self.assertEqual(call['vendor_cache'], '${{ inputs.vendor_cache }}', name)
+        workflow_text = (ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text()
+        self.assertIn("vendor_cache: {type: string, default: 'true'}", workflow_text)

@@ -64,10 +64,10 @@ five nights. Browser entries stay complete. The policy is recorded in
 deferred IDs), so a night can be reproduced locally with
 `QA_NIGHTLY_POLICY=true QA_NIGHT_LABEL=YYYY-MM-DD python -m qa_ui_auto.ci plan`.
 
-Windows only runs on Friday, Saturday and Sunday **evenings** (Beijing). The
-night label is the UTC date of the nominal trigger, so Friday evening is the
-run that starts Saturday 03:17 Beijing. Other nights plan `linux,macos` only:
-no Windows browser, native shards or producer are scheduled. Override the gate
+Windows only runs on Saturday, Sunday and Monday **evenings** (Beijing). The
+night label is the UTC date of the nominal trigger, so Saturday evening is the
+run that starts Sunday 03:17 Beijing. Other nights plan `linux,macos` only: no
+Windows browser, native shards or producer are scheduled. Override the gate
 with `QA_WINDOWS_NIGHTS` (comma-separated weekday names) or simulate a night on
 a manual dispatch with `nightly_policy=true` plus `night_label=YYYY-MM-DD`.
 
@@ -123,11 +123,12 @@ the artifact key still covers manifests, toolchain, runner image and compile
 environment, and each restore is checksum-validated. Archives are retained for
 three days so the next nightly and the following workday can reuse them.
 
-The opt-in `vendor_cache=true` dispatch input enables the vendored Cargo
-dependency experiment: the archive key adds a digest of `src-tauri/vendor`,
-vendored path dependencies are no longer excluded from the archive, and their
-source mtimes are normalized before compiling so restored fingerprints stay
-fresh. It is off by default and intended for matched A/B runs; see
+The vendored Cargo dependency cache experiment is enabled by default: the
+archive key adds a digest of `src-tauri/vendor`, vendored path dependencies are
+no longer excluded from the archive, and their source mtimes are normalized
+before compiling so restored fingerprints stay fresh. The first run after the
+switch republishes a new-key archive; later runs reuse it. Pass
+`vendor_cache=false` to run the previous behavior for a matched A/B; see
 `docs-feature/qa-ui-auto-platform-nightly-coverage-and-cache-design.md`.
 
 When the runtime misses, Cargo can still restore matching compiled dependencies.

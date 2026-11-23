@@ -38,18 +38,18 @@ class NightLabelTests(unittest.TestCase):
         self.assertEqual(nightly.night_label(dt.datetime(2026, 11, 20, 19, 16, tzinfo=dt.timezone.utc)),
                          dt.date(2026, 11, 19))
 
-    def test_windows_runs_only_on_friday_saturday_and_sunday_nights(self):
+    def test_windows_runs_only_on_saturday_sunday_and_monday_nights(self):
         nights = nightly.DEFAULT_WINDOWS_NIGHTS
         enabled = {date for date in (dt.date(2026, 11, 20) + dt.timedelta(days=offset)
                                      for offset in range(7))
                    if nightly.windows_enabled(date, nights)}
-        self.assertEqual({date.weekday() for date in enabled}, {4, 5, 6})
-        for date in (dt.date(2026, 11, 23) + dt.timedelta(days=offset) for offset in range(4)):
+        self.assertEqual({date.weekday() for date in enabled}, {0, 5, 6})
+        for date in (dt.date(2026, 11, 24), dt.date(2026, 11, 25), dt.date(2026, 11, 20)):
             self.assertEqual(nightly.platforms_for_night(['linux', 'windows', 'macos'], date, enabled=True),
                              ['linux', 'macos'])
-        self.assertEqual(nightly.platforms_for_night(['linux', 'windows', 'macos'],
-                                                     dt.date(2026, 11, 20), enabled=True),
-                         ['linux', 'windows', 'macos'])
+        for date in (dt.date(2026, 11, 23), dt.date(2026, 11, 21), dt.date(2026, 11, 22)):
+            self.assertEqual(nightly.platforms_for_night(['linux', 'windows', 'macos'], date, enabled=True),
+                             ['linux', 'windows', 'macos'])
 
     def test_invalid_weekday_configuration_fails_closed(self):
         with self.assertRaisesRegex(ValueError, 'unknown nightly weekdays'):
@@ -117,7 +117,7 @@ class NightlyPlanTests(unittest.TestCase):
                             for reason in plan['reasons'][native_ids[0]]))
 
     def test_weekend_night_keeps_windows_and_full_percent_restores_coverage(self):
-        plan = make_plan(args(scope='all', nightly_policy=True, night_label='2026-11-20',
+        plan = make_plan(args(scope='all', nightly_policy=True, night_label='2026-11-23',
                               native_sample_percent=100))
         self.assertEqual(plan['nightly']['platforms'], ['linux', 'windows', 'macos'])
         self.assertTrue(plan['nightly']['windows'])

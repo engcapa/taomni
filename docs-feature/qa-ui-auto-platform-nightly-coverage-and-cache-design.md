@@ -9,8 +9,8 @@
 | 决策 | 内容 |
 | --- | --- |
 | 夜跑覆盖 | 方案 B：native 保留 crash 套件 + 平台限定用例 + 共享用例的 20% 轮换窗口；browser 保持全量 |
-| Windows 平台 | 仅周五、周六、周日晚（夜标签周一至周五的北京夜跑分别对应…见 §2.2）运行；其余夜晚整段跳过 Windows（browser、native 与构建） |
-| vendor mtime | 允许作为实验开关先跑 A/B，默认关闭 |
+| Windows 平台 | 仅周六、周日、周一晚（夜标签 Sat/Sun/Mon，对应周日/周一/周二 03:17 北京启动的夜跑）运行；其余夜晚整段跳过 Windows（browser、native 与构建） |
+| vendor mtime | 实验开关；2026-11-23 起默认启用（`vendor_cache=false` 可回退） |
 | 执行范围 | P0（调度与信号）→ P1（缓存）→ P2/P3（覆盖与并发收敛） |
 | 不改动 | PR/impacted/selected 的选择语义、crash 套件强制包含、release 二进制身份与逐文件校验 |
 
@@ -33,10 +33,12 @@
 
 | 夜标签（北京晚上） | 定时运行开始（北京） | Windows |
 | --- | --- | --- |
-| 周五 | 周六 03:17 | 运行 |
 | 周六 | 周日 03:17 | 运行 |
 | 周日 | 周一 03:17 | 运行 |
-| 周一至周四 | 周二至周五 03:17 | 跳过 |
+| 周一 | 周二 03:17 | 运行 |
+| 周二至周五 | 周三至周六 03:17 | 跳过 |
+
+默认值 `QA_WINDOWS_NIGHTS=sat,sun,mon`（2026-11-23 按用户决定调整；此前为 Fri/Sat/Sun）。
 
 跳过时 `platforms=linux,macos`：Windows 的 browser 分片、native 构建与 native 分片全部不进入计划，因此也不会占用 runner 槽位。`qa-ui-auto-platforms-result` 仍按实际计划校验。
 
@@ -91,18 +93,18 @@
 - PR 只读默认分支归档；分支/fork 不能写入默认分支作用域；
 - `trusted_cache=false` 派发输入可临时关闭默认分支读取，用于 A/B 与冷编复现。
 
-### 5.2 vendor 路径依赖缓存实验（默认关闭）
+### 5.2 vendor 路径依赖缓存实验（默认启用，可回退）
 
 `src-tauri/Cargo.toml` 的 `[patch.crates-io]` 引用了 13 个 `src-tauri/vendor/*` path 依赖。现有归档按 `src-tauri/**/Cargo.toml` 把它们的 package 全部视为 local unit 排除，导致暖编仍重编 33–38 个 crate（Windows 构建步骤 13.5 分钟、macOS 16.4 分钟）。
 
-实验开关 `QA_VENDOR_CACHE=1`：
+实验由 `QA_VENDOR_CACHE` 控制；2026-11-23 起默认启用（`vendor_cache=false` 派发输入或清空该变量即关闭）：
 
 - 归档键加入 `vendor_tree_digest()`（优先 `git ls-tree -r HEAD -- src-tauri/vendor`，无 git 时按文件内容摘要回退），vendor 源码变化必定触发新键；
 - vendor 包不再视为 local unit，其 `deps/build/.fingerprint` 进入归档；
 - `QA_VENDOR_MTIME_EPOCH`（默认 `1600000000`）在编译前把 vendor 源码 mtime 归一化，使恢复的 fingerprint 在 Cargo 看来仍然新鲜；`ci_cargo_artifact.py normalize` 供 workflow 在 restore 后调用；
 - 开关与 epoch 值进入 `build_inputs()`，避免开关切换时错误复用二进制身份。
 
-预期：暖编重编 crate 从 33–38 降到个位数，Windows/macOS 暖编构建步骤有机会从 13–16 分钟降到 3–6 分钟。以 A/B 实测为准，未达标则保持关闭并记录证据。
+预期：暖编重编 crate 从 33–38 降到个位数，Windows/macOS 暖编构建步骤有机会从 13–16 分钟降到 3–6 分钟。Linux 上的机制 A/B 已验证（36→3 个 crate）；Windows/macOS 的净收益从默认启用后的 PR/夜跑数据继续收集，未达标可用 `vendor_cache=false` 回退。
 
 ## 6. 预期收益
 
@@ -117,10 +119,10 @@
 ## 7. 验收与 A/B 协议
 
 - **计划等价（本地/CI 均可）**：同一 head 用 `night_label` 连续跑 1 个轮换周期（5 夜），断言每个共享 native 用例恰好出现一次；`selected`/`impacted` 的计划与改动前一致；crash 与平台限定用例每晚都在。
-- **Windows 门控**：分别模拟周五/周六/周日与周一至周四的 `night_label`，断言 `platforms` 与矩阵；`scope=selected` 始终保留显式请求的 Windows。
+- **Windows 门控**：分别模拟周六/周日/周一与周二至周五的 `night_label`，断言 `platforms` 与矩阵；`scope=selected` 始终保留显式请求的 Windows。
 - **opt-in**：无 key 的 `scope=all` 计划把相关用例记入 `gaps`；设置 key 后恢复；`selected` 显式请求未满足时规划失败。
 - **受信任归档**：在未改 manifest/工具链的新分支上派发 focused native 运行，构建日志出现来自默认分支 run 的 `Restored Cargo ...`，构建时间接近暖编；改名/过期/伪造来源测试回退冷编。
-- **vendor A/B**：同一 commit 两个分支：A 关闭（现状），B 开启。B 首轮冷编建立新键，次轮恢复后记录重编 crate 数与构建步骤耗时；A 用同轮暖编对照。验收判据：B 暖编构建步骤 ≤ 6 分钟且二进制身份校验通过；否则回退开关。
+- **vendor A/B（已默认启用）**：Linux 已按“同一 commit、强制重编、开关开/关”完成对照（3 vs 36 个 crate）。Windows/macOS 的增益从默认启用后的夜跑与 PR 运行收集；判据仍是暖编重编 crate 数、构建步骤与二进制身份校验，异常时用 `vendor_cache=false` 回退。
 - **夜跑实测**：连续两个自然夜跑记录墙钟、各 job 等待、native 执行数与失败/跳过；与上一轮 113:29 对比；任何抽样导致的“未执行”必须出现在 `nightly.deferred` 与 summary 中。
 
 ## 8. 首轮实现验证（2026-11-23）
@@ -144,7 +146,7 @@
 
 - **夜间策略与 Windows 门控按计划工作**：计划、矩阵和 deferred 记录都能从 `selection.json` 复算；V1 的失败来自 Maven Central 429（基础设施）与 2 个既有产品断言（`linux-native-shard-2/TC-WS-079`、`linux-native-shard-4/TC-FILE-OPEN-045`），不是策略或缓存改动。
 - **vendor 归档机制成立**：开关打开后，暖编重编 crate 从 36 降到 3，说明 vendor 中间产物确实被 Cargo 复用。
-- **Linux 上的净收益有限**：本机 Linux 暖编本来就只需 ~10 分钟，恢复 1.6 GB 归档的 1.5 分钟会抵消一部分收益；同条件对照只快约 1 分钟（9.7 → 8.7）。Windows/macOS 的第二轮实测暖编构建步骤为 13.5/16.4 分钟，是这项优化真正的目标平台，需要按同一 A/B 协议补测后再决定是否默认打开。当前保持默认关闭。
+- **Linux 上的净收益有限**：本机 Linux 暖编本来就只需 ~10 分钟，恢复 1.6 GB 归档的 1.5 分钟会抵消一部分收益；同条件对照只快约 1 分钟（9.7 → 8.7）。Windows/macOS 的第二轮实测暖编构建步骤为 13.5/16.4 分钟，是这项优化真正的目标平台。按 2026-11-23 决定，**vendor 缓存已默认启用**，其 Windows/macOS 净收益由默认启用后的 PR 与夜跑数据继续确认。
 - **冷编不受开关影响**：22.6 分钟（关）对 22.0 分钟（开），符合“只影响恢复路径”的预期。
 - **同分支归档已可跨 commit 复用**：`45129303833`（新探针提交）仍从同分支早先的 run 取到了 Cargo 依赖归档（键不含源码），说明归档键不含源码是可行的。
 - **受信任默认分支路径已端到端验证**：在没有任何本分支归档的 `qa/trusted-cache-probe` 上，`45131100717` 的日志记录 `Found qa-cargo-dependencies-v1-...-72f90c... in trusted workflow run 45124668225 (workflow_dispatch on main)`；没有归档时回退冷编（`45118200487` 的 `No retained artifact ... on trusted main`）。来源校验（默认分支、completed、非当前 run、同一 workflow）在两次运行中都按预期过滤。
@@ -156,7 +158,7 @@
 - 夜间策略由 workflow env `QA_NIGHTLY_SAMPLE_PERCENT=100` 或 `nightly_policy=false` 关闭；恢复三端全量只需派发时把策略关掉。
 - Windows 门控由 `QA_WINDOWS_NIGHTS`（默认 `fri,sat,sun`）控制，设为全周即恢复现状。
 - 受信任归档与本分支归档互不影响，查找失败自动回退；删除该 step 即恢复。
-- vendor 实验由 `QA_VENDOR_CACHE` 控制，默认关闭；关闭后归档键与当前完全一致。
+- vendor 实验由 `QA_VENDOR_CACHE` 控制，默认启用；派发 `vendor_cache=false`（或清空该变量）即回到旧行为，归档键也随之回到旧值。
 
 ## 10. 改动清单
 
