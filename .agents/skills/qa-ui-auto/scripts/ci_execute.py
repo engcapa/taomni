@@ -159,6 +159,8 @@ def main():
             config = {"app": {"base_url": "http://127.0.0.1:5000", "mode": entry["mode"]},
                       "worker": {"parallel": 1 if serial else entry.get("workers", 2)},
                       "report": {"dir": str(args.report), "keep_runs": 0}}
+            if installation := manifest.get("module_profile"):
+                config["module_profile"] = installation
             if entry["mode"] == "native" and manifest.get("modular_rdp_p95") is True:
                 config["rdp"] = {"modular_p95": True}
             if entry["mode"] == "native" and os.environ.get("QA_WORKSPACE_STAGE_TRACE") == "1":

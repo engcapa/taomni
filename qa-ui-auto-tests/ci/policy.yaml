@@ -32,7 +32,10 @@ smoke:
 - TC-FILE-OPEN-004
 - TC-FILE-OPEN-005
 - TC-FILE-OPEN-006
+- TC-FILE-OPEN-047
 unavailable: {}
+requires_plugin:
+  TC-FILE-OPEN-047: mail
 # Opt-in fixtures need a credential a hosted runner intentionally does not hold.
 # When none of the listed variables is set at plan time the fixture's cases are
 # recorded as declared capability gaps instead of running and skipping, which
@@ -172,6 +175,7 @@ cases:
 - TC-FILE-OPEN-044
 - TC-FILE-OPEN-045
 - TC-FILE-OPEN-046
+- TC-FILE-OPEN-047
 - TC-WS-098
 - TC-WS-099
 - TC-WS-100

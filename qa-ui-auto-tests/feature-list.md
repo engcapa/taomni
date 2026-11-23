@@ -16615,6 +16615,9 @@ File Explorer 是 Sessions 下方的独立工作区，Tools 面板不再提供�
 
 ## 全局文件打开 / 预览 / 编辑
 
+TC-FILE-OPEN-006 检查工作区入口去重和全局文件设置。TC-FILE-OPEN-047
+检查 Mail 附件的只读副本、去重和最终关闭清理，并在完整模块回归中使用已启用的 Mail。
+
 <!-- feature
 id: F-FILEOPEN-1
 title: Global File Opening and Shared Viewers

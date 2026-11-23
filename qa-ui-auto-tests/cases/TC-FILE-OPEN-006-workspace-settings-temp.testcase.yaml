@@ -1,29 +1,22 @@
 id: TC-FILE-OPEN-006
-title: Workspace file entries dedupe, global settings persist and mail temps stay read-only then release
-description: AC18/19/20. Real project-tree context menu opens a workspace viewer, normal tree entry and second explicit action
-  reuse it. Settings use actual controls and persist across reload. Mail attachment downloads through real native IMAP (browser
-  stub is VFS-only), dedupes the controlled copy and releases its exact observed temp path after final host close. SFTP cancellation/resume
-  and AI/ terminal/Git UI entries are supported by focused unit tests but not exercised here; do not claim complete entry-matrix
-  runtime coverage.
+title: Workspace file entries dedupe and global settings persist
+description: Project-tree context menu opens a workspace viewer and the second explicit action reuses it.
+  Global file-opening Settings use actual controls and persist across reload.
 modes:
 - browser
 - native
 covers:
 - F-FILEOPEN-1
 - F-EXPLORER-1
-- F-MAIL-5
 tags:
 - p0
 - file-open
 - workspace
 - settings
-- mail
-- temporary-file
 - crash-regression
 fixtures:
 - reset_db
 - file_open_files
-- file_open_mail
 timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
@@ -154,59 +147,8 @@ steps:
 - assert_localstorage:
     key: taomni.fileOpen.preferences.v1
     contains: '"associations":{}'
-- click: '[data-testid="side-tab-sessions"]'
-- click: '[data-testid="side-tab-sessions"]'
-- fill:
-    selector: '[data-testid="qc-input"]'
-    value: ${fixture.mail_quick_connect}
-- click: '[data-testid="qc-submit"]'
-- wait_for: '[data-testid="mail-client-tab"]'
-- wait_for:
-    selector: '[data-testid="mail-message-row"][data-subject="Account-level AI policy"]'
-    timeout_sec: 60
-- click: '[data-testid="mail-message-row"][data-subject="Account-level AI policy"]'
-- wait_for: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
-- dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
-- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
-- wait_for: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-editor"] .cm-line'
-- assert_text:
-    selector: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-editor"] .cm-content'
-    contains: Mail attachment read-only fixture.
-- assert_visible: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-readonly"]'
-- assert_disabled: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-save"]'
-- assert_attribute:
-    selector: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-editor"] .cm-content'
-    name: contenteditable
-    equals: 'false'
-- assert_items:
-    selector: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-editor"] .cm-line'
-    equals:
-    - Mail attachment read-only fixture.
-    - Save locally before editing.
-    - ''
-- assert_file_open_bytes:
-    selector: '[data-testid="file-viewer"][data-readonly="true"]'
-    remember: mail-copy
-    equals: 'Mail attachment read-only fixture.
-
-      Save locally before editing.
-
-      '
-- click: '[data-testid="tab-item"][data-tab-type="mail"]'
-- dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
-- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
-- assert_count:
-    selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
-    equal: 1
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
-- wait_for:
-    selector: '[data-testid="file-viewer"][data-readonly="true"]'
-    state: detached
-- assert_file_open_bytes:
-    remember: mail-copy
-    absent: true
 - assert_no_runtime_errors: null
-- screenshot: global-settings-mail-temp-closed.png
+- screenshot: global-file-settings-reset.png
 verification:
   review: reviewed
   requirements:
@@ -275,39 +217,6 @@ verification:
     - 55
     - 56
     - 57
-  - id: R3
-    requirement: Mail opens one controlled read-only copy and final-host close deletes only that observed temporary artifact.
-    actions:
-    - 60
-    - 61
-    - 64
-    - 66
-    - 74
-    - 75
-    - 78
-    checkpoints:
-    - step: 70
-      expectation: Remote copy cannot Save in place.
-    - step: 71
-      expectation: CodeMirror is genuinely non-editable.
-    - step: 72
-      expectation: Downloaded text is exact.
-    - step: 73
-      expectation: Independent VFS/native bytes match downloaded attachment and controlled path is retained.
-    - step: 77
-      expectation: Reopening the same attachment reuses one main viewer.
-    - step: 80
-      expectation: Closing the final host removes its observed controlled temp file.
-    - step: 81
-      expectation: Shared scope/settings/temp lifecycle has no uncaught runtime errors.
-    results:
-    - 70
-    - 71
-    - 72
-    - 73
-    - 77
-    - 80
-    - 81
   - id: R4
     requirement: HTML proxy mode has app/custom/none choices, custom panel is feature-local, and none persists across reload
       without opening network by default.
@@ -336,9 +245,6 @@ verification:
     method: manual
     reason: Controls are real and unit-tested bilingually; pixel/layout review remains unrun.
   native:
-  - check: IMAP attachment download, read-only host and temp cleanup
-    method: automated
-    reason: Native mode uses local real IMAP and independent host reads/removal observation.
   - check: SFTP cancel/resume, AI/terminal/Git entries, Save-as-local and OS system handler
     method: manual
     reason: Focused unit tests support implementation; six-case runtime matrix does not yet execute these separate entry workflows.

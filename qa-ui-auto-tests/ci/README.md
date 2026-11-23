@@ -25,6 +25,18 @@ Mail and restarting. The shard saves the catalog digest, package provenance,
 HTTP requests, active pointers and retained sessions. The regular focused run
 uses the signed Hello/MFA fixture.
 
+For the modular release crash regressions, select `scope=selected`,
+`tags=crash-regression`, `modes=browser,native` and `native_release=true`.
+Run the same source with `module_profile=core-only` and
+`module_profile=full`. Supply `first_release_run` for the full native profile.
+The selection lists the cases that require a plugin in the core-only profile.
+The browser cases use the matching preview registry. Each full native shard
+installs the signed release packages with the product verifier, restores that
+fresh registry after the per-case reset, and checks the enabled versions before
+the case starts. Summary and runner receipts bind the observed versions and the
+package digests to the case results. These paths share the signed-Mail QA build
+recipe. Use the installed package workflow for the actual release-binary inventory.
+
 The modular refactor also uses `qa-modular-upgrade.yml` with an exact `head`.
 It runs the shared capture library checks for the four release targets, real
 X11 capture source tests, and the production host adapter against a real hello

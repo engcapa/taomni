@@ -40,9 +40,14 @@ on:
         type: number
         default: 2
       first_release_run:
-        description: Release Bundle run supplying the frozen business roster for TC-MODULES-040
+        description: Release Bundle run supplying the frozen business roster for TC-MODULES-040 or the full native crash profile
         type: string
         default: ''
+      module_profile:
+        description: Installation state for a selected crash-regression run
+        type: choice
+        options: [default, core-only, full]
+        default: default
       native_release:
         description: Use release QA builds for selected native cases (reuse full-run caches)
         type: boolean
@@ -84,6 +89,7 @@ on:
       shards: {type: string, default: auto}
       browser_workers: {type: number, default: 2}
       first_release_run: {type: string, default: ''}
+      module_profile: {type: string, default: default}
       native_release: {type: boolean, default: false}
       modular_rdp_p95: {type: boolean, default: false}
       workspace_stage_trace: {type: boolean, default: false}
@@ -295,6 +301,7 @@ jobs:
           QA_BROWSER_WORKERS: ${{ inputs.browser_workers }}
           QA_CASE_IDS: ${{ inputs.case_ids }}
           QA_FIRST_RELEASE_RUN: ${{ inputs.first_release_run }}
+          QA_MODULE_PROFILE: ${{ inputs.module_profile }}
           QA_FEATURES: ${{ inputs.features }}
           # New feature PRs and focused runs always include the packaged crash
           # suite, even when their feature selectors differ.

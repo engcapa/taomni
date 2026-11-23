@@ -15,6 +15,7 @@ import yaml
 
 from .feature_catalog import load_features
 from .linux_profiles import DEFAULT_LINUX_PROFILE, LINUX_PROFILES, profile_support
+from . import module_profile
 from .provenance import execution_identity, input_digest
 from .testcase import discover
 from .verification import browser_support, native_support, plan as impact_plan
@@ -241,6 +242,25 @@ def make_plan(args, *, cases=None, features=None) -> dict:
     head = commit(args.head or "HEAD")
     if head != commit("HEAD"):
         raise ValueError("checkout the requested head before planning")
+    installation_profile = getattr(args, "module_profile", "default") or "default"
+    release_run = getattr(args, "first_release_run", "")
+    installation = {}
+    requires_plugin = {}
+    if installation_profile != "default":
+        if (installation_profile not in {"core-only", "full"}
+                or (scope, wanted_tags) != ("selected", {"crash-regression"})
+                or requested or wanted_features):
+            raise ValueError("module_profile requires selected scope with only the crash-regression tag")
+        if installation_profile == "core-only" and release_run:
+            raise ValueError("core-only profile cannot consume a signed release roster")
+        if installation_profile == "full" and "native" in modes and (not release_run.isdigit() or int(release_run) < 1):
+            raise ValueError("full native profile requires a matching Release Bundle run ID")
+        roster = module_profile.roster()
+        requires_plugin = policy.get("requires_plugin", {})
+        if set(requires_plugin) - explicit or set(requires_plugin.values()) - roster.keys():
+            raise ValueError("invalid plugin dependency in the crash-regression case catalog")
+        installation = {"name": installation_profile, "source": head, "release_run": release_run,
+                        "modules": roster if installation_profile == "full" else {}}
     changed, base, ancestor, impact = [], None, None, None
     reasons = {cid: ["explicit selector"] for cid in explicit}
     if scope == "impacted":
@@ -290,6 +310,10 @@ def make_plan(args, *, cases=None, features=None) -> dict:
                     if mode not in case.modes:
                         not_applicable.append({"case": cid, **combination,
                                                "reason": "case does not declare this mode"})
+                        continue
+                    if installation_profile == "core-only" and cid in requires_plugin:
+                        not_applicable.append({"case": cid, **combination, "requires_plugin": requires_plugin[cid],
+                                               "reason": "requires a module installed only in the full profile"})
                         continue
                     reason = native_support(case, target) if mode == "native" else browser_support(case, target)
                     if reason:
@@ -368,18 +392,25 @@ def make_plan(args, *, cases=None, features=None) -> dict:
     # literal case IDs remain strict so a mistyped/unsupported request fails.
     mode_inapplicable = {cid for cid in explicit - requested
                          if not set(by_id[cid].modes).intersection(modes)}
-    unreachable = explicit - reachable - mode_inapplicable
+    profile_inapplicable = requires_plugin.keys() if installation_profile == "core-only" else set()
+    unreachable = explicit - reachable - mode_inapplicable - profile_inapplicable
     if unreachable:
         raise ValueError(f"explicit cases unavailable in requested combinations: {sorted(unreachable)}")
     if not entries and scope != "impacted":
         raise ValueError("selection contains no runnable cases")
     from .ci_sharding import schedule
     entries, groups, builds = schedule(entries, by_id, dependencies, scope=scope,
-        shards=getattr(args, "shards", "auto"), browser_workers=getattr(args, "browser_workers", 2))
+        shards=getattr(args, "shards", "auto"), browser_workers=getattr(args, "browser_workers", 2),
+        use_signed_mail=bool(installation))
+    if installation_profile == "full":
+        for entry in entries:
+            if entry["mode"] == "native":
+                entry["capabilities"].append("full-module-profile")
     return {"schema": "qa-ui-auto.ci-selection.v1", "groups": groups, "builds": builds, "head": head, "base": base,
             "linux_profiles": linux_profiles, "macos_runner": macos_runner,
             "native_release": bool(getattr(args, "native_release", False)),
             "modular_rdp_p95": bool(getattr(args, "modular_rdp_p95", False)),
+            **({"module_profile": installation} if installation else {}),
             "merge_base": ancestor, "scope": scope, "changed_paths": changed,
             "identity": execution_identity(Path.cwd()), "reasons": reasons, "impact": impact,
             "entries": entries, "gaps": gaps, "no_relevant_changes": not entries,
@@ -482,6 +513,8 @@ def aggregate(manifest: dict, root: Path) -> dict:
                     cid = case["id"]
                     if case.get("case_sha256") != entry["case_digests"][cid]:
                         raise ValueError(f"case identity mismatch: {cid}")
+                    if manifest.get("module_profile"):
+                        module_profile.verify_receipt(manifest["module_profile"], entry["mode"], case.get("module_profile"))
                     totals[case["status"]] += 1
                     if case["status"] != "passed":
                         message = (case.get("failure") or {}).get("message") or case.get("fixtures_skipped") or case["status"]
@@ -540,7 +573,8 @@ def main(argv=None):
     for name, default in [("scope", "smoke"), ("head", ""), ("base", ""),
                           ("platforms", ""), ("modes", ""),
                           ("linux_profiles", DEFAULT_LINUX_PROFILE), ("macos_runner", "macos-15"), ("shards", "auto"),
-                          ("case_ids", ""), ("features", ""), ("tags", "")]:
+                          ("case_ids", ""), ("features", ""), ("tags", ""),
+                          ("module_profile", "default"), ("first_release_run", "")]:
         plan.add_argument("--" + name.replace("_", "-"), default=os.environ.get("QA_" + name.upper()) or default)
     plan.add_argument("--browser-workers", type=int, default=int(os.environ.get("QA_BROWSER_WORKERS") or 2))
     plan.add_argument("--native-release", action="store_true",
@@ -560,7 +594,7 @@ def main(argv=None):
             write_json(args.output, result)
             matrix = {"include": [{k: e[k] for k in ("id", "runner", "arch", "mode", "platform_key", "capabilities",
                                                      "linux_profile", "linux_wrapper", "cache_key", "rdp_unit_contracts", "build_id", "workers")} for e in result["entries"]]}
-            if os.environ.get("QA_FIRST_RELEASE_RUN") and not any("first-upgrade-installer" in job["capabilities"] for job in matrix["include"]):
+            if args.first_release_run and args.module_profile != "full" and not any("first-upgrade-installer" in job["capabilities"] for job in matrix["include"]):
                 raise ValueError("first_release_run requires the native first-upgrade case TC-MODULES-040")
             github_output("matrix", json.dumps(matrix, separators=(",", ":")))
             for mode in ("browser", "native"):

@@ -25,6 +25,35 @@ def args(**overrides):
         'case_ids': '', 'features': '', 'tags': '', 'shards': '1'} | overrides))
 
 
+class ModuleProfileSelectionTests(unittest.TestCase):
+    def test_both_installation_states_preserve_applicable_crash_cases(self):
+        options = dict(scope="selected", tags="crash-regression", native_release=True, shards="3")
+        core = make_plan(args(**options, module_profile="core-only"))
+        full = make_plan(args(**options, module_profile="full", first_release_run="123"))
+        self.assertEqual(core["module_profile"]["modules"], {})
+        self.assertEqual(len(full["module_profile"]["modules"]), 10)
+        self.assertEqual(core["gaps"], [])
+        self.assertEqual(full["gaps"], [])
+        self.assertEqual([b["id"] for b in core["builds"]], [b["id"] for b in full["builds"]])
+        self.assertTrue(all(b["id"].endswith("-release-signed-mail") for b in full["builds"]))
+        excludes = [entry for entry in core["not_applicable"] if "requires_plugin" in entry]
+        self.assertEqual(len(excludes), 6)
+        self.assertTrue(all(e["case"] == "TC-FILE-OPEN-047" and e["requires_plugin"] == "mail" for e in excludes))
+        core_modes = {(e["mode"], e["platform_key"], case) for e in core["entries"] for case in e["selected_ids"]}
+        full_modes = {(e["mode"], e["platform_key"], case) for e in full["entries"] for case in e["selected_ids"]}
+        self.assertEqual(full_modes - core_modes,
+                         {("browser", "linux", "TC-FILE-OPEN-047"), ("native", "linux", "TC-FILE-OPEN-047"),
+                          ("browser", "windows", "TC-FILE-OPEN-047"), ("native", "windows", "TC-FILE-OPEN-047"),
+                          ("browser", "macos", "TC-FILE-OPEN-047"), ("native", "macos", "TC-FILE-OPEN-047")})
+        for entry in full["entries"]:
+            self.assertEqual("full-module-profile" in entry["capabilities"], entry["mode"] == "native")
+            self.assertNotIn("legacy-mail-imap", entry["capabilities"])
+
+    def test_full_native_profile_requires_a_release_producer(self):
+        with self.assertRaisesRegex(ValueError, "matching Release Bundle run ID"):
+            make_plan(args(scope="selected", tags="crash-regression", module_profile="full"))
+
+
 class MacosRunnerSelectionTests(unittest.TestCase):
     def test_macos_26_arm64_recovery_keeps_cases_crash_selection_and_release_architecture(self):
         selected = dict(scope="selected", platforms="macos", modes="native",
@@ -157,7 +186,7 @@ class SelectionTests(unittest.TestCase):
                     'TC-WS-052', 'TC-WS-053', 'TC-WS-054', 'TC-WS-056', 'TC-WS-057', 'TC-MOBILE-013',
                     'TC-FILE-OPEN-002', 'TC-FILE-OPEN-003', 'TC-FILE-OPEN-005', 'TC-FILE-OPEN-006',
                     'TC-FILE-OPEN-007', 'TC-FILE-OPEN-008', 'TC-FILE-OPEN-009', 'TC-FILE-OPEN-010', 'TC-FILE-OPEN-011', 'TC-FILE-OPEN-012',
-                    'TC-FILE-OPEN-013', 'TC-TAO-HOME-002', 'TC-EXPLORER-013', 'TC-FILE-OPEN-041'}
+                    'TC-FILE-OPEN-013', 'TC-TAO-HOME-002', 'TC-EXPLORER-013', 'TC-FILE-OPEN-041', 'TC-FILE-OPEN-047'}
         for entry in native:
             with self.subTest(profile=entry['linux_profile']):
                 self.assertEqual(set(entry['selected_ids']), expected)

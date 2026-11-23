@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { invokePlugin } from "./plugin";
+import { setCrashRegressionModuleProfile } from "../modulePreview";
+import type { PluginRecord } from "../../lib/pluginRegistry";
+import frozenRoster from "../../../src-tauri/plugins/legacy-upgrade.json";
 import type { LegacyInstallSnapshot, MigrationExecutionResult } from "../../lib/ipc/plugin";
 
 beforeEach(() => localStorage.clear());
@@ -16,6 +19,23 @@ describe("browser plugin boundary", () => {
   it("never returns a fake success for unsupported lifecycle commands", async () => {
     await expect(invokePlugin("plugin_set_enabled")).rejects.toThrow("requires the desktop app");
     expect(await invokePlugin("plugin_cancel_request")).toBe(false);
+  });
+
+  it("loads the complete crash-regression roster and clears it in the core profile", async () => {
+    const manifests = import.meta.glob<{ default: { slug: string; version: string } }>(
+      "../../../src-tauri/plugins/*/module.json", { eager: true },
+    );
+    const versions = Object.fromEntries(frozenRoster.map((id) => {
+      const slug = id.replace("taomni-plugin-", "");
+      return [slug, manifests[`../../../src-tauri/plugins/${slug}/module.json`].default.version];
+    }));
+    setCrashRegressionModuleProfile(versions);
+    const records = await invokePlugin<PluginRecord[]>("plugin_list");
+    expect(records).toHaveLength(frozenRoster.length);
+    expect(Object.fromEntries(records.map(({ manifest }) => [manifest.slug, manifest.version]))).toEqual(versions);
+    expect(records.every(({ lifecycle }) => lifecycle === "enabled")).toBe(true);
+    setCrashRegressionModuleProfile({});
+    expect(await invokePlugin("plugin_list")).toEqual([]);
   });
 });
 

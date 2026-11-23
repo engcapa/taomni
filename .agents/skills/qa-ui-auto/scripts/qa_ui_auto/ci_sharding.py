@@ -59,7 +59,8 @@ def split_signed_mail(entry, by_id, dependencies, capabilities):
     return variants
 
 
-def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_workers=2, costs=None):
+def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_workers=2, costs=None,
+             use_signed_mail=False):
     from .ci import capabilities
     if shards != 'auto' and (not str(shards).isdigit() or not 1 <= int(shards) <= 8):
         raise ValueError('shards must be auto or an integer from 1 to 8')
@@ -133,6 +134,9 @@ def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_work
             shard['signed_mail_build'] = scope == 'selected' and (
                 'signed-mail' in entry['capabilities'] and 'legacy-mail-imap' not in entry['capabilities']
             )
+            if use_signed_mail and entry['mode'] == 'native':
+                shard['capabilities'] = [cap for cap in shard['capabilities'] if cap != 'legacy-mail-imap']
+                shard['signed_mail_build'] = True
             shard['case_digests'] = {cid: entry['case_digests'][cid] for cid in assigned}
             shard['rdp_unit_contracts'] = entry['rdp_unit_contracts'] and index == 0
             scheduled.append(shard)
@@ -160,6 +164,8 @@ def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_work
                                    linux_wrapper='', desktop={}, cache_key='ubuntu-22.04-x11')
         build = builds[key]
         build['capabilities'] = sorted(set(build['capabilities']) | set(entry['capabilities']))
+        if use_signed_mail:
+            build['capabilities'] = sorted(set(build['capabilities']) | {'signed-mail'})
         build['rdp_unit_contracts'] |= entry['rdp_unit_contracts']
     return scheduled, groups, list(builds.values())
 

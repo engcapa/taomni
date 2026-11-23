@@ -24,11 +24,22 @@
 | TC-FILE-OPEN-003 | SVG 净化和代码/渲染/分栏切换、原始源码保存 | browser/native |
 | TC-FILE-OPEN-004 | Markdown 实时/源码/分栏、表格/图片粘贴/操作与导出生命周期 | browser |
 | TC-FILE-OPEN-005 | HTML 协议与本地资源、隔离/网络策略、设备/源码/控制台生命周期 | browser/native |
-| TC-FILE-OPEN-006 | 工作区/全局设置切换、邮件只读副本去重与关闭清理 | browser/native |
+| TC-FILE-OPEN-006 | 工作区文件入口去重、全局文件设置持久化与恢复默认 | browser/native |
+| TC-FILE-OPEN-007 | Native Markdown 粘贴系统图片、真实导出、取消和占位符保留源码 | native |
+| TC-FILE-OPEN-008 | AI 路径、Git 预览、SFTP 和终端链接走共享文件打开入口 | browser/native |
+| TC-FILE-OPEN-009 | Native HTML 预览代理、路径隔离与关闭取消 | native |
+| TC-FILE-OPEN-010 | HTML 沙箱外链确认和脚本策略 | browser/native |
+| TC-FILE-OPEN-011 | 原生本地终端通过修饰键点击打开并去重真实文件 | native |
+| TC-FILE-OPEN-012 | 光栅图像变换、剪贴板像素、相邻文件导航和大小限制 | browser/native |
 | TC-FILE-OPEN-013 | Markdown Live 默认只读、显式编辑、split 实际拖拽、独立 Mermaid 主题与目录选项；切换后正文保持 | browser/native |
 | TC-EXPLORER-013 | 新建 Markdown/HTML/SVG/JSON/TypeScript，进入实际编辑器、保存与关闭重开；独立文件字节和代码工作区 reload 恢复 | browser/native |
 | TC-FILE-OPEN-041 | Live 表格格式与 Split 一致，源码编辑、Tab、Undo 和 Redo 后格式及邻居保留，覆盖完整 GFM 保存重开、受控图片及 HTML 清理 | browser/native |
+| TC-FILE-OPEN-047 | Mail 附件只读打开、实际文件内容、去重和最终关闭清理，依赖 Mail 模块 | browser/native |
 | TC-TAO-HOME-002 | Tao Messages 原生 IPC、慢流停止后的真实网络关闭、多轮顺序、reload 历史及三种代理路径 | native/release |
+
+模块化发布在 GitHub Runner 执行核心和完整模块两套集合。核心集合的
+`not_applicable` 记录依赖外部模块的用例。Mobile 位于基座，两个集合均执行
+TC-MOBILE-012 和 TC-MOBILE-013。工作流输入见 [Hosted QA](README.md#trigger-and-select)。
 
 本地使用隔离的 QA 配置和测试桌面，不清理个人配置。保持 native 串行、全部本地测试 worker 总数不超过 2。下列命令应通过 `background_job.py` 启动，native 使用匹配当前源码的 QA release 二进制：
 
