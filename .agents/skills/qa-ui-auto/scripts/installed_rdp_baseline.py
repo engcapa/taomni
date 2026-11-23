@@ -1,7 +1,9 @@
 """Run the existing RDP performance case against a verified installed Linux build."""
+import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from zipfile import ZipFile
 
 from modular_bundle_inventory import digest, write_json
 from qa_ui_auto.config import resolve
@@ -24,6 +26,11 @@ def install_signed_server(steps, origin, profile, source):
     signature = archive.with_name(receipt["signature"])
     if receipt["sourceSha"] != source or digest(archive) != receipt["sha256"]:
         raise RuntimeError("The RDP Server package does not match the installed core source")
+
+    with ZipFile(archive) as package:
+        signed_host = json.loads(package.read("module.json"))["entry"]["host"]
+        with package.open(signed_host) as binary:
+            host_digest = hashlib.file_digest(binary, "sha256").hexdigest()
 
     desktop_action(steps, "wait_for", element("status-bar"))
     desktop_action(steps, "click", element("ribbon-settings"))
@@ -53,10 +60,14 @@ def install_signed_server(steps, origin, profile, source):
         raise RuntimeError("The performance profile selected a different RDP Server version")
     installed = module / "versions" / version
     manifest = json.loads((installed / "module.json").read_text(encoding="utf-8"))
-    executable = (installed / manifest["entry"]["host"]).resolve(strict=True)
-    if not executable.is_relative_to(installed.resolve()) or digest(executable) != receipt["hostSha256"]:
+    if manifest["entry"]["host"] != signed_host:
+        raise RuntimeError("The installed RDP Server manifest selected a different host")
+    executable = (installed / signed_host).resolve(strict=True)
+    if not executable.is_relative_to(installed.resolve()) or digest(executable) != host_digest:
         raise RuntimeError("The performance profile selected different RDP Server host bytes")
-    return {key: receipt[key] for key in ("sourceSha", "platform", "version", "sha256", "hostSha256")}
+    result = {key: receipt[key] for key in ("sourceSha", "platform", "version", "sha256")}
+    result["hostSha256"] = host_digest
+    return result
 
 
 def measure(candidate, probe, source, work, report, *, origin=None):
