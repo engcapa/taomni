@@ -17,9 +17,11 @@ export function ViewerCloseDialog() {
   const dialog = useRef<HTMLDivElement>(null);
   useFocusReturn(!!request);
   const cancel = () => { useDocumentStore.setState({ closeRequest: undefined }); request?.cancel?.(); };
+  // A new close prompt starts clean; persistence/busy updates below must not
+  // wipe an actionable keep-draft/Save failure that is being shown.
+  useEffect(() => { if (request) setError(null); }, [request]);
   useEffect(() => {
     if (!request) return;
-    setError(null);
     const listener = (event: KeyboardEvent) => {
       if (event.isComposing) return;
       if (event.key === "Escape" && !busy) { event.preventDefault(); event.stopPropagation(); cancel(); }
@@ -37,16 +39,30 @@ export function ViewerCloseDialog() {
   const finish = () => { useDocumentStore.setState({ closeRequest: undefined }); request.proceed(); };
   const keepDraft = () => {
     // Persist the recovery copy before the close callback releases the viewer.
-    // This intentionally keeps the on-disk file untouched and lets the next
-    // cold start restore the same dirty document.
-    useDocumentStore.getState().flushDrafts();
-    finish();
+    // Small buffers go to localStorage, oversized/unstorable buffers to the
+    // native Notepad disk snapshot; a real failure keeps the tab open with an
+    // actionable error instead of silently dropping the unsaved content.
+    setBusy(true);
+    setError(null);
+    void (async () => {
+      try {
+        await useDocumentStore.getState().persistRecoveryDrafts(request.paths);
+        finish();
+      } catch (failure) {
+        setError(label(
+          `草稿保存失败：${String(failure)}。文件未关闭，请重试，或取消后手动保存文件。`,
+          `Draft could not be saved: ${String(failure)}. The file was not closed; retry, or cancel and save the file manually.`,
+        ));
+      } finally {
+        setBusy(false);
+      }
+    })();
   };
   return createPortal(<div className="fv fv-global-dialog"><div className="fv-modal-bg"><div ref={dialog} className="fv-modal" role="dialog" aria-modal="true" aria-label={label("保存更改", "Save changes")} data-testid="viewer-close-dialog">
     <h3>{label("保存未保存的更改？", "Save unsaved changes?")}</h3>
     <p>{request.paths.map((path) => <span style={{ display: "block" }} key={path}>{path}</span>)}</p>
     {request.paths.some((path) => useDocumentStore.getState().documents[documentPathKey(path)]?.external) && <p>{label("磁盘版本已更改。取消关闭后可在文件横幅比较差异、重新加载或保留我的版本。", "The disk version changed. Cancel closing to compare, reload or keep your version in the file banner.")}</p>}
-    {error && <p role="alert">{error}</p>}
+    {error && <p role="alert" data-testid="viewer-close-error">{error}</p>}
     <footer><button className="fv-button outline" data-testid="viewer-close-cancel" disabled={busy} onClick={cancel}>{label("取消", "Cancel")}</button><button className="fv-button" data-testid="viewer-close-discard" disabled={busy} onClick={() => { request.paths.forEach((path) => useDocumentStore.getState().discard(path)); finish(); }}>{label("不保存", "Discard")}</button><button className="fv-button outline" data-testid="viewer-close-keep-draft" disabled={busy} onClick={keepDraft}>{label("保留草稿", "Keep draft")}</button><button autoFocus className="fv-button primary" data-testid="viewer-close-save" disabled={busy} onClick={() => { setBusy(true); setError(null); void (async () => { try { for (const path of request.paths) await useDocumentStore.getState().save(path); finish(); } catch (failure) { setError(String(failure)); } finally { setBusy(false); } })(); }}>{label("保存", "Save")}</button></footer>
   </div></div></div>, document.body);
 }

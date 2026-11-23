@@ -20,6 +20,23 @@ export function readViewerDrafts(): Record<string, ViewerDraft> {
   } catch { return {}; }
 }
 
+/** Drop stale localStorage entries so a fresh native snapshot is not shadowed on restore. */
+export function removeViewerDraftEntries(keys: Iterable<string>): void {
+  try {
+    const drafts = readViewerDrafts();
+    let removed = false;
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(drafts, key)) {
+        delete drafts[key];
+        removed = true;
+      }
+    }
+    if (removed) localStorage.setItem(VIEWER_DRAFTS_KEY, JSON.stringify(drafts));
+  } catch {
+    // Storage unavailable: the native snapshot still remains the freshest copy.
+  }
+}
+
 export function writeViewerDrafts(documents: Record<string, ViewerDocument>): void {
   const drafts = readViewerDrafts();
   const now = Date.now();
