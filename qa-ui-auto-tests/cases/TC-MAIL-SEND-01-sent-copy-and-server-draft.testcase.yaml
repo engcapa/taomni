@@ -10,7 +10,8 @@ description: 'TASK-06 (docs-feature/mail-thunderbird-parity-design.md AC-20/AC-2
 
   server model; native mode uses the fake IMAP/SMTP server and the real
 
-  lettre + IMAP APPEND path.
+  SMTP and IMAP APPEND path. The accepted recipient is available when composing
+  another message.
 
   '
 covers:
@@ -46,7 +47,7 @@ steps:
 - wait_for: '[data-testid="mail-compose-dialog"]'
 - fill:
     selector: '[data-testid="mail-recipient-to"] input'
-    value: receiver@example.com
+    value: qa-sent-contact@example.org
 - press: Enter
 - fill:
     selector: '[data-testid="mail-compose-subject"]'
@@ -128,6 +129,15 @@ steps:
       ?? '').includes('Stored on the server for other clients')
     expect_truthy: true
     timeout_sec: 30
+- assert_no_runtime_errors: null
+- click: '[data-testid="mail-client-tab"] [data-testid="mail-compose-open"]'
+- fill: {selector: '[data-testid="mail-recipient-to"] input', value: qa-sent-cont}
+- assert_text:
+    selector: '[data-testid="mail-recipient-suggestions"]'
+    contains: qa-sent-contact@example.org
+    timeout_sec: 20
+- click: '[role="dialog"][aria-label="New message"] [aria-label="Close dialog"]'
+- wait_for: {selector: '[data-testid="mail-compose-dialog"]', state: detached}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -216,6 +226,14 @@ verification:
     - {step: 45, expectation: The server no longer lists the discarded draft.}
     - {step: 46, expectation: The deleted draft leaves the local list.}
     results: [20, 38, 45, 46]
+  - id: R5
+    requirement: Sending makes the accepted recipient available in a new composer.
+    actions: [22, 55, 56, 58]
+    checkpoints:
+    - {step: 57, expectation: A partial address locates the recipient of the delivered message.}
+    - {step: 59, expectation: Closing the new composer leaves the mailbox ready.}
+    - {step: 60, expectation: Reopening and closing the composer leaves no runtime errors.}
+    results: [57, 59, 60]
   visual:
   - check: 截图中状态栏显示已保存 Sent 副本，写信窗口已关闭。
     method: manual

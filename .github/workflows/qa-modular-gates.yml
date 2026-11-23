@@ -110,8 +110,6 @@ jobs:
             cargo tree --manifest-path src-tauri/Cargo.toml --locked -p taomni --edges normal,build --prefix none \
               --target "$target" > "gate-inventory/cargo-tree-$target.txt"
             cargo tree --manifest-path src-tauri/Cargo.toml --locked -p taomni --edges normal,build --prefix none \
-              --target "$target" --invert lettre --format '{p} {f}' > "gate-inventory/mail-compose-features-$target.txt"
-            cargo tree --manifest-path src-tauri/Cargo.toml --locked -p taomni --edges normal,build --prefix none \
               --target "$target" --invert taomni-mail-engine --format '{p} {f}' > "gate-inventory/mail-engine-features-$target.txt"
           done
           git ls-files src-tauri/resources > gate-inventory/resource-sources.txt
@@ -158,17 +156,10 @@ jobs:
               assert "taomni-mfa-api" in packages, f"{target}: missing the shared MFA contract"
               assert not packages.intersection({"taomni-mfa-engine", "taomni-plugin-mfa", "quircs"}), f"{target}: the core depends on the MFA engine or decoder"
               assert "taomni-mail-api" in packages, f"{target}: missing the shared Mail contract"
-              assert not packages.intersection({"imap", "imap-proto", "taomni-plugin-mail"}), f"{target}: the core depends on the Mail IMAP transport or host"
+              assert not packages.intersection({"imap", "imap-proto", "lettre", "taomni-plugin-mail"}), f"{target}: the core depends on the Mail IMAP or SMTP runtime or host"
               mail_engine = Path(f"gate-inventory/mail-engine-features-{target}.txt").read_text()
               engine_features = [line.split()[2:] for line in mail_engine.splitlines() if line.startswith("taomni-mail-engine ")]
               assert all("pop3-runtime" not in ",".join(features).split(",") for features in engine_features), f"{target}: the core includes the desktop POP3 transport"
-              mail_features = Path(f"gate-inventory/mail-compose-features-{target}.txt").read_text()
-              lettre = [line.split()[2:] for line in mail_features.splitlines() if line.startswith("lettre ")]
-              # Earlier signed Mail packages accept prebuilt bytes. The core
-              # keeps the builder for that compatibility path.
-              assert all(set(",".join(features).split(",")) - {""} <= {"builder"} for features in lettre), (
-                  f"{target}: the core links Lettre features beyond the compatible MIME builder"
-              )
           resources = json.loads(Path("src-tauri/tauri.windows.conf.json").read_text())["bundle"]["resources"]
           assert all("resources/vnc/" not in entry for entry in resources), "Core declares VNC module resources"
           PY

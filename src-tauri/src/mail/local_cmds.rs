@@ -14,7 +14,7 @@ use super::{
     MailAccountConfig, MailDeleteResult, MailDownloadAttachmentResult, MailFlagResult, MailFolder,
     MailMarkReadResult, MailMessageBody, MailMoveResult, MailSendRequest, MailSendResult,
     MailSyncAllResult, MailTestConnectionResult, MessageBuildOptions, extract_attachment, now_ts,
-    pop3_store, resolve_config, upsert_sent_contacts,
+    pop3_store, resolve_config,
 };
 use crate::state::AppState;
 
@@ -483,37 +483,33 @@ pub(super) async fn send(
                     .pop3_owner_gate(&account_id)
                     .lock_owned()
                     .await;
-                let stored: Result<usize, String> =
-                    match pop3_store::is_hosted(state, &account_id).await {
-                        Ok(true) => {
-                            let sent_recipients = request
-                                .to
-                                .into_iter()
-                                .chain(request.cc)
-                                .chain(request.bcc)
-                                .collect();
-                            pop3_store::hosted(
-                                state,
-                                &account_id,
-                                LocalMailboxAction::Append {
-                                    folder: "Sent".into(),
-                                    originals: vec![bytes],
-                                    sent_recipients,
-                                },
-                            )
-                            .await
-                        }
-                        Ok(false) => {
-                            super::with_mail_db_async(state, &account_id, move |db, account| {
-                                pop3::import_local_messages(db, account, "Sent", &[bytes])?;
-                                upsert_sent_contacts(db, account, &request)
-                            })
-                            .await
-                        }
-                        Err(error) => Err(error),
-                    };
+                let stored: Result<(), String> = match pop3_store::is_hosted(state, &account_id)
+                    .await
+                {
+                    Ok(true) => {
+                        let sent_recipients = request
+                            .to
+                            .into_iter()
+                            .chain(request.cc)
+                            .chain(request.bcc)
+                            .collect();
+                        pop3_store::hosted::<usize>(
+                            state,
+                            &account_id,
+                            LocalMailboxAction::Append {
+                                folder: "Sent".into(),
+                                originals: vec![bytes],
+                                sent_recipients,
+                            },
+                        )
+                        .await
+                        .map(drop)
+                    }
+                    Ok(false) => store_legacy_sent_copy(state, account_id, bytes, request).await,
+                    Err(error) => Err(error),
+                };
                 match stored {
-                    Ok(_) => result.sent_copy_folder = Some("Sent".into()),
+                    Ok(()) => result.sent_copy_folder = Some("Sent".into()),
                     Err(e) => result.sent_copy_error = Some(e),
                 }
             }
@@ -521,6 +517,30 @@ pub(super) async fn send(
         }
     }
     Ok(result)
+}
+
+async fn store_legacy_sent_copy(
+    state: &AppState,
+    account: String,
+    bytes: Vec<u8>,
+    request: MailSendRequest,
+) -> Result<(), String> {
+    let cache = state.mail_db(&account)?;
+    super::mail_db_task(cache.clone(), account.clone(), move |db, account| {
+        pop3::import_local_messages(db, account, "Sent", &[bytes]).map(drop)
+    })
+    .await?;
+    if let Err(error) = super::module_host::record_sent_contacts(
+        state.plugins.clone(),
+        cache,
+        account.clone(),
+        request,
+    )
+    .await
+    {
+        tracing::warn!(%account, %error, "mail sent; contact cache update failed");
+    }
+    Ok(())
 }
 
 /// Store raw messages (mbox/.eml import) in a local folder.

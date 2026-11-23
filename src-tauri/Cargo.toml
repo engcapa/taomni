@@ -449,7 +449,7 @@ gtk = "0.18.2"
 
 [dev-dependencies]
 imap = "2.4.1"
-taomni-mail-engine = { path = "crates/taomni-mail-engine", features = ["imap-runtime", "pop3-runtime"], default-features = false }
+taomni-mail-engine = { path = "crates/taomni-mail-engine", features = ["imap-runtime", "pop3-runtime", "mime-compose"], default-features = false }
 taomni-mfa-engine = { path = "crates/taomni-mfa-engine" }
 # Cargo enables the helper when building integration tests. Tauri enumerates
 # only enabled binary targets when it assembles a desktop installer.

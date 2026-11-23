@@ -177,7 +177,16 @@ fn sent_contacts_raise_sent_source() {
         request_read_receipt: false,
     };
 
-    assert_eq!(upsert_sent_contacts(&conn, "acct", &request).unwrap(), 1);
+    let addresses = request.to.iter().chain(&request.cc).chain(&request.bcc);
+    assert_eq!(
+        taomni_mail_engine::cache::upsert_sent_contacts(
+            &conn,
+            "acct",
+            addresses.map(String::as_str)
+        )
+        .unwrap(),
+        1
+    );
     let contacts = search_contacts(&conn, "acct", "receiver", 8).unwrap();
 
     assert_eq!(contacts.len(), 1);

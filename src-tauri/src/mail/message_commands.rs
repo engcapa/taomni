@@ -128,15 +128,13 @@ pub(super) async fn send_message(
         // returned immediately; neither cache contention nor APPEND can turn
         // an accepted message into a send error (and an unsafe SMTP retry).
         tokio::spawn(async move {
-            let cached_account_id = account_id.clone();
-            let contacts = tokio::task::spawn_blocking(move || {
-                let db = db.lock().map_err(|e| e.to_string())?;
-                init_mail_tables(&db).map_err(|e| e.to_string())?;
-                upsert_sent_contacts(&db, &cached_account_id, &sent_request)
-                    .map_err(|error| error.to_string())
-            })
-            .await
-            .unwrap_or_else(|error| Err(error.to_string()));
+            let contacts = module_host::record_sent_contacts(
+                registry.clone(),
+                db,
+                account_id.clone(),
+                sent_request,
+            )
+            .await;
             if let Err(error) = contacts {
                 tracing::warn!(%account_id, %error, "mail sent; contact cache update failed");
             }

@@ -3,8 +3,10 @@
 //! answered (or declined) only once, from any client.
 
 use serde::Serialize;
-use taomni_mail_api::pop3_store::LocalMailboxAction;
-use taomni_mail_engine::responses::{MailResponse, Receipt};
+use taomni_mail_api::{
+    pop3_store::LocalMailboxAction,
+    responses::{MailResponse, Receipt},
+};
 use tauri::State;
 
 use super::{MailAccountConfig, resolve_config};

@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-pub use taomni_mail_engine::compose::{MailSendAttachment, MailSendRequest};
+pub use taomni_mail_api::compose::{MailSendAttachment, MailSendRequest};
 pub use taomni_mail_engine::drafts::{
     MailDraft, MailDraftAttachment, MailDraftContext, MailDraftSaveRequest, MailOutboxState,
 };

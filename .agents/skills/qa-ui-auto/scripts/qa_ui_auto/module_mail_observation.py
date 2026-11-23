@@ -109,6 +109,14 @@ def run(ctx, args):
         if "mail/compose-message" not in manifest["commands"]:
             raise StepError("The installed Mail version does not assemble messages in its host")
         report["delivery"] = observe_delivery(phase)
+        if phase == "imap-delivery":
+            command = "mail/record-sent-contacts"
+            if command not in manifest["commands"]:
+                raise StepError("The signed Mail host does not record SMTP recipients")
+            report["delivery"]["sentContacts"] = {
+                "command": command,
+                **observe_sent_contact(plugins.parent / "mail-cache", "receiver@example.com"),
+            }
     if phase in {"archive-published", "archive-cleaned", "archive-original", "cache-cleared"}:
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
         command = {
@@ -309,6 +317,19 @@ def observe_delivery(phase):
             raise StepError("The IMAP Sent copy is missing the delivered body")
         report["matchingSentCopy"] = True
     return report
+
+
+def observe_sent_contact(root, email):
+    databases = sorted(root.glob("*.db"))
+    if len(databases) != 1:
+        raise StepError(f"Expected one delivery contact cache, found {len(databases)}")
+    database = databases[0]
+    ordinary(database)
+    with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as conn:
+        rows = conn.execute("SELECT sent_count FROM mail_contacts WHERE email=?", (email,)).fetchall()
+    if rows != [(1,)]:
+        raise StepError(f"The delivered recipient was not recorded exactly once in the account cache: {rows}")
+    return {"database": database.name, "email": email, "sentCount": rows[0][0]}
 
 
 def observe_filter_watermark(root):

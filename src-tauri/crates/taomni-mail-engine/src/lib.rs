@@ -5,9 +5,11 @@ pub mod archive;
 pub mod attachment_cache;
 pub mod cache;
 pub mod calendar;
+#[cfg(feature = "mime-compose")]
 pub mod compose;
 pub mod contacts;
 pub mod database;
+#[cfg(feature = "mime-compose")]
 pub mod delivery;
 pub mod draft_import;
 pub mod drafts;
@@ -39,6 +41,7 @@ pub mod mutation_journal;
 #[cfg(feature = "imap-runtime")]
 pub mod mutation_transport;
 pub mod pop3;
+#[cfg(feature = "mime-compose")]
 pub mod responses;
 pub mod search;
 #[cfg(any(feature = "legacy-smtp", feature = "routed-smtp", test))]

@@ -16,9 +16,11 @@ mod watermarks;
 
 use rusqlite::{Connection, Result as SqlResult};
 
+#[cfg(feature = "mime-compose")]
+pub use contacts::upsert_sent_contacts;
 pub use contacts::{
-    MailContactSuggestion, clean_contact_name, contact_email, escape_like, mailbox_to_contact,
-    reindex_cached_contacts, search_contacts, upsert_contact, upsert_sent_contacts,
+    MailContactSuggestion, clean_contact_name, contact_email, escape_like, reindex_cached_contacts,
+    search_contacts, upsert_contact,
 };
 pub use flags::{
     flags_include_seen, mark_cached_messages_read, reconcile_cached_read, update_cached_flags,

@@ -1,12 +1,13 @@
 //! Mail calendar commands over the desktop account, proxy and storage adapters.
 
 use serde::Serialize;
+use taomni_mail_api::responses::MailResponse;
 use tauri::State;
 
 use super::{MailAccountConfig, resolve_config};
 use crate::state::AppState;
 
-pub use taomni_mail_engine::calendar::{MailInvite, MailInviteAttendee, MailInviteTime};
+pub use taomni_mail_api::calendar::{MailInvite, MailInviteAttendee, MailInviteTime};
 pub(super) use taomni_mail_engine::calendar::{
     fold, param, parse_time, split_property, unescape, unfold,
 };
@@ -65,7 +66,7 @@ pub async fn mail_respond_invite(
         .clone()
         .ok_or_else(|| "the invitation has no organizer".to_string())?;
     let account = resolve_config(&state, config)?;
-    let response = taomni_mail_engine::responses::MailResponse::Invitation {
+    let response = MailResponse::Invitation {
         invite: Box::new(invite),
         response,
     };

@@ -42,6 +42,8 @@ pub(super) mod pop3_store;
 mod prefetch;
 mod responses;
 pub(super) use responses::send_response;
+mod sent_contacts;
+pub(super) use sent_contacts::record_sent_contacts;
 
 pub(super) use archive::{HostedImap, archives_imap, imports_imap};
 pub(super) use archive_index::{

@@ -5,8 +5,10 @@ use lettre::{
     address::{Address, Envelope},
     message::{Mailbox, MultiPart, SinglePart, header::ContentType},
 };
-use serde::{Deserialize, Serialize};
-use taomni_mail_api::compose::PreparedMail;
+use taomni_mail_api::{
+    compose::PreparedMail,
+    responses::{MailResponse, Receipt, ResponseRequest},
+};
 
 use crate::{
     calendar::{MailInvite, build_reply_ics, partstat_of},
@@ -14,56 +16,32 @@ use crate::{
     delivery::{prepare_message, prepare_with_envelope},
 };
 
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ResponseRequest {
-    pub email_address: String,
-    pub display_name: Option<String>,
-    pub stamp: i64,
-    pub response: MailResponse,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
-pub enum MailResponse {
-    Invitation {
-        invite: Box<MailInvite>,
-        response: String,
-    },
-    Receipt(Receipt),
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Receipt {
-    pub uid: u32,
-    pub message_id: Option<String>,
-    pub subject: String,
-    pub recipient: String,
-    pub automatic: bool,
-}
-
-impl ResponseRequest {
-    pub fn prepare(&self) -> Result<PreparedMail, String> {
-        let me = self.email_address.trim();
-        let name = self.display_name.as_deref();
-        match &self.response {
-            MailResponse::Invitation { invite, response } => {
-                invitation(invite, partstat_of(response)?, me, name, self.stamp)
-            }
-            MailResponse::Receipt(receipt) => {
-                let recipient = &receipt.recipient;
-                let from: Address = me
-                    .parse()
-                    .map_err(|e| format!("invalid account address: {e}"))?;
-                let to: Address = recipient
-                    .parse()
-                    .map_err(|e| format!("invalid receipt address {recipient}: {e}"))?;
-                let envelope = Envelope::new(Some(from), vec![to]).map_err(|e| e.to_string())?;
-                let bytes = build_mdn(me, name, recipient, receipt, receipt.automatic, self.stamp)
-                    .into_bytes();
-                Ok(prepare_with_envelope(&envelope, bytes))
-            }
+pub fn prepare_response(request: &ResponseRequest) -> Result<PreparedMail, String> {
+    let me = request.email_address.trim();
+    let name = request.display_name.as_deref();
+    match &request.response {
+        MailResponse::Invitation { invite, response } => {
+            invitation(invite, partstat_of(response)?, me, name, request.stamp)
+        }
+        MailResponse::Receipt(receipt) => {
+            let recipient = &receipt.recipient;
+            let from: Address = me
+                .parse()
+                .map_err(|e| format!("invalid account address: {e}"))?;
+            let to: Address = recipient
+                .parse()
+                .map_err(|e| format!("invalid receipt address {recipient}: {e}"))?;
+            let envelope = Envelope::new(Some(from), vec![to]).map_err(|e| e.to_string())?;
+            let bytes = build_mdn(
+                me,
+                name,
+                recipient,
+                receipt,
+                receipt.automatic,
+                request.stamp,
+            )
+            .into_bytes();
+            Ok(prepare_with_envelope(&envelope, bytes))
         }
     }
 }
@@ -208,10 +186,8 @@ mod tests {
                 },
             };
             let bytes = serde_json::to_vec(&request).unwrap();
-            let message = serde_json::from_slice::<ResponseRequest>(&bytes)
-                .unwrap()
-                .prepare()
-                .unwrap();
+            let decoded: ResponseRequest = serde_json::from_slice(&bytes).unwrap();
+            let message = prepare_response(&decoded).unwrap();
             assert_eq!(
                 message.envelope.sender.as_deref(),
                 Some("reader@example.com")

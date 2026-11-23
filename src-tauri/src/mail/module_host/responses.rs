@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
-use taomni_mail_api::{MimeUpload, SEND_RESPONSE, SMTP_DELIVERY_UNKNOWN, SmtpResponse};
-use taomni_mail_engine::responses::{MailResponse, ResponseRequest};
+use taomni_mail_api::{
+    MimeUpload, SEND_RESPONSE, SMTP_DELIVERY_UNKNOWN, SmtpResponse,
+    responses::{MailResponse, ResponseRequest},
+};
 use taomni_plugin_stream::routed_tcp::Route;
 
-use super::{PluginRegistry, ResolvedMailAccount, bind_smtp, invoke_result, send_smtp, supports};
+use super::{PluginRegistry, ResolvedMailAccount, bind_smtp, invoke_result, supports};
 
 pub(in crate::mail) async fn send_response(
     registry: Arc<PluginRegistry>,
@@ -18,11 +20,16 @@ pub(in crate::mail) async fn send_response(
         stamp: crate::mail::now_ts(),
     };
     if !supports(&registry, SEND_RESPONSE) {
-        // Earlier Mail packages accept prepared RFC 5322 bytes.
-        let message = tokio::task::spawn_blocking(move || content.prepare())
+        #[cfg(feature = "legacy-mail-smtp")]
+        if super::use_legacy_smtp(&registry) {
+            let message = tokio::task::spawn_blocking(move || {
+                taomni_mail_engine::responses::prepare_response(&content)
+            })
             .await
             .map_err(|error| error.to_string())??;
-        return send_smtp(registry, account, message).await.map(drop);
+            return super::send_smtp(registry, account, message).await.map(drop);
+        }
+        return Err("Enable or update Mail in the module store to send this response".into());
     }
     let data = tokio::task::spawn_blocking(move || serde_json::to_vec(&content))
         .await

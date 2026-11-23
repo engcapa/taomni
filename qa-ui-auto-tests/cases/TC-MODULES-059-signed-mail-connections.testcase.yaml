@@ -244,7 +244,7 @@ verification:
     - {step: 128, expectation: The IMAP Sent copy was stored.}
     - {step: 129, expectation: The actual IMAP Sent folder contains the accepted message.}
     - {step: 130, expectation: IMAP Drafts no longer contains the original server draft.}
-    - {step: 131, expectation: The verified host still holds the Mail writer lease after IMAP delivery.}
+    - {step: 131, expectation: The verified host declares recipient recording and the account cache contains exactly one sent-contact entry for the delivered address.}
     - {step: 160, expectation: The SMTP server received the message sent from the POP3 account.}
     - {step: 161, expectation: The POP3 copy was stored in local Sent.}
     - {step: 162, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}

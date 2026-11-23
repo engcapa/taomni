@@ -14,6 +14,7 @@ pub mod archive_scan;
 pub mod attachment_cache;
 pub mod body_cache;
 pub mod cache_query;
+pub mod calendar;
 pub mod compose;
 pub mod filter_cache;
 pub mod folder_cache;
@@ -25,7 +26,9 @@ pub mod imap_sync;
 pub mod message;
 pub mod pop3_exchange;
 pub mod pop3_store;
+pub mod responses;
 pub mod search;
+pub mod sent_contacts;
 
 pub const SLUG: &str = "mail";
 pub const IMAP_MAILBOX_OWNER: &str = "mail/imap-mailbox-owner";

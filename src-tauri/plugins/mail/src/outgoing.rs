@@ -48,10 +48,9 @@ pub(super) fn respond(
         Ok(bytes) => bytes,
         Err(error) => return Ok(Err(error)),
     };
-    let response: taomni_mail_engine::responses::ResponseRequest =
-        serde_json::from_slice(&bytes)
-            .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
-    let message = match response.prepare() {
+    let response: taomni_mail_api::responses::ResponseRequest = serde_json::from_slice(&bytes)
+        .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+    let message = match taomni_mail_engine::responses::prepare_response(&response) {
         Ok(message) => message,
         Err(error) => return Ok(Err(error)),
     };

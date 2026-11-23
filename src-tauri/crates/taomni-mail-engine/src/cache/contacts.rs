@@ -1,5 +1,6 @@
-use crate::{MailAddress, compose::parse_mailbox, now_ts};
-use lettre::message::Mailbox;
+#[cfg(feature = "mime-compose")]
+use crate::compose::parse_mailbox;
+use crate::{MailAddress, now_ts};
 use rusqlite::{Connection, Result as SqlResult, params};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -147,13 +148,7 @@ pub fn reindex_cached_contacts(conn: &Connection, account_id: &str) -> SqlResult
     Ok(contacts.len())
 }
 
-pub fn mailbox_to_contact(mailbox: Mailbox) -> MailAddress {
-    MailAddress {
-        name: mailbox.name,
-        address: Some(mailbox.email.to_string()),
-    }
-}
-
+#[cfg(feature = "mime-compose")]
 pub fn upsert_sent_contacts<'a>(
     conn: &Connection,
     account_id: &str,
@@ -166,7 +161,10 @@ pub fn upsert_sent_contacts<'a>(
         let Ok(mailbox) = parse_mailbox(raw) else {
             continue;
         };
-        let address = mailbox_to_contact(mailbox);
+        let address = MailAddress {
+            name: mailbox.name,
+            address: Some(mailbox.email.to_string()),
+        };
         let Some(email) = contact_email(&address) else {
             continue;
         };

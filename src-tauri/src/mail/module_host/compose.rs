@@ -11,7 +11,7 @@ use taomni_plugin_stream::routed_tcp::Route;
 use tokio::io::AsyncReadExt;
 
 use super::{PluginRegistry, ResolvedMailAccount, invoke, supports};
-use crate::mail::smtp::{attachment_metadata, build_send_message_with, read_attachment_bytes};
+use crate::mail::smtp::{attachment_metadata, read_attachment_bytes};
 
 pub(in crate::mail) async fn compose_message(
     registry: Arc<PluginRegistry>,
@@ -20,12 +20,16 @@ pub(in crate::mail) async fn compose_message(
     options: MessageBuildOptions,
 ) -> Result<PreparedMail, String> {
     if !supports(&registry, COMPOSE_MESSAGE) {
-        let account = account.clone();
-        return tokio::task::spawn_blocking(move || {
-            build_send_message_with(&account, &message, &options)
-        })
-        .await
-        .map_err(|error| format!("Mail compose task failed: {error}"))?;
+        #[cfg(feature = "legacy-mail-smtp")]
+        if super::use_legacy_smtp(&registry) {
+            let account = account.clone();
+            return tokio::task::spawn_blocking(move || {
+                crate::mail::smtp::build_send_message_with(&account, &message, &options)
+            })
+            .await
+            .map_err(|error| format!("Mail compose task failed: {error}"))?;
+        }
+        return Err("Enable or update Mail in the module store to prepare this message".into());
     }
     let local_attachments = std::mem::take(&mut message.attachments);
     let attachments = local_attachments

@@ -7,11 +7,12 @@ publish = false
 description = "Mail message parsing and data contracts independent of desktop runtime"
 
 [features]
-default = ["imap-runtime", "pop3-runtime"]
+default = ["imap-runtime", "pop3-runtime", "mime-compose"]
 imap-runtime = ["dep:imap", "dep:imap-proto"]
 pop3-runtime = ["dep:md-5"]
-legacy-smtp = ["lettre/hostname", "lettre/native-tls", "lettre/pool", "lettre/smtp-transport"]
-routed-smtp = ["lettre/hostname", "lettre/smtp-transport", "lettre/tokio1-native-tls", "dep:tokio", "dep:tokio-native-tls"]
+mime-compose = ["dep:lettre"]
+legacy-smtp = ["mime-compose", "lettre/hostname", "lettre/native-tls", "lettre/pool", "lettre/smtp-transport"]
+routed-smtp = ["mime-compose", "lettre/hostname", "lettre/smtp-transport", "lettre/tokio1-native-tls", "dep:tokio", "dep:tokio-native-tls"]
 
 [dependencies]
 base64 = "0.22"
@@ -20,7 +21,7 @@ flate2 = "1"
 hex = "0.4"
 imap = { version = "2.4.1", features = ["tls"], default-features = false, optional = true }
 imap-proto = { version = "=0.10.2", optional = true }
-lettre = { version = "0.11.22", default-features = false, features = ["builder"] }
+lettre = { version = "0.11.22", default-features = false, features = ["builder"], optional = true }
 mail-parser = { version = "0.11.4", features = ["full_encoding"] }
 md-5 = { version = "0.11", optional = true }
 native-tls = "0.2"

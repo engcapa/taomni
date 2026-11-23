@@ -36,6 +36,7 @@ mod pop3_round;
 mod pop3_store;
 mod pop3_sync;
 mod prefetch;
+mod sent_contacts;
 mod snapshot;
 mod store;
 
@@ -80,6 +81,7 @@ fn host_config() -> HostConfig {
                 SEND_SMTP,
                 taomni_mail_api::COMPOSE_MESSAGE,
                 taomni_mail_api::SEND_RESPONSE,
+                taomni_mail_api::sent_contacts::RECORD_SENT_CONTACTS,
                 STORE_IMAP_SENT,
                 STORE_IMAP_DRAFT,
                 DISCARD_IMAP_DRAFT,
@@ -276,6 +278,11 @@ impl PluginHandler for Handler {
                 let input = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(outgoing::respond(&self.io, operation, input)?)
+            }
+            taomni_mail_api::sent_contacts::RECORD_SENT_CONTACTS => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(sent_contacts::serve(&self.io, operation, endpoint)?)
             }
             STORE_IMAP_SENT => {
                 let input = serde_json::from_value(params.unwrap_or_default())

@@ -1,16 +1,22 @@
-use super::{MailSendAttachment, MailSendRequest, ResolvedMailAccount};
+use super::MailSendAttachment;
 use std::path::Path;
 
 #[cfg(feature = "legacy-mail-smtp")]
 use super::{DEFAULT_TIMEOUT_SECS, Duration, ProxyForward, mail_effective_endpoint};
+#[cfg(any(test, feature = "legacy-mail-smtp"))]
+use super::{MailSendRequest, ResolvedMailAccount};
 
-use taomni_mail_api::compose::{ComposeAttachment, PreparedMail};
+use taomni_mail_api::compose::ComposeAttachment;
+#[cfg(any(test, feature = "legacy-mail-smtp"))]
+use taomni_mail_api::compose::PreparedMail;
 pub(super) use taomni_mail_api::compose::{MessageBuildOptions, validate_send_request};
-use taomni_mail_engine::compose::{MailSender, ResolvedSendAttachment, build_message};
-
-use taomni_mail_engine::delivery::prepare_message;
 #[cfg(feature = "legacy-mail-smtp")]
 use taomni_mail_engine::smtp::{SmtpClient, SmtpEndpoint};
+#[cfg(any(test, feature = "legacy-mail-smtp"))]
+use taomni_mail_engine::{
+    compose::{MailSender, ResolvedSendAttachment, build_message},
+    delivery::prepare_message,
+};
 
 #[cfg(feature = "legacy-mail-smtp")]
 pub(super) struct MailSmtpTransport {
@@ -52,6 +58,7 @@ pub(super) fn build_smtp_transport(
     })
 }
 
+#[cfg(test)]
 pub(super) fn build_send_message(
     account: &ResolvedMailAccount,
     request: &MailSendRequest,
@@ -59,6 +66,7 @@ pub(super) fn build_send_message(
     build_send_message_with(account, request, &MessageBuildOptions::default())
 }
 
+#[cfg(any(test, feature = "legacy-mail-smtp"))]
 pub(super) fn build_send_message_with(
     account: &ResolvedMailAccount,
     request: &MailSendRequest,
@@ -72,7 +80,8 @@ pub(super) fn build_send_message_with(
     build_message(sender, request, options, read_send_attachments).map(prepare_message)
 }
 
-pub(super) fn read_send_attachments(
+#[cfg(any(test, feature = "legacy-mail-smtp"))]
+fn read_send_attachments(
     attachments: &[MailSendAttachment],
 ) -> Result<Vec<ResolvedSendAttachment>, String> {
     attachments
