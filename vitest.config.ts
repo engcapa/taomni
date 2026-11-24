@@ -18,6 +18,9 @@ export default defineConfig(({ mode }) => ({
     __TAOMNI_QA_COMPLETION_OBSERVATION__: JSON.stringify(false),
     __TAOMNI_QA_UPDATER__: JSON.stringify(false),
     __TAOMNI_QA_OVERLAY_TIMING__: JSON.stringify(true),
+    // The bridge must not install the approval probe during unit tests; probe
+    // tests install it explicitly.
+    __TAOMNI_QA_AGENT_APPROVAL_PROBE__: JSON.stringify(false),
   },
   test: {
     environment: "jsdom",

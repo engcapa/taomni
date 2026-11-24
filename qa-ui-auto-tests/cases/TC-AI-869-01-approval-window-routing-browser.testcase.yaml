@@ -1,0 +1,356 @@
+id: TC-AI-869-01-approval-window-routing-browser
+title: Tao local-agent approval cards stay in the addressed window, dedupe and clear
+description: 'Issue #869 renderer contract. A local-agent approval is an event addressed to the window that started the chat turn; a detached session window mounts the same bridge. This case drives the real bridge through its QA-only trigger and asserts: the addressed card renders once with Allow / Allow for session / Deny, and each decision is reported through cc_resolve_permission; a repeated emit does not stack a second card; agent-cc-permission-resolved removes a card that another window already decided; an event addressed to a different window label is ignored while the unlabelled broadcast fallback stays answerable; and the ACP gate shows its locally trusted option labels, reports the selected option through acp_resolve_permission, reports cancel through acp_cancel_permission and disappears on the production dismissed broadcast. Browser preview has one renderer, so cross-window delivery itself is proven by TC-AI-869-02.'
+covers:
+- F-AI-2.4
+tags:
+- ai
+- approval
+- window
+- regression
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- seed_storage:
+    key: qa.agentApproval.threadId
+    value: '"qa-869-thread"'
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"own"'
+- &id001
+  press: Control+Alt+Shift+F9
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: visible
+- assert_text:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    contains: Bash
+- assert_text:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    contains: echo qa-approved
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 1
+- assert_visible: '[data-testid="ai-chat-cc-permission-allow"]'
+- assert_visible: '[data-testid="ai-chat-cc-permission-allow-session"]'
+- assert_visible: '[data-testid="ai-chat-cc-permission-deny"]'
+- screenshot: approval-addressed-card.png
+- click: '[data-testid="ai-chat-cc-permission-allow-session"]'
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: detached
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniQaApprovalInvocations||[])
+    contains: '"decision":"allow-session"'
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"duplicate"'
+- *id001
+- wait: 1
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 1
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"resolved"'
+- *id001
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: detached
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 0
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"foreign"'
+- *id001
+- wait: 1
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 0
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"fallback"'
+- *id001
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: visible
+- click: '[data-testid="ai-chat-cc-permission-allow"]'
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: detached
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniQaApprovalInvocations||[])
+    contains: '"decision":"allow"'
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"own"'
+- *id001
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: visible
+- click: '[data-testid="ai-chat-cc-permission-deny"]'
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: detached
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniQaApprovalInvocations||[])
+    contains: '"decision":"deny"'
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"acp"'
+- *id001
+- wait_for:
+    selector: '[data-testid="ai-chat-acp-permission-card"]'
+    state: visible
+- assert_text:
+    selector: '[data-testid="ai-chat-acp-permission-card"]'
+    contains: 本地 Agent 请求执行操作
+- assert_text:
+    selector: '[data-testid="ai-chat-acp-permission-card"]'
+    contains: 仅允许这一次
+- assert_text:
+    selector: '[data-testid="ai-chat-acp-permission-card"]'
+    contains: 拒绝这一次
+- assert_visible: '[data-testid="ai-chat-acp-permission-cancel"]'
+- assert_visible: '[data-testid="ai-chat-acp-permission-option-allow_once"]'
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 1
+- screenshot: approval-acp-card.png
+- click: '[data-testid="ai-chat-acp-permission-option-allow_once"]'
+- wait_for:
+    selector: '[data-testid="ai-chat-acp-permission-card"]'
+    state: detached
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniQaApprovalInvocations||[])
+    contains: '"optionId":"allow-once"'
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"acp"'
+- *id001
+- wait_for:
+    selector: '[data-testid="ai-chat-acp-permission-card"]'
+    state: visible
+- click: '[data-testid="ai-chat-acp-permission-cancel"]'
+- wait_for:
+    selector: '[data-testid="ai-chat-acp-permission-card"]'
+    state: detached
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniQaApprovalInvocations||[])
+    contains: '"command":"acp_cancel_permission"'
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"acp"'
+- *id001
+- wait_for:
+    selector: '[data-testid="ai-chat-acp-permission-card"]'
+    state: visible
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"acp-dismiss"'
+- *id001
+- wait_for:
+    selector: '[data-testid="ai-chat-acp-permission-card"]'
+    state: detached
+- assert_count:
+    selector: '[data-testid="ai-chat-acp-permission-card"]'
+    equal: 0
+- assert_no_runtime_errors: null
+- screenshot: approval-cards-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: V1-addressed-card
+    requirement: The addressed approval renders exactly one safety-gate card with the write badge, the command preview and the real Allow / Allow-for-session / Deny controls.
+    actions:
+    - 5
+    - 6
+    - 7
+    checkpoints:
+    - step: 8
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible"}}'
+    - step: 9
+      expectation: '{"assert_text": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "contains": "Bash"}}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "contains": "echo qa-approved"}}'
+    - step: 11
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-cc-permission-allow\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-cc-permission-allow-session\"]"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-cc-permission-deny\"]"}'
+    results:
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+  - id: V2-allow-session
+    requirement: Allow for session reports the allow-session decision through cc_resolve_permission and clears the card.
+    actions:
+    - 16
+    checkpoints:
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached"}}'
+    - step: 18
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify(window.__taomniQaApprovalInvocations||[])", "contains": "\"decision\":\"allow-session\""}}'
+    results:
+    - 17
+    - 18
+  - id: V3-duplicate-emit
+    requirement: Emitting the same prompt twice keeps one card (a stray double-emit must not stack two).
+    actions:
+    - 19
+    - 20
+    checkpoints:
+    - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
+    results:
+    - 22
+  - id: V4-resolved
+    requirement: agent-cc-permission-resolved removes a card whose call was already decided elsewhere, so no residue stays clickable.
+    actions:
+    - 23
+    - 24
+    checkpoints:
+    - step: 25
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached"}}'
+    - step: 26
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 0}}'
+    results:
+    - 25
+    - 26
+  - id: V5-foreign-window
+    requirement: A prompt addressed to another window label renders nothing.
+    actions:
+    - 27
+    - 28
+    checkpoints:
+    - step: 30
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 0}}'
+    results:
+    - 30
+  - id: V6-broadcast-allow
+    requirement: 'The unlabelled broadcast fallback is answerable: Allow reports the allow decision through cc_resolve_permission and clears the card.'
+    actions:
+    - 31
+    - 32
+    - 34
+    checkpoints:
+    - step: 33
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible"}}'
+    - step: 35
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached"}}'
+    - step: 36
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify(window.__taomniQaApprovalInvocations||[])", "contains": "\"decision\":\"allow\""}}'
+    results:
+    - 33
+    - 35
+    - 36
+  - id: V7-deny
+    requirement: Deny reports the deny decision through cc_resolve_permission and clears the card.
+    actions:
+    - 37
+    - 38
+    - 40
+    checkpoints:
+    - step: 39
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible"}}'
+    - step: 41
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached"}}'
+    - step: 42
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify(window.__taomniQaApprovalInvocations||[])", "contains": "\"decision\":\"deny\""}}'
+    results:
+    - 39
+    - 41
+    - 42
+  - id: V8-acp-surface
+    requirement: The ACP gate shows locally trusted option labels, reports the selected option id, reports cancel separately and clears on the production dismissed broadcast.
+    actions:
+    - 43
+    - 44
+    - 53
+    - 56
+    - 57
+    - 59
+    - 62
+    - 63
+    - 65
+    - 66
+    checkpoints:
+    - step: 45
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "state": "visible"}}'
+    - step: 46
+      expectation: '{"assert_text": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "contains": "本地 Agent 请求执行操作"}}'
+    - step: 47
+      expectation: '{"assert_text": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "contains": "仅允许这一次"}}'
+    - step: 48
+      expectation: '{"assert_text": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "contains": "拒绝这一次"}}'
+    - step: 49
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-acp-permission-cancel\"]"}'
+    - step: 50
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-acp-permission-option-allow_once\"]"}'
+    - step: 51
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
+    - step: 54
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "state": "detached"}}'
+    - step: 55
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify(window.__taomniQaApprovalInvocations||[])", "contains": "\"optionId\":\"allow-once\""}}'
+    - step: 58
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "state": "visible"}}'
+    - step: 60
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "state": "detached"}}'
+    - step: 61
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify(window.__taomniQaApprovalInvocations||[])", "contains": "\"command\":\"acp_cancel_permission\""}}'
+    - step: 64
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "state": "visible"}}'
+    - step: 67
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "state": "detached"}}'
+    - step: 68
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "equal": 0}}'
+    results:
+    - 45
+    - 46
+    - 47
+    - 48
+    - 49
+    - 50
+    - 51
+    - 54
+    - 55
+    - 58
+    - 60
+    - 61
+    - 64
+    - 67
+    - 68
+  - id: V9-crash-regression
+    requirement: No uncaught error, unhandled rejection or crash UI appears after the whole approval workflow.
+    actions:
+    - 66
+    checkpoints:
+    - step: 69
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 69
+  visual:
+  - check: The approval card is readable, not clipped and shows its preview, write badge and three actions at the drawer-anchored position.
+    method: manual
+    reason: DOM and count assertions prove presence and routing; readable density still needs the retained screenshots.
+  native:
+  - check: Real multi-window delivery, the real pending-permission registry and the resolved broadcast across two OS windows.
+    method: not-applicable
+    reason: Browser preview has one renderer and a stubbed backend; TC-AI-869-02 covers the native boundary.

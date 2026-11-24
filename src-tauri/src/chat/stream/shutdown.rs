@@ -92,5 +92,12 @@ pub(crate) async fn stop_thread_runtime_inner(
             "agent-acp-permission-dismissed",
             json!({ "threadId": thread_id, "permissionOwnerId": null, "callId": null }),
         );
+        // Same for a Claude Code approval: its oneshot sender was just dropped,
+        // so the prompt can never be answered and its card(s) must go away.
+        crate::windowing::thread_delivery::broadcast_cc_permission_resolved(
+            app,
+            None,
+            Some(thread_id),
+        );
     }
 }

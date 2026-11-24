@@ -10,7 +10,6 @@ use rmcp::model::CallToolResult;
 use rmcp::model::Content;
 use std::time::Duration;
 use tauri::AppHandle;
-use tauri::Emitter;
 use tauri::Manager;
 use uuid::Uuid;
 
@@ -43,11 +42,31 @@ pub(crate) fn deny_result(message: impl Into<String>) -> CallToolResult {
 
 /// Emit `agent-cc-permission` and block until a human decision arrives via
 /// `cc_resolve_permission` (defaults to deny on timeout). Shared by all flavors.
+///
+/// The prompt is delivered to the window that started the turn for this thread
+/// (issue #869) instead of every webview, so a detached session window cannot
+/// render a second copy of the same card.
 pub(crate) async fn await_permission(
     app: &AppHandle,
     scope: &TokenScope,
     tool: &str,
     input: &serde_json::Value,
+) -> CcPermissionDecision {
+    request_permission(app, &scope.thread_id, tool, input, scope.trust.as_str()).await
+}
+
+/// Register a permission prompt, deliver it to the thread's owning window and
+/// block until it is decided (or times out).
+///
+/// Split out of [`await_permission`] so the isolated QA build can drive the same
+/// delivery/resolution path without a live MCP request (see
+/// `qa_agent_approval_probe`).
+pub(crate) async fn request_permission(
+    app: &AppHandle,
+    thread_id: &str,
+    tool: &str,
+    input: &serde_json::Value,
+    trust: &str,
 ) -> CcPermissionDecision {
     let call_id = Uuid::new_v4().to_string();
     let (tx, rx) = tokio::sync::oneshot::channel::<CcPermissionDecision>();
@@ -65,19 +84,21 @@ pub(crate) async fn await_permission(
         state.mobile.confirmations.lock().unwrap().insert(
             call_id.clone(),
             serde_json::json!({
-                "id":call_id, "thread_id":scope.thread_id, "tool":tool, "supported":true
+                "id":call_id, "thread_id":thread_id, "tool":tool, "supported":true
             }),
         );
-        state.mobile.events.publish(serde_json::json!({"type":"task_status", "task_id":format!("thread:{}",scope.thread_id),"status":"awaiting_confirmation", "summary":tool}));
+        state.mobile.events.publish(serde_json::json!({"type":"task_status", "task_id":format!("thread:{thread_id}"),"status":"awaiting_confirmation", "summary":tool}));
     }
-    let _ = app.emit(
+    crate::windowing::thread_delivery::emit_thread_event_for_app(
+        app,
+        thread_id,
         "agent-cc-permission",
         serde_json::json!({
             "callId": call_id,
-            "threadId": scope.thread_id,
+            "threadId": thread_id,
             "tool": tool,
             "args": input,
-            "trust": scope.trust.as_str(),
+            "trust": trust,
         }),
     );
 
@@ -92,6 +113,14 @@ pub(crate) async fn await_permission(
                     .lock()
                     .unwrap()
                     .remove(&call_id);
+                // Timeout or a stopped bridge: no decision can arrive any more,
+                // so drop the card everywhere instead of leaving a dead prompt
+                // that only fails when clicked.
+                crate::windowing::thread_delivery::broadcast_cc_permission_resolved(
+                    app,
+                    Some(&call_id),
+                    Some(thread_id),
+                );
                 CcPermissionDecision::Deny
             }
         };
@@ -112,7 +141,7 @@ pub(crate) async fn await_permission(
     drop(confirmations);
     state
         .mobile
-        .task_status(&scope.thread_id, "running", "confirmation_resolved");
+        .task_status(thread_id, "running", "confirmation_resolved");
     decision
 }
 

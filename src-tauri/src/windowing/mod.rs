@@ -12,6 +12,8 @@
 //! Supported kinds: sftp, rdp, vnc, terminal, database, lan-chat, notes,
 //! servers. Anything else lands in the catch-all error branch below.
 
+pub(crate) mod thread_delivery;
+
 use tauri::{
     AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, utils::config::Color,
 };

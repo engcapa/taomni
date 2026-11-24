@@ -30,6 +30,36 @@ import { invokeScreenshot } from "./commands/screenshot";
 
 const stubCommandRegistry = new CommandRegistry();
 
+/**
+ * Issue #869 QA observation: the local-agent approval bridge calls commands that
+ * only exist in the desktop backend. Browser preview records those calls so a QA
+ * case can assert the renderer reached the IPC boundary with the exact decision
+ * (and did not, for example, resolve a prompt it never owned). Browser-only; this
+ * module never ships in a Tauri build.
+ */
+const APPROVAL_COMMANDS = new Set([
+  "cc_resolve_permission",
+  "cc_resolve_tool_call",
+  "acp_resolve_permission",
+  "acp_cancel_permission",
+  "qa_agent_approval_probe",
+]);
+const approvalInvocations: Array<{ command: string; args: unknown }> = [];
+
+declare global {
+  interface Window {
+    /** Browser-preview approval IPC trace (issue #869 QA cases). */
+    readonly __taomniQaApprovalInvocations?: Array<{ command: string; args: unknown }>;
+  }
+}
+
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "__taomniQaApprovalInvocations", {
+    configurable: true,
+    get: () => approvalInvocations.slice(),
+  });
+}
+
 if (typeof window !== "undefined") installStubMailQaControl(mailStubSeed);
 
 const NOTEPAD_VIEWER_COMMANDS = new Set([
@@ -41,6 +71,11 @@ const NOTEPAD_VIEWER_COMMANDS = new Set([
 ]);
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  if (APPROVAL_COMMANDS.has(cmd)) {
+    approvalInvocations.push({ command: cmd, args });
+    if (approvalInvocations.length > 64) approvalInvocations.shift();
+    return undefined as T;
+  }
   if (NOTEPAD_VIEWER_COMMANDS.has(cmd) || cmd.startsWith("notepad_")) {
     return await invokeNotepad(cmd, args) as T;
   }

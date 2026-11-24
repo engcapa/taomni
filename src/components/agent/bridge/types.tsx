@@ -22,6 +22,12 @@ export interface PermissionPrompt {
   tool: string;
   args: Record<string, unknown>;
   trust: string;
+  /**
+   * Window this prompt was delivered to (issue #869). The backend addresses the
+   * window that started the turn; a prompt carrying another window's label must
+   * not render here. Absent for a broadcast fallback, which every window answers.
+   */
+  windowLabel?: string;
 }
 
 
@@ -39,6 +45,8 @@ export interface AcpPermissionPrompt {
   title: string;
   kind: string;
   options: AcpPermissionOption[];
+  /** Addressed window label; see {@link PermissionPrompt.windowLabel}. */
+  windowLabel?: string;
 }
 
 
@@ -59,6 +67,21 @@ export interface ToolDispatch {
   threadId: string;
   tool: string;
   args: Record<string, unknown>;
+  /** Addressed window label; see {@link PermissionPrompt.windowLabel}. */
+  windowLabel?: string;
+}
+
+/**
+ * `agent-cc-permission-resolved`: a Claude Code approval is no longer
+ * actionable — it was decided here or in another window, timed out, or its
+ * thread stopped. Without it a second window kept a dead card that only failed
+ * when clicked (issue #869).
+ *
+ * `callId` absent means every pending prompt of `threadId` is resolved.
+ */
+export interface CcPermissionResolved {
+  callId?: string | null;
+  threadId?: string | null;
 }
 
 

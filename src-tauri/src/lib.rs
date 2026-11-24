@@ -94,7 +94,7 @@ fn activate_qa_profile(identifier: &str) {
     }
 }
 
-fn qa_profile_active() -> bool {
+pub(crate) fn qa_profile_active() -> bool {
     QA_PROFILE_ACTIVE.load(Ordering::Acquire)
 }
 

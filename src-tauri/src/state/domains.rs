@@ -88,6 +88,10 @@ pub struct AgentRuntime {
     /// Pending CC permission prompts awaiting a human decision, keyed by
     /// per-call id. See [`CcPermissionResponder`].
     pub cc_pending_permissions: Arc<Mutex<HashMap<String, CcPermissionResponder>>>,
+    /// Thread id -> label of the webview that started the current chat turn.
+    /// Thread-scoped approval and side-effect events are delivered to that
+    /// window instead of being broadcast into every window (issue #869).
+    pub thread_windows: Arc<crate::windowing::thread_delivery::ThreadWindows>,
     /// Per-thread captured-command store (方案4). Holds the full stdout/stderr
     /// of `run_captured` runs (B path: Taomni-local files) so CC can grep/page
     /// large output without dumping it into context. Reduction happens here.

@@ -51,6 +51,7 @@ pub(crate) use permissions::decide_permission;
 pub(crate) use permissions::deny_json;
 pub(crate) use permissions::deny_result;
 pub(crate) use permissions::enforce_inline_permission;
+pub(crate) use permissions::request_permission;
 pub(crate) use scope::enforce_session_scope;
 pub(crate) use scope::normalize_tool_name;
 pub(crate) use scope::scope_from_ctx;

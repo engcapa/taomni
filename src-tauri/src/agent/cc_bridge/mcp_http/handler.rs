@@ -11,7 +11,6 @@ use rmcp::service::RequestContext;
 use rmcp::service::RoleServer;
 use std::time::Duration;
 use tauri::AppHandle;
-use tauri::Emitter;
 use tauri::Manager;
 use uuid::Uuid;
 
@@ -69,7 +68,13 @@ impl CcHandler {
                 .unwrap()
                 .insert(call_id.clone(), tx);
         }
-        let _ = self.app.emit(
+        // The effect must run in exactly one webview: deliver to the window that
+        // started the turn for this thread, and only fall back to a broadcast
+        // when that window is gone (issue #869 — a broadcast ran the effect in
+        // every window, e.g. writing the same command into two terminals).
+        crate::windowing::thread_delivery::emit_thread_event_for_app(
+            &self.app,
+            &scope.thread_id,
             "agent-cc-tool",
             serde_json::json!({
                 "callId": call_id,

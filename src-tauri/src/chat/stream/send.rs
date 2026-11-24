@@ -22,11 +22,19 @@ use tauri::State;
 use uuid::Uuid;
 
 /// Send a message and get a response (non-streaming for v2.4 static shell).
+///
+/// Records the calling webview as the owner of this thread's approval events,
+/// matching `chat_stream` (issue #869).
 #[tauri::command]
 pub async fn chat_send(
     req: ChatSendRequest,
+    window: tauri::WebviewWindow,
     state: State<'_, AppState>,
 ) -> Result<ChatSendResponse, String> {
+    state
+        .agent
+        .thread_windows
+        .record(&req.thread_id, window.label());
     {
         let ai_ctx = state.ai_ctx.read().await;
         if ai_ctx.config.fully_disabled {

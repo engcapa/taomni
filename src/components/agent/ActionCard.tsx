@@ -83,6 +83,7 @@ export function ActionCard({
             <button
               type="button"
               className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+              data-testid="ai-chat-cc-permission-allow"
               onClick={() => onDecide("allow")}
             >
               <CheckCircle className="w-3.5 h-3.5" />
@@ -91,6 +92,7 @@ export function ActionCard({
             <button
               type="button"
               className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
+              data-testid="ai-chat-cc-permission-allow-session"
               onClick={() => onDecide("allow-session")}
               title={t("agent.actionAllowSessionTitle")}
             >
@@ -99,6 +101,7 @@ export function ActionCard({
             <button
               type="button"
               className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 text-[var(--taomni-text-muted)]"
+              data-testid="ai-chat-cc-permission-deny"
               onClick={() => onDecide("deny")}
             >
               <XCircle className="w-3.5 h-3.5" />
