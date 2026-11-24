@@ -85,7 +85,7 @@ pub fn cache_body_if_current_in_transaction(
     Ok(true)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mime-parse"))]
 mod tests {
     use super::*;
     use crate::{

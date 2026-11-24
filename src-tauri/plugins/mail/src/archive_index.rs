@@ -66,6 +66,11 @@ fn execute(store: &Store, input: &ArchiveIndexRequest) -> Result<Vec<u8>, RpcErr
             read(&db)
         }
         ArchiveIndexSource::ModuleData => {
+            if store.query(account, storage::query::has_pending_attachment_backfill)? {
+                let rw = store.open_writable_mailbox(account)?;
+                storage::query::complete_pending_attachment_backfill(&rw)
+                    .map_err(|_| unavailable())?;
+            }
             if let Some(bytes) = store.query(account, |db| Ok(Some(read(db))))? {
                 return bytes;
             }

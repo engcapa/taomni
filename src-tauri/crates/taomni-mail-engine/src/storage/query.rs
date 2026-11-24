@@ -1,8 +1,11 @@
 //! Local archive queries and immutable cleanup previews; no mailbox network calls.
 use super::cleanup::collect_garbage;
+#[cfg(feature = "mime-parse")]
 use super::index::legacy_attachment_flag;
 use super::model::ArchiveEntry;
 use rusqlite::{Connection, params, params_from_iter, types::Value};
+
+const LEGACY_ATTACHMENT_BACKFILL_KEY: &str = "legacy_attachment_backfill_pending";
 
 pub use taomni_mail_api::archive_index::{
     ArchiveKey, ArchivePage, ArchiveQuery, ArchiveRow, ArchiveSelection, ArchiveSort,
@@ -18,7 +21,10 @@ pub(super) fn init_index(db: &Connection) -> rusqlite::Result<()> {
         |r| r.get(0),
     )?;
     let tx = db.unchecked_transaction()?;
-    tx.execute_batch("CREATE TABLE IF NOT EXISTS mail_archive_index (
+    tx.execute_batch("CREATE TABLE IF NOT EXISTS mail_archive_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS mail_archive_index (
         account_id TEXT NOT NULL,folder TEXT NOT NULL,uid_validity INTEGER NOT NULL,uid INTEGER NOT NULL,
         sha256 TEXT NOT NULL,subject TEXT NOT NULL,sender TEXT NOT NULL,recipients TEXT NOT NULL,
         date_ts INTEGER,has_attachments INTEGER NOT NULL,raw_size INTEGER NOT NULL,stored_size INTEGER NOT NULL,stored_at INTEGER NOT NULL,
@@ -50,20 +56,73 @@ pub(super) fn init_index(db: &Connection) -> rusqlite::Result<()> {
         CREATE TRIGGER IF NOT EXISTS mail_archive_index_update AFTER UPDATE ON mail_full_messages BEGIN
           DELETE FROM mail_archive_index WHERE account_id=old.account_id AND folder=old.folder AND uid_validity=old.uid_validity AND uid=old.uid;
           {insert}; END;"))?;
-    if !exists {
+    #[cfg(feature = "mime-parse")]
+    let backfill_pending: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM mail_archive_meta WHERE key=?1)",
+        [LEGACY_ATTACHMENT_BACKFILL_KEY],
+        |r| r.get(0),
+    )?;
+    #[cfg(feature = "mime-parse")]
+    if !exists || backfill_pending {
         // Existing header-only snapshots can lack attachment flags. Inspect each
         // distinct original once during migration, with bounded streaming memory.
         let objects: Vec<(String,String)> = tx.prepare("SELECT DISTINCT account_id,sha256 FROM mail_full_messages WHERE COALESCE(json_extract(header_json,'$.hasAttachments'),0)=0")?.query_map([],|r|Ok((r.get(0)?,r.get(1)?)))?.collect::<rusqlite::Result<_>>()?;
         for (account, hash) in objects {
             if let Ok(true) = legacy_attachment_flag(&tx, &account, &hash) {
-                tx.execute("UPDATE mail_full_messages SET header_json=json_set(header_json,'$.hasAttachments',1) WHERE account_id=? AND sha256=?",params![account,hash])?;
+                tx.execute(
+                    "UPDATE mail_full_messages SET header_json=json_set(CASE WHEN json_type(header_json)='object' THEN header_json ELSE '{}' END,'$.hasAttachments',1) WHERE account_id=? AND sha256=?",
+                    params![account, hash],
+                )?;
             }
         }
+        tx.execute(
+            "DELETE FROM mail_archive_meta WHERE key=?1",
+            [LEGACY_ATTACHMENT_BACKFILL_KEY],
+        )?;
+    }
+    #[cfg(not(feature = "mime-parse"))]
+    if !exists {
+        let needs_backfill: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM mail_full_messages WHERE COALESCE(json_extract(header_json,'$.hasAttachments'),0)=0)",
+            [],
+            |r| r.get(0),
+        )?;
+        if needs_backfill {
+            tx.execute(
+                "INSERT OR REPLACE INTO mail_archive_meta(key, value) VALUES(?1, '1')",
+                [LEGACY_ATTACHMENT_BACKFILL_KEY],
+            )?;
+        }
+    }
+    if !exists {
         tx.execute_batch(&format!(
             "INSERT OR IGNORE INTO mail_archive_index SELECT {projection} FROM mail_full_messages;"
         ))?;
     }
     tx.commit()
+}
+
+pub fn has_pending_attachment_backfill(db: &Connection) -> rusqlite::Result<bool> {
+    let has_meta: bool = db.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='mail_archive_meta')",
+        [],
+        |r| r.get(0),
+    )?;
+    if !has_meta {
+        return Ok(false);
+    }
+    db.query_row(
+        "SELECT EXISTS(SELECT 1 FROM mail_archive_meta WHERE key=?1)",
+        [LEGACY_ATTACHMENT_BACKFILL_KEY],
+        |r| r.get(0),
+    )
+}
+
+pub fn complete_pending_attachment_backfill(db: &Connection) -> rusqlite::Result<()> {
+    if has_pending_attachment_backfill(db)? {
+        init_index(db)?;
+    }
+    Ok(())
 }
 
 fn filter(account: &str, query: &ArchiveQuery) -> Result<(String, Vec<Value>), String> {

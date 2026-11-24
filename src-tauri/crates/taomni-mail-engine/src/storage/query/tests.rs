@@ -1,4 +1,5 @@
 use super::*;
+#[cfg(feature = "mime-parse")]
 use crate::storage;
 fn fixture() -> (tempfile::TempDir, Connection) {
     let dir = tempfile::tempdir().unwrap();
@@ -212,6 +213,7 @@ fn previews_freeze_membership_respect_shared_objects_and_exclusions() {
         2
     );
 }
+#[cfg(feature = "mime-parse")]
 #[test]
 fn attachment_metadata_is_built_from_mime_and_migrated_for_old_snapshots() {
     let (_dir, db) = fixture();
@@ -312,4 +314,116 @@ fn legacy_archive_migrates_once_and_retains_search_after_header_cache_deletion()
         .total,
         0
     );
+}
+
+#[cfg(not(feature = "mime-parse"))]
+#[test]
+fn pre_index_database_defers_attachment_backfill_without_mime_parse() {
+    use flate2::{Compression, write::GzEncoder};
+    use sha2::{Digest, Sha256};
+    use std::{fs, io::Write};
+
+    let (_dir, db) = fixture();
+    let raw = b"Subject: Attachments\r\nContent-Type: multipart/mixed; boundary=x\r\n\r\n--x\r\nContent-Type: text/plain\r\n\r\nbody\r\n--x\r\nContent-Disposition: attachment; filename=a.bin\r\n\r\nbytes\r\n--x--\r\n";
+    let hash = hex::encode(Sha256::digest(raw));
+    let root = crate::storage::account_root(&db, "qa").unwrap();
+    let object = crate::storage::object_path(&root, &hash).unwrap();
+    fs::create_dir_all(object.parent().unwrap()).unwrap();
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::new(3));
+    encoder.write_all(raw).unwrap();
+    let gz = encoder.finish().unwrap();
+    fs::write(&object, &gz).unwrap();
+
+    db.execute_batch("DROP TRIGGER mail_archive_index_insert;DROP TRIGGER mail_archive_index_update;DROP TRIGGER mail_archive_index_delete;DROP TABLE mail_archive_search;DROP TABLE mail_archive_index;").unwrap();
+    db.execute(
+        "INSERT INTO mail_full_messages VALUES('qa','INBOX',1,10,?1,?2,?3,200,'{\"subject\":\"Attachments\",\"hasAttachments\":false}')",
+        params![hash, raw.len() as i64, gz.len() as i64],
+    )
+    .unwrap();
+
+    init_index(&db).unwrap();
+    let marker: Option<String> = db
+        .query_row(
+            "SELECT value FROM mail_archive_meta WHERE key='legacy_attachment_backfill_pending'",
+            [],
+            |r| r.get(0),
+        )
+        .ok();
+    assert_eq!(marker.as_deref(), Some("1"));
+    assert_eq!(
+        query(
+            &db,
+            "qa",
+            &ArchiveQuery {
+                text: "Attachments".into(),
+                ..Default::default()
+            },
+            0
+        )
+        .unwrap()
+        .total,
+        1
+    );
+}
+
+#[cfg(feature = "mime-parse")]
+#[test]
+fn deferred_attachment_backfill_completes_when_mime_parse_opens_indexed_db() {
+    let (_dir, db) = fixture();
+    db.execute(
+        "INSERT INTO mail_messages(account_id,folder,uid,updated_at) VALUES('qa','INBOX',1,0)",
+        [],
+    )
+    .unwrap();
+    let raw = b"Subject: Attachments\r\nContent-Type: multipart/mixed; boundary=x\r\n\r\n--x\r\nContent-Type: text/plain\r\n\r\nbody\r\n--x\r\nContent-Disposition: attachment; filename=a.bin\r\n\r\nbytes\r\n--x--\r\n";
+    storage::store(&db, "qa", "INBOX", 1, 10, raw.as_slice()).unwrap();
+    // Simulate an unflagged legacy index created by core without `mime-parse`.
+    db.execute(
+        "UPDATE mail_full_messages SET header_json=json_set(header_json,'$.hasAttachments',0)",
+        [],
+    )
+    .unwrap();
+    db.execute(
+        "INSERT OR REPLACE INTO mail_archive_meta(key, value) VALUES('legacy_attachment_backfill_pending', '1')",
+        [],
+    )
+    .unwrap();
+    assert_eq!(
+        query(
+            &db,
+            "qa",
+            &ArchiveQuery {
+                has_attachments: Some(true),
+                ..Default::default()
+            },
+            0
+        )
+        .unwrap()
+        .total,
+        0
+    );
+
+    complete_pending_attachment_backfill(&db).unwrap();
+    assert_eq!(
+        query(
+            &db,
+            "qa",
+            &ArchiveQuery {
+                has_attachments: Some(true),
+                ..Default::default()
+            },
+            0
+        )
+        .unwrap()
+        .total,
+        1
+    );
+    let pending: bool = db
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM mail_archive_meta WHERE key='legacy_attachment_backfill_pending')",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(!pending);
 }

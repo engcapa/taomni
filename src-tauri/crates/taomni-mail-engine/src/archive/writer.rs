@@ -1,4 +1,6 @@
-use super::{MessageObject, compress_message};
+use super::MessageObject;
+#[cfg(feature = "mime-parse")]
+use super::compress_message;
 use super::{
     download_imap_original, progress::ScanProgress, scan_store::ArchiveScanStore,
     scanner::ArchiveConnection,
@@ -43,8 +45,10 @@ pub trait OriginalEncoder {
     }
 }
 
+#[cfg(feature = "mime-parse")]
 pub struct LocalEncoder;
 
+#[cfg(feature = "mime-parse")]
 impl OriginalEncoder for LocalEncoder {
     fn encode(
         &self,

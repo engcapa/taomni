@@ -9,6 +9,20 @@ use tauri::State;
 use super::pop3;
 #[cfg(any(test, feature = "legacy-mail-pop3"))]
 use super::pop3::Pop3Client;
+
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
+macro_rules! legacy_pop3_op {
+    ($state:expr, $account:expr, $action:expr, $legacy:expr) => {
+        pop3_store::run($state, $account, $action, $legacy).await
+    };
+}
+
+#[cfg(not(any(test, feature = "legacy-mail-pop3")))]
+macro_rules! legacy_pop3_op {
+    ($state:expr, $account:expr, $action:expr, $legacy:expr) => {
+        pop3_store::run_with_host($state, $account, $action).await
+    };
+}
 use super::sync::{MailFolderSyncResult, MailSyncMode};
 use super::{
     MailAccountConfig, MailDeleteResult, MailDownloadAttachmentResult, MailFlagResult, MailFolder,
@@ -90,39 +104,47 @@ async fn download(
         let new_unseen = outcome.messages.len();
         return Ok((outcome.messages, new_unseen, outcome.remaining));
     }
-    let leave_days = account.config.pop3_leave_days;
-    let db = state.mail_db(&account_id)?;
-    let gate = state.legacy.mail.mutation_gate(&account_id);
-    let registry = state.plugins.clone();
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        let _local = gate.lock().map_err(|error| error.to_string())?;
-        let ledger = pop3::sqlite_ledger(|| db.lock(), &account_id);
-        let sync = |mailbox: &mut dyn taomni_mail_engine::pop3::Pop3Mailbox| {
-            pop3::sync_inbox(mailbox, &ledger, leave_days)
-        };
-        let outcome = if super::module_host::runs_pop3_rounds(&registry) {
-            let _mutation = db.mutation_lease()?;
-            super::module_host::run_pop3_round(registry, &account, handle, &ledger)?
-        } else if super::module_host::syncs_pop3(&registry) {
-            let _mutation = db.mutation_lease()?;
-            let mut client = super::module_host::HostedPop3::open(registry, &account, handle)?;
-            sync(&mut client)?
-        } else {
-            #[cfg(not(any(test, feature = "legacy-mail-pop3")))]
-            return Err(super::SIGNED_MAIL_CONNECTION_REQUIRED.into());
-            #[cfg(any(test, feature = "legacy-mail-pop3"))]
-            {
+    if super::module_host::pop3_store::supports_legacy(&state.plugins) {
+        let cache = state.mail_db(&account_id)?;
+        let outcome =
+            super::module_host::pop3_store::sync_legacy(state.plugins.clone(), cache, &account)
+                .await?;
+        let new_unseen = outcome.messages.len();
+        return Ok((outcome.messages, new_unseen, outcome.remaining));
+    }
+    #[cfg(not(any(test, feature = "legacy-mail-pop3")))]
+    return Err(pop3_store::legacy_unavailable(&state.plugins));
+    #[cfg(any(test, feature = "legacy-mail-pop3"))]
+    {
+        let leave_days = account.config.pop3_leave_days;
+        let db = state.mail_db(&account_id)?;
+        let gate = state.legacy.mail.mutation_gate(&account_id);
+        let registry = state.plugins.clone();
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::spawn_blocking(move || {
+            let _local = gate.lock().map_err(|error| error.to_string())?;
+            let ledger = pop3::sqlite_ledger(|| db.lock(), &account_id);
+            let sync = |mailbox: &mut dyn taomni_mail_engine::pop3::Pop3Mailbox| {
+                pop3::sync_inbox(mailbox, &ledger, leave_days)
+            };
+            let outcome = if super::module_host::runs_pop3_rounds(&registry) {
+                let _mutation = db.mutation_lease()?;
+                super::module_host::run_pop3_round(registry, &account, handle, &ledger)?
+            } else if super::module_host::syncs_pop3(&registry) {
+                let _mutation = db.mutation_lease()?;
+                let mut client = super::module_host::HostedPop3::open(registry, &account, handle)?;
+                sync(&mut client)?
+            } else {
                 let _mutation = db.mutation_lease()?;
                 let mut client = Pop3Client::connect(&account, &handle)?;
                 sync(&mut client.session)?
-            }
-        };
-        let new_unseen = outcome.messages.len();
-        Ok((outcome.messages, new_unseen, outcome.remaining))
-    })
-    .await
-    .map_err(|e| format!("POP3 sync task failed: {e}"))?
+            };
+            let new_unseen = outcome.messages.len();
+            Ok((outcome.messages, new_unseen, outcome.remaining))
+        })
+        .await
+        .map_err(|e| format!("POP3 sync task failed: {e}"))?
+    }
 }
 
 pub(super) async fn sync_folder(
@@ -197,17 +219,16 @@ pub(super) async fn get_body(
 ) -> Result<MailMessageBody, String> {
     let folder = folder.to_owned();
     let missing = format!("message {uid} is not in the local {folder} folder");
-    pop3_store::run(
+    let body: Option<MailMessageBody> = legacy_pop3_op!(
         state,
         account_id,
         LocalMailboxAction::Body {
             folder: folder.clone(),
             uid,
         },
-        move |db, account| pop3::local_body(db, account, &folder, uid),
-    )
-    .await?
-    .ok_or(missing)
+        move |db, account| pop3::local_body(db, account, &folder, uid)
+    )?;
+    body.ok_or(missing)
 }
 
 pub(super) async fn mark_read(
@@ -281,7 +302,7 @@ pub(super) async fn move_or_copy(
     copy: bool,
 ) -> Result<MailMoveResult, String> {
     let (key, ids, destination) = (folder.to_owned(), uids.to_vec(), target.to_owned());
-    let count = pop3_store::run(
+    let count = legacy_pop3_op!(
         state,
         account_id,
         LocalMailboxAction::MoveOrCopy {
@@ -293,9 +314,8 @@ pub(super) async fn move_or_copy(
         move |db, account| {
             pop3::ensure_local_folders(db, account)?;
             pop3::move_local(db, account, &key, &ids, &destination, copy)
-        },
-    )
-    .await?;
+        }
+    )?;
     Ok(MailMoveResult {
         folder: folder.to_string(),
         target: target.to_string(),
@@ -317,16 +337,15 @@ pub(super) async fn delete(
     } else {
         Some(uids.unwrap_or_default())
     };
-    let deleted = pop3_store::run(
+    let deleted = legacy_pop3_op!(
         state,
         account_id,
         LocalMailboxAction::Delete {
             folder: key.clone(),
             uids: targets.clone(),
         },
-        move |db, account| pop3::delete_local(db, account, &key, targets.as_deref()),
-    )
-    .await?;
+        move |db, account| pop3::delete_local(db, account, &key, targets.as_deref())
+    )?;
     Ok(MailDeleteResult {
         folder: folder.to_string(),
         deleted,
@@ -404,16 +423,15 @@ pub(super) async fn delete_folder(
         return Err("the local INBOX cannot be deleted".into());
     }
     let name = name.to_owned();
-    pop3_store::run(
+    legacy_pop3_op!(
         state,
         account_id,
         LocalMailboxAction::DeleteFolder { name: name.clone() },
         move |db, account| {
             pop3::delete_local_folder(db, account, &name)?;
             pop3::list_local_folders(db, account)
-        },
+        }
     )
-    .await
 }
 
 pub(super) async fn download_attachment(
@@ -566,22 +584,49 @@ async fn store_legacy_sent_copy(
     bytes: Vec<u8>,
     request: MailSendRequest,
 ) -> Result<(), String> {
-    let cache = state.mail_db(&account)?;
-    super::mail_db_task(cache.clone(), account.clone(), move |db, account| {
-        pop3::import_local_messages(db, account, "Sent", &[bytes]).map(drop)
-    })
-    .await?;
-    if let Err(error) = super::module_host::record_sent_contacts(
-        state.plugins.clone(),
-        cache,
-        account.clone(),
-        request,
-    )
-    .await
-    {
-        tracing::warn!(%account, %error, "mail sent; contact cache update failed");
+    if super::module_host::pop3_store::supports_legacy(&state.plugins) {
+        let sent_recipients = request
+            .to
+            .into_iter()
+            .chain(request.cc)
+            .chain(request.bcc)
+            .collect();
+        return pop3_store::run_legacy::<usize>(
+            state,
+            &account,
+            LocalMailboxAction::Append {
+                folder: "Sent".into(),
+                originals: vec![bytes],
+                sent_recipients,
+            },
+        )
+        .await
+        .map(drop);
     }
-    Ok(())
+    #[cfg(not(any(test, feature = "legacy-mail-pop3")))]
+    {
+        let _ = (bytes, request);
+        Err(pop3_store::legacy_unavailable(&state.plugins))
+    }
+    #[cfg(any(test, feature = "legacy-mail-pop3"))]
+    {
+        let cache = state.mail_db(&account)?;
+        super::mail_db_task(cache.clone(), account.clone(), move |db, account| {
+            pop3::import_local_messages(db, account, "Sent", &[bytes]).map(drop)
+        })
+        .await?;
+        if let Err(error) = super::module_host::record_sent_contacts(
+            state.plugins.clone(),
+            cache,
+            account.clone(),
+            request,
+        )
+        .await
+        {
+            tracing::warn!(%account, %error, "mail sent; contact cache update failed");
+        }
+        Ok(())
+    }
 }
 
 /// Store raw messages (mbox/.eml import) in a local folder.
@@ -610,6 +655,24 @@ pub(super) async fn import(
         )
         .await;
     }
+    if super::module_host::pop3_store::supports_legacy(&state.plugins) {
+        return pop3_store::run_legacy(
+            state,
+            account_id,
+            LocalMailboxAction::Append {
+                folder,
+                originals: messages,
+                sent_recipients: Vec::new(),
+            },
+        )
+        .await;
+    }
+    #[cfg(not(any(test, feature = "legacy-mail-pop3")))]
+    {
+        let _ = (folder, messages);
+        Err(pop3_store::legacy_unavailable(&state.plugins))
+    }
+    #[cfg(any(test, feature = "legacy-mail-pop3"))]
     super::with_mail_db_async(state, account_id, move |db, account| {
         pop3::import_local_messages(db, account, &folder, &messages)
     })

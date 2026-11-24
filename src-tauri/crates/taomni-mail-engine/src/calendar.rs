@@ -6,6 +6,7 @@
 //! Times with a TZID are shown as the sender's wall-clock time plus zone name
 //! (no tz database is bundled); UTC and date-only values are exact.
 
+#[cfg(feature = "mime-parse")]
 use mail_parser::{MessageParser, MimeHeaders};
 pub use taomni_mail_api::calendar::{MailInvite, MailInviteAttendee, MailInviteTime};
 
@@ -98,6 +99,7 @@ pub fn parse_time(value: &str, params: &[(String, String)]) -> Option<MailInvite
     })
 }
 
+#[cfg(any(test, feature = "mime-parse"))]
 fn person(value: &str, params: &[(String, String)]) -> MailInviteAttendee {
     let email = value
         .trim()
@@ -114,6 +116,7 @@ fn person(value: &str, params: &[(String, String)]) -> MailInviteAttendee {
 }
 
 /// Parse the first VEVENT of an iCalendar object.
+#[cfg(any(test, feature = "mime-parse"))]
 fn parse_invite(ics: &str) -> Option<MailInvite> {
     let mut invite = MailInvite {
         ics: ics.to_string(),
@@ -151,6 +154,7 @@ fn parse_invite(ics: &str) -> Option<MailInvite> {
 }
 
 /// Find and parse a `text/calendar` part of a raw message.
+#[cfg(feature = "mime-parse")]
 pub fn invite_from_message(raw: &[u8]) -> Option<MailInvite> {
     let message = MessageParser::default().parse(raw)?;
     message.parts.iter().find_map(|part| {
@@ -306,6 +310,7 @@ mod tests {
         assert!(partstat_of("maybe").is_err());
     }
 
+    #[cfg(feature = "mime-parse")]
     #[test]
     fn finds_the_calendar_part_of_a_message() {
         let raw = format!(

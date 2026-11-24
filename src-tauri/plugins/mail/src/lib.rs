@@ -35,6 +35,7 @@ mod mime_decoding;
 mod mutation_jobs;
 mod outgoing;
 mod pop3_attachment;
+mod pop3_legacy;
 mod pop3_round;
 mod pop3_store;
 mod pop3_sync;
@@ -124,7 +125,9 @@ fn host_config() -> HostConfig {
                 OPEN_POP3_SYNC,
                 taomni_mail_api::SYNC_POP3_ROUND,
                 taomni_mail_api::pop3_store::LOCAL_MAILBOX,
+                taomni_mail_api::pop3_store::LEGACY_LOCAL_MAILBOX,
                 taomni_mail_api::pop3_store::SYNC_OWNED_MAILBOX,
+                taomni_mail_api::pop3_store::SYNC_LEGACY_MAILBOX,
                 taomni_mail_api::pop3_store::READ_POP3_ATTACHMENT,
                 FETCH_IMAP_ATTACHMENT,
                 SNAPSHOT_PREPARE_METHOD,
@@ -517,10 +520,30 @@ impl PluginHandler for Handler {
                     endpoint,
                 )?)
             }
+            taomni_mail_api::pop3_store::LEGACY_LOCAL_MAILBOX => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(pop3_legacy::serve(
+                    &self.io,
+                    operation,
+                    &self.store,
+                    endpoint,
+                )?)
+            }
             taomni_mail_api::pop3_store::SYNC_OWNED_MAILBOX => {
                 let request = serde_json::from_value(params.unwrap_or_default())
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
                 serde_json::to_value(pop3_store::round(
+                    &self.io,
+                    operation,
+                    self.store.clone(),
+                    request,
+                )?)
+            }
+            taomni_mail_api::pop3_store::SYNC_LEGACY_MAILBOX => {
+                let request = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(pop3_legacy::round(
                     &self.io,
                     operation,
                     self.store.clone(),

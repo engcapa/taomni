@@ -156,10 +156,14 @@ jobs:
               assert "taomni-mfa-api" in packages, f"{target}: missing the shared MFA contract"
               assert not packages.intersection({"taomni-mfa-engine", "taomni-plugin-mfa", "quircs"}), f"{target}: the core depends on the MFA engine or decoder"
               assert "taomni-mail-api" in packages, f"{target}: missing the shared Mail contract"
-              assert not packages.intersection({"imap", "imap-proto", "lettre", "taomni-plugin-mail"}), f"{target}: the core depends on the Mail IMAP or SMTP runtime or host"
+              assert not packages.intersection({"imap", "imap-proto", "lettre", "mail-parser", "taomni-plugin-mail"}), f"{target}: the core depends on the Mail IMAP, SMTP, or MIME parser runtime or host"
               mail_engine = Path(f"gate-inventory/mail-engine-features-{target}.txt").read_text()
               engine_features = [line.split()[2:] for line in mail_engine.splitlines() if line.startswith("taomni-mail-engine ")]
-              assert all("pop3-runtime" not in ",".join(features).split(",") for features in engine_features), f"{target}: the core includes the desktop POP3 transport"
+              assert all(
+                  feature not in ",".join(features).split(",")
+                  for features in engine_features
+                  for feature in ("pop3-runtime", "mime-parse")
+              ), f"{target}: the core includes the desktop POP3 or MIME parser feature"
           resources = json.loads(Path("src-tauri/tauri.windows.conf.json").read_text())["bundle"]["resources"]
           assert all("resources/vnc/" not in entry for entry in resources), "Core declares VNC module resources"
           build_script = Path("src-tauri/build.rs").read_text()

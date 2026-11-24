@@ -25,7 +25,7 @@ pub(super) fn candidates(
     load_candidates(db, account, folder, &selection)
 }
 
-pub(super) fn search_rows(
+pub(crate) fn search_rows(
     db: &Connection,
     account: &str,
     bodies: bool,

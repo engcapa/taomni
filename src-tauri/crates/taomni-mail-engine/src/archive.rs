@@ -1,6 +1,7 @@
 //! Streaming codec for immutable, content-addressed email archives.
 #[cfg(feature = "imap-runtime")]
 mod imap_chunks;
+#[cfg(feature = "mime-parse")]
 mod metadata;
 pub mod progress;
 pub mod scan_store;
@@ -16,14 +17,18 @@ pub use transfer::download_imap_original;
 
 use std::io::{BufRead, BufReader, Read, Write};
 
-use flate2::{Compression, read::GzDecoder, write::GzEncoder};
+use flate2::read::GzDecoder;
+#[cfg(feature = "mime-parse")]
+use flate2::{Compression, write::GzEncoder};
 use sha2::{Digest, Sha256};
 
+#[cfg(feature = "mime-parse")]
 use metadata::AttachmentScan;
 
 pub use taomni_mail_api::archive::{ArchiveChunk, ArchiveQuery, MessageObject};
 
 /// Encode into a staging writer. The archive owner handles publication.
+#[cfg(feature = "mime-parse")]
 pub fn compress_message(
     mut raw: impl Read,
     destination: impl Write,
@@ -60,6 +65,7 @@ pub fn compress_message(
     })
 }
 
+#[cfg(feature = "mime-parse")]
 pub fn has_attachment(source: impl Read) -> Result<bool, String> {
     let mut reader = GzDecoder::new(source);
     let mut scan = AttachmentScan::default();
@@ -151,7 +157,7 @@ fn verify_decoded(
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mime-parse"))]
 mod encoding_tests {
     use super::*;
     use std::io::Seek;

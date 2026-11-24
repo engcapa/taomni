@@ -42,8 +42,10 @@ pub(super) use local_mailbox::local_mailbox;
 pub(super) mod imap_archive_original;
 mod imap_outgoing;
 mod mutations;
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
 mod pop3;
 pub(super) mod pop3_attachment;
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
 mod pop3_round;
 pub(super) mod pop3_store;
 mod prefetch;
@@ -64,7 +66,9 @@ pub(super) use imap_outgoing::{
 };
 pub(super) use mbox::{export_imap_mbox, exports_imap_mbox};
 pub(super) use mutations::{HostedMutations, owns_mutation_journal, run_owned_job};
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
 pub(super) use pop3::{HostedPop3, syncs_pop3};
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
 pub(super) use pop3_round::{run_pop3_round, runs_pop3_rounds};
 pub(super) use prefetch::{prefetch_imap_bodies, prefetches_imap_bodies};
 

@@ -3,11 +3,14 @@ use super::index::object_path;
 use super::model::FullMessage;
 use super::model::PreparedMessage;
 use super::query::ArchiveKey;
-use crate::archive::{MessageObject, compress_message, verify_message};
+#[cfg(feature = "mime-parse")]
+use crate::archive::compress_message;
+use crate::archive::{MessageObject, verify_message};
 use rusqlite::params;
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 use std::fs;
 use std::fs::File;
+#[cfg(feature = "mime-parse")]
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
@@ -15,6 +18,7 @@ use taomni_mail_api::archive::StagedArchiveOriginal;
 
 const TEMPORARY_ORIGINAL_PREFIX: &str = ".archive-original-";
 
+#[cfg(feature = "mime-parse")]
 pub fn store(
     db: &Connection,
     account: &str,
@@ -34,6 +38,7 @@ pub fn store(
 }
 
 /// Compression runs outside the account DB lock. Relocation first stops this worker.
+#[cfg(feature = "mime-parse")]
 pub fn prepare(
     root: &Path,
     raw: impl Read,

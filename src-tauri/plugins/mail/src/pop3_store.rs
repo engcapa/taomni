@@ -1,7 +1,7 @@
 //! Read and mutate the local mailbox through the verified host's account store.
 
 mod archive;
-mod index;
+pub(super) mod index;
 #[cfg(test)]
 mod tests;
 
@@ -171,6 +171,8 @@ fn execute(
         Archive(action) => archive::execute(store, account, action, check),
         Delete { folder, uids } => {
             let db = store.open_writable_mailbox(account)?;
+            taomni_mail_engine::storage::query::complete_pending_attachment_backfill(&db)
+                .map_err(|_| unavailable())?;
             encode(
                 &local_store::delete_local(&db, account, &folder, uids.as_deref())
                     .map_err(|_| unavailable())?,
@@ -184,6 +186,8 @@ fn execute(
                 ));
             }
             let db = store.open_writable_mailbox(account)?;
+            taomni_mail_engine::storage::query::complete_pending_attachment_backfill(&db)
+                .map_err(|_| unavailable())?;
             local_store::delete_local_folder(&db, account, &name).map_err(|_| unavailable())?;
             encode(&local_store::list_local_folders(&db, account).map_err(|_| unavailable())?)
         }
@@ -194,7 +198,11 @@ fn execute(
     }
 }
 
-fn mutate(db: &Connection, account: &str, action: LocalMailboxAction) -> Result<Vec<u8>, RpcError> {
+pub(super) fn mutate(
+    db: &Connection,
+    account: &str,
+    action: LocalMailboxAction,
+) -> Result<Vec<u8>, RpcError> {
     use LocalMailboxAction::*;
 
     match action {
@@ -271,6 +279,6 @@ fn mutate(db: &Connection, account: &str, action: LocalMailboxAction) -> Result<
     encode(&local_store::list_local_folders(db, account).map_err(|_| unavailable())?)
 }
 
-fn encode(value: &impl Serialize) -> Result<Vec<u8>, RpcError> {
+pub(super) fn encode(value: &impl Serialize) -> Result<Vec<u8>, RpcError> {
     serde_json::to_vec(value).map_err(|_| unavailable())
 }

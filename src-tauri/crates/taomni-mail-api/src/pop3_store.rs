@@ -12,8 +12,28 @@ use crate::{
 };
 
 pub const LOCAL_MAILBOX: &str = "mail/local-pop3-mailbox";
+pub const LEGACY_LOCAL_MAILBOX: &str = "mail/legacy-pop3-mailbox";
 pub const SYNC_OWNED_MAILBOX: &str = "mail/sync-owned-pop3-mailbox";
+pub const SYNC_LEGACY_MAILBOX: &str = "mail/sync-legacy-pop3-mailbox";
 pub const READ_POP3_ATTACHMENT: &str = "mail/read-pop3-attachment";
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LegacyMailboxRequest {
+    pub account_id: String,
+    pub database: PathBuf,
+    pub action: LocalMailboxAction,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LegacyPop3Round {
+    pub account_id: String,
+    pub database: PathBuf,
+    pub connection: IncomingTest,
+    pub reply: Endpoint,
+    pub leave_days: Option<u32>,
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

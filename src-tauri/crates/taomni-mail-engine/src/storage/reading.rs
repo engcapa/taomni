@@ -123,7 +123,7 @@ fn open_file(path: &Path) -> Result<File, String> {
     File::open(path).map_err(|error| format!("Open saved email: {error}"))
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mime-parse"))]
 pub fn read(
     db: &Connection,
     account: &str,
@@ -135,7 +135,7 @@ pub fn read(
         .transpose()
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mime-parse"))]
 pub fn export(
     db: &Connection,
     account: &str,
@@ -157,7 +157,7 @@ pub fn list(db: &Connection, account: &str, offset: u32) -> Result<Vec<ArchiveEn
         }).map_err(|e|e.to_string())?.collect::<rusqlite::Result<_>>().map_err(|e|e.to_string())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mime-parse"))]
 pub fn read_entry(db: &Connection, account: &str, entry: &ArchiveEntry) -> Result<Vec<u8>, String> {
     open_entry(db, account, entry)?.read()
 }

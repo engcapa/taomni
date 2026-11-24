@@ -71,6 +71,8 @@ impl ArchivePreviews {
             .map_err(|error| RpcError::new(ErrorCode::InvalidState, error))?;
         check()?;
         let mut db = connect(&database, OpenFlags::SQLITE_OPEN_READ_WRITE)?;
+        taomni_mail_engine::storage::query::complete_pending_attachment_backfill(&db)
+            .map_err(|_| super::store::unavailable())?;
         let check = || check().map_err(|error| error.message);
         match request.action {
             ArchiveIndexAction::Preview { selection } => {

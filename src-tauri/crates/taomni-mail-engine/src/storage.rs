@@ -8,7 +8,7 @@ pub mod query;
 mod reading;
 pub mod scan;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mime-parse"))]
 mod tests;
 
 pub use cleanup::{
@@ -18,5 +18,7 @@ pub use cleanup::{
 pub(crate) use index::object_path;
 pub use index::{account_root, init_tables, lookup};
 pub use model::{ArchiveEntry, FullMessage, FullMessageMode, PreparedMessage};
-pub use publication::{open_staged_original, prepare, prepare_with, publish, store};
+pub use publication::{open_staged_original, prepare_with, publish};
+#[cfg(feature = "mime-parse")]
+pub use publication::{prepare, store};
 pub use reading::{OpenMessage, list, open, open_entry, open_with};

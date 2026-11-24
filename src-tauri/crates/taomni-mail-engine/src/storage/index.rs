@@ -1,8 +1,10 @@
 use super::model::FullMessage;
+#[cfg(feature = "mime-parse")]
 use crate::archive::has_attachment;
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::params;
+#[cfg(feature = "mime-parse")]
 use std::fs::File;
 use std::path::Path;
 use std::path::PathBuf;
@@ -50,6 +52,7 @@ pub fn account_root(db: &Connection, account_id: &str) -> Result<PathBuf, String
     )))
 }
 
+#[cfg(feature = "mime-parse")]
 pub(super) fn legacy_attachment_flag(
     db: &Connection,
     account: &str,

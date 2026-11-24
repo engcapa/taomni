@@ -115,5 +115,5 @@ pub fn publish_original(
     })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mime-parse"))]
 mod tests;

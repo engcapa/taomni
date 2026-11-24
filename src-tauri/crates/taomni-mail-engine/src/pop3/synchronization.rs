@@ -100,9 +100,12 @@ pub fn plan_round(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "mime-parse")]
     use super::super::{local_store, sqlite_ledger};
     use super::*;
+    #[cfg(feature = "mime-parse")]
     use rusqlite::Connection;
+    #[cfg(feature = "mime-parse")]
     use std::sync::Mutex;
 
     #[test]
@@ -125,6 +128,7 @@ mod tests {
         assert!(keep.is_empty(), "no policy keeps everything on the server");
     }
 
+    #[cfg(feature = "mime-parse")]
     struct ServerRound<'a> {
         db: &'a Mutex<Connection>,
         accepts_quit: bool,
@@ -132,6 +136,7 @@ mod tests {
         requested_delete: bool,
     }
 
+    #[cfg(feature = "mime-parse")]
     impl Pop3Mailbox for ServerRound<'_> {
         fn uidl(&mut self) -> Result<Vec<(u32, String)>, String> {
             assert!(self.db.try_lock().is_ok());
@@ -160,6 +165,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "mime-parse")]
     #[test]
     fn unconfirmed_quit_keeps_the_original_and_retries_deletion_without_redownloading() {
         let conn = Connection::open_in_memory().unwrap();
@@ -209,6 +215,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "mime-parse")]
     #[test]
     fn download_rolls_back_original_header_and_receipt_together() {
         let conn = Connection::open_in_memory().unwrap();

@@ -53,6 +53,7 @@ fn folder_step_keeps_current_list_metadata_across_a_subscription_change() {
     assert_eq!(cached.flags, ["\\Archive"]);
 }
 
+#[cfg(feature = "mime-parse")]
 #[test]
 fn folder_round_keeps_headers_and_watermark_at_the_same_commit() {
     let conn = Connection::open_in_memory().unwrap();
@@ -165,6 +166,7 @@ fn migration_is_idempotent_and_keeps_rows() {
     );
 }
 
+#[cfg(feature = "mime-parse")]
 #[test]
 fn purge_cached_folder_removes_folder_and_subfolders_only() {
     let conn = Connection::open_in_memory().unwrap();

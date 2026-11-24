@@ -1,11 +1,17 @@
 //! Account-scoped persistence for downloaded POP3 originals and receipts.
 
-use std::{collections::HashMap, ops::Deref};
+use std::collections::HashMap;
+#[cfg(feature = "mime-parse")]
+use std::ops::Deref;
 
+#[cfg(feature = "mime-parse")]
 use rusqlite::{Connection, Transaction, TransactionBehavior, params};
 
+#[cfg(feature = "mime-parse")]
 use super::local_store;
-use crate::{MailMessageCached, MailMessageHeader};
+#[cfg(feature = "mime-parse")]
+use crate::MailMessageCached;
+use crate::MailMessageHeader;
 
 pub trait Pop3Ledger {
     fn known_messages(&self) -> Result<HashMap<String, i64>, String>;
@@ -19,11 +25,13 @@ pub trait Pop3Ledger {
     fn confirm_deletions(&self, uidls: &[&str]) -> Result<(), String>;
 }
 
+#[cfg(feature = "mime-parse")]
 struct SqliteLedger<'a, F> {
     database: F,
     account: &'a str,
 }
 
+#[cfg(feature = "mime-parse")]
 pub fn sqlite_ledger<D: Deref<Target = Connection>>(
     database: impl Fn() -> Result<D, String>,
     account: &str,
@@ -31,6 +39,7 @@ pub fn sqlite_ledger<D: Deref<Target = Connection>>(
     SqliteLedger { database, account }
 }
 
+#[cfg(feature = "mime-parse")]
 impl<D, F> Pop3Ledger for SqliteLedger<'_, F>
 where
     D: Deref<Target = Connection>,
@@ -79,6 +88,7 @@ where
     }
 }
 
+#[cfg(feature = "mime-parse")]
 fn known_messages(conn: &Connection, account: &str) -> rusqlite::Result<HashMap<String, i64>> {
     let mut query =
         conn.prepare("SELECT uidl, fetched_at FROM mail_pop3_uidl WHERE account_id = ?1")?;
@@ -87,6 +97,7 @@ fn known_messages(conn: &Connection, account: &str) -> rusqlite::Result<HashMap<
         .collect()
 }
 
+#[cfg(feature = "mime-parse")]
 fn commit_download(
     conn: &Connection,
     account: &str,
@@ -108,6 +119,7 @@ fn commit_download(
     Ok(Some(message))
 }
 
+#[cfg(feature = "mime-parse")]
 fn database_error(error: rusqlite::Error) -> String {
     error.to_string()
 }

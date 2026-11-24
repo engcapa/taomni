@@ -18,11 +18,13 @@ use std::{
     time::Duration,
 };
 use taomni_mail_api::archive_scan::{ArchiveScanAction, ArchiveScanStatus};
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use taomni_mail_engine::archive::writer::LocalEncoder;
 use taomni_mail_engine::{
     archive::{
         progress::{ArchiveStatus, ScanProgress},
         scan_store::ArchiveScanStore,
-        writer::{ArchiveMailbox, LocalEncoder, OriginalEncoder},
+        writer::{ArchiveMailbox, OriginalEncoder},
     },
     storage::scan,
 };
@@ -111,7 +113,14 @@ pub(super) fn start(app: AppHandle, config: MailAccountConfig, resume: bool) -> 
                 crate::mail::module_host::ArchiveEncoder::for_registry(&runtime, &state.plugins);
             let encoder: &dyn OriginalEncoder = match &encoder {
                 Some(host) => host,
-                None => &LocalEncoder,
+                None => {
+                    #[cfg(any(test, feature = "legacy-mail-imap"))]
+                    {
+                        &LocalEncoder
+                    }
+                    #[cfg(not(any(test, feature = "legacy-mail-imap")))]
+                    return Err(crate::mail::SIGNED_MAIL_ARCHIVE_REQUIRED.to_string());
+                }
             };
             let hosted_scan = module_host::HostedArchiveScan {
                 registry: &state.plugins,

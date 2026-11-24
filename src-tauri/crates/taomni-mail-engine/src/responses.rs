@@ -193,27 +193,32 @@ mod tests {
                 Some("reader@example.com")
             );
             assert_eq!(message.envelope.recipients, ["chair@example.com"]);
-            let parsed = mail_parser::MessageParser::default()
-                .parse(&message.bytes)
-                .unwrap();
-            use mail_parser::MimeHeaders;
-            let calendar = parsed
-                .parts
-                .iter()
-                .find(|part| {
-                    part.content_type().is_some_and(|kind| {
-                        kind.ctype() == "text" && kind.subtype() == Some("calendar")
+            #[cfg(feature = "mime-parse")]
+            {
+                let parsed = mail_parser::MessageParser::default()
+                    .parse(&message.bytes)
+                    .unwrap();
+                use mail_parser::MimeHeaders;
+                let calendar = parsed
+                    .parts
+                    .iter()
+                    .find(|part| {
+                        part.content_type().is_some_and(|kind| {
+                            kind.ctype() == "text" && kind.subtype() == Some("calendar")
+                        })
                     })
-                })
-                .unwrap();
-            let ics = std::str::from_utf8(calendar.contents()).unwrap();
-            for line in [
-                "METHOD:REPLY",
-                "UID:event-1",
-                "SEQUENCE:3",
-                &format!("ATTENDEE;PARTSTAT={expected};CN=\"Reader\":mailto:reader@example.com"),
-            ] {
-                assert!(ics.contains(line), "{line}");
+                    .unwrap();
+                let ics = std::str::from_utf8(calendar.contents()).unwrap();
+                for line in [
+                    "METHOD:REPLY",
+                    "UID:event-1",
+                    "SEQUENCE:3",
+                    &format!(
+                        "ATTENDEE;PARTSTAT={expected};CN=\"Reader\":mailto:reader@example.com"
+                    ),
+                ] {
+                    assert!(ics.contains(line), "{line}");
+                }
             }
         }
         invite.method = "CANCEL".into();
@@ -248,10 +253,13 @@ mod tests {
         assert!(raw.contains("Final-Recipient: rfc822;me@example.com\r\n"));
         assert!(raw.contains("Original-Message-ID: <orig@example.com>\r\n"));
         assert!(raw.contains("Disposition: manual-action/MDN-sent-manually; displayed\r\n"));
-        let parsed = mail_parser::MessageParser::default()
-            .parse(raw.as_bytes())
-            .unwrap();
-        assert_eq!(parsed.parts.len(), 3, "multipart + two parts");
+        #[cfg(feature = "mime-parse")]
+        {
+            let parsed = mail_parser::MessageParser::default()
+                .parse(raw.as_bytes())
+                .unwrap();
+            assert_eq!(parsed.parts.len(), 3, "multipart + two parts");
+        }
         let auto = build_mdn("me@example.com", None, "boss@example.com", &header, true, 1);
         assert!(auto.contains("automatic-action/MDN-sent-automatically"));
         assert!(auto.contains("From: me@example.com\r\n"));

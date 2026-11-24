@@ -1,10 +1,13 @@
+use crate::MailFolder;
+#[cfg(feature = "mime-parse")]
+use crate::cache::{cached_to_body, get_cached_body, upsert_message};
 use crate::cache::{
-    cached_to_body, get_cached_body, list_cached_folders, mark_cached_messages_read,
-    unread_cached_uids, update_cached_flags, upsert_folder, upsert_message,
+    list_cached_folders, mark_cached_messages_read, unread_cached_uids, update_cached_flags,
+    upsert_folder,
 };
 use crate::now_ts;
-use crate::parse_body_message;
-use crate::{MailFolder, MailMessageBody, MailMessageCached};
+#[cfg(feature = "mime-parse")]
+use crate::{MailMessageBody, MailMessageCached, parse_body_message};
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::Result as SqlResult;
@@ -143,6 +146,7 @@ pub fn refresh_counts(conn: &Connection, account_id: &str, folder: &str) -> SqlR
     Ok(())
 }
 
+#[cfg(feature = "mime-parse")]
 fn next_uid(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<u32> {
     conn.query_row(
         "SELECT MAX(COALESCE((SELECT MAX(uid) FROM mail_messages WHERE account_id = ?1 AND folder = ?2), 0),
@@ -156,6 +160,7 @@ fn next_uid(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<u32>
 }
 
 /// Store a raw message in a local folder; returns the cached row.
+#[cfg(feature = "mime-parse")]
 pub fn insert_local(
     conn: &Connection,
     account_id: &str,
@@ -200,6 +205,7 @@ pub fn local_raw(
     select_local_raw(conn, account_id, folder, uid)
 }
 
+#[cfg(feature = "mime-parse")]
 pub fn local_body(
     conn: &Connection,
     account_id: &str,
@@ -222,6 +228,7 @@ pub fn local_body(
     }))
 }
 
+#[cfg(feature = "mime-parse")]
 pub fn import_local_messages(
     conn: &Connection,
     account_id: &str,
@@ -284,6 +291,7 @@ fn select_local_raw(
 }
 
 /// Move (or copy) local messages; returns the count.
+#[cfg(feature = "mime-parse")]
 pub fn move_local(
     conn: &Connection,
     account_id: &str,
@@ -298,6 +306,7 @@ pub fn move_local(
     Ok(moved)
 }
 
+#[cfg(feature = "mime-parse")]
 pub fn move_local_in_transaction(
     conn: &Connection,
     account_id: &str,
@@ -332,6 +341,7 @@ pub fn move_local_in_transaction(
     Ok(moved)
 }
 
+#[cfg(feature = "mime-parse")]
 fn delete_rows(conn: &Connection, account_id: &str, folder: &str, uid: u32) -> SqlResult<()> {
     conn.execute(
         "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
@@ -345,6 +355,7 @@ fn delete_rows(conn: &Connection, account_id: &str, folder: &str, uid: u32) -> S
 }
 
 /// Permanently delete local messages (`uids` None = the whole folder).
+#[cfg(feature = "mime-parse")]
 pub fn delete_local(
     conn: &Connection,
     account_id: &str,
@@ -415,6 +426,7 @@ pub fn rename_local_folder_in_transaction(
     Ok(())
 }
 
+#[cfg(feature = "mime-parse")]
 pub fn delete_local_folder(conn: &Connection, account_id: &str, name: &str) -> SqlResult<()> {
     delete_local(conn, account_id, name, None)?;
     conn.execute(
@@ -424,5 +436,5 @@ pub fn delete_local_folder(conn: &Connection, account_id: &str, name: &str) -> S
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mime-parse"))]
 mod tests;

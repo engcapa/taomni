@@ -1,14 +1,19 @@
+#[cfg(feature = "mime-parse")]
 use mail_parser::{Address, MessageParser, MimeHeaders, PartType};
 
+#[cfg(feature = "mime-parse")]
 use crate::inline_images::rewrite_cid_images_in_html;
+#[cfg(feature = "mime-parse")]
 use crate::{
-    DownloadedMailAttachment, MailAddress, MailAttachmentInfo, MailMessageCached,
-    MailMessageHeader, now_ts, parse_list_unsubscribe,
+    DownloadedMailAttachment, MailAddress, MailAttachmentInfo, now_ts, parse_list_unsubscribe,
 };
+use crate::{MailMessageCached, MailMessageHeader};
 
 /// Cap for HTML bodies after embedding inline CID images as data URLs.
+#[cfg(feature = "mime-parse")]
 const MAX_EMBEDDED_BODY_BYTES: usize = 5 * 1024 * 1024;
 
+#[cfg(feature = "mime-parse")]
 pub struct HeaderInput<'a> {
     pub account_id: &'a str,
     pub folder: &'a str,
@@ -19,6 +24,7 @@ pub struct HeaderInput<'a> {
     pub raw_size: Option<u32>,
 }
 
+#[cfg(feature = "mime-parse")]
 pub fn parse_header(input: HeaderInput<'_>) -> MailMessageCached {
     let HeaderInput {
         account_id,
@@ -92,6 +98,7 @@ pub fn parse_header(input: HeaderInput<'_>) -> MailMessageCached {
 
 /// Message ids of an `In-Reply-To` / `References` header, angle brackets
 /// stripped, in header order.
+#[cfg(feature = "mime-parse")]
 pub fn header_message_ids(value: &mail_parser::HeaderValue<'_>) -> Vec<String> {
     let raw: Vec<String> = match value {
         mail_parser::HeaderValue::Text(text) => vec![text.to_string()],
@@ -109,6 +116,7 @@ pub fn header_message_ids(value: &mail_parser::HeaderValue<'_>) -> Vec<String> {
         .collect()
 }
 
+#[cfg(feature = "mime-parse")]
 pub fn parse_body_message(
     account_id: &str,
     folder: &str,
@@ -202,6 +210,7 @@ pub fn parse_body_message(
 }
 
 /// Receipt address of a read-receipt request (RFC 8098 §2.1).
+#[cfg(feature = "mime-parse")]
 fn receipt_request(message: &mail_parser::Message<'_>) -> Option<String> {
     let raw = message.header_raw("Disposition-Notification-To")?;
     let address = match (raw.find('<'), raw.rfind('>')) {
@@ -302,6 +311,7 @@ pub fn thread_references(references: &[String], in_reply_to: Option<&str>) -> St
         .join(" ")
 }
 
+#[cfg(feature = "mime-parse")]
 fn address_list(addr: Option<&Address<'_>>) -> Vec<MailAddress> {
     addr.map(|addr| {
         addr.iter()
@@ -314,6 +324,7 @@ fn address_list(addr: Option<&Address<'_>>) -> Vec<MailAddress> {
     .unwrap_or_default()
 }
 
+#[cfg(feature = "mime-parse")]
 pub fn attachment_info(part: &mail_parser::MessagePart<'_>) -> MailAttachmentInfo {
     let size = match &part.body {
         PartType::Text(s) | PartType::Html(s) => Some(s.len()),
@@ -333,6 +344,7 @@ pub fn attachment_info(part: &mail_parser::MessagePart<'_>) -> MailAttachmentInf
     }
 }
 
+#[cfg(feature = "mime-parse")]
 pub fn extract_attachment(
     body: &[u8],
     attachment_index: usize,
@@ -350,6 +362,7 @@ pub fn extract_attachment(
 
 /// Resolve IMAP section numbering against the MIME tree, independent of the
 /// parser's attachment list (which can order inline/alternative parts differently).
+#[cfg(feature = "mime-parse")]
 pub fn extract_attachment_section(
     body: &[u8],
     section: &str,
@@ -387,6 +400,7 @@ pub fn extract_attachment_section(
     decoded_attachment(part)
 }
 
+#[cfg(feature = "mime-parse")]
 fn decoded_attachment(
     part: &mail_parser::MessagePart<'_>,
 ) -> Result<DownloadedMailAttachment, String> {
@@ -425,6 +439,7 @@ pub fn truncate_utf8_bytes(value: &str, max_bytes: usize) -> String {
     value[..end].to_string()
 }
 
+#[cfg(feature = "mime-parse")]
 fn normalize_preview(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
 }

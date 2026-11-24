@@ -136,6 +136,32 @@ pub(crate) async fn hosted<T: DeserializeOwned + Send + 'static>(
     module_host::pop3_store::run(state.plugins.clone(), account, action).await
 }
 
+pub(crate) async fn run_legacy<T: DeserializeOwned + Send + 'static>(
+    state: &AppState,
+    account: &str,
+    action: LocalMailboxAction,
+) -> Result<T, String> {
+    module_host::pop3_store::run_legacy(
+        state.plugins.clone(),
+        state.mail_db(account)?,
+        account,
+        action,
+    )
+    .await
+}
+
+#[cfg(not(any(test, feature = "legacy-mail-pop3")))]
+pub(super) fn legacy_unavailable(registry: &crate::plugin::PluginRegistry) -> String {
+    if registry
+        .get("mail")
+        .is_some_and(|entry| entry.state == LifecycleState::Enabled)
+    {
+        "Update the Mail module to open this POP3 mailbox".into()
+    } else {
+        super::SIGNED_MAIL_CONNECTION_REQUIRED.into()
+    }
+}
+
 pub(super) async fn run<T>(
     state: &AppState,
     account: &str,
@@ -145,10 +171,40 @@ pub(super) async fn run<T>(
 where
     T: DeserializeOwned + Send + 'static,
 {
-    with_account_owner(state, account, action, async {
-        mail_db_task(state.mail_db(account)?, account.to_owned(), legacy).await
-    })
-    .await
+    let _authority = state
+        .legacy
+        .mail
+        .pop3_owner_gate(account)
+        .lock_owned()
+        .await;
+    if is_hosted(state, account).await? {
+        return hosted(state, account, action).await;
+    }
+    if module_host::pop3_store::supports_legacy(&state.plugins) {
+        return run_legacy(state, account, action).await;
+    }
+    mail_db_task(state.mail_db(account)?, account.to_owned(), legacy).await
+}
+
+#[cfg(not(any(test, feature = "legacy-mail-pop3")))]
+pub(super) async fn run_with_host<T: DeserializeOwned + Send + 'static>(
+    state: &AppState,
+    account: &str,
+    action: LocalMailboxAction,
+) -> Result<T, String> {
+    let _authority = state
+        .legacy
+        .mail
+        .pop3_owner_gate(account)
+        .lock_owned()
+        .await;
+    if is_hosted(state, account).await? {
+        return hosted(state, account, action).await;
+    }
+    if module_host::pop3_store::supports_legacy(&state.plugins) {
+        return run_legacy(state, account, action).await;
+    }
+    Err(legacy_unavailable(&state.plugins))
 }
 
 pub(super) async fn with_account_owner<T: DeserializeOwned + Send + 'static>(

@@ -488,6 +488,6 @@ fn sync_directories(path: &Path, control: &SnapshotControl) -> Result<(), String
     check(control)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "mime-parse"))]
 #[path = "migration_tests.rs"]
 mod tests;
