@@ -14,9 +14,6 @@ timeout_sec: 660
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
-- module_marketplace_probe: {phase: source}
-- reload_window: null
-- wait_for: '[data-testid="status-bar"]'
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: 'module store'}
 - fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.vnc_server_previous_archive}'}
@@ -25,6 +22,9 @@ steps:
 - wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 60}
 - press: {selector: '[data-testid="module-action-enable-vnc-server"]:enabled', key: Enter}
 - wait_for: {selector: '[data-testid="module-action-disable-vnc-server"]:enabled', timeout_sec: 45}
+- module_marketplace_probe: {phase: source}
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="global-search-trigger"]'
 - wait_for: '[data-testid="global-search-modal"]'
@@ -172,7 +172,7 @@ verification:
   requirements:
   - id: old-enabled
     requirement: The previous signed host serves the runner-local desktop or displays the platform setup guidance.
-    actions: [4, 6, 7, 8, 9, 10, 12, 14, 15, 17, 18, 20, 25, 27]
+    actions: [3, 4, 5, 6, 7, 9, 12, 14, 15, 17, 18, 20, 25, 27]
     checkpoints:
     - {step: 29, expectation: The previous signed host serves the runner-local desktop or displays the platform setup guidance.}
     results: [29]
