@@ -21,7 +21,6 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 bundle_root="$repo_root/src-tauri/target/$target_triple/release/bundle"
 app="$bundle_root/macos/Taomni.app"
 main_executable="$app/Contents/MacOS/taomni"
-resource_root="$app/Contents/Resources"
 
 test -d "$app" || {
   echo "Taomni app bundle is missing: $app" >&2
@@ -122,28 +121,9 @@ test "$main_architectures" = "$expected_arch" || {
   exit 1
 }
 
-foreign_resources="$(find "$resource_root" -type d \( -path '*/sockscap/linux' -o -path '*/sockscap/windows' \) -print -quit)"
-if [ -n "$foreign_resources" ]; then
-  echo "Unexpected SocksCap resources in the macOS bundle: $foreign_resources" >&2
-  exit 1
-fi
-
-bridge_count="$(find "$resource_root" -type f -path '*/sockscap/macos/sockscap-redirector-bridge' | wc -l | tr -d ' ')"
-test "$bridge_count" = "1" || {
-  echo "Expected one SocksCap Redirector bridge in the macOS bundle, found $bridge_count" >&2
-  exit 1
-}
-bridge="$(find "$resource_root" -type f -path '*/sockscap/macos/sockscap-redirector-bridge' -print -quit)"
-test -x "$bridge"
-test "$(lipo -archs "$bridge")" = "$expected_arch"
-cmp "$bridge" "$repo_root/src-tauri/resources/sockscap/macos/sockscap-redirector-bridge"
-if [ -n "${updater_app:-}" ]; then
-  cmp "$bridge" "$updater_app/${bridge#"$app"/}"
-fi
-
 verify_separate_installer() {
   local misplaced
-  misplaced="$(find "$1" \( -name 'Mitmproxy Redirector.app.tar' -o -path '*/macos/redirector' -o -iname xray \) -print -quit)"
+  misplaced="$(find "$1" \( -path '*/sockscap/*' -o -name 'sockscap-redirector-bridge' -o -name 'Mitmproxy Redirector.app.tar' -o -path '*/macos/redirector' -o -iname xray \) -print -quit)"
   if [ -n "$misplaced" ]; then
     echo "The SocksCap module installer or runtime was included in the core bundle: $misplaced" >&2
     return 1
@@ -158,10 +138,10 @@ verify_test_fixture_absent() {
   fi
 }
 verify_test_fixture_absent "$app"
-verify_separate_installer "$resource_root"
+verify_separate_installer "$app"
 if [ -n "${updater_app:-}" ]; then
   verify_test_fixture_absent "$updater_app"
-  verify_separate_installer "$updater_app/Contents/Resources"
+  verify_separate_installer "$updater_app"
 fi
 
 if [ "$notarize" = true ]; then

@@ -143,7 +143,8 @@ jobs:
               }), f"{target}: the core still depends on a remote desktop client implementation"
               assert "taomni-plugin-vnc-server" not in packages, f"{target}: the core depends on the VNC daemon host"
               assert not packages.intersection({"taomni-plugin-servers", "taomni-local-servers-engine"}), f"{target}: the core depends on the Local servers engine"
-              assert not packages.intersection({"taomni-plugin-sockscap", "taomni-sockscap-xray"}), f"{target}: the core depends on the SocksCap Xray host or manager"
+              assert "taomni-sockscap-api" in packages, f"{target}: missing the shared SocksCap contract"
+              assert not packages.intersection({"taomni-plugin-sockscap", "taomni-sockscap-tools", "taomni-sockscap-xray"}), f"{target}: the core depends on the SocksCap host, tools or Xray manager"
               assert not packages.intersection({
                   "taomni-plugin-ai-voice-local", "taomni-local-voice-engine",
                   "whisper-rs", "whisper-rs-sys", "sherpa-onnx", "sherpa-onnx-sys", "llama-cpp-2",
@@ -168,6 +169,9 @@ jobs:
               ), f"{target}: the core includes the desktop POP3 or MIME parser feature"
           resources = json.loads(Path("src-tauri/tauri.windows.conf.json").read_text())["bundle"]["resources"]
           assert all("resources/vnc/" not in entry for entry in resources), "Core declares VNC module resources"
+          macos = json.loads(Path("src-tauri/tauri.macos.conf.json").read_text())
+          assert all("sockscap" not in entry for entry in macos["bundle"]["resources"]), "Core declares macOS SocksCap module resources"
+          assert all("sockscap" not in command for command in macos["build"].values()), "Core stages a macOS SocksCap helper"
           build_script = Path("src-tauri/build.rs").read_text()
           assert "compile_linux_sockscap_launcher" not in build_script and "taomni-sockscap-trace-launcher" not in build_script, "Core build.rs embeds the SocksCap Linux launcher"
           assert not Path("src-tauri/src/sockscap/capture/linux/trace_launcher.c").exists(), "Core retains SocksCap Linux launcher source"

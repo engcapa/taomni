@@ -210,6 +210,13 @@ class BundleFileTests(unittest.TestCase):
         record_payload_receipt('linux-x86_64', self.root)
         receipt = json.loads((self.root / 'core-payload-receipt.json').read_text())
         self.assertTrue(receipt['moduleReexecArguments']['--sockscap-redirector-bridge'])
+        (payload / 'usr/bin/taomni-sockscap-trace-launcher').write_bytes(b'module-owned helper')
+        raw.write_text(json.dumps({
+            'payload': tree_sample(payload), 'executableSha256': digest(executable),
+            'moduleReexecArguments': module_reexec_arguments(executable),
+        }))
+        with self.assertRaisesRegex(ValueError, 'module-owned SocksCap file'):
+            record_payload_receipt('linux-x86_64', self.root)
 
     def test_macos_and_windows_use_their_actual_package_families(self):
         targets = {

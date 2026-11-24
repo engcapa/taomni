@@ -1,7 +1,7 @@
 {
   "build": {
-    "beforeDevCommand": "bash scripts/stage-sockscap-macos-bridge.sh --dev && bash scripts/bundle-krb5-macos.sh stage && pnpm dev",
-    "beforeBuildCommand": "pnpm build && bash scripts/bundle-krb5-macos.sh stage && bash scripts/stage-sockscap-macos-bridge.sh --release"
+    "beforeDevCommand": "bash scripts/bundle-krb5-macos.sh stage && pnpm dev",
+    "beforeBuildCommand": "pnpm build && bash scripts/bundle-krb5-macos.sh stage"
   },
   "app": {
     "security": {
@@ -10,8 +10,7 @@
   },
   "bundle": {
     "resources": [
-      "resources/licenses/*",
-      "resources/sockscap/macos/[Rs]*"
+      "resources/licenses/*"
     ]
   }
 }

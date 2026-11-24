@@ -23,9 +23,7 @@ function fixture(t) {
   };
   put(join(app, "Contents/MacOS/taomni"), "#!/bin/sh\n# app executable\n", true);
   put(join(app, "Contents/Frameworks/libgssapi_krb5.2.2.dylib"), "bundled krb5");
-  const bridge = "sockscap/macos/sockscap-redirector-bridge";
-  put(join(root, "src-tauri/resources", bridge), "bridge executable", true);
-  put(join(app, "Contents/Resources", bridge), "bridge executable", true);
+  mkdirSync(join(app, "Contents/Resources"), { recursive: true });
   const pack = () => execFileSync("tar", ["-czf", `${app}.tar.gz`, "-C", bundle, "Taomni.app"], { env: { ...process.env, LC_ALL: "C", LANG: "C" }, stdio: "ignore" });
   pack();
   put(`${app}.tar.gz.sig`, "fixture signature");
@@ -85,7 +83,17 @@ test("macOS release rejects SocksCap resources from another desktop platform", (
   mkdirSync(join(f.app, "Contents/Resources/sockscap/windows"), { recursive: true });
   const result = f.run();
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Unexpected SocksCap resources in the macOS bundle/);
+  assert.match(result.stderr, /SocksCap module installer or runtime was included/);
+});
+
+test("core and archived updater each exclude the standalone Redirector bridge", (t) => {
+  const f = fixture(t);
+  const bridge = join(f.app, "Contents/MacOS/sockscap-redirector-bridge");
+  writeFileSync(bridge, "legacy bridge fixture");
+  assert.match(f.run().stderr, /SocksCap module installer or runtime was included/);
+  f.pack();
+  rmSync(bridge);
+  assert.match(f.run().stderr, /SocksCap module installer or runtime was included/);
 });
 
 test("core and archived updater each exclude the module-owned Redirector installer", (t) => {

@@ -32,5 +32,9 @@ for format in deb rpm appimage; do
     echo "The $format core package contains SocksCap's Xray executable" >&2
     exit 1
   fi
+  if grep -E '(^|/)taomni-sockscap-trace-launcher$' "$files"; then
+    echo "The $format core package contains the SocksCap module trace launcher" >&2
+    exit 1
+  fi
   echo "Verified $format core installer contents"
 done

@@ -193,7 +193,7 @@ pub async fn recover_system(
     #[cfg(target_os = "macos")]
     {
         let _ = sudo_password;
-        return macos::recover_system(_registry).await.map(|()| Vec::new());
+        return macos::recover_system().await.map(|()| Vec::new());
     }
     #[cfg(all(not(target_os = "linux"), not(windows), not(target_os = "macos")))]
     {

@@ -26,6 +26,8 @@ RUNNERS = {'linux-x86_64': 'ubuntu-22.04', 'windows-x86_64': 'windows-latest',
            'darwin-aarch64': 'macos-15', 'darwin-x86_64': 'macos-15-intel'}
 
 MODULE_REEXEC_ARGUMENTS = ('--vnc-special-key-hook', '--sockscap-redirector-bridge')
+SOCKSCAP_EXECUTABLES = {'xray', 'xray.exe', 'sockscap-redirector-bridge', 'taomni-sockscap-trace-launcher',
+                       'sockscap-helper.exe', 'windivert.dll', 'windivert64.sys'}
 
 
 def plan_targets(value: str, *, upgrade_desktop: bool = False, include_linux_inventory: bool = False,
@@ -189,6 +191,9 @@ def record_payload_receipt(target: str, directory: Path) -> None:
         raise ValueError('core payload file bytes do not match the observed total')
     if sorted(files, key=lambda row: (-row['bytes'], row['path']))[:25] != sample['largestFiles']:
         raise ValueError('core payload file inventory differs from its largest-file sample')
+    for row in files:
+        if row['path'].replace('\\', '/').rsplit('/', 1)[-1].casefold() in SOCKSCAP_EXECUTABLES:
+            raise ValueError(f"core payload contains a module-owned SocksCap file: {row['path']}")
 
     if target.startswith('darwin-'):
         executable_path = 'Contents/MacOS/taomni'

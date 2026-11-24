@@ -134,7 +134,6 @@ pub async fn start(
     let provider_cleanup = SocketCleanup(provider_socket_path.clone());
     let bridge = launch_bridge(
         &state.plugins,
-        false,
         &executable,
         &provider_socket_path,
         &flow_socket_path,

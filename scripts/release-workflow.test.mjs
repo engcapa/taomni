@@ -23,8 +23,8 @@ test("the Windows base excludes SocksCap and desktop installers retain their pla
   ]);
   assert.deepEqual(config(".macos").bundle.resources, [
     "resources/licenses/*",
-    "resources/sockscap/macos/[Rs]*",
   ]);
+  assert.doesNotMatch(JSON.stringify(config(".macos").build), /sockscap/i);
 });
 test("macOS native tests and bundles share a deployment target supporting Whisper filesystem APIs", () => {
   const config = JSON.parse(readFileSync(fileURLToPath(new URL("../src-tauri/tauri.conf.json", import.meta.url)), "utf8"));
