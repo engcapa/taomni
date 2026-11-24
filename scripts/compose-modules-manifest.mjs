@@ -154,6 +154,7 @@ export function composeModulesManifest({
   requireManifestSignature = false,
   manifestSignaturePath,
   legacyUpgrade,
+  allowProvisional = false,
 }) {
   if (!/^v\d+\.\d+\.\d+(?:-[\da-zA-Z.-]+)?(?:\+[\da-zA-Z.-]+)?$/.test(tag)) throw new Error("Invalid release tag");
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error("Invalid GitHub repository");
@@ -220,7 +221,8 @@ export function composeModulesManifest({
     }
     for (const id of legacyUpgrade) {
       const module = manifests.get(id);
-      if (id === "taomni-plugin-lanchat" || module?.status !== "stable" || !module.description) {
+      const allowedStatus = module?.status === "stable" || (allowProvisional && module?.status === "provisional");
+      if (id === "taomni-plugin-lanchat" || !allowedStatus || !module.description) {
         throw new Error(`legacyUpgrade requires a stable module with a description: ${id}`);
       }
       if (module.platforms.some((platform) => !plugins.get(id).platforms[platform])) {
@@ -228,7 +230,8 @@ export function composeModulesManifest({
       }
     }
     for (const module of manifests.values()) {
-      if (module.status === "stable" && !module.description) {
+      const allowedStatus = module.status === "stable" || (allowProvisional && module.status === "provisional");
+      if (allowedStatus && !module.description) {
         throw new Error(`Stable module ${module.id} needs a description for the module store`);
       }
     }
@@ -260,8 +263,8 @@ export function composeModulesManifest({
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const [artifactsDir, outputDir, mode, ...extra] = process.argv.slice(2);
-  if (!artifactsDir || !outputDir || (mode && !["--delta", "--first-release"].includes(mode)) || extra.length) {
-    throw new Error("Usage: node scripts/compose-modules-manifest.mjs <artifacts-dir> <staging-dir> [--delta|--first-release]");
+  if (!artifactsDir || !outputDir || (mode && !["--delta", "--first-release", "--rehearsal-first-release"].includes(mode)) || extra.length) {
+    throw new Error("Usage: node scripts/compose-modules-manifest.mjs <artifacts-dir> <staging-dir> [--delta|--first-release|--rehearsal-first-release]");
   }
   const published = process.env.MODULES_PUBLISHED_CATALOG
     ? readJson(process.env.MODULES_PUBLISHED_CATALOG, "published modules.json") : null;
@@ -272,7 +275,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const configuredRoster = process.env.MODULES_LEGACY_UPGRADE_IDS?.split(",").map((id) => id.trim()).filter(Boolean);
   let roster = configuredRoster?.length ? configuredRoster : published?.legacyUpgrade;
   if (mode === "--delta") roster = undefined;
-  if (mode === "--first-release") {
+  const allowProvisional = mode === "--rehearsal-first-release";
+  if (mode === "--first-release" || mode === "--rehearsal-first-release") {
     if (published) throw new Error("The initial roster cannot replace an existing published catalog");
     roster = readJson(new URL("../src-tauri/plugins/legacy-upgrade.json", import.meta.url), "first-release roster");
   }
@@ -287,6 +291,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     requireManifestSignature: process.env.MODULES_REQUIRE_SIGNATURE === "1",
     manifestSignaturePath: process.env.MODULES_MANIFEST_SIGNATURE,
     legacyUpgrade: roster,
+    allowProvisional,
   });
   console.log(`Staged ${result.assets.length} plugin packages for ${Object.keys(result.manifest.plugins).length} plugins${result.signedManifest ? " with signed modules.json" : ""}`);
 }

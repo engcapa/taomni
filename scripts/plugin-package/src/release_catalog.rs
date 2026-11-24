@@ -16,15 +16,29 @@ use crate::{
 };
 
 mod update;
-pub use update::prepare_catalog_update;
+pub use update::{prepare_catalog_update, prepare_catalog_update_rehearsal};
 
 const CATALOG: &str = "modules.json";
 const SIGNATURE: &str = "modules.json.minisig";
 const MAX_CATALOG: u64 = 4 * 1024 * 1024;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StatusPolicy {
+    StableOnly,
+    RehearsalAllowProvisional,
+}
+
 pub fn sign_staged(directory: &Path) -> Result<()> {
+    sign_staged_with_policy(directory, StatusPolicy::StableOnly)
+}
+
+pub fn sign_staged_rehearsal(directory: &Path) -> Result<()> {
+    sign_staged_with_policy(directory, StatusPolicy::RehearsalAllowProvisional)
+}
+
+fn sign_staged_with_policy(directory: &Path, policy: StatusPolicy) -> Result<()> {
     let verifier = public_verifier()?;
-    let catalog = inspect(directory, &verifier)?;
+    let catalog = inspect_with_policy(directory, &verifier, policy)?;
     let signer = ReleaseSigner::from_environment()?;
     let signature = signer.sign(&catalog.path, &catalog.comment())?;
     let mut temporary = tempfile::NamedTempFile::new_in(directory)?;
@@ -36,7 +50,17 @@ pub fn sign_staged(directory: &Path) -> Result<()> {
 
 pub fn verify_staged(directory: &Path) -> Result<()> {
     let verifier = public_verifier()?;
-    inspect_signed(directory, &verifier).map(|_| ())
+    inspect_signed_with_policy(directory, &verifier, StatusPolicy::StableOnly).map(|_| ())
+}
+
+pub fn verify_staged_rehearsal(directory: &Path) -> Result<()> {
+    let verifier = public_verifier()?;
+    inspect_signed_with_policy(
+        directory,
+        &verifier,
+        StatusPolicy::RehearsalAllowProvisional,
+    )
+    .map(|_| ())
 }
 
 /// Verify a published catalog before copying its exact bytes to a new core
@@ -75,10 +99,10 @@ fn check_release_roster(
     Ok(())
 }
 
-struct Catalog {
-    path: PathBuf,
+pub(crate) struct Catalog {
+    pub(crate) path: PathBuf,
     sequence: u64,
-    document: Value,
+    pub(crate) document: Value,
     raw: String,
 }
 
@@ -122,15 +146,31 @@ fn read_catalog(directory: &Path) -> Result<Catalog> {
 }
 
 fn inspect(directory: &Path, verifier: &minisign_verify::PublicKey) -> Result<Catalog> {
+    inspect_with_policy(directory, verifier, StatusPolicy::StableOnly)
+}
+
+pub(crate) fn inspect_with_policy(
+    directory: &Path,
+    verifier: &minisign_verify::PublicKey,
+    policy: StatusPolicy,
+) -> Result<Catalog> {
     let catalog = read_catalog(directory)?;
     validated_roster(&catalog.document)?;
-    verify_packages(directory, verifier, &catalog.document)?;
+    verify_packages_with_policy(directory, verifier, &catalog.document, policy)?;
     Ok(catalog)
 }
 
 fn inspect_signed(directory: &Path, verifier: &minisign_verify::PublicKey) -> Result<Catalog> {
+    inspect_signed_with_policy(directory, verifier, StatusPolicy::StableOnly)
+}
+
+pub(crate) fn inspect_signed_with_policy(
+    directory: &Path,
+    verifier: &minisign_verify::PublicKey,
+    policy: StatusPolicy,
+) -> Result<Catalog> {
     let catalog = read_signed_catalog(directory, verifier)?;
-    verify_packages(directory, verifier, &catalog.document)?;
+    verify_packages_with_policy(directory, verifier, &catalog.document, policy)?;
     Ok(catalog)
 }
 
@@ -171,10 +211,11 @@ fn validated_roster(doc: &Value) -> Result<BTreeSet<&str>> {
     Ok(seen)
 }
 
-fn verify_packages(
+pub(crate) fn verify_packages_with_policy(
     directory: &Path,
     verifier: &minisign_verify::PublicKey,
     doc: &Value,
+    policy: StatusPolicy,
 ) -> Result<()> {
     let api = crate::string(doc, "coreApiVersion")?;
     let plugins = catalog_plugins(doc)?;
@@ -202,7 +243,9 @@ fn verify_packages(
                 PLATFORMS.contains(&platform.as_str()),
                 "unsupported module platform: {platform}"
             );
-            verify_asset(directory, verifier, plugin, version, platform, asset)?;
+            verify_asset(
+                directory, verifier, plugin, version, platform, asset, policy,
+            )?;
         }
     }
     Ok(())
@@ -215,6 +258,7 @@ fn verify_asset(
     version: &str,
     platform: &str,
     asset: &Value,
+    policy: StatusPolicy,
 ) -> Result<()> {
     let id = crate::string(plugin, "id")?;
     let filename = format!("{id}-{version}-{platform}.taomni-plugin");
@@ -262,8 +306,14 @@ fn verify_asset(
     );
     let manifest: Value = serde_json::from_reader(entry)?;
     let description = crate::string(&manifest, "description")?.trim();
+    let status_ok = match policy {
+        StatusPolicy::StableOnly => manifest["status"] == "stable",
+        StatusPolicy::RehearsalAllowProvisional => {
+            matches!(manifest["status"].as_str(), Some("stable" | "provisional"))
+        }
+    };
     ensure!(
-        manifest["status"] == "stable" && !description.is_empty(),
+        status_ok && !description.is_empty(),
         "release module must be stable and described: {id}"
     );
     for key in ["id", "slug", "version", "name", "coreApiVersion", "kind"] {
@@ -338,6 +388,26 @@ mod tests {
         version: &str,
         tag: &str,
     ) -> (PathBuf, Value) {
+        stage_module_with_status(
+            root,
+            signer,
+            slug,
+            version,
+            tag,
+            "stable",
+            "Generate time-based codes",
+        )
+    }
+
+    pub(super) fn stage_module_with_status(
+        root: &Path,
+        signer: &ReleaseSigner,
+        slug: &str,
+        version: &str,
+        tag: &str,
+        status: &str,
+        description: &str,
+    ) -> (PathBuf, Value) {
         let payload = root.join("input");
         fs::create_dir_all(&payload).unwrap();
         fs::write(payload.join("host"), b"sample execution payload").unwrap();
@@ -345,7 +415,7 @@ mod tests {
         let platform = "linux-x86_64";
         let manifest = json!({
             "id": id, "slug": slug, "name": slug, "version": version, "coreApiVersion": "1",
-            "description": "Generate time-based codes", "status": "stable", "kind": "auth",
+            "description": description, "status": status, "kind": "auth",
             "platforms": [platform], "entry": {"host": "host"}, "permissions": ["vault.fixed-key"]
         });
         fs::write(
@@ -490,5 +560,64 @@ mod tests {
         fs::write(&verified.path, format!("{}\n", verified.raw)).unwrap();
         let corrupt = check_release_roster(&staged, Some(&published), verifier).unwrap_err();
         assert!(corrupt.to_string().contains("signature"));
+    }
+
+    #[test]
+    fn provisional_packages_require_rehearsal_policy_while_invalid_descriptions_and_experimental_stay_rejected()
+     {
+        let signer = ReleaseSigner::test_key();
+        let verifier = signer.test_verifier();
+
+        let root = tempfile::tempdir().unwrap();
+        let (provisional, _) = stage_module_with_status(
+            root.path(),
+            &signer,
+            "mfa",
+            "1.1.0",
+            "v0.6.0",
+            "provisional",
+            "Generate time-based codes",
+        );
+        assert!(inspect(&provisional, verifier).is_err());
+        assert!(inspect_with_policy(&provisional, verifier, StatusPolicy::StableOnly).is_err());
+        inspect_with_policy(
+            &provisional,
+            verifier,
+            StatusPolicy::RehearsalAllowProvisional,
+        )
+        .unwrap();
+
+        let empty_desc = tempfile::tempdir().unwrap();
+        let (blank, _) = stage_module_with_status(
+            empty_desc.path(),
+            &signer,
+            "mfa",
+            "1.1.0",
+            "v0.6.0",
+            "provisional",
+            "   ",
+        );
+        assert!(
+            inspect_with_policy(&blank, verifier, StatusPolicy::RehearsalAllowProvisional).is_err()
+        );
+
+        let experimental_dir = tempfile::tempdir().unwrap();
+        let (experimental, _) = stage_module_with_status(
+            experimental_dir.path(),
+            &signer,
+            "mfa",
+            "1.1.0",
+            "v0.6.0",
+            "experimental",
+            "Generate time-based codes",
+        );
+        assert!(
+            inspect_with_policy(
+                &experimental,
+                verifier,
+                StatusPolicy::RehearsalAllowProvisional,
+            )
+            .is_err()
+        );
     }
 }

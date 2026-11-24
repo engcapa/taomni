@@ -4,8 +4,8 @@ use anyhow::{Context, Result, ensure};
 use semver::Version;
 
 use super::{
-    CATALOG, catalog_plugins, inspect, inspect_signed, public_verifier, read_catalog,
-    verify_packages,
+    CATALOG, StatusPolicy, catalog_plugins, inspect_signed_with_policy, inspect_with_policy,
+    public_verifier, read_catalog, verify_packages_with_policy,
 };
 
 /// Prepare a complete catalog for a release of only the selected modules.
@@ -15,7 +15,28 @@ pub fn prepare_catalog_update(
     changed: &Path,
     output: &Path,
 ) -> Result<Vec<String>> {
-    prepare(previous, changed, output, &public_verifier()?)
+    prepare_with_policy(
+        previous,
+        changed,
+        output,
+        &public_verifier()?,
+        StatusPolicy::StableOnly,
+    )
+}
+
+/// Rehearsal-only delta preparation permitting signed provisional packages.
+pub fn prepare_catalog_update_rehearsal(
+    previous: &Path,
+    changed: &Path,
+    output: &Path,
+) -> Result<Vec<String>> {
+    prepare_with_policy(
+        previous,
+        changed,
+        output,
+        &public_verifier()?,
+        StatusPolicy::RehearsalAllowProvisional,
+    )
 }
 
 fn prepare(
@@ -24,6 +45,22 @@ fn prepare(
     output: &Path,
     verifier: &minisign_verify::PublicKey,
 ) -> Result<Vec<String>> {
+    prepare_with_policy(
+        previous,
+        changed,
+        output,
+        verifier,
+        StatusPolicy::StableOnly,
+    )
+}
+
+fn prepare_with_policy(
+    previous: &Path,
+    changed: &Path,
+    output: &Path,
+    verifier: &minisign_verify::PublicKey,
+    policy: StatusPolicy,
+) -> Result<Vec<String>> {
     ensure!(
         output.file_name().is_some()
             && output
@@ -31,7 +68,7 @@ fn prepare(
                 .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound),
         "choose an unused output directory"
     );
-    let baseline = inspect_signed(previous, verifier)?;
+    let baseline = inspect_signed_with_policy(previous, verifier, policy)?;
     let delta = read_catalog(changed)?;
     let mut document = baseline.document;
     ensure!(
@@ -48,7 +85,7 @@ fn prepare(
         "module-only releases must preserve the first-upgrade roster"
     );
     let updated_at = crate::string(&delta.document, "updatedAt")?;
-    verify_packages(changed, verifier, &delta.document)?;
+    verify_packages_with_policy(changed, verifier, &delta.document, policy)?;
     let updates = catalog_plugins(&delta.document)?;
     for (id, next) in updates {
         if let Some(current) = document["plugins"].get(id) {
@@ -107,7 +144,7 @@ fn prepare(
         staging.path().join(CATALOG),
         serde_json::to_vec_pretty(&document)?,
     )?;
-    inspect(staging.path(), verifier)?;
+    inspect_with_policy(staging.path(), verifier, policy)?;
     fs::rename(staging.path(), output)?;
     Ok(uploads)
 }

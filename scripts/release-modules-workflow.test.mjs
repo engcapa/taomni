@@ -182,3 +182,29 @@ test("an unexpected latest core release stops the catalog upload", (t) => {
   assert.equal(result.status, 1);
   assert(!calls.some((args) => args[1] === "upload"));
 });
+
+test("read-only catalog rehearsal skips publication and verifies the delta without release writes", () => {
+  const publishJob = workflow.split("\n  publish:\n")[1].split("\n  rehearse-catalog:\n")[0];
+  assert.match(publishJob, /if: \$\{\{ !inputs\.package_only && needs\.source\.result == 'success' && needs\.sign\.result == 'success' && needs\.source\.outputs\.rehearsal_baseline_run == '' \}\}/);
+  const coreWorkflow = readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
+  for (const prod of [publishJob, coreWorkflow]) {
+    assert.doesNotMatch(prod, /--rehearsal-allow-provisional|--rehearsal-first-release/);
+  }
+
+  const rehearsalJob = workflow.split("\n  rehearse-catalog:\n")[1];
+  assert.ok(rehearsalJob, "Missing rehearse-catalog job");
+  assert.match(rehearsalJob, /contents: read/);
+  assert.match(rehearsalJob, /actions: read/);
+  for (const needle of [
+    "--rehearsal-first-release",
+    "--delta",
+    "--prepare-catalog-update current-catalog changed-catalog next-catalog --rehearsal-allow-provisional",
+    "--verify-release-roster next-catalog current-catalog",
+    "--sign-catalog next-catalog --rehearsal-allow-provisional",
+    "--verify-catalog next-catalog --rehearsal-allow-provisional",
+    "verify-module-catalog-delta.mjs",
+  ]) {
+    assert(rehearsalJob.includes(needle), `Missing rehearsal step marker: ${needle}`);
+  }
+  assert.doesNotMatch(rehearsalJob, /gh release (?:create|upload|edit)/);
+});

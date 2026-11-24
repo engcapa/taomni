@@ -241,3 +241,44 @@ test("a changed module can be staged against a roster containing other modules",
   assert.deepEqual(Object.keys(catalog.plugins), [next.id]);
 });
 
+test("rehearsal-first-release accepts provisional roster modules while strict first-release rejects them", (t) => {
+  const f = fixture(t);
+  const roster = JSON.parse(readFileSync(new URL("../src-tauri/plugins/legacy-upgrade.json", import.meta.url), "utf8"));
+  const script = fileURLToPath(new URL("./compose-modules-manifest.mjs", import.meta.url));
+  for (const id of roster) {
+    const slug = id.slice("taomni-plugin-".length);
+    const manifest = JSON.parse(readFileSync(new URL(`../src-tauri/plugins/${slug}/module.json`, import.meta.url), "utf8"));
+    for (const platform of manifest.platforms) {
+      f.add(platform, `${slug} ${platform}`, { ...manifest, status: "provisional" });
+    }
+  }
+  const run = (mode, extraEnv = {}) => spawnSync(process.execPath, [script, f.artifacts, f.output, mode], {
+    env: { TAG: "v0.6.0", GITHUB_REPOSITORY: "engcapa/taomni", ...extraEnv },
+    encoding: "utf8",
+  });
+
+  const strict = run("--first-release");
+  assert.notEqual(strict.status, 0);
+  assert.match(strict.stderr, /legacyUpgrade requires a stable module/);
+  rmSync(f.output, { recursive: true, force: true });
+
+  const rehearsal = run("--rehearsal-first-release");
+  assert.equal(rehearsal.status, 0, rehearsal.stderr);
+  const catalog = JSON.parse(readFileSync(join(f.output, "modules.json"), "utf8"));
+  assert.deepEqual(catalog.legacyUpgrade, roster);
+  assert.equal(catalog.releaseExceptions["taomni-plugin-mobile"].placement, "core");
+
+  const previous = join(f.root, "published.json");
+  writeFileSync(previous, JSON.stringify({ sequence: 1, legacyUpgrade: roster }));
+  rmSync(f.output, { recursive: true, force: true });
+  const replacePublished = run("--rehearsal-first-release", { MODULES_PUBLISHED_CATALOG: previous });
+  assert.notEqual(replacePublished.status, 0);
+  assert.match(replacePublished.stderr, /initial roster cannot replace/);
+
+  rmSync(f.output, { recursive: true, force: true });
+  rmSync(join(f.artifacts, "plugin-sockscap", "linux-x86_64"), { recursive: true, force: true });
+  const missingPlatform = run("--rehearsal-first-release");
+  assert.notEqual(missingPlatform.status, 0);
+  assert.match(missingPlatform.stderr, /all declared platform assets for taomni-plugin-sockscap/);
+});
+

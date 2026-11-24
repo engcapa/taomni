@@ -22,6 +22,16 @@ on:
         default: macos-15
         type: choice
         options: [macos-15, macos-15-intel, macos-26, macos-latest]
+      rehearsal_baseline_run:
+        description: Artifact-only Release Bundle run ID for read-only single-module catalog rehearsal (never publishes)
+        required: false
+        default: ''
+        type: string
+      baseline_tag:
+        description: Baseline core release tag for read-only catalog rehearsal URLs
+        required: false
+        default: v0.6.0
+        type: string
   workflow_call:
     inputs:
       tag:
@@ -82,6 +92,8 @@ jobs:
       matrix: ${{ steps.source.outputs.matrix }}
       macos_runner: ${{ steps.source.outputs.macos_runner }}
       built_frontend: ${{ steps.source.outputs.built_frontend }}
+      rehearsal_baseline_run: ${{ steps.source.outputs.rehearsal_baseline_run }}
+      baseline_tag: ${{ steps.source.outputs.baseline_tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -95,6 +107,8 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           PACKAGE_ONLY: ${{ inputs.package_only || false }}
           MACOS_RUNNER: ${{ inputs.macos_runner || 'macos-15' }}
+          REHEARSAL_BASELINE_RUN: ${{ inputs.rehearsal_baseline_run || '' }}
+          BASELINE_TAG: ${{ inputs.baseline_tag || 'v0.6.0' }}
         run: |
           python - <<'PY'
           import json, os, pathlib, re, subprocess
@@ -103,12 +117,21 @@ jobs:
           tag = os.environ['RELEASE_TAG'].strip()
           package_only = os.environ['PACKAGE_ONLY'] == 'true'
           macos_runner = os.environ['MACOS_RUNNER']
+          rehearsal_baseline_run = os.environ['REHEARSAL_BASELINE_RUN'].strip()
+          baseline_tag = os.environ['BASELINE_TAG'].strip()
           if not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]*[a-z0-9])?', slug):
               raise SystemExit('module must be a lowercase module slug')
           if (tag or not package_only) and not re.fullmatch(r'v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)*', tag):
               raise SystemExit('tag must be a semantic version prefixed with v')
           if macos_runner not in {'macos-15', 'macos-15-intel', 'macos-26', 'macos-latest'}:
               raise SystemExit('select a supported GitHub-hosted macOS runner')
+          if rehearsal_baseline_run:
+              if package_only:
+                  raise SystemExit('rehearsal_baseline_run cannot be combined with package_only')
+              if not re.fullmatch(r'[1-9][0-9]*', rehearsal_baseline_run):
+                  raise SystemExit('rehearsal_baseline_run must be a numeric workflow run ID')
+              if not re.fullmatch(r'v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)*', baseline_tag) or baseline_tag == tag:
+                  raise SystemExit('baseline_tag must be a distinct semantic version prefixed with v')
           manifest_path = pathlib.Path('src-tauri/plugins') / slug / 'module.json'
           if not manifest_path.is_file():
               raise SystemExit(f'module manifest is missing: {manifest_path}')
@@ -116,7 +139,7 @@ jobs:
           if manifest.get('id') != f'taomni-plugin-{slug}':
               raise SystemExit('module id must match the selected slug')
           status = manifest.get('status')
-          if status != 'stable' and not (package_only and not tag and status == 'provisional'):
+          if status != 'stable' and not ((package_only and not tag and status == 'provisional') or (rehearsal_baseline_run and status == 'provisional')):
               raise SystemExit('only stable modules can enter a production catalog')
           if not manifest.get('description', '').strip():
               raise SystemExit('stable modules require a store description')
@@ -150,6 +173,8 @@ jobs:
               stream.write('matrix=' + json.dumps({'include': targets}, separators=(',', ':')) + '\n')
               stream.write(f'macos_runner={macos_runner}\n')
               stream.write(f'built_frontend={str(built_frontend).lower()}\n')
+              stream.write(f'rehearsal_baseline_run={rehearsal_baseline_run}\n')
+              stream.write(f'baseline_tag={baseline_tag}\n')
           PY
 
   desktop-frontend:
@@ -311,6 +336,7 @@ jobs:
           MODULE_SLUG: ${{ needs.source.outputs.slug }}
           RELEASE_TAG: ${{ inputs.tag }}
           PACKAGE_ONLY: ${{ inputs.package_only || false }}
+          REHEARSAL_BASELINE_RUN: ${{ needs.source.outputs.rehearsal_baseline_run }}
         run: |
           python - <<'PY'
           import json, os, pathlib, re, sys
@@ -335,7 +361,8 @@ jobs:
               raise SystemExit('candidate module metadata differs from trusted source')
           status = candidate.get('status')
           rehearsal = os.environ['PACKAGE_ONLY'] == 'true' and not os.environ['RELEASE_TAG'].strip()
-          if (status != 'stable' and not (rehearsal and status == 'provisional')) or candidate.get('id') != f"taomni-plugin-{os.environ['MODULE_SLUG']}":
+          catalog_rehearsal = bool(os.environ.get('REHEARSAL_BASELINE_RUN', '').strip())
+          if (status != 'stable' and not ((rehearsal or catalog_rehearsal) and status == 'provisional')) or candidate.get('id') != f"taomni-plugin-{os.environ['MODULE_SLUG']}":
               raise SystemExit('candidate module status or identity is invalid for this release')
           if any(path.is_symlink() for path in root.rglob('*')):
               raise SystemExit('candidate payload contains a symlink')
@@ -429,7 +456,7 @@ jobs:
   publish:
     name: Publish module catalog and packages
     needs: [source, sign]
-    if: ${{ !inputs.package_only && needs.source.result == 'success' && needs.sign.result == 'success' }}
+    if: ${{ !inputs.package_only && needs.source.result == 'success' && needs.sign.result == 'success' && needs.source.outputs.rehearsal_baseline_run == '' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     concurrency:
@@ -456,7 +483,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Run release and catalog contracts
         run: |
-          node --test scripts/fetch-published-module-assets.test.mjs scripts/compose-modules-manifest.test.mjs scripts/stage-published-module-catalog.test.mjs scripts/release-modules-workflow.test.mjs
+          node --test scripts/fetch-published-module-assets.test.mjs scripts/compose-modules-manifest.test.mjs scripts/stage-published-module-catalog.test.mjs scripts/verify-module-catalog-delta.test.mjs scripts/release-modules-workflow.test.mjs
           cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
           cargo build --manifest-path scripts/plugin-package/Cargo.toml --release --locked
       - uses: actions/download-artifact@v4
@@ -565,4 +592,145 @@ jobs:
             next-catalog/modules.json
             next-catalog/modules.json.minisig
           if-no-files-found: error
+          retention-days: 30
+
+  rehearse-catalog:
+    name: Rehearse read-only single-module catalog delta
+    needs: [source, sign]
+    if: ${{ !inputs.package_only && needs.source.outputs.rehearsal_baseline_run != '' && needs.source.result == 'success' && needs.sign.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.tag }}
+      BASELINE_TAG: ${{ needs.source.outputs.baseline_tag }}
+      BASELINE_RUN: ${{ needs.source.outputs.rehearsal_baseline_run }}
+      MODULE_SLUG: ${{ needs.source.outputs.slug }}
+      MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run release and catalog contracts
+        run: |
+          node --test scripts/fetch-published-module-assets.test.mjs scripts/compose-modules-manifest.test.mjs scripts/stage-published-module-catalog.test.mjs scripts/verify-module-catalog-delta.test.mjs scripts/release-modules-workflow.test.mjs
+          cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
+          cargo build --manifest-path scripts/plugin-package/Cargo.toml --release --locked
+      - id: baseline
+        name: Validate baseline Release Bundle run
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+
+          repo = os.environ['GH_REPO']
+          run_id = os.environ['BASELINE_RUN']
+          raw = subprocess.check_output(['gh', 'api', f'repos/{repo}/actions/runs/{run_id}'], text=True)
+          run = json.loads(raw)
+          if (
+              run.get('path') != '.github/workflows/release.yml'
+              or run.get('event') != 'workflow_dispatch'
+              or run.get('status') != 'completed'
+              or run.get('conclusion') != 'success'
+              or (run.get('repository') or {}).get('full_name') != repo
+          ):
+              raise SystemExit(f'Invalid baseline Release Bundle run {run_id}: {run}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
+              stream.write(f"sha={run['head_sha']}\n")
+              stream.write(f"updated_at={run['created_at']}\n")
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ needs.source.outputs.rehearsal_baseline_run }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: module-signed-*-${{ needs.source.outputs.rehearsal_baseline_run }}
+          path: baseline-signed-artifacts
+          merge-multiple: false
+      - name: Stage and sign baseline rehearsal catalog
+        env:
+          BASELINE_UPDATED_AT: ${{ steps.baseline.outputs.updated_at }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          TAG="$BASELINE_TAG" MODULE_SEQUENCE=1 MODULE_UPDATED_AT="$BASELINE_UPDATED_AT" MODULES_REQUIRE_SIGNATURE=0 \
+            node scripts/compose-modules-manifest.mjs baseline-signed-artifacts current-catalog --rehearsal-first-release
+          scripts/plugin-package/target/release/taomni-plugin-package --sign-catalog current-catalog --rehearsal-allow-provisional
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog-signature current-catalog
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog current-catalog --rehearsal-allow-provisional
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: module-signed-${{ needs.source.outputs.slug }}-*-${{ github.run_id }}
+          path: signed-artifacts
+          merge-multiple: false
+      - name: Compose and merge module catalog delta
+        env:
+          MODULES_PUBLISHED_CATALOG: current-catalog/modules.json
+          MODULE_SEQUENCE: ${{ github.run_number }}
+          MODULES_REQUIRE_SIGNATURE: '0'
+          MODULE_UPDATED_AT: ${{ needs.source.outputs.committed_at }}
+          MODULE_TARGETS: ${{ needs.source.outputs.matrix }}
+        run: |
+          set -euo pipefail
+          mkdir -p changed-modules
+          find signed-artifacts -type f -name '*.taomni-plugin' -exec cp {} changed-modules/ \;
+          find signed-artifacts -type f -name '*.taomni-plugin.minisig' -exec cp {} changed-modules/ \;
+          expected="$(node -e 'console.log(JSON.parse(process.env.MODULE_TARGETS).include.length)')"
+          test "$(find changed-modules -type f -name '*.taomni-plugin' | wc -l)" = "$expected"
+          node scripts/compose-modules-manifest.mjs changed-modules changed-catalog --delta
+          scripts/plugin-package/target/release/taomni-plugin-package \
+            --prepare-catalog-update current-catalog changed-catalog next-catalog --rehearsal-allow-provisional > new-assets.json
+          cp changed-catalog/SHA256SUMS next-catalog/SHA256SUMS
+          (cd next-catalog && sha256sum --check --strict SHA256SUMS)
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-release-roster next-catalog current-catalog
+      - name: Sign and verify rehearsed catalog
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          scripts/plugin-package/target/release/taomni-plugin-package --sign-catalog next-catalog --rehearsal-allow-provisional
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog next-catalog --rehearsal-allow-provisional
+      - name: Verify single-module catalog delta invariants
+        env:
+          BASELINE_SHA: ${{ steps.baseline.outputs.sha }}
+        run: |
+          node scripts/verify-module-catalog-delta.mjs \
+            --baseline current-catalog/modules.json \
+            --next next-catalog/modules.json \
+            --new-assets new-assets.json \
+            --sha256sums next-catalog/SHA256SUMS \
+            --module "$MODULE_SLUG" \
+            --tag "$TAG" \
+            --baseline-tag "$BASELINE_TAG" \
+            --repository "$GH_REPO" \
+            --source-sha "$MODULE_SOURCE_SHA" \
+            --baseline-run "$BASELINE_RUN" \
+            --baseline-sha "$BASELINE_SHA" \
+            --output delta-verification.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: module-rehearsal-evidence-${{ needs.source.outputs.slug }}-${{ github.run_id }}
+          path: |
+            delta-verification.json
+            new-assets.json
+            current-catalog/modules.json
+            current-catalog/modules.json.minisig
+            next-catalog/modules.json
+            next-catalog/modules.json.minisig
+            next-catalog/SHA256SUMS
+          if-no-files-found: warn
           retention-days: 30

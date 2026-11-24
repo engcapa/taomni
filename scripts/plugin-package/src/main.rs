@@ -51,15 +51,29 @@ fn run() -> Result<()> {
         .is_some_and(|argument| argument == "--prepare-catalog-update")
     {
         args.next();
-        let directories: Vec<_> = args.collect();
-        let [previous, changed, output] = directories.as_slice() else {
-            anyhow::bail!("expected --prepare-catalog-update PREVIOUS_DIR CHANGED_DIR OUTPUT_DIR");
+        let arguments: Vec<_> = args.collect();
+        let (previous, changed, output, allow_provisional) = match arguments.as_slice() {
+            [previous, changed, output] => (previous, changed, output, false),
+            [previous, changed, output, flag] if flag == "--rehearsal-allow-provisional" => {
+                (previous, changed, output, true)
+            }
+            _ => anyhow::bail!(
+                "expected --prepare-catalog-update PREVIOUS_DIR CHANGED_DIR OUTPUT_DIR [--rehearsal-allow-provisional]"
+            ),
         };
-        let assets = taomni_plugin_package::release_catalog::prepare_catalog_update(
-            Path::new(previous),
-            Path::new(changed),
-            Path::new(output),
-        )?;
+        let assets = if allow_provisional {
+            taomni_plugin_package::release_catalog::prepare_catalog_update_rehearsal(
+                Path::new(previous),
+                Path::new(changed),
+                Path::new(output),
+            )?
+        } else {
+            taomni_plugin_package::release_catalog::prepare_catalog_update(
+                Path::new(previous),
+                Path::new(changed),
+                Path::new(output),
+            )?
+        };
         println!("{}", serde_json::to_string_pretty(&assets)?);
         return Ok(());
     }
@@ -71,16 +85,27 @@ fn run() -> Result<()> {
         let path = args
             .next()
             .context("expected the staged catalog directory")?;
+        let extra = args.next();
         ensure!(
             args.next().is_none(),
             "catalog operations accept one directory"
         );
+        let allow_provisional = match (operation.as_str(), extra.as_deref()) {
+            (_, None) => false,
+            ("--sign-catalog" | "--verify-catalog", Some("--rehearsal-allow-provisional")) => true,
+            _ => anyhow::bail!("catalog operations accept one directory"),
+        };
         use taomni_plugin_package::release_catalog;
         let directory = Path::new(&path);
-        return match operation.as_str() {
-            "--sign-catalog" => release_catalog::sign_staged(directory),
-            "--verify-catalog-signature" => release_catalog::verify_catalog_signature(directory),
-            _ => release_catalog::verify_staged(directory),
+        return match (operation.as_str(), allow_provisional) {
+            ("--sign-catalog", false) => release_catalog::sign_staged(directory),
+            ("--sign-catalog", true) => release_catalog::sign_staged_rehearsal(directory),
+            ("--verify-catalog-signature", false) => {
+                release_catalog::verify_catalog_signature(directory)
+            }
+            ("--verify-catalog", false) => release_catalog::verify_staged(directory),
+            ("--verify-catalog", true) => release_catalog::verify_staged_rehearsal(directory),
+            _ => unreachable!("validated catalog operation"),
         };
     }
     let mut values = BTreeMap::new();
