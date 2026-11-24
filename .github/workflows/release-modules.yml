@@ -265,6 +265,11 @@ jobs:
         env:
           MODULE_TARGET: ${{ matrix.target }}
         run: python scripts/sockscap_windows_resource.py src-tauri/plugins/sockscap unsigned-module --helper "src-tauri/target/$MODULE_TARGET/release/sockscap-helper.exe"
+      - name: Build and stage Linux SocksCap trace launcher
+        if: needs.source.outputs.slug == 'sockscap' && runner.os == 'Linux'
+        run: |
+          python -m unittest discover -s scripts -p test_sockscap_linux_resource.py
+          python scripts/sockscap_linux_resource.py stage src-tauri/plugins/sockscap unsigned-module
       - uses: actions/upload-artifact@v4
         with:
           name: module-unsigned-${{ needs.source.outputs.slug }}-${{ matrix.platform }}-${{ github.run_id }}
@@ -311,6 +316,7 @@ jobs:
           import json, os, pathlib, re, sys
           sys.path.insert(0, 'scripts')
           from local_voice_runtime import verify_runtime
+          import sockscap_linux_resource as linux_capture
           import sockscap_redirector_resource as redirector
           root = pathlib.Path('candidate')
           observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
@@ -320,6 +326,7 @@ jobs:
           trusted = json.loads((pathlib.Path('src-tauri/plugins') / os.environ['MODULE_SLUG'] / 'module.json').read_text(encoding='utf-8'))
           candidate = json.loads((root / 'unsigned-module/module.json').read_text(encoding='utf-8'))
           redirector.verify(os.environ['MODULE_SLUG'], os.environ['MODULE_PLATFORM'], pathlib.Path('src-tauri/plugins') / os.environ['MODULE_SLUG'], root / 'unsigned-module')
+          linux_capture.verify(os.environ['MODULE_SLUG'], os.environ['MODULE_PLATFORM'], root / 'unsigned-module')
           host = trusted.get('entry', {}).get('host')
           if host and os.environ['MODULE_PLATFORM'].startswith('windows-') and not host.endswith('.exe'):
               host += '.exe'
@@ -363,6 +370,9 @@ jobs:
       - name: Verify the module-owned Windows capture files
         if: needs.source.outputs.slug == 'sockscap' && matrix.platform == 'windows-x86_64'
         run: python scripts/sockscap_windows_resource.py src-tauri/plugins/sockscap candidate/unsigned-module
+      - name: Verify the module-owned Linux trace launcher
+        if: needs.source.outputs.slug == 'sockscap' && matrix.platform == 'linux-x86_64'
+        run: python scripts/sockscap_linux_resource.py verify sockscap linux-x86_64 candidate/unsigned-module
       - name: Check Linux module ABI against the core baseline
         if: matrix.platform == 'linux-x86_64'
         env:

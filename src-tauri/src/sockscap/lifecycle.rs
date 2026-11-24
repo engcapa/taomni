@@ -207,7 +207,7 @@ pub async fn sockscap_start(
         tracing::info!("sockscap: {gfw_start_note}");
     }
 
-    let caps = capture::capabilities();
+    let caps = capture::capabilities_for(&app);
 
     #[cfg(windows)]
     let status: Result<SocksCapStatus, String> =

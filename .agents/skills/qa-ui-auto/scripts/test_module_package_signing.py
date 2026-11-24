@@ -56,6 +56,10 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
                     "files": {name: {"sha256": hashlib.sha256(content).hexdigest()}
                               for name, content in assets.items()},
                 }))
+            elif platform == "linux-x86_64":
+                linux_capture = Path("resources/linux")
+                (payload / linux_capture).mkdir(parents=True)
+                (payload / linux_capture / "taomni-sockscap-trace-launcher").write_bytes(b"\x7fELF inert unit launcher")
         frontend = manifest["entry"].get("frontend")
         if frontend and module not in {"vnc-client", "rdp-client", "mail", "mfa", "screenshot", "sockscap",
                                        "rdp-server", "vnc-server", "servers"}:
@@ -83,7 +87,7 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
         source = guard.split("\n", 1)[1].rsplit("\nPY", 1)[0]
         scripts = root / "scripts"
         scripts.mkdir(exist_ok=True)
-        for helper in ("local_voice_runtime.py", "sockscap_redirector_resource.py",
+        for helper in ("local_voice_runtime.py", "sockscap_linux_resource.py", "sockscap_redirector_resource.py",
                        "sockscap_windows_resource.py", "sockscap_xray_resource.py"):
             shutil.copyfile(ROOT / "scripts" / helper, scripts / helper)
         with chdir(root), patch.object(sys, "path", list(sys.path)), patch.dict(os.environ, {
@@ -92,20 +96,24 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
         }):
             exec(compile(source, "trusted-workflow-payload-guard", "exec"), {})
 
-    def test_macos_sockscap_requires_the_exact_pinned_installer(self):
+    def seed_macos_redirector(self, root, payload):
         resource = Path("resources/macos/redirector/0.12.11")
+        trusted = root / "src-tauri/plugins/sockscap" / resource
+        trusted.mkdir(parents=True)
+        archive = b"inert test archive"
+        (trusted / "manifest.json").write_text(json.dumps({"appTarSha256": hashlib.sha256(archive).hexdigest()}))
+        (trusted / "LICENSE").write_text("fixture license")
+        shutil.copytree(trusted, payload / resource)
+        target = payload / resource / "Mitmproxy Redirector.app.tar"
+        target.write_bytes(archive)
+        return target, archive
+
+    def test_macos_sockscap_requires_the_exact_pinned_installer(self):
         for platform in ("darwin-aarch64", "darwin-x86_64"):
             with self.subTest(platform=platform), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 payload = self.seed(root, "sockscap", platform)
-                trusted = root / "src-tauri/plugins/sockscap" / resource
-                trusted.mkdir(parents=True)
-                archive = b"inert test archive"
-                (trusted / "manifest.json").write_text(json.dumps({"appTarSha256": hashlib.sha256(archive).hexdigest()}))
-                (trusted / "LICENSE").write_text("fixture license")
-                shutil.copytree(trusted, payload / resource)
-                target = payload / resource / "Mitmproxy Redirector.app.tar"
-                target.write_bytes(archive)
+                target, archive = self.seed_macos_redirector(root, payload)
                 self.guard(root, "sockscap", platform)
                 target.write_bytes(archive + b"altered")
                 with self.assertRaisesRegex(ValueError, "differs from the pinned release"):
@@ -126,6 +134,36 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
             (payload / "resources/xray/xray.exe").write_bytes(b"altered")
             with self.assertRaisesRegex(ValueError, "Xray xray.exe differs"):
                 self.guard(root, "sockscap", platform)
+
+    def test_linux_sockscap_requires_verified_elf_launcher_and_excludes_other_targets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = self.seed(root, "sockscap", "linux-x86_64")
+            self.guard(root, "sockscap", "linux-x86_64")
+            launcher = payload / "resources/linux/taomni-sockscap-trace-launcher"
+            original = launcher.read_bytes()
+            launcher.write_bytes(b"not-elf")
+            with self.assertRaisesRegex(ValueError, "not an ELF executable"):
+                self.guard(root, "sockscap", "linux-x86_64")
+            launcher.write_bytes(original)
+            (payload / "resources/linux/extra").write_bytes(b"extra")
+            with self.assertRaisesRegex(ValueError, "Unexpected or missing"):
+                self.guard(root, "sockscap", "linux-x86_64")
+            launcher.unlink()
+            (payload / "resources/linux/extra").unlink()
+            with self.assertRaisesRegex(ValueError, "Unexpected or missing"):
+                self.guard(root, "sockscap", "linux-x86_64")
+
+        for platform in ("windows-x86_64", "darwin-aarch64", "darwin-x86_64"):
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                payload = self.seed(root, "sockscap", platform)
+                if platform.startswith("darwin-"):
+                    self.seed_macos_redirector(root, payload)
+                (payload / "resources/linux").mkdir(parents=True, exist_ok=True)
+                (payload / "resources/linux/taomni-sockscap-trace-launcher").write_bytes(b"\x7fELF unexpected")
+                with self.assertRaisesRegex(ValueError, "Unexpected Linux"):
+                    self.guard(root, "sockscap", platform)
 
     def test_local_voice_requires_its_windows_runtime_in_the_signed_payload(self):
         runtime = runpy.run_path(str(ROOT / "scripts/local_voice_runtime.py"))["WINDOWS_RUNTIME"]

@@ -162,6 +162,9 @@ jobs:
               assert all("pop3-runtime" not in ",".join(features).split(",") for features in engine_features), f"{target}: the core includes the desktop POP3 transport"
           resources = json.loads(Path("src-tauri/tauri.windows.conf.json").read_text())["bundle"]["resources"]
           assert all("resources/vnc/" not in entry for entry in resources), "Core declares VNC module resources"
+          build_script = Path("src-tauri/build.rs").read_text()
+          assert "compile_linux_sockscap_launcher" not in build_script and "taomni-sockscap-trace-launcher" not in build_script, "Core build.rs embeds the SocksCap Linux launcher"
+          assert not Path("src-tauri/src/sockscap/capture/linux/trace_launcher.c").exists(), "Core retains SocksCap Linux launcher source"
           PY
       - name: Build the release frontend and record actual chunk hashes
         env:

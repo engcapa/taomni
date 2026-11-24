@@ -95,6 +95,28 @@ pub(crate) fn verified_package(manifest: &ModuleManifest) -> VerifiedPackage {
     try_verified_package(manifest).unwrap()
 }
 
+#[allow(dead_code)]
+pub(crate) fn verified_package_with_files(
+    manifest: &ModuleManifest,
+    extra: &[(&str, &[u8])],
+) -> VerifiedPackage {
+    let mut tree = files(manifest);
+    for (path, bytes) in extra {
+        tree.insert((*path).to_owned(), (*bytes).to_vec());
+    }
+    let bytes = archive(tree);
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    file.write_all(&bytes).unwrap();
+    VerifiedPackage::prepare(
+        file.path(),
+        &package_signature(&bytes, manifest, super::host_platform()),
+        super::host_platform(),
+        &verifier(),
+        None,
+    )
+    .unwrap()
+}
+
 pub(crate) fn try_verified_package(
     manifest: &ModuleManifest,
 ) -> Result<VerifiedPackage, super::TrustError> {

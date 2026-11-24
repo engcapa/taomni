@@ -1,9 +1,9 @@
 use super::lifetime::LaunchedCaptureHandle;
-use super::limits::LAUNCHER_BYTES;
 use super::model::LaunchedAppPhase;
 use super::preparation::materialize_launcher;
 use super::preparation::prepare_launch;
 use super::preparation::resolve_executable;
+use super::preparation::test_launcher_bytes;
 use crate::sockscap::config::AppLaunchPreparation;
 use std::fs;
 use std::io::Read;
@@ -82,7 +82,8 @@ async fn start_rootless_test_capture() -> RootlessTestCapture {
     }));
 
     let directory = tempfile::tempdir().unwrap();
-    let capture = LaunchedCaptureHandle::start(context, directory.path())
+    let launcher = materialize_launcher(directory.path(), test_launcher_bytes()).unwrap();
+    let capture = LaunchedCaptureHandle::start(context, launcher)
         .await
         .expect("start ptrace/seccomp capture");
     RootlessTestCapture {
@@ -196,10 +197,11 @@ fn curl_arguments(output: &Path) -> Vec<String> {
 #[test]
 fn materialized_launcher_is_private_and_stable() {
     let directory = tempfile::tempdir().unwrap();
-    let first = materialize_launcher(directory.path()).unwrap();
-    let second = materialize_launcher(directory.path()).unwrap();
+    let bytes = test_launcher_bytes();
+    let first = materialize_launcher(directory.path(), bytes).unwrap();
+    let second = materialize_launcher(directory.path(), bytes).unwrap();
     assert_eq!(first, second);
-    assert_eq!(fs::read(&first).unwrap(), LAUNCHER_BYTES);
+    assert_eq!(fs::read(&first).unwrap(), bytes);
     assert_eq!(
         fs::metadata(&first).unwrap().permissions().mode() & 0o777,
         0o700

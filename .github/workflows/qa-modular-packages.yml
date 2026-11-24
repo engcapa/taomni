@@ -270,6 +270,9 @@ jobs:
         env:
           MODULE_TARGET: ${{ matrix.target }}
         run: python scripts/sockscap_windows_resource.py src-tauri/plugins/sockscap unsigned-module --helper "src-tauri/target/$MODULE_TARGET/release/sockscap-helper.exe"
+      - name: Build and stage Linux SocksCap trace launcher
+        if: env.QA_MODULE == 'sockscap' && runner.os == 'Linux'
+        run: python scripts/sockscap_linux_resource.py stage src-tauri/plugins/sockscap unsigned-module
       - name: Compile the previous host version for the native lifecycle test
         if: matrix.lifecycle
         env:
@@ -364,6 +367,7 @@ jobs:
           sys.path.insert(0, '.agents/skills/qa-ui-auto/scripts')
           from qa_ui_auto.module_qa_versions import lifecycle_versions
           from local_voice_runtime import runtime_files, verify_runtime
+          import sockscap_linux_resource as linux_capture
           import sockscap_redirector_resource as redirector
           import sockscap_windows_resource as windows_capture
           import sockscap_xray_resource as xray
@@ -392,6 +396,7 @@ jobs:
                   if platform == 'windows-x86_64':
                       resources.update(windows_capture.files(trusted_source))
                       windows_capture.verify(trusted_source, payload)
+                  resources.update(linux_capture.files(slug, platform))
               allowed = {'module.json', *binaries, *resources}
               frontend = expected['entry'].get('frontend')
               if frontend and slug not in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
@@ -403,6 +408,7 @@ jobs:
                           allowed.add(source.relative_to(trusted_source).as_posix())
               verify_runtime(slug, platform, payload)
               redirector.verify(slug, platform, trusted_source, payload)
+              linux_capture.verify(slug, platform, payload)
               manifest = json.loads((payload / 'module.json').read_text(encoding='utf-8'))
               expected_version = expected['version'] if version is None else version
               assert manifest == {**expected, 'version': expected_version}, 'Candidate metadata differs from the trusted official contract'

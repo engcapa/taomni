@@ -3,7 +3,7 @@
   "slug": "sockscap",
   "name": "SocksCap",
   "description": "Manage application traffic routing and its proxy profiles.",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "coreApiVersion": "1",
   "kind": "remote-client",
   "status": "provisional",

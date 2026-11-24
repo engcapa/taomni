@@ -43,7 +43,12 @@ fn trace_wake_socket_buffers_commands_and_sigchld() {
 
 #[test]
 fn traced_signal_burst_is_resumed_without_polling_delay() {
-    let launcher = PathBuf::from(concat!(env!("OUT_DIR"), "/taomni-sockscap-trace-launcher"));
+    let directory = tempfile::tempdir().unwrap();
+    let launcher = crate::sockscap::capture::linux::launched::materialize_launcher(
+        directory.path(),
+        crate::sockscap::capture::linux::launched::test_launcher_bytes(),
+    )
+    .unwrap();
     if let Err(error) = preflight(&launcher) {
         eprintln!("skipping rootless ptrace latency test: {error}");
         return;

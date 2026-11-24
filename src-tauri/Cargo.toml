@@ -87,7 +87,6 @@ bench = false
 [build-dependencies]
 tauri-build = { version = "2.7.1", features = [] }
 prost-build = "0.14"
-cc = "1"
 
 [dependencies]
 # Plain native windows keep capture range borders lightweight and out of the crop.

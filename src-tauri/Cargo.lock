@@ -10836,7 +10836,6 @@ dependencies = [
  "byteorder",
  "bytes",
  "cbc 0.2.1",
- "cc",
  "chardetng",
  "chrono",
  "clickhouse-rs",
@@ -11396,7 +11395,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-sockscap"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "serde",
  "serde_json",
