@@ -73,7 +73,7 @@ steps:
 - assert_no_runtime_errors: null
 - click: '[data-testid="ribbon-settings"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
-- click: '[data-testid="module-action-disable-rdp-client"]'
+- press: {selector: '[data-testid="module-action-disable-rdp-client"]:enabled', key: Enter}
 - wait_for: '[data-testid="module-action-enable-rdp-client"]'
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="side-tab-sessions"]'
