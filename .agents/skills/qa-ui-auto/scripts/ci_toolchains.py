@@ -131,7 +131,7 @@ def warm_projects(root, capabilities):
                                    ([gradle, "--no-daemon", "clean", "build"], gradle_root),
                                    ([mvn, "-q", "-o", "-DskipTests", "package"], maven),
                                    ([gradle, "--offline", "--no-daemon", "clean", "build"], gradle_root)):
-            receipts.append(projects._run_build(command, directory))
+            receipts.append(projects._run_build(command, directory, budget_seconds=480.0))
     source = Path("src/components/editor/workspace/__fixtures__/jdtls/projects/maven-single")
     project = root / "warm-maven-single"
     project.mkdir(parents=True, exist_ok=True)

@@ -7,8 +7,20 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
+
+from ci_maven_warmup import transient_failure, with_forced_update, with_maven_options
+
+BUILD_ATTEMPTS = 3
+BUILD_RETRY_DELAYS = (5.0, 15.0)
+BUILD_BUDGET_SECONDS = 300.0
+BUILD_ATTEMPT_TIMEOUT_SECONDS = 240.0
+
+
+def _output_text(value: str | bytes | None) -> str:
+    return value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value or ""
 
 
 MAVEN_POM = """\
@@ -94,38 +106,84 @@ def _gradle_binary() -> str | None:
     return str(candidates[0]) if candidates else None
 
 
-def _run_build(command: list[str], root: Path) -> dict[str, Any]:
+def _run_build(command: list[str], root: Path, *,
+               budget_seconds: float = BUILD_BUDGET_SECONDS,
+               attempt_timeout: float = BUILD_ATTEMPT_TIMEOUT_SECONDS,
+               attempts: int = BUILD_ATTEMPTS) -> dict[str, Any]:
+    """Build one Java fixture, retrying only transient repository failures.
+
+    Hosted Maven Central rate-limits shared runner egress (HTTP 429), and the
+    Java 25 warmup builds run online. A transient download failure is retried
+    with backoff inside one bounded budget so it cannot be mistaken for a
+    product/build failure; compile errors and other permanent failures stay
+    fatal on the first attempt. Maven commands also carry the retry handler
+    options so the transporter itself absorbs shorter spikes.
+    """
     build_env = {**os.environ, "CI": "true"}
     jdk25_candidate = Path(os.environ.get("JAVA25_HOME", os.environ.get("JAVA_HOME", "")))
     if str(jdk25_candidate) != "." and jdk25_candidate.is_dir():
         build_env["JAVA_HOME"] = str(jdk25_candidate)
         build_env["PATH"] = f"{jdk25_candidate / 'bin'}{os.pathsep}{build_env.get('PATH', '')}"
-    if os.name == "nt" and Path(command[0]).suffix.lower() in {".bat", ".cmd"}:
-        command = [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/s", "/c", subprocess.list2cmdline(command)]
-    started = subprocess.run(
-        command,
-        cwd=root,
-        env=build_env,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=240,
-        check=False,
-    )
-    receipt = {
-        "command": command,
-        "cwd": str(root),
-        "exitCode": started.returncode,
-        "stdoutTail": started.stdout[-4000:],
-        "stderrTail": started.stderr[-4000:],
-    }
-    if started.returncode != 0:
-        raise RuntimeError(
+    base_argv = with_maven_options(command)
+    deadline = time.monotonic() + budget_seconds
+    retries: list[dict[str, Any]] = []
+    for attempt in range(1, attempts + 1):
+        argv = with_forced_update(base_argv) if attempt > 1 else list(base_argv)
+        if os.name == "nt" and Path(command[0]).suffix.lower() in {".bat", ".cmd"}:
+            argv = [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/s", "/c",
+                    subprocess.list2cmdline(argv)]
+        remaining = deadline - time.monotonic()
+        timeout = min(attempt_timeout, remaining) if remaining > 1.0 else 1.0
+        transient = False
+        timed_out = False
+        try:
+            started = subprocess.run(
+                argv,
+                cwd=root,
+                env=build_env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout,
+                check=False,
+            )
+            returncode = started.returncode
+            stdout, stderr = started.stdout, started.stderr
+            output = stdout + "\n" + stderr
+            transient = returncode != 0 and transient_failure(output)
+        except subprocess.TimeoutExpired as exc:
+            timed_out = True
+            returncode = None
+            stdout = _output_text(exc.stdout)
+            stderr = _output_text(exc.stderr)
+            output = stdout + "\n" + stderr
+            transient = True
+        if returncode == 0:
+            return {
+                "command": argv,
+                "cwd": str(root),
+                "exitCode": 0,
+                "stdoutTail": stdout[-4000:],
+                "stderrTail": stderr[-4000:],
+                "attempts": attempt,
+                "retries": retries,
+            }
+        failure = RuntimeError(
             f"Java 25 fixture build failed ({' '.join(command)}): "
-            f"{started.stderr[-1000:] or started.stdout[-1000:]}"
+            f"{stderr[-1000:] or stdout[-1000:]}"
+            + (f" (timed out after {timeout:g}s)" if timed_out else "")
+            + (f"; attempts={attempt}" if attempt > 1 else "")
         )
-    return receipt
+        delay = BUILD_RETRY_DELAYS[attempt - 1] if attempt <= len(BUILD_RETRY_DELAYS) else 0.0
+        if attempt >= attempts or not transient or deadline - time.monotonic() <= delay:
+            raise failure
+        retries.append({"attempt": attempt, "timedOut": timed_out,
+                        "exitCode": returncode, "tail": output[-2000:]})
+        print(f"Java fixture build hit a transient repository failure; retry "
+              f"{attempt + 1}/{attempts} in {delay:g}s", flush=True)
+        time.sleep(delay)
+    raise AssertionError("unreachable")
 
 
 def _jdtls_process_count() -> int:

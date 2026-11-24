@@ -564,6 +564,19 @@ whole debug/test extension server directories are retained. Product semantics
 and debugging still require the actual native cases; preparation alone is not
 product coverage.
 
+Maven repository transfers are retried instead of failing the shard. Hosted
+runners share Maven Central egress and can receive HTTP 408/429/5xx or stalled
+connections while Java warmup downloads plugins and dependencies. Both the
+warmup wrapper (`ci_maven_warmup.py`) and the Java 25 online builds retry only
+transient transfer failures, with exponential backoff and a bounded budget;
+retries pass `-U` so a cached failed resolution is re-attempted, and Maven
+commands carry Wagon/Resolver retry-handler options. Java jobs also export
+`MAVEN_OPTS` with the same retry policy. Compile errors, permanent repository
+errors (401/404) and failures after the budget remain fatal on the first or
+last attempt. A cached `~/.m2/repository` would remove the remaining burst
+exposure but is not enabled because the Actions cache quota is already at its
+10 GB limit; keep the retry path quota-free unless cache capacity changes.
+
 Default Linux native uses Xvfb, Openbox, DBus and, when required, fcitx5/wbpy.
 IME preparation waits for the job-owned daemon to acquire its DBus name before
 opening a GTK input context. Preparation and native key injection observe the
