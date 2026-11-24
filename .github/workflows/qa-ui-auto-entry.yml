@@ -403,18 +403,26 @@ jobs:
             if (-not (Test-Path -LiteralPath $gflags)) { throw 'mstsc heap verifier unavailable' }
             "QA_MSTSC_GFLAGS=$gflags" >> $env:GITHUB_ENV
           }
-          $tesseract = Join-Path $env:ProgramFiles 'Tesseract-OCR\tesseract.exe'
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
-            choco install tesseract --yes --no-progress
-            $installExit = $LASTEXITCODE
-            if ($installExit -eq 0 -and (Test-Path -LiteralPath $tesseract)) { break }
-            if ($attempt -eq 3) {
-              throw "Tesseract installation failed after $attempt attempts (exit $installExit; executable: $tesseract)"
-            }
-            Write-Warning "Tesseract is unavailable after install attempt $attempt (exit $installExit); retrying in 15 seconds"
-            Start-Sleep -Seconds 15
+          # Pin the same upstream installer distributed by Chocolatey. The
+          # community feed can return 503 while the release asset is available.
+          $tesseractDir = Join-Path $env:ProgramFiles 'Tesseract-OCR'
+          $tesseract = Join-Path $tesseractDir 'tesseract.exe'
+          $installer = Join-Path $env:RUNNER_TEMP 'qa-tesseract-setup.exe'
+          $download = @{
+            Uri = 'https://github.com/tesseract-ocr/tesseract/releases/download/5.5.3/tesseract-ocr-w64-setup-5.5.3.20260724.exe'
+            OutFile = $installer
+            MaximumRetryCount = 3
+            RetryIntervalSec = 15
           }
-          'C:\Program Files\Tesseract-OCR' >> $env:GITHUB_PATH
+          Invoke-WebRequest @download
+          if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash -ne 'BEE9E3434BD94FD65387D9BE28CD467A41F61B1275383B55B0F59A1331270AE4') {
+            throw 'Unexpected Tesseract installer checksum'
+          }
+          $install = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
+          if ($install.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $tesseract -PathType Leaf)) {
+            throw "Tesseract installation failed (exit $($install.ExitCode); executable: $tesseract)"
+          }
+          $tesseractDir >> $env:GITHUB_PATH
       # Hosted audio cases need a loopback device. BlackHole has no controller
       # app or microphone consent sheet to cover capture fixtures on macOS.
       - name: Windows virtual audio output
