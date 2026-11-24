@@ -346,6 +346,7 @@ pub async fn cc_cancel_capture(
 pub async fn cc_track_terminal(
     tab_id: String,
     session_id: String,
+    window: tauri::WebviewWindow,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
@@ -353,7 +354,16 @@ pub async fn cc_track_terminal(
         .cc_tab_sessions
         .lock()
         .map_err(|e| e.to_string())?
-        .insert(tab_id, session_id);
+        .insert(tab_id.clone(), session_id);
+    // Record which window holds the live terminal so terminal-writing tools are
+    // dispatched there instead of the chat window (issue #869: after a detach
+    // those are different windows).
+    state
+        .agent
+        .cc_tab_windows
+        .lock()
+        .map_err(|e| e.to_string())?
+        .insert(tab_id, window.label().to_string());
     Ok(())
 }
 
@@ -374,6 +384,11 @@ pub async fn cc_untrack_terminal(
         .map_err(|e| e.to_string())?;
     if map.get(&tab_id).is_some_and(|s| *s == session_id) {
         map.remove(&tab_id);
+        // Only drop the owning window together with the session mapping, so a
+        // stale unmount cannot delete the detached window's newer terminal.
+        if let Ok(mut windows) = state.agent.cc_tab_windows.lock() {
+            windows.remove(&tab_id);
+        }
     }
     Ok(())
 }

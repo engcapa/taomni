@@ -159,16 +159,34 @@ pub(crate) fn emit_thread_event<B: EventBus + ?Sized>(
     event: &str,
     payload: Value,
 ) -> Delivery {
-    if let Delivery::Target(label) = plan_delivery(bus, windows, thread_id) {
+    let owner = windows.owner(thread_id);
+    let delivery = emit_to_window_or_broadcast(bus, owner.as_deref(), event, payload);
+    if delivery == Delivery::Broadcast
+        && let Some(stale) = owner
+    {
+        windows.forget_owner(thread_id, &stale);
+    }
+    delivery
+}
+
+/// Deliver to `label` when that window is alive, else broadcast.
+///
+/// Used both for thread-scoped events and for side effects whose target window
+/// is not the thread owner (a terminal-writing tool must run in the window that
+/// holds the terminal, which after a detach is a different window).
+pub(crate) fn emit_to_window_or_broadcast<B: EventBus + ?Sized>(
+    bus: &B,
+    label: Option<&str>,
+    event: &str,
+    payload: Value,
+) -> Delivery {
+    if let Some(label) = label.filter(|label| bus.has_webview(label)) {
         let mut targeted = payload.clone();
-        stamp_window_label(&mut targeted, &label);
-        if bus.emit_to_label(&label, event, targeted) {
-            return Delivery::Target(label);
+        stamp_window_label(&mut targeted, label);
+        if bus.emit_to_label(label, event, targeted) {
+            return Delivery::Target(label.to_string());
         }
         // The window disappeared between the existence probe and the emit.
-        windows.forget_owner(thread_id, &label);
-    } else if let Some(stale) = windows.owner(thread_id) {
-        windows.forget_owner(thread_id, &stale);
     }
     let _ = bus.emit_all(event, payload);
     Delivery::Broadcast
@@ -338,6 +356,47 @@ mod tests {
         let targeted = bus.targeted.borrow();
         assert_eq!(targeted.len(), 1, "exactly one window must be addressed");
         assert_eq!(targeted[0].0, "main");
+    }
+
+    #[test]
+    fn explicit_window_delivery_targets_only_that_window() {
+        let bus = FakeBus::with_windows(&["main", "terminal-abc"]);
+
+        let delivery = emit_to_window_or_broadcast(
+            &bus,
+            Some("terminal-abc"),
+            "agent-cc-tool",
+            json!({ "callId": "call-1" }),
+        );
+
+        assert_eq!(delivery, Delivery::Target("terminal-abc".into()));
+        assert_eq!(bus.targeted.borrow()[0].0, "terminal-abc");
+        assert_eq!(bus.targeted.borrow()[0].2["windowLabel"], "terminal-abc");
+        assert!(bus.broadcasts.borrow().is_empty());
+    }
+
+    #[test]
+    fn explicit_window_delivery_broadcasts_for_a_dead_or_unknown_window() {
+        let bus = FakeBus::with_windows(&["main"]);
+
+        for label in [None, Some("terminal-closed")] {
+            let delivery = emit_to_window_or_broadcast(
+                &bus,
+                label,
+                "agent-cc-tool",
+                json!({ "callId": "call-1" }),
+            );
+            assert_eq!(delivery, Delivery::Broadcast);
+        }
+
+        let broadcasts = bus.broadcasts.borrow();
+        assert_eq!(broadcasts.len(), 2);
+        assert!(
+            broadcasts
+                .iter()
+                .all(|(_, payload)| payload.get(WINDOW_LABEL_FIELD).is_none()),
+            "broadcasts must not be addressed to one window"
+        );
     }
 
     #[test]

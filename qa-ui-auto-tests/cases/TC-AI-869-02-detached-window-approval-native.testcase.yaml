@@ -161,12 +161,9 @@ steps:
     selector: '[data-testid="ai-chat-safety-gate"]'
     timeout_sec: 45
 - switch_window:
-    selector: '[data-testid="detached-reattach"]'
+    selector: '[data-testid="sidebar"]'
     close_with: '[data-testid="detached-reattach"]'
     timeout_sec: 60
-- switch_window:
-    selector: '[data-testid="sidebar"]'
-    timeout_sec: 45
 - seed_storage:
     key: qa.agentApproval.mode
     value: '"fallback"'
@@ -286,34 +283,33 @@ verification:
     - 65
     - 66
     - 67
-    - 68
-    - 72
+    - 71
     checkpoints:
     - step: 64
       expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "timeout_sec": 45}}'
-    - step: 69
+    - step: 68
       expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "timeout_sec": 45}}'
-    - step: 70
+    - step: 69
       expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
-    - step: 73
+    - step: 72
       expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached", "timeout_sec": 30}}'
-    - step: 74
+    - step: 73
       expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"delivery\":\"broadcast\"", "timeout_sec": 20}}'
     results:
     - 64
+    - 68
     - 69
-    - 70
+    - 72
     - 73
-    - 74
   - id: V6-crash-regression
     requirement: No uncaught error, unhandled rejection or crash UI appears in the main window after the window lifecycle and decisions.
     actions:
-    - 72
+    - 71
     checkpoints:
-    - step: 75
+    - step: 74
       expectation: '{"assert_no_runtime_errors": null}'
     results:
-    - 75
+    - 74
   visual:
   - check: The detached-window card, the two-window broadcast state and the cleared main window are readable and correctly sized in the retained screenshots.
     method: manual

@@ -183,6 +183,7 @@ impl AppState {
                 cc_capture_cancels: Arc::new(Mutex::new(HashMap::new())),
                 agent_thread_cwd: Arc::new(Mutex::new(HashMap::new())),
                 cc_tab_sessions: Arc::new(Mutex::new(HashMap::new())),
+                cc_tab_windows: Arc::new(Mutex::new(HashMap::new())),
                 agent_db_bindings: Arc::new(RwLock::new(HashMap::new())),
                 agent_db_selected_objects: Arc::new(RwLock::new(HashMap::new())),
                 agent_code_workspaces: Arc::new(RwLock::new(HashMap::new())),

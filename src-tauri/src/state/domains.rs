@@ -112,6 +112,14 @@ pub struct AgentRuntime {
     /// `read_capture`) can resolve the live terminal that `run_in_terminal`
     /// reaches indirectly through the frontend registry. Refreshed on reconnect.
     pub cc_tab_sessions: Arc<Mutex<HashMap<String, String>>>,
+    /// Maps a terminal *tab id* to the window label whose terminal panel
+    /// currently owns it. Side-effect tools that write into a terminal
+    /// (`run_in_terminal`, `read_terminal_tail`) must run in that window: after
+    /// a detach the terminal lives in a detached window while the chat that
+    /// drives the tool stays in the main window. Refreshed on connect; the
+    /// ownership guard in `cc_untrack_terminal` keeps a stale unmount from
+    /// deleting a newer owner.
+    pub cc_tab_windows: Arc<Mutex<HashMap<String, String>>>,
     /// Live DB connection id an agent thread is bound to (Phase 6). The runtime key
     /// for `db_connections` is generated in the frontend (`createRuntimeDbSessionId`)
     /// and isn't derivable backend-side, so the frontend bridges it over each
