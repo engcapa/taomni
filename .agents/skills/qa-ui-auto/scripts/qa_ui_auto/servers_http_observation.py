@@ -55,8 +55,8 @@ def run(ctx, phase):
     return f"Verified Local HTTP {phase} on {HOST}:{PORT}"
 
 
-def verify_listener_closed(host, port):
-    deadline = time.monotonic() + 5
+def verify_listener_closed(host, port, *, timeout_sec=5):
+    deadline = time.monotonic() + timeout_sec
     while True:
         try:
             with socket.create_connection((host, port), timeout=1):

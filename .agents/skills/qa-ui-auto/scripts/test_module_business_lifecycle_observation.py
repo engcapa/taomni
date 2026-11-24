@@ -15,6 +15,7 @@ import zipfile
 import yaml
 
 from qa_ui_auto import module_business_lifecycle_observation as observation
+from qa_ui_auto import module_remote_lifecycle_observation as remote_lifecycle
 from qa_ui_auto.behavior_contract import is_check, validate_contract
 from qa_ui_auto.ci import capabilities
 from qa_ui_auto.fixtures import module_marketplace, module_signed_archive, module_voice
@@ -38,6 +39,38 @@ HOST_NEW = {"pid": 2202, "started": 22.0, "executable": "/qa/new-host"}
 
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+class WindowsRemoteServerObservationTests(unittest.TestCase):
+    def setUp(self):
+        owner = SimpleNamespace(signed_rdp_server={"port": 27777}, signed_vnc_daemon={"port": 27777})
+        session = SimpleNamespace(text=lambda selector: "No VNC server found in PATH")
+        self.ctx = SimpleNamespace(fixture_context=owner, session=session)
+
+    def test_listener_table_can_confirm_closed_port_when_loopback_times_out(self):
+        table = (
+            b"TCP 127.0.0.1:27777 127.0.0.1:51123 TIME_WAIT 0\n"
+            b"TCP 127.0.0.1:27778 0.0.0.0:0 LISTENING 112\n"
+        )
+        for slug, phase in (("rdp-server", "old-disabled"), ("vnc-server", "old-enabled")):
+            with self.subTest(slug=slug), \
+                    patch("platform.system", return_value="Windows"), \
+                    patch("socket.create_connection", side_effect=TimeoutError), \
+                    patch("time.monotonic", side_effect=[0, 11]), \
+                    patch("subprocess.check_output", return_value=table) as netstat:
+                observed = remote_lifecycle.server_runtime(self.ctx, slug, phase, None)
+                self.assertEqual(observed["port"], 27777)
+                self.assertFalse(observed["listening"])
+                self.assertEqual(observed["proof"], "absent-from-windows-listener-table")
+                netstat.assert_called_once_with(["netstat.exe", "-ano", "-p", "tcp"], timeout=5)
+
+    def test_timeout_does_not_hide_a_wildcard_listener(self):
+        with patch("platform.system", return_value="Windows"), \
+                patch("socket.create_connection", side_effect=TimeoutError), \
+                patch("time.monotonic", side_effect=[0, 11]), \
+                patch("subprocess.check_output", return_value=b"TCP 0.0.0.0:27777 0.0.0.0:0 LISTENING 111\n"), \
+                self.assertRaisesRegex(StepError, "127.0.0.1:27777"):
+            remote_lifecycle.server_runtime(self.ctx, "rdp-server", "old-disabled", None)
 
 
 class BusinessLifecycleTests(unittest.TestCase):

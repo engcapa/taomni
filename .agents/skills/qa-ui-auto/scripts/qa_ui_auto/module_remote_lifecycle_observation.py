@@ -13,6 +13,7 @@ from .module_mfa_lifecycle_observation import digest
 from .module_rdp_server_observation import observe_settings as observe_rdp_settings
 from .module_retained_observation import ordinary
 from .module_vnc_server_observation import observe_listener, observe_settings as observe_vnc_settings
+from .servers_http_observation import verify_listener_closed
 from .steps import StepError
 
 
@@ -112,17 +113,17 @@ def server_runtime(ctx, slug, phase, host):
         port = owner.signed_rdp_server["port"]
         if started:
             _rdp_listener(port)
-        else:
-            observe_listener(port, expect_rfb=False)
-        return {"port": port, "listening": started}
+            return {"port": port, "listening": True}
+        proof = verify_listener_closed("127.0.0.1", port, timeout_sec=10)
+        return {"port": port, "listening": False, "proof": proof}
 
     port = owner.signed_vnc_daemon["port"]
     if system != "Linux":
-        observe_listener(port, expect_rfb=False)
+        proof = verify_listener_closed("127.0.0.1", port, timeout_sec=10)
         message = {"Darwin": "Taomni cannot start it for you.", "Windows": "No VNC server found in PATH"}[system]
         if started and message not in ctx.session.text('[data-testid="server-log"]'):
             raise StepError("The signed VNC Server did not show the platform's setup guidance")
-        return {"port": port, "listening": False, "platformGuidance": message if started else None}
+        return {"port": port, "listening": False, "proof": proof, "platformGuidance": message if started else None}
 
     import psutil
     from native_qa_bridge import identity
