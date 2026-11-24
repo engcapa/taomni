@@ -192,3 +192,24 @@ test("Mail host may use the engine and SDK without linking a peer module", (t) =
   fs.appendFileSync(tree, "taomni-plugin-mfa v0.1.0\n");
   assert.match(modularBoundaryViolations(root, { mailHostTreeFile: tree }).join("\n"), /Mail host dependency tree contains taomni-plugin-mfa/);
 });
+
+test("RDP client, VNC client, and SocksCap hosts enforce SDK-only ownership", (t) => {
+  const root = fixture(t);
+  for (const [slug, label, crate] of [
+    ["rdp-client", "RDP Client", "taomni-rdp-client-engine"],
+    ["vnc-client", "VNC Client", "taomni-vnc-engine"],
+    ["sockscap", "SocksCap", "taomni-sockscap-api"],
+  ]) {
+    const directory = `src-tauri/plugins/${slug}`;
+    fs.mkdirSync(path.join(root, directory, "src"), { recursive: true });
+    write(root, `${directory}/Cargo.toml`, `[dependencies]\n${crate} = { path = "../../crates/${crate}" }\ntaomni-plugin-sdk = { path = "../../crates/taomni-plugin-sdk" }\n`);
+    write(root, `${directory}/src/main.rs`, "use taomni_plugin_sdk::Operation;\n");
+    assert.deepEqual(modularBoundaryViolations(root), []);
+    write(root, `${directory}/Cargo.toml`, '[dependencies]\ncore = { path = "../.." }\n');
+    write(root, `${directory}/src/main.rs`, "use crate::state::AppState;\n");
+    const errors = modularBoundaryViolations(root).join("\n");
+    assert.match(errors, new RegExp(`${label} host.*links core-owned services`));
+    assert.match(errors, new RegExp(`${label} host must access core services only through the SDK`));
+    fs.rmSync(path.join(root, directory), { recursive: true, force: true });
+  }
+});

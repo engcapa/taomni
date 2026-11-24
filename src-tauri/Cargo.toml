@@ -121,7 +121,6 @@ taomni-server-process = { path = "crates/taomni-server-process" }
 taomni-pty = { path = "crates/taomni-pty" }
 taomni-local-servers-engine = { path = "crates/taomni-local-servers-engine", optional = true }
 taomni-rdp-server-engine = { path = "crates/taomni-rdp-server-engine", optional = true }
-taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-rdp-client-api = { path = "crates/taomni-rdp-client-api" }
 taomni-rdp-client-engine = { path = "crates/taomni-rdp-client-engine", optional = true }
 taomni-file-uri = { path = "crates/taomni-file-uri" }
@@ -206,19 +205,10 @@ taomni-sockscap-api = { path = "crates/taomni-sockscap-api" }
 taomni-mail-engine = { path = "crates/taomni-mail-engine", default-features = false }
 native-tls = "0.2"
 tokio-native-tls = "0.3"
-# `qoi`/`qoiz` must stay enabled together with `session`: the server's default
-# features turn them on in ironrdp-pdu, so `client_codecs_capabilities`
-# advertises QOI/QOIZ, and an IronRDP-based server (Taomni's own included)
-# then sends surface bits the client could not decode — a black desktop.
-ironrdp = { version = "0.17.0", features = ["core", "connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol", "qoi", "qoiz"] }
-ironrdp-bulk = "=0.1.1"
-ironrdp-tokio = { version = "0.10.0", features = ["reqwest-rustls-ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 rustls-native-certs = "0.8"
 rustls-platform-verifier = "0.7"
 x509-cert = "0.2"
-# RDP server (servers/rdp.rs): self-signed TLS cert + cross-platform input injection.
-rcgen = "0.14"
 # Async TLS for native transports.
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 # Input injection for the RDP server. Use the pure-Rust `x11rb` backend (not the
@@ -457,6 +447,8 @@ taomni-sockscap-xray = { path = "plugins/sockscap/xray" }
 taomni-screenshot-ocr = { path = "crates/taomni-screenshot-ocr" }
 taomni-screenshot-recording = { path = "crates/taomni-screenshot-recording" }
 mail-parser = { version = "0.11.4", features = ["full_encoding"] }
+# Self-signed TLS certificates in plugin/download_tests.rs.
+rcgen = "0.14"
 tempfile = "3"
 ed25519-dalek = "2"
 # Compare the VNC inflater with the legacy decoder in the live benchmark.
