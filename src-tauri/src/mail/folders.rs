@@ -27,7 +27,7 @@ pub(super) use taomni_mail_engine::imap_folders::imap_set_subscription;
 pub(super) use taomni_mail_storage::imap_folders::{SUBSCRIBED_ATTRIBUTE, folder_visible};
 
 #[cfg(test)]
-use taomni_mail_storage::{
+use taomni_mail_engine::{
     imap_folders::{FolderStatus, imap_folder_status},
     imap_sync::{FolderSyncState, folder_unchanged},
 };
