@@ -28,6 +28,11 @@ EXPECTED_LOCATOR = {
     "dataSchemaVersion": 1,
     "files": [{"path": "mfa.db", "kind": "sqlite"}],
 }
+ALLOWED_PRE_RESTORE_FILES = (
+    {"path": "mfa.db", "kind": "sqlite"},
+    {"path": "mfa.db-shm", "kind": "file"},
+    {"path": "mfa.db-wal", "kind": "file"},
+)
 HOST_NAMES = {"taomni-plugin-mfa", "taomni-plugin-mfa.exe"}
 
 
@@ -56,11 +61,36 @@ def check_installed_mfa(module: Path, receipt: dict) -> Path:
     return host
 
 
+def _validate_retained_locator(locator: object, *, allow_wal_sidecars: bool) -> None:
+    if not allow_wal_sidecars:
+        if locator != EXPECTED_LOCATOR:
+            raise StepError(f"Retained MFA locator differs from expected schema: {locator!r}")
+        return
+    if (
+        not isinstance(locator, dict)
+        or set(locator) != set(EXPECTED_LOCATOR)
+        or locator.get("formatVersion") != 1
+        or locator.get("slug") != "mfa"
+        or locator.get("dataSchemaVersion") != 1
+    ):
+        raise StepError(f"Retained MFA locator differs from expected schema: {locator!r}")
+    files = locator.get("files")
+    if not isinstance(files, list) or {"path": "mfa.db", "kind": "sqlite"} not in files:
+        raise StepError(f"Retained MFA locator differs from expected schema: {locator!r}")
+    if any(not isinstance(entry, dict) or entry not in ALLOWED_PRE_RESTORE_FILES for entry in files):
+        raise StepError(f"Retained MFA locator differs from expected schema: {locator!r}")
+    paths = [entry["path"] for entry in files]
+    if len(set(paths)) != len(paths) or paths != sorted(paths):
+        raise StepError(f"Retained MFA locator differs from expected schema: {locator!r}")
+
+
 def check_uninstalled_retained(
     plugins: Path,
     module: Path,
     record: dict,
     expected_db_sha256: str | None = None,
+    *,
+    allow_wal_sidecars: bool = False,
 ) -> dict:
     if record.get("state") != "uninstalled" or record.get("dataRetained") is not True:
         raise StepError(f"Expected uninstalled retained MFA state, got {record!r}")
@@ -70,8 +100,12 @@ def check_uninstalled_retained(
     locator_path = plugins / ".retained-data/mfa.json"
     ordinary(locator_path)
     locator = json.loads(locator_path.read_text(encoding="utf-8"))
-    if locator != EXPECTED_LOCATOR:
-        raise StepError(f"Retained MFA locator differs from expected schema: {locator!r}")
+    _validate_retained_locator(locator, allow_wal_sidecars=allow_wal_sidecars)
+    if not allow_wal_sidecars:
+        for sidecar_name in ("mfa.db-wal", "mfa.db-shm"):
+            sidecar = module / "data" / sidecar_name
+            if sidecar.exists() or sidecar.is_symlink():
+                raise StepError(f"Restored retained MFA directory left stale SQLite sidecar: {sidecar_name}")
     database = module / "data/mfa.db"
     actual_sha = digest(database)
     if expected_db_sha256 and actual_sha != expected_db_sha256:
@@ -262,7 +296,9 @@ def run(ctx, phase):
             require_clean(profile)
             running = expected_state == "enabled"
             if expected_state == "uninstalled":
-                evidence["retainedData"] = check_uninstalled_retained(plugins, module, record)
+                evidence["retainedData"] = check_uninstalled_retained(
+                    plugins, module, record, allow_wal_sidecars=True,
+                )
                 host_path = None
             else:
                 host_path = check_installed_mfa(module, receipt) if running else None
@@ -302,7 +338,9 @@ def run(ctx, phase):
                 raise StepError("Original verified MFA backup archive changed before restore")
             running = expected_state == "enabled"
             if expected_state == "uninstalled":
-                evidence["retainedData"] = check_uninstalled_retained(plugins, module, record)
+                evidence["retainedData"] = check_uninstalled_retained(
+                    plugins, module, record, allow_wal_sidecars=True,
+                )
                 host_path = None
             else:
                 installed = check_installed_mfa(module, receipt)
@@ -347,6 +385,7 @@ def run(ctx, phase):
             if expected_state == "uninstalled":
                 evidence["retainedData"] = check_uninstalled_retained(
                     plugins, module, record, expected_db_sha256=state["archiveMfaSha256"],
+                    allow_wal_sidecars=False,
                 )
                 host_path = None
             else:

@@ -139,7 +139,15 @@ class SignedMfaBackupObservationTests(unittest.TestCase):
         ctx = SimpleNamespace(case_dir=work, fixture_context=owner, session=session)
         return ctx, owner, profile, plugins, module, version_dir
 
-    def _set_uninstalled(self, plugins: Path, module: Path, version_dir: Path, state_active: bool) -> None:
+    def _set_uninstalled(
+        self,
+        plugins: Path,
+        module: Path,
+        version_dir: Path,
+        state_active: bool,
+        *,
+        with_wal_sidecars: bool = False,
+    ) -> None:
         import shutil
 
         if not state_active:
@@ -148,7 +156,19 @@ class SignedMfaBackupObservationTests(unittest.TestCase):
             (module / "active.json").write_text(json.dumps({"activeVersion": None, "previousVersion": "0.1.2"}), encoding="utf-8")
             control = plugins / ".retained-data"
             control.mkdir(exist_ok=True)
-            (control / "mfa.json").write_text(json.dumps(observation.EXPECTED_LOCATOR), encoding="utf-8")
+            files = [{"path": "mfa.db", "kind": "sqlite"}]
+            if with_wal_sidecars:
+                files.extend([
+                    {"path": "mfa.db-shm", "kind": "file"},
+                    {"path": "mfa.db-wal", "kind": "file"},
+                ])
+            locator = {
+                "formatVersion": 1,
+                "slug": "mfa",
+                "dataSchemaVersion": 1,
+                "files": files,
+            }
+            (control / "mfa.json").write_text(json.dumps(locator), encoding="utf-8")
         else:
             vdir = module / "versions/0.1.2"
             (vdir / ".taomni-trust").mkdir(parents=True, exist_ok=True)
@@ -184,7 +204,7 @@ class SignedMfaBackupObservationTests(unittest.TestCase):
                     self.assertIn("initial", observation.run(ctx, "initial"))
 
                 if target_state == "uninstalled":
-                    self._set_uninstalled(plugins, module, version_dir, state_active=False)
+                    self._set_uninstalled(plugins, module, version_dir, state_active=False, with_wal_sidecars=True)
 
                 with patch.object(observation, "isolated_data_root", return_value=profile), \
                      patch.object(observation, "writer_lease", return_value={"exists": True, "held": target_state == "enabled"}), \
@@ -198,7 +218,7 @@ class SignedMfaBackupObservationTests(unittest.TestCase):
                     self._set_uninstalled(plugins, module, version_dir, state_active=True)
                 _write_mfa_db(module / "data/mfa.db", 1)
                 if target_state == "uninstalled":
-                    self._set_uninstalled(plugins, module, version_dir, state_active=False)
+                    self._set_uninstalled(plugins, module, version_dir, state_active=False, with_wal_sidecars=True)
 
                 with patch.object(observation, "isolated_data_root", return_value=profile), \
                      patch.object(observation, "writer_lease", return_value={"exists": True, "held": target_state == "enabled"}), \
@@ -206,10 +226,12 @@ class SignedMfaBackupObservationTests(unittest.TestCase):
                      patch.object(observation, "invoke", return_value=reg(target_state)):
                     self.assertIn("ready", observation.run(ctx, "ready"))
 
-                # Apply restore: generation advances and mfa.db rolls back to exact archived SQLite bytes.
+                # Apply restore: generation advances, sidecars are pruned, locator omits sidecars, and mfa.db rolls back cleanly.
                 (profile / ".profile-state.json").write_text(json.dumps({"generation": AFTER_GEN}), encoding="utf-8")
                 with zipfile.ZipFile(archive_path) as archive:
                     (module / "data/mfa.db").write_bytes(archive.read("plugins/mfa/data/mfa.db"))
+                if target_state == "uninstalled":
+                    (plugins / ".retained-data/mfa.json").write_text(json.dumps(observation.EXPECTED_LOCATOR), encoding="utf-8")
                 ctx.session.restore_relaunch_observation = {
                     "passed": True,
                     "manual_launch": False,
@@ -258,13 +280,41 @@ class SignedMfaBackupObservationTests(unittest.TestCase):
 
             # Retained locator / DB bytes / relaunch checks.
             ctx, _, profile, plugins, module, version_dir = self._setup_profile(root / "uninstalled", "TC-MODULES-106")
-            self._set_uninstalled(plugins, module, version_dir, state_active=False)
+            self._set_uninstalled(plugins, module, version_dir, state_active=False, with_wal_sidecars=True)
+            observation.check_uninstalled_retained(
+                plugins, module, {"state": "uninstalled", "dataRetained": True}, allow_wal_sidecars=True,
+            )
+            for label, bad_files in (
+                ("missing_db", [{"path": "mfa.db-wal", "kind": "file"}]),
+                ("extra_file", [{"path": "extra.bin", "kind": "file"}, {"path": "mfa.db", "kind": "sqlite"}]),
+                ("duplicate", [{"path": "mfa.db", "kind": "sqlite"}, {"path": "mfa.db", "kind": "sqlite"}]),
+                ("unsorted", [{"path": "mfa.db-wal", "kind": "file"}, {"path": "mfa.db", "kind": "sqlite"}]),
+                ("wrong_kind", [{"path": "mfa.db", "kind": "sqlite"}, {"path": "mfa.db-wal", "kind": "sqlite"}]),
+            ):
+                with self.subTest(pre_restore_locator=label):
+                    (plugins / ".retained-data/mfa.json").write_text(
+                        json.dumps({**observation.EXPECTED_LOCATOR, "files": bad_files}), encoding="utf-8",
+                    )
+                    with self.assertRaises(StepError):
+                        observation.check_uninstalled_retained(
+                            plugins, module, {"state": "uninstalled", "dataRetained": True}, allow_wal_sidecars=True,
+                        )
+            self._set_uninstalled(plugins, module, version_dir, state_active=False, with_wal_sidecars=True)
+            with self.assertRaises(StepError):
+                observation.check_uninstalled_retained(plugins, module, {"state": "uninstalled", "dataRetained": True})
             with self.assertRaises(StepError):
                 observation.check_uninstalled_retained(plugins, module, {"state": "uninstalled", "dataRetained": False})
             (plugins / ".retained-data/mfa.json").write_text(json.dumps({"slug": "wrong"}), encoding="utf-8")
             with self.assertRaises(StepError):
                 observation.check_uninstalled_retained(plugins, module, {"state": "uninstalled", "dataRetained": True})
             (plugins / ".retained-data/mfa.json").write_text(json.dumps(observation.EXPECTED_LOCATOR), encoding="utf-8")
+            for sidecar_name in ("mfa.db-wal", "mfa.db-shm"):
+                sidecar = module / "data" / sidecar_name
+                sidecar.write_bytes(b"stale")
+                with self.assertRaises(StepError):
+                    observation.check_uninstalled_retained(plugins, module, {"state": "uninstalled", "dataRetained": True})
+                sidecar.unlink()
+            observation.check_uninstalled_retained(plugins, module, {"state": "uninstalled", "dataRetained": True})
             with self.assertRaises(StepError):
                 observation.check_uninstalled_retained(plugins, module, {"state": "uninstalled", "dataRetained": True}, expected_db_sha256="0" * 64)
             (profile / "mfa.db").write_bytes(b"legacy")
