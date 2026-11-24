@@ -259,7 +259,10 @@ fn check_stale_pop3_attachment(host: &mut MailHost, owned_legacy_source: &Path) 
         io.block_on(async {
             let (_route, endpoint, mut peer) = Route::pair().await.unwrap();
             let call = scope.spawn(move || {
-                host.send(READ_POP3_ATTACHMENT, serde_json::to_value(endpoint).unwrap())
+                host.send(
+                    READ_POP3_ATTACHMENT,
+                    serde_json::to_value(endpoint).unwrap(),
+                )
             });
             tokio::time::timeout(WAIT, write_body_frame(&mut peer, &stale))
                 .await

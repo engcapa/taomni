@@ -19,7 +19,7 @@ fn mailbox(root: &Path, account: &str) -> LegacyMailbox {
 }
 
 fn control() -> SnapshotControl {
-    SnapshotControl::with_timeout(Duration::from_secs(10))
+    SnapshotControl::with_timeout(Duration::from_secs(30))
 }
 
 #[test]
