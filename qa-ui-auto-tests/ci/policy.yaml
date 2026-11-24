@@ -48,6 +48,11 @@ opt_in:
         - TAOMNI_QA_AGNES_KEY
         reason: Agnes key is not provisioned; the Agnes regression is opt-in
 cases:
+# Issue #869: Tao approval delivery is window-scoped; one browser contract case
+# and one native two-window case.
+- TC-AI-869-01-approval-window-routing-browser
+- TC-AI-869-02-detached-window-approval-native
+- TC-AI-869-03-closed-owner-fallback-native
 - TC-WS-GIT-CLONE-01-defaults-proxy-and-clone-browser
 - TC-WS-GIT-CLONE-02-background-close-cancel-retry-browser
 - TC-WS-GIT-CLONE-03-native-real-clone-config-and-tree

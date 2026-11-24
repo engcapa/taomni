@@ -109,6 +109,9 @@ pub async fn chat_delete_thread(
         store::delete_thread(&db, &thread_id).map_err(|e| e.to_string())?;
     }
     stop_thread_runtime(&thread_id, &app, state.inner()).await;
+    // The thread can no longer start a turn, so its approval-window ownership
+    // record is dead weight (issue #869).
+    state.agent.thread_windows.forget(&thread_id);
     state.mobile.file_roots.lock().unwrap().remove(&thread_id);
     state.mobile.roots_changed.notify_one();
     state

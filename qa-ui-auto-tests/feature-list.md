@@ -4763,6 +4763,22 @@ controls:
     selector: '[data-testid="ai-chat-safety-gate"]'
     kind: display
     optional: true       # only while a local-agent permission prompt is pending
+  - id: ai-chat-cc-permission-allow
+    selector: '[data-testid="ai-chat-cc-permission-allow"]'
+    kind: interactive
+    optional: true       # only while a Claude Code permission prompt is pending
+  - id: ai-chat-cc-permission-allow-session
+    selector: '[data-testid="ai-chat-cc-permission-allow-session"]'
+    kind: interactive
+    optional: true       # only while a Claude Code permission prompt is pending
+  - id: ai-chat-cc-permission-deny
+    selector: '[data-testid="ai-chat-cc-permission-deny"]'
+    kind: interactive
+    optional: true       # only while a Claude Code permission prompt is pending
+  - id: ai-chat-acp-permission-option-allow_once
+    selector: '[data-testid="ai-chat-acp-permission-option-allow_once"]'
+    kind: interactive
+    optional: true       # only while an ACP permission option of that kind is offered
   - id: ai-chat-acp-permission-card
     selector: '[data-testid="ai-chat-acp-permission-card"]'
     kind: display

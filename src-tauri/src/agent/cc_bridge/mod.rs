@@ -1,6 +1,7 @@
 // ⚠️ This module must NOT use crate::vault::*
 // CC authentication is fully delegated to the CC CLI itself.
 
+pub mod approval_replay;
 pub mod commands;
 pub mod config;
 pub mod mcp_control;
