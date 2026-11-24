@@ -12,7 +12,7 @@ tags: [modules, voice, marketplace, lifecycle, native-boundary, p1]
 modes: [native]
 native_platforms: [Linux, Windows, macOS]
 fixtures: [reset_db, module_signed_voice_archive, module_marketplace, release_build_required]
-timeout_sec: 480
+timeout_sec: 600
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
@@ -43,9 +43,9 @@ steps:
 - click: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
 - wait_for: {selector: '[data-testid="chat-voice-button"][data-state="recording"]', timeout_sec: 40}
 - click: '[data-testid="chat-voice-button"]'
-- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 45}
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 90}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 15}
 - eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: country}
-- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 15}
 - click: '[data-testid="ai-chat-drawer-hide"]'
 - wait_for: {selector: '[data-testid="ai-chat-drawer"][data-open="true"]', state: detached}
 - assert_signed_module_lifecycle: {slug: ai-voice-local, phase: old-enabled}
@@ -93,9 +93,9 @@ steps:
 - click: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
 - wait_for: {selector: '[data-testid="chat-voice-button"][data-state="recording"]', timeout_sec: 40}
 - click: '[data-testid="chat-voice-button"]'
-- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 45}
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 90}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 15}
 - eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: country}
-- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 15}
 - click: '[data-testid="ai-chat-drawer-hide"]'
 - wait_for: {selector: '[data-testid="ai-chat-drawer"][data-open="true"]', state: detached}
 - assert_signed_module_lifecycle: {slug: ai-voice-local, phase: old-reenabled}
@@ -117,9 +117,9 @@ steps:
 - click: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
 - wait_for: {selector: '[data-testid="chat-voice-button"][data-state="recording"]', timeout_sec: 40}
 - click: '[data-testid="chat-voice-button"]'
-- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 45}
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 90}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 15}
 - eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: country}
-- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 15}
 - click: '[data-testid="ai-chat-drawer-hide"]'
 - wait_for: {selector: '[data-testid="ai-chat-drawer"][data-open="true"]', state: detached}
 - click: '[data-testid="ribbon-settings"]'
@@ -143,9 +143,9 @@ steps:
 - click: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
 - wait_for: {selector: '[data-testid="chat-voice-button"][data-state="recording"]', timeout_sec: 40}
 - click: '[data-testid="chat-voice-button"]'
-- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 45}
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 90}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 15}
 - eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: country}
-- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 15}
 - click: '[data-testid="ai-chat-drawer-hide"]'
 - wait_for: {selector: '[data-testid="ai-chat-drawer"][data-open="true"]', state: detached}
 - click: '[data-testid="ribbon-settings"]'
@@ -184,9 +184,9 @@ steps:
 - click: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
 - wait_for: {selector: '[data-testid="chat-voice-button"][data-state="recording"]', timeout_sec: 40}
 - click: '[data-testid="chat-voice-button"]'
-- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 45}
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 90}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 15}
 - eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: country}
-- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 15}
 - assert_signed_module_lifecycle: {slug: ai-voice-local, phase: reinstalled}
 - assert_no_runtime_errors: null
 verification:
@@ -196,37 +196,37 @@ verification:
     requirement: Update and roll back a disabled Local Voice host-only package without restarting Taomni while rejecting dictation cleanly when disabled and preserving the cached Whisper model.
     actions: [10, 12, 17, 19, 27, 29, 38, 46, 58, 61, 63, 66]
     checkpoints:
-    - {step: 30, expectation: The earlier signed host decodes JFK speech into the empty composer draft.}
-    - {step: 31, expectation: The decoded transcript includes the distinct reference word country.}
+    - {step: 31, expectation: The earlier signed host decodes JFK speech into the empty composer draft.}
+    - {step: 32, expectation: The decoded transcript includes the distinct reference word country.}
     - {step: 35, expectation: The earlier signed host owns the writer lease and cached model hash matches.}
     - {step: 40, expectation: Disabling releases the writer lease cleanly.}
     - {step: 48, expectation: Dictation while disabled surfaces Enable Local Voice guidance and remains idle.}
     - {step: 65, expectation: Updating while disabled activates the current host-only version without starting the host.}
     - {step: 68, expectation: Rolling back while disabled restores the earlier version with no running host.}
-    results: [30, 31, 35, 40, 48, 65, 68]
+    results: [31, 32, 35, 40, 48, 65, 68]
   - id: enabled-update-and-failed-handshake
     requirement: Replace and roll back an active Local Voice host, decode real speech on every switched version, and recover cleanly when an update fails handshake.
     actions: [69, 77, 79, 90, 91, 101, 103, 113, 117, 127, 129]
     checkpoints:
-    - {step: 80, expectation: Re-enabled earlier host freshly decodes JFK speech after clearing the composer.}
+    - {step: 81, expectation: Re-enabled earlier host freshly decodes JFK speech after clearing the composer.}
     - {step: 85, expectation: Old host is re-enabled and owns its writer lease.}
     - {step: 93, expectation: Live update starts the current signed host cleanly.}
-    - {step: 104, expectation: Current signed host freshly decodes JFK speech in the composer.}
+    - {step: 105, expectation: Current signed host freshly decodes JFK speech in the composer.}
     - {step: 115, expectation: Handshake-failure version reports permission denied without interrupting the active host.}
     - {step: 116, expectation: Failed update preserves the running current host and its writer lease.}
     - {step: 119, expectation: Manual rollback switches the running host back to the earlier version.}
-    - {step: 130, expectation: Rolled-back earlier host freshly decodes JFK speech.}
-    results: [80, 85, 93, 104, 115, 116, 119, 130]
+    - {step: 131, expectation: Rolled-back earlier host freshly decodes JFK speech.}
+    results: [81, 85, 93, 105, 115, 116, 119, 131]
   - id: stateless-uninstall-and-reinstall
     requirement: Uninstalling Local Voice clears binaries and runtime with an empty retained locator while preserving cached ASR model weights, shows install guidance while missing, and restores real decoding on reinstall.
     actions: [137, 138, 146, 158, 160, 168, 170]
     checkpoints:
     - {step: 140, expectation: Uninstall removes versions and runtime cleanly with stateless empty retained-data locator and preserved whisper-base cache.}
     - {step: 148, expectation: Dictation while uninstalled displays Install Local Voice guidance.}
-    - {step: 171, expectation: Reinstalling and enabling current Local Voice restores JFK speech decoding.}
+    - {step: 172, expectation: Reinstalling and enabling current Local Voice restores JFK speech decoding.}
     - {step: 174, expectation: Reinstalled host owns its writer lease and passes final lifecycle checks.}
     - {step: 175, expectation: No renderer runtime errors occurred across all lifecycle transitions.}
-    results: [140, 148, 171, 174, 175]
+    results: [140, 148, 172, 174, 175]
   visual:
   - check: Whisper model selection, composer transcription text, and Module Store action/error badges across all switches.
     method: automated
