@@ -32,7 +32,7 @@ pub(super) async fn load(
             &root,
             &part.account_id,
             |db, account| {
-                taomni_mail_engine::migration::legacy_attachment(
+                taomni_mail_storage::migration::legacy_attachment(
                     db,
                     account,
                     &part.folder,

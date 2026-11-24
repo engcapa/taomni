@@ -19,8 +19,8 @@ use std::{
 };
 use taomni_mail_api::archive_scan::{ArchiveScanAction, ArchiveScanStatus};
 #[cfg(any(test, feature = "legacy-mail-imap"))]
-use taomni_mail_engine::archive::writer::LocalEncoder;
-use taomni_mail_engine::{
+use taomni_mail_storage::archive::writer::LocalEncoder;
+use taomni_mail_storage::{
     archive::{
         progress::{ArchiveStatus, ScanProgress},
         scan_store::ArchiveScanStore,

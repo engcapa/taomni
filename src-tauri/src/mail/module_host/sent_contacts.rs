@@ -24,7 +24,7 @@ pub(in crate::mail) async fn record_sent_contacts(
         #[cfg(feature = "legacy-mail-smtp")]
         if super::use_legacy_smtp(&registry) {
             return crate::mail::mail_db_task(cache, account_id, move |db, account| {
-                taomni_mail_engine::cache::upsert_sent_contacts(
+                taomni_mail_storage::cache::upsert_sent_contacts(
                     db,
                     account,
                     recipients.iter().map(String::as_str),

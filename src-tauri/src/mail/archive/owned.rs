@@ -10,7 +10,7 @@ use taomni_mail_api::{
     archive_index::ArchiveKey,
     pop3_store::{LocalArchiveAction, LocalMailboxAction},
 };
-use taomni_mail_engine::archive::progress::ScanProgress;
+use taomni_mail_storage::archive::progress::ScanProgress;
 use tauri::{AppHandle, Manager};
 
 use crate::{mail::pop3_store, state::AppState};

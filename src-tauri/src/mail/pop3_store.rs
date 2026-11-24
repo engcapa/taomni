@@ -48,7 +48,7 @@ pub(super) fn receipt_exists(plugins: &std::path::Path, account: &str) -> Result
         return Ok(false);
     }
     let data = PluginDataRoot::open(plugins, "mail").map_err(|e| e.to_string())?;
-    taomni_mail_engine::pop3::ownership::is_owned(&data.data, account).map_err(|e| e.to_string())
+    taomni_mail_storage::pop3::ownership::is_owned(&data.data, account).map_err(|e| e.to_string())
 }
 
 /// Older modular profiles can keep an untransferred mailbox in their original

@@ -9,7 +9,7 @@ use crate::{
 };
 use rusqlite::{Connection, OptionalExtension};
 use std::path::Path;
-use taomni_mail_engine::database::{configured_directory, mail_db_file_stem};
+use taomni_mail_storage::database::{configured_directory, mail_db_file_stem};
 
 fn restored_mailbox(registry: &PluginRegistry, filename: &str) -> Result<bool, String> {
     Ok(retained_data::load(&registry.root(), "mail")
@@ -46,7 +46,7 @@ pub(super) fn import_source<T>(
         .map_err(|e| e.to_string())?;
     drop(db);
     let directory = configured_directory(options.as_deref().unwrap_or("{}"), legacy_root)?;
-    let rows = taomni_mail_engine::migration::read_legacy_mailbox(
+    let rows = taomni_mail_storage::migration::read_legacy_mailbox(
         &directory.join(filename),
         account,
         read,

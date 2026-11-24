@@ -9,7 +9,7 @@ use taomni_mail_api::{
         Pop3LedgerRequest, Pop3Round, Pop3SyncOutcome, read_ledger_message, write_ledger_message,
     },
 };
-use taomni_mail_engine::pop3::Pop3Ledger;
+use taomni_mail_storage::pop3::Pop3Ledger;
 use taomni_plugin_stream::routed_tcp::Route;
 use tokio::runtime::Handle;
 

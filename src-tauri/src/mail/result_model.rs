@@ -62,7 +62,7 @@ pub struct MailTestConnectionResult {
     pub folder_count: usize,
 }
 
-pub use taomni_mail_engine::cache::MailContactSuggestion;
+pub use taomni_mail_storage::cache::MailContactSuggestion;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

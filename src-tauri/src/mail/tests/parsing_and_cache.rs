@@ -179,7 +179,7 @@ fn sent_contacts_raise_sent_source() {
 
     let addresses = request.to.iter().chain(&request.cc).chain(&request.bcc);
     assert_eq!(
-        taomni_mail_engine::cache::upsert_sent_contacts(
+        taomni_mail_storage::cache::upsert_sent_contacts(
             &conn,
             "acct",
             addresses.map(String::as_str)

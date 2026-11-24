@@ -15,32 +15,32 @@ fn mail_only_backup_recognizes_owned_imap_and_pop3_and_applies_archive_selection
     let path = harness.root.path().join("plugins/mail/data");
     fs::create_dir_all(&path).unwrap();
     let account = "module-pop3";
-    let stem = taomni_mail_engine::database::mail_db_file_stem(account);
+    let stem = taomni_mail_storage::database::mail_db_file_stem(account);
     let db = rusqlite::Connection::open(path.join(format!("{stem}.db"))).unwrap();
-    taomni_mail_engine::cache::init_mail_tables(&db).unwrap();
-    taomni_mail_engine::pop3::ownership::mark_owned(&path, account).unwrap();
+    taomni_mail_storage::cache::init_mail_tables(&db).unwrap();
+    taomni_mail_storage::pop3::ownership::mark_owned(&path, account).unwrap();
     let original = b"Subject: Kept in the module\r\n\r\nRaw POP3 bytes\r\n";
-    taomni_mail_engine::pop3::local_store::import_local_messages(
+    taomni_mail_storage::pop3::local_store::import_local_messages(
         &db,
         account,
         "INBOX",
         &[original.to_vec()],
     )
     .unwrap();
-    taomni_mail_engine::storage::store(&db, account, "INBOX", 1, 1, original.as_slice()).unwrap();
+    taomni_mail_storage::storage::store(&db, account, "INBOX", 1, 1, original.as_slice()).unwrap();
     write(&path.join("attachments/attachment.bin"), b"attachment");
     drop(db);
 
     let imap = "module-imap";
-    let imap_stem = taomni_mail_engine::database::mail_db_file_stem(imap);
+    let imap_stem = taomni_mail_storage::database::mail_db_file_stem(imap);
     let imap_name = format!("{imap_stem}.db");
     let imap_path = path.join(&imap_name);
     let db = rusqlite::Connection::open(&imap_path).unwrap();
-    taomni_mail_engine::cache::init_mail_tables(&db).unwrap();
+    taomni_mail_storage::cache::init_mail_tables(&db).unwrap();
     let imap_message =
-        taomni_mail_engine::parse_body_message(imap, "INBOX", 1, None, original, 1024);
-    taomni_mail_engine::cache::upsert_message(&db, &imap_message).unwrap();
-    taomni_mail_engine::imap_ownership::mark_owned(&path, imap).unwrap();
+        taomni_mail_storage::parse_body_message(imap, "INBOX", 1, None, original, 1024);
+    taomni_mail_storage::cache::upsert_message(&db, &imap_message).unwrap();
+    taomni_mail_storage::imap_ownership::mark_owned(&path, imap).unwrap();
     drop(db);
 
     let staging = tempfile::tempdir().unwrap();
@@ -82,11 +82,11 @@ fn mail_only_backup_recognizes_owned_imap_and_pop3_and_applies_archive_selection
             .unwrap();
         let module_data = imap_snapshot.disk_path.parent().unwrap();
         assert_eq!(
-            taomni_mail_engine::imap_ownership::database(module_data, imap).unwrap(),
+            taomni_mail_storage::imap_ownership::database(module_data, imap).unwrap(),
             Some(imap_snapshot.disk_path.clone())
         );
         let restored_imap = rusqlite::Connection::open(&imap_snapshot.disk_path).unwrap();
-        let body = taomni_mail_engine::cache::get_cached_body(&restored_imap, imap, "INBOX", 1)
+        let body = taomni_mail_storage::cache::get_cached_body(&restored_imap, imap, "INBOX", 1)
             .unwrap()
             .unwrap();
         assert!(body.text.as_deref().unwrap().contains("Raw POP3 bytes"));
@@ -120,13 +120,13 @@ fn mail_only_backup_recognizes_owned_imap_and_pop3_and_applies_archive_selection
             .unwrap();
         let restored = rusqlite::Connection::open(&staged.disk_path).unwrap();
         assert_eq!(
-            taomni_mail_engine::storage::list(&restored, account, 0)
+            taomni_mail_storage::storage::list(&restored, account, 0)
                 .unwrap()
                 .len(),
             usize::from(include_files)
         );
         assert_eq!(
-            taomni_mail_engine::pop3::local_store::read_local_raw(&restored, account, "INBOX", 1)
+            taomni_mail_storage::pop3::local_store::read_local_raw(&restored, account, "INBOX", 1)
                 .unwrap()
                 .as_deref(),
             Some(original.as_slice()),

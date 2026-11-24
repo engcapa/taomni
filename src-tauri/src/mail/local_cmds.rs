@@ -124,7 +124,7 @@ async fn download(
         tokio::task::spawn_blocking(move || {
             let _local = gate.lock().map_err(|error| error.to_string())?;
             let ledger = pop3::sqlite_ledger(|| db.lock(), &account_id);
-            let sync = |mailbox: &mut dyn taomni_mail_engine::pop3::Pop3Mailbox| {
+            let sync = |mailbox: &mut dyn taomni_mail_storage::pop3::Pop3Mailbox| {
                 pop3::sync_inbox(mailbox, &ledger, leave_days)
             };
             let outcome = if super::module_host::runs_pop3_rounds(&registry) {
@@ -450,7 +450,7 @@ pub(super) async fn download_attachment(
         let raw = raw(state, account_id, folder, uid).await?;
         let target_path = target_path.to_owned();
         return super::decode_mail_original(move || {
-            let attachment = taomni_mail_engine::extract_attachment(&raw, index)?;
+            let attachment = taomni_mail_storage::extract_attachment(&raw, index)?;
             super::attachment_files::publish_mail_bytes(
                 std::path::Path::new(&target_path),
                 &attachment.bytes,

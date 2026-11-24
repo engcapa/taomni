@@ -9,7 +9,7 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::time::Instant;
 pub use taomni_mail_api::archive::ArchiveStatus;
-use taomni_mail_engine::archive::progress::ScanProgress;
+use taomni_mail_storage::archive::progress::ScanProgress;
 
 #[derive(Default)]
 pub struct ArchiveManager {

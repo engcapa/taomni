@@ -13,7 +13,7 @@ use taomni_mail_api::{
     archive::{ARCHIVE_FRAME_BYTES, ArchiveEncoding, PUBLISH_IMAP_ARCHIVE, receive_encoding},
     archive_index::ArchiveKey,
 };
-use taomni_mail_engine::{
+use taomni_mail_storage::{
     archive::{
         MessageObject,
         progress::ScanProgress,

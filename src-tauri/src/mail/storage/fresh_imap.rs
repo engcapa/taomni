@@ -4,7 +4,7 @@ use std::{fs, io::ErrorKind, path::Path};
 
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use taomni_mail_api::{INITIALIZE_IMAP_MAILBOX, SLUG};
-use taomni_mail_engine::database::{
+use taomni_mail_storage::database::{
     ProcessLock, configured_directory, mail_db_file_stem, redirect_path,
 };
 

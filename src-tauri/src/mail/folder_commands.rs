@@ -1,7 +1,7 @@
 //! Update the server folder tree, then commit its metadata to the mailbox cache.
 
 use taomni_mail_api::{ImapFolderChange, folder_cache::FolderCacheAction};
-use taomni_mail_engine::cache::apply_folder_change;
+use taomni_mail_storage::cache::apply_folder_change;
 
 use super::*;
 

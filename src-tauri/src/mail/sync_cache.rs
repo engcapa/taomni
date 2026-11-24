@@ -4,7 +4,7 @@ use taomni_mail_api::{
     imap_index::{AppliedStep, ImapIndexAction, ImapIndexRetention},
     imap_sync::{FolderStepOutcome, MailFolderSyncResult},
 };
-use taomni_mail_engine::cache::{MailCacheSettings, apply_folder_round, cache_sync_result};
+use taomni_mail_storage::cache::{MailCacheSettings, apply_folder_round, cache_sync_result};
 use tauri::State;
 
 use super::{MailFolder, MailMessageCached, module_host, sync, with_mail_db_async};

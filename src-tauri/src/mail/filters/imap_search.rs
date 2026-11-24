@@ -1,4 +1,4 @@
-use taomni_mail_engine::filters::{MailFilter, MailFilterField, MailFilterOp};
+use taomni_mail_storage::filters::{MailFilter, MailFilterField, MailFilterOp};
 
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 use crate::mail::ActiveImapSession;

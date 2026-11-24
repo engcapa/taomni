@@ -5,9 +5,9 @@ use std::sync::Arc;
 
 use taomni_mail_api::{cache_query::CacheQuery, pop3_store::LocalMailboxAction};
 use taomni_mail_api::{message::MailMessageHeader, search::ImapSearchRequest};
-use taomni_mail_engine::search::search_cached_messages;
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 use taomni_mail_engine::search::search_imap_messages;
+use taomni_mail_storage::search::search_cached_messages;
 use tauri::State;
 
 pub use taomni_mail_api::search::{MailSearchField, MailSearchQuery};

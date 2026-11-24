@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use rusqlite::params;
 use serde_json::json;
-use taomni_mail_engine::cache::{get_cached_body, init_mail_tables, upsert_message};
-use taomni_mail_engine::contacts::{MailAddressBookEntry, save_entry};
+use taomni_mail_storage::cache::{get_cached_body, init_mail_tables, upsert_message};
+use taomni_mail_storage::contacts::{MailAddressBookEntry, save_entry};
 
 use super::*;
 use crate::plugin::{
@@ -46,7 +46,7 @@ fn cached_mail(root: &Path, account: &str, text: &str) -> PathBuf {
     init_mail_tables(&db).unwrap();
     let raw = format!("Subject: legacy\r\n\r\n{text}\r\n");
     let message =
-        taomni_mail_engine::parse_body_message(account, "INBOX", 9, None, raw.as_bytes(), 256);
+        taomni_mail_storage::parse_body_message(account, "INBOX", 9, None, raw.as_bytes(), 256);
     upsert_message(&db, &message).unwrap();
     let draft = serde_json::from_value(json!({
         "id": "scheduled", "subject": format!("Legacy {account} draft"),
@@ -54,7 +54,7 @@ fn cached_mail(root: &Path, account: &str, text: &str) -> PathBuf {
         "remoteDraftFolder":"Drafts","remoteDraftUid":9,
     }))
     .unwrap();
-    taomni_mail_engine::drafts::save_mail_draft(&db, account, draft).unwrap();
+    taomni_mail_storage::drafts::save_mail_draft(&db, account, draft).unwrap();
     save_entry(
         &db,
         account,
@@ -180,7 +180,7 @@ fn installs_and_records_default_and_custom_mail_data_for_a_verified_package() {
             .join(MAIL_MIGRATION_TARGET)
             .join(source.file_name().unwrap());
         assert_eq!(
-            taomni_mail_engine::imap_ownership::database(path.parent().unwrap(), account).unwrap(),
+            taomni_mail_storage::imap_ownership::database(path.parent().unwrap(), account).unwrap(),
             Some(path.clone())
         );
         let handle = runtime
@@ -190,8 +190,8 @@ fn installs_and_records_default_and_custom_mail_data_for_a_verified_package() {
         assert_eq!(Path::new(db.path().unwrap()).canonicalize().unwrap(), path);
         let value = get_cached_body(&db, account, "INBOX", 9).unwrap().unwrap();
         assert!(value.text.unwrap().contains(text));
-        assert!(taomni_mail_engine::draft_import::is_owned(&db, account).unwrap());
-        let queued = taomni_mail_engine::drafts::get_mail_draft(&db, account, "scheduled")
+        assert!(taomni_mail_storage::draft_import::is_owned(&db, account).unwrap());
+        let queued = taomni_mail_storage::drafts::get_mail_draft(&db, account, "scheduled")
             .unwrap()
             .unwrap();
         assert_eq!(queued.remote_draft_uid, Some(9));
@@ -310,7 +310,7 @@ fn a_restored_mailbox_takes_precedence_over_the_legacy_source_at_first_activatio
     )
     .unwrap();
     let plugins = profile.join("plugins");
-    taomni_mail_engine::imap_ownership::mark_owned(&data, "custom").unwrap();
+    taomni_mail_storage::imap_ownership::mark_owned(&data, "custom").unwrap();
     let locator = retained_data::discover(&plugins, OWNER, 1).unwrap();
     retained_data::save(&plugins, &locator).unwrap();
     let before = restored.each_ref().map(|path| fs::read(path).unwrap());
@@ -333,12 +333,12 @@ fn a_restored_mailbox_takes_precedence_over_the_legacy_source_at_first_activatio
     assert_eq!(fs::read(legacy).unwrap(), legacy_before);
     assert!(!missing_custom.exists());
     assert!(
-        taomni_mail_engine::imap_ownership::database(&data, "default")
+        taomni_mail_storage::imap_ownership::database(&data, "default")
             .unwrap()
             .is_none()
     );
     assert_eq!(
-        taomni_mail_engine::imap_ownership::database(&data, "custom").unwrap(),
+        taomni_mail_storage::imap_ownership::database(&data, "custom").unwrap(),
         Some(restored[1].clone())
     );
 }
@@ -424,7 +424,7 @@ fn older_packages_keep_the_live_legacy_mailbox_even_with_a_migrated_copy() {
     let staged = profile.join(MAIL_MIGRATION_TARGET);
     assert!(staged.join(old.file_name().unwrap()).exists());
     assert!(
-        taomni_mail_engine::imap_ownership::database(&staged, "custom")
+        taomni_mail_storage::imap_ownership::database(&staged, "custom")
             .unwrap()
             .is_none()
     );
@@ -446,7 +446,7 @@ fn older_packages_keep_the_live_legacy_mailbox_even_with_a_migrated_copy() {
     );
 
     // A later owner-capable app must wait for a compatible installed module.
-    taomni_mail_engine::imap_ownership::mark_owned(&staged, "custom").unwrap();
+    taomni_mail_storage::imap_ownership::mark_owned(&staged, "custom").unwrap();
     let result = runtime.database(&registry, "custom", || {
         panic!("do not use the cached legacy handle")
     });

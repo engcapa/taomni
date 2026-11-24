@@ -3,7 +3,7 @@ use super::{FullMessageMode, account_root, read, store, stores_full};
 use rusqlite::Connection;
 use std::fs;
 use std::path::Path;
-use taomni_mail_engine::database::{MAIL_MUTATION_LOCK, ProcessLock};
+use taomni_mail_storage::database::{MAIL_MUTATION_LOCK, ProcessLock};
 
 #[test]
 fn relocation_switches_the_existing_connection_and_rolls_back_publication_failure() {

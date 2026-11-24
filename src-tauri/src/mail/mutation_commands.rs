@@ -75,7 +75,7 @@ pub async fn mail_clear_cache(
             if pop3::has_local_store(&tx, &account_id).map_err(|error| error.to_string())? {
                 return Err(POP3_CLEAR_ERROR.into());
             }
-            taomni_mail_engine::cache::clear_cached_account(&tx, &account_id)
+            taomni_mail_storage::cache::clear_cached_account(&tx, &account_id)
                 .map_err(|error| error.to_string())?;
             tx.commit().map_err(|error| error.to_string())
         }

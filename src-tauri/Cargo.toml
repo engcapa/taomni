@@ -27,6 +27,7 @@ members = [
     "crates/taomni-file-uri",
     "crates/taomni-mail-api",
     "crates/taomni-mail-engine",
+    "crates/taomni-mail-storage",
     "crates/taomni-mfa-api",
     "crates/taomni-mfa-engine",
     "crates/taomni-module-settings",
@@ -202,7 +203,8 @@ tokio-tungstenite = { version = "0.29", features = ["rustls-tls-native-roots"] }
 imap = { version = "2.4.1", optional = true }
 taomni-mail-api = { path = "crates/taomni-mail-api" }
 taomni-sockscap-api = { path = "crates/taomni-sockscap-api" }
-taomni-mail-engine = { path = "crates/taomni-mail-engine", default-features = false }
+taomni-mail-engine = { path = "crates/taomni-mail-engine", default-features = false, optional = true }
+taomni-mail-storage = { path = "crates/taomni-mail-storage" }
 native-tls = "0.2"
 tokio-native-tls = "0.3"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
@@ -321,9 +323,9 @@ legacy-rdp-server = ["dep:taomni-rdp-server-engine", "rdp-server-audio"]
 legacy-local-servers = ["dep:taomni-local-servers-engine"]
 legacy-screenshot-media = ["dep:taomni-screenshot-ocr", "dep:taomni-screenshot-recording"]
 legacy-mfa = ["dep:taomni-mfa-engine"]
-legacy-mail-imap = ["dep:imap", "taomni-mail-engine/imap-runtime"]
-legacy-mail-pop3 = ["taomni-mail-engine/pop3-runtime"]
-legacy-mail-smtp = ["taomni-mail-engine/legacy-smtp"]
+legacy-mail-imap = ["dep:imap", "dep:taomni-mail-engine", "taomni-mail-engine/imap-runtime"]
+legacy-mail-pop3 = ["dep:taomni-mail-engine", "taomni-mail-engine/pop3-runtime"]
+legacy-mail-smtp = ["dep:taomni-mail-engine", "taomni-mail-engine/legacy-smtp"]
 # Dedicated hosted test harness: use the production pinned key on every thread
 # instead of the normal unit-fixture key. Production verification is unchanged.
 qa-release-trust-gates = []

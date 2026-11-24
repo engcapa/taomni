@@ -8974,6 +8974,8 @@ Mail 宿主从旧库的归档记录返回保存时间。只有 POP3 原件时，
 
 查看原文和保存 EML 优先读取已归档的原件。启用的签名 Mail 宿主从 IMAP 读取未归档的 MIME 原件，由核心保存到用户选定的位置。TC-MODULES-059 检查真实 IMAP 原文与本机保存的 EML 文件，TC-MODULES-060 检查 Browser 的原文对话框和导出内容。`TC-MODULES-111` 覆盖签名 Mail 宿主两版本在线更新、禁/启用回滚、握手失败恢复、卸载保留 SQLite 邮箱库/归档定位记录，以及重装后无重启恢复真实 IMAP 同步与邮件阅读。
 
+Mail 宿主使用独立协议引擎。基座通过共享存储库迁移和还原旧 SQLite 邮箱及归档对象。`TC-MODULES-049/101` 分别核对旧账号迁移和新 IMAP 账号的数据库归属。四目标 G9 清单检查默认基座的 Cargo 依赖。
+
 <!-- feature
 id: F-MAIL-23
 status: partial

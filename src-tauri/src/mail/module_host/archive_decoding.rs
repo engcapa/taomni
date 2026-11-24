@@ -8,7 +8,7 @@ use taomni_mail_api::{
     archive::{ArchiveAttachmentDecoding, ArchiveDecoding},
     message::MailMessageBody,
 };
-use taomni_mail_engine::storage::OpenMessage;
+use taomni_mail_storage::storage::OpenMessage;
 use taomni_plugin_stream::routed_tcp::Endpoint;
 
 use super::{PluginRegistry, mime_exchange::transform, supports};
@@ -17,7 +17,7 @@ use crate::mail::legacy_archive_without_host;
 use crate::mail::{SIGNED_MAIL_ARCHIVE_REQUIRED, decode_mail_original};
 
 #[cfg(feature = "legacy-mail-imap")]
-use taomni_mail_engine::{cache::cached_to_body, extract_attachment, parse_body_message};
+use taomni_mail_storage::{cache::cached_to_body, extract_attachment, parse_body_message};
 
 pub(in crate::mail) async fn decode_archive_original(
     registry: Arc<PluginRegistry>,
@@ -112,7 +112,7 @@ async fn transfer_original<P: Serialize + Send + 'static>(
 #[cfg(test)]
 mod tests {
     use rusqlite::Connection;
-    use taomni_mail_engine::{cache::init_mail_tables, storage};
+    use taomni_mail_storage::{cache::init_mail_tables, storage};
 
     use super::*;
 

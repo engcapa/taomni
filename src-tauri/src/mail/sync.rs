@@ -3,15 +3,15 @@
 #[cfg(test)]
 mod tests;
 
-pub use taomni_mail_engine::imap_sync::{MailFolderSyncResult, MailSyncMode, MailSyncRequestMode};
+pub use taomni_mail_storage::imap_sync::{MailFolderSyncResult, MailSyncMode, MailSyncRequestMode};
 
-pub(super) use taomni_mail_engine::imap_folders::quote_imap_string;
-pub(super) use taomni_mail_engine::imap_sync::{
+pub(super) use taomni_mail_storage::imap_folders::quote_imap_string;
+pub(super) use taomni_mail_storage::imap_sync::{
     FLAG_RECONCILE_WINDOW, FolderStepOutcome, FolderSyncState, StepParams, advance_state,
     step_result,
 };
 
-pub(super) use taomni_mail_engine::cache::{
+pub(super) use taomni_mail_storage::cache::{
     apply_folder_step, load_folder_sync_state, now_ms, record_folder_error,
 };
 

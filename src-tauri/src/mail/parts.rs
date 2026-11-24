@@ -2,7 +2,7 @@
 
 use std::io::Write;
 use std::path::Path;
-pub(super) use taomni_mail_engine::attachment_cache::attachment_cache_path;
+pub(super) use taomni_mail_storage::attachment_cache::attachment_cache_path;
 
 pub(super) fn write_cache_file(path: &Path, bytes: &[u8]) {
     if let Some(parent) = path.parent() {

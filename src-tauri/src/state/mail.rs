@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use taomni_mail_api::{IMAP_MAILBOX_OWNER, SLUG};
-pub(crate) use taomni_mail_engine::database::mail_db_file_stem;
-use taomni_mail_engine::{database::MailDatabase, imap_ownership};
+pub(crate) use taomni_mail_storage::database::mail_db_file_stem;
+use taomni_mail_storage::{database::MailDatabase, imap_ownership};
 
 pub(crate) struct MailRuntime {
     // Each account's database is separate from taomni.db and other accounts.

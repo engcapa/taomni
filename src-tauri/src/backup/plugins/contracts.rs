@@ -69,7 +69,7 @@ impl PluginDataSet {
             .filter_map(|file| {
                 file.path.strip_suffix(".pop3-owner").or_else(|| {
                     file.path
-                        .strip_suffix(taomni_mail_engine::imap_ownership::RECEIPT_SUFFIX)
+                        .strip_suffix(taomni_mail_storage::imap_ownership::RECEIPT_SUFFIX)
                 })
             })
             .map(|stem| format!("{stem}.db"))
@@ -122,7 +122,7 @@ impl PluginDataSet {
             for file in &self.files {
                 if let Some(stem) = file
                     .path
-                    .strip_suffix(taomni_mail_engine::imap_ownership::RECEIPT_SUFFIX)
+                    .strip_suffix(taomni_mail_storage::imap_ownership::RECEIPT_SUFFIX)
                     && (file.kind != PluginDataFileKind::File
                         || stem.contains('/')
                         || !sqlite.contains(format!("{stem}.db").as_str()))

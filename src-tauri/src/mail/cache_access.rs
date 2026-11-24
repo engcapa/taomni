@@ -5,7 +5,7 @@ use taomni_mail_api::cache_query::CacheQuery;
 
 use super::*;
 
-pub use taomni_mail_engine::cache::init_mail_tables;
+pub use taomni_mail_storage::cache::init_mail_tables;
 
 pub(super) fn with_mail_db<T>(
     state: &State<'_, AppState>,

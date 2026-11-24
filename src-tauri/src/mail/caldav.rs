@@ -5,7 +5,7 @@
 
 use reqwest::Url;
 use serde::Serialize;
-use taomni_mail_engine::agenda::{
+use taomni_mail_storage::agenda::{
     AgendaAction, AgendaResources, AgendaState, EventDelta, FUTURE_DAYS, MailAgendaEvent,
 };
 use tauri::State;
@@ -411,7 +411,7 @@ pub async fn mail_add_invite_to_calendar(
 mod tests {
     use super::*;
     use rusqlite::Connection;
-    use taomni_mail_engine::agenda::{agenda, store_events};
+    use taomni_mail_storage::agenda::{agenda, store_events};
 
     const EXPANDED: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:standup\r\nRECURRENCE-ID:20261005T010000Z\r\nDTSTART:20261005T010000Z\r\nDTEND:20261005T011500Z\r\nSUMMARY:Standup\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT10M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:standup\r\nRECURRENCE-ID:20261006T010000Z\r\nDTSTART:20261006T010000Z\r\nDTEND:20261006T011500Z\r\nSUMMARY:Standup\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 

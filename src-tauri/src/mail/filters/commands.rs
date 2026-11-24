@@ -1,6 +1,6 @@
 use super::store;
 use crate::state::AppState;
-use taomni_mail_engine::filters::{
+use taomni_mail_storage::filters::{
     MailFilter, parse_filter_file, rules::FilterRulesAction, serialize_filter_file,
 };
 use tauri::State;

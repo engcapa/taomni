@@ -4,7 +4,7 @@ use crate::mail::message_source::fetch_original_from_server;
 use crate::state::AppState;
 use std::collections::BTreeMap;
 use std::io::Write;
-use taomni_mail_engine::filters::{MailFilterRunResult, MessagePlan};
+use taomni_mail_storage::filters::{MailFilterRunResult, MessagePlan};
 use tauri::State;
 
 pub(super) async fn raw_bytes(

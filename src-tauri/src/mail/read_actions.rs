@@ -6,9 +6,9 @@ use std::future::Future;
 use taomni_mail_api::{
     ImapFlagUpdate, imap_flag_cache::ImapFlagCacheAction, imap_mutation::UID_BATCH_SIZE,
 };
-use taomni_mail_engine::cache::reconcile_cached_read;
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 pub(super) use taomni_mail_engine::imap_mutations::unread_uids;
+use taomni_mail_storage::cache::reconcile_cached_read;
 
 pub(super) struct ReadFlagTransport {
     #[cfg(any(test, feature = "legacy-mail-imap"))]

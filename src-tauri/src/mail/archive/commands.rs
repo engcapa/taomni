@@ -8,7 +8,7 @@ use taomni_mail_api::{
     archive_scan::{ArchiveScanAction, ArchiveScanStatus},
     pop3_store::LocalArchiveAction,
 };
-use taomni_mail_engine::storage::scan;
+use taomni_mail_storage::storage::scan;
 use tauri::{AppHandle, Manager, State};
 
 #[tauri::command]

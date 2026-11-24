@@ -9,7 +9,7 @@
 //!   instead of EXAMINE + SEARCHes).
 
 use taomni_mail_api::{FolderSubscription, folder_cache::FolderCacheAction};
-use taomni_mail_engine::cache::{refresh_subscription_flags, sync_folder_tree};
+use taomni_mail_storage::cache::{refresh_subscription_flags, sync_folder_tree};
 use tauri::State;
 
 #[cfg(any(test, feature = "legacy-mail-imap"))]
@@ -24,10 +24,10 @@ use crate::state::AppState;
 use taomni_mail_engine::imap_folders::imap_list_folders;
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 pub(super) use taomni_mail_engine::imap_folders::imap_set_subscription;
-pub(super) use taomni_mail_engine::imap_folders::{SUBSCRIBED_ATTRIBUTE, folder_visible};
+pub(super) use taomni_mail_storage::imap_folders::{SUBSCRIBED_ATTRIBUTE, folder_visible};
 
 #[cfg(test)]
-use taomni_mail_engine::{
+use taomni_mail_storage::{
     imap_folders::{FolderStatus, imap_folder_status},
     imap_sync::{FolderSyncState, folder_unchanged},
 };

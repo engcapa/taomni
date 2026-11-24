@@ -10,7 +10,7 @@ use serde::de::DeserializeOwned;
 use std::path::Path;
 use taomni_mail_api::archive_index::ArchiveIndexAction;
 use taomni_mail_api::pop3_store::LocalArchiveAction;
-use taomni_mail_engine::storage::scan;
+use taomni_mail_storage::storage::scan;
 use tauri::State;
 
 use super::owned;

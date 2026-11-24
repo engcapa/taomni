@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 #[cfg(test)]
-use taomni_mail_engine::parse_list_unsubscribe;
+use taomni_mail_storage::parse_list_unsubscribe;
 
 async fn post_one_click(url: &str, allow_plain_http: bool) -> Result<u16, String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| format!("invalid unsubscribe URL: {e}"))?;

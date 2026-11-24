@@ -9,7 +9,7 @@ use taomni_mail_api::{
         ImapBodyReply, ImapExchange, PrefetchBodies, read_body_frame, read_frame, write_frame,
     },
 };
-use taomni_mail_engine::cache::{cache_body_if_current, pending_bodies};
+use taomni_mail_storage::cache::{cache_body_if_current, pending_bodies};
 use taomni_plugin_stream::routed_tcp::Route;
 use tauri::State;
 

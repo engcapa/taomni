@@ -2,7 +2,9 @@ use super::*;
 use taomni_mail_api::contact_history::ContactHistoryAction;
 
 #[cfg(test)]
-pub(super) use taomni_mail_engine::drafts::{delete_mail_draft, list_mail_drafts, save_mail_draft};
+pub(super) use taomni_mail_storage::drafts::{
+    delete_mail_draft, list_mail_drafts, save_mail_draft,
+};
 
 #[tauri::command]
 pub async fn mail_list_drafts(

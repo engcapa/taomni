@@ -11,7 +11,7 @@ use crate::mail::webdav::DavAuth;
 use crate::mail::webdav::DavClient;
 use crate::state::AppState;
 use reqwest::Url;
-use taomni_mail_engine::contacts::{
+use taomni_mail_storage::contacts::{
     MailAddressBookEntry, StoredCard,
     mailbox::{BookAction, DavState},
 };

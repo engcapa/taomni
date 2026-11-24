@@ -199,7 +199,7 @@ pub async fn mail_sync_folder(
 
     let started_ms = sync::now_ms();
     let result = if module_host::syncs_imap_headers(&state.plugins, params.include_bodies) {
-        let step = taomni_mail_engine::imap_sync::HeaderStepRequest {
+        let step = taomni_mail_storage::imap_sync::HeaderStepRequest {
             account_id: account_id.clone(),
             folder: folder.clone(),
             state: sync_state,

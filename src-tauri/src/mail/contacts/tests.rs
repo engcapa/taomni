@@ -8,7 +8,7 @@ use crate::mail::webdav::parse_multistatus;
 use reqwest::Url;
 use rusqlite::Connection;
 use std::collections::HashMap;
-use taomni_mail_engine::contacts::{
+use taomni_mail_storage::contacts::{
     MailAddressBookEntry, apply_changes, delete_entry, load_cards, save_entry,
 };
 

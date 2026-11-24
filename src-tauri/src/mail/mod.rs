@@ -100,7 +100,7 @@ mod tests;
 
 pub mod archive;
 
-pub(crate) use taomni_mail_engine::storage::query as archive_query;
+pub(crate) use taomni_mail_storage::storage::query as archive_query;
 
 pub mod autoconfig;
 
@@ -210,7 +210,7 @@ use crate::state::AppState;
 use crate::terminal::network::NetworkSettings;
 
 use sync::{FolderStepOutcome, FolderSyncState, StepParams};
-use taomni_mail_engine::imap_errors::{imap_catch_result, is_imap_transport_error};
+use taomni_mail_storage::imap_errors::{imap_catch_result, is_imap_transport_error};
 
 mod limits;
 

@@ -4,21 +4,20 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.94"
 publish = false
-description = "Mail message parsing and data contracts independent of desktop runtime"
+description = "Mail protocol adapters and delivery for the independent Mail host"
 
 [features]
 default = ["imap-runtime", "pop3-runtime", "mime-compose", "mime-parse"]
-mime-parse = ["dep:mail-parser"]
+mime-parse = ["dep:mail-parser", "taomni-mail-storage/mime-parse"]
 imap-runtime = ["mime-parse", "dep:imap", "dep:imap-proto"]
 pop3-runtime = ["mime-parse", "dep:md-5"]
-mime-compose = ["dep:lettre"]
+mime-compose = ["dep:lettre", "taomni-mail-storage/mime-compose"]
 legacy-smtp = ["mime-compose", "lettre/hostname", "lettre/native-tls", "lettre/pool", "lettre/smtp-transport"]
 routed-smtp = ["mime-compose", "lettre/hostname", "lettre/smtp-transport", "lettre/tokio1-native-tls", "dep:tokio", "dep:tokio-native-tls"]
 
 [dependencies]
 base64 = "0.22"
 chrono = "0.4"
-flate2 = "1"
 hex = "0.4"
 imap = { version = "2.4.1", features = ["tls"], default-features = false, optional = true }
 imap-proto = { version = "=0.10.2", optional = true }
@@ -26,19 +25,11 @@ lettre = { version = "0.11.22", default-features = false, features = ["builder"]
 mail-parser = { version = "0.11.4", features = ["full_encoding"], optional = true }
 md-5 = { version = "0.11", optional = true }
 native-tls = "0.2"
-regex = "1"
-rusqlite = { version = "0.40", features = ["bundled", "hooks"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-sha2 = "0.11"
 taomni-mail-api = { path = "../taomni-mail-api" }
-taomni-sqlite-snapshot = { path = "../taomni-sqlite-snapshot" }
-tempfile = "3"
+taomni-mail-storage = { path = "../taomni-mail-storage" }
 tokio = { version = "1", features = ["net", "time"], optional = true }
 tokio-native-tls = { version = "0.3", optional = true }
-tokio-util = "0.7"
 tracing = "0.1"
-uuid = { version = "1", features = ["v4"] }
 
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
+[dev-dependencies]
+serde_json = "1"

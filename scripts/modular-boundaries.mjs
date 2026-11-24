@@ -39,7 +39,7 @@ function sharedLibraryViolations(root) {
       }
     }
   }
-  for (const name of ["taomni-asr-models", "taomni-local-voice-api", "taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api", "taomni-rdp-client-engine", "taomni-mail-api", "taomni-mail-engine", "taomni-vnc-api", "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector", "taomni-screenshot-api", "taomni-screenshot-ocr", "taomni-screenshot-recording", "taomni-server-process", "taomni-local-servers-engine", "taomni-pty"]) {
+  for (const name of ["taomni-asr-models", "taomni-local-voice-api", "taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api", "taomni-rdp-client-engine", "taomni-mail-api", "taomni-mail-storage", "taomni-mail-engine", "taomni-vnc-api", "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector", "taomni-screenshot-api", "taomni-screenshot-ocr", "taomni-screenshot-recording", "taomni-server-process", "taomni-local-servers-engine", "taomni-pty"]) {
     const directory = path.join(root, "src-tauri/crates", name);
     const manifest = fs.readFileSync(path.join(directory, "Cargo.toml"), "utf8");
     const isMailApi = name === "taomni-mail-api";
@@ -66,6 +66,10 @@ function sharedLibraryViolations(root) {
       if (isMailApi && (packageName === "taomni-mail-engine"
         || resolvedPath === path.join(root, "src-tauri/crates/taomni-mail-engine"))) {
         errors.push(`${name}/Cargo.toml: ${section}.${dependency} links the Mail engine`);
+      }
+      if (name === "taomni-mail-storage" && (["taomni-mail-engine", "imap", "imap-proto"].includes(packageName)
+        || resolvedPath === path.join(root, "src-tauri/crates/taomni-mail-engine"))) {
+        errors.push(`${name}/Cargo.toml: ${section}.${dependency} links Mail protocol transport`);
       }
     }
     for (const filename of rustFiles(path.join(directory, "src"))) {

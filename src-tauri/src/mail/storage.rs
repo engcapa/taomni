@@ -9,13 +9,13 @@ mod tests;
 pub(super) use relocation::relocate;
 pub use relocation::{configured_directory, save_mail_session};
 
-pub use taomni_mail_engine::storage::{
+pub use taomni_mail_storage::storage::{
     ArchiveEntry, FullMessage, FullMessageMode, OpenMessage, PreparedMessage, account_root,
     as_sql_error, collect_garbage, init_tables, list, lookup, open, open_entry, remove_entries,
     snapshot_objects, snapshot_objects_with,
 };
 #[cfg(any(test, feature = "legacy-mail-imap", feature = "legacy-mail-pop3"))]
-pub use taomni_mail_engine::storage::{prepare, store};
+pub use taomni_mail_storage::storage::{prepare, store};
 
 #[cfg(test)]
 pub fn read(
@@ -30,4 +30,4 @@ pub fn read(
 }
 
 #[cfg(test)]
-pub(super) use taomni_mail_engine::archive::scanner::stores_full;
+pub(super) use taomni_mail_storage::archive::scanner::stores_full;

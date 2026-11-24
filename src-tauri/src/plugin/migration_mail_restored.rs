@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use taomni_mail_engine::migration::{HostedMailboxData, LegacyMailbox, StagedMailData};
+use taomni_mail_storage::migration::{HostedMailboxData, LegacyMailbox, StagedMailData};
 use taomni_sqlite_snapshot::SnapshotControl;
 
 use super::{DataReceipt, OWNER, RECEIPT, load_receipt, paths};
@@ -96,7 +96,7 @@ pub(super) fn publish(
     }
     for account in restored_pop3 {
         control.check().map_err(|error| error.to_string())?;
-        taomni_mail_engine::pop3::ownership::mark_owned(&staged, account)
+        taomni_mail_storage::pop3::ownership::mark_owned(&staged, account)
             .map_err(|error| error.to_string())?;
     }
     paths::write_json_durable(&staged.join(RECEIPT), receipt)?;

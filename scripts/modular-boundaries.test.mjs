@@ -9,7 +9,7 @@ function fixture(t, manifest = "") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "taomni-capture-boundary-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const shared = ["taomni-asr-models", "taomni-local-voice-api", "taomni-file-uri", "taomni-rdp-common", "taomni-rdp-client-api",
-    "taomni-rdp-client-engine", "taomni-mail-api", "taomni-mail-engine", "taomni-mfa-engine", "taomni-vnc-api",
+    "taomni-rdp-client-engine", "taomni-mail-api", "taomni-mail-storage", "taomni-mail-engine", "taomni-mfa-engine", "taomni-vnc-api",
     "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-redirector", "taomni-screenshot-api",
     "taomni-screenshot-ocr", "taomni-screenshot-recording", "taomni-server-process", "taomni-local-servers-engine", "taomni-pty"];
   for (const child of ["src/screenshot", "src/mfa", "src/mobile", "src/servers", "src/config",

@@ -1,6 +1,6 @@
 use serde::de::DeserializeOwned;
 use taomni_mail_api::{CALDAV_AGENDA, MailboxRequest};
-use taomni_mail_engine::agenda::{AgendaAction, handoff};
+use taomni_mail_storage::agenda::{AgendaAction, handoff};
 
 use crate::{
     mail::{local_storage, module_host},

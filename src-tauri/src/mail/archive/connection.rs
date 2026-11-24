@@ -3,7 +3,7 @@
 use std::{future::Future, time::Duration};
 
 use taomni_mail_api::{HOST_REQUEST_TIMEOUT, OPEN_IMAP_ARCHIVE};
-use taomni_mail_engine::{
+use taomni_mail_storage::{
     MailFolder,
     archive::{ArchiveQuery, scanner::ArchiveConnection},
     imap_sync::{FolderStepOutcome, FolderSyncState, HeaderStepRequest, StepParams},
@@ -29,7 +29,7 @@ impl ArchiveConnection for ActiveImapSession {
         state: &FolderSyncState,
         step: &StepParams,
     ) -> Result<FolderStepOutcome, String> {
-        let cache = taomni_mail_engine::cache::MailCacheSettings::default();
+        let cache = taomni_mail_storage::cache::MailCacheSettings::default();
         let mut mailbox = taomni_mail_engine::imap_messages::Mailbox {
             account_id: account,
             name: folder,

@@ -11,8 +11,8 @@ use crate::mail::webdav::href_path;
 use crate::mail::webdav::parse_multistatus;
 use reqwest::Url;
 use std::collections::HashMap;
-use taomni_mail_engine::contacts::{CardChange, StoredCard};
-use taomni_mail_engine::vcard::{parse_vcards, serialize_vcard};
+use taomni_mail_storage::contacts::{CardChange, StoredCard};
+use taomni_mail_storage::vcard::{parse_vcards, serialize_vcard};
 
 /// Upload local changes, then pull the server state.
 pub(super) async fn sync_collection(

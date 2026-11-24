@@ -1,5 +1,5 @@
 use taomni_mail_api::{FILTER_RULES, MailboxRequest, filter_cache::FilterCacheAction};
-use taomni_mail_engine::filters::{
+use taomni_mail_storage::filters::{
     MailFilter, ensure_filter_mark,
     rules::{self, FilterRulesAction, FilterRulesImport, FilterRulesReply},
 };

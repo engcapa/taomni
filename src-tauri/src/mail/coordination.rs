@@ -1,7 +1,7 @@
 //! Cache ownership for the existing desktop commands and backup adapter.
 use std::path::PathBuf;
 
-pub(crate) use taomni_mail_engine::database::{
+pub(crate) use taomni_mail_storage::database::{
     MailDatabase, ProcessLock, redirect_path, write_redirect,
 };
 

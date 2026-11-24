@@ -27,9 +27,7 @@ impl imap::Authenticator for Xoauth2Authenticator<'_> {
     }
 }
 
-pub fn xoauth2_sasl_response(username: &str, access_token: &str) -> String {
-    format!("user={username}\x01auth=Bearer {access_token}\x01\x01")
-}
+pub use taomni_mail_storage::imap_auth::xoauth2_sasl_response;
 
 #[cfg(feature = "imap-runtime")]
 pub fn authenticate<T: Read + Write>(

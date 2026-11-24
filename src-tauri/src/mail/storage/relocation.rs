@@ -2,9 +2,9 @@ use rusqlite::Connection;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use taomni_mail_engine::database::{MAIL_MUTATION_LOCK, ProcessLock};
+use taomni_mail_storage::database::{MAIL_MUTATION_LOCK, ProcessLock};
 
-pub use taomni_mail_engine::database::configured_directory;
+pub use taomni_mail_storage::database::configured_directory;
 
 pub(super) fn copy_tree(source: &Path, target: &Path) -> Result<(), String> {
     if !source.exists() {

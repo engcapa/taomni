@@ -10940,6 +10940,7 @@ dependencies = [
  "taomni-local-voice-engine",
  "taomni-mail-api",
  "taomni-mail-engine",
+ "taomni-mail-storage",
  "taomni-mfa-api",
  "taomni-mfa-engine",
  "taomni-plugin-api",
@@ -11168,14 +11169,32 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",
- "flate2",
  "hex",
  "imap",
  "imap-proto",
  "lettre",
- "libc",
  "mail-parser",
  "md-5 0.11.0",
+ "native-tls",
+ "serde_json",
+ "taomni-mail-api",
+ "taomni-mail-storage",
+ "tokio",
+ "tokio-native-tls",
+ "tracing",
+]
+
+[[package]]
+name = "taomni-mail-storage"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "flate2",
+ "hex",
+ "lettre",
+ "libc",
+ "mail-parser",
  "native-tls",
  "regex",
  "rusqlite",
@@ -11185,10 +11204,7 @@ dependencies = [
  "taomni-mail-api",
  "taomni-sqlite-snapshot",
  "tempfile",
- "tokio",
- "tokio-native-tls",
  "tokio-util 0.7.19",
- "tracing",
  "uuid",
 ]
 
@@ -11257,7 +11273,7 @@ dependencies = [
 
 [[package]]
 name = "taomni-plugin-mail"
-version = "0.1.58"
+version = "0.1.59"
 dependencies = [
  "libc",
  "rusqlite",

@@ -10,7 +10,7 @@ use taomni_mail_api::{
     contact_history::{ContactHistoryAction, MailContactSuggestion},
     pop3_store::LocalMailboxAction,
 };
-use taomni_mail_engine::contacts::{
+use taomni_mail_storage::contacts::{
     handoff::{self, AddressBookImport},
     mailbox::BookAction,
 };
@@ -78,7 +78,7 @@ pub(in crate::mail) async fn suggestions(
     query: String,
     limit: u32,
 ) -> Result<Vec<MailContactSuggestion>, String> {
-    use taomni_mail_engine::{
+    use taomni_mail_storage::{
         cache::search_contacts,
         contacts::{merge_suggestions, search_recipient_suggestions},
     };

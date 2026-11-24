@@ -74,9 +74,9 @@ impl ActiveImapSession {
     pub(super) fn sync_folder_round(
         &mut self,
         account: &ResolvedMailAccount,
-        request: &taomni_mail_engine::imap_sync::FolderRoundRequest,
+        request: &taomni_mail_storage::imap_sync::FolderRoundRequest,
         include_bodies: bool,
-    ) -> Result<taomni_mail_engine::imap_sync::FolderRoundOutcome, String> {
+    ) -> Result<taomni_mail_storage::imap_sync::FolderRoundOutcome, String> {
         use taomni_mail_engine::imap_sync::sync_folder_round;
 
         let mut mailbox = imap_mailbox(account, &request.folder.name);

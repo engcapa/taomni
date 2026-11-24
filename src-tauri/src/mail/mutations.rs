@@ -5,7 +5,7 @@ use crate::{plugin::PluginRegistry, state::MailDbHandle};
 use taomni_mail_api::imap_mutation::ImapMutationJob;
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 use taomni_mail_api::imap_mutation::{MutationError, MutationReply, MutationRequest};
-use taomni_mail_engine::mutation_journal::{
+use taomni_mail_storage::mutation_journal::{
     MutationJobRequest, MutationSession, SendMutation, run_mutation,
 };
 
@@ -13,7 +13,7 @@ pub(super) use taomni_mail_api::imap_mutation::MutationKind as Kind;
 pub use taomni_mail_api::imap_mutation::MutationProgress as Progress;
 
 #[cfg(test)]
-use taomni_mail_engine::mutation_journal::COMMAND_BYTES;
+use taomni_mail_storage::mutation_journal::COMMAND_BYTES;
 
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 fn legacy_query(

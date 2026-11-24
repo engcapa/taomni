@@ -18,7 +18,7 @@ use taomni_mail_api::{
 };
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 use taomni_mail_engine::mbox::imap_export_folder;
-use taomni_mail_engine::mbox::{
+use taomni_mail_storage::mbox::{
     is_mbox, mbox_separator, mboxrd_escape, normalize_crlf, split_mbox,
 };
 use tauri::State;

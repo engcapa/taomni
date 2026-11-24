@@ -1,9 +1,9 @@
 use super::*;
 
-#[cfg(test)]
-pub(super) use taomni_mail_engine::imap_auth::xoauth2_sasl_response;
 #[cfg(any(test, feature = "legacy-mail-imap"))]
 use taomni_mail_engine::imap_transport::{ImapConnection, ImapSession};
+#[cfg(test)]
+pub(super) use taomni_mail_storage::imap_auth::xoauth2_sasl_response;
 
 pub(super) struct ProxyForward(JoinHandle<()>);
 

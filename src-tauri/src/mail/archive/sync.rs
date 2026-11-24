@@ -4,7 +4,7 @@ use crate::{
     mail::{ResolvedMailAccount, module_host},
     state::AppState,
 };
-use taomni_mail_engine::archive::writer::ArchiveMailbox;
+use taomni_mail_storage::archive::writer::ArchiveMailbox;
 
 pub(super) fn run(
     state: &AppState,

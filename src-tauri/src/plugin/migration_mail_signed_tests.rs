@@ -2,7 +2,7 @@
 use std::process::{Command, Output};
 
 use serde_json::Value;
-use taomni_mail_engine::{archive::compress_message, storage};
+use taomni_mail_storage::{archive::compress_message, storage};
 
 use super::*;
 use crate::plugin::{migration_mail_provision as provision, test_services::VaultHarness};

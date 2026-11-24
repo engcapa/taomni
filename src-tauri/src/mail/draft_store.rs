@@ -2,8 +2,8 @@
 use rusqlite::Connection;
 use serde::de::DeserializeOwned;
 use taomni_mail_api::{LOCAL_DRAFTS, RemoteDraftLocation};
-use taomni_mail_engine::draft_import::DraftImport;
-use taomni_mail_engine::drafts::{
+use taomni_mail_storage::draft_import::DraftImport;
+use taomni_mail_storage::drafts::{
     DraftAction, DraftRequest, MailDraft, MailDraftSaveRequest, delete_mail_draft, get_mail_draft,
     list_mail_drafts, replace_remote_location, save_mail_draft,
 };
@@ -36,7 +36,7 @@ async fn hosted<T: DeserializeOwned + Send + 'static>(
             migrated,
             &root,
             &account,
-            taomni_mail_engine::draft_import::read_account,
+            taomni_mail_storage::draft_import::read_account,
         )?;
         Ok(DraftImport {
             replace_staged,
@@ -60,7 +60,7 @@ pub(crate) async fn list(state: &AppState, account: &str) -> Result<Vec<MailDraf
 pub(crate) async fn hosted_search_index(
     state: &AppState,
     account: &str,
-) -> Result<Vec<taomni_mail_engine::drafts::DraftSearchEntry>, String> {
+) -> Result<Vec<taomni_mail_storage::drafts::DraftSearchEntry>, String> {
     if !state
         .plugins
         .get("mail")

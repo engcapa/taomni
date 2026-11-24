@@ -6,7 +6,7 @@ use taomni_mail_api::{
     imap_exchange::{read_body_frame, write_frame},
     pop3_exchange::{Pop3Command, Pop3Exchange},
 };
-use taomni_mail_engine::pop3::Pop3Mailbox;
+use taomni_mail_storage::pop3::Pop3Mailbox;
 use taomni_plugin_stream::routed_tcp::Route;
 use tokio::{io::DuplexStream, runtime::Handle};
 

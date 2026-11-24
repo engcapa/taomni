@@ -16,7 +16,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use native_tls::TlsConnector;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-pub(super) use taomni_mail_engine::tls::{certificate_error_hint, tls_connector};
+pub(super) use taomni_mail_storage::tls::{certificate_error_hint, tls_connector};
 use tauri::State;
 
 use super::{

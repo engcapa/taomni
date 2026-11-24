@@ -112,13 +112,13 @@ mod connection;
 #[cfg(test)]
 mod tests;
 
-pub(super) use taomni_mail_engine::pop3::local_store::{
+pub(super) use taomni_mail_storage::pop3::local_store::{
     create_local_folder, ensure_local_folders, has_local_store, list_local_folders,
     list_local_originals, local_raw, mark_local_read, rename_local_folder, set_local_flags,
 };
 
 #[cfg(any(test, feature = "legacy-mail-pop3"))]
-pub(super) use taomni_mail_engine::pop3::local_store::{
+pub(super) use taomni_mail_storage::pop3::local_store::{
     delete_local, delete_local_folder, import_local_messages, local_body, move_local,
 };
 
@@ -130,4 +130,4 @@ pub(super) fn is_pop3(config: &MailAccountConfig) -> bool {
 pub(super) use connection::Pop3Client;
 
 #[cfg(any(test, feature = "legacy-mail-pop3"))]
-pub(super) use taomni_mail_engine::pop3::{sqlite_ledger, sync_inbox};
+pub(super) use taomni_mail_storage::pop3::{sqlite_ledger, sync_inbox};

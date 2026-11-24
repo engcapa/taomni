@@ -10,7 +10,7 @@ use taomni_mail_api::{
     imap_exchange::{read_body_frame, write_body_frame},
     imap_sync::{FolderStepOutcome, FolderSyncState},
 };
-use taomni_mail_engine::archive::{progress::ScanProgress, scan_store::ArchiveScanStore};
+use taomni_mail_storage::archive::{progress::ScanProgress, scan_store::ArchiveScanStore};
 use taomni_plugin_stream::routed_tcp::Route;
 use tokio::runtime::Handle;
 

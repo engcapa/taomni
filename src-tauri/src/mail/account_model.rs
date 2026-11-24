@@ -12,7 +12,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 
-pub use taomni_mail_engine::cache::MailCacheSettings;
+pub use taomni_mail_storage::cache::MailCacheSettings;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

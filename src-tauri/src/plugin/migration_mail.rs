@@ -8,7 +8,7 @@ use std::{
 
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
-use taomni_mail_engine::{
+use taomni_mail_storage::{
     database::{configured_directory, mail_db_file_stem},
     migration::{HostedMailboxData, LegacyMailbox, StagedMailData, read_legacy_mailbox},
 };
@@ -404,7 +404,7 @@ fn reuse_restored_data(
             } else {
                 // Older retained snapshots can include draft data and a stale
                 // IMAP index. Preserve the files and any existing owner receipt.
-                taomni_mail_engine::imap_ownership::database(&mail_root.data, &mailbox.account_id)
+                taomni_mail_storage::imap_ownership::database(&mail_root.data, &mailbox.account_id)
                     .map_err(|error| error.to_string())?;
             }
         } else if (hosted.imap_cache && !mailbox.pop3)

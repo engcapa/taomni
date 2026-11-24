@@ -17,7 +17,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-use taomni_mail_engine::archive::{
+use taomni_mail_storage::archive::{
     CHUNK,
     progress::ScanProgress,
     scanner::ContentFailures,

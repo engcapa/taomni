@@ -96,8 +96,10 @@ jobs:
         run: |
           set -o pipefail
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-api --lib --locked 2>&1 | tee modular-protocol-evidence/mail-api-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-storage --lib --locked 2>&1 | tee modular-protocol-evidence/mail-storage-core-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-storage --lib --all-features --locked 2>&1 | tee modular-protocol-evidence/mail-storage-unit.log
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-engine --lib --locked 2>&1 | tee modular-protocol-evidence/mail-engine-unit.log
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-engine --lib --locked \
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-storage --lib --locked \
             mutation_journal::tests::account_lease_blocks_an_independent_process -- --exact --ignored \
             2>&1 | tee modular-protocol-evidence/mail-mutation-process-lock.log
           grep -Fq 'test result: ok. 1 passed;' modular-protocol-evidence/mail-mutation-process-lock.log

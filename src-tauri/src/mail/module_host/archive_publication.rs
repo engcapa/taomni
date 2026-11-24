@@ -11,7 +11,7 @@ use taomni_mail_api::{
     archive_index::ArchiveKey,
     imap_exchange::{read_frame, write_frame},
 };
-use taomni_mail_engine::{
+use taomni_mail_storage::{
     archive::writer::ArchiveMailbox,
     storage::{PreparedMessage, scan::PAUSED},
 };

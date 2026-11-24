@@ -8,8 +8,8 @@ use super::{MailAccountConfig, resolve_config};
 use crate::state::AppState;
 
 pub use taomni_mail_api::calendar::{MailInvite, MailInviteAttendee, MailInviteTime};
-use taomni_mail_engine::calendar::partstat_of;
-pub(super) use taomni_mail_engine::calendar::{
+use taomni_mail_storage::calendar::partstat_of;
+pub(super) use taomni_mail_storage::calendar::{
     fold, param, parse_time, split_property, unescape, unfold,
 };
 
@@ -42,7 +42,7 @@ pub async fn mail_get_invite(
     #[cfg(feature = "legacy-mail-imap")]
     if legacy {
         return tokio::task::spawn_blocking(move || {
-            taomni_mail_engine::calendar::invite_from_message(&raw)
+            taomni_mail_storage::calendar::invite_from_message(&raw)
         })
         .await
         .map_err(|error| format!("Mail invitation task failed: {error}"));

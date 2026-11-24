@@ -16,8 +16,8 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use taomni_mail_api::pop3_store::LocalMailboxAction;
 use taomni_mail_api::{filter_cache::FilterCacheAction, imap_exchange::FilterBodyQuery};
-use taomni_mail_engine::filters::rules::FilterRulesAction;
-use taomni_mail_engine::filters::{
+use taomni_mail_storage::filters::rules::FilterRulesAction;
+use taomni_mail_storage::filters::{
     CandidateSelection, FilterMessage, MailFilter, MailFilterRunResult, MessagePlan,
     ensure_filter_mark, filter_mark, load_candidates, plan_message, set_filter_mark,
 };

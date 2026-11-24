@@ -20,7 +20,7 @@ mod store;
 #[cfg(test)]
 mod tests;
 
-pub use taomni_mail_engine::filters::{
+pub use taomni_mail_storage::filters::{
     MailFilter, MailFilterAction, MailFilterActionKind, MailFilterCondition, MailFilterField,
     MailFilterOp, MailFilterRunResult,
 };
