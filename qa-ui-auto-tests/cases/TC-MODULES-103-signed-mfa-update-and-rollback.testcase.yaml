@@ -65,6 +65,7 @@ steps:
 - press: {selector: '[data-testid="module-action-enable-mfa"]:enabled', key: Enter}
 - wait_for: '[data-testid="module-action-disable-mfa"]'
 - click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mfa"]'
 - assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082}
 - assert_signed_mfa_lifecycle: old-reenabled
@@ -77,6 +78,7 @@ steps:
 - wait_for: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
 - assert_signed_mfa_lifecycle: updated-enabled
 - click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mfa"]'
 - assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082}
 - click: '[data-testid="mfa-account-hotp-next"]'
@@ -93,6 +95,7 @@ steps:
 - assert_text: {selector: '[data-testid="module-action-rollback-mfa"]:enabled', contains: '${fixture.mfa_current_version}'}
 - assert_signed_mfa_lifecycle: rolled-back-enabled
 - click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mfa"]'
 - assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 359 152}
 - click: '[data-testid="mfa-account-hotp-next"]'
@@ -105,6 +108,7 @@ steps:
 - assert_visible: '[data-testid="module-data-retained-mfa"]'
 - assert_signed_mfa_lifecycle: uninstalled
 - click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mfa"]'
 - wait_for: '[data-plugin-slug="mfa"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
 - assert_count: {selector: '[data-testid="mfa-account-code"]', equal: 0}
@@ -117,6 +121,7 @@ steps:
 - press: {selector: '[data-testid="module-action-enable-mfa"]:enabled', key: Enter}
 - wait_for: '[data-testid="module-action-disable-mfa"]'
 - click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mfa"]'
 - assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 969 429}
 - assert_signed_mfa_lifecycle: reinstalled
@@ -126,7 +131,7 @@ verification:
   requirements:
   - id: disabled-update-and-rollback
     requirement: Update and roll back the disabled MFA module without starting its host or changing the original account.
-    actions: [10, 12, 18, 25, 27, 32, 35, 37, 38, 40, 42, 45, 48, 51]
+    actions: [10, 12, 18, 25, 27, 32, 35, 37, 38, 40, 42, 45, 48, 52]
     checkpoints:
     - {step: 29, expectation: The installed prerelease runs the signed host and saves the original account at counter one.}
     - {step: 34, expectation: Disable releases the original host process and the writer lease.}
@@ -134,30 +139,30 @@ verification:
     - {step: 41, expectation: Verified package review identifies the version pending approval.}
     - {step: 44, expectation: The approved package becomes active while the module remains disabled.}
     - {step: 47, expectation: Rollback selects the prerelease while preserving the disabled preference and account.}
-    - {step: 53, expectation: Re-enabling the prerelease starts a new host and reopens the same account.}
-    results: [29, 34, 36, 41, 44, 47, 53]
+    - {step: 54, expectation: Re-enabling the prerelease starts a new host and reopens the same account.}
+    results: [29, 34, 36, 41, 44, 47, 54]
   - id: enabled-update-and-failed-handshake
     requirement: Replace a running MFA host, recover after handshake rejection and roll back in the same desktop process.
-    actions: [56, 58, 59, 63, 65, 69, 70, 71, 75, 79, 81]
+    actions: [57, 59, 60, 65, 67, 71, 72, 73, 77, 82, 84]
     checkpoints:
-    - {step: 61, expectation: The old host has exited and the current signed host already owns the writer lease.}
-    - {step: 66, expectation: The current host advances the original account to counter two.}
-    - {step: 73, expectation: The install form reports why the replacement failed.}
-    - {step: 74, expectation: The failing package reached verified staging and a replacement of the working host already owns the original account.}
-    - {step: 77, expectation: Rollback starts the signed prerelease and releases the current host without replacing the desktop.}
-    - {step: 82, expectation: The rolled-back host advances the original account to counter three.}
-    results: [61, 66, 73, 74, 77, 82]
+    - {step: 62, expectation: The old host has exited and the current signed host already owns the writer lease.}
+    - {step: 68, expectation: The current host advances the original account to counter two.}
+    - {step: 75, expectation: The install form reports why the replacement failed.}
+    - {step: 76, expectation: The failing package reached verified staging and a replacement of the working host already owns the original account.}
+    - {step: 79, expectation: Rollback starts the signed prerelease and releases the current host without replacing the desktop.}
+    - {step: 85, expectation: The rolled-back host advances the original account to counter three.}
+    results: [62, 68, 75, 76, 79, 85]
   - id: retained-uninstall-and-reinstall
     requirement: Remove version files and the active host on uninstall, then reuse the original account after explicitly reinstalling MFA.
-    actions: [85, 86, 91, 96, 97, 98, 100, 103]
+    actions: [88, 89, 95, 100, 101, 102, 104, 108]
     checkpoints:
-    - {step: 88, expectation: Settings identifies that user data has been retained.}
-    - {step: 89, expectation: "Version directories are gone, the lease is free and the data locator owns the original encrypted account."}
-    - {step: 92, expectation: The open manager tab identifies the missing module.}
-    - {step: 99, expectation: The explicit signed reinstall completes successfully.}
-    - {step: 105, expectation: The new host reuses the original encrypted account and counter on the same desktop.}
-    - {step: 106, expectation: The complete lifecycle leaves no renderer runtime errors.}
-    results: [88, 89, 92, 99, 105, 106]
+    - {step: 91, expectation: Settings identifies that user data has been retained.}
+    - {step: 92, expectation: "Version directories are gone, the lease is free and the data locator owns the original encrypted account."}
+    - {step: 96, expectation: The open manager tab identifies the missing module.}
+    - {step: 103, expectation: The explicit signed reinstall completes successfully.}
+    - {step: 110, expectation: The new host reuses the original encrypted account and counter on the same desktop.}
+    - {step: 111, expectation: The complete lifecycle leaves no renderer runtime errors.}
+    results: [91, 92, 96, 103, 110, 111]
   visual:
   - check: The signed catalog offers the MFA version and the offline form displays the handshake failure.
     method: automated
