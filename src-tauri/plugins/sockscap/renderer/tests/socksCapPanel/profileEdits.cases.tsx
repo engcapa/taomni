@@ -70,4 +70,47 @@ export function registerProfileEditCases() {
     fireEvent.blur(port);
     await waitFor(() => expect(fixtureState.currentCfg.upstream.port).toBe(1080));
   });
+
+  it("keeps incomplete unconfigured upstream edits as a local draft until host and port are valid", async () => {
+    fixtureState.currentCfg.upstream = { kind: "http", sessionId: "", host: "", port: 0 };
+    fixtureState.currentCfg.profiles[0].upstream = { kind: "http", sessionId: "", host: "", port: 0 };
+    const writes = vi.mocked(sockscapSetConfig);
+    writes.mockClear();
+    writes.mockImplementation(async (config) => {
+      for (const p of config.profiles.filter((item) => item.enabled && config.activeProfileIds.includes(item.id))) {
+        if (!(p.upstream.sessionId ?? "").trim()) {
+          if (!(p.upstream.host ?? "").trim()) throw new Error("upstream host is empty");
+          if (!p.upstream.port) throw new Error("upstream port must be > 0");
+        }
+      }
+      fixtureState.currentCfg = JSON.parse(JSON.stringify(config));
+    });
+    try {
+      const { port } = await openUpstream();
+      const kindSelect = screen.getByTestId<HTMLSelectElement>("sockscap-upstream-kind");
+      fireEvent.change(kindSelect, { target: { value: "trojan" } });
+      expect(kindSelect.value).toBe("trojan");
+      expect(screen.getByTestId("sockscap-sharelink-input")).toBeInTheDocument();
+      expect(writes).not.toHaveBeenCalled();
+
+      const hostInput = screen.getByTestId<HTMLInputElement>("sockscap-upstream-host");
+      fireEvent.change(hostInput, { target: { value: "127.0.0.2" } });
+      expect(hostInput.value).toBe("127.0.0.2");
+      expect(writes).not.toHaveBeenCalled();
+
+      fireEvent.change(port, { target: { value: "19392" } });
+      await waitFor(() => expect(writes).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(fixtureState.currentCfg.upstream).toMatchObject({
+          kind: "trojan",
+          host: "127.0.0.2",
+          port: 19392,
+        }),
+      );
+    } finally {
+      writes.mockImplementation(async (cfg) => {
+        fixtureState.currentCfg = JSON.parse(JSON.stringify(cfg));
+      });
+    }
+  });
 }

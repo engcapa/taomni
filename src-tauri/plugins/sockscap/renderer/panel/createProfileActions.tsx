@@ -56,6 +56,20 @@ export function createProfileActions(context: CreateProfileActionsContext) {
       userRules: updatedSelected.userRules,
       defaultAction: updatedSelected.defaultAction,
     };
+    const isDraftUpstreamEdit =
+      partial.upstream !== undefined &&
+      updatedSelected.enabled &&
+      nextCfg.activeProfileIds.includes(updatedSelected.id) &&
+      !(updatedSelected.upstream.sessionId ?? "").trim() &&
+      (!(updatedSelected.upstream.host ?? "").trim() || !updatedSelected.upstream.port);
+    if (isDraftUpstreamEdit) {
+      if (locked) {
+        report(t("sockscap.lockedTooltip"), false);
+        return null;
+      }
+      select(nextCfg);
+      return nextCfg;
+    }
     return (await persistConfig(nextCfg)) ? nextCfg : null;
   };
 
