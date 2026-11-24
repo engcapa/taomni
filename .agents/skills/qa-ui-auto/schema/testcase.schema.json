@@ -988,6 +988,10 @@
           "enum": ["old-enabled", "old-disabled", "updated-disabled", "rolled-back-disabled", "old-reenabled", "updated-enabled", "failed-update", "rolled-back-enabled", "uninstalled", "reinstalled"],
           "description": "Verify installed MFA version hashes, live host and desktop process identities, writer ownership, and the original retained HOTP account."
         },
+        "assert_signed_mfa_backup": {
+          "enum": ["initial", "archive", "ready", "restored", "reopened"],
+          "description": "Read the signed MFA package, native host ownership and paired Vault/MFA SQLite data before and after the exact UI-started backup and automatic restore."
+        },
         "assert_signed_vnc_daemon": {
           "enum": ["idle", "running", "backup", "stopped", "disabled"],
           "description": "Verify the signed VNC server host's installed bytes, lease and local daemon endpoint."

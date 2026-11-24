@@ -36,15 +36,17 @@ def digest(path: Path) -> str:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def account_record(database: Path, counter: int) -> dict:
+def account_record(database: Path, counter: int, *, issuer: str = ISSUER) -> dict:
     ordinary(database)
     with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as connection:
         rows = connection.execute(
-            "SELECT id, kind, counter, secret_ct, secret_nonce FROM mfa_accounts WHERE issuer = ?", (ISSUER,),
+            "SELECT id, kind, counter, secret_ct, secret_nonce FROM mfa_accounts WHERE issuer = ?", (issuer,),
         ).fetchall()
     if len(rows) != 1 or rows[0][1:3] != ("hotp", counter):
         raise StepError(f"Expected one module HOTP account at counter {counter}")
     identifier, _, _, ciphertext, nonce = rows[0]
+    if len(ciphertext) < 16 or not nonce:
+        raise StepError("MFA account does not contain an encrypted secret")
     return {"id": identifier, "counter": counter,
             "encryptedSecretSha256": hashlib.sha256(ciphertext + nonce).hexdigest()}
 

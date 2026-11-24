@@ -22,7 +22,7 @@ from native_build import QA_APP_ID
 from tauri_webdriver import native_isolation_env
 
 from ..module_qa_versions import MFA_LIFECYCLE_CASE, lifecycle_versions
-from .module_mfa_restore import CASE_ID as MFA_RESTORE_CASE
+from .module_mfa_restore import CASE_ID as MFA_RESTORE_CASE, SIGNED_BACKUP_STATES
 from .backup_policy import isolated_data_root
 
 
@@ -104,7 +104,9 @@ def setup(ctx):
 
 
 def setup_mfa(ctx):
-    if ctx.case_id not in {"TC-MODULES-038", "TC-MODULES-039", "TC-MODULES-044", "TC-MODULES-090", MFA_RESTORE_CASE, MFA_LIFECYCLE_CASE} or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    signed_cases = {"TC-MODULES-038", "TC-MODULES-039", "TC-MODULES-044", "TC-MODULES-090",
+                    MFA_RESTORE_CASE, MFA_LIFECYCLE_CASE, *SIGNED_BACKUP_STATES}
+    if ctx.case_id not in signed_cases or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Signed MFA input requires its registered native upgrade case")
     raw = os.environ.get("QA_SIGNED_MFA_ROOT")
     if not raw:
@@ -112,6 +114,9 @@ def setup_mfa(ctx):
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     receipt, archive, signature, frontend = load_artifact(Path(raw), source, platform_key(), "mfa", version=None)
     receipt["frontendSha256"] = hashlib.sha256(frontend).hexdigest()
+    if ctx.case_id in SIGNED_BACKUP_STATES:
+        receipt["hostSha256"] = mfa_host_digest(archive, receipt["platform"])
+        ctx.signed_mfa_backup = receipt
     owned = Path(ctx.case_dir).resolve() / "signed-mfa"
     owned.mkdir()
     destination = owned / archive.name

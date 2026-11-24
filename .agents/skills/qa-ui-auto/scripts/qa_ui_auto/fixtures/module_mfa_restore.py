@@ -9,6 +9,11 @@ import uuid
 
 CASE_ID = "TC-MODULES-048"
 MODULE_DB = "plugins/mfa/data/mfa.db"
+SIGNED_BACKUP_STATES = {
+    "TC-MODULES-104": "enabled",
+    "TC-MODULES-105": "disabled",
+    "TC-MODULES-106": "uninstalled",
+}
 
 
 def stage(profile, source, evidence):
