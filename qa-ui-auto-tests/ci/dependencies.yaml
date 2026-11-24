@@ -349,3 +349,4 @@ TC-NP-105: []
 # relies on a predecessor's app state.
 TC-AI-869-01-approval-window-routing-browser: []
 TC-AI-869-02-detached-window-approval-native: []
+TC-AI-869-03-closed-owner-fallback-native: []
