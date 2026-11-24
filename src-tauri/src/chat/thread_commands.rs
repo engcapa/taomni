@@ -109,6 +109,7 @@ pub async fn chat_delete_thread(
         store::delete_thread(&db, &thread_id).map_err(|e| e.to_string())?;
     }
     stop_thread_runtime(&thread_id, &app, state.inner()).await;
+    state.core.agent.thread_windows.forget(&thread_id);
     state
         .legacy
         .mobile

@@ -602,6 +602,8 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "cc_cancel_capture"
         | "cc_track_terminal"
         | "cc_untrack_terminal"
+        | "cc_pending_permission_prompts"
+        | "qa_agent_approval_probe"
         | "codex_detect"
         | "codex_get_custom_config"
         | "codex_get_profile_config"

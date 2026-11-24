@@ -1,4 +1,5 @@
 pub mod acp_bridge;
+pub mod approval_probe;
 pub mod capture;
 pub mod cc_bridge;
 pub mod cmd_classify;

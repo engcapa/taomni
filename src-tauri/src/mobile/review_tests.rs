@@ -231,7 +231,7 @@ async fn desktop_only_gates_are_visible_and_drop_cleans_up() {
         false
     );
     assert_eq!(
-        agent_view::confirm(&f.state, "thread:t", "side-effect", "approve").unwrap_err(),
+        agent_view::confirm(&f.state, "thread:t", "side-effect", "approve", None).unwrap_err(),
         "not_supported_on_mobile"
     );
     drop(gate);

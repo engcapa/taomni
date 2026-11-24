@@ -94,7 +94,7 @@ fn activate_qa_profile(identifier: &str) {
     }
 }
 
-fn qa_profile_active() -> bool {
+pub(crate) fn qa_profile_active() -> bool {
     QA_PROFILE_ACTIVE.load(Ordering::Acquire)
 }
 
@@ -256,6 +256,7 @@ pub fn run() {
                 let builder = qa_driver::configure(app.handle(), builder);
                 let main_window = builder.build()?;
                 webview_recovery::install(&main_window);
+                windowing::thread_delivery::install_window_cleanup(&main_window);
                 screenshot::prewarm(app.handle());
             }
             runtime::desktop::start(app.handle());

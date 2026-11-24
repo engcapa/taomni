@@ -153,15 +153,15 @@ async fn confirmations_are_thread_scoped_and_first_answer_wins() {
         "gate".into(),
         json!({"id":"gate","thread_id":"task","tool":"write","supported":true}),
     );
-    assert!(agent_view::confirm(&f.state, "thread:other", "gate", "approve").is_err());
-    assert!(agent_view::confirm(&f.state, "thread:task", "gate", "allow_session").is_err());
-    agent_view::confirm(&f.state, "thread:task", "gate", "reject").unwrap();
+    assert!(agent_view::confirm(&f.state, "thread:other", "gate", "approve", None).is_err());
+    assert!(agent_view::confirm(&f.state, "thread:task", "gate", "allow_session", None).is_err());
+    agent_view::confirm(&f.state, "thread:task", "gate", "reject", None).unwrap();
     assert!(matches!(
         rx.await.unwrap(),
         crate::state::CcPermissionDecision::Deny
     ));
     assert_eq!(
-        agent_view::confirm(&f.state, "thread:task", "gate", "approve").unwrap_err(),
+        agent_view::confirm(&f.state, "thread:task", "gate", "approve", None).unwrap_err(),
         "already_resolved"
     );
     assert!(agent_view::confirmations(&f.state, "task").is_empty());

@@ -349,6 +349,7 @@ pub async fn cc_cancel_capture(
 pub async fn cc_track_terminal(
     tab_id: String,
     session_id: String,
+    window: tauri::WebviewWindow,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
@@ -357,7 +358,17 @@ pub async fn cc_track_terminal(
         .cc_tab_sessions
         .lock()
         .map_err(|e| e.to_string())?
-        .insert(tab_id, session_id);
+        .insert(tab_id.clone(), session_id);
+    // Record which window holds the live terminal so terminal-writing tools are
+    // dispatched there instead of the chat window (issue #869: after a detach
+    // those are different windows).
+    state
+        .core
+        .agent
+        .cc_tab_windows
+        .lock()
+        .map_err(|e| e.to_string())?
+        .insert(tab_id, window.label().to_string());
     Ok(())
 }
 
@@ -369,6 +380,7 @@ pub async fn cc_track_terminal(
 pub async fn cc_untrack_terminal(
     tab_id: String,
     session_id: String,
+    window: tauri::WebviewWindow,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let mut map = state
@@ -379,6 +391,16 @@ pub async fn cc_untrack_terminal(
         .map_err(|e| e.to_string())?;
     if map.get(&tab_id).is_some_and(|s| *s == session_id) {
         map.remove(&tab_id);
+        // Only drop the owning window together with the session mapping, and
+        // only when it is still this window: a detached panel can adopt the same
+        // backend session id, so a late unmount from the old window must not
+        // steal the new window's terminal routing.
+        if let Ok(mut windows) = state.core.agent.cc_tab_windows.lock() {
+            let label = window.label();
+            if windows.get(&tab_id).is_some_and(|owner| owner == label) {
+                windows.remove(&tab_id);
+            }
+        }
     }
     Ok(())
 }
@@ -411,12 +433,27 @@ pub async fn cc_resolve_tool_call(
 
 /// Resolve a pending CC permission prompt with the human's decision (from the
 /// ActionCard). Unblocks the in-app MCP server's `permission_prompt` handler.
+///
+/// The decision arrives from one window; every other window that still shows a
+/// card for this call is told to drop it (`agent-cc-permission-resolved`), so a
+/// stale card cannot be clicked a second time (issue #869).
 #[tauri::command]
 pub async fn cc_resolve_permission(
+    app: AppHandle,
     call_id: String,
     decision: crate::state::CcPermissionDecision,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    let thread_id = state
+        .legacy
+        .mobile
+        .confirmations
+        .lock()
+        .map_err(|e| e.to_string())?
+        .get(&call_id)
+        .filter(|value| value["supported"] == true)
+        .and_then(|value| value["thread_id"].as_str())
+        .map(str::to_string);
     let sender = state
         .core
         .agent
@@ -424,13 +461,21 @@ pub async fn cc_resolve_permission(
         .lock()
         .map_err(|e| e.to_string())?
         .remove(&call_id);
-    match sender {
+    let resolved = match sender {
         Some(tx) => {
             let _ = tx.send(decision);
             Ok(())
         }
         None => Err(format!("no pending CC permission prompt '{call_id}'")),
-    }
+    };
+    // Broadcast after the registry update: the deciding window clears its card
+    // locally, and any card another window still holds is now unreachable.
+    crate::windowing::thread_delivery::broadcast_cc_permission_resolved(
+        &app,
+        Some(&call_id),
+        thread_id.as_deref(),
+    );
+    resolved
 }
 
 /// Streaming variant of `cc_send_message`. Emits `cc-stream:{thread_id}`

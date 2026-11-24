@@ -22,12 +22,22 @@ use uuid::Uuid;
 
 /// Streaming variant of `chat_send`. Emits events on
 /// `chat-stream:{thread_id}` and resolves once the stream finishes (or errors).
+///
+/// The calling webview becomes the owner of this thread's approval/side-effect
+/// events (issue #869): a turn started in the main window must not render its
+/// permission cards in a detached session window, and vice versa.
 #[tauri::command]
 pub async fn chat_stream(
     req: ChatSendRequest,
+    window: tauri::WebviewWindow,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    state
+        .core
+        .agent
+        .thread_windows
+        .record(&req.thread_id, window.label());
     chat_stream_inner(req, Some(app), state.inner(), None).await
 }
 

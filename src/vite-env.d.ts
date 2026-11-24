@@ -22,3 +22,10 @@ declare const __TAOMNI_BUNDLED_SERVER_SETTINGS__: boolean;
 declare const __TAOMNI_BUNDLED_SCREENSHOT_MEDIA__: boolean;
 /** Screenshot overlay startup marks (`window.__TAOMNI_OVERLAY_TIMING__`): QA bundle only. */
 declare const __TAOMNI_QA_OVERLAY_TIMING__: boolean;
+
+/**
+ * Issue #869: true only in the isolated QA bundle (`vite build --mode qa`) and
+ * in the browser preview server. Installs the hidden approval probe chord used
+ * by the multi-window QA cases; production builds compile it away.
+ */
+declare const __TAOMNI_QA_AGENT_APPROVAL_PROBE__: boolean;

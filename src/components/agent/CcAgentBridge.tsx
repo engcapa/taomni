@@ -15,12 +15,15 @@ import {
   type PermissionPrompt,
   type AcpPermissionPrompt,
   type AcpPermissionDismissed,
+  type CcPermissionResolved,
   type ToolDispatch,
   type SqlEcho,
 } from "./bridge/types";
 import { executeTool } from "./bridge/tools";
 import { useSafetyGatePlacement, AcpPermissionCard } from "./bridge/safetyGate";
 import { buildEchoNote, fmtBytes, describe, preview } from "./bridge/formatting";
+import { addressesThisWindow } from "../../lib/windowLabel";
+import { QA_APPROVAL_PROBE_ENABLED, installApprovalProbe } from "./approvalProbe";
 
 export function CcAgentBridge() {
   const [queue, setQueue] = useState<QueuedPermission[]>([]);
@@ -28,13 +31,25 @@ export function CcAgentBridge() {
   const [captures, setCaptures] = useState<CaptureProgress[]>([]);
   const activeThreadId = useChatStore((state) => state.activeThreadId);
 
+  // Hidden QA approval probe (issue #869): only the isolated QA bundle and the
+  // browser preview install it, so production never listens for the chord.
+  useEffect(
+    () => (QA_APPROVAL_PROBE_ENABLED ? installApprovalProbe() : undefined),
+    [],
+  );
+
   // --- permission prompts (HITL) ---------------------------------------
   useEffect(() => {
     let unlistenCc: UnlistenFn | null = null;
     let unlistenAcp: UnlistenFn | null = null;
     let unlistenAcpDismissed: UnlistenFn | null = null;
+    let unlistenCcResolved: UnlistenFn | null = null;
     let disposed = false;
     void listen<PermissionPrompt>("agent-cc-permission", (event) => {
+      // The backend addresses the window that started the turn, so a detached
+      // session window cannot render a second copy of the same card (issue
+      // #869). Unlabelled events are the broadcast fallback and stay accepted.
+      if (!addressesThisWindow(event.payload.windowLabel)) return;
       // Dedupe by callId: a stray double-emit must not stack two cards.
       const prompt: QueuedPermission = { source: "cc", ...event.payload };
       setQueue((q) =>
@@ -53,6 +68,7 @@ export function CcAgentBridge() {
       // bridge is simply inert there.
     });
     void listen<AcpPermissionPrompt>("agent-acp-permission", (event) => {
+      if (!addressesThisWindow(event.payload.windowLabel)) return;
       const prompt: QueuedPermission = { source: "acp", ...event.payload };
       setQueue((q) =>
         q.some(
@@ -70,6 +86,24 @@ export function CcAgentBridge() {
     }).catch(() => {
       // ACP gates are only emitted by the desktop backend; ignore a missing
       // event bridge in browser-only tests just like the CC listener above.
+    });
+    void listen<CcPermissionResolved>("agent-cc-permission-resolved", (event) => {
+      // Decided here or in another window, timed out, or its thread stopped:
+      // a card that is no longer answerable must not linger (issue #869).
+      const { callId, threadId } = event.payload ?? {};
+      if (callId == null && threadId == null) return;
+      setQueue((q) =>
+        q.filter((p) => {
+          if (p.source !== "cc") return true;
+          if (callId != null) return p.callId !== callId;
+          return p.threadId !== threadId;
+        }),
+      );
+    }).then((fn) => {
+      if (disposed) void fn();
+      else unlistenCcResolved = fn;
+    }).catch(() => {
+      // Resolved notifications only exist on the desktop backend.
     });
     void listen<AcpPermissionDismissed>("agent-acp-permission-dismissed", (event) => {
       const { threadId, permissionOwnerId, callId } = event.payload;
@@ -89,8 +123,40 @@ export function CcAgentBridge() {
     return () => {
       disposed = true;
       unlistenCc?.();
+      unlistenCcResolved?.();
       unlistenAcp?.();
       unlistenAcpDismissed?.();
+    };
+  }, []);
+
+  // Tauri events are not queued: after a renderer reload or crash the bridge has
+  // no card for a prompt that is still pending. Re-read the prompts addressed to
+  // this window on mount; dedupe by callId keeps an already-received prompt from
+  // being shown twice.
+  useEffect(() => {
+    let disposed = false;
+    void invoke<PermissionPrompt[]>("cc_pending_permission_prompts")
+      .then((prompts) => {
+        if (disposed || !Array.isArray(prompts)) return;
+        const restored = prompts.filter(
+          (prompt) => prompt && prompt.callId && addressesThisWindow(prompt.windowLabel),
+        );
+        if (restored.length === 0) return;
+        setQueue((q) => {
+          const next = [...q];
+          for (const prompt of restored) {
+            if (!next.some((p) => p.source === "cc" && p.callId === prompt.callId)) {
+              next.push({ source: "cc", ...prompt });
+            }
+          }
+          return next;
+        });
+      })
+      .catch(() => {
+        // Browser preview and older backends have no replay command.
+      });
+    return () => {
+      disposed = true;
     };
   }, []);
 
@@ -177,6 +243,9 @@ export function CcAgentBridge() {
     let unlisten: UnlistenFn | null = null;
     let disposed = false;
     void listen<ToolDispatch>("agent-cc-tool", (event) => {
+      // Only the addressed window performs the effect; otherwise two windows
+      // would write the same command into their terminals (issue #869).
+      if (!addressesThisWindow(event.payload.windowLabel)) return;
       void executeTool(event.payload);
     }).then((fn) => {
       // See the permission listener above: avoid leaking a duplicate listener,
@@ -323,6 +392,9 @@ export function CcAgentBridge() {
           style={safetyGatePlacement.style}
           data-testid="ai-chat-safety-gate"
           data-anchor={safetyGatePlacement.anchored ? "chat-drawer" : "viewport"}
+          // Observable queue depth: only the head renders, so a stacked
+          // duplicate is invisible in the DOM without this.
+          data-queue-length={String(queue.length)}
         >
           {head.source === "cc" ? (
             <ActionCard

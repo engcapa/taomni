@@ -432,7 +432,7 @@ async fn dispatch(
             Ok(Reply::Text("已请求停止当前轮次。".into()))
         }
         _ => {
-            agent_view::confirm(&core.state(), task, rest, action)?;
+            agent_view::confirm(&core.state(), task, rest, action, core.app().as_ref())?;
             Ok(Reply::Text("确认已处理。".into()))
         }
     }

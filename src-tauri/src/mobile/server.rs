@@ -366,7 +366,13 @@ async fn confirm(
     Json(p): Json<Decision>,
 ) -> ApiResult {
     authenticated(&s, &headers)?;
-    agent_view::confirm(&s.core.state(), &id, &cid, &p.decision)?;
+    agent_view::confirm(
+        &s.core.state(),
+        &id,
+        &cid,
+        &p.decision,
+        s.core.app().as_ref(),
+    )?;
     Ok(Json(json!({"status":"resolved"})))
 }
 async fn changes(

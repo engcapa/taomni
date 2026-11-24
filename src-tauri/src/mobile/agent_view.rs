@@ -24,7 +24,13 @@ pub fn confirmations(state: &AppState, thread: &str) -> Vec<Value> {
         .map(|v| json!({"id":v["id"],"tool":v["tool"],"supported":v["supported"]}))
         .collect()
 }
-pub fn confirm(state: &AppState, id: &str, cid: &str, decision: &str) -> Result<(), String> {
+pub fn confirm(
+    state: &AppState,
+    id: &str,
+    cid: &str,
+    decision: &str,
+    app: Option<&tauri::AppHandle>,
+) -> Result<(), String> {
     let tid = id.strip_prefix("thread:").ok_or("session_not_found")?;
     let value = match decision {
         "approve" => CcPermissionDecision::Allow,
@@ -54,6 +60,15 @@ pub fn confirm(state: &AppState, id: &str, cid: &str, decision: &str) -> Result<
         .remove(cid)
         .ok_or("already_resolved")?;
     sender.send(value).map_err(|_| "already_resolved")?;
+    // A desktop window may still show this card; deciding on the phone must
+    // clear it instead of leaving a dead prompt (issue #869).
+    if let Some(app) = app {
+        crate::windowing::thread_delivery::broadcast_cc_permission_resolved(
+            app,
+            Some(cid),
+            Some(tid),
+        );
+    }
     state.legacy.mobile.events.publish(json!({"type":"task_status", "task_id":id,"status":"running","summary":"confirmation_resolved"}));
     Ok(())
 }

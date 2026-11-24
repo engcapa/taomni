@@ -24,6 +24,9 @@ export default defineConfig(({ mode }) => ({
     __TAOMNI_BUNDLED_SOCKSCAP_RENDERER__: JSON.stringify(true),
     __TAOMNI_BUNDLED_SERVER_SETTINGS__: JSON.stringify(true),
     __TAOMNI_QA_OVERLAY_TIMING__: JSON.stringify(true),
+    // The bridge must not install the approval probe during unit tests; probe
+    // tests install it explicitly.
+    __TAOMNI_QA_AGENT_APPROVAL_PROBE__: JSON.stringify(false),
   },
   test: {
     environment: "jsdom",

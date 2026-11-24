@@ -43,6 +43,12 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     __TAOMNI_BUNDLED_SCREENSHOT_MEDIA__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview)),
     // Screenshot overlay startup marks (P0-0b): read by native QA only.
     __TAOMNI_QA_OVERLAY_TIMING__: JSON.stringify(mode === "qa"),
+    // Issue #869: installs the hidden approval probe chord in the isolated QA
+    // bundle and in the browser preview server (the two QA surfaces). Normal
+    // production builds compile the install branch away.
+    __TAOMNI_QA_AGENT_APPROVAL_PROBE__: JSON.stringify(
+      mode === "qa" || (command === "serve" && !isPreview),
+    ),
   },
   optimizeDeps: {
     // Keep qa-ui-auto startup from crawling the entire dependency graph in
