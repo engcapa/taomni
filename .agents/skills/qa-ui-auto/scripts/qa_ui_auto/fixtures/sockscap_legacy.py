@@ -10,13 +10,17 @@ import shutil
 import subprocess
 import zipfile
 
+from ..module_qa_versions import SOCKSCAP_LIFECYCLE_CASE
 from . import sockscap_redirector
 from .backup_policy import isolated_data_root
-from .module_signed_archive import load_artifact, platform_key
+from .module_signed_archive import load_artifact, platform_key, setup_business_lifecycle
 
 XRAY_CASE_ID = "TC-MODULES-084"
 WINDOWS_CAPTURE_CASE_ID = "TC-MODULES-085"
-SIGNED_CASES = {XRAY_CASE_ID, WINDOWS_CAPTURE_CASE_ID, "TC-MODULES-072", "TC-MODULES-073", sockscap_redirector.CASE_ID, sockscap_redirector.INSTALLER_CASE}
+SIGNED_CASES = {
+    XRAY_CASE_ID, WINDOWS_CAPTURE_CASE_ID, "TC-MODULES-072", "TC-MODULES-073",
+    SOCKSCAP_LIFECYCLE_CASE, sockscap_redirector.CASE_ID, sockscap_redirector.INSTALLER_CASE,
+}
 
 
 def setup(ctx):
@@ -119,6 +123,12 @@ def setup_signed(ctx):
                 sockscap_xray_sha256=receipt["resourceSha256"],
                 sockscap_xray_staged=ctx.sockscap_staged_resource.as_posix(),
             )
+
+    if ctx.case_id == SOCKSCAP_LIFECYCLE_CASE:
+        setup_business_lifecycle(
+            ctx, "sockscap", Path(os.environ["QA_SIGNED_SOCKSCAP_ROOT"]), owned, receipt, archive, prefix="sockscap",
+        )
+        ctx.values["sockscap_module_config"] = (isolated_data_root(ctx) / "plugins/sockscap/data/config.json").as_posix()
 
     (owned / "provenance.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
 

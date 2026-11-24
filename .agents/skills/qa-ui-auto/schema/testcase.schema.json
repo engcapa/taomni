@@ -988,6 +988,16 @@
           "enum": ["old-enabled", "old-disabled", "updated-disabled", "rolled-back-disabled", "old-reenabled", "updated-enabled", "failed-update", "rolled-back-enabled", "uninstalled", "reinstalled"],
           "description": "Verify installed MFA version hashes, live host and desktop process identities, writer ownership, and the original retained HOTP account."
         },
+        "assert_signed_module_lifecycle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["slug", "phase"],
+          "properties": {
+            "slug": {"enum": ["servers", "sockscap"]},
+            "phase": {"enum": ["old-enabled", "old-disabled", "updated-disabled", "rolled-back-disabled", "old-reenabled", "updated-enabled", "failed-update", "rolled-back-enabled", "uninstalled", "reinstalled"]}
+          },
+          "description": "Verify installed signed business module version hashes, host and desktop process lineage, writer ownership, and retained module data across updates, rollback, handshake recovery, and uninstall."
+        },
         "assert_signed_mfa_backup": {
           "enum": ["initial", "archive", "ready", "restored", "reopened"],
           "description": "Read the signed MFA package, native host ownership and paired Vault/MFA SQLite data before and after the exact UI-started backup and automatic restore."

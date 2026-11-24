@@ -125,7 +125,7 @@ jobs:
                       requested.add(platform)
                       if capability == 'signed-module' and 'signed-roster' in build['capabilities']:
                           roster.add(platform)
-                      if capability == 'signed-mfa' and 'signed-mfa-lifecycle' in build['capabilities']:
+                      if f"{capability}-lifecycle" in build['capabilities']:
                           lifecycle.add(platform)
               if not requested:
                   raise SystemExit('No signed module target selected')
@@ -425,9 +425,9 @@ jobs:
           if module == 'hello-plugin' or os.environ['MODULE_LIFECYCLE'] == 'true':
               previous_version, failing_version = lifecycle_versions(module, expected['version'])
               check_payload(module, 'unsigned-previous', previous_version)
-              if module == 'mfa':
+              if module != 'hello-plugin':
                   binary = expected['entry']['host']
-                  assert not filecmp.cmp(root / 'unsigned-module' / binary, root / 'unsigned-previous' / binary, shallow=False), 'Previous MFA host must be independently compiled'
+                  assert not filecmp.cmp(root / 'unsigned-module' / binary, root / 'unsigned-previous' / binary, shallow=False), f'Previous {module} host must be independently compiled'
               # This signed test input deliberately changes only the declared
               # version. The binary will reject the host handshake, exercising
               # recovery through the actual installer and verified registry.
@@ -536,10 +536,24 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           MODULE_PLATFORM: ${{ matrix.platform }}
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+          MODULE_LIFECYCLE: ${{ matrix.lifecycle }}
         run: |
-          scripts/plugin-package/target/release/taomni-plugin-package \
-            --payload candidate/unsigned-module --platform "$MODULE_PLATFORM" \
-            --output signed-module --source-sha "$MODULE_SOURCE_SHA"
+          if [[ "$MODULE_LIFECYCLE" == 'true' ]]; then
+            scripts/plugin-package/target/release/taomni-plugin-package \
+              --payload candidate/unsigned-module --platform "$MODULE_PLATFORM" \
+              --output signed-module --source-sha "$MODULE_SOURCE_SHA" \
+              --qa-catalog true
+            for pair in 'unsigned-previous previous' 'handshake-failure handshake-failure'; do
+              read -r payload destination <<< "$pair"
+              scripts/plugin-package/target/release/taomni-plugin-package \
+                --payload "candidate/$payload" --platform "$MODULE_PLATFORM" \
+                --output "signed-module/$destination" --source-sha "$MODULE_SOURCE_SHA"
+            done
+          else
+            scripts/plugin-package/target/release/taomni-plugin-package \
+              --payload candidate/unsigned-module --platform "$MODULE_PLATFORM" \
+              --output signed-module --source-sha "$MODULE_SOURCE_SHA"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: qa-modular-package-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}

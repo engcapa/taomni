@@ -9,6 +9,7 @@ import socket
 import subprocess
 import time
 
+from .module_qa_versions import SERVERS_LIFECYCLE_CASE
 from .steps import StepError
 
 CASE_ID = "TC-SERVERS-003-tab-functional-native"
@@ -20,7 +21,7 @@ CONTENT = b"Taomni Local servers fixture\n"
 
 
 def setup(ctx):
-    if ctx.case_id not in {CASE_ID, SIGNED_CASE_ID} or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    if ctx.case_id not in {CASE_ID, SIGNED_CASE_ID, SERVERS_LIFECYCLE_CASE} or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("The HTTP file fixture requires its native Local servers case")
     root = Path(ctx.case_dir).resolve() / "http-docroot"
     root.mkdir()
@@ -30,7 +31,7 @@ def setup(ctx):
 
 def run(ctx, phase):
     fixture = ctx.fixture_context
-    if fixture.case_id not in {CASE_ID, SIGNED_CASE_ID} or not fixture.values.get("local_servers_http_root"):
+    if fixture.case_id not in {CASE_ID, SIGNED_CASE_ID, SERVERS_LIFECYCLE_CASE} or not fixture.values.get("local_servers_http_root"):
         raise StepError("The HTTP observation requires its native Local servers fixture")
     if phase == "serving":
         connection = http.client.HTTPConnection(HOST, PORT, timeout=3)

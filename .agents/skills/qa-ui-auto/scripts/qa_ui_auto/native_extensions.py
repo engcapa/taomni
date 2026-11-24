@@ -36,6 +36,8 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("assert_signed_mail_host")(assert_signed_mail_host)
     from .module_mfa_lifecycle_observation import run as assert_signed_mfa_lifecycle
     register_verb("assert_signed_mfa_lifecycle")(assert_signed_mfa_lifecycle)
+    from .module_business_lifecycle_observation import run as assert_signed_module_lifecycle
+    register_verb("assert_signed_module_lifecycle")(assert_signed_module_lifecycle)
     from .module_mfa_backup_observation import run as assert_signed_mfa_backup
     register_verb("assert_signed_mfa_backup")(assert_signed_mfa_backup)
     from .module_sockscap_observation import run as assert_signed_sockscap_host, resource_fixture

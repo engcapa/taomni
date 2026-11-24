@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 import threading
 
-from ..module_qa_versions import MFA_LIFECYCLE_CASE
+from ..module_qa_versions import LIFECYCLE_CASES
 from .module_download import plugin_root
 from .module_signed_archive import load_artifact
 from . import module_first_release
@@ -106,13 +106,21 @@ def fixture_files(root, receipt, *, opt_in=False, include_tampered=True):
     return files
 
 
+SIGNED_ROOT_ENV = {
+    "mfa": "QA_SIGNED_MFA_ROOT",
+    "servers": "QA_SIGNED_SERVERS_ROOT",
+    "sockscap": "QA_SIGNED_SOCKSCAP_ROOT",
+}
+
+
 def setup(ctx):
     if (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("module_marketplace requires the native pinned verifier")
     plugin_root(ctx)  # validate run-owned isolation before opening any service
-    if ctx.case_id == MFA_LIFECYCLE_CASE:
-        receipt = ctx.mfa_lifecycle["current"]
-        files = fixture_files(Path(os.environ["QA_SIGNED_MFA_ROOT"]), receipt, include_tampered=False)
+    lifecycle_slug = LIFECYCLE_CASES.get(ctx.case_id)
+    if lifecycle_slug:
+        receipt = ctx.module_lifecycle[lifecycle_slug]["current"]
+        files = fixture_files(Path(os.environ[SIGNED_ROOT_ENV[lifecycle_slug]]), receipt, include_tampered=False)
         ctx.module_marketplace = Origin(files, Path(ctx.case_dir) / "module-marketplace-requests.json")
         return
     receipt = json.loads((Path(ctx.case_dir) / "official-module-fixture.json").read_text())

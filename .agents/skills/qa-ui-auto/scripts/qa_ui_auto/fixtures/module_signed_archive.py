@@ -21,7 +21,7 @@ import zipfile
 from native_build import QA_APP_ID
 from tauri_webdriver import native_isolation_env
 
-from ..module_qa_versions import MFA_LIFECYCLE_CASE, lifecycle_versions
+from ..module_qa_versions import MFA_LIFECYCLE_CASE, SERVERS_LIFECYCLE_CASE, lifecycle_versions
 from .module_mfa_restore import CASE_ID as MFA_RESTORE_CASE, SIGNED_BACKUP_STATES
 from .backup_policy import isolated_data_root
 
@@ -136,31 +136,64 @@ def setup_mfa(ctx):
         setup_mfa_lifecycle(ctx, Path(raw), owned, receipt, archive)
 
 
-def setup_mfa_lifecycle(ctx, artifact_root, owned, current, current_archive):
-    previous, failing = lifecycle_versions("mfa", current["version"])
+def _archive_member_sha256(archive_path: Path, member: str) -> str:
+    with zipfile.ZipFile(archive_path) as package, package.open(member) as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def setup_business_lifecycle(
+    ctx,
+    slug: str,
+    artifact_root: Path,
+    owned: Path,
+    current: dict,
+    current_archive: Path,
+    *,
+    prefix: str,
+    frontend_path: str | None = "frontend/index.js",
+) -> dict:
+    previous, failing = lifecycle_versions(slug, current["version"])
+    host = f"taomni-plugin-{slug}.exe" if current["platform"].startswith("windows") else f"taomni-plugin-{slug}"
+    current.setdefault("hostSha256", _archive_member_sha256(current_archive, host))
+    if frontend_path:
+        current.setdefault("frontendSha256", _archive_member_sha256(current_archive, frontend_path))
     manifests = {"current": current}
-    binaries = {"current": mfa_host_digest(current_archive, current["platform"])}
+    binaries = {"current": current["hostSha256"]}
     for label, directory, version in (("previous", "previous", previous), ("failed", "handshake-failure", failing)):
         receipt, archive, signature, _ = load_artifact(
-            artifact_root / directory, current["sourceSha"], current["platform"], "mfa", version=version,
+            artifact_root / directory, current["sourceSha"], current["platform"], slug, version=version,
         )
-        with zipfile.ZipFile(archive) as package, package.open("frontend/index.js") as frontend:
-            receipt["frontendSha256"] = hashlib.file_digest(frontend, "sha256").hexdigest()
-        if receipt["frontendSha256"] != current["frontendSha256"]:
-            raise RuntimeError("The MFA QA variant changed the approved frontend bytes")
-        binaries[label] = mfa_host_digest(archive, receipt["platform"])
+        if frontend_path:
+            receipt["frontendSha256"] = _archive_member_sha256(archive, frontend_path)
+            if receipt["frontendSha256"] != current["frontendSha256"]:
+                raise RuntimeError(f"The {slug} QA variant changed the approved frontend bytes")
+        binaries[label] = _archive_member_sha256(archive, host)
         manifests[label] = receipt
         destination = owned / archive.name
         shutil.copyfile(archive, destination)
-        ctx.values.update({f"mfa_{label}_archive": destination.as_posix(), f"mfa_{label}_signature": signature,
-                           f"mfa_{label}_version": version})
+        ctx.values.update({
+            f"{prefix}_{label}_archive": destination.as_posix(),
+            f"{prefix}_{label}_signature": signature,
+            f"{prefix}_{label}_version": version,
+        })
     if binaries["previous"] == binaries["current"] or binaries["failed"] != binaries["current"]:
-        raise RuntimeError("MFA lifecycle inputs must contain two independently built host versions and one version mismatch")
+        raise RuntimeError(f"{slug} lifecycle inputs must contain two independently built host versions and one version mismatch")
     for label, receipt in manifests.items():
         receipt["hostSha256"] = binaries[label]
-    ctx.mfa_lifecycle = manifests
-    ctx.values["mfa_current_version"] = current["version"]
+    lifecycle = getattr(ctx, "module_lifecycle", None)
+    if lifecycle is None:
+        lifecycle = {}
+        ctx.module_lifecycle = lifecycle
+    lifecycle[slug] = manifests
+    ctx.values[f"{prefix}_current_version"] = current["version"]
     (owned / "lifecycle-provenance.json").write_text(json.dumps(manifests, indent=2) + "\n", encoding="utf-8")
+    return manifests
+
+
+def setup_mfa_lifecycle(ctx, artifact_root, owned, current, current_archive):
+    ctx.mfa_lifecycle = setup_business_lifecycle(
+        ctx, "mfa", artifact_root, owned, current, current_archive, prefix="mfa",
+    )
 
 
 def mfa_host_digest(archive, target):
@@ -342,7 +375,7 @@ SERVERS_CASE = "TC-MODULES-066"
 
 
 def setup_servers(ctx):
-    if ctx.case_id != SERVERS_CASE or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    if ctx.case_id not in {SERVERS_CASE, SERVERS_LIFECYCLE_CASE} or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Signed Local servers input requires its registered native case")
     raw = os.environ.get("QA_SIGNED_SERVERS_ROOT")
     if not raw:
@@ -361,25 +394,30 @@ def setup_servers(ctx):
     shutil.copyfile(archive, destination)
     (owned / "provenance.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
     ctx.signed_servers = {"host": host, "receipt": info}
-    rows = {
-        "http": json.dumps({"port": 28489, "bindAddress": "127.0.0.1", "rootDir": ctx.values["local_servers_http_root"]}),
-        "ssh": json.dumps({
-            "port": 28491, "bindAddress": "127.0.0.1", "rootDir": ctx.values["local_servers_ssh_root"],
-            "password": ctx.values["local_servers_ssh_password"], "loginShell": False,
-        }),
-        "vnc": '{"port":15900}',
-        "rdp": '{"port":13389}',
-    }
-    database = isolated_data_root(ctx) / "taomni.db"
-    with closing(sqlite3.connect(database)) as connection, connection:
-        connection.execute(
-            "CREATE TABLE IF NOT EXISTS server_configs "
-            "(server_type TEXT PRIMARY KEY, config_json TEXT NOT NULL, updated_at INTEGER NOT NULL)"
+    if ctx.case_id == SERVERS_LIFECYCLE_CASE:
+        setup_business_lifecycle(
+            ctx, "servers", Path(raw), owned, info, archive, prefix="servers",
         )
-        connection.executemany(
-            "INSERT INTO server_configs VALUES (?, ?, 1)", rows.items(),
-        )
-    ctx.signed_servers["legacy_rows"] = rows
+    if ctx.case_id == SERVERS_CASE:
+        rows = {
+            "http": json.dumps({"port": 28489, "bindAddress": "127.0.0.1", "rootDir": ctx.values["local_servers_http_root"]}),
+            "ssh": json.dumps({
+                "port": 28491, "bindAddress": "127.0.0.1", "rootDir": ctx.values["local_servers_ssh_root"],
+                "password": ctx.values["local_servers_ssh_password"], "loginShell": False,
+            }),
+            "vnc": '{"port":15900}',
+            "rdp": '{"port":13389}',
+        }
+        database = isolated_data_root(ctx) / "taomni.db"
+        with closing(sqlite3.connect(database)) as connection, connection:
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS server_configs "
+                "(server_type TEXT PRIMARY KEY, config_json TEXT NOT NULL, updated_at INTEGER NOT NULL)"
+            )
+            connection.executemany(
+                "INSERT INTO server_configs VALUES (?, ?, 1)", rows.items(),
+            )
+        ctx.signed_servers["legacy_rows"] = rows
     ctx.values.update(local_servers_archive=destination.as_posix(), local_servers_signature=signature)
 
 

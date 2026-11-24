@@ -98,6 +98,9 @@ controls:
   - id: module-marketplace-current
     selector: '[data-testid="module-marketplace-current"]'
     kind: display
+    aliases:
+    - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-current"]'
   - id: module-marketplace-mfa-current
     selector: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
     kind: display
@@ -106,6 +109,8 @@ controls:
     kind: display
     aliases:
     - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-update"]'
   - id: module-marketplace-new
     selector: '[data-testid="module-marketplace-new"]'
     kind: display
@@ -140,11 +145,15 @@ controls:
     kind: interactive
     aliases:
     - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-review"]'
   - id: module-marketplace-download
     selector: '[data-testid="module-marketplace-download"]'
     kind: interactive
     aliases:
     - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-download"]'
   - id: module-network-settings
     selector: '[data-testid="module-network-settings"]'
     kind: display
@@ -353,6 +362,8 @@ controls:
     kind: interactive
     aliases:
     - '[data-testid="module-action-rollback-mfa"]'
+    - '[data-testid="module-action-rollback-servers"]'
+    - '[data-testid="module-action-rollback-sockscap"]'
   - id: module-action-enable-hello-plugin
     selector: '[data-testid="module-action-enable-hello-plugin"]'
     kind: interactive
@@ -390,6 +401,7 @@ controls:
     aliases:
     - '[data-testid="module-action-uninstall-mfa"]'
     - '[data-testid="module-action-uninstall-mail"]'
+    - '[data-testid="module-action-uninstall-servers"]'
     - '[data-testid="module-action-uninstall-sockscap"]'
     - '[data-testid="module-action-uninstall-${fixture.module_roster_remove}"]'
   - id: module-action-install-hello-plugin
@@ -398,6 +410,7 @@ controls:
     aliases:
     - '[data-testid="module-action-install-mfa"]'
     - '[data-testid="module-action-install-mail"]'
+    - '[data-testid="module-action-install-servers"]'
     - '[data-testid="module-action-install-sockscap"]'
     - '[data-testid="module-action-install-${fixture.module_roster_remove}"]'
   - id: module-delete-data-hello-plugin
@@ -408,6 +421,8 @@ controls:
     kind: display
     aliases:
     - '[data-testid="module-data-retained-mfa"]'
+    - '[data-testid="module-data-retained-servers"]'
+    - '[data-testid="module-data-retained-sockscap"]'
   - id: module-action-open-hello-plugin
     selector: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
     kind: interactive
@@ -491,7 +506,7 @@ Mail 宿主跨进程用例在一份草稿写入期间提交第二份，核对单
 
 `TC-MODULES-052` 检查首次自动准备 Mail 后，商店展示下次启动导入的状态。Browser 刷新后状态保留，签名升级专项通过真实启动应用迁移。
 
-`TC-MODULES-007/010/040/042` 观察真实版本目录删除。010 还确认取消永久删除时签名包和业务数据原样保留，确认后数据和定位记录消失。042 校验存在更新时卸载会释放宿主、清理所有版本并保留业务数据。043 使用浏览器模型检查取消永久删除和卸载后只提供主动安装。
+`TC-MODULES-007/010/040/042` 观察真实版本目录删除。010 还确认取消永久删除时签名包和业务数据原样保留，确认后数据和定位记录消失。042 校验存在更新时卸载会释放宿主、清理所有版本并保留业务数据。043 使用浏览器模型检查取消永久删除和卸载后只提供主动安装。独立 signed 业务模块的双版本在线更新/离线安装、禁/启用回滚、握手失败恢复与卸载保留数据重装由 `TC-MODULES-103`（MFA）、`TC-MODULES-107`（Local servers）与 `TC-MODULES-108`（SocksCap）覆盖。
 
 原生还原确认的自动重启由 `TC-MODULES-033/034/035` 在 Linux、Windows 和 macOS 覆盖运行、禁用与卸载保留数据三态。用例通过界面创建配对备份，变更模块数据、HOTP 和主密码，再用原生还原对话框拒绝旧密码、接受当前密码。探针观察旧进程正常退出、新进程 PID 和启动时间、可执行文件和 QA 隔离目录，再连接应用重启后的 WebView。还原后核验模块行、active 指针、generation、writer lease、原密码和 HOTP 755224。Browser `TC-BACKUP-RESTORE-001` 覆盖确认、密码错误和重复提交。独立 signed MFA 宿主在运行、禁用与卸载保留数据三态下的自动还原重启由 `TC-MODULES-104/105/106` 在 Linux、Windows 和 macOS 覆盖，核验配对 v2 备份、旧主密码拒止、`generation` 递增、`active.json` 不变与重启后 HOTP 连续性。
 
@@ -6270,7 +6285,7 @@ controls:
 - `TC-SERVERS-001-tab-singleton-browser` 和 `TC-auto-F-Servers-1-servers-dialog` 覆盖浏览器单实例页签及跨上下文互斥，`TC-SERVERS-002-tab-singleton-native` 覆盖原生双进程 `ModuleLock` 与热路由切换。`TC-SERVERS-003-tab-functional-native` 核对 HTTP 文件内容、监听关闭、日志、运行中修改端口提示和配置持久化。应用 HTTP 设置直接保存该服务，其他服务的凭据不参与。
 - VNC 由签名 `vnc-server` 宿主启动和监督系统 daemon。Linux X11 的 `TC-MODULES-063` 核对已安装表单文件的 SHA-256，再验证真实回环连接、停止及禁用后的端口与租约释放。`TC-MODULES-064` 在 Browser 从模块入口核对端口、绑定地址、密码及两个选项的保存和恢复。
 - TC-SERVERS-004 从 Local servers 启动真实 SSH 监听器。独立客户端验证鉴权、SFTP 文件内容、PTY 命令完成和停止后的端口关闭。
-- TC-MODULES-066 核对签名表单的 SHA-256、原 HTTP 和 SSH 设置及原 Vault 口令，停用后同时关闭两个监听。TC-SERVERS-004 及 066 核对 PTY 输出与零和非零退出码。TC-SERVERS-005 验证 Browser 从模块入口保存、重开和明确移除凭据。
+- TC-MODULES-066 核对签名表单的 SHA-256、原 HTTP 和 SSH 设置及原 Vault 口令，停用后同时关闭两个监听。TC-SERVERS-004 及 066 核对 PTY 输出与零和非零退出码。TC-SERVERS-005 验证 Browser 从模块入口保存、重开和明确移除凭据。TC-MODULES-107 覆盖签名 Local servers 宿主两版本更新回滚、握手失败回退与保留配置重装恢复 HTTP 监听。
 
 ### 22.2 RDP Server（与 Windows 远程桌面对齐）🚧
 
@@ -9386,7 +9401,7 @@ controls:
 -->
 
 - 提供全局/按应用 TCP 路由、上游代理、GFWList、规则 dry-run、状态与流量统计的控制面板。
-- 启用 SocksCap 后，Tools 标签加载模块前端和样式，测试目标在独立宿主计算实际决策并显示命中的规则。TC-MODULES-073 核对旧配置与规则进入签名宿主，停用再启用后继续命中同一规则。TC-MODULES-074 在 Browser 从停用占位进入商店，在同一标签验证启用、试算、再次停用及恢复试算。
+- 启用 SocksCap 后，Tools 标签加载模块前端和样式，测试目标在独立宿主计算实际决策并显示命中的规则。TC-MODULES-073 核对旧配置与规则进入签名宿主，停用再启用后继续命中同一规则。TC-MODULES-074 在 Browser 从停用占位进入商店，在同一标签验证启用、试算、再次停用及恢复试算。TC-MODULES-108 覆盖签名 SocksCap 宿主两版本在线更新、握手失败回退、版本/runtime 清理与保留 Vault 上游重装。
 - TC-MODULES-080 从 macOS 原生面板启动针对单个程序的捕获，在等待系统批准时从商店停用。核对签名宿主、桥接进程、上游启动器、私有套接字、写锁和恢复记录。
 - TC-MODULES-085 从 Windows 原生面板启动捕获，核对 WinDivert 损坏拒绝和提权辅助进程的宿主归属。停用后验证宿主退出、转发监听端口关闭和恢复日志清理，卸载后核对保留配置与版本目录。TC-MODULES-074 和 TC-MODULES-085 验证卸载后重新打开工具时显示安装入口，捕获启动按钮已移除。
 - TC-MODULES-081 从邮件地址簿新增联系人并停用模块，逐阶段核对签名宿主、模块邮箱库中的联系人和旧缓存。重新启用后从写信界面选择联系人，再从地址簿删除同一条记录。

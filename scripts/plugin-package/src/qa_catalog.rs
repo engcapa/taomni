@@ -60,6 +60,20 @@ pub fn write_legacy_roster(
     )
 }
 
+const QA_CATALOG_PLUGIN_IDS: [&str; 11] = [
+    "taomni-plugin-hello-plugin",
+    "taomni-plugin-ai-voice-local",
+    "taomni-plugin-mail",
+    "taomni-plugin-mfa",
+    "taomni-plugin-rdp-client",
+    "taomni-plugin-rdp-server",
+    "taomni-plugin-screenshot",
+    "taomni-plugin-servers",
+    "taomni-plugin-sockscap",
+    "taomni-plugin-vnc-client",
+    "taomni-plugin-vnc-server",
+];
+
 pub fn write(output: &Path, receipt: &Value, signer: &ReleaseSigner) -> Result<()> {
     let manifest: Value = serde_json::from_slice(&fs::read(output.join("module.json"))?)?;
     let id = receipt["id"].as_str().context("missing package id")?;
@@ -70,8 +84,8 @@ pub fn write(output: &Path, receipt: &Value, signer: &ReleaseSigner) -> Result<(
         .as_str()
         .context("missing package filename")?;
     ensure!(
-        id == "taomni-plugin-hello-plugin" || id == "taomni-plugin-mfa",
-        "QA catalog is restricted to official test modules"
+        QA_CATALOG_PLUGIN_IDS.contains(&id),
+        "QA catalog is restricted to official modules"
     );
     ensure!(
         Path::new(archive)
@@ -245,5 +259,33 @@ mod tests {
         let mut forbidden = receipt;
         forbidden["id"] = json!("taomni-plugin-third-party");
         assert!(write(root, &forbidden, &signer).is_err());
+
+        for slug in ["servers", "sockscap"] {
+            let business_dir = tempfile::tempdir().unwrap();
+            let business_root = business_dir.path();
+            let id = format!("taomni-plugin-{slug}");
+            let archive = format!("{slug}.taomni-plugin");
+            let business_receipt = json!({
+                "id": id, "slug": slug, "version": "0.1.3", "coreApiVersion": "1",
+                "platform": "linux-x86_64", "archive": archive, "sha256": "c".repeat(64),
+                "size": 24, "sourceSha": "d".repeat(40),
+            });
+            fs::write(
+                business_root.join("module.json"),
+                json!({"name": slug, "kind": "local-server", "permissions": ["fs.dataDir"]})
+                    .to_string(),
+            )
+            .unwrap();
+            fs::write(
+                business_root.join(format!("{archive}.minisig")),
+                "exact package signature\n",
+            )
+            .unwrap();
+            write(business_root, &business_receipt, &signer).unwrap();
+            let catalog: Value =
+                serde_json::from_slice(&fs::read(business_root.join("modules.json")).unwrap())
+                    .unwrap();
+            assert_eq!(catalog["plugins"][&id]["slug"], json!(slug));
+        }
     }
 }

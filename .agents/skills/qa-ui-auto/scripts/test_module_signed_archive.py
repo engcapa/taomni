@@ -14,7 +14,7 @@ from qa_ui_auto.behavior_contract import is_check
 from qa_ui_auto.ci import capabilities
 from qa_ui_auto.fixtures import sockscap_legacy
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_key, setup, setup_mfa
-from qa_ui_auto.module_qa_versions import MFA_LIFECYCLE_CASE
+from qa_ui_auto.module_qa_versions import MFA_LIFECYCLE_CASE, SERVERS_LIFECYCLE_CASE, SOCKSCAP_LIFECYCLE_CASE
 from qa_ui_auto.module_signed_observation import check, validate
 from qa_ui_auto.steps import StepError
 from qa_ui_auto.testcase import load_case
@@ -139,6 +139,16 @@ class OfficialModuleArtifactTests(unittest.TestCase):
         self.assertIn("signed-mfa-lifecycle", capabilities([case], "native"))
         self.assertNotIn("signed-mfa-lifecycle", capabilities([case], "browser"))
 
+    def test_native_business_lifecycles_request_matching_extra_signed_inputs(self):
+        for case_id, base_cap in (
+            (SERVERS_LIFECYCLE_CASE, "signed-local-servers"),
+            (SOCKSCAP_LIFECYCLE_CASE, "signed-sockscap"),
+        ):
+            case = load_case(next((ROOT / "qa-ui-auto-tests/cases").glob(case_id + "-*")))
+            self.assertIn(base_cap, capabilities([case], "native"))
+            self.assertIn(f"{base_cap}-lifecycle", capabilities([case], "native"))
+            self.assertNotIn(f"{base_cap}-lifecycle", capabilities([case], "browser"))
+
     def test_native_oracle_does_not_accept_a_plausible_registry_without_real_ping(self):
         record = {"state": "enabled", "reason": None}
         ping = {"value": {"pluginId": "taomni-plugin-hello-plugin", "version": "0.1.0", "enabled": True}}
@@ -202,11 +212,13 @@ class OfficialModuleArtifactTests(unittest.TestCase):
         ])
         self.assertLess(signing.index(macos_identity), signing.index(macos_host))
         for step in package_steps:
-            self.assertTrue(step["run"].startswith("scripts/plugin-package/target/release/taomni-plugin-package"))
+            self.assertTrue('scripts/plugin-package/target/release/taomni-plugin-package' in step["run"])
             self.assertNotIn("cargo", step["run"])
             self.assertNotIn("TAURI_SIGNING_PRIVATE_KEY", step["run"])
             self.assertLess(signing.index(macos_host), signing.index(step))
-        self.assertNotIn("--qa-catalog", package_steps[1]["run"])
+        else_branch = package_steps[1]["run"].split("else\n", 1)[1]
+        self.assertNotIn("--qa-catalog", else_branch)
+        self.assertIn("--qa-catalog true", package_steps[1]["run"])
         self.assertNotIn("release", json.dumps([step for step in signing if "upload-artifact" in step.get("uses", "")]).lower())
 
 

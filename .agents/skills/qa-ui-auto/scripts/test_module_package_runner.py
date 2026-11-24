@@ -116,17 +116,22 @@ class OfficialPackageRunnerTests(unittest.TestCase):
         self.assertEqual(json.loads(values["build_matrix"])["include"][0]["target"], "aarch64-apple-darwin")
         self.assertEqual(self.roster_targets(values, "sign_matrix"), {"darwin-aarch64": False})
 
-    def test_mfa_lifecycle_build_is_limited_to_selected_runner_platforms(self):
-        builds = {"include": [
-            {"platform_key": "linux", "arch": "X64", "capabilities": ["signed-mfa"]},
-            {"platform_key": "macos", "arch": "ARM64", "capabilities": ["signed-mfa", "signed-mfa-lifecycle"]},
-        ]}
-        with tempfile.TemporaryDirectory() as directory:
-            values = self.admit("macos-26", Path(directory) / "output", json.dumps(builds), "mfa")
-        expected = {"linux-x86_64": False, "darwin-aarch64": True}
-        for matrix in ("build_matrix", "sign_matrix"):
-            self.assertEqual({entry["platform"]: entry["lifecycle"]
-                              for entry in json.loads(values[matrix])["include"]}, expected)
+    def test_business_lifecycle_build_is_limited_to_selected_runner_platforms(self):
+        for slug, cap in (
+            ("mfa", "signed-mfa"),
+            ("servers", "signed-local-servers"),
+            ("sockscap", "signed-sockscap"),
+        ):
+            builds = {"include": [
+                {"platform_key": "linux", "arch": "X64", "capabilities": [cap]},
+                {"platform_key": "macos", "arch": "ARM64", "capabilities": [cap, f"{cap}-lifecycle"]},
+            ]}
+            with self.subTest(slug=slug), tempfile.TemporaryDirectory() as directory:
+                values = self.admit("macos-26", Path(directory) / "output", json.dumps(builds), slug)
+                expected = {"linux-x86_64": False, "darwin-aarch64": True}
+                for matrix in ("build_matrix", "sign_matrix"):
+                    self.assertEqual({entry["platform"]: entry["lifecycle"]
+                                      for entry in json.loads(values[matrix])["include"]}, expected)
 
     def test_server_module_frontends_follow_their_own_package_targets(self):
         builds = {"include": [
