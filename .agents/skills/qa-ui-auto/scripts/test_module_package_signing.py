@@ -202,13 +202,17 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
                 self.guard(root, "hello-plugin", "linux-x86_64")
 
     def test_business_lifecycle_requires_distinct_previous_host_bytes_and_fixed_version(self):
-        for module in ("mfa", "servers", "sockscap"):
+        runtime = runpy.run_path(str(ROOT / "scripts/local_voice_runtime.py"))["WINDOWS_RUNTIME"]
+        for module in ("mfa", "servers", "sockscap", "screenshot", "ai-voice-local", "mail"):
             for platform in PLATFORMS:
                 with self.subTest(module=module, platform=platform), tempfile.TemporaryDirectory() as directory:
                     root = Path(directory)
                     current = self.seed(root, module, platform)
                     if module == "sockscap" and platform.startswith("darwin-"):
                         self.seed_macos_redirector(root, current)
+                    if module == "ai-voice-local" and platform == "windows-x86_64":
+                        for name in runtime:
+                            (current / name).write_bytes(b"inert runtime library")
                     manifest = json.loads((current / "module.json").read_text())
                     host_name = manifest["entry"]["host"]
                     previous_version, failed_version = lifecycle_versions(module, manifest["version"])

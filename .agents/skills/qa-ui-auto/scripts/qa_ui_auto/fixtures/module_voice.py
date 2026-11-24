@@ -13,15 +13,16 @@ from native_build import QA_APP_ID
 from tauri_webdriver import native_isolation_env
 
 from .backup_policy import isolated_data_root
-from .module_signed_archive import load_artifact, platform_key
+from ..module_qa_versions import VOICE_LIFECYCLE_CASE
+from .module_signed_archive import load_artifact, platform_key, setup_business_lifecycle
 
 CASE = "TC-MODULES-067"
 SLUG = "ai-voice-local"
 
 
 def setup(ctx):
-    if ctx.case_id != CASE:
-        raise RuntimeError(f"The signed Local Voice fixture belongs to {CASE}")
+    if ctx.case_id not in {CASE, VOICE_LIFECYCLE_CASE}:
+        raise RuntimeError(f"The signed Local Voice fixture belongs to {CASE} or {VOICE_LIFECYCLE_CASE}")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     root = Path(__file__).resolve().parents[6]
     manifest = json.loads((root / "src-tauri/plugins" / SLUG / "module.json").read_text(encoding="utf-8"))
@@ -44,6 +45,8 @@ def setup(ctx):
             raise RuntimeError("Local Voice model hash changed after preparation")
     (cache / model).parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(weights, cache / model)
+    ctx.local_voice_model_path = (cache / model).resolve()
+    ctx.local_voice_model_sha256 = model.parent.name
 
     data.mkdir(parents=True, exist_ok=True)
     pcm = data / "qa-local-voice.f32le"
@@ -62,3 +65,7 @@ def setup(ctx):
         local_voice_host=(data / "plugins" / SLUG / "versions" / manifest["version"] / host).as_posix(),
         local_voice_host_sha256=receipt["hostSha256"],
     )
+    if ctx.case_id == VOICE_LIFECYCLE_CASE:
+        setup_business_lifecycle(
+            ctx, SLUG, package, owned, receipt, archive, prefix="local_voice", frontend_path=None,
+        )

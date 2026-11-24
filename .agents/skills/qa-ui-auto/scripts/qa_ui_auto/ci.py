@@ -144,6 +144,9 @@ def capabilities(cases, mode: str) -> list[str]:
                     "mfa": "signed-mfa-lifecycle",
                     "servers": "signed-local-servers-lifecycle",
                     "sockscap": "signed-sockscap-lifecycle",
+                    "screenshot": "signed-screenshot-lifecycle",
+                    "ai-voice-local": "signed-local-voice-lifecycle",
+                    "mail": "signed-mail-lifecycle",
                 }[slug]
                 result.add(lifecycle_cap)
             if fixtures & {"module_legacy_install", "module_legacy_mfa"}:

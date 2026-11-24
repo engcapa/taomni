@@ -993,7 +993,7 @@
           "additionalProperties": false,
           "required": ["slug", "phase"],
           "properties": {
-            "slug": {"enum": ["servers", "sockscap"]},
+            "slug": {"enum": ["servers", "sockscap", "screenshot", "ai-voice-local", "mail"]},
             "phase": {"enum": ["old-enabled", "old-disabled", "updated-disabled", "rolled-back-disabled", "old-reenabled", "updated-enabled", "failed-update", "rolled-back-enabled", "uninstalled", "reinstalled"]}
           },
           "description": "Verify installed signed business module version hashes, host and desktop process lineage, writer ownership, and retained module data across updates, rollback, handshake recovery, and uninstall."

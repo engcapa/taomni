@@ -21,7 +21,13 @@ import zipfile
 from native_build import QA_APP_ID
 from tauri_webdriver import native_isolation_env
 
-from ..module_qa_versions import MFA_LIFECYCLE_CASE, SERVERS_LIFECYCLE_CASE, lifecycle_versions
+from ..module_qa_versions import (
+    MAIL_LIFECYCLE_CASE,
+    MFA_LIFECYCLE_CASE,
+    SCREENSHOT_LIFECYCLE_CASE,
+    SERVERS_LIFECYCLE_CASE,
+    lifecycle_versions,
+)
 from .module_mfa_restore import CASE_ID as MFA_RESTORE_CASE, SIGNED_BACKUP_STATES
 from .backup_policy import isolated_data_root
 
@@ -212,6 +218,7 @@ def setup_rdp(ctx):
 
 SIGNED_MAIL_CASES = {
     "TC-MODULES-101",
+    MAIL_LIFECYCLE_CASE,
     "TC-MAIL-BULK-03", "TC-MODULES-059", "TC-MODULES-068", "TC-MODULES-070", "TC-MODULES-076",
     "TC-MODULES-077", "TC-MODULES-079", "TC-MODULES-081", "TC-MODULES-083", "TC-MODULES-086",
     "TC-MODULES-088", "TC-MODULES-091", "TC-MODULES-092", "TC-MODULES-095", "TC-MODULES-096",
@@ -243,10 +250,14 @@ def setup_mail(ctx):
     (owned / "provenance.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     ctx.signed_mail = {"host": host, "frontend": frontend, "receipt": receipt}
     ctx.values.update(mail_signed_archive=destination.as_posix(), mail_signed_signature=signature)
+    if ctx.case_id == MAIL_LIFECYCLE_CASE:
+        setup_business_lifecycle(
+            ctx, "mail", Path(raw), owned, receipt, archive, prefix="mail",
+        )
 
 
 def setup_screenshot(ctx):
-    if ctx.case_id not in {"TC-MODULES-061", "TC-MODULES-062"} or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    if ctx.case_id not in {"TC-MODULES-061", "TC-MODULES-062", SCREENSHOT_LIFECYCLE_CASE} or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Signed Screenshot input requires its registered native case")
     setting = "QA_SIGNED_SCREENSHOT_ROOT"
     raw = os.environ.get(setting)
@@ -254,13 +265,17 @@ def setup_screenshot(ctx):
         raise RuntimeError(f"{setting} is required to locate the signed artifact")
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     manifest = Path(__file__).resolve().parents[6] / "src-tauri/plugins/screenshot/module.json"
-    version = json.loads(manifest.read_text(encoding="utf-8"))["version"]
+    expected = json.loads(manifest.read_text(encoding="utf-8"))
+    version, frontend = expected["version"], expected["entry"]["frontend"]
     info, archive, signature, _ = load_artifact(
         Path(raw), source, platform_key(), "screenshot", version=version,
     )
     host = "taomni-plugin-screenshot.exe" if platform.system() == "Windows" else "taomni-plugin-screenshot"
-    with zipfile.ZipFile(archive) as package, package.open(host) as binary:
-        info["hostSha256"] = hashlib.file_digest(binary, "sha256").hexdigest()
+    with zipfile.ZipFile(archive) as package:
+        with package.open(host) as binary:
+            info["hostSha256"] = hashlib.file_digest(binary, "sha256").hexdigest()
+        with package.open(frontend) as script:
+            info["frontendSha256"] = hashlib.file_digest(script, "sha256").hexdigest()
     owned = Path(ctx.case_dir).resolve() / "signed-screenshot"
     owned.mkdir()
     destination = owned / archive.name
@@ -268,6 +283,10 @@ def setup_screenshot(ctx):
     (owned / "provenance.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
     ctx.signed_screenshot = {"host": host, "receipt": info}
     ctx.values.update(screenshot_signed_archive=destination.as_posix(), screenshot_signed_signature=signature)
+    if ctx.case_id == SCREENSHOT_LIFECYCLE_CASE:
+        setup_business_lifecycle(
+            ctx, "screenshot", Path(raw), owned, info, archive, prefix="screenshot",
+        )
 
 
 VNC_SERVER_CASE = "TC-MODULES-063"

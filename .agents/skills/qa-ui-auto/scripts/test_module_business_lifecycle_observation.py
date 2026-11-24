@@ -1,9 +1,11 @@
 """Unit and contract tests for generalized business-module two-version lifecycles."""
 from __future__ import annotations
 
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
+import sqlite3
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -15,8 +17,16 @@ import yaml
 from qa_ui_auto import module_business_lifecycle_observation as observation
 from qa_ui_auto.behavior_contract import is_check, validate_contract
 from qa_ui_auto.ci import capabilities
-from qa_ui_auto.fixtures import module_marketplace, module_signed_archive
-from qa_ui_auto.module_qa_versions import OFFICIAL_LIFECYCLE_SLUGS, SERVERS_LIFECYCLE_CASE, SOCKSCAP_LIFECYCLE_CASE, lifecycle_versions
+from qa_ui_auto.fixtures import module_marketplace, module_signed_archive, module_voice
+from qa_ui_auto.module_qa_versions import (
+    MAIL_LIFECYCLE_CASE,
+    OFFICIAL_LIFECYCLE_SLUGS,
+    SCREENSHOT_LIFECYCLE_CASE,
+    SERVERS_LIFECYCLE_CASE,
+    SOCKSCAP_LIFECYCLE_CASE,
+    VOICE_LIFECYCLE_CASE,
+    lifecycle_versions,
+)
 from qa_ui_auto.steps import StepError
 from qa_ui_auto.testcase import load_case
 
@@ -38,7 +48,7 @@ class BusinessLifecycleTests(unittest.TestCase):
             self.assertEqual((prev, fail), ("0.1.3-qa.previous", "0.1.4-qa.handshake-failure"))
 
     def _seed_installed(self, plugins: Path, slug: str, version: str, previous_version: str | None,
-                        pkg_bytes: bytes, host_bytes: bytes, fe_bytes: bytes):
+                        pkg_bytes: bytes, host_bytes: bytes, fe_bytes: bytes | None, retained_files=None):
         module = plugins / slug
         module.mkdir(parents=True, exist_ok=True)
         (module / "active.json").write_text(json.dumps({
@@ -49,10 +59,11 @@ class BusinessLifecycleTests(unittest.TestCase):
         if version:
             vdir = module / "versions" / version
             (vdir / ".taomni-trust").mkdir(parents=True, exist_ok=True)
-            (vdir / "frontend").mkdir(parents=True, exist_ok=True)
             (vdir / ".taomni-trust/package.taomni-plugin").write_bytes(pkg_bytes)
             (vdir / f"taomni-plugin-{slug}").write_bytes(host_bytes)
-            (vdir / "frontend/index.js").write_bytes(fe_bytes)
+            if fe_bytes is not None:
+                (vdir / "frontend").mkdir(parents=True, exist_ok=True)
+                (vdir / "frontend/index.js").write_bytes(fe_bytes)
         else:
             versions = module / "versions"
             if versions.exists():
@@ -61,10 +72,32 @@ class BusinessLifecycleTests(unittest.TestCase):
             (plugins / ".retained-data").mkdir(parents=True, exist_ok=True)
             (plugins / ".retained-data" / f"{slug}.json").write_text(json.dumps({
                 "formatVersion": 1, "slug": slug, "dataSchemaVersion": 1,
-                "files": [{"path": "config.json", "kind": "file"}],
+                "files": retained_files if retained_files is not None else [{"path": "config.json", "kind": "file"}],
             }), encoding="utf-8")
 
     def _write_data(self, plugins: Path, slug: str, http_root: str):
+        profile = plugins.parent
+        profile.mkdir(parents=True, exist_ok=True)
+        if slug in observation.STATELESS_SLUGS:
+            return {"retained_files": []}
+        if slug == "mail":
+            account_id = "mail-acc-1"
+            stem = f"{account_id}-{hashlib.sha256(account_id.encode()).hexdigest()[:16]}"
+            with closing(sqlite3.connect(profile / "taomni.db")) as db:
+                db.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, session_type TEXT, name TEXT)")
+                db.execute("INSERT INTO sessions VALUES (?, 'Mail', 'QA owned IMAP')", (account_id,))
+                db.commit()
+            data = plugins / "mail/data"
+            data.mkdir(parents=True, exist_ok=True)
+            (data / f"{stem}.imap-owner").write_text(f"taomni-imap-store-v1\n{stem}\n", encoding="utf-8")
+            with closing(sqlite3.connect(data / f"{stem}.db")) as db:
+                db.execute("CREATE TABLE mail_messages (account_id TEXT, folder TEXT, subject TEXT)")
+                db.execute("INSERT INTO mail_messages VALUES (?, 'INBOX', 'Fresh ownership 0001')", (account_id,))
+                db.commit()
+            return {"retained_files": [
+                {"path": f"{stem}.db", "kind": "sqlite"},
+                {"path": f"{stem}.imap-owner", "kind": "file"},
+            ]}
         data = plugins / slug / "data"
         data.mkdir(parents=True, exist_ok=True)
         if slug == "servers":
@@ -72,9 +105,16 @@ class BusinessLifecycleTests(unittest.TestCase):
         else:
             payload = {"upstream": {"kind": "trojan", "host": "127.0.0.2", "port": 19392, "passwordRef": "vault:abc"}}
         (data / "config.json").write_text(json.dumps(payload), encoding="utf-8")
+        return {"retained_files": [{"path": "config.json", "kind": "file"}]}
 
     def test_all_ten_lifecycle_phases_and_data_continuity_verify_cleanly(self):
-        for slug, case_id in (("servers", SERVERS_LIFECYCLE_CASE), ("sockscap", SOCKSCAP_LIFECYCLE_CASE)):
+        for slug, case_id in (
+            ("servers", SERVERS_LIFECYCLE_CASE),
+            ("sockscap", SOCKSCAP_LIFECYCLE_CASE),
+            ("screenshot", SCREENSHOT_LIFECYCLE_CASE),
+            ("ai-voice-local", VOICE_LIFECYCLE_CASE),
+            ("mail", MAIL_LIFECYCLE_CASE),
+        ):
             with self.subTest(slug=slug), tempfile.TemporaryDirectory() as directory:
                 profile = Path(directory).resolve() / "profile"
                 plugins = profile / "plugins"
@@ -83,34 +123,40 @@ class BusinessLifecycleTests(unittest.TestCase):
                 http_root = str(Path(directory).resolve() / "docroot")
                 old_pkg, new_pkg, fail_pkg = b"old-pkg", b"new-pkg", b"fail-pkg"
                 old_host, new_host = b"old-host", b"new-host"
-                fe = b"export default () => null;"
+                fe = None if slug == "ai-voice-local" else b"export default () => null;"
                 (plugins / ".downloads").mkdir(parents=True)
                 (plugins / ".downloads" / f"{_sha256(new_pkg)}.taomni-plugin").write_bytes(new_pkg)
+                fe_hash = {"frontendSha256": _sha256(fe)} if fe is not None else {}
                 packages = {
                     "previous": {
                         "version": "0.1.2-qa.previous", "platform": "linux-x86_64", "sourceSha": "a" * 40,
-                        "sha256": _sha256(old_pkg), "hostSha256": _sha256(old_host), "frontendSha256": _sha256(fe),
+                        "sha256": _sha256(old_pkg), "hostSha256": _sha256(old_host), **fe_hash,
                         "archive": f"{slug}-prev.taomni-plugin",
                     },
                     "current": {
                         "version": "0.1.2", "platform": "linux-x86_64", "sourceSha": "a" * 40,
-                        "sha256": _sha256(new_pkg), "hostSha256": _sha256(new_host), "frontendSha256": _sha256(fe),
+                        "sha256": _sha256(new_pkg), "hostSha256": _sha256(new_host), **fe_hash,
                         "archive": f"{slug}-cur.taomni-plugin",
                     },
                     "failed": {
                         "version": "0.1.3-qa.handshake-failure", "platform": "linux-x86_64", "sourceSha": "a" * 40,
-                        "sha256": _sha256(fail_pkg), "hostSha256": _sha256(new_host), "frontendSha256": _sha256(fe),
+                        "sha256": _sha256(fail_pkg), "hostSha256": _sha256(new_host), **fe_hash,
                         "archive": f"{slug}-fail.taomni-plugin",
                     },
                 }
+                model_path = Path(directory).resolve() / "cache/ggml-base.bin"
+                model_path.parent.mkdir(parents=True)
+                model_path.write_bytes(b"whisper-base-weights")
                 owner = SimpleNamespace(
                     case_id=case_id,
                     values={"local_servers_http_root": http_root},
+                    local_voice_model_path=model_path,
+                    local_voice_model_sha256=_sha256(b"whisper-base-weights"),
                     module_lifecycle={slug: packages},
                     module_marketplace=SimpleNamespace(requests=["/" + packages["current"]["archive"]]),
                 )
                 ctx = SimpleNamespace(case_dir=case_dir, fixture_context=owner, session=None)
-                self._write_data(plugins, slug, http_root)
+                meta = self._write_data(plugins, slug, http_root)
 
                 for phase in (
                     "old-enabled", "old-disabled", "updated-disabled", "rolled-back-disabled",
@@ -124,13 +170,14 @@ class BusinessLifecycleTests(unittest.TestCase):
                     host_bytes = old_host if label == "previous" else new_host
                     self._seed_installed(
                         plugins, slug, selected["version"] if selected else None, prev, pkg_bytes, host_bytes, fe,
+                        retained_files=meta["retained_files"],
                     )
                     if phase == "failed-update":
                         staged = plugins / slug / "versions" / packages["failed"]["version"] / ".taomni-trust/package.taomni-plugin"
                         staged.parent.mkdir(parents=True, exist_ok=True)
                         staged.write_bytes(fail_pkg)
                     reg_record = {"manifest": {"slug": slug, "version": selected["version"] if selected else None},
-                                  "state": state, "reason": None, "dataRetained": True}
+                                  "state": state, "reason": None, "dataRetained": slug not in observation.STATELESS_SLUGS}
                     with patch("qa_ui_auto.fixtures.backup_policy.isolated_data_root", return_value=profile), \
                          patch.object(observation, "writer_lease", return_value={"exists": True, "held": state == "enabled"}), \
                          patch.object(observation, "inspect_module_process", return_value=(CORE, HOST_NEW if state == "enabled" else None)), \
@@ -164,6 +211,9 @@ class BusinessLifecycleTests(unittest.TestCase):
         for case_id, env_var, slug in (
             (SERVERS_LIFECYCLE_CASE, "QA_SIGNED_SERVERS_ROOT", "servers"),
             (SOCKSCAP_LIFECYCLE_CASE, "QA_SIGNED_SOCKSCAP_ROOT", "sockscap"),
+            (SCREENSHOT_LIFECYCLE_CASE, "QA_SIGNED_SCREENSHOT_ROOT", "screenshot"),
+            (VOICE_LIFECYCLE_CASE, "QA_SIGNED_LOCAL_VOICE_ROOT", "ai-voice-local"),
+            (MAIL_LIFECYCLE_CASE, "QA_SIGNED_MAIL_ROOT", "mail"),
         ):
             with self.subTest(case_id=case_id), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory).resolve()
@@ -199,11 +249,52 @@ class BusinessLifecycleTests(unittest.TestCase):
             helper.assert_called_once()
             self.assertFalse((root / "profile/taomni.db").exists())
 
-    def test_wave1_case_contracts_are_valid_across_all_three_platforms(self):
+    def test_rejects_stateless_data_dir_drifted_voice_model_or_missing_mail_locator(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = Path(directory).resolve() / "profile"
+            plugins = profile / "plugins"
+            case_dir = Path(directory).resolve() / "case"
+            case_dir.mkdir(parents=True)
+            (plugins / "screenshot/data").mkdir(parents=True)
+            with self.assertRaisesRegex(StepError, "unexpectedly created data directory"):
+                observation.verify_module_data(SimpleNamespace(), "screenshot", plugins / "screenshot")
+
+            model = Path(directory).resolve() / "ggml-base.bin"
+            model.write_bytes(b"original-model")
+            voice_owner = SimpleNamespace(local_voice_model_path=model, local_voice_model_sha256=_sha256(b"other"))
+            with self.assertRaisesRegex(StepError, "model cache drifted"):
+                observation.verify_module_data(voice_owner, "ai-voice-local", plugins / "ai-voice-local")
+
+            mail_meta = self._write_data(plugins, "mail", "")
+            self._seed_installed(
+                plugins, "mail", None, "0.1.57-qa.previous", b"p", b"h", b"f",
+                retained_files=[mail_meta["retained_files"][0]],
+            )
+            mail_owner = SimpleNamespace(case_id=MAIL_LIFECYCLE_CASE, module_lifecycle={"mail": {
+                "previous": {"version": "0.1.57-qa.previous"},
+                "current": {"sourceSha": "a" * 40, "platform": "linux-x86_64"},
+            }})
+            ctx = SimpleNamespace(case_dir=case_dir, fixture_context=mail_owner, session=None)
+            reg_record = {"manifest": {"slug": "mail", "version": None}, "state": "uninstalled",
+                          "reason": None, "dataRetained": True}
+            with patch("qa_ui_auto.fixtures.backup_policy.isolated_data_root", return_value=profile), \
+                 patch.object(observation, "writer_lease", return_value={"exists": True, "held": False}), \
+                 patch.object(observation, "inspect_module_process", return_value=(CORE, None)), \
+                 patch.object(observation, "invoke", return_value={"value": [reg_record]}), \
+                 self.assertRaisesRegex(StepError, "retained locator"):
+                observation.run(ctx, {"slug": "mail", "phase": "uninstalled"})
+
+    def test_wave1_and_wave2a_case_contracts_are_valid_across_all_three_platforms(self):
         for phase in observation.STATES:
-            for slug in ("servers", "sockscap"):
+            for slug in ("servers", "sockscap", "screenshot", "ai-voice-local", "mail"):
                 self.assertTrue(is_check({"assert_signed_module_lifecycle": {"slug": slug, "phase": phase}}))
-        for case_id in (SERVERS_LIFECYCLE_CASE, SOCKSCAP_LIFECYCLE_CASE):
+        for case_id in (
+            SERVERS_LIFECYCLE_CASE,
+            SOCKSCAP_LIFECYCLE_CASE,
+            SCREENSHOT_LIFECYCLE_CASE,
+            VOICE_LIFECYCLE_CASE,
+            MAIL_LIFECYCLE_CASE,
+        ):
             path = next((ROOT / "qa-ui-auto-tests/cases").glob(f"{case_id}-*.testcase.yaml"))
             case = load_case(path)
             self.assertEqual(case.modes, ["native"])

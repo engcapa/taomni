@@ -110,6 +110,9 @@ SIGNED_ROOT_ENV = {
     "mfa": "QA_SIGNED_MFA_ROOT",
     "servers": "QA_SIGNED_SERVERS_ROOT",
     "sockscap": "QA_SIGNED_SOCKSCAP_ROOT",
+    "screenshot": "QA_SIGNED_SCREENSHOT_ROOT",
+    "ai-voice-local": "QA_SIGNED_LOCAL_VOICE_ROOT",
+    "mail": "QA_SIGNED_MAIL_ROOT",
 }
 
 

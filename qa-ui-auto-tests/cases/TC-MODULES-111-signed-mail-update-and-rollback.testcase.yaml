@@ -1,0 +1,197 @@
+id: TC-MODULES-111
+title: Signed Mail switches versions and preserves module-owned IMAP SQLite store and owner receipt in one session
+description: >-
+  Install an independently compiled Mail prerelease, create and synchronize an owned IMAP account
+  against the local fake mail server, download the current signed package from the loopback catalog,
+  update and roll back both while disabled and while running without restarting Taomni, recover from
+  a handshake-failure candidate, uninstall with module SQLite database, ownership receipt, and
+  retained locator preserved, and reinstall with seamless IMAP synchronization restored.
+covers: [F-Modules-1, F-MAIL-1, F-MAIL-3, F-MAIL-23]
+tags: [modules, mail, marketplace, lifecycle, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, mail_server, module_signed_mail_archive, module_marketplace, release_build_required]
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- module_marketplace_probe: {phase: source}
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_previous_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_previous_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-mail"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill: {selector: 'input[aria-label="IMAP server"]', value: '${fixture.mail_host}'}
+- select_option: {selector: '[data-testid="mail-imap-security"]', value: None}
+- fill: {selector: 'input[aria-label="IMAP port"]', value: '${fixture.mail_imap_port}'}
+- fill: {selector: 'input[aria-label="Mail email or username"]', value: qa@example.com}
+- fill: {selector: 'input[aria-label="Mail password or app password token"]', value: qa-pass}
+- fill: {selector: 'input[aria-label="SMTP server"]', value: '${fixture.mail_host}'}
+- select_option: {selector: '[data-testid="mail-smtp-security"]', value: None}
+- fill: {selector: 'input[aria-label="SMTP port"]', value: '${fixture.mail_smtp_port}'}
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: QA owned IMAP}
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mail-lifecycle-vault
+- wait_for: {selector: '[data-testid="session-editor"]', state: detached, timeout_sec: 45}
+- assert_count: {selector: '[data-testid="session-tree-item"][data-session-name="QA owned IMAP"]', equal: 1}
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA owned IMAP"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"][data-plugin-kind="account"][data-plugin-version="${fixture.mail_previous_version}"] [data-testid="mail-client-tab"]', timeout_sec: 25}
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 40}
+- mail_server_deliver: {folder: INBOX, count: 1, prefix: Fresh ownership}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 40}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Fresh ownership 0001"]'
+- assert_signed_module_lifecycle: {slug: mail, phase: old-enabled}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-disable-mail"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-enable-mail"]:enabled'
+- assert_signed_module_lifecycle: {slug: mail, phase: old-disabled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-update"]'
+- click: '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-download"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: {selector: '[data-testid="module-download-task"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-review"]'
+- assert_text: {selector: '[data-testid="confirm-dialog-message"]', contains: '${fixture.mail_current_version}'}
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-current"]'
+- assert_signed_module_lifecycle: {slug: mail, phase: updated-disabled}
+- click: '[data-testid="module-action-rollback-mail"]'
+- assert_text: {selector: '[data-testid="module-action-rollback-mail"]:enabled', contains: '${fixture.mail_current_version}'}
+- assert_signed_module_lifecycle: {slug: mail, phase: rolled-back-disabled}
+- press: {selector: '[data-testid="module-action-enable-mail"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"][data-plugin-kind="account"][data-plugin-version="${fixture.mail_previous_version}"] [data-testid="mail-client-tab"]', timeout_sec: 25}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 40}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Fresh ownership 0001"]'
+- assert_signed_module_lifecycle: {slug: mail, phase: old-reenabled}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-update"]'
+- click: '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-review"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-current"]'
+- assert_signed_module_lifecycle: {slug: mail, phase: updated-enabled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"][data-plugin-kind="account"][data-plugin-version="${fixture.mail_current_version}"] [data-testid="mail-client-tab"]', timeout_sec: 25}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 40}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Fresh ownership 0001"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_failed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_failed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="failed"]', timeout_sec: 45}
+- assert_text: {selector: '[data-testid="module-offline-error"]', contains: 'Plugin permission denied'}
+- assert_signed_module_lifecycle: {slug: mail, phase: failed-update}
+- click: '[data-testid="module-action-rollback-mail"]'
+- assert_text: {selector: '[data-testid="module-action-rollback-mail"]:enabled', contains: '${fixture.mail_current_version}'}
+- assert_signed_module_lifecycle: {slug: mail, phase: rolled-back-enabled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"][data-plugin-kind="account"][data-plugin-version="${fixture.mail_previous_version}"] [data-testid="mail-client-tab"]', timeout_sec: 25}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 40}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Fresh ownership 0001"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-uninstall-mail"]:enabled', key: Enter}
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-mail"]'
+- assert_visible: '[data-testid="module-data-retained-mail"]'
+- assert_signed_module_lifecycle: {slug: mail, phase: uninstalled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+- assert_count: {selector: '[data-testid="mail-client-tab"]', equal: 0}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-mail"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"][data-plugin-kind="account"][data-plugin-version="${fixture.mail_current_version}"] [data-testid="mail-client-tab"]', timeout_sec: 25}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 40}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Fresh ownership 0001"]'
+- assert_signed_module_lifecycle: {slug: mail, phase: reinstalled}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: disabled-update-and-rollback
+    requirement: Update and roll back a disabled Mail package without restarting Taomni while preserving the module-owned IMAP SQLite database and showing disabled account guidance.
+    actions: [10, 12, 29, 31, 34, 38, 44, 55, 58, 60, 63]
+    checkpoints:
+    - {step: 39, expectation: Synchronized mailbox INBOX matches the server contents.}
+    - {step: 41, expectation: 'The earlier signed Mail host owns the writer lease, account SQLite database, and .imap-owner receipt.'}
+    - {step: 46, expectation: Disabling releases the writer lease cleanly.}
+    - {step: 62, expectation: Updating while disabled activates the current signed version without starting the host.}
+    - {step: 65, expectation: Rolling back while disabled restores the earlier version with no running host.}
+    results: [39, 41, 46, 62, 65]
+  - id: enabled-update-and-failed-handshake
+    requirement: Replace and roll back an active Mail host, keep IMAP sync working cleanly on every switched version, and recover cleanly when an update fails handshake.
+    actions: [66, 72, 80, 81, 88, 95, 99, 106]
+    checkpoints:
+    - {step: 73, expectation: Re-enabled earlier Mail host preserves the SQLite database identity and synchronizes INBOX.}
+    - {step: 75, expectation: Re-enabled earlier host owns its writer lease.}
+    - {step: 83, expectation: Live update starts the current Mail host cleanly without restarting Taomni.}
+    - {step: 89, expectation: Current Mail host synchronizes INBOX with the preserved account store.}
+    - {step: 97, expectation: Handshake-failure candidate reports permission denied without replacing the active Mail host.}
+    - {step: 98, expectation: Failed update keeps the active current host running cleanly.}
+    - {step: 101, expectation: Manual rollback switches the running host back to the earlier version.}
+    - {step: 107, expectation: Rolled-back earlier Mail host synchronizes INBOX cleanly.}
+    results: [73, 75, 83, 89, 97, 98, 101, 107]
+  - id: retained-uninstall-and-reinstall
+    requirement: Uninstall removes Mail versions and runtime while retaining the IMAP SQLite database, ownership receipt, and locator, renders missing-module placeholder, and restores sync on reinstall.
+    actions: [111, 112, 125, 127, 133]
+    checkpoints:
+    - {step: 114, expectation: Uninstall displays retained-data indicator on the Mail store card.}
+    - {step: 115, expectation: Retained locator still declares both SQLite database and .imap-owner receipt.}
+    - {step: 120, expectation: Existing Mail account tab shows missing-module guidance with no Mail content mounted.}
+    - {step: 134, expectation: Reinstalling and enabling current Mail restores IMAP synchronization.}
+    - {step: 136, expectation: Reinstalled Mail host owns its writer lease and preserved database identity.}
+    - {step: 137, expectation: No renderer runtime errors occurred across the full lifecycle.}
+    results: [114, 115, 120, 134, 136, 137]
+  visual:
+  - check: Synchronized Mail message row, unavailable placeholders across disabled and uninstalled states, and Module Store retained indicator.
+    method: automated
+    reason: UI waits and assertions confirm rendered version attributes, INBOX rows, and placeholder states.
+  native:
+  - check: Real OS process lineage, signed host and frontend hashes, writer lease, module SQLite store, .imap-owner receipt, zero legacy mail-cache files, and retained locator entries.
+    method: automated
+    reason: assert_signed_module_lifecycle inspects live processes, leases, SQLite tables, receipts, and directories in isolated QA profiles.

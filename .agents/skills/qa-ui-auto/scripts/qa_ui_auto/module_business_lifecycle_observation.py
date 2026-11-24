@@ -7,7 +7,13 @@ from pathlib import Path
 
 from .module_mfa_lifecycle_observation import digest, inspect_process
 from .module_profile_observation import writer_lease
-from .module_qa_versions import SERVERS_LIFECYCLE_CASE, SOCKSCAP_LIFECYCLE_CASE
+from .module_qa_versions import (
+    MAIL_LIFECYCLE_CASE,
+    SCREENSHOT_LIFECYCLE_CASE,
+    SERVERS_LIFECYCLE_CASE,
+    SOCKSCAP_LIFECYCLE_CASE,
+    VOICE_LIFECYCLE_CASE,
+)
 from .module_retained_observation import assert_code_removed, ordinary
 from .module_signed_observation import invoke
 from .steps import StepError
@@ -29,7 +35,11 @@ STATES = {
 REGISTERED_CASES = {
     "servers": SERVERS_LIFECYCLE_CASE,
     "sockscap": SOCKSCAP_LIFECYCLE_CASE,
+    "screenshot": SCREENSHOT_LIFECYCLE_CASE,
+    "ai-voice-local": VOICE_LIFECYCLE_CASE,
+    "mail": MAIL_LIFECYCLE_CASE,
 }
+STATELESS_SLUGS = frozenset({"screenshot", "ai-voice-local"})
 
 
 def validate(args) -> tuple[str, str]:
@@ -89,7 +99,36 @@ def inspect_module_process(ctx, slug: str, expected_host: Path | None, previous:
     return core, host
 
 
+def _store_lifecycle_data(owner, slug: str, summary: dict) -> dict:
+    baseline = getattr(owner, "module_lifecycle_data", {}).get(slug)
+    if baseline and baseline != summary:
+        raise StepError(f"The {slug} lifecycle altered its retained module configuration")
+    store = getattr(owner, "module_lifecycle_data", None)
+    if store is None:
+        store = {}
+        owner.module_lifecycle_data = store
+    store[slug] = summary
+    return summary
+
+
 def verify_module_data(owner, slug: str, module: Path) -> dict:
+    if slug in STATELESS_SLUGS:
+        if (module / "data").exists():
+            raise StepError(f"Stateless {slug} module unexpectedly created data directory")
+        if slug == "ai-voice-local":
+            model_path = getattr(owner, "local_voice_model_path", None)
+            model_sha = getattr(owner, "local_voice_model_sha256", None)
+            if not model_path or not model_sha or digest(Path(model_path)) != model_sha:
+                raise StepError("Local Voice model cache drifted or disappeared across lifecycle")
+            return _store_lifecycle_data(owner, slug, {"stateless": True, "modelSha256": model_sha})
+        return _store_lifecycle_data(owner, slug, {"stateless": True})
+    if slug == "mail":
+        from .module_mail_initialization import observe
+
+        previous = getattr(owner, "module_lifecycle_data", {}).get(slug)
+        identity = observe(module.parent.parent, "imap-account-synced", previous)
+        return _store_lifecycle_data(owner, slug, identity)
+
     config_path = module / "data/config.json"
     ordinary(config_path)
     raw = config_path.read_bytes()
@@ -118,14 +157,7 @@ def verify_module_data(owner, slug: str, module: Path) -> dict:
         summary = {"kind": "trojan", "host": "127.0.0.2", "port": 19392, "passwordRef": password_ref}
     else:
         raise StepError(f"Unsupported business lifecycle data check for {slug}")
-    baseline = getattr(owner, "module_lifecycle_data", {}).get(slug)
-    if baseline and baseline != summary:
-        raise StepError(f"The {slug} lifecycle altered its retained module configuration")
-    store = getattr(owner, "module_lifecycle_data", None)
-    if store is None:
-        store = {}
-        owner.module_lifecycle_data = store
-    store[slug] = summary
+    summary = _store_lifecycle_data(owner, slug, summary)
     return {"configSha256": hashlib.sha256(raw).hexdigest(), **summary}
 
 
@@ -177,25 +209,43 @@ def run(ctx, args) -> str:
             observed = {
                 "packageSha256": digest(directory / ".taomni-trust/package.taomni-plugin"),
                 "hostSha256": digest(host),
-                "frontendSha256": digest(directory / "frontend/index.js"),
             }
             expected = {
                 "packageSha256": selected["sha256"],
                 "hostSha256": selected["hostSha256"],
-                "frontendSha256": selected["frontendSha256"],
             }
+            if selected.get("frontendSha256"):
+                observed["frontendSha256"] = digest(directory / "frontend/index.js")
+                expected["frontendSha256"] = selected["frontendSha256"]
             if observed != expected:
                 raise StepError(f"Installed {slug} package, host or frontend differs from the signed version")
             evidence.update(observed)
         else:
             assert_code_removed(module)
-            if (module / "runtime").exists() or not record.get("dataRetained"):
-                raise StepError(f"{slug} uninstall must remove code and runtime while retaining data")
+            if (module / "runtime").exists():
+                raise StepError(f"{slug} uninstall must remove code and runtime")
             locator_path = plugins / ".retained-data" / f"{slug}.json"
             ordinary(locator_path)
             locator = json.loads(locator_path.read_text(encoding="utf-8"))
-            if locator.get("slug") != slug or {"path": "config.json", "kind": "file"} not in locator.get("files", []):
-                raise StepError(f"The retained locator no longer owns {slug} data/config.json")
+            files = locator.get("files", [])
+            if locator.get("slug") != slug:
+                raise StepError(f"The retained locator owner does not match {slug}: {locator!r}")
+            if slug in STATELESS_SLUGS:
+                if record.get("dataRetained") or (module / "data").exists() or files != []:
+                    raise StepError(f"Stateless {slug} uninstall must not retain data: {locator!r}")
+            else:
+                if not record.get("dataRetained"):
+                    raise StepError(f"{slug} uninstall must retain module data")
+                if slug == "mail":
+                    mail_identity = verify_module_data(owner, "mail", module)
+                    expected_files = [
+                        {"path": mail_identity["database"], "kind": "sqlite"},
+                        {"path": mail_identity["receipt"], "kind": "file"},
+                    ]
+                    if any(item not in files for item in expected_files):
+                        raise StepError(f"The retained locator no longer owns Mail database/receipt: {locator!r}")
+                elif {"path": "config.json", "kind": "file"} not in files:
+                    raise StepError(f"The retained locator no longer owns {slug} data/config.json")
             evidence["retainedData"] = locator
 
         if phase == "failed-update":

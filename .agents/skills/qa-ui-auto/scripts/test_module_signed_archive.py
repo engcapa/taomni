@@ -14,7 +14,14 @@ from qa_ui_auto.behavior_contract import is_check
 from qa_ui_auto.ci import capabilities
 from qa_ui_auto.fixtures import sockscap_legacy
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_key, setup, setup_mfa
-from qa_ui_auto.module_qa_versions import MFA_LIFECYCLE_CASE, SERVERS_LIFECYCLE_CASE, SOCKSCAP_LIFECYCLE_CASE
+from qa_ui_auto.module_qa_versions import (
+    MAIL_LIFECYCLE_CASE,
+    MFA_LIFECYCLE_CASE,
+    SCREENSHOT_LIFECYCLE_CASE,
+    SERVERS_LIFECYCLE_CASE,
+    SOCKSCAP_LIFECYCLE_CASE,
+    VOICE_LIFECYCLE_CASE,
+)
 from qa_ui_auto.module_signed_observation import check, validate
 from qa_ui_auto.steps import StepError
 from qa_ui_auto.testcase import load_case
@@ -143,6 +150,9 @@ class OfficialModuleArtifactTests(unittest.TestCase):
         for case_id, base_cap in (
             (SERVERS_LIFECYCLE_CASE, "signed-local-servers"),
             (SOCKSCAP_LIFECYCLE_CASE, "signed-sockscap"),
+            (SCREENSHOT_LIFECYCLE_CASE, "signed-screenshot"),
+            (VOICE_LIFECYCLE_CASE, "signed-local-voice"),
+            (MAIL_LIFECYCLE_CASE, "signed-mail"),
         ):
             case = load_case(next((ROOT / "qa-ui-auto-tests/cases").glob(case_id + "-*")))
             self.assertIn(base_cap, capabilities([case], "native"))

@@ -101,6 +101,9 @@ controls:
     aliases:
     - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-current"]'
     - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-current"]'
   - id: module-marketplace-mfa-current
     selector: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
     kind: display
@@ -111,6 +114,9 @@ controls:
     - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-update"]'
     - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-update"]'
     - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-update"]'
   - id: module-marketplace-new
     selector: '[data-testid="module-marketplace-new"]'
     kind: display
@@ -147,6 +153,9 @@ controls:
     - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-review"]'
     - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-review"]'
     - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-review"]'
   - id: module-marketplace-download
     selector: '[data-testid="module-marketplace-download"]'
     kind: interactive
@@ -154,6 +163,9 @@ controls:
     - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-download"]'
     - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-download"]'
     - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-download"]'
   - id: module-network-settings
     selector: '[data-testid="module-network-settings"]'
     kind: display
@@ -364,6 +376,9 @@ controls:
     - '[data-testid="module-action-rollback-mfa"]'
     - '[data-testid="module-action-rollback-servers"]'
     - '[data-testid="module-action-rollback-sockscap"]'
+    - '[data-testid="module-action-rollback-screenshot"]'
+    - '[data-testid="module-action-rollback-ai-voice-local"]'
+    - '[data-testid="module-action-rollback-mail"]'
   - id: module-action-enable-hello-plugin
     selector: '[data-testid="module-action-enable-hello-plugin"]'
     kind: interactive
@@ -403,6 +418,8 @@ controls:
     - '[data-testid="module-action-uninstall-mail"]'
     - '[data-testid="module-action-uninstall-servers"]'
     - '[data-testid="module-action-uninstall-sockscap"]'
+    - '[data-testid="module-action-uninstall-screenshot"]'
+    - '[data-testid="module-action-uninstall-ai-voice-local"]'
     - '[data-testid="module-action-uninstall-${fixture.module_roster_remove}"]'
   - id: module-action-install-hello-plugin
     selector: '[data-testid="module-action-install-hello-plugin"]'
@@ -412,6 +429,8 @@ controls:
     - '[data-testid="module-action-install-mail"]'
     - '[data-testid="module-action-install-servers"]'
     - '[data-testid="module-action-install-sockscap"]'
+    - '[data-testid="module-action-install-screenshot"]'
+    - '[data-testid="module-action-install-ai-voice-local"]'
     - '[data-testid="module-action-install-${fixture.module_roster_remove}"]'
   - id: module-delete-data-hello-plugin
     selector: '[data-testid="module-delete-data-hello-plugin"]'
@@ -423,6 +442,7 @@ controls:
     - '[data-testid="module-data-retained-mfa"]'
     - '[data-testid="module-data-retained-servers"]'
     - '[data-testid="module-data-retained-sockscap"]'
+    - '[data-testid="module-data-retained-mail"]'
   - id: module-action-open-hello-plugin
     selector: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
     kind: interactive
@@ -438,6 +458,7 @@ controls:
       - '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
       - '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
       - '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
       - '[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
     kind: display
   - id: plugin-tab-error
@@ -506,7 +527,7 @@ Mail 宿主跨进程用例在一份草稿写入期间提交第二份，核对单
 
 `TC-MODULES-052` 检查首次自动准备 Mail 后，商店展示下次启动导入的状态。Browser 刷新后状态保留，签名升级专项通过真实启动应用迁移。
 
-`TC-MODULES-007/010/040/042` 观察真实版本目录删除。010 还确认取消永久删除时签名包和业务数据原样保留，确认后数据和定位记录消失。042 校验存在更新时卸载会释放宿主、清理所有版本并保留业务数据。043 使用浏览器模型检查取消永久删除和卸载后只提供主动安装。独立 signed 业务模块的双版本在线更新/离线安装、禁/启用回滚、握手失败恢复与卸载保留数据重装由 `TC-MODULES-103`（MFA）、`TC-MODULES-107`（Local servers）与 `TC-MODULES-108`（SocksCap）覆盖。
+`TC-MODULES-007/010/040/042` 观察真实版本目录删除。010 还确认取消永久删除时签名包和业务数据原样保留，确认后数据和定位记录消失。042 校验存在更新时卸载会释放宿主、清理所有版本并保留业务数据。043 使用浏览器模型检查取消永久删除和卸载后只提供主动安装。独立 signed 业务模块的双版本在线更新/离线安装、禁/启用回滚、握手失败恢复与卸载保留数据/无状态重装由 `TC-MODULES-103`（MFA）、`TC-MODULES-107`（Local servers）、`TC-MODULES-108`（SocksCap）、`TC-MODULES-109`（Screenshot）、`TC-MODULES-110`（Local Voice）与 `TC-MODULES-111`（Mail）覆盖。
 
 原生还原确认的自动重启由 `TC-MODULES-033/034/035` 在 Linux、Windows 和 macOS 覆盖运行、禁用与卸载保留数据三态。用例通过界面创建配对备份，变更模块数据、HOTP 和主密码，再用原生还原对话框拒绝旧密码、接受当前密码。探针观察旧进程正常退出、新进程 PID 和启动时间、可执行文件和 QA 隔离目录，再连接应用重启后的 WebView。还原后核验模块行、active 指针、generation、writer lease、原密码和 HOTP 755224。Browser `TC-BACKUP-RESTORE-001` 覆盖确认、密码错误和重复提交。独立 signed MFA 宿主在运行、禁用与卸载保留数据三态下的自动还原重启由 `TC-MODULES-104/105/106` 在 Linux、Windows 和 macOS 覆盖，核验配对 v2 备份、旧主密码拒止、`generation` 递增、`active.json` 不变与重启后 HOTP 连续性。
 
@@ -5194,7 +5215,7 @@ controls:
 - 默认本地 SenseVoice + Small q8 组合，按语种路由；Turbo q5 可选。旧 f16 显式一键替换，校验成功后删除旧权重。模型按需下载或离线导入，版本目录按哈希隔离。
 - 在线阿里／火山／Deepgram／Soniox，共享代理和 vault；Gemini 默认隐藏为实验项。清理默认关，可选轻／全并保留原文和撤销。
 - 标题栏和 Chat、LAN 聊天、终端 AI 改写说明共用听写组件，只填入可编辑文本，不自动发送或执行。
-- AI 全局禁用时隐藏入口。浏览器语音 fixture 仅验证交互；原生采集与跨平台权限需真机检查。
+- AI 全局禁用时隐藏入口。浏览器语音 fixture 仅验证交互；原生采集与跨平台权限需真机检查。`TC-MODULES-110` 覆盖签名 Local Voice 宿主两版本在线更新、禁/启用回滚、握手失败回退与无状态卸载重装后的持续听写。
 
 ### 14.4 AI Chat Drawer ✅
 
@@ -8909,7 +8930,7 @@ controls:
 
 Mail 宿主从旧库的归档记录返回保存时间。只有 POP3 原件时，读取正文不生成缓存时间。归档和本地原件的内容、时间字段及重开后的结果由 `profile_host` 跨进程用例核对，Browser 和 Native 归档操作由 `TC-MAIL-STORAGE-01/02` 覆盖。TC-MODULES-070 检查普通账户阅读器从自定义归档加载正文和附件名，核对 IMAP 正文请求数。
 
-查看原文和保存 EML 优先读取已归档的原件。启用的签名 Mail 宿主从 IMAP 读取未归档的 MIME 原件，由核心保存到用户选定的位置。TC-MODULES-059 检查真实 IMAP 原文与本机保存的 EML 文件，TC-MODULES-060 检查 Browser 的原文对话框和导出内容。
+查看原文和保存 EML 优先读取已归档的原件。启用的签名 Mail 宿主从 IMAP 读取未归档的 MIME 原件，由核心保存到用户选定的位置。TC-MODULES-059 检查真实 IMAP 原文与本机保存的 EML 文件，TC-MODULES-060 检查 Browser 的原文对话框和导出内容。`TC-MODULES-111` 覆盖签名 Mail 宿主两版本在线更新、禁/启用回滚、握手失败恢复、卸载保留 SQLite 邮箱库/归档定位记录，以及重装后无重启恢复真实 IMAP 同步与邮件阅读。
 
 <!-- feature
 id: F-MAIL-23
@@ -14073,7 +14094,7 @@ controls:
 - 滚动截图开始前说明自动滚动与结束方式，进行中显示帧数、“完成”和“取消”；完成保留已捕获长图，取消保留原始选区和标注。滚动及录制期间使用选区外的原生红色边框和控制窗口，避免依赖平台的内容保护来排除控制画面；全屏等没有安全控制位置时隐藏控制窗口，截图快捷键结束采集后再显示预览。没有安全位置且快捷键未注册时拒绝启动并提示调整范围或启用快捷键。
 - Browser `TC-SHOT-001`–`021` 检查真实 renderer 输入、选区几何、`data-shapes` 历史、已绘制 canvas 颜色/线宽、PNG 解码尺寸、dialog 取消/确认、贴图 route 和快捷键/倒计时；浏览器 OCR 返回 `Taomni stub OCR\nuser@example.com`，滚动 stub 返回 400×1800 的可读长图，录制 stop 返回 PNG preview。请求/route/形状数断言不等于真实采集、拼接、GIF/MP4 编码或敏感像素遮盖证据；水印 apply/clear 状态不宣称水印输出像素通过。
 - Native `SHOT-N*` 用例负责真实屏幕、滚动注入/拼接、OS 剪贴板、媒体解码和窗口/全局热键边界。N2/N9 捕获完整长页并将产物逐像素/24×24 区块与真实 renderer canvas 保留的原画比对，覆盖文字、图案、分隔线及缺失/重复/错位/拉伸，不只检查高度或单列颜色。N5–N8 对 GIF/MP4 每一解码帧核对原画 frame id、每轮随机 nonce、区域像素及有序时间线，黑帧/错区域/静态或无关多帧均不得通过；保存原始 PNG、产物、逐帧指标/时间线和原图/实际/差异接触图。
-- `TC-MODULES-061` 安装并启用签名 Screenshot OCR 包，核对宿主与离线 WASM 的实际识别文字、撤销/重做、剪贴板像素和写租约，停用后再次执行原生截图，并用竞争采集租约确认录制先提示启用模块。Browser `TC-SHOT-021` 核对自动遮挡使用裁剪后的图片，并覆盖选区、历史和复制结果。
+- `TC-MODULES-061` 安装并启用签名 Screenshot OCR 包，核对宿主与离线 WASM 的实际识别文字、撤销/重做、剪贴板像素和写租约，停用后再次执行原生截图，并用竞争采集租约确认录制先提示启用模块。Browser `TC-SHOT-021` 核对自动遮挡使用裁剪后的图片，并覆盖选区、历史和复制结果。`TC-MODULES-109` 覆盖签名 Screenshot 两版本在线更新、禁/启用回滚、握手失败恢复、无状态卸载清理与重装恢复原生 OCR/自动遮挡。
 - `TC-MODULES-062` 从同一签名宿主完成 GIF 和 MP4 录制，验证签名包内的录制界面、实际像素及时间戳、预览清理、取消时的临时文件与采集租约，以及停用后的写租约。Browser `TC-SHOT-006` 检查停止、预览和首帧复制。`TC-SHOT-020` 检查保存和取消录制后再次打开普通截图。
 - 默认基座对未安装或停用 Screenshot 模块的 OCR 和录制请求给出模块商店提示。生产 Cargo 树与前端产物清单覆盖引擎和语言资源的裁剪。隔离 QA 构建保留旧实现，用于回归旧配置与签名模块的切换。
 - 新增 Browser `TC-SHOT-022` 验证自由轮廓/退化拒绝/移动缩放/历史/切换/轮廓外命中，`TC-SHOT-023` 将两种轮廓 Pin 的实际 PNG 与导出前保留原图做独立 RGB/alpha 比对。Native `TC-SHOT-N11` 使用真实 OS 鼠标绘制凹形选区，分别核对 Pin 文件与 OS 剪贴板 RGBA；实际拖动 Pin 后读取窗口位置差/置顶状态，并检查独立副本存活/销毁。run36991920385（SHA63c275da）三端新增与保留流程已通过：各 browser23/23、native11/11，零失败零跳过；三端 Pin 实际位移均80×64，原画 RGB 完全一致且非边缘 alpha 无差异。Linux 置顶读取真实 X11 ABOVE atom，保留 GTK/Tao 缓存 false 作为诊断，不用缓存或 builder 声明代替实际 WM 状态。

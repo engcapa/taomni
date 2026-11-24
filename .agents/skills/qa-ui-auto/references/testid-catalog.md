@@ -2850,11 +2850,17 @@
 - `[data-testid="module-marketplace-current"]` — display — F-Modules-1.module-marketplace-current
   ↳ `[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-current"]` — alias
   ↳ `[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-current"]` — alias
+  ↳ `[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-current"]` — alias
+  ↳ `[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-current"]` — alias
+  ↳ `[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-current"]` — alias
 - `[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]` — display — F-Modules-1.module-marketplace-mfa-current
 - `[data-testid="module-marketplace-update"]` — display — F-Modules-1.module-marketplace-update
   ↳ `[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-update"]` — alias
   ↳ `[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-update"]` — alias
   ↳ `[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-update"]` — alias
+  ↳ `[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-update"]` — alias
+  ↳ `[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-update"]` — alias
+  ↳ `[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-update"]` — alias
 - `[data-testid="module-marketplace-new"]` — display — F-Modules-1.module-marketplace-new
 - `[data-testid="module-release-notice"]` — display — F-Modules-1.module-release-notice
 - `[data-testid="module-release-new"]` — display — F-Modules-1.module-release-new
@@ -2868,10 +2874,16 @@
   ↳ `[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-review"]` — alias
   ↳ `[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-review"]` — alias
   ↳ `[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-review"]` — alias
+  ↳ `[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-review"]` — alias
+  ↳ `[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-review"]` — alias
+  ↳ `[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-review"]` — alias
 - `[data-testid="module-marketplace-download"]` — interactive — F-Modules-1.module-marketplace-download
   ↳ `[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-download"]` — alias
   ↳ `[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-download"]` — alias
   ↳ `[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-download"]` — alias
+  ↳ `[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-download"]` — alias
+  ↳ `[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-download"]` — alias
+  ↳ `[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-download"]` — alias
 - `[data-testid="module-network-settings"]` — display — F-Modules-1.module-network-settings
 - `[data-testid="module-network-mode"]` — interactive — F-Modules-1.module-network-mode
 - `[data-testid="module-network-custom"]` — display — F-Modules-1.module-network-custom
@@ -2952,6 +2964,9 @@
   ↳ `[data-testid="module-action-rollback-mfa"]` — alias
   ↳ `[data-testid="module-action-rollback-servers"]` — alias
   ↳ `[data-testid="module-action-rollback-sockscap"]` — alias
+  ↳ `[data-testid="module-action-rollback-screenshot"]` — alias
+  ↳ `[data-testid="module-action-rollback-ai-voice-local"]` — alias
+  ↳ `[data-testid="module-action-rollback-mail"]` — alias
 - `[data-testid="module-action-enable-hello-plugin"]` — interactive — F-Modules-1.module-action-enable-hello-plugin
   ↳ `[data-testid="module-action-enable-mfa"]` — alias
   ↳ `[data-testid="module-action-enable-vnc-client"]` — alias
@@ -2980,18 +2995,23 @@
   ↳ `[data-testid="module-action-uninstall-mail"]` — alias
   ↳ `[data-testid="module-action-uninstall-servers"]` — alias
   ↳ `[data-testid="module-action-uninstall-sockscap"]` — alias
+  ↳ `[data-testid="module-action-uninstall-screenshot"]` — alias
+  ↳ `[data-testid="module-action-uninstall-ai-voice-local"]` — alias
   ↳ `[data-testid="module-action-uninstall-${fixture.module_roster_remove}"]` — alias
 - `[data-testid="module-action-install-hello-plugin"]` — interactive — F-Modules-1.module-action-install-hello-plugin
   ↳ `[data-testid="module-action-install-mfa"]` — alias
   ↳ `[data-testid="module-action-install-mail"]` — alias
   ↳ `[data-testid="module-action-install-servers"]` — alias
   ↳ `[data-testid="module-action-install-sockscap"]` — alias
+  ↳ `[data-testid="module-action-install-screenshot"]` — alias
+  ↳ `[data-testid="module-action-install-ai-voice-local"]` — alias
   ↳ `[data-testid="module-action-install-${fixture.module_roster_remove}"]` — alias
 - `[data-testid="module-delete-data-hello-plugin"]` — interactive — F-Modules-1.module-delete-data-hello-plugin
 - `[data-testid="module-data-retained-hello-plugin"]` — display — F-Modules-1.module-data-retained-hello-plugin
   ↳ `[data-testid="module-data-retained-mfa"]` — alias
   ↳ `[data-testid="module-data-retained-servers"]` — alias
   ↳ `[data-testid="module-data-retained-sockscap"]` — alias
+  ↳ `[data-testid="module-data-retained-mail"]` — alias
 - `[data-testid="module-action-open-hello-plugin-hello-plugin"]` — interactive — F-Modules-1.module-action-open-hello-plugin
 - `[data-testid="plugin-tab-panel"]` — display — F-Modules-1.plugin-tab-panel
 - `[data-testid="plugin-tab-unavailable"]` — display — F-Modules-1.plugin-tab-unavailable
@@ -3001,6 +3021,7 @@
   ↳ `[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
   ↳ `[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]` — alias
   ↳ `[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
+  ↳ `[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]` — alias
   ↳ `[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
 - `[data-testid="plugin-tab-error"]` — display — F-Modules-1.plugin-tab-error
 - `[data-testid="plugin-tab-retry"]` — interactive — F-Modules-1.plugin-tab-retry
