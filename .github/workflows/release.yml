@@ -45,9 +45,14 @@ on:
         description: Verified artifact-only Release Bundle run to publish with the tag
         required: false
         type: string
+      module_rehearsal_baseline_run:
+        description: "Artifact-only Release Bundle run ID for read-only single-module catalog rehearsal (never builds core or publishes)."
+        required: false
+        type: string
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: release-bundle-${{ github.ref }}
@@ -68,6 +73,7 @@ jobs:
       modules: ${{ steps.plan.outputs.modules }}
       candidate_run: ${{ steps.plan.outputs.candidate_run }}
       rehearse_first_upgrade: ${{ steps.plan.outputs.rehearse_first_upgrade }}
+      module_rehearsal_baseline_run: ${{ steps.plan.outputs.module_rehearsal_baseline_run }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -90,6 +96,7 @@ jobs:
           RELEASE_TEST_VERSION: ${{ inputs.test_version }}
           INPUT_RELEASE_MODULES: ${{ inputs.modules }}
           INPUT_CANDIDATE_RUN: ${{ inputs.candidate_run }}
+          INPUT_MODULE_REHEARSAL_BASELINE_RUN: ${{ inputs.module_rehearsal_baseline_run }}
         run: node scripts/resolve-release-build.mjs
 
   # ---------------------------------------------------------------------------
@@ -413,7 +420,7 @@ jobs:
 
   package-modules:
     needs: plan
-    if: needs.plan.outputs.modules != '[]' && needs.plan.outputs.candidate_run == ''
+    if: needs.plan.outputs.modules != '[]' && needs.plan.outputs.candidate_run == '' && needs.plan.outputs.module_rehearsal_baseline_run == ''
     strategy:
       fail-fast: false
       # Queue all selected modules so their target jobs can use available runners.
@@ -468,10 +475,29 @@ jobs:
           path: candidate-roster
           if-no-files-found: error
 
+  rehearse-module-release:
+    needs: plan
+    if: needs.plan.outputs.module_rehearsal_baseline_run != ''
+    uses: ./.github/workflows/release-modules.yml
+    with:
+      tag: v${{ needs.plan.outputs.test_version || '0.6.0' }}-${{ fromJSON(needs.plan.outputs.modules)[0] }}.rehearsal
+      module: ${{ fromJSON(needs.plan.outputs.modules)[0] }}
+      head: ${{ github.sha }}
+      macos_runner: ${{ needs.plan.outputs.macos_runner }}
+      package_only: false
+      rehearsal_baseline_run: ${{ needs.plan.outputs.module_rehearsal_baseline_run }}
+      baseline_tag: v${{ needs.plan.outputs.test_version || '0.6.0' }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
   verify-candidate-updater:
     name: Verify four-target candidate updater
     needs: [plan, build, build-macos]
-    if: github.event_name == 'workflow_dispatch' && needs.plan.outputs.tag == '' && inputs.platforms == 'all' && inputs.macos_arch == 'both'
+    if: github.event_name == 'workflow_dispatch' && needs.plan.outputs.tag == '' && inputs.platforms == 'all' && inputs.macos_arch == 'both' && needs.plan.outputs.module_rehearsal_baseline_run == ''
     runs-on: ubuntu-22.04
     permissions:
       contents: read

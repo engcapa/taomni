@@ -332,3 +332,19 @@ test("failed uploads never publish latest.json and failed release-note reads sto
   assert.notEqual(notes.run({ TEST_GH_EXISTING_RELEASE: "1", TEST_GH_NOTES_FAIL: "1" }).status, 0);
   assert(!notes.calls().some((args) => args[1] === "upload"));
 });
+
+test("read-only single-module rehearsal invokes release-modules without building core or publishing", () => {
+  assert.match(workflow, /^  actions: read$/m);
+  const rehearseJob = workflow.split("  rehearse-module-release:\n")[1].split("  verify-candidate-updater:\n")[0];
+  assert.match(rehearseJob, /if: needs\.plan\.outputs\.module_rehearsal_baseline_run != ''/);
+  assert.match(rehearseJob, /uses: \.\/\.github\/workflows\/release-modules\.yml/);
+  assert.match(rehearseJob, /package_only: false/);
+  assert.match(rehearseJob, /rehearsal_baseline_run: \$\{\{ needs\.plan\.outputs\.module_rehearsal_baseline_run \}\}/);
+  assert.match(rehearseJob, /baseline_tag: v\$\{\{ needs\.plan\.outputs\.test_version \|\| '0\.6\.0' \}\}/);
+  const pack = workflow.split("  package-modules:\n")[1].split("  verify-candidate-roster:\n")[0];
+  assert.match(pack, /module_rehearsal_baseline_run == ''/);
+  const updater = workflow.split("  verify-candidate-updater:\n")[1].split("  finalize-updater-manifest:\n")[0];
+  assert.match(updater, /module_rehearsal_baseline_run == ''/);
+  const finalizer = workflow.split("  finalize-updater-manifest:\n")[1];
+  assert.match(finalizer, /needs\.plan\.outputs\.tag != ''/);
+});

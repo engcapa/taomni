@@ -56,6 +56,16 @@ on:
         description: Build and sign GitHub Actions artifacts for the calling core workflow
         default: false
         type: boolean
+      rehearsal_baseline_run:
+        description: Artifact-only Release Bundle run ID for read-only single-module catalog rehearsal (never publishes)
+        required: false
+        default: ''
+        type: string
+      baseline_tag:
+        description: Baseline core release tag for read-only catalog rehearsal URLs
+        required: false
+        default: v0.6.0
+        type: string
     secrets:
       TAURI_SIGNING_PRIVATE_KEY:
         required: true

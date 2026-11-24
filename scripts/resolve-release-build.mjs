@@ -30,11 +30,26 @@ export function releaseBuildPlan(env, packageVersion) {
   if (candidateRun && (!tag || !/^[1-9]\d*$/.test(candidateRun))) {
     throw new Error("candidate_run requires a release tag and a positive run ID.");
   }
+  const moduleRehearsalRun = manual ? env.INPUT_MODULE_REHEARSAL_BASELINE_RUN?.trim() || "" : "";
   const moduleInput = manual ? env.INPUT_RELEASE_MODULES?.trim() : "";
   const modules = moduleInput ? moduleInput.split(",").map((slug) => slug.trim()) : [];
   if (modules.some((slug) => !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(slug))
     || new Set(modules).size !== modules.length) {
     throw new Error("modules must be a comma-separated list of unique module slugs.");
+  }
+  if (moduleRehearsalRun) {
+    if (!/^[1-9]\d*$/.test(moduleRehearsalRun)) {
+      throw new Error("module_rehearsal_baseline_run must be a positive run ID.");
+    }
+    if (tag || candidateRun) {
+      throw new Error("module_rehearsal_baseline_run is read-only and requires an empty tag and candidate_run.");
+    }
+    if (env.INPUT_MACOS_STATIC_KRB5 === "true") {
+      throw new Error("module_rehearsal_baseline_run cannot be combined with macos_static_krb5.");
+    }
+    if (modules.length !== 1) {
+      throw new Error("module_rehearsal_baseline_run requires exactly one module slug in modules.");
+    }
   }
   if (!["all", "macos", "windows"].includes(platforms) || !["both", "aarch64", "x86_64"].includes(arch)) {
     throw new Error("Unsupported build platform or macOS architecture.");
@@ -46,7 +61,7 @@ export function releaseBuildPlan(env, packageVersion) {
   if (tag && (platforms !== "all" || arch !== "both")) {
     throw new Error("Tagged releases require every platform and both macOS architectures.");
   }
-  const macosArchitectures = ["aarch64", "x86_64"].filter(
+  const macosArchitectures = moduleRehearsalRun ? [] : ["aarch64", "x86_64"].filter(
     (target) => platforms !== "windows" && (arch === "both" || arch === target),
   );
   if (manual && env.INPUT_MACOS_STATIC_KRB5 === "true" && (tag || !macosArchitectures.includes("aarch64"))) {
@@ -54,8 +69,8 @@ export function releaseBuildPlan(env, packageVersion) {
   }
   const desktopPlatforms = [];
   // Keep the Linux bundle on the glibc 2.35 baseline.
-  if (platforms === "all") desktopPlatforms.push("ubuntu-22.04");
-  if (platforms !== "macos") desktopPlatforms.push("windows-latest");
+  if (!moduleRehearsalRun && platforms === "all") desktopPlatforms.push("ubuntu-22.04");
+  if (!moduleRehearsalRun && platforms !== "macos") desktopPlatforms.push("windows-latest");
   return {
     version: testVersion || packageVersion,
     tag: tag || "",
@@ -66,6 +81,7 @@ export function releaseBuildPlan(env, packageVersion) {
     macos_runner: macosRunner,
     modules: JSON.stringify(modules),
     candidate_run: candidateRun,
+    module_rehearsal_baseline_run: moduleRehearsalRun,
   };
 }
 

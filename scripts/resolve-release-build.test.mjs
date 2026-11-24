@@ -10,6 +10,7 @@ test("the default manual build collects all platforms without publishing", () =>
   assert.deepEqual(releaseBuildPlan(manual, version), {
     version, tag: "", test_version: "", build_desktop: "true", desktop_platforms: '["ubuntu-22.04","windows-latest"]',
     macos_architectures: '["aarch64","x86_64"]', macos_runner: "macos-15", modules: "[]", candidate_run: "",
+    module_rehearsal_baseline_run: "",
   });
 });
 
@@ -19,6 +20,7 @@ test("Intel-only upgrade tests resolve distinct versions without enabling releas
     assert.deepEqual(plan, {
       version: testVersion, tag: "", test_version: testVersion, build_desktop: "false", desktop_platforms: "[]",
       macos_architectures: '["x86_64"]', macos_runner: "macos-15", modules: "[]", candidate_run: "",
+      module_rehearsal_baseline_run: "",
     });
   }
   const arm = releaseBuildPlan({ ...manual, INPUT_MACOS_ARCH: "aarch64" }, version);
@@ -127,4 +129,44 @@ test("test versions reject malformed SemVer and command/env-file injection", () 
   }
   assert.throws(() => releaseBuildPlan({ ...manual, INPUT_PLATFORMS: "linux" }, version), /Unsupported/);
   assert.throws(() => releaseBuildPlan({ ...manual, INPUT_MACOS_ARCH: "all" }, version), /Unsupported/);
+});
+
+test("read-only single-module rehearsal skips desktop builds and validates inputs", () => {
+  const plan = releaseBuildPlan({
+    ...manual,
+    RELEASE_TEST_VERSION: "0.6.0",
+    INPUT_RELEASE_MODULES: "sockscap",
+    INPUT_MODULE_REHEARSAL_BASELINE_RUN: "45283305083",
+  }, version);
+  assert.deepEqual(plan, {
+    version: "0.6.0",
+    tag: "",
+    test_version: "0.6.0",
+    build_desktop: "false",
+    desktop_platforms: "[]",
+    macos_architectures: "[]",
+    macos_runner: "macos-15",
+    modules: '["sockscap"]',
+    candidate_run: "",
+    module_rehearsal_baseline_run: "45283305083",
+  });
+  for (const [overrides, expected] of [
+    [{ INPUT_RELEASE_MODULES: "sockscap", INPUT_MODULE_REHEARSAL_BASELINE_RUN: "../bad" }, /positive run ID/],
+    [{ INPUT_RELEASE_TAG: `v${version}`, INPUT_RELEASE_MODULES: "sockscap", INPUT_MODULE_REHEARSAL_BASELINE_RUN: "45283305083" }, /read-only/],
+    [{ INPUT_RELEASE_TAG: `v${version}`, INPUT_CANDIDATE_RUN: "123", INPUT_RELEASE_MODULES: "sockscap", INPUT_MODULE_REHEARSAL_BASELINE_RUN: "45283305083" }, /read-only/],
+    [{ INPUT_MACOS_STATIC_KRB5: "true", INPUT_RELEASE_MODULES: "sockscap", INPUT_MODULE_REHEARSAL_BASELINE_RUN: "45283305083" }, /macos_static_krb5/],
+    [{ INPUT_MODULE_REHEARSAL_BASELINE_RUN: "45283305083" }, /exactly one module/],
+    [{ INPUT_RELEASE_MODULES: "sockscap, mail", INPUT_MODULE_REHEARSAL_BASELINE_RUN: "45283305083" }, /exactly one module/],
+  ]) {
+    assert.throws(() => releaseBuildPlan({ ...manual, ...overrides }, version), expected);
+  }
+  const tagEvent = releaseBuildPlan({
+    GITHUB_EVENT_NAME: "push",
+    GITHUB_REF_TYPE: "tag",
+    GITHUB_REF_NAME: `v${version}`,
+    INPUT_RELEASE_MODULES: "sockscap",
+    INPUT_MODULE_REHEARSAL_BASELINE_RUN: "45283305083",
+  }, version);
+  assert.equal(tagEvent.module_rehearsal_baseline_run, "");
+  assert.equal(tagEvent.build_desktop, "true");
 });
