@@ -22,10 +22,13 @@ from native_build import QA_APP_ID
 from tauri_webdriver import native_isolation_env
 
 from ..module_qa_versions import (
+    LIFECYCLE_CASES,
     MAIL_LIFECYCLE_CASE,
     MFA_LIFECYCLE_CASE,
+    RDP_SERVER_LIFECYCLE_CASE,
     SCREENSHOT_LIFECYCLE_CASE,
     SERVERS_LIFECYCLE_CASE,
+    VNC_SERVER_LIFECYCLE_CASE,
     lifecycle_versions,
 )
 from .module_mfa_restore import CASE_ID as MFA_RESTORE_CASE, SIGNED_BACKUP_STATES
@@ -301,7 +304,7 @@ def server_settings_provenance(ctx, receipt, frontend):
 
 
 def setup_vnc_server(ctx):
-    if ctx.case_id != VNC_SERVER_CASE or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    if ctx.case_id not in {VNC_SERVER_CASE, VNC_SERVER_LIFECYCLE_CASE} or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Signed VNC Server input requires its registered native case")
     setting = "QA_SIGNED_VNC_SERVER_ROOT"
     raw = os.environ.get(setting)
@@ -340,13 +343,15 @@ def setup_vnc_server(ctx):
     ctx.signed_vnc_daemon = {"host": host, "receipt": info, "port": port, "legacy_settings": legacy_settings}
     ctx.values.update(vnc_daemon_archive=destination.as_posix(), vnc_daemon_signature=signature,
                       vnc_daemon_port=port)
+    if ctx.case_id == VNC_SERVER_LIFECYCLE_CASE:
+        setup_business_lifecycle(ctx, "vnc-server", Path(raw), owned, info, archive, prefix="vnc_server")
 
 
 RDP_SERVER_CASE = "TC-MODULES-065"
 
 
 def setup_rdp_server(ctx):
-    if ctx.case_id != RDP_SERVER_CASE or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    if ctx.case_id not in {RDP_SERVER_CASE, RDP_SERVER_LIFECYCLE_CASE} or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Signed RDP Server input requires its registered native case")
     raw = os.environ.get("QA_SIGNED_RDP_SERVER_ROOT")
     if not raw:
@@ -388,6 +393,8 @@ def setup_rdp_server(ctx):
         "host": host, "receipt": receipt, "port": port, "legacy_settings": legacy_settings,
     }
     ctx.values.update(rdp_server_archive=destination.as_posix(), rdp_server_signature=signature)
+    if ctx.case_id == RDP_SERVER_LIFECYCLE_CASE:
+        setup_business_lifecycle(ctx, "rdp-server", Path(raw), owned, receipt, archive, prefix="rdp_server")
 
 
 SERVERS_CASE = "TC-MODULES-066"
@@ -465,4 +472,6 @@ def setup_desktop_client(ctx, protocol):
         f"{protocol}_signed_signature": signature,
         f"{protocol}_signed_version": receipt["version"],
     })
+    if LIFECYCLE_CASES.get(ctx.case_id) == slug:
+        setup_business_lifecycle(ctx, slug, Path(raw), owned, receipt, archive, prefix=f"{protocol}_client")
 

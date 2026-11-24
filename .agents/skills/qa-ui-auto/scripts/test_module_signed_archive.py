@@ -17,10 +17,14 @@ from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_ke
 from qa_ui_auto.module_qa_versions import (
     MAIL_LIFECYCLE_CASE,
     MFA_LIFECYCLE_CASE,
+    RDP_CLIENT_LIFECYCLE_CASE,
+    RDP_SERVER_LIFECYCLE_CASE,
     SCREENSHOT_LIFECYCLE_CASE,
     SERVERS_LIFECYCLE_CASE,
     SOCKSCAP_LIFECYCLE_CASE,
     VOICE_LIFECYCLE_CASE,
+    VNC_CLIENT_LIFECYCLE_CASE,
+    VNC_SERVER_LIFECYCLE_CASE,
 )
 from qa_ui_auto.module_signed_observation import check, validate
 from qa_ui_auto.steps import StepError
@@ -153,6 +157,10 @@ class OfficialModuleArtifactTests(unittest.TestCase):
             (SCREENSHOT_LIFECYCLE_CASE, "signed-screenshot"),
             (VOICE_LIFECYCLE_CASE, "signed-local-voice"),
             (MAIL_LIFECYCLE_CASE, "signed-mail"),
+            (VNC_CLIENT_LIFECYCLE_CASE, "signed-vnc"),
+            (RDP_CLIENT_LIFECYCLE_CASE, "signed-rdp"),
+            (RDP_SERVER_LIFECYCLE_CASE, "signed-local-rdp"),
+            (VNC_SERVER_LIFECYCLE_CASE, "signed-local-vnc"),
         ):
             case = load_case(next((ROOT / "qa-ui-auto-tests/cases").glob(case_id + "-*")))
             self.assertIn(base_cap, capabilities([case], "native"))

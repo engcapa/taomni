@@ -147,6 +147,10 @@ def capabilities(cases, mode: str) -> list[str]:
                     "screenshot": "signed-screenshot-lifecycle",
                     "ai-voice-local": "signed-local-voice-lifecycle",
                     "mail": "signed-mail-lifecycle",
+                    "vnc-client": "signed-vnc-lifecycle",
+                    "rdp-client": "signed-rdp-lifecycle",
+                    "rdp-server": "signed-local-rdp-lifecycle",
+                    "vnc-server": "signed-local-vnc-lifecycle",
                 }[slug]
                 result.add(lifecycle_cap)
             if fixtures & {"module_legacy_install", "module_legacy_mfa"}:

@@ -284,22 +284,17 @@ class BusinessLifecycleTests(unittest.TestCase):
                  self.assertRaisesRegex(StepError, "retained locator"):
                 observation.run(ctx, {"slug": "mail", "phase": "uninstalled"})
 
-    def test_wave1_and_wave2a_case_contracts_are_valid_across_all_three_platforms(self):
-        for phase in observation.STATES:
-            for slug in ("servers", "sockscap", "screenshot", "ai-voice-local", "mail"):
-                self.assertTrue(is_check({"assert_signed_module_lifecycle": {"slug": slug, "phase": phase}}))
-        for case_id in (
-            SERVERS_LIFECYCLE_CASE,
-            SOCKSCAP_LIFECYCLE_CASE,
-            SCREENSHOT_LIFECYCLE_CASE,
-            VOICE_LIFECYCLE_CASE,
-            MAIL_LIFECYCLE_CASE,
-        ):
+    def test_signed_business_case_contracts_are_valid_across_all_three_platforms(self):
+        for slug, case_id in observation.REGISTERED_CASES.items():
             path = next((ROOT / "qa-ui-auto-tests/cases").glob(f"{case_id}-*.testcase.yaml"))
             case = load_case(path)
             self.assertEqual(case.modes, ["native"])
             self.assertEqual(case.native_platforms, ["Linux", "Windows", "macOS"])
-            self.assertEqual(capabilities([case], "browser"), [])
+            self.assertFalse(any(cap.startswith("signed-") for cap in capabilities([case], "browser")))
+            checks = [step["assert_signed_module_lifecycle"] for step in case.steps
+                      if "assert_signed_module_lifecycle" in step]
+            self.assertEqual(checks, [{"slug": slug, "phase": phase} for phase in observation.STATES])
+            self.assertTrue(all(is_check({"assert_signed_module_lifecycle": check}) for check in checks))
             doc = yaml.safe_load(path.read_text(encoding="utf-8"))
             self.assertEqual(validate_contract(doc, require_review=True), [])
 

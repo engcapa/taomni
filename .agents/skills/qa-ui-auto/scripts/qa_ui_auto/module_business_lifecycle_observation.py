@@ -7,13 +7,8 @@ from pathlib import Path
 
 from .module_mfa_lifecycle_observation import digest, inspect_process
 from .module_profile_observation import writer_lease
-from .module_qa_versions import (
-    MAIL_LIFECYCLE_CASE,
-    SCREENSHOT_LIFECYCLE_CASE,
-    SERVERS_LIFECYCLE_CASE,
-    SOCKSCAP_LIFECYCLE_CASE,
-    VOICE_LIFECYCLE_CASE,
-)
+from .module_qa_versions import LIFECYCLE_CASES
+from .module_remote_lifecycle_observation import CLIENTS, SERVER_FILES, client_data, server_data, server_runtime, vnc_client_connection
 from .module_retained_observation import assert_code_removed, ordinary
 from .module_signed_observation import invoke
 from .steps import StepError
@@ -32,14 +27,8 @@ STATES = {
     "reinstalled": ("current", None, "enabled"),
 }
 
-REGISTERED_CASES = {
-    "servers": SERVERS_LIFECYCLE_CASE,
-    "sockscap": SOCKSCAP_LIFECYCLE_CASE,
-    "screenshot": SCREENSHOT_LIFECYCLE_CASE,
-    "ai-voice-local": VOICE_LIFECYCLE_CASE,
-    "mail": MAIL_LIFECYCLE_CASE,
-}
-STATELESS_SLUGS = frozenset({"screenshot", "ai-voice-local"})
+REGISTERED_CASES = {slug: case for case, slug in LIFECYCLE_CASES.items() if slug != "mfa"}
+STATELESS_SLUGS = frozenset({"screenshot", "ai-voice-local", "vnc-client"})
 
 
 def validate(args) -> tuple[str, str]:
@@ -112,6 +101,12 @@ def _store_lifecycle_data(owner, slug: str, summary: dict) -> dict:
 
 
 def verify_module_data(owner, slug: str, module: Path) -> dict:
+    if slug in CLIENTS:
+        if slug in STATELESS_SLUGS and (module / "data").exists():
+            raise StepError(f"Stateless {slug} module unexpectedly created data directory")
+        return _store_lifecycle_data(owner, slug, client_data(owner, slug, module))
+    if slug in SERVER_FILES:
+        return _store_lifecycle_data(owner, slug, server_data(owner, slug, module))
     if slug in STATELESS_SLUGS:
         if (module / "data").exists():
             raise StepError(f"Stateless {slug} module unexpectedly created data directory")
@@ -244,6 +239,10 @@ def run(ctx, args) -> str:
                     ]
                     if any(item not in files for item in expected_files):
                         raise StepError(f"The retained locator no longer owns Mail database/receipt: {locator!r}")
+                elif slug in SERVER_FILES or slug == "rdp-client":
+                    expected_files = SERVER_FILES.get(slug, {("data.db", "sqlite")})
+                    if {(item.get("path"), item.get("kind")) for item in files} != expected_files:
+                        raise StepError(f"The retained locator does not own the expected {slug} files: {locator!r}")
                 elif {"path": "config.json", "kind": "file"} not in files:
                     raise StepError(f"The retained locator no longer owns {slug} data/config.json")
             evidence["retainedData"] = locator
@@ -268,7 +267,12 @@ def run(ctx, args) -> str:
         core, active_host = inspect_module_process(ctx, slug, host if running else None, history.get(slug))
         history[slug] = {"core": core, "host": active_host}
         owner.module_lifecycle_last = history
-        evidence.update(core=core, host=active_host, data=verify_module_data(owner, slug, module), passed=True)
+        evidence.update(core=core, host=active_host, data=verify_module_data(owner, slug, module))
+        if slug in SERVER_FILES:
+            evidence["listener"] = server_runtime(ctx, slug, phase, active_host)
+        if slug == "vnc-client":
+            evidence["rfbConnections"] = vnc_client_connection(owner, phase)
+        evidence["passed"] = True
         return f"Signed {slug} lifecycle {phase} verified"
     finally:
         with (Path(ctx.case_dir) / f"signed-{slug}-lifecycle.jsonl").open("a", encoding="utf-8") as stream:

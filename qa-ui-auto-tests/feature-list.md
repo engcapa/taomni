@@ -99,6 +99,10 @@ controls:
     selector: '[data-testid="module-marketplace-current"]'
     kind: display
     aliases:
+    - '[data-module-id="taomni-plugin-rdp-client"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-rdp-server"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-vnc-client"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-vnc-server"] [data-testid="module-marketplace-current"]'
     - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-current"]'
     - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-current"]'
     - '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-current"]'
@@ -111,6 +115,10 @@ controls:
     selector: '[data-testid="module-marketplace-update"]'
     kind: display
     aliases:
+    - '[data-module-id="taomni-plugin-rdp-client"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-rdp-server"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-vnc-client"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-vnc-server"] [data-testid="module-marketplace-update"]'
     - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-update"]'
     - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-update"]'
     - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-update"]'
@@ -150,6 +158,10 @@ controls:
     selector: '[data-testid="module-marketplace-review"]'
     kind: interactive
     aliases:
+    - '[data-module-id="taomni-plugin-rdp-client"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-rdp-server"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-vnc-client"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-vnc-server"] [data-testid="module-marketplace-review"]'
     - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-review"]'
     - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-review"]'
     - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-review"]'
@@ -160,6 +172,10 @@ controls:
     selector: '[data-testid="module-marketplace-download"]'
     kind: interactive
     aliases:
+    - '[data-module-id="taomni-plugin-rdp-client"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-rdp-server"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-vnc-client"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-vnc-server"] [data-testid="module-marketplace-download"]'
     - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-download"]'
     - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-download"]'
     - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-download"]'
@@ -373,6 +389,14 @@ controls:
     selector: '[data-testid="module-action-rollback-hello-plugin"]'
     kind: interactive
     aliases:
+    - '[data-testid="module-action-rollback-rdp-client"]'
+    - '[data-testid="module-action-rollback-rdp-client"]:enabled'
+    - '[data-testid="module-action-rollback-rdp-server"]'
+    - '[data-testid="module-action-rollback-rdp-server"]:enabled'
+    - '[data-testid="module-action-rollback-vnc-client"]'
+    - '[data-testid="module-action-rollback-vnc-client"]:enabled'
+    - '[data-testid="module-action-rollback-vnc-server"]'
+    - '[data-testid="module-action-rollback-vnc-server"]:enabled'
     - '[data-testid="module-action-rollback-mfa"]'
     - '[data-testid="module-action-rollback-servers"]'
     - '[data-testid="module-action-rollback-sockscap"]'
@@ -414,6 +438,10 @@ controls:
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
     aliases:
+    - '[data-testid="module-action-uninstall-rdp-client"]:enabled'
+    - '[data-testid="module-action-uninstall-rdp-server"]:enabled'
+    - '[data-testid="module-action-uninstall-vnc-client"]:enabled'
+    - '[data-testid="module-action-uninstall-vnc-server"]:enabled'
     - '[data-testid="module-action-uninstall-mfa"]'
     - '[data-testid="module-action-uninstall-mail"]'
     - '[data-testid="module-action-uninstall-servers"]'
@@ -425,6 +453,10 @@ controls:
     selector: '[data-testid="module-action-install-hello-plugin"]'
     kind: interactive
     aliases:
+    - '[data-testid="module-action-install-rdp-client"]'
+    - '[data-testid="module-action-install-rdp-server"]'
+    - '[data-testid="module-action-install-vnc-client"]'
+    - '[data-testid="module-action-install-vnc-server"]'
     - '[data-testid="module-action-install-mfa"]'
     - '[data-testid="module-action-install-mail"]'
     - '[data-testid="module-action-install-servers"]'
@@ -439,6 +471,10 @@ controls:
     selector: '[data-testid="module-data-retained-hello-plugin"]'
     kind: display
     aliases:
+    - '[data-testid="module-data-retained-rdp-client"]'
+    - '[data-testid="module-data-retained-rdp-server"]'
+    - '[data-testid="module-data-retained-vnc-client"]'
+    - '[data-testid="module-data-retained-vnc-server"]'
     - '[data-testid="module-data-retained-mfa"]'
     - '[data-testid="module-data-retained-servers"]'
     - '[data-testid="module-data-retained-sockscap"]'
@@ -452,6 +488,12 @@ controls:
   - id: plugin-tab-unavailable
     selector: '[data-testid="plugin-tab-unavailable"]'
     aliases:
+      - '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+      - '[data-plugin-slug="rdp-server"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="rdp-server"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+      - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+      - '[data-plugin-slug="vnc-server"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="vnc-server"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
       - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
       - '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
       - '[data-plugin-slug="mfa"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
@@ -527,7 +569,7 @@ Mail 宿主跨进程用例在一份草稿写入期间提交第二份，核对单
 
 `TC-MODULES-052` 检查首次自动准备 Mail 后，商店展示下次启动导入的状态。Browser 刷新后状态保留，签名升级专项通过真实启动应用迁移。
 
-`TC-MODULES-007/010/040/042` 观察真实版本目录删除。010 还确认取消永久删除时签名包和业务数据原样保留，确认后数据和定位记录消失。042 校验存在更新时卸载会释放宿主、清理所有版本并保留业务数据。043 使用浏览器模型检查取消永久删除和卸载后只提供主动安装。独立 signed 业务模块的双版本在线更新/离线安装、禁/启用回滚、握手失败恢复与卸载保留数据/无状态重装由 `TC-MODULES-103`（MFA）、`TC-MODULES-107`（Local servers）、`TC-MODULES-108`（SocksCap）、`TC-MODULES-109`（Screenshot）、`TC-MODULES-110`（Local Voice）与 `TC-MODULES-111`（Mail）覆盖。
+`TC-MODULES-007/010/040/042` 观察真实版本目录删除。010 还确认取消永久删除时签名包和业务数据原样保留，确认后数据和定位记录消失。042 校验存在更新时卸载会释放宿主、清理所有版本并保留业务数据。043 使用浏览器模型检查取消永久删除和卸载后只提供主动安装。独立签名业务模块的双版本在线更新和离线安装、禁用和启用状态下的回滚、握手失败恢复、卸载与重装由 `TC-MODULES-103`（MFA）和 `TC-MODULES-107`–`115` 覆盖。`TC-MODULES-112/113` 检查 VNC/RDP 会话、分离窗口与输入，`TC-MODULES-114/115` 检查 RDP/VNC 服务端配置与监听释放。VNC Server 在 Linux 使用 `x11vnc`，在 Windows 和 macOS 的托管环境检查外部服务或系统共享指引。
 
 原生还原确认的自动重启由 `TC-MODULES-033/034/035` 在 Linux、Windows 和 macOS 覆盖运行、禁用与卸载保留数据三态。用例通过界面创建配对备份，变更模块数据、HOTP 和主密码，再用原生还原对话框拒绝旧密码、接受当前密码。探针观察旧进程正常退出、新进程 PID 和启动时间、可执行文件和 QA 隔离目录，再连接应用重启后的 WebView。还原后核验模块行、active 指针、generation、writer lease、原密码和 HOTP 755224。Browser `TC-BACKUP-RESTORE-001` 覆盖确认、密码错误和重复提交。独立 signed MFA 宿主在运行、禁用与卸载保留数据三态下的自动还原重启由 `TC-MODULES-104/105/106` 在 Linux、Windows 和 macOS 覆盖，核验配对 v2 备份、旧主密码拒止、`generation` 递增、`active.json` 不变与重启后 HOTP 连续性。
 

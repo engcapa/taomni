@@ -113,6 +113,10 @@ SIGNED_ROOT_ENV = {
     "screenshot": "QA_SIGNED_SCREENSHOT_ROOT",
     "ai-voice-local": "QA_SIGNED_LOCAL_VOICE_ROOT",
     "mail": "QA_SIGNED_MAIL_ROOT",
+    "vnc-client": "QA_SIGNED_VNC_ROOT",
+    "rdp-client": "QA_SIGNED_RDP_ROOT",
+    "rdp-server": "QA_SIGNED_RDP_SERVER_ROOT",
+    "vnc-server": "QA_SIGNED_VNC_SERVER_ROOT",
 }
 
 

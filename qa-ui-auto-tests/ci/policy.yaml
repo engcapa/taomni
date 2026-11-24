@@ -166,6 +166,10 @@ cases:
 - TC-MODULES-109
 - TC-MODULES-110
 - TC-MODULES-111
+- TC-MODULES-112
+- TC-MODULES-113
+- TC-MODULES-114
+- TC-MODULES-115
 - TC-BACKUP-RESTORE-001
 - TC-WS-GIT-CLONE-01-defaults-proxy-and-clone-browser
 - TC-WS-GIT-CLONE-02-background-close-cancel-retry-browser
