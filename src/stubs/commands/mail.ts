@@ -1,5 +1,5 @@
 import { mailArchiveStub } from "../mailArchiveStub";
-import { stubMailAppend, stubMailChangeFolder, stubMailClearCache, stubMailExpunge, stubMailFindHeader, stubMailListCached, stubMailListFolders, stubMailSearch, stubMailSyncAll, stubMailSyncFolder, stubMailSyncHeaders, stubMailIdleStart, stubMailSetSubscription, stubMailIdleStop, stubMailRecordSent, stubMailMutation, stubMailUpdateCachedFlags, stubMailMarkRead, stubMailPrefetchBodies, type Seed as MailStubSeed, type StubMailSearchQuery } from "../mailServerStub";
+import { stubMailAppend, stubMailChangeFolder, stubMailClearCache, stubMailExpunge, stubMailFindHeader, stubMailListCached, stubMailListFolders, stubMailMarkBodyCached, stubMailSearch, stubMailSyncAll, stubMailSyncFolder, stubMailSyncHeaders, stubMailIdleStart, stubMailSetSubscription, stubMailIdleStop, stubMailRecordSent, stubMailMutation, stubMailUpdateCachedFlags, stubMailMarkRead, stubMailPrefetchBodies, type Seed as MailStubSeed, type StubMailSearchQuery } from "../mailServerStub";
 import { stubApplyFilters, stubListFilters, stubSaveFilters } from "../mailFiltersStub";
 import { stubAddressBookSuggestions, stubDeleteAddressBookEntry, stubListAddressBook, stubSaveAddressBookEntry } from "../mailContactsStub";
 import type { MailAddressBookEntry } from "../../lib/mailContacts";
@@ -102,7 +102,7 @@ export const mailStubSeed: MailStubSeed = (accountId) => ({
   messages: (folder) => stubMailMessages(accountId, folder),
 });
 
-export function stubMailBody(accountId: string, folder: string, uid: number) {
+export function stubMailBody(accountId: string, folder: string, uid: number, source: "cache" | "remote" = "cache") {
   const stored = stubMailFindHeader(accountId, mailStubSeed, folder, uid);
   const header = stored
     ?? stubMailMessages(accountId, folder).find((message) => message.uid === uid)
@@ -125,7 +125,7 @@ export function stubMailBody(accountId: string, folder: string, uid: number) {
     attachments: header.attachments,
     rawSize: header.rawSize,
     cachedAt: Math.floor(Date.now() / 1000),
-    source: "cache",
+    source,
   };
 }
 
@@ -389,7 +389,8 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
       const accountId = stubMailAccountId(invokeArgs);
       const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
       const uid = Number((invokeArgs?.uid as number | undefined) ?? 91);
-      return stubMailBody(accountId, folder, uid) as T;
+      const source = stubMailMarkBodyCached(accountId, mailStubSeed, folder, uid);
+      return stubMailBody(accountId, folder, uid, source) as T;
     }
 
     case "mail_fetch_raw":

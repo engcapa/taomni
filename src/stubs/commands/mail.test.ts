@@ -60,4 +60,25 @@ describe("browser mail cache recovery", () => {
     const body = await invokeMail<MailMessageBody>("mail_get_message_body", { config, folder, uid });
     expect(body).toMatchObject({ subject: "Recovered original 0001", text, html: null });
   });
+
+  it("reports remote on first uncached body read, cache after reopening, and remote after clearing cache", async () => {
+    const accountId = "browser-cache-source";
+    const config = { sessionId: accountId };
+    const folder = "INBOX";
+    const qaWindow = window as Window & { __taomniQaMail?: StubMailQaControl };
+    installStubMailQaControl(() => ({ meta: [], messages: () => [] }));
+    const [uid] = qaWindow.__taomniQaMail!.deliver(accountId, folder, 1, "Reopened cached mail");
+
+    await invokeMail("mail_sync_folder", { config, folder });
+    const first = await invokeMail<MailMessageBody>("mail_get_message_body", { config, folder, uid });
+    expect(first.source).toBe("remote");
+
+    const reopened = await invokeMail<MailMessageBody>("mail_get_message_body", { config, folder, uid });
+    expect(reopened.source).toBe("cache");
+
+    await invokeMail("mail_clear_cache", { accountId });
+    await invokeMail("mail_sync_folder", { config, folder });
+    const afterClear = await invokeMail<MailMessageBody>("mail_get_message_body", { config, folder, uid });
+    expect(afterClear.source).toBe("remote");
+  });
 });

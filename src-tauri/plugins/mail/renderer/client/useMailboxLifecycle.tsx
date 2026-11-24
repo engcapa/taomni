@@ -88,7 +88,10 @@ export function useMailboxLifecycle(context: UseMailboxLifecycleContext) {
     messageTabs,
   } = context;
 
+  const initializedSessionRef = useRef<string | null>(null);
   useEffect(() => {
+    if (initializedSessionRef.current === info.sessionId) return;
+    initializedSessionRef.current = info.sessionId;
     initialSyncDoneRef.current = false;
     foldersRef.current = [];
     bodyWarmSeqRef.current += 1;

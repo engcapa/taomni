@@ -240,7 +240,7 @@ export function createSyncFolderNow(controllerContext: SyncFolderNowContext): (f
     notify = false,
   ) => {
     if (controllerContext.syncInFlightRef.current || controllerContext.manualSyncPendingRef.current) {
-      if (indicator !== "none" && controllerContext.visibleRef.current) controllerContext.setStatus("Mail sync already running");
+      if (indicator !== "none" && controllerContext.visibleRef.current) controllerContext.setLoadingStatus("Mail sync already running");
       return null;
     }
     controllerContext.syncInFlightRef.current = true;
@@ -262,7 +262,13 @@ export function createSyncFolderNow(controllerContext: SyncFolderNowContext): (f
       }
       if (notify) controllerContext.notifyNewMail(newUnseen);
       if (indicator !== "none" && controllerContext.visibleRef.current) {
-        controllerContext.setLoadingStatus(fetched > 0 ? `Synced ${fetched} headers` : "Mailbox up to date");
+        controllerContext.setLoadingStatus((current) =>
+          fetched > 0
+            ? `Synced ${fetched} headers`
+            : current?.startsWith("Loaded body from ")
+              ? current
+              : "Mailbox up to date",
+        );
       }
       return primary;
     } catch (e) {

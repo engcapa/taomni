@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import type { MailFolderSyncResult, MailMessageBody, MailMessageHeader, MailSyncAllResult } from "../../../../../../src/lib/mail";
@@ -192,5 +193,27 @@ export function registerMailCacheSynchronizationCases() {
     fireEvent.click(screen.getByTestId("mail-load-more"));
     await waitFor(() => expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-count", "120"));
     expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-has-more", "false");
+  });
+
+  it("avoids duplicate on-open sync under StrictMode and preserves Loaded body from cache", async () => {
+    let finishSync!: (result: MailFolderSyncResult) => void;
+    mailMocks.mailSyncFolder.mockImplementation(() => new Promise((resolve) => { finishSync = resolve; }));
+    mailMocks.mailGetMessageBody.mockResolvedValue({ ...messageBody, source: "cache" });
+
+    render(
+      <StrictMode>
+        <MailClientTab tabId="mail-tab" info={{ ...info, sync: { ...info.sync, onOpen: true } }} visible />
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(finishSync).toBeDefined());
+    expect(mailMocks.mailSyncFolder).toHaveBeenCalledTimes(1);
+    await screen.findByText("Loaded body from cache");
+    expect(screen.queryByText("Mail sync already running")).not.toBeInTheDocument();
+
+    await act(async () => finishSync(stepResult({})));
+    await waitFor(() => expect(screen.getByTestId("mail-sync-button")).toBeEnabled());
+    expect(screen.getByTestId("mail-client-tab")).toHaveTextContent("Loaded body from cache");
+    expect(screen.queryByText("Mailbox up to date")).not.toBeInTheDocument();
   });
 }

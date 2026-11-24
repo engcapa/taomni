@@ -207,6 +207,22 @@ export async function stubMailPrefetchBodies(
   return true;
 }
 
+export function stubMailMarkBodyCached(
+  accountId: string,
+  seed: Seed,
+  folderName: string,
+  uid: number,
+): "cache" | "remote" {
+  const entry = folderState(account(accountId, seed), folderName);
+  const cached = entry.cache.get(uid);
+  if (cached) {
+    if (cached.bodyCached) return "cache";
+    entry.cache.set(uid, { ...cached, bodyCached: true });
+    return "remote";
+  }
+  return entry.server.has(uid) ? "remote" : "cache";
+}
+
 export function stubMailSyncFolder(
   accountId: string,
   seed: Seed,
