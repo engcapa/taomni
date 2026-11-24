@@ -10817,7 +10817,7 @@ dependencies = [
 
 [[package]]
 name = "taomni"
-version = "0.3.0"
+version = "0.6.0"
 dependencies = [
  "aes 0.9.3",
  "aes-gcm 0.10.3",

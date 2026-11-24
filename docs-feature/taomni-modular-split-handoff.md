@@ -1,6 +1,18 @@
 # Taomni 模块化重构交接
 
-**交接快照为北京时间 2026-11-24 20:34。开发与 GitHub 监控已按指令暂停，目前仍不能上生产。** 本阶段已完成 Mail `0.1.57` POP3 附件与 `0.1.58` 引擎/解析迁移、MFA 三态自动还原、SocksCap Linux 启动器/冷启与草稿修复、V-008 只读单模块目录演练、基座 `ironrdp`/`rcgen`/`mail-parser` 依赖裁剪，以及 Wave 1 + Wave 2A（**6/10** 首发业务模块：`mfa`、`servers`、`sockscap`、`screenshot`、`ai-voice-local`、`mail`）三端双版本无重启生命周期验证。公开发行仍是单体 `v0.5.13`，生产上线前还需完成 Wave 2B 剩余 4 个模块、基座剩余 Mail/SocksCap 核心清理、版本号定版（`0.6.0`）与 10 模块清单转 `stable`，并在同一正式候选 SHA 上收齐四目标发布包、`v0.5.13` 实装升级、纯核心/全模块 `crash-regression` 与 G1–G11 原始回执。[实施台账](taomni-modular-split-progress.md#接下来的执行顺序) · [当前公开版本](https://github.com/engcapa/taomni/releases/tag/v0.5.13)
+## 2026-11-24 续接进展
+
+**公开发行仍是单体 `v0.5.13`。生产发布待同一 `0.6.0` 候选 SHA 收齐四目标实装升级、纯核心与全模块的崩溃回归，以及 G1–G11 回执。** [当前公开版本](https://github.com/engcapa/taomni/releases/tag/v0.5.13)
+
+- Wave 2A 工作流 `#45391530402` 已确认整体成功，18 个分片共通过 150 项。首发 10 个模块中有 6 个已取得 Linux、Windows 和 macOS ARM64 三端双版本生命周期证据。 [Wave 2A 回执](https://github.com/engcapa/taomni/actions/runs/45391530402)
+- Wave 2B 已新增 `TC-MODULES-112`–`115`。VNC Client 和 RDP Client 在 Linux、Windows、macOS ARM64 各通过 10/10 阶段，首发已取得三端生命周期证据的模块共 8/10。两个服务端的旧配置触发了首装流程，用例已改为先装入旧版，再接入更新目录。VNC Server 在 Linux 验证 RFB 认证、监听和 `x11vnc` 回收，在 Windows 和 macOS 托管环境核对外部 VNC 服务和系统屏幕共享的指引。原三端复跑因 macOS 排队已取消，分为 Linux/Windows 和 macOS 26 两次运行。 [首轮回执](https://github.com/engcapa/taomni/actions/runs/45399176436) · [Linux/Windows 复跑](https://github.com/engcapa/taomni/actions/runs/45412993964) · [macOS ARM64 复跑](https://github.com/engcapa/taomni/actions/runs/45414324974)
+- macOS 基座包已移除旧 SocksCap Redirector 桥接程序。旧会话恢复通过验签后的系统 Provider 清除捕获范围，正常捕获继续使用签名 SocksCap 宿主。Linux、Windows 和 macOS 安装包清点会拒绝对应模块运行部件。 [代码](https://github.com/engcapa/taomni/commit/55cdefc0b) · [原生回归](https://github.com/engcapa/taomni/actions/runs/45401294673)
+- Mail `0.1.59` 将协议引擎移出默认基座，旧 SQLite 邮箱、归档对象和备份迁移保留共享存储实现。四目标本地 Cargo 树均排除 `taomni-mail-engine`、`imap`、`imap-proto`、`lettre` 和 `mail-parser`。存储库默认与全特性分别通过 40、70 项单测，独立协议引擎和 Mail 宿主分别通过 23、46 项。基座 Mail 迁移和备份单测各通过 7、3 项，生产前端构建清单的 424 个入口均排除首发模块渲染代码。 [代码](https://github.com/engcapa/taomni/commit/ef895cd1b)
+- 候选升级工作流通过 `package_run` 指定同源码发布构建。崩溃回归的 `module_profile=full` 通过 `first_release_run` 获取同一批签名模块。`module_profile=core-only` 通过 `head` 绑定相同源码并验证空模块列表。 [升级工作流](../.github/workflows/qa-modular-upgrade.yml) · [崩溃回归配置](../qa-ui-auto-tests/ci/README.md)
+
+## 2026-11-24 20:34 原交接快照
+
+本阶段已完成 Mail `0.1.57` POP3 附件与 `0.1.58` 引擎/解析迁移、MFA 三态自动还原、SocksCap Linux 启动器/冷启与草稿修复、V-008 只读单模块目录演练、基座 `ironrdp`/`rcgen`/`mail-parser` 依赖裁剪，以及 Wave 1 + Wave 2A 的 6 个首发业务模块三端双版本无重启生命周期验证。 [实施台账](taomni-modular-split-progress.md#接下来的执行顺序)
 
 ## 接手位置
 
@@ -87,8 +99,8 @@ python .agents/skills/qa-ui-auto/scripts/ci_live_monitor.py \
    - 在本地跑完格式、严格类型检查、Rust 单元/集成测试、`qa_ui_auto.audit --gate` 与 `pnpm check:refactor`，推送并**冻结单一正式候选 SHA**。
 4. **P0 待办 4 — 在同一正式候选 SHA 上收齐发布包、`0.5.13` 升级、双配置回归与 G1–G11 原始回执**：
    - **(a) 全量发布包预建与签名校验**：用冻结候选 SHA 跑 [`release.yml`](../.github/workflows/release.yml)（空 `tag`、`platforms=all`、`macos_arch=both`、冻结十模块 roster、沿用 `main` 签名配置），产出四目标核心安装件、40 个 `.taomni-plugin`、`.minisig`、`SHA256SUMS`、`modules.json`、updater 验签工件与 `modular-candidate-roster-<run-id>`。
-   - **(b) 真实 `v0.5.13 → 0.6.0` 四目标安装与升级验收**：使用同一 SHA 与 `candidate_run` 派发 [`qa-modular-upgrade.yml`](../.github/workflows/qa-modular-upgrade.yml)（`package_targets=all`，启用 `package_first_release_linux`、`package_first_release_desktop`、`package_relocation_linux`、`package_rdp_perf`，安装基线 `0.5.13`），验收 Linux（deb/RPM/AppImage）、Windows MSI 与 macOS 双架构（ARM64/Intel）实装升级、旧数据迁移（至少覆盖 RDP/VNC、Servers、MFA、SocksCap、Mail）、禁用/卸载保留、新模块选装、回退与再次升级，以及 G1–G6 实装回执。
-   - **(c) 双安装配置全量与核心崩溃回归**：在同一候选 SHA 上以 `module_profile=core-only` 和 `module_profile=full`（传入同一 `first_release_run`、`tags=crash-regression`、`native_release=true`）分别通过 [`qa-ui-auto-platforms.yml`](../.github/workflows/qa-ui-auto-platforms.yml)，并在正式候选上确认 MFA 界面还原、v1 归档兼容、GUI/headless 互斥，以及安装包体积、启动、内存、终端 I/O、RDP 与安装任务性能预算。
+   - **(b) 真实 `v0.5.13 → 0.6.0` 四目标安装与升级验收**：使用同一 SHA 和 `package_run` 派发 [`qa-modular-upgrade.yml`](../.github/workflows/qa-modular-upgrade.yml)（`package_targets=all`，启用 `package_first_release_linux`、`package_first_release_desktop`、`package_relocation_linux`、`package_rdp_perf`，安装基线 `0.5.13`），验收 Linux（deb/RPM/AppImage）、Windows MSI 与 macOS 双架构（ARM64/Intel）实装升级、旧数据迁移（至少覆盖 RDP/VNC、Servers、MFA、SocksCap、Mail）、禁用/卸载保留、新模块选装、回退与再次升级，以及 G1–G6 实装回执。
+   - **(c) 双安装配置全量与核心崩溃回归**：同一候选 SHA 以 `module_profile=core-only` 和 `module_profile=full` 各通过 [`qa-ui-auto-platforms.yml`](../.github/workflows/qa-ui-auto-platforms.yml)。两轮传 `tags=crash-regression` 和 `native_release=true`，完整模块配置额外传 `first_release_run`。在正式候选上确认 MFA 界面还原、v1 归档兼容、GUI/headless 互斥，以及安装包体积、启动、内存、终端 I/O、RDP 与安装任务性能预算。
    - **(d) G1–G11 全门绑定归档**：按每次并发 ≤3 个上限通过 [`qa-modular-gates.yml`](../.github/workflows/qa-modular-gates.yml) 收齐其余 `host`/`protocol`/`system`/`signed` 子运行回执，确保发布台账把 G1–G11 逐一绑定到**同一候选源码 SHA、runner 镜像版本、包资产 ID 与 SHA-256、用例/选集摘要与原始工件路径**。
 5. **P0 待办 5 — 正式差异发布（待用户确认后执行）**：
    - 全部门禁闭环并获用户确认发布后，按双清单与先上传包与 `.minisig`、最后发布 `modules.json` 与 `latest.json` 的规则，复用已验签 `candidate_run` 工件发布正式 Core Release 与首套模块 Catalog，模块资产绝不打入核心安装包。
