@@ -15,7 +15,37 @@ const MAX_FILE_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 const MAX_CHECKSUM_BYTES: u64 = 8 * 1024 * 1024;
 pub(super) type TreeDigests = BTreeMap<String, String>;
 
-pub(super) fn extract(file: &mut File, destination: &Path) -> Result<TreeDigests, TrustError> {
+pub(super) struct ArchiveInspection {
+    pub(super) checksums: TreeDigests,
+    pub(super) manifest_bytes: Vec<u8>,
+}
+
+#[derive(Clone, Copy)]
+enum SpecialEntry {
+    Checksums,
+    Manifest,
+}
+
+pub(super) fn extract(
+    file: &mut File,
+    destination: &Path,
+    max_manifest_bytes: u64,
+) -> Result<ArchiveInspection, TrustError> {
+    scan_archive(file, Some(destination), max_manifest_bytes)
+}
+
+pub(super) fn inspect(
+    file: &mut File,
+    max_manifest_bytes: u64,
+) -> Result<ArchiveInspection, TrustError> {
+    scan_archive(file, None, max_manifest_bytes)
+}
+
+fn scan_archive(
+    file: &mut File,
+    destination: Option<&Path>,
+    max_manifest_bytes: u64,
+) -> Result<ArchiveInspection, TrustError> {
     let mut archive = zip::ZipArchive::new(file).map_err(zip_error)?;
     if archive.len() > MAX_FILES {
         return Err(invalid("archive contains too many entries"));
@@ -23,6 +53,8 @@ pub(super) fn extract(file: &mut File, destination: &Path) -> Result<TreeDigests
     let mut seen = BTreeSet::new();
     let mut actual = BTreeMap::new();
     let mut expanded = 0_u64;
+    let mut raw_checksums: Option<Vec<u8>> = None;
+    let mut raw_manifest: Option<Vec<u8>> = None;
     for index in 0..archive.len() {
         let mut entry = archive.by_index(index).map_err(zip_error)?;
         let name = std::str::from_utf8(entry.name_raw())
@@ -51,19 +83,42 @@ pub(super) fn extract(file: &mut File, destination: &Path) -> Result<TreeDigests
         {
             return Err(invalid("archive entry exceeds size or expansion limits"));
         }
-        let target = destination.join(&name);
         if directory {
             if entry.size() != 0 {
                 return Err(invalid("archive directory contains data"));
             }
-            fs::create_dir_all(target)?;
+            if let Some(root) = destination {
+                fs::create_dir_all(root.join(&name))?;
+            }
             continue;
         }
-        fs::create_dir_all(target.parent().expect("validated relative path"))?;
-        let mut output = OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&target)?;
+        let capture = match name.as_str() {
+            "SHA256SUMS" => Some((
+                SpecialEntry::Checksums,
+                MAX_CHECKSUM_BYTES,
+                "SHA256SUMS exceeds 8 MiB",
+            )),
+            "module.json" => Some((
+                SpecialEntry::Manifest,
+                max_manifest_bytes,
+                "module.json exceeds 2 MiB",
+            )),
+            _ => None,
+        };
+        let mut captured = capture.map(|_| Vec::new());
+        let mut output = if let Some(root) = destination {
+            let target = root.join(&name);
+            fs::create_dir_all(target.parent().expect("validated relative path"))?;
+            Some((
+                OpenOptions::new()
+                    .create_new(true)
+                    .write(true)
+                    .open(&target)?,
+                target,
+            ))
+        } else {
+            None
+        };
         let mut hasher = Sha256::new();
         let mut written = 0_u64;
         let mut buffer = [0_u8; 128 * 1024];
@@ -76,36 +131,46 @@ pub(super) fn extract(file: &mut File, destination: &Path) -> Result<TreeDigests
             if written > entry.size() {
                 return Err(invalid("archive entry exceeds its declared size"));
             }
+            if let (Some((_, limit, message)), Some(bytes)) = (capture, captured.as_mut()) {
+                if written > limit {
+                    return Err(invalid(message));
+                }
+                bytes.extend_from_slice(&buffer[..count]);
+            }
             hasher.update(&buffer[..count]);
-            output.write_all(&buffer[..count])?;
+            if let Some((file_out, _)) = output.as_mut() {
+                file_out.write_all(&buffer[..count])?;
+            }
         }
         if written != entry.size() {
             return Err(invalid("archive entry is truncated"));
         }
-        output.sync_all()?;
-        // Preserve only the executable bit; package-supplied setuid, group or
-        // world-write permissions never reach the installed filesystem.
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(
-                &target,
-                fs::Permissions::from_mode(if mode & 0o111 != 0 { 0o700 } else { 0o600 }),
-            )?;
+        if let Some((file_out, target)) = output {
+            file_out.sync_all()?;
+            // Preserve only the executable bit; package-supplied setuid, group or
+            // world-write permissions never reach the installed filesystem.
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(
+                    &target,
+                    fs::Permissions::from_mode(if mode & 0o111 != 0 { 0o700 } else { 0o600 }),
+                )?;
+            }
+            #[cfg(not(unix))]
+            let _ = target;
+        }
+        match (capture, captured) {
+            (Some((SpecialEntry::Checksums, _, _)), Some(bytes)) => raw_checksums = Some(bytes),
+            (Some((SpecialEntry::Manifest, _, _)), Some(bytes)) => raw_manifest = Some(bytes),
+            _ => {}
         }
         actual.insert(name, hex::encode(hasher.finalize()));
     }
-    let sums_path = destination.join("SHA256SUMS");
-    if !actual.contains_key("SHA256SUMS") {
+    let Some(sums_bytes) = raw_checksums else {
         return Err(invalid("package is missing SHA256SUMS"));
-    }
-    let mut raw = String::new();
-    File::open(sums_path)?
-        .take(MAX_CHECKSUM_BYTES + 1)
-        .read_to_string(&mut raw)?;
-    if raw.len() as u64 > MAX_CHECKSUM_BYTES {
-        return Err(invalid("SHA256SUMS exceeds 8 MiB"));
-    }
+    };
+    let raw = String::from_utf8(sums_bytes).map_err(|_| invalid("SHA256SUMS must be UTF-8"))?;
     let declared = parse_checksums(&raw)?;
     if declared.len() + 1 != actual.len()
         || declared
@@ -116,7 +181,13 @@ pub(super) fn extract(file: &mut File, destination: &Path) -> Result<TreeDigests
             "SHA256SUMS does not match the exact package contents",
         ));
     }
-    Ok(actual)
+    let Some(manifest_bytes) = raw_manifest else {
+        return Err(invalid("package is missing module.json"));
+    };
+    Ok(ArchiveInspection {
+        checksums: actual,
+        manifest_bytes,
+    })
 }
 
 fn parse_checksums(raw: &str) -> Result<TreeDigests, TrustError> {

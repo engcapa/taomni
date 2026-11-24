@@ -457,3 +457,113 @@ fn cached_asset_trust_hashes_the_returned_bytes_and_rejects_changes_or_unknown_f
     fs::write(destination.join("frontend/index.js"), b"changed").unwrap();
     assert!(trust.read_file("frontend/index.js").is_err());
 }
+
+#[test]
+fn installed_verification_enforces_tree_and_archive_invariants_without_temp_extraction() {
+    let root = tempdir().unwrap();
+    let manifest = manifest();
+    let package = support::verified_package_with_files(
+        &manifest,
+        &[("resources/extra.bin", b"resource payload")],
+    );
+    let destination = ModuleInstaller::new(root.path())
+        .stage_verified(&package)
+        .unwrap();
+
+    assert_eq!(
+        verify_installed(&destination, host_platform()).unwrap(),
+        manifest
+    );
+    let trust = InstalledTrust::verify(&destination, host_platform()).unwrap();
+    assert_eq!(
+        trust.read_file("resources/extra.bin").unwrap(),
+        b"resource payload"
+    );
+
+    // Extra, missing, or altered installed payload files must be rejected.
+    let extra = destination.join("resources/unsigned.bin");
+    fs::write(&extra, b"extra").unwrap();
+    assert!(verify_installed(&destination, host_platform()).is_err());
+    assert!(InstalledTrust::verify(&destination, host_platform()).is_err());
+    fs::remove_file(&extra).unwrap();
+
+    fs::remove_file(destination.join("resources/extra.bin")).unwrap();
+    assert!(verify_installed(&destination, host_platform()).is_err());
+    assert!(InstalledTrust::verify(&destination, host_platform()).is_err());
+    fs::write(destination.join("resources/extra.bin"), b"altered").unwrap();
+    assert!(verify_installed(&destination, host_platform()).is_err());
+    fs::write(destination.join("resources/extra.bin"), b"resource payload").unwrap();
+    assert!(verify_installed(&destination, host_platform()).is_ok());
+
+    let replace_proof = |bytes: Vec<u8>| {
+        let (archive_path, signature_path) = installed_proof_paths(&destination);
+        fs::write(&archive_path, &bytes).unwrap();
+        fs::write(
+            &signature_path,
+            package_signature(&bytes, &manifest, host_platform()),
+        )
+        .unwrap();
+    };
+
+    // Proof archive missing module.json must fail closed.
+    let mut without_manifest = files(&manifest);
+    without_manifest.remove("module.json");
+    replace_proof(archive(without_manifest));
+    assert!(verify_installed(&destination, host_platform()).is_err());
+    assert!(InstalledTrust::verify(&destination, host_platform()).is_err());
+
+    // Directory entry named module.json must not impersonate the manifest.
+    let mut dir_manifest = files(&manifest);
+    dir_manifest.remove("module.json");
+    let sums = dir_manifest
+        .iter()
+        .map(|(path, bytes)| format!("{}  {path}\n", sha256_hex(bytes)))
+        .collect::<String>();
+    dir_manifest.insert("SHA256SUMS".into(), sums.into_bytes());
+    let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+    writer
+        .add_directory("module.json/", SimpleFileOptions::default())
+        .unwrap();
+    for (path, bytes) in dir_manifest {
+        writer
+            .start_file(path, SimpleFileOptions::default().unix_permissions(0o755))
+            .unwrap();
+        writer.write_all(&bytes).unwrap();
+    }
+    replace_proof(writer.finish().unwrap().into_inner());
+    assert!(verify_installed(&destination, host_platform()).is_err());
+    assert!(InstalledTrust::verify(&destination, host_platform()).is_err());
+
+    // Mismatched SHA256SUMS in the proof archive must fail closed.
+    let mut bad_sums = files(&manifest);
+    bad_sums.insert(
+        "SHA256SUMS".into(),
+        format!("{}  module.json\n", "a".repeat(64)).into_bytes(),
+    );
+    replace_proof(archive(bad_sums));
+    assert!(verify_installed(&destination, host_platform()).is_err());
+
+    // Symlink entry in the proof archive must fail closed.
+    let mut symlink_zip = ZipWriter::new(Cursor::new(Vec::new()));
+    symlink_zip
+        .add_symlink("host", "../../outside", SimpleFileOptions::default())
+        .unwrap();
+    replace_proof(symlink_zip.finish().unwrap().into_inner());
+    assert!(verify_installed(&destination, host_platform()).is_err());
+
+    // Oversized expansion bomb in the proof archive must fail closed.
+    let mut bomb_files = files(&manifest);
+    bomb_files.insert("bomb".into(), vec![0; 2 * 1024 * 1024]);
+    let mut bomb_zip = ZipWriter::new(Cursor::new(Vec::new()));
+    for (name, bytes) in bomb_files {
+        bomb_zip
+            .start_file(
+                name,
+                SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated),
+            )
+            .unwrap();
+        bomb_zip.write_all(&bytes).unwrap();
+    }
+    replace_proof(bomb_zip.finish().unwrap().into_inner());
+    assert!(verify_installed(&destination, host_platform()).is_err());
+}

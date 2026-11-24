@@ -20,7 +20,7 @@ steps:
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-sockscap"]'
-- wait_for: '[data-testid="sockscap-start"]:enabled'
+- wait_for: {selector: '[data-testid="sockscap-start"]:enabled', timeout_sec: 30}
 - assert_signed_sockscap_host: running
 - sockscap_resource_fixture: alter
 - click: '[data-testid="sockscap-start"]'
