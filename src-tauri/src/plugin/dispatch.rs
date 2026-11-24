@@ -40,16 +40,19 @@ impl PendingCall<'_> {
         }
     }
 
+    fn request_cancelled(&self) -> bool {
+        self.registry
+            .pending_requests
+            .lock()
+            .expect("plugin request lock poisoned")
+            .get(&self.key)
+            .is_none_or(|request| request.cancelled)
+    }
+
     pub(super) fn cancelled(&self) -> bool {
         self.registry.shutting_down.load(Ordering::Acquire)
             || self.registry.quiescence.load(Ordering::Acquire) != 0
-            || self
-                .registry
-                .pending_requests
-                .lock()
-                .expect("plugin request lock poisoned")
-                .get(&self.key)
-                .is_none_or(|request| request.cancelled)
+            || self.request_cancelled()
     }
 }
 
@@ -103,7 +106,7 @@ impl PluginRegistry {
         let record = self.call_record(slug, command)?;
         let pending = self.begin_call(slug, request_id)?;
         // Cancellation can arrive before the blocking worker registers its ID.
-        if caller_cancelled() || pending.cancelled() {
+        if caller_cancelled() || pending.request_cancelled() {
             return Err(cancelled());
         }
         let runtime = self.host_for(slug, &record)?;
