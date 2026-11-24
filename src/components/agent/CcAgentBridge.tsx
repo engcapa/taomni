@@ -129,6 +129,37 @@ export function CcAgentBridge() {
     };
   }, []);
 
+  // Tauri events are not queued: after a renderer reload or crash the bridge has
+  // no card for a prompt that is still pending. Re-read the prompts addressed to
+  // this window on mount; dedupe by callId keeps an already-received prompt from
+  // being shown twice.
+  useEffect(() => {
+    let disposed = false;
+    void invoke<PermissionPrompt[]>("cc_pending_permission_prompts")
+      .then((prompts) => {
+        if (disposed || !Array.isArray(prompts)) return;
+        const restored = prompts.filter(
+          (prompt) => prompt && prompt.callId && addressesThisWindow(prompt.windowLabel),
+        );
+        if (restored.length === 0) return;
+        setQueue((q) => {
+          const next = [...q];
+          for (const prompt of restored) {
+            if (!next.some((p) => p.source === "cc" && p.callId === prompt.callId)) {
+              next.push({ source: "cc", ...prompt });
+            }
+          }
+          return next;
+        });
+      })
+      .catch(() => {
+        // Browser preview and older backends have no replay command.
+      });
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
     let disposed = false;
@@ -361,6 +392,9 @@ export function CcAgentBridge() {
           style={safetyGatePlacement.style}
           data-testid="ai-chat-safety-gate"
           data-anchor={safetyGatePlacement.anchored ? "chat-drawer" : "viewport"}
+          // Observable queue depth: only the head renders, so a stacked
+          // duplicate is invisible in the DOM without this.
+          data-queue-length={String(queue.length)}
         >
           {head.source === "cc" ? (
             <ActionCard

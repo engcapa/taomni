@@ -20,7 +20,8 @@
  *
  * - `threadId` (seeded by the case): thread to attribute the prompt to.
  * - `mode` (seeded by the case): `own` | `fallback` | `stale` | `foreign` |
- *   `duplicate` | `resolved` | `acp` | `acp-dismiss`.
+ *   `duplicate` | `resolved` | `acp` | `acp-dismiss` | `tool` (desktop only:
+ *   dispatches a real terminal side effect to the window that owns the terminal).
  * - `lastResult` (written by the probe): probe outcome, `{decision, delivery,
  *   windowLabel, ...}`; a resolved native decision therefore proves the real
  *   backend path completed.
@@ -58,7 +59,8 @@ export type ApprovalProbeMode =
   | "duplicate"
   | "resolved"
   | "acp"
-  | "acp-dismiss";
+  | "acp-dismiss"
+  | "tool";
 
 interface StoredPrompt {
   source: "cc" | "acp";

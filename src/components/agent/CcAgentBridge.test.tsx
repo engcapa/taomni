@@ -510,6 +510,8 @@ describe("CcAgentBridge window-scoped approval delivery", () => {
     });
 
     expect(screen.getAllByTestId("ai-chat-safety-gate")).toHaveLength(1);
+    // Only the queue head renders, so the depth has to be asserted explicitly.
+    expect(screen.getByTestId("ai-chat-safety-gate")).toHaveAttribute("data-queue-length", "1");
   });
 
   it("drops a card another window already resolved", async () => {
@@ -606,6 +608,102 @@ describe("CcAgentBridge window-scoped approval delivery", () => {
         output: expect.any(String),
       });
     });
+  });
+
+  it("reports a targeted terminal effect this window cannot perform", async () => {
+    setWindowLabel("main");
+    render(<CcAgentBridge />);
+
+    await act(async () => {
+      await emit("agent-cc-tool", {
+        callId: "dispatch-no-terminal",
+        threadId: "thread-1",
+        tool: "run_in_terminal",
+        args: { session_id: "tab-elsewhere", command: "echo qa" },
+        windowLabel: "main",
+      });
+    });
+
+    // A targeted dispatch reaches this window only, so silence would hang the
+    // MCP tool call until its timeout.
+    await waitFor(() => {
+      expect(tauriInvoke).toHaveBeenCalledWith("cc_resolve_tool_call", {
+        callId: "dispatch-no-terminal",
+        ok: false,
+        output: expect.stringContaining("not open in this window"),
+      });
+    });
+  });
+
+  it("stays silent for a broadcast terminal effect another window may own", async () => {
+    setWindowLabel("main");
+    render(<CcAgentBridge />);
+
+    await act(async () => {
+      await emit("agent-cc-tool", {
+        callId: "dispatch-broadcast",
+        threadId: "thread-1",
+        tool: "run_in_terminal",
+        args: { session_id: "tab-elsewhere", command: "echo qa" },
+      });
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(tauriInvoke).not.toHaveBeenCalledWith("cc_resolve_tool_call", expect.anything());
+  });
+
+  it("restores a pending approval that was addressed to this window", async () => {
+    setWindowLabel("main");
+    vi.mocked(tauriInvoke).mockImplementationOnce(async (cmd: string) => {
+      if (cmd !== "cc_pending_permission_prompts") return undefined;
+      return [
+        {
+          callId: "permission-restored",
+          threadId: "thread-1",
+          tool: "run_in_terminal",
+          args: { command: "echo restored" },
+          trust: "default",
+          windowLabel: "main",
+        },
+        {
+          callId: "permission-other-window",
+          threadId: "thread-1",
+          tool: "run_in_terminal",
+          args: { command: "echo other" },
+          trust: "default",
+          windowLabel: "terminal-abc",
+        },
+      ];
+    });
+    render(<CcAgentBridge />);
+
+    expect(await screen.findByTestId("ai-chat-safety-gate")).toBeInTheDocument();
+    expect(screen.getByTestId("ai-chat-safety-gate")).toHaveTextContent("echo restored");
+    expect(screen.getByTestId("ai-chat-safety-gate")).toHaveAttribute("data-queue-length", "1");
+  });
+
+  it("does not duplicate a restored approval that also arrives as an event", async () => {
+    setWindowLabel("main");
+    vi.mocked(tauriInvoke).mockImplementationOnce(async (cmd: string) =>
+      cmd === "cc_pending_permission_prompts"
+        ? [{
+          callId: "permission-restored-twice",
+          threadId: "thread-1",
+          tool: "run_in_terminal",
+          args: { command: "echo once" },
+          trust: "default",
+          windowLabel: "main",
+        }]
+        : undefined,
+    );
+    render(<CcAgentBridge />);
+    await screen.findByTestId("ai-chat-safety-gate");
+
+    await act(async () => {
+      await emit("agent-cc-permission", ccPrompt("permission-restored-twice", "thread-1", "main"));
+    });
+
+    expect(screen.getByTestId("ai-chat-safety-gate")).toHaveAttribute("data-queue-length", "1");
   });
 
   it("ignores an ACP gate addressed to a different window", async () => {

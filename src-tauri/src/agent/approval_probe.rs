@@ -17,11 +17,19 @@
 //! Only the initiator (CC's MCP `permission_prompt` tool or an ACP agent) is
 //! synthetic; the delivery, cards, queue and commands are the shipped ones.
 //!
+//! `tool` reproduces the side-effect half instead: the caller becomes the chat
+//! owner, then a real `agent-cc-tool` dispatch for the terminal tracked to
+//! another window is delivered through the production routing, and its outcome
+//! is returned. That is how the detach case proves the effect ran in the window
+//! that owns the terminal rather than in the chat window.
+//!
 //! Every build compiles this command, but it refuses to run outside the isolated
-//! QA profile (`com.taomni.app.qa`) — the same gate as `parity005_native_fault`.
-//! A production app therefore has no runtime entry to it.
+//! QA application profile (`com.taomni.app.qa`); the renderer chord that calls it
+//! is compiled out of production bundles. A production app therefore never
+//! reaches it.
 
 use crate::agent::cc_bridge::mcp_http::request_permission;
+use crate::agent::cc_bridge::mcp_http::request_tool_dispatch;
 use crate::state::AppState;
 use crate::windowing::thread_delivery::Delivery;
 use crate::windowing::thread_delivery::emit_thread_event_for_app;
@@ -55,6 +63,9 @@ fn delivery_name(delivery: &Delivery) -> String {
 ///   deciding one clears the other through the resolved broadcast).
 /// * `acp` — emit an ACP permission card addressed like a real one.
 /// * `acp-dismiss` — emit the production ACP dismissed broadcast.
+/// * `tool` — claim the thread for the calling window, then dispatch a real
+///   `run_in_terminal` effect for a terminal owned by a *different* window and
+///   return its outcome (proves the terminal-window routing).
 #[tauri::command]
 pub async fn qa_agent_approval_probe(
     window: WebviewWindow,
@@ -116,6 +127,50 @@ pub async fn qa_agent_approval_probe(
             "delivery": delivery_name(&planned),
             "callId": call_id,
             "decision": serde_json::Value::Null,
+        }));
+    }
+
+    if mode == "tool" {
+        state
+            .agent
+            .thread_windows
+            .record(&thread_id, window.label());
+        let candidate = {
+            let tab_windows = state
+                .agent
+                .cc_tab_windows
+                .lock()
+                .map(|map| map.clone())
+                .unwrap_or_default();
+            tab_windows
+                .into_iter()
+                .filter(|(_, label)| label != window.label())
+                .min_by_key(|(tab, _)| tab.clone())
+        };
+        let Some((tab_id, terminal_window)) = candidate else {
+            return Err(
+                "qa_agent_approval_probe tool: no terminal is tracked to another window".into(),
+            );
+        };
+        let outcome = request_tool_dispatch(
+            &app,
+            &thread_id,
+            "run_in_terminal",
+            json!({
+                "session_id": tab_id,
+                "command": "echo QA_CC_TOOL_ONCE",
+                "description": "QA probe side effect used to verify window-scoped dispatch (issue #869)",
+            }),
+        )
+        .await;
+        return Ok(json!({
+            "threadId": thread_id,
+            "mode": mode,
+            "windowLabel": window.label(),
+            "tabId": tab_id,
+            "terminalWindow": terminal_window,
+            "delivery": format!("target:{terminal_window}"),
+            "outcome": outcome,
         }));
     }
 

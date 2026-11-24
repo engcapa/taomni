@@ -38,6 +38,7 @@ mod tests;
 mod tools;
 
 pub(crate) use handler::TOOL_TIMEOUT_SECS;
+pub(crate) use handler::request_tool_dispatch;
 pub use model::Flavor;
 pub(crate) use model::TokenMap;
 pub use model::TokenScope;

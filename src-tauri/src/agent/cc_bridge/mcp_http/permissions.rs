@@ -89,18 +89,32 @@ pub(crate) async fn request_permission(
         );
         state.mobile.events.publish(serde_json::json!({"type":"task_status", "task_id":format!("thread:{thread_id}"),"status":"awaiting_confirmation", "summary":tool}));
     }
-    crate::windowing::thread_delivery::emit_thread_event_for_app(
+    let payload = serde_json::json!({
+        "callId": call_id,
+        "threadId": thread_id,
+        "tool": tool,
+        "args": input,
+        "trust": trust,
+    });
+    let delivery = crate::windowing::thread_delivery::emit_thread_event_for_app(
         app,
         thread_id,
         "agent-cc-permission",
-        serde_json::json!({
-            "callId": call_id,
-            "threadId": thread_id,
-            "tool": tool,
-            "args": input,
-            "trust": trust,
-        }),
+        payload.clone(),
     );
+    // Remember a targeted prompt so a bridge that mounts later (renderer reload,
+    // crash recovery) can re-read it instead of leaving the approval to time out.
+    if let Some(label) = delivery.label() {
+        let mut stored = payload;
+        stored["windowLabel"] = serde_json::json!(label);
+        let state = app.state::<AppState>();
+        state
+            .agent
+            .cc_pending_prompt_payloads
+            .lock()
+            .unwrap()
+            .insert(call_id.clone(), stored);
+    }
 
     let decision =
         match tokio::time::timeout(Duration::from_secs(PERMISSION_TIMEOUT_SECS), rx).await {
@@ -125,6 +139,12 @@ pub(crate) async fn request_permission(
             }
         };
     let state = app.state::<AppState>();
+    state
+        .agent
+        .cc_pending_prompt_payloads
+        .lock()
+        .unwrap()
+        .remove(&call_id);
     let pending: std::collections::HashSet<_> = state
         .agent
         .cc_pending_permissions

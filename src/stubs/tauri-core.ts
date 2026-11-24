@@ -71,6 +71,9 @@ const NOTEPAD_VIEWER_COMMANDS = new Set([
 ]);
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  // Issue #869: the bridge re-reads its pending approvals on mount. Browser
+  // preview has no backend registry, so nothing is pending there.
+  if (cmd === "cc_pending_permission_prompts") return [] as T;
   if (APPROVAL_COMMANDS.has(cmd)) {
     approvalInvocations.push({ command: cmd, args });
     if (approvalInvocations.length > 64) approvalInvocations.shift();

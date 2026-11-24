@@ -375,6 +375,7 @@ pub async fn cc_track_terminal(
 pub async fn cc_untrack_terminal(
     tab_id: String,
     session_id: String,
+    window: tauri::WebviewWindow,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let mut map = state
@@ -384,10 +385,15 @@ pub async fn cc_untrack_terminal(
         .map_err(|e| e.to_string())?;
     if map.get(&tab_id).is_some_and(|s| *s == session_id) {
         map.remove(&tab_id);
-        // Only drop the owning window together with the session mapping, so a
-        // stale unmount cannot delete the detached window's newer terminal.
+        // Only drop the owning window together with the session mapping, and
+        // only when it is still this window: a detached panel can adopt the same
+        // backend session id, so a late unmount from the old window must not
+        // steal the new window's terminal routing.
         if let Ok(mut windows) = state.agent.cc_tab_windows.lock() {
-            windows.remove(&tab_id);
+            let label = window.label();
+            if windows.get(&tab_id).is_some_and(|owner| owner == label) {
+                windows.remove(&tab_id);
+            }
         }
     }
     Ok(())

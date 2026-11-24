@@ -176,6 +176,7 @@ impl AppState {
                 chat_runs: Arc::new(ChatRunRegistry::new(HashMap::new())),
                 cc_pending_tool_calls: Arc::new(Mutex::new(HashMap::new())),
                 cc_pending_permissions: Arc::new(Mutex::new(HashMap::new())),
+                cc_pending_prompt_payloads: Arc::new(Mutex::new(HashMap::new())),
                 thread_windows: Arc::new(crate::windowing::thread_delivery::ThreadWindows::new()),
                 captures: Arc::new(crate::agent::capture::CaptureRegistry::new(
                     std::env::temp_dir().join("taomni-cc-captures"),

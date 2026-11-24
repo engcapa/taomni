@@ -88,6 +88,13 @@ pub struct AgentRuntime {
     /// Pending CC permission prompts awaiting a human decision, keyed by
     /// per-call id. See [`CcPermissionResponder`].
     pub cc_pending_permissions: Arc<Mutex<HashMap<String, CcPermissionResponder>>>,
+    /// Payload of every pending CC permission prompt, keyed by call id. A
+    /// renderer reload or crash drops its event listener and Tauri does not
+    /// queue events, so a freshly mounted bridge re-reads the prompts addressed
+    /// to its window instead of letting the approval time out
+    /// (`cc_pending_permission_prompts`). Only targeted prompts are stored; a
+    /// broadcast prompt is already visible in every window.
+    pub cc_pending_prompt_payloads: Arc<Mutex<HashMap<String, serde_json::Value>>>,
     /// Thread id -> label of the webview that started the current chat turn.
     /// Thread-scoped approval and side-effect events are delivered to that
     /// window instead of being broadcast into every window (issue #869).

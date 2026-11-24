@@ -1,6 +1,7 @@
 id: TC-AI-869-02-detached-window-approval-native
 title: Detached terminal window owns the Tao approval card and deciding clears every window
-description: 'Issue #869 native regression. A detached terminal window mounts the same CcAgentBridge as the main window, so a broadcast approval rendered two cards and a side-effect could run twice. This case opens a real second window from a local-shell bookmark and drives the QA-gated probe, which registers a genuine pending permission and emits through the production thread->window targeting. It asserts: only the owner window shows the card; its Allow decision reaches the real pending registry; the ACP gate addressed to the owner window is not duplicated in the main window and the production dismissed broadcast clears it; a broadcast fallback (stale owner label) renders in both live windows and deciding in one clears the other through agent-cc-permission-resolved; after the owner window closes, the next prompt still renders in the main window and can be decided; and no runtime errors appear.'
+description: 'Issue #869 native regression. A detached terminal window mounts the same CcAgentBridge as the main window, so a broadcast approval rendered two cards and a side-effect could run twice. This case opens a real second window from a local-shell bookmark and drives the QA-gated probe, which registers a genuine pending permission and emits through the production thread->window targeting. It asserts: only the owner window shows the card; its Allow decision reaches the real pending registry; the ACP gate addressed to the owner window is not duplicated in the main window and the production dismissed broadcast clears it; a real run_in_terminal side effect whose terminal lives in the detached window is routed there even though the chat owner is the main window; a broadcast fallback (stale owner label) renders in both live windows and deciding in one clears the other through agent-cc-permission-resolved; after the owner window is reattached the next prompt still appears in the main window
+  and can be decided; and no runtime errors appear.'
 covers:
 - F-AI-2.4
 - F6.3
@@ -15,7 +16,7 @@ modes:
 - native
 fixtures:
 - reset_db
-timeout_sec: 420
+timeout_sec: 480
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
@@ -54,16 +55,22 @@ steps:
 - seed_storage:
     key: qa.agentApproval.mode
     value: '"own"'
-- press: Control+Alt+Shift+F9
+- &id001
+  press: Control+Alt+Shift+F9
 - wait_for:
     selector: '[data-testid="ai-chat-safety-gate"]'
+    state: visible
     timeout_sec: 45
 - assert_count:
     selector: '[data-testid="ai-chat-safety-gate"]'
     equal: 1
+- assert_attribute:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    name: data-queue-length
+    equals: '1'
 - screenshot: native-detached-owner-card.png
 - switch_window:
-    selector: '[data-testid="sidebar"]'
+    selector: '[data-testid="status-bar"]'
     timeout_sec: 45
 - wait: 1
 - assert_count:
@@ -85,15 +92,16 @@ steps:
 - seed_storage:
     key: qa.agentApproval.mode
     value: '"acp"'
-- press: Control+Alt+Shift+F9
+- *id001
 - wait_for:
     selector: '[data-testid="ai-chat-acp-permission-card"]'
+    state: visible
     timeout_sec: 30
 - assert_count:
     selector: '[data-testid="ai-chat-acp-permission-card"]'
     equal: 1
 - switch_window:
-    selector: '[data-testid="sidebar"]'
+    selector: '[data-testid="status-bar"]'
     timeout_sec: 45
 - assert_count:
     selector: '[data-testid="ai-chat-acp-permission-card"]'
@@ -101,7 +109,7 @@ steps:
 - seed_storage:
     key: qa.agentApproval.mode
     value: '"acp-dismiss"'
-- press: Control+Alt+Shift+F9
+- *id001
 - switch_window:
     selector: '[data-testid="detached-reattach"]'
     timeout_sec: 45
@@ -111,23 +119,86 @@ steps:
     timeout_sec: 30
 - screenshot: native-acp-card-dismissed.png
 - switch_window:
-    selector: '[data-testid="sidebar"]'
+    selector: '[data-testid="status-bar"]'
     timeout_sec: 45
 - seed_storage:
     key: qa.agentApproval.mode
-    value: '"stale"'
-- press: Control+Alt+Shift+F9
+    value: '"own"'
+- *id001
 - wait_for:
     selector: '[data-testid="ai-chat-safety-gate"]'
+    state: visible
+    timeout_sec: 45
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: visible
     timeout_sec: 45
 - assert_count:
     selector: '[data-testid="ai-chat-safety-gate"]'
     equal: 1
+- assert_attribute:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    name: data-queue-length
+    equals: '1'
+- screenshot: native-approval-restored-after-reload.png
+- click: '[data-testid="ai-chat-cc-permission-allow"]'
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: detached
+    timeout_sec: 30
+- eval_readonly:
+    expression: localStorage.getItem('qa.agentApproval.lastResult')||''
+    contains: '"decision":"allow"'
+    timeout_sec: 20
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    timeout_sec: 45
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"tool"'
+- *id001
+- eval_readonly:
+    expression: localStorage.getItem('qa.agentApproval.lastResult')||''
+    contains: '"ok":true'
+    timeout_sec: 30
+- eval_readonly:
+    expression: localStorage.getItem('qa.agentApproval.lastResult')||''
+    contains: '"delivery":"target:'
+    timeout_sec: 20
+- switch_window:
+    selector: '[data-testid="detached-reattach"]'
+    timeout_sec: 45
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: QA_CC_TOOL_ONCE
+    timeout_sec: 30
+- screenshot: native-side-effect-in-terminal-window.png
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    timeout_sec: 45
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"stale"'
+- *id001
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: visible
+    timeout_sec: 45
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    name: data-queue-length
+    equals: '1'
 - switch_window:
     selector: '[data-testid="detached-reattach"]'
     timeout_sec: 45
 - wait_for:
     selector: '[data-testid="ai-chat-safety-gate"]'
+    state: visible
     timeout_sec: 45
 - assert_count:
     selector: '[data-testid="ai-chat-safety-gate"]'
@@ -143,7 +214,7 @@ steps:
     contains: '"decision":"deny"'
     timeout_sec: 20
 - switch_window:
-    selector: '[data-testid="sidebar"]'
+    selector: '[data-testid="status-bar"]'
     timeout_sec: 45
 - wait: 1
 - assert_count:
@@ -156,20 +227,22 @@ steps:
 - seed_storage:
     key: qa.agentApproval.mode
     value: '"own"'
-- press: Control+Alt+Shift+F9
+- *id001
 - wait_for:
     selector: '[data-testid="ai-chat-safety-gate"]'
+    state: visible
     timeout_sec: 45
 - switch_window:
-    selector: '[data-testid="sidebar"]'
+    selector: '[data-testid="status-bar"]'
     close_with: '[data-testid="detached-reattach"]'
     timeout_sec: 60
 - seed_storage:
     key: qa.agentApproval.mode
     value: '"fallback"'
-- press: Control+Alt+Shift+F9
+- *id001
 - wait_for:
     selector: '[data-testid="ai-chat-safety-gate"]'
+    state: visible
     timeout_sec: 45
 - assert_count:
     selector: '[data-testid="ai-chat-safety-gate"]'
@@ -190,7 +263,7 @@ verification:
   review: reviewed
   requirements:
   - id: V1-owner-only
-    requirement: A real detached terminal window is created; the approval it owns renders only there, and the main window shows no card.
+    requirement: A real detached terminal window is created; the approval it owns renders only there, with one queue entry, and the main window shows no card.
     actions:
     - 3
     - 5
@@ -206,115 +279,169 @@ verification:
     - 21
     - 22
     checkpoints:
+    - step: 19
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec": 45}}'
     - step: 23
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "timeout_sec": 45}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
     - step: 24
       expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
-    - step: 28
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "name": "data-queue-length", "equals": "1"}}'
+    - step: 29
       expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 0}}'
     results:
+    - 19
     - 23
     - 24
-    - 28
+    - 25
+    - 29
   - id: V2-decision
     requirement: Allow in the owner window resolves the real pending permission and the card disappears.
     actions:
-    - 31
+    - 32
     checkpoints:
-    - step: 32
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached", "timeout_sec": 30}}'
     - step: 33
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached", "timeout_sec": 30}}'
+    - step: 34
       expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"decision\":\"allow\"", "timeout_sec": 20}}'
     results:
-    - 32
     - 33
+    - 34
   - id: V3-acp-window-scope
     requirement: The ACP gate is addressed to its owner window only and the production dismissed broadcast clears it there.
     actions:
-    - 34
     - 35
-    - 40
+    - 36
     - 41
+    - 42
     checkpoints:
-    - step: 36
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "timeout_sec": 30}}'
     - step: 37
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "state": "visible", "timeout_sec": 30}}'
+    - step: 38
       expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "equal": 1}}'
-    - step: 39
+    - step: 40
       expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "equal": 0}}'
-    - step: 43
+    - step: 44
       expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-acp-permission-card\"]", "state": "detached", "timeout_sec": 30}}'
     results:
-    - 36
     - 37
-    - 39
-    - 43
-  - id: V4-broadcast-residue
-    requirement: When the recorded owner window is gone the prompt is broadcast, both live windows show it, and deciding in one removes the other window's card instead of leaving a dead card.
+    - 38
+    - 40
+    - 44
+  - id: V4-replay-after-reload
+    requirement: A pending approval addressed to this window is restored after its renderer reloads (Tauri events are not queued), with one queue entry, and can still be decided.
     actions:
-    - 46
     - 47
-    - 54
-    checkpoints:
-    - step: 48
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "timeout_sec": 45}}'
-    - step: 49
-      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
-    - step: 51
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "timeout_sec": 45}}'
-    - step: 52
-      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
-    - step: 56
-      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"decision\":\"deny\"", "timeout_sec": 20}}'
-    - step: 59
-      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 0}}'
-    results:
     - 48
+    - 50
+    - 56
+    checkpoints:
+    - step: 49
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 52
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
+    - step: 53
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "name": "data-queue-length", "equals": "1"}}'
+    - step: 58
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"decision\":\"allow\"", "timeout_sec": 20}}'
+    results:
     - 49
     - 51
     - 52
-    - 56
-    - 59
-  - id: V5-closed-owner
-    requirement: Closing the owner window while it owns the thread still lets the next prompt appear in the main window and reach a decision.
+    - 53
+    - 54
+    - 58
+  - id: V5-terminal-effect
+    requirement: A real run_in_terminal effect is delivered to the window that owns the terminal, not to the chat owner, and the bound terminal shows its command.
     actions:
+    - 61
+    - 64
+    checkpoints:
+    - step: 62
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"ok\":true", "timeout_sec": 30}}'
+    - step: 63
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"delivery\":\"target:", "timeout_sec": 20}}'
+    - step: 65
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "QA_CC_TOOL_ONCE", "timeout_sec": 30}}'
+    results:
     - 62
     - 63
     - 65
-    - 66
-    - 67
-    - 71
-    checkpoints:
-    - step: 64
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "timeout_sec": 45}}'
-    - step: 68
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "timeout_sec": 45}}'
-    - step: 69
-      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
-    - step: 72
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached", "timeout_sec": 30}}'
-    - step: 73
-      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"delivery\":\"broadcast\"", "timeout_sec": 20}}'
-    results:
-    - 64
+  - id: V6-broadcast-residue
+    requirement: When the recorded owner window is gone the prompt is broadcast, both live windows show one card each, and deciding in one removes the other window's card instead of leaving a dead card.
+    actions:
     - 68
     - 69
-    - 72
-    - 73
-  - id: V6-crash-regression
-    requirement: No uncaught error, unhandled rejection or crash UI appears in the main window after the window lifecycle and decisions.
-    actions:
-    - 71
+    - 77
+    - 80
     checkpoints:
+    - step: 70
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
+    - step: 71
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
+    - step: 72
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "name": "data-queue-length", "equals": "1"}}'
     - step: 74
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
+    - step: 75
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
+    - step: 78
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached", "timeout_sec": 30}}'
+    - step: 79
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"decision\":\"deny\"", "timeout_sec": 20}}'
+    - step: 82
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 0}}'
+    results:
+    - 70
+    - 71
+    - 72
+    - 74
+    - 75
+    - 78
+    - 79
+    - 82
+  - id: V7-closed-owner
+    requirement: Reattaching the owner window while it owns the thread still lets the next prompt appear in the main window and reach a decision.
+    actions:
+    - 84
+    - 85
+    - 86
+    - 88
+    - 89
+    - 90
+    - 94
+    checkpoints:
+    - step: 91
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
+    - step: 92
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
+    - step: 95
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached", "timeout_sec": 30}}'
+    - step: 96
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"delivery\":\"broadcast\"", "timeout_sec": 20}}'
+    results:
+    - 91
+    - 92
+    - 95
+    - 96
+  - id: V8-crash-regression
+    requirement: No uncaught error, unhandled rejection or crash UI appears in the main window after the window lifecycle, decisions and side effect.
+    actions:
+    - 94
+    checkpoints:
+    - step: 97
       expectation: '{"assert_no_runtime_errors": null}'
     results:
-    - 74
+    - 97
   visual:
-  - check: The detached-window card, the two-window broadcast state and the cleared main window are readable and correctly sized in the retained screenshots.
+  - check: The detached-window card, the two-window broadcast state, the side effect in the terminal and the cleared main window are readable and correctly sized in the retained screenshots.
     method: manual
     reason: Counts prove aliasing and clearing; window chrome, clipping and readability still need the screenshots.
   native:
-  - check: Two real OS windows, the real pending-permission registry, the resolved broadcast and window destruction are exercised through the QA probe on the shipped delivery path.
+  - check: Two real OS windows, the real pending-permission registry, the resolved broadcast, window destruction and a real terminal side effect are exercised through the QA probe on the shipped delivery paths.
     method: automated
     reason: Only a real second WebView and the Tauri backend can duplicate or drop these events; browser preview cannot.

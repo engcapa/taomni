@@ -186,7 +186,13 @@ export async function executeTool(dispatch: ToolDispatch): Promise<void> {
         }
         const term = getTerminal(tabId);
         if (!term) {
-          return;
+          // A targeted dispatch reaches exactly one window, so this window must
+          // report that it cannot perform the effect instead of letting the
+          // tool call hang until its timeout. A broadcast (no windowLabel) stays
+          // silent: the window that owns the terminal will perform it.
+          if (!dispatch.windowLabel) return;
+          output = "run_in_terminal: the bound terminal is not open in this window";
+          break;
         }
         term.writeInput(buildInteractiveCommandInput(command));
         ok = true;
@@ -203,7 +209,9 @@ export async function executeTool(dispatch: ToolDispatch): Promise<void> {
         }
         const term = getTerminal(tabId);
         if (!term) {
-          return;
+          if (!dispatch.windowLabel) return;
+          output = "read_terminal_tail: the bound terminal is not open in this window";
+          break;
         }
         const n = Number(args.lines ?? 50);
         output = term.getLastLines(Number.isFinite(n) && n > 0 ? n : 50);
