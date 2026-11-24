@@ -250,6 +250,12 @@ class NightlyAndCachePipelineTests(unittest.TestCase):
         entry_env = self.entry['jobs']['entry']['env']
         self.assertEqual(entry_env['QA_DEFAULT_BRANCH'], '${{ github.event.repository.default_branch }}')
 
+    def test_java_jobs_get_job_wide_maven_transfer_retries(self):
+        env = self.entry['jobs']['entry']['env']
+        self.assertIn("contains(matrix.capabilities, 'java')", env['MAVEN_OPTS'])
+        self.assertIn('maven.wagon.http.retryHandler.count=5', env['MAVEN_OPTS'])
+        self.assertIn('aether.connector.http.retryHandler.count=5', env['MAVEN_OPTS'])
+
     def test_vendor_cache_experiment_is_enabled_by_default_and_can_be_disabled(self):
         env = self.entry['jobs']['entry']['env']
         self.assertIn("inputs.vendor_cache != 'false'", env['QA_VENDOR_CACHE'])
