@@ -10,7 +10,8 @@ description: 'TASK-21 (docs-feature/mail-thunderbird-parity-design.md AC-65).
 
   no repeated downloads). Opens a newly downloaded message and checks its
   rendered text. Reopens the same account and checks the complete list and
-  a single row for the most recent message.
+  a single row for the most recent message. Opens a saved attachment in the
+  read-only viewer and checks that closing it releases the temporary copy.
 
   Browser mode drives the stub server model (renderer orchestration only);
 
@@ -24,6 +25,7 @@ description: 'TASK-21 (docs-feature/mail-thunderbird-parity-design.md AC-65).
 covers:
 - F-MAIL-17
 - F-MAIL-3
+- F-FILEOPEN-1
 tags:
 - mail
 - p2
@@ -32,7 +34,8 @@ modes:
 - native
 fixtures:
 - reset_db
-- mail_server
+- file_open_mail
+- file_open_files
 timeout_sec: 210
 steps:
 - open: ${cfg.app.base_url}
@@ -111,6 +114,15 @@ steps:
     equal: 0
 - assert_disabled: '[data-testid="mail-mark-folder-read"]'
 - assert_no_runtime_errors: null
+- click: '[data-testid="mail-message-row"][data-subject="${fixture.file_open_mail_subject}"]'
+- wait_for: '[data-testid="mail-attachment-open"][data-name="policy.txt"]:enabled'
+- dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
+- assert_file_open_bytes: {selector: '[data-testid="file-viewer"][data-readonly="true"]', remember: pop3-part, equals: '${fixture.file_open_mail_text}'}
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-readonly="true"]', state: detached}
+- assert_file_open_bytes: {remember: pop3-part, absent: true}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -176,6 +188,17 @@ verification:
     - {step: 38, expectation: The Mark Folder Read command is disabled when no unread messages remain.}
     - {step: 39, expectation: No uncaught renderer errors occur.}
     results: [34, 36, 37, 38, 39]
+  - id: local-attachment
+    requirement: The POP3 reader opens its attachment as a temporary read-only file and releases it when the viewer closes.
+    actions: [40, 42, 45]
+    checkpoints:
+    - {step: 41, expectation: The locally stored message exposes the expected attachment.}
+    - {step: 43, expectation: The attachment opens in a read-only viewer.}
+    - {step: 44, expectation: An independent file read matches the fixture bytes.}
+    - {step: 46, expectation: Closing the viewer removes its tab.}
+    - {step: 47, expectation: The viewer has released the temporary file.}
+    - {step: 48, expectation: No uncaught renderer errors occur.}
+    results: [41, 43, 44, 46, 47, 48]
   visual:
   - check: 截图中本地文件夹（INBOX/Sent/Drafts/Trash/Junk）与 POP3 状态显示正确。
     method: manual

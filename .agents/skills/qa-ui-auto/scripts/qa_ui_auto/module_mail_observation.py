@@ -136,14 +136,16 @@ def run(ctx, args):
         from .module_mail_pop3 import observe
 
         manifest = json.loads((version_root / "module.json").read_text(encoding="utf-8"))
-        if "mail/sync-owned-pop3-mailbox" not in manifest["commands"]:
-            raise StepError("The installed Mail version does not own the POP3 mailbox")
+        capabilities = ["mail/sync-owned-pop3-mailbox", "mail/read-pop3-attachment"]
+        if not set(capabilities) <= set(manifest["commands"]):
+            raise StepError("The installed Mail version must own POP3 sync and attachment reads")
         server = mail_fake_server.ACTIVE.state
         with server.lock:
             commands = [command for command in server.log if command.startswith("POP3 ")]
         if any(command not in commands for command in ("POP3 UIDL", "POP3 RETR", "POP3 QUIT")):
             raise StepError("The POP3 fixture did not observe a complete mailbox round")
         report["pop3Commands"] = commands
+        report["pop3Capabilities"] = capabilities
         report["mailbox"] = observe(module / "data", plugins.parent / "mail-cache")
     if phase in {"pop3-saved", "pop3-reopened", "pop3-retained"}:
         from .module_mail_pop3 import observe
@@ -153,6 +155,24 @@ def run(ctx, args):
             signed["pop3Mailbox"] = report["mailbox"]
         elif report["mailbox"] != signed.get("pop3Mailbox"):
             raise StepError("The POP3 UIDL ledger or stored originals changed")
+        if phase == "pop3-reopened" and owner.case_id == "TC-MODULES-076":
+            from pathlib import Path
+
+            server = mail_fake_server.ACTIVE.state
+            with server.lock:
+                server_subjects = [
+                    msg.raw for msg in server.folders["INBOX"].messages.values()
+                    if b"Subject: Account-level AI policy" in msg.raw
+                ]
+            if server_subjects:
+                raise StepError("The POP3 attachment fixture message is still present on the server")
+            target = Path(owner.values["file_open_mail_target"])
+            ordinary(target)
+            with target.open("rb") as stream:
+                actual = hashlib.file_digest(stream, "sha256").hexdigest()
+            if actual != owner.values["file_open_mail_sha256"]:
+                raise StepError("The downloaded POP3 attachment differs from the original MIME part")
+            report["attachment"] = {"path": str(target), "sha256": actual, "serverCopyAbsent": True}
     if phase in {"filter-saved", "filter-retained"}:
         if owner.case_id != "TC-MODULES-092":
             raise StepError("Filter storage requires the signed filter case")

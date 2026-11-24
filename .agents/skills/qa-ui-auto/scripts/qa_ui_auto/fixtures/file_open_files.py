@@ -95,6 +95,11 @@ def setup_mail(ctx: Any) -> None:
     native = (ctx.cfg.get("app") or {}).get("mode") == "native"
     ctx.values["file_open_mail_subject"] = "Account-level AI policy"
     ctx.values["file_open_mail_text"] = MAIL_TEXT
+    pop3_attachment = ctx.case_id in {"TC-MAIL-POP3-01", "TC-MODULES-076"}
+    if pop3_attachment and native and ctx.case_id == "TC-MODULES-076":
+        # Keep the original mailbox fixture while adding a stable MIME part.
+        ctx.values["file_open_mail_target"] = (Path(ctx.case_dir).resolve() / "pop3-policy.txt").as_posix()
+        ctx.values["file_open_mail_sha256"] = hashlib.sha256(MAIL_TEXT.encode()).hexdigest()
     if not native:
         return
     from .. import mail_fake_server
@@ -103,7 +108,7 @@ def setup_mail(ctx: Any) -> None:
         raise RuntimeError("file_open_mail requires the local fake mail server")
     signed_mail = ctx.case_id == "TC-MODULES-059"
     with server.state.lock:
-        if not signed_mail:
+        if not signed_mail and not pop3_attachment:
             for folder in server.state.folders.values():
                 folder.messages.clear()
         raw = ("From: QA <qa@example.com>\r\nTo: reader@example.com\r\nSubject: Account-level AI policy\r\n"

@@ -34,6 +34,7 @@ mod mbox_export;
 mod mime_decoding;
 mod mutation_jobs;
 mod outgoing;
+mod pop3_attachment;
 mod pop3_round;
 mod pop3_store;
 mod pop3_sync;
@@ -124,6 +125,7 @@ fn host_config() -> HostConfig {
                 taomni_mail_api::SYNC_POP3_ROUND,
                 taomni_mail_api::pop3_store::LOCAL_MAILBOX,
                 taomni_mail_api::pop3_store::SYNC_OWNED_MAILBOX,
+                taomni_mail_api::pop3_store::READ_POP3_ATTACHMENT,
                 FETCH_IMAP_ATTACHMENT,
                 SNAPSHOT_PREPARE_METHOD,
                 SNAPSHOT_METHOD,
@@ -207,6 +209,16 @@ impl PluginHandler for Handler {
                     &self.store,
                     operation,
                     request,
+                )?)
+            }
+            taomni_mail_api::pop3_store::READ_POP3_ATTACHMENT => {
+                let endpoint = serde_json::from_value(params.unwrap_or_default())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                serde_json::to_value(pop3_attachment::serve(
+                    &self.io,
+                    &self.store,
+                    operation,
+                    endpoint,
                 )?)
             }
             taomni_mail_api::CALDAV_AGENDA => {

@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use rusqlite::{Connection, params};
 use serde::Serialize;
 use serde_json::json;
 use taomni_mail_api::{
@@ -11,8 +12,12 @@ use taomni_mail_api::{
     calendar::{DECODE_INVITE, MailInvite},
     imap_exchange::{AttachmentReceipt, read_body_frame, write_body_frame},
     message::MailMessageBody,
-    pop3_store::LocalArchiveAction,
+    pop3_store::{LocalArchiveAction, Pop3AttachmentRequest, READ_POP3_ATTACHMENT},
 };
+use taomni_mail_engine::{
+    cache::init_mail_tables, database::mail_db_file_stem, pop3::local_store::migrate_local_tables,
+};
+use taomni_plugin_api::ErrorCode;
 use taomni_plugin_stream::routed_tcp::Route;
 use tokio::io::{AsyncReadExt, DuplexStream};
 
@@ -142,6 +147,63 @@ pub(super) fn check_invitation(host: &mut MailHost) {
     assert!(decode(host, ORIGINAL).is_none());
 }
 
+pub(super) fn check_pop3_attachment(host: &mut MailHost, owned_legacy_source: &Path) {
+    let read_part = |host: &mut MailHost, account_id: &str, legacy_database| {
+        exchange(
+            host,
+            READ_POP3_ATTACHMENT,
+            Pop3AttachmentRequest {
+                account_id: account_id.into(),
+                legacy_database,
+                folder: "Sent".into(),
+                uid: 4,
+                index: 0,
+            },
+            async |mut peer| {
+                let header = read_body_frame(&mut peer).await.unwrap();
+                let receipt = serde_json::from_slice::<Option<AttachmentReceipt>>(&header)
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(receipt.name.as_deref(), Some("original.bin"));
+                assert_eq!(
+                    receipt.content_type.as_deref(),
+                    Some("application/octet-stream")
+                );
+                assert_eq!(receipt.size, ATTACHMENT.len());
+                let mut bytes = Vec::new();
+                peer.read_to_end(&mut bytes).await.unwrap();
+                assert_eq!(bytes, ATTACHMENT);
+            },
+        );
+    };
+
+    // 1. Owned mailbox reads from the module database.
+    read_part(host, ACCOUNT, None);
+
+    // 2. Stale legacy path for an already-owned account is rejected.
+    check_stale_pop3_attachment(host, owned_legacy_source);
+
+    // 3. Unowned legacy mailbox path decodes directly from the retained database.
+    let temp = tempfile::tempdir().unwrap();
+    let legacy_account = "legacy-pop3-attachment";
+    let unowned_db = temp
+        .path()
+        .canonicalize()
+        .unwrap()
+        .join(format!("{}.db", mail_db_file_stem(legacy_account)));
+    {
+        let db = Connection::open(&unowned_db).unwrap();
+        init_mail_tables(&db).unwrap();
+        migrate_local_tables(&db).unwrap();
+        db.execute(
+            "INSERT INTO mail_local_raw(account_id, folder, uid, raw) VALUES (?1, 'Sent', 4, ?2)",
+            params![legacy_account, ORIGINAL.as_bytes()],
+        )
+        .unwrap();
+    }
+    read_part(host, legacy_account, Some(unowned_db));
+}
+
 fn exchange<T>(
     host: &mut MailHost,
     method: &str,
@@ -177,4 +239,36 @@ fn exchange_bytes<T>(
             reply
         })
     })
+}
+
+fn check_stale_pop3_attachment(host: &mut MailHost, owned_legacy_source: &Path) {
+    let io = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    let stale = serde_json::to_vec(&Pop3AttachmentRequest {
+        account_id: ACCOUNT.into(),
+        legacy_database: Some(owned_legacy_source.to_path_buf()),
+        folder: "Sent".into(),
+        uid: 4,
+        index: 0,
+    })
+    .unwrap();
+    std::thread::scope(|scope| {
+        io.block_on(async {
+            let (_route, endpoint, mut peer) = Route::pair().await.unwrap();
+            let call = scope.spawn(move || {
+                host.send(READ_POP3_ATTACHMENT, serde_json::to_value(endpoint).unwrap())
+            });
+            tokio::time::timeout(WAIT, write_body_frame(&mut peer, &stale))
+                .await
+                .unwrap()
+                .unwrap();
+            let response = call.join().unwrap();
+            let err = response.error.expect("stale legacy path must fail");
+            assert_eq!(err.code, ErrorCode::InvalidState as i32);
+            assert!(err.message.contains("POP3 mailbox ownership has changed"));
+        });
+    });
 }

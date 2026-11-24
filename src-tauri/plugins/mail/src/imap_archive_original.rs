@@ -122,7 +122,7 @@ fn original_receipt(size: usize) -> AttachmentReceipt {
     }
 }
 
-fn send(
+pub(super) fn send(
     runtime: &Runtime,
     operation: &Operation,
     peer: &mut TcpStream,

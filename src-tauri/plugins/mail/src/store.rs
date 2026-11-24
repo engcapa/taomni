@@ -126,6 +126,14 @@ impl Store {
         }
     }
 
+    pub(super) fn owns_pop3_cache(&self, account: &str) -> Result<bool, RpcError> {
+        validate_account(account)?;
+        let Some(data) = self.data_root(false)? else {
+            return Ok(false);
+        };
+        taomni_mail_engine::pop3::ownership::is_owned(&data, account).map_err(|_| unavailable())
+    }
+
     pub(super) fn data_root(&self, create: bool) -> Result<Option<PathBuf>, RpcError> {
         checked_directory(&self.profile, Path::new("plugins/mail/data"), create)
     }

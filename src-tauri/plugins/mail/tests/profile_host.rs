@@ -333,6 +333,11 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
             ],
         )
         .unwrap();
+        db.execute(
+            "INSERT INTO mail_local_raw(account_id, folder, uid, raw) VALUES (?1, 'Sent', 4, ?2)",
+            rusqlite::params![ACCOUNT, archive_original::ORIGINAL.as_bytes()],
+        )
+        .unwrap();
         let draft = serde_json::from_value(json!({
             "id":"scheduled",
             "subject":"Draft saved by the monolith",
@@ -401,6 +406,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     archive_original::check(&mut host, &source);
     archive_original::check(&mut host, &path);
     archive_original::check_invitation(&mut host);
+    archive_original::check_pop3_attachment(&mut host, &source);
     let folders = host.call("mail_list_cached_folders", json!({"accountId":ACCOUNT}));
     assert_eq!(folders[0]["name"], "INBOX");
     assert_eq!(folders[0]["cachedCount"], 1);

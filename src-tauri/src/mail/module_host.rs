@@ -43,6 +43,7 @@ pub(super) mod imap_archive_original;
 mod imap_outgoing;
 mod mutations;
 mod pop3;
+pub(super) mod pop3_attachment;
 mod pop3_round;
 pub(super) mod pop3_store;
 mod prefetch;

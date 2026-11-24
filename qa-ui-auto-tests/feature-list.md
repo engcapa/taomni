@@ -8432,6 +8432,8 @@ files:
   - src-tauri/src/mail/imap_transport.rs
   - src-tauri/src/mail/local_cmds.rs
   - src-tauri/crates/taomni-mail-engine/src/pop3.rs
+  - src-tauri/src/mail/module_host/pop3_attachment.rs
+  - src-tauri/plugins/mail/src/pop3_attachment.rs
 controls:
   - id: incoming-protocol
     selector: '[data-testid="mail-incoming-protocol"]'
@@ -8449,6 +8451,7 @@ controls:
 - 会话编辑器 “Incoming” 可选 POP3（本地文件夹），Quick Connect 支持 `pop3://` / `pop3s://`（默认端口 995/110）。支持 TLS、STLS 与明文；明文且服务器提供时间戳时使用 APOP，OAuth 使用 XOAUTH2。
 - 以 `UIDL` 去重下载到本地 INBOX（每批 50 封，重复同步不产生重复邮件）；“Delete from server after N days”（空 = 保留，0 = 下载后立即删除）按下载时间在服务器执行 `DELE`。
 - 本地文件夹（INBOX/Sent/Drafts/Trash/Junk 与自建文件夹）支持移动、复制、删除、标记、搜索、重命名与 mbox 导入导出；发出的邮件副本存入本地 Sent。本地邮件不受邮件头保留策略裁剪，清空缓存会被拒绝（邮件只有本地一份）。
+- 签名 Mail 宿主从 POP3 的本地原件解码附件，基座在收齐字节后保存文件。TC-MODULES-076 删除服务器副本后，用原生保存对话框校验取消、重试和文件摘要。TC-MAIL-POP3-01 校验只读预览的内容和关闭后的文件清理。
 
 ---
 

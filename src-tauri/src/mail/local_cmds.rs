@@ -13,8 +13,8 @@ use super::sync::{MailFolderSyncResult, MailSyncMode};
 use super::{
     MailAccountConfig, MailDeleteResult, MailDownloadAttachmentResult, MailFlagResult, MailFolder,
     MailMarkReadResult, MailMessageBody, MailMoveResult, MailSendRequest, MailSendResult,
-    MailSyncAllResult, MailTestConnectionResult, MessageBuildOptions, extract_attachment, now_ts,
-    pop3_store, resolve_config,
+    MailSyncAllResult, MailTestConnectionResult, MessageBuildOptions, now_ts, pop3_store,
+    resolve_config,
 };
 use crate::state::AppState;
 
@@ -424,14 +424,55 @@ pub(super) async fn download_attachment(
     index: usize,
     target_path: &str,
 ) -> Result<MailDownloadAttachmentResult, String> {
-    let raw = raw(state, account_id, folder, uid).await?;
-    let attachment = extract_attachment(&raw, index)?;
-    let path = super::write_attachment_file(target_path, &attachment.bytes)?;
+    if target_path.is_empty() {
+        return Err("attachment download path is required".into());
+    }
+    #[cfg(feature = "legacy-mail-pop3")]
+    if state.plugins.get(taomni_mail_api::SLUG).is_none() {
+        let raw = raw(state, account_id, folder, uid).await?;
+        let target_path = target_path.to_owned();
+        return super::decode_mail_original(move || {
+            let attachment = taomni_mail_engine::extract_attachment(&raw, index)?;
+            super::attachment_files::publish_mail_bytes(
+                std::path::Path::new(&target_path),
+                &attachment.bytes,
+            )?;
+            Ok(MailDownloadAttachmentResult {
+                path: target_path,
+                name: attachment.name,
+                content_type: attachment.content_type,
+                size: attachment.bytes.len(),
+            })
+        })
+        .await;
+    }
+
+    let _authority = state
+        .legacy
+        .mail
+        .pop3_owner_gate(account_id)
+        .lock_owned()
+        .await;
+    let cache = if pop3_store::is_hosted(state, account_id).await? {
+        None
+    } else {
+        Some(state.mail_db(account_id)?)
+    };
+    let receipt = super::module_host::pop3_attachment::save(
+        state.plugins.clone(),
+        cache,
+        account_id,
+        folder,
+        uid,
+        index,
+        std::path::Path::new(target_path),
+    )
+    .await?;
     Ok(MailDownloadAttachmentResult {
-        path,
-        name: attachment.name,
-        content_type: attachment.content_type,
-        size: attachment.bytes.len(),
+        path: target_path.to_owned(),
+        name: receipt.name,
+        content_type: receipt.content_type,
+        size: receipt.size,
     })
 }
 

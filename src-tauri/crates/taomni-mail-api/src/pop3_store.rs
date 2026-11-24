@@ -1,5 +1,7 @@
 //! Account-scoped commands for the local mailbox of a POP3 account.
 
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 use taomni_plugin_stream::routed_tcp::Endpoint;
 
@@ -11,6 +13,19 @@ use crate::{
 
 pub const LOCAL_MAILBOX: &str = "mail/local-pop3-mailbox";
 pub const SYNC_OWNED_MAILBOX: &str = "mail/sync-owned-pop3-mailbox";
+pub const READ_POP3_ATTACHMENT: &str = "mail/read-pop3-attachment";
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Pop3AttachmentRequest {
+    pub account_id: String,
+    /// Canonical account cache for a retained mailbox. An owned mailbox uses
+    /// the module database and does not carry a path in the request.
+    pub legacy_database: Option<PathBuf>,
+    pub folder: String,
+    pub uid: u32,
+    pub index: usize,
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
