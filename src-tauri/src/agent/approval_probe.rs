@@ -35,6 +35,9 @@ use crate::windowing::thread_delivery::Delivery;
 use crate::windowing::thread_delivery::emit_thread_event_for_app;
 use crate::windowing::thread_delivery::plan_thread_delivery;
 use serde_json::json;
+use std::collections::HashSet;
+use std::sync::Mutex;
+use std::sync::OnceLock;
 use tauri::Emitter;
 use tauri::Manager;
 use tauri::State;
@@ -42,6 +45,39 @@ use tauri::WebviewWindow;
 use uuid::Uuid;
 
 const PROBE_THREAD_DEFAULT: &str = "qa-agent-approval-thread";
+
+/// Threads with a blocking probe currently waiting for a decision.
+fn probe_guard() -> &'static Mutex<HashSet<String>> {
+    static GUARD: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    GUARD.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+/// Releases the thread's probe slot when the command finishes (decision,
+/// timeout, or cancellation).
+struct ProbeGuard {
+    thread_id: String,
+}
+
+impl ProbeGuard {
+    fn acquire(thread_id: &str) -> Option<Self> {
+        let mut guard = probe_guard().lock().unwrap_or_else(|e| e.into_inner());
+        if !guard.insert(thread_id.to_string()) {
+            return None;
+        }
+        Some(Self {
+            thread_id: thread_id.to_string(),
+        })
+    }
+}
+
+impl Drop for ProbeGuard {
+    fn drop(&mut self) {
+        probe_guard()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&self.thread_id);
+    }
+}
 
 fn delivery_name(delivery: &Delivery) -> String {
     match delivery {
@@ -81,8 +117,28 @@ pub async fn qa_agent_approval_probe(
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| PROBE_THREAD_DEFAULT.to_string());
     let mode = mode.unwrap_or_else(|| "own".to_string());
+    // A repeated trigger must not stack approvals. The renderer chord is already
+    // single-flight per document, but the stimulus can reach the backend twice
+    // (observed with the WebKitGTK automation transport after a window switch),
+    // and two pending prompts for one thread would later surface as two cards.
+    let _guard = match mode.as_str() {
+        "own" | "fallback" | "stale" => match ProbeGuard::acquire(&thread_id) {
+            Some(guard) => Some(guard),
+            None => {
+                return Ok(json!({
+                    "threadId": thread_id,
+                    "mode": mode,
+                    "windowLabel": window.label(),
+                    "skipped": "approval probe already pending for this thread",
+                }));
+            }
+        },
+        _ => None,
+    };
     match mode.as_str() {
-        "own" | "acp" => state
+        // `tool` claims the thread for the caller on purpose: the effect must
+        // still be routed to the window that owns the terminal.
+        "own" | "acp" | "tool" => state
             .agent
             .thread_windows
             .record(&thread_id, window.label()),

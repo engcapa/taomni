@@ -241,6 +241,31 @@ describe("approval probe chord", () => {
     }
   });
 
+  it("ignores a second chord while a probe is still in flight", async () => {
+    seed("own");
+    setWindowLabel("terminal-abc");
+    (window as unknown as TauriGlobal).__TAURI_INTERNALS__ = {
+      metadata: { currentWindow: { label: "terminal-abc" } },
+      invoke: () => undefined,
+    };
+    // The desktop invoke resolves immediately in this mock; hold it so the first
+    // probe stays in flight while the second chord is delivered.
+    const { invoke } = await import("@tauri-apps/api/core");
+    const gate: { release?: () => void } = {};
+    vi.mocked(invoke).mockImplementationOnce(
+      () => new Promise((resolve) => {
+        gate.release = () => resolve({ delivery: "target:terminal-abc", decision: "allow" });
+      }),
+    );
+
+    const first = runApprovalProbe();
+    const second = runApprovalProbe();
+    gate.release?.();
+    await Promise.all([first, second]);
+
+    expect(vi.mocked(invoke)).toHaveBeenCalledTimes(1);
+  });
+
   it("does not double-install the chord", async () => {
     seed("own");
     const first = installApprovalProbe();

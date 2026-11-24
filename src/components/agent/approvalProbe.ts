@@ -43,6 +43,12 @@ export const APPROVAL_PROBE_MODE_KEY = "qa.agentApproval.mode";
 export const APPROVAL_PROBE_THREAD_KEY = "qa.agentApproval.threadId";
 export const APPROVAL_PROBE_RESULT_KEY = "qa.agentApproval.lastResult";
 export const APPROVAL_PROBE_LAST_KEY = "qa.agentApproval.lastPrompt";
+/**
+ * Journal of the last probe attempt, including the backend result. QA cases use
+ * it to prove the trigger actually reached the backend (and whether a duplicate
+ * trigger was skipped) without having to wait for a decision.
+ */
+export const APPROVAL_PROBE_ATTEMPT_KEY = "qa.agentApproval.lastAttempt";
 
 /** Mode used when the case seeds none. */
 export const APPROVAL_PROBE_DEFAULT_MODE = "own";
@@ -246,10 +252,19 @@ async function runBrowserProbe(mode: string, threadId: string): Promise<void> {
   }
 }
 
+let probeInFlight = false;
+
 /**
  * Run one probe cycle. Exported for unit tests; the installed chord calls it.
+ *
+ * A chord must not stack prompts: the `own`/`stale` modes stay in flight until a
+ * card is decided, so a duplicated key event (observed with the WebKitGTK
+ * automation transport after a window switch) would otherwise create a second
+ * pending approval that later re-appears through the mount replay.
  */
 export async function runApprovalProbe(): Promise<void> {
+  if (probeInFlight) return;
+  probeInFlight = true;
   const mode = probeMode();
   const threadId = probeThread();
   try {
@@ -263,17 +278,31 @@ export async function runApprovalProbe(): Promise<void> {
       });
       return;
     }
+    writeJson(APPROVAL_PROBE_ATTEMPT_KEY, {
+      threadId,
+      mode,
+      windowLabel: currentWindowLabel(),
+    });
     const result = await invoke<Record<string, unknown>>("qa_agent_approval_probe", {
       threadId,
       mode,
     });
-    writeJson(APPROVAL_PROBE_RESULT_KEY, { threadId, mode, ...result });
-  } catch (error) {
-    writeJson(APPROVAL_PROBE_RESULT_KEY, {
+    writeJson(APPROVAL_PROBE_ATTEMPT_KEY, {
       threadId,
       mode,
-      error: error instanceof Error ? error.message : String(error),
+      windowLabel: currentWindowLabel(),
+      result: result ?? null,
     });
+    // A duplicate trigger is rejected by the backend's single-flight guard; it
+    // must not overwrite the outcome of the prompt that is actually pending.
+    if (result && typeof result.skipped === "string") return;
+    writeJson(APPROVAL_PROBE_RESULT_KEY, { threadId, mode, ...result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    writeJson(APPROVAL_PROBE_RESULT_KEY, { threadId, mode, error: message });
+    writeJson(APPROVAL_PROBE_ATTEMPT_KEY, { threadId, mode, error: message });
+  } finally {
+    probeInFlight = false;
   }
 }
 

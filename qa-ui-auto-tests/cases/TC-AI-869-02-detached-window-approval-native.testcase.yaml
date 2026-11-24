@@ -148,10 +148,12 @@ steps:
     selector: '[data-testid="ai-chat-safety-gate"]'
     state: detached
     timeout_sec: 30
-- eval_readonly:
-    expression: localStorage.getItem('qa.agentApproval.lastResult')||''
-    contains: '"decision":"allow"'
-    timeout_sec: 20
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- wait: 2
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 0
 - switch_window:
     selector: '[data-testid="status-bar"]'
     timeout_sec: 45
@@ -232,6 +234,11 @@ steps:
     selector: '[data-testid="ai-chat-safety-gate"]'
     state: visible
     timeout_sec: 45
+- click: '[data-testid="ai-chat-cc-permission-allow"]'
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: detached
+    timeout_sec: 30
 - switch_window:
     selector: '[data-testid="status-bar"]'
     close_with: '[data-testid="detached-reattach"]'
@@ -335,6 +342,7 @@ verification:
     - 48
     - 50
     - 56
+    - 58
     checkpoints:
     - step: 49
       expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
@@ -346,97 +354,107 @@ verification:
       expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
     - step: 54
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "name": "data-queue-length", "equals": "1"}}'
-    - step: 58
-      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"decision\":\"allow\"", "timeout_sec": 20}}'
+    - step: 59
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 61
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 0}}'
     results:
     - 49
     - 51
     - 52
     - 53
     - 54
-    - 58
+    - 59
+    - 61
   - id: V5-terminal-effect
     requirement: A real run_in_terminal effect is delivered to the window that owns the terminal, not to the chat owner, and the bound terminal shows its command.
     actions:
-    - 61
     - 64
+    - 67
     checkpoints:
-    - step: 62
-      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"ok\":true", "timeout_sec": 30}}'
-    - step: 63
-      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"delivery\":\"target:", "timeout_sec": 20}}'
     - step: 65
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"ok\":true", "timeout_sec": 30}}'
+    - step: 66
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"delivery\":\"target:", "timeout_sec": 20}}'
+    - step: 68
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "QA_CC_TOOL_ONCE", "timeout_sec": 30}}'
     results:
-    - 62
-    - 63
     - 65
+    - 66
+    - 68
   - id: V6-broadcast-residue
     requirement: When the recorded owner window is gone the prompt is broadcast, both live windows show one card each, and deciding in one removes the other window's card instead of leaving a dead card.
     actions:
-    - 68
-    - 69
-    - 77
-    - 80
-    checkpoints:
-    - step: 70
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
-    - step: 71
-      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
-    - step: 72
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "name": "data-queue-length", "equals": "1"}}'
-    - step: 74
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
-    - step: 75
-      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
-    - step: 78
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached", "timeout_sec": 30}}'
-    - step: 79
-      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"decision\":\"deny\"", "timeout_sec": 20}}'
-    - step: 82
-      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 0}}'
-    results:
-    - 70
     - 71
     - 72
+    - 80
+    - 83
+    checkpoints:
+    - step: 73
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
+    - step: 74
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
+    - step: 75
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "name": "data-queue-length", "equals": "1"}}'
+    - step: 77
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
+    - step: 78
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
+    - step: 81
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached", "timeout_sec": 30}}'
+    - step: 82
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"decision\":\"deny\"", "timeout_sec": 20}}'
+    - step: 85
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 0}}'
+    results:
+    - 73
     - 74
     - 75
+    - 77
     - 78
-    - 79
+    - 81
     - 82
+    - 85
   - id: V7-closed-owner
     requirement: Reattaching the owner window while it owns the thread still lets the next prompt appear in the main window and reach a decision.
     actions:
-    - 84
-    - 85
-    - 86
+    - 87
     - 88
     - 89
-    - 90
+    - 91
+    - 93
     - 94
+    - 95
+    - 99
     checkpoints:
-    - step: 91
+    - step: 90
       expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
     - step: 92
-      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
-    - step: 95
       expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached", "timeout_sec": 30}}'
     - step: 96
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
+    - step: 97
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
+    - step: 100
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached", "timeout_sec": 30}}'
+    - step: 101
       expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"delivery\":\"broadcast\"", "timeout_sec": 20}}'
     results:
-    - 91
+    - 90
     - 92
-    - 95
     - 96
+    - 97
+    - 100
+    - 101
   - id: V8-crash-regression
     requirement: No uncaught error, unhandled rejection or crash UI appears in the main window after the window lifecycle, decisions and side effect.
     actions:
-    - 94
+    - 99
     checkpoints:
-    - step: 97
+    - step: 102
       expectation: '{"assert_no_runtime_errors": null}'
     results:
-    - 97
+    - 102
   visual:
   - check: The detached-window card, the two-window broadcast state, the side effect in the terminal and the cleared main window are readable and correctly sized in the retained screenshots.
     method: manual

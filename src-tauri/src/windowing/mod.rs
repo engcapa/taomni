@@ -144,6 +144,9 @@ pub async fn open_detached_window(
         .build()
         .map_err(|e| format!("failed to open detached window: {}", e))?;
     crate::webview_recovery::install(&window);
+    // Drop this window's approval/terminal routing as soon as it is destroyed,
+    // so a later event broadcasts instead of being delivered into the void.
+    thread_delivery::install_window_cleanup(&window);
     Ok(())
 }
 

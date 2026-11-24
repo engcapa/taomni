@@ -78,6 +78,12 @@ impl ThreadWindows {
             .cloned()
     }
 
+    /// Drop every thread owned by `label` (window destroyed).
+    pub(crate) fn forget_label(&self, label: &str) {
+        let mut owners = self.owners.lock().unwrap_or_else(|e| e.into_inner());
+        owners.retain(|_, owner| owner != label);
+    }
+
     /// Drop any owner recorded for `thread_id`.
     pub(crate) fn forget(&self, thread_id: &str) {
         self.owners
@@ -190,6 +196,33 @@ pub(crate) fn emit_to_window_or_broadcast<B: EventBus + ?Sized>(
     }
     let _ = bus.emit_all(event, payload);
     Delivery::Broadcast
+}
+
+/// Drop routing state that named a window which no longer exists.
+///
+/// A closing window stays in Tauri's registry for a moment after its renderer is
+/// gone. Without this cleanup the recorded owner still answers
+/// `has_webview(..)`, so the next approval would be emitted into that dying
+/// window instead of falling back to a broadcast — and nobody would see it.
+pub(crate) fn forget_window_routes(state: &crate::state::AppState, label: &str) {
+    state.agent.thread_windows.forget_label(label);
+    if let Ok(mut owners) = state.agent.cc_tab_windows.lock() {
+        owners.retain(|_, owner| owner != label);
+    }
+}
+
+/// Window-lifecycle hook for every window that can own routing state.
+///
+/// Must be installed next to `webview_recovery::install` on the main and on
+/// detached windows.
+pub(crate) fn install_window_cleanup(window: &tauri::WebviewWindow) {
+    let app = window.app_handle().clone();
+    let label = window.label().to_owned();
+    window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) {
+            forget_window_routes(&app.state::<crate::state::AppState>(), &label);
+        }
+    });
 }
 
 /// Emit a thread-scoped event for an `AppHandle`, resolving `AppState` itself.
@@ -466,6 +499,20 @@ mod tests {
         let broadcasts = bus.broadcasts.borrow();
         assert_eq!(broadcasts.len(), 1);
         assert!(broadcasts[0].1.get(WINDOW_LABEL_FIELD).is_none());
+    }
+
+    #[test]
+    fn forget_label_drops_every_thread_owned_by_a_destroyed_window() {
+        let windows = ThreadWindows::new();
+        windows.record("thread-a", "terminal-gone");
+        windows.record("thread-b", "main");
+        windows.record("thread-c", "terminal-gone");
+
+        windows.forget_label("terminal-gone");
+
+        assert_eq!(windows.owner("thread-a"), None);
+        assert_eq!(windows.owner("thread-c"), None);
+        assert_eq!(windows.owner("thread-b").as_deref(), Some("main"));
     }
 
     #[test]
