@@ -42,6 +42,9 @@ jobs:
       QA_CARGO_ARCHIVE: qa-build-output/cargo-dependencies
       QA_VENDOR_CACHE: ${{ (inputs.operation == 'build' || inputs.operation == 'contracts') && inputs.vendor_cache != 'false' && '1' || '' }}
       QA_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      # Maven Central rate-limits shared runner egress (HTTP 429). Give every
+      # Maven JVM transporter-level retries; fixture builds add outer backoff.
+      MAVEN_OPTS: ${{ contains(matrix.capabilities, 'java') && '-Dmaven.wagon.http.retryHandler.count=5 -Daether.connector.http.retryHandler.count=5' || '' }}
       QA_TRUSTED_CACHE: ${{ inputs.trusted_cache != 'false' && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
