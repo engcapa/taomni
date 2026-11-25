@@ -2,7 +2,7 @@ id: TC-EXPLORER-014
 title: Explorer creates recognized editable file types and rejects invalid names without overwriting files
 description: Toolbar and directory blank-area context entry open the same type selector. Exercise cancellation, path/preview-only rejection,
   an existing-file conflict, retry, extension-specific numbered names, selected rename and exact empty bytes. Native proves real exclusive
-  file creation; browser proves VFS only. Existing folder/txt workflow remains protected by TC-EXPLORER-003.
+  file creation. Also rename a quick-created text document from its default name, checking both names on disk or in the browser VFS.
 modes:
 - browser
 - native
@@ -319,6 +319,15 @@ steps:
     equals: ''
 - assert_no_runtime_errors: null
 - screenshot: TC-EXPLORER-014-create-editable-types.png
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-file"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/New text document.txt', equals: ''}
+- fill: {selector: '[data-testid="explorer-rename-input"]', value: '工作笔记.txt'}
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="工作笔记.txt"][aria-selected="true"]'
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/工作笔记.txt', equals: ''}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/New text document.txt', absent: true}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -545,6 +554,16 @@ verification:
     - 149
     - 151
     - 152
+  - id: R4
+    requirement: The quick-created text document can be renamed immediately from its default name.
+    actions: [154, 155, 157, 158]
+    checkpoints:
+    - {step: 156, expectation: The default text document exists with zero bytes.}
+    - {step: 159, expectation: Explorer selects the new name.}
+    - {step: 160, expectation: The renamed document exists with zero bytes.}
+    - {step: 161, expectation: The default name is absent after the rename.}
+    - {step: 162, expectation: The inline rename completes without runtime errors.}
+    results: [156, 159, 160, 161, 162]
   visual:
   - check: New-file dialog and resulting editor/table layout.
     method: manual

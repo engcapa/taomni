@@ -280,13 +280,75 @@ pub(super) fn rename_entry(path: &Path, name: &str) -> OpResult<String> {
     let source = absolute_entry(path)?;
     let destination = source.with_file_name(name);
     if source != destination {
-        rename_no_replace(&source, &destination)
-            .map_err(|e| OpError::io("rename", &destination, e))?;
+        let result = rename_no_replace(&source, &destination);
+        #[cfg(target_os = "linux")]
+        let result = result.or_else(|e| rename_file_on_unsupported_fs(&source, &destination, e));
+        result.map_err(|e| OpError::io("rename", &destination, e))?;
     }
     // Return the caller's directory spelling: the shared listing also uses it.
     // A canonical Windows \\?\ prefix (or symlinked Unix parent) would otherwise
     // prevent the newly renamed row from matching the selection path.
     Ok(path.with_file_name(name).to_string_lossy().into_owned())
+}
+
+#[cfg(target_os = "linux")]
+pub(super) fn rename_file_on_unsupported_fs(
+    source: &Path,
+    destination: &Path,
+    error: std::io::Error,
+) -> std::io::Result<()> {
+    use std::io;
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    if !matches!(
+        error.raw_os_error(),
+        Some(libc::EINVAL | libc::EOPNOTSUPP | libc::ENOSYS)
+    ) {
+        return Err(error);
+    }
+    let original = fs::symlink_metadata(source)?;
+    if !original.is_file() {
+        return Err(error);
+    }
+    let staging = tempfile::Builder::new()
+        .prefix(".taomni-rename-")
+        .permissions(fs::Permissions::from_mode(0o700))
+        .tempdir_in(source.parent().expect("absolute file path"))?;
+    let held = staging.path().join("file");
+    fs::File::create_new(&held)?;
+    // ntfs-3g supports hard links but rejects RENAME_NOREPLACE. Creating a
+    // link claims the new name exclusively and preserves the file's inode.
+    fs::hard_link(source, destination)?;
+    // Capture the old directory entry before deciding whether to unlink it.
+    // A stat followed by unlink(source) can delete a concurrent replacement.
+    fs::rename(source, &held).map_err(|e| {
+        io::Error::new(
+            e.kind(),
+            format!(
+                "Created the new link but could not remove {}: {e}",
+                source.display()
+            ),
+        )
+    })?;
+    let is_original = |path: &Path| {
+        fs::symlink_metadata(path)
+            .is_ok_and(|entry| (entry.dev(), entry.ino()) == (original.dev(), original.ino()))
+    };
+    if is_original(&held) && is_original(destination) {
+        return staging.close();
+    }
+    // Restore the captured entry exclusively if either public name changed.
+    if let Err(e) = fs::hard_link(&held, source) {
+        let _ = staging.keep();
+        return Err(io::Error::other(format!(
+            "A file changed during rename; could not restore {} ({e}). File retained at {}",
+            source.display(),
+            held.display()
+        )));
+    }
+    Err(io::Error::other(
+        "A file changed during rename; restored the old name",
+    ))
 }
 
 pub(super) fn create_entry(directory: &Path, name: &str, folder: bool) -> OpResult<String> {
