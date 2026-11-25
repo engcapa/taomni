@@ -43,3 +43,5 @@ Tauri updater 2.11.0 在 Windows 运行签名校验通过的安装包，再退�
 - `auto-before.json`、`manual-before.json`、`upgrade-fixed.json`、`auto-fixed.json` 和 `http.log` 对应两次应用内升级。`initial.json` 使用 Win32 键盘事件。上表三组用 Windows 系统剪贴板写入和回读，再向 WebView2 发送组合键。修复后自动启动的父进程为 `explorer.exe`。
 - `nsis-unit.log` 中 8 项通过，包含对新装、仅 `/R`、仅 `/UPDATE`、同时传入两者的真实安装进程检查。`os-contract.log` 保留同一生产 Rust 模块的交互桌面回执。仓库中的测试入口为 `cargo test --bin taomni desktop_environment_after_update -- --ignored --nocapture`。
 - 安装器实测范围为本机当前用户 NSIS 安装。MSI、其他 Windows 桌面环境和用户原先失效的具体路径仍缺少现场证据。保存目录持久化作为回归用例，故障归因限于上表能复现的行为。
+- Windows browser 的 TC-NP-104、TC-NP-106 均通过。Windows 标准 QA release 的 TC-NP-103、TC-NP-105、TC-NP-107 均通过。TC-NP-107 在同一配置的第二个进程中验证上次保存目录，独立读取的两个文件分别为 14 和 22 字节。TC-NP-105 覆盖快捷键和菜单连续粘贴、系统剪贴板的复制与剪切。
+- Windows browser 完整崩溃回归使用 Vite 开发服务串行执行，17 项通过，TC-FILE-OPEN-008 因缺少 SSH fixture 跳过。最初三 worker 运行中发生首屏超时，静态预览也缺少 fixture 动态导入的源码模块；保留两轮诊断收据，以开发服务的完整串行结果记录验收。Windows Sherpa 原生缓存与安装器回归 3 项通过。
