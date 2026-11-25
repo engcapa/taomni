@@ -29,11 +29,23 @@ SilentUnInstall silent
 Name "Taomni runtime hook test"
 OutFile "${installer}"
 InstallDir "${destination}"
+!include "LogicLib.nsh"
+!include "FileFunc.nsh"
+Var UpdateMode
 !define MAINBINARYNAME "taomni"
 !define MAINBINARYSRCPATH "${forwardSlashes ? binary.replaceAll("\\", "/") : binary}"
 !include "${hooks}"
 Section
+  ClearErrors
+  \${GetOptions} $CMDLINE "/UPDATE" $0
+  \${IfNot} \${Errors}
+    StrCpy $UpdateMode 1
+  \${EndIf}
   !insertmacro NSIS_HOOK_POSTINSTALL
+  ReadEnvStr $0 "TAOMNI_UPDATE_INSTALLER_PID"
+  FileOpen $1 "${root}\\relaunch.txt" w
+  FileWrite $1 "$0"
+  FileClose $1
   WriteUninstaller "$INSTDIR\\uninstall.exe"
 SectionEnd
 Section "Uninstall"
@@ -43,6 +55,18 @@ SectionEnd
 `);
   return { root, destination, installer, compile: () => spawnSync(makensis, ["/V2", script], { encoding: "utf8" }) };
 }
+
+test("only a restarting update marks the installer child with its actual PID", { skip: !native }, (t) => {
+  const f = fixture(t);
+  const compiled = f.compile();
+  assert.equal(compiled.status, 0, compiled.stdout + compiled.stderr);
+  for (const options of [[], ["/R"], ["/UPDATE"], ["/UPDATE", "/R"]]) {
+    const run = spawnSync(f.installer, ["/S", ...options], { timeout: 30000 });
+    assert.equal(run.status, 0, String(run.error));
+    const marker = readFileSync(join(f.root, "relaunch.txt"), "utf8");
+    assert.equal(marker, options.includes("/R") && options.includes("/UPDATE") ? String(run.pid) : "");
+  }
+});
 
 for (const forwardSlashes of [false, true]) {
   test(`real NSIS installs and overwrites all runtime DLLs (forward slashes: ${forwardSlashes})`, { skip: !native }, (t) => {
