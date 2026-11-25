@@ -22,7 +22,7 @@ export function UsagesScopeDialog({ open, symbolHint, onConfirm, onCancel }: Usa
       data-testid="usages-scope-dialog"
       role="dialog"
       aria-label="Find Usages scope"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
       onClick={onCancel}
     >
       <div

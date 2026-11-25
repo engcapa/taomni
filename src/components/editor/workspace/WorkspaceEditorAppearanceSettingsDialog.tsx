@@ -70,7 +70,7 @@ export function WorkspaceEditorAppearanceSettingsDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[900] flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}

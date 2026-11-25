@@ -62,7 +62,7 @@ export function UndoWorkspaceEditConfirmDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="code-workspace-undo-confirm-title"
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
       onKeyDown={handleKeyDown}
     >
       <div className="w-[360px] max-w-[90vw] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-4 text-ui-body text-[var(--taomni-code-text)] shadow-xl">

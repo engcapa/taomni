@@ -29,8 +29,7 @@ export function ServersTabBlockedDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-[950] flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
       onClick={dismiss}
       onKeyDown={handleKeyDown}
     >

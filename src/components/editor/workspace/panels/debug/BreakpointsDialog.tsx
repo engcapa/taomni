@@ -92,7 +92,7 @@ export function BreakpointsDialog({ debug, initial = null, onOpenBreakpoint, onC
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30" onMouseDown={(event) => {
+    <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
       <div

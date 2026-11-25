@@ -194,7 +194,7 @@ export function DapAdapterGuideDialog({
       role="dialog"
       aria-modal="true"
       data-testid="dap-adapter-guide-dialog"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
     >
       <div className="flex h-[min(650px,90vh)] w-[min(820px,94vw)] flex-col overflow-hidden rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[var(--taomni-code-text)] shadow-2xl">
         {/* Header */}

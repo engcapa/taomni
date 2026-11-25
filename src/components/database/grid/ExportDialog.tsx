@@ -201,7 +201,7 @@ export function ExportDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/45" onMouseDown={onClose}>
+    <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center" onMouseDown={onClose}>
       <div
         className="w-[920px] max-w-[calc(100vw-24px)] h-[min(760px,calc(100vh-24px))] flex flex-col rounded shadow-xl"
         style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)", color: "var(--taomni-text)" }}

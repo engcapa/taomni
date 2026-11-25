@@ -116,8 +116,7 @@ export function WorkspaceFsModals({ request, initialPath, onCancel, onSubmit }: 
 
   return (
     <div
-      className="fixed inset-0 z-[900] flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.35)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onCancel();
       }}

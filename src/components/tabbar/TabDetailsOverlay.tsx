@@ -117,7 +117,7 @@ export function TabDetailsOverlay({
   if (!open || placements.length === 0) return null;
 
   return createPortal(
-    <div data-testid="tab-details-overlay" className="fixed inset-0 pointer-events-none z-[9990]" aria-hidden="true">
+    <div data-testid="tab-details-overlay" className="fixed inset-0 pointer-events-none z-[var(--taomni-z-tooltip)]" aria-hidden="true">
       {placements.map(({ tab, left, top, anchorLeft }) => {
         const summary = buildTabDetailSummary(tab, sessions, runtimeByTab[tab.id], cwdByTab[tab.id], t);
         const active = activeTabId === tab.id;

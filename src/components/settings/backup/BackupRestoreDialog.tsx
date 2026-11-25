@@ -5,7 +5,7 @@ export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | 
   const displayError = inspectError?.startsWith("backupSettings.") ? t(inspectError) : inspectError;
   return <>
       {restoreModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4">
           <div
             role="dialog"
             aria-modal="true"

@@ -55,8 +55,7 @@ export function ExternalFileConflictDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[970] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.46)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
       onClick={onCancel}
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;

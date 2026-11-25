@@ -71,7 +71,7 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
       aria-labelledby={titleId}
       data-testid="file-template-settings-dialog"
       onKeyDown={handleKeyDown}
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[10vh]"
+      className="fixed inset-0 taomni-dialog-backdrop flex items-start justify-center p-4 pt-[10vh]"
     >
       <div className="flex w-full max-w-2xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)] shadow-2xl">
         {/* Header */}

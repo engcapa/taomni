@@ -313,6 +313,7 @@ cases:
 - TC-UIC-015-module-install-error
 - TC-UIC-016-home-launch-actions
 - TC-UIC-017-workspace-keymap-reference
+- TC-UIC-018-desktop-overlay-layers
 - TC-UIC-DLG-explorer-new-file
 - TC-UIC-DLG-mail-attachment-reminder
 - TC-MOBILE-001

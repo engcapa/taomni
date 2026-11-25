@@ -24,7 +24,7 @@ export function CellValueDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/45"
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
       onMouseDown={onClose}
       onKeyDown={(event) => {
         if (event.key === "Escape") onClose();

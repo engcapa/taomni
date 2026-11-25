@@ -47,7 +47,7 @@ export function EditorAiRewriteDialog({
   return (
     <div
       data-testid="code-workspace-ai-rewrite-dialog"
-      className="fixed inset-0 z-[430] flex items-center justify-center bg-black/45 p-4"
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div

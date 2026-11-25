@@ -35,8 +35,7 @@ export function DbObjectDetailDialog({ detail, onClose, onStatus }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[950] flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
       onClick={onClose}
       onKeyDown={(e) => {
         if (e.key === "Escape") {

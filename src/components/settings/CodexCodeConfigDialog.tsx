@@ -278,7 +278,7 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(20,30,45,0.4)" }}>
+    <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center">
       <div
         role="dialog"
         aria-modal="true"

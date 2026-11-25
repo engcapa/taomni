@@ -54,7 +54,7 @@ export function SurroundWithDialog({ open, languageId, onClose, onPick }: Surrou
       aria-labelledby="surround-with-title"
       data-testid="surround-with-dialog"
       onKeyDown={handleKeyDown}
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[12vh]"
+      className="fixed inset-0 taomni-dialog-backdrop flex items-start justify-center p-4 pt-[12vh]"
     >
       <div className="flex w-full max-w-md flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">

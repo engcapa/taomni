@@ -60,7 +60,7 @@ function TitleBarOverflow({ children, slotRef, visible, contextKey }: {
     </div>
     {createPortal(<div ref={menuRef} data-testid="titlebar-actions-menu" data-taomni-context-menu="" role="menu"
       aria-label={t("titlebar.moreActions")} hidden={!expanded}
-      className="taomni-titlebar-actions-menu fixed z-[9999] w-64 max-w-[calc(100vw-16px)] max-h-[75vh] overflow-y-auto rounded-lg border p-1 shadow-xl"
+      className="taomni-titlebar-actions-menu fixed z-[var(--taomni-z-popover)] w-64 max-w-[calc(100vw-16px)] max-h-[75vh] overflow-y-auto rounded-lg border p-1 shadow-xl"
       style={{ ...position, display: expanded ? undefined : "none", background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
       onClick={(event) => {
         const button = (event.target as Element).closest<HTMLButtonElement>("button");

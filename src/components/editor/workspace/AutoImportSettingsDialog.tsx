@@ -69,7 +69,7 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
       onKeyDown={handleKeyDown}
       data-testid="auto-import-settings-dialog"
     >

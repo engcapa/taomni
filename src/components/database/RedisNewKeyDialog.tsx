@@ -56,7 +56,7 @@ export function RedisNewKeyDialog({ sessionId, onClose, onCreated }: RedisNewKey
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(20,30,45,0.4)" }}>
+    <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center">
       <div
         className="w-[440px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] flex flex-col rounded-[6px] shadow-2xl border overflow-hidden"
         style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-chrome-border)", color: "var(--taomni-text)" }}

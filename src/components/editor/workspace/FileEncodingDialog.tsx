@@ -78,8 +78,7 @@ export function FileEncodingDialog({
   // otherwise claims clicks aligned with a separator behind the dialog.
   return createPortal(
     <div
-      className="fixed inset-0 z-[980] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.46)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
       onClick={onClose}
       onKeyDown={(event) => {
         if (event.key === "Escape") {

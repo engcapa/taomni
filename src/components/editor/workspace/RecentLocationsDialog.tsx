@@ -110,7 +110,7 @@ export function RecentLocationsDialog({
       aria-labelledby="recent-locations-title"
       data-testid="recent-locations-dialog"
       onKeyDown={handleKeyDown}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
     >
       <div className="flex h-[75vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-ui-body text-[var(--taomni-code-text)]">
         {/* Header */}

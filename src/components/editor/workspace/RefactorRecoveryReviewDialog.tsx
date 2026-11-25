@@ -157,7 +157,7 @@ export function RefactorRecoveryReviewDialog({
 
   return (
       <div
-        className="fixed inset-0 z-[940] flex items-center justify-center bg-black/45 p-4"
+        className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
         onClick={() => {
           if (busy) return;
           if (confirmingDismiss) {

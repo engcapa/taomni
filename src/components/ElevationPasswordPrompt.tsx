@@ -34,8 +34,7 @@ export function ElevationPasswordPrompt({
   return (
     <div
       data-testid="sockscap-root-prompt-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(20,30,45,0.4)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
     >
       <form
         data-testid="sockscap-root-prompt-dialog"

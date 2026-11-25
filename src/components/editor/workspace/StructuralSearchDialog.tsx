@@ -117,7 +117,7 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onMouseDown={cancel}>
+    <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center" onMouseDown={cancel}>
       <div
         ref={dialogRef}
         tabIndex={-1}

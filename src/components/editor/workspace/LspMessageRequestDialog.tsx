@@ -35,8 +35,7 @@ export function LspMessageRequestDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[960] flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.42)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
       onClick={() => onSelect(null)}
       onKeyDown={handleKeyDown}
     >

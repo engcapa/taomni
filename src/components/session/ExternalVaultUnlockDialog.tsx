@@ -77,8 +77,7 @@ export function ExternalVaultUnlockDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center"
       onClick={onSkip}
       onKeyDown={handleKeyDown}
     >

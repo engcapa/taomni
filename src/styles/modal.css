@@ -1,3 +1,7 @@
+.taomni-dialog-backdrop {
+  z-index: var(--taomni-z-modal, 1000);
+  background: var(--taomni-overlay, rgb(0 0 0 / 40%));
+}
 .taomni-modal {
   position: fixed;
   inset: 0;

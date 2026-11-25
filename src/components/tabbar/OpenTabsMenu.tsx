@@ -258,7 +258,7 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab, show
       data-testid="open-tabs-menu"
       role="dialog"
       aria-label={t("tabs.filterOpenTabs")}
-      className="taomni-tab-filter-menu fixed z-[9999] w-72 max-h-[70vh] flex flex-col rounded shadow-lg border"
+      className="taomni-tab-filter-menu fixed w-72 max-h-[70vh] flex flex-col rounded shadow-lg border"
       style={{
         top: pos.top,
         right: pos.right,

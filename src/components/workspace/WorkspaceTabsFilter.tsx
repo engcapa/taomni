@@ -56,7 +56,7 @@ export function WorkspaceTabsFilter() {
       aria-haspopup="dialog" aria-expanded={open} data-active={hasWorkspaceTabFilter(filter) || undefined}
       onClick={() => setOpen((value) => !value)}><Filter /></button>
     {open && createPortal(<div ref={menuRef} data-testid="workspace-tabs-filter-menu" role="dialog"
-      aria-label={t("platform.filterWorkspaceTabs")} className="taomni-tab-filter-menu fixed z-[9999] flex w-80 max-w-[calc(100vw-16px)] max-h-[70vh] flex-col rounded-lg border shadow-xl"
+      aria-label={t("platform.filterWorkspaceTabs")} className="taomni-tab-filter-menu fixed flex w-80 max-w-[calc(100vw-16px)] max-h-[70vh] flex-col rounded-lg border shadow-xl"
       style={{ ...position, background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}>
       <div className="flex items-center gap-2 px-3 py-2">
         <Search className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-text-muted)]" />

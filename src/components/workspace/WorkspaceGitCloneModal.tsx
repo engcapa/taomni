@@ -200,8 +200,7 @@ export function WorkspaceGitCloneModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[900] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.45)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) closeDialog();
       }}

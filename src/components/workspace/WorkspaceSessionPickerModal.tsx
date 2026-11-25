@@ -94,8 +94,7 @@ export function WorkspaceSessionPickerModal({ open, workspaceId, onClose }: Work
 
   return (
     <div
-      className="fixed inset-0 z-[910] flex items-start justify-center pt-[12vh]"
-      style={{ background: "rgba(0,0,0,0.35)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-start justify-center pt-[12vh]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}

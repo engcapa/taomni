@@ -201,8 +201,7 @@ function OpenGlobalCommandModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[920] flex items-start justify-center pt-[10vh]"
-      style={{ background: "rgba(0,0,0,0.35)" }}
+      className="fixed inset-0 taomni-dialog-backdrop flex items-start justify-center pt-[10vh]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) close();
       }}
