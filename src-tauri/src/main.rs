@@ -1,6 +1,9 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(windows)]
+mod windows_update_relaunch;
+
 fn main() {
     let mut args = std::env::args_os().skip(1);
     let first = args.next();
@@ -26,6 +29,10 @@ fn main() {
     #[cfg(windows)]
     if std::env::args().nth(1).as_deref() == Some("--screenshot-scroll-input") {
         std::process::exit(taomni_lib::run_screenshot_scroll_input());
+    }
+    #[cfg(windows)]
+    if windows_update_relaunch::handoff_to_desktop() {
+        return;
     }
     taomni_lib::run();
 }

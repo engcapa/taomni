@@ -45,9 +45,7 @@ steps:
 - host_clipboard:
     action: set
     kind: text
-    text: |-
-      NATIVE-PASTE-ONE
-      LINE-TWO
+    text: "NATIVE-PASTE-ONE\r\nLINE-TWO"
 - press:
     key: Mod+v
     selector: '[data-testid="viewer-editor"] .cm-content'
@@ -62,9 +60,9 @@ steps:
 - wait_for: '[data-testid="notepad-menu-item-edit.paste"]'
 - click: '[data-testid="notepad-menu-item-edit.paste"]'
 - wait: 0.5
-- assert_text:
-    selector: '[data-testid="viewer-editor"] .cm-content'
-    contains: NATIVE-PASTE-ONE
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals: [alphaNATIVE-PASTE-ONE, LINE-TWONATIVE-PASTE-ONE, LINE-TWO]
 # Select-all copy must publish the real buffer to the OS clipboard, verified by
 # an independent reader rather than the product's own state.
 - press:

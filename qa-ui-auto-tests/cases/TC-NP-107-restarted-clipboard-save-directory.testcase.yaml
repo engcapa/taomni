@@ -1,0 +1,61 @@
+id: TC-NP-107
+title: Restarting the desktop preserves the Notepad save directory and OS clipboard paste
+covers: [F-NOTEPAD-1, F-NOTEPAD-5]
+tags: [p1, notepad, clipboard, persistence, regression]
+modes: [native]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 240
+steps:
+  - open: ${cfg.app.base_url}
+  - vault_first_run: qa-notepad-restart
+  - click: '[data-testid="side-tab-explorer"]'
+  - click: '[data-testid="explorer-tab-new-notepad"]'
+  - click: '[data-testid="viewer-editor"] .cm-content'
+  - type: before restart
+  - press: Mod+s
+  - fill: {selector: '[data-testid="notepad-save-as-input"]', value: '${fixture.file_open_root}/before restart.txt'}
+  - click: '[data-testid="notepad-save-as-confirm"]'
+  - assert_file_open_bytes: {path: '${fixture.file_open_root}/before restart.txt', equals: before restart}
+  - native_restart_app:
+      expect_exit_confirmation:
+        title: Exit
+        message: There are 2 open tabs. Exit Taomni and close them?
+        confirm_label: Exit
+  - click: '[data-testid="side-tab-explorer"]'
+  - click: '[data-testid="explorer-tab-new-notepad"]'
+  - click: '[data-testid="file-viewer"][data-active="true"] .cm-content'
+  - host_clipboard: {action: set, kind: text, text: "第一行\r\nsecond line"}
+  - press: Mod+v
+  - assert_items: {selector: '[data-testid="file-viewer"][data-active="true"] .cm-line', equals: [第一行, second line]}
+  - type: '!'
+  - press: Mod+s
+  - eval_readonly:
+      expression: document.querySelector('.np-modal .np-input').value.replace(/\\/g, '/')
+      contains: ${fixture.file_open_root}/
+      timeout_sec: 8
+  - fill: {selector: '[data-testid="notepad-save-as-input"]', value: '${fixture.file_open_root}/after restart.txt'}
+  - click: '[data-testid="notepad-save-as-confirm"]'
+  - assert_file_open_bytes: {path: '${fixture.file_open_root}/after restart.txt', equals: "第一行\nsecond line!"}
+  - assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+    - id: R1
+      requirement: A clean process restart retains the last successful Save As directory in the same profile.
+      actions: [4, 6, 7, 8, 9, 11, 13, 19]
+      checkpoints:
+        - {step: 10, expectation: The first file exists with exactly the saved bytes.}
+        - {step: 20, expectation: The next save dialog defaults to the directory used before exit.}
+      results: [10, 20]
+    - id: R2
+      requirement: The new WebView pastes real multiline OS clipboard text and saves the complete document.
+      actions: [14, 15, 16, 18, 19, 21, 22]
+      checkpoints:
+        - {step: 17, expectation: Both clipboard lines appear once.}
+        - {step: 23, expectation: The real UTF-8 file contains both lines with LF and the trailing exclamation mark.}
+        - {step: 24, expectation: Editing and saving raised no runtime errors.}
+      results: [17, 23, 24]
+  visual:
+    - {check: Remembered directory and visible text, method: automated, reason: Read the actual Save As input and rendered editor lines.}
+  native:
+    - {check: Restart and persisted bytes, method: automated, reason: The harness restarts the same isolated profile and verifies host clipboard and file bytes.}

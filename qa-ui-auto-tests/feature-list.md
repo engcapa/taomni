@@ -17772,6 +17772,12 @@ controls:
   - id: notepad-menu-item-edit-paste
     selector: '[data-testid="notepad-menu-item-edit.paste"]'
     kind: interactive
+  - id: notepad-menu-item-edit-paste-special
+    selector: '[data-testid="notepad-menu-item-edit.pasteSpecial"]'
+    kind: interactive
+  - id: notepad-paste-plain
+    selector: '[data-testid="notepad-paste-plain"]'
+    kind: interactive
   - id: notepad-menu-item-edit-clipboard-history
     selector: '[data-testid="notepad-menu-item-edit.clipboardHistory"]'
     kind: interactive

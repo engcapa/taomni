@@ -220,6 +220,13 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           node --test scripts/windows-runtime-bundle.test.mjs
           pwsh -File scripts/verify-windows-release-bundle.ps1
+      - name: Exercise the updated GUI in the Windows desktop environment
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          set -eo pipefail
+          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --bin taomni -- --ignored --exact windows_update_relaunch::tests::desktop_environment_after_update --nocapture | tee windows-update-relaunch.log
+          grep -F "1 passed; 0 failed" windows-update-relaunch.log
 
       - name: Collect workflow artifacts
         shell: bash

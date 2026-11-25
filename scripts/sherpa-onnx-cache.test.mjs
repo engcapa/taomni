@@ -142,6 +142,9 @@ SilentUnInstall silent
 Name "Sherpa cache recovery regression"
 OutFile "${installer}"
 InstallDir "${installed}"
+!include "LogicLib.nsh"
+!include "FileFunc.nsh"
+Var UpdateMode
 !define MAINBINARYNAME "sherpa-cache-probe"
 !define MAINBINARYSRCPATH "${join(release, "sherpa-cache-probe.exe")}"
 !include "${hooks}"
