@@ -5025,10 +5025,11 @@ controls:
 id: F-AI-2.1
 status: done
 area: ai/settings
-components: [AiMasterSwitch, PrivacyToggle, SettingsPanel]
+components: [AiMasterSwitch, PrivacyToggle, SettingsSwitch, SettingsPanel]
 files:
   - src/components/settings/AiMasterSwitch.tsx
   - src/components/settings/PrivacyToggle.tsx
+  - src/components/ui/SettingsSwitch.tsx
   - src/components/settings/SettingsPanel.tsx
   - src/stores/aiStore.ts
 controls:
@@ -5050,6 +5051,7 @@ controls:
 
 - `AiMasterSwitch`：一键关闭所有 AI 入口（Drawer 按钮、PTT、命令重写等），内存占用与网络调用全部归零
 - `PrivacyToggle`：保持 AI 启用，但强制把请求路由到 loopback / 本地 provider
+- 两个开关都支持 Tab、Space 和 Enter，保存期间保留焦点，失败后可在原开关重试。
 - 状态由 `aiStore.config.fully_disabled` 持久化；勾选后Chat 听写与共享 Chat 入口立即从 DOM 中移除
 
 ### 14.2 终端补全与命令重写 ✅

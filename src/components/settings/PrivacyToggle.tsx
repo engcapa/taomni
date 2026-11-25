@@ -1,9 +1,10 @@
+import { SettingsSwitch } from "../ui/SettingsSwitch";
 import { useAiStore } from "../../stores/aiStore";
 import { Shield, ShieldOff } from "lucide-react";
 import { useT } from "../../lib/i18n";
 
 export function PrivacyToggle() {
-  const { config, saveConfig } = useAiStore();
+  const { config, saving, saveConfig } = useAiStore();
   const t = useT();
 
   if (!config) return null;
@@ -32,42 +33,15 @@ export function PrivacyToggle() {
   };
 
   return (
-    <div
+    <SettingsSwitch
       data-testid="ai-full-local-toggle"
-      className={`flex items-center gap-3 rounded border p-3 cursor-pointer transition-colors ${
-        isLocalMode
-          ? "border-ui-info-border bg-ui-info-surface"
-          : "border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-      }`}
-      onClick={toggle}
-    >
-      {isLocalMode ? (
-        <Shield className="w-5 h-5 text-ui-info shrink-0" />
-      ) : (
-        <ShieldOff className="w-5 h-5 text-[var(--taomni-text-muted)] shrink-0" />
-      )}
-      <div className="flex-1">
-        <div className="text-ui-body font-semibold">
-          {t("aiSettings.fullLocal")} {isLocalMode ? t("aiSettings.disabledSuffix") : ""}
-        </div>
-        <div className="text-ui-small text-[var(--taomni-text-muted)]">
-          {isLocalMode
-            ? t("aiSettings.fullLocalEnabledDesc")
-            : t("aiSettings.fullLocalDisabledDesc")}
-        </div>
-      </div>
-      <div
-        className={`w-9 h-5 rounded-full transition-colors relative ${
-          isLocalMode ? "bg-[var(--taomni-info-icon)]" : "bg-[var(--taomni-divider)]"
-        }`}
-      >
-        <div
-          className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-            isLocalMode ? "translate-x-4" : "translate-x-0.5"
-          }`}
-        />
-      </div>
-    </div>
+      label={t("aiSettings.fullLocal")}
+      description={t(isLocalMode ? "aiSettings.fullLocalEnabledDesc" : "aiSettings.fullLocalDisabledDesc")}
+      icon={isLocalMode ? <Shield className="size-5" /> : <ShieldOff className="size-5" />}
+      checked={isLocalMode}
+      saving={saving}
+      onToggle={toggle}
+    />
   );
 }
 
