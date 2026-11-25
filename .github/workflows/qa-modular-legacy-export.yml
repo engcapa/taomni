@@ -27,6 +27,43 @@ jobs:
         with:
           ref: ${{ inputs.head }}
           persist-credentials: false
+      - name: Read the verifier's test dependencies for a frozen candidate
+        if: inputs.head != github.sha
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: export-verifier
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /src-tauri/crates/taomni-host-gates/Cargo.toml
+            /src-tauri/Cargo.lock
+          persist-credentials: false
+      - name: Apply only host-gate test dependency changes to the candidate checkout
+        if: inputs.head != github.sha
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          import tomllib
+
+          manifest = Path("src-tauri/crates/taomni-host-gates/Cargo.toml")
+          lock = Path("src-tauri/Cargo.lock")
+          verifier = Path("export-verifier")
+          def production_inputs(path):
+              with path.open("rb") as stream:
+                  parsed = tomllib.load(stream)
+              if path.name == "Cargo.toml":
+                  parsed.pop("dev-dependencies", None)
+              else:
+                  gate, = [entry for entry in parsed["package"] if entry["name"] == "taomni-host-gates"]
+                  gate.pop("dependencies")
+              return parsed
+          if all(production_inputs(path) == production_inputs(verifier / path) for path in (manifest, lock)):
+              for path in (manifest, lock):
+                  shutil.copyfile(verifier / path, path)
+          else:
+              print("Using the selected candidate's dependency resolution for this historical build")
+          PY
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -46,6 +83,8 @@ jobs:
 
           evidence = pathlib.Path("modular-export-evidence").resolve()
           evidence.mkdir()
+          patch = subprocess.check_output(["git", "diff", "HEAD", "--", "src-tauri/crates/taomni-host-gates/Cargo.toml", "src-tauri/Cargo.lock"])
+          (evidence / "test-dependencies.patch").write_bytes(patch)
           os.environ["TAOMNI_GATE_EVIDENCE_DIR"] = str(evidence)
           source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           (evidence / "source-sha.txt").write_text(source + "\n")
@@ -59,7 +98,7 @@ jobs:
           binaries = [message["executable"] for line in build.stdout.splitlines() if (message := json.loads(line)).get("reason") == "compiler-artifact" and message.get("executable") and message["target"]["name"] == "legacy_export"]
           assert len(binaries) == 1, "Expected the exact production export harness"
           binary = pathlib.Path(binaries[0]).resolve(strict=True)
-          identity = {"source_sha": source, "platform": platform.platform(), "architecture": platform.machine(), "rustc": rustc, "test_binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(), "production_source": "src-tauri/src/plugin/migration_export/mod.rs"}
+          identity = {"source_sha": source, "verification_sha": os.environ["GITHUB_SHA"], "test_dependency_patch_sha256": hashlib.sha256(patch).hexdigest(), "platform": platform.platform(), "architecture": platform.machine(), "rustc": rustc, "test_binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(), "production_source": "src-tauri/src/plugin/migration_export/mod.rs"}
           (evidence / "identity.json").write_text(json.dumps(identity, indent=2) + "\n")
 
           def run(name, *args):

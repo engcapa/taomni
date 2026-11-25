@@ -11107,6 +11107,7 @@ dependencies = [
  "taomni-profile-locks",
  "taomni-rdp-client-api",
  "taomni-server-process",
+ "taomni-sockscap-api",
  "taomni-sqlite-snapshot",
  "tempfile",
  "thiserror 2.0.20",
