@@ -185,14 +185,21 @@ def close_tab(steps, tab_type):
     desktop_action(steps, "wait_for", {"selector": tab, "state": "detached"})
 
 
+def assert_original_body(steps, scope=""):
+    plain = scope + element("mail-body-mode-plain")
+    reader = scope + element("mail-reader-text")
+    desktop_action(steps, "wait_for", {"selector": f"{plain}, {reader}", "timeout_sec": 45})
+    if steps.session.execute(f"return Boolean(document.querySelector({json.dumps(plain)}));"):
+        desktop_action(steps, "click", plain)
+    desktop_action(steps, "assert_text", {"selector": reader, "contains": LEGACY_BODY, "timeout_sec": 45})
+
+
 def read_original(steps):
     row = element("mail-message-row") + f'[data-subject="{LEGACY_SUBJECT}"]'
     desktop_action(steps, "wait_for", {"selector": row, "timeout_sec": 45})
     try:
         desktop_action(steps, "dblclick", row)
-        desktop_action(steps, "assert_text", {
-            "selector": element("mail-reader-text"), "contains": LEGACY_BODY, "timeout_sec": 45,
-        })
+        assert_original_body(steps)
     except RuntimeError:
         steps.session.screenshot(steps.case_dir / "installed-mail-reader-failure.png")
         raise
@@ -309,10 +316,7 @@ def exercise_migrated(steps, mailbox, server, package):
     archive_read = element("mail-archive-read")
     desktop_action(steps, "assert_text", {"selector": archive_read, "contains": LEGACY_SUBJECT})
     desktop_action(steps, "click", archive_read)
-    desktop_action(steps, "assert_text", {
-        "selector": f"{element('mail-archive-preview')} {element('mail-reader-text')}",
-        "contains": LEGACY_BODY, "timeout_sec": 45,
-    })
+    assert_original_body(steps, element("mail-archive-preview") + " ")
     desktop_action(steps, "screenshot", "installed-mail-migrated-archive.png")
     desktop_action(steps, "click", element("mail-archive-close"))
     result["writerLease"] = writer_lease(mailbox.profile / "plugins", enabled=True, slug="mail")
