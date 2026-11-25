@@ -241,7 +241,7 @@ export function ReferencesPanel({ result, roots, semanticIndex, onOpenLocation, 
         </div>
       )}
       {result.error && (
-        <div className="mx-2 mb-1 rounded border border-red-500/30 bg-red-500/10 p-2 text-red-500">
+        <div className="mx-2 mb-1 rounded border border-ui-danger-border bg-ui-danger-surface p-2 text-ui-danger">
           {result.error}
         </div>
       )}

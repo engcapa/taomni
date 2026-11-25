@@ -315,7 +315,7 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
           <div
             data-testid="structural-search-unavailable"
             role="status"
-            className="mx-3 mb-1 flex items-center gap-1.5 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300"
+            className="mx-3 mb-1 flex items-center gap-1.5 rounded border border-ui-warning-border bg-ui-warning-surface px-2 py-1 text-ui-warning"
           >
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 truncate">{message ?? "Structural Search backend is not available"}</span>

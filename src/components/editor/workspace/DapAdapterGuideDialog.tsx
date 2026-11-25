@@ -251,7 +251,7 @@ export function DapAdapterGuideDialog({
                   {details.description}
                 </p>
               </div>
-              <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-ui-caption font-semibold text-emerald-400">
+              <span className="rounded border border-ui-success-border bg-ui-success-surface px-2 py-0.5 font-mono text-ui-caption font-semibold text-ui-success">
                 Runtime: {currentFixture.runtime}
               </span>
             </div>

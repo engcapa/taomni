@@ -198,7 +198,7 @@ export function WorkspaceRecoveryDialog({
                         {path}
                       </span>
                       {group.some((row) => resolutionBadgeTone(row) === "blocked") && (
-                        <span className="shrink-0 rounded bg-red-500/15 px-1.5 py-0.5 text-ui-caption font-semibold uppercase tracking-wide text-red-400">
+                        <span className="shrink-0 rounded bg-ui-danger-surface px-1.5 py-0.5 text-ui-caption font-semibold uppercase tracking-wide text-ui-danger">
                           Save blocked
                         </span>
                       )}
@@ -248,7 +248,7 @@ export function WorkspaceRecoveryDialog({
                               {onAcknowledgeLedgerEntry && (
                                 <button
                                   type="button"
-                                  className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-ui-caption hover:bg-emerald-500/15 hover:text-emerald-400"
+                                  className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-ui-caption hover:bg-ui-success-surface hover:text-ui-success"
                                   title="Acknowledge only this row and unblock saving this path"
                                   onClick={() => onAcknowledgeLedgerEntry(row)}
                                 >
@@ -295,7 +295,7 @@ export function WorkspaceRecoveryDialog({
                         type="button"
                         aria-label={`Discard recovery for ${entry.path}`}
                         title="Discard"
-                        className="mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-red-500/15 hover:text-red-400"
+                        className="mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-ui-danger-surface hover:text-ui-danger"
                         onClick={() => onDiscard(entry)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />

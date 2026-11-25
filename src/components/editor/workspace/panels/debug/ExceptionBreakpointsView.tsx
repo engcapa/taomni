@@ -172,7 +172,7 @@ export function ExceptionBreakpointRulesView({
           <button
             type="button"
             data-testid="debug-exception-rule-add"
-            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-emerald-500/15 hover:text-emerald-500 disabled:opacity-40"
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-ui-success-surface hover:text-ui-success disabled:opacity-40"
             title="Add exception path rule"
             aria-label="Add exception path rule"
             disabled={parseExceptionPathNames(newRule).length === 0}
@@ -259,7 +259,7 @@ export function ExceptionBreakpointRulesView({
               <button
                 type="button"
                 data-testid={`debug-exception-rule-remove-${index}`}
-                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-rose-500/15 hover:text-rose-500"
+                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-ui-danger-surface hover:text-ui-danger"
                 title="Remove exception rule"
                 aria-label="Remove exception rule"
                 onClick={() => debug.removeExceptionBreakpointRule(rule.id)}
@@ -340,7 +340,7 @@ export function ExceptionBreakpointRuleEditor({
           <button
             type="button"
             data-testid={`debug-exception-rule-path-remove-${ruleIndex}-${segmentIndex}`}
-            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-rose-500/15 hover:text-rose-500"
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-ui-danger-surface hover:text-ui-danger"
             title="Remove path segment"
             aria-label="Remove path segment"
             onClick={() => setSegment(segmentIndex, [])}
@@ -363,7 +363,7 @@ export function ExceptionBreakpointRuleEditor({
         <button
           type="button"
           data-testid={`debug-exception-rule-path-add-${ruleIndex}`}
-          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-emerald-500/15 hover:text-emerald-500 disabled:opacity-40"
+          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-ui-success-surface hover:text-ui-success disabled:opacity-40"
           title="Add path segment"
           aria-label="Add path segment"
           disabled={parseExceptionPathNames(newSegment).length === 0}

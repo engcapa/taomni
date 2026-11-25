@@ -42,7 +42,7 @@ export function matchingFlatFileRows(
   }
   if (state.error && !state.entries.length) {
     return [{ key: `${root.id}:flat-message`, render: () => (
-      <div className="m-2 rounded border border-red-500/30 bg-red-500/10 p-2 text-ui-body text-red-500">
+      <div className="m-2 rounded border border-ui-danger-border bg-ui-danger-surface p-2 text-ui-body text-ui-danger">
         {state.error}
       </div>
     ) }];

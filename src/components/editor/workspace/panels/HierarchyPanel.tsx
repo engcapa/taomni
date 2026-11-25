@@ -362,7 +362,7 @@ export function HierarchyPanel({
       {staleReason && root && (
         <div
           data-testid="hierarchy-stale-banner"
-          className="flex shrink-0 items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-2 py-1 text-ui-caption text-amber-500"
+          className="flex shrink-0 items-center gap-2 border-b border-ui-warning-border bg-ui-warning-surface px-2 py-1 text-ui-caption text-ui-warning"
         >
           <RotateCcw className="h-3 w-3 shrink-0" />
           <span className="min-w-0 flex-1 truncate" title={staleReason}>{staleReason}</span>

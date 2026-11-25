@@ -465,7 +465,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
               </label>
               <div
                 data-testid="keymap-capture-conflicts"
-                className="mt-2 max-h-24 min-h-0 overflow-y-auto rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-500"
+                className="mt-2 max-h-24 min-h-0 overflow-y-auto rounded border border-ui-warning-border bg-ui-warning-surface px-2 py-1 text-ui-warning"
                 role="status"
                 aria-live="polite"
               >

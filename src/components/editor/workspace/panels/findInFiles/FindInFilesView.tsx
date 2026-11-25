@@ -327,7 +327,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
         <div
           role="alert"
           data-testid="code-workspace-replace-error"
-          className="border-b border-red-500/30 bg-red-500/10 px-2 py-1 text-ui-small text-red-500"
+          className="border-b border-ui-danger-border bg-ui-danger-surface px-2 py-1 text-ui-small text-ui-danger"
         >
           {replaceCommitError}
         </div>
@@ -341,14 +341,14 @@ export function FindInFilesView(props: FindInFilesViewProps) {
         </div>
       )}
       {(summary?.truncated || summary?.cancelled) && (
-        <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-ui-caption text-amber-500">
+        <div className="shrink-0 border-b border-ui-warning-border bg-ui-warning-surface px-3 py-1 text-ui-caption text-ui-warning">
           {summary.cancelled ? "Search cancelled — results are partial." : `Match limit reached (${MAX_TOTAL_MATCHES}) — refine the query to see everything.`}
         </div>
       )}
       {scopePlan.status !== "ready" && (
         <div
           data-testid="code-workspace-find-scope-notice"
-          className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-ui-caption text-amber-500"
+          className="shrink-0 border-b border-ui-warning-border bg-ui-warning-surface px-3 py-1 text-ui-caption text-ui-warning"
         >
           {scopePlan.reason} — switch scope or refresh project facts.
         </div>

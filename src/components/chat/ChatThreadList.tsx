@@ -65,7 +65,7 @@ export function ChatThreadList({ threads, activeThreadId, onSelect, onNew, onDel
             </div>
             <IconButton
               type="button"
-              className="opacity-0 group-hover:opacity-100 h-5 w-5 p-0 inline-flex items-center justify-center rounded hover:bg-red-500/20 hover:text-red-400 transition-all"
+              className="opacity-0 group-hover:opacity-100 h-5 w-5 p-0 inline-flex items-center justify-center rounded hover:bg-ui-danger-surface hover:text-ui-danger transition-all"
               onClick={(e) => { e.stopPropagation(); onDelete(th.id); }}
               label={t("chat.threadDeleteTitle")}
             >

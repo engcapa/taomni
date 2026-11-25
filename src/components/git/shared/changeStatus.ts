@@ -1,17 +1,17 @@
 /** Keep change kinds consistent across Changes (tree/flat) and commit files. */
 export function gitChangeStatusColor(status: string, conflict = false): string {
-  if (conflict) return "bg-red-500/15 text-red-500";
+  if (conflict) return "bg-ui-danger-surface text-ui-danger";
   switch (status) {
     case "added":
-      return "bg-emerald-500/15 text-emerald-500";
+      return "bg-ui-success-surface text-ui-success";
     case "deleted":
-      return "bg-red-500/15 text-red-500";
+      return "bg-ui-danger-surface text-ui-danger";
     case "renamed":
     case "copied":
-      return "bg-purple-500/15 text-purple-500";
+      return "bg-[var(--taomni-git-moved-bg)] text-[var(--taomni-git-moved-text)]";
     case "untracked":
-      return "bg-amber-500/15 text-amber-500";
+      return "bg-ui-warning-surface text-ui-warning";
     default:
-      return "bg-blue-500/15 text-blue-500";
+      return "bg-ui-info-surface text-ui-info";
   }
 }

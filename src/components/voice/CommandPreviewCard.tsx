@@ -106,7 +106,7 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
 
       {/* Blocked warning */}
       {preview.blocked && (
-        <div className="mb-3 rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-ui-body text-red-400">
+        <div className="mb-3 rounded border border-ui-danger-border bg-ui-danger-surface px-3 py-2 text-ui-body text-ui-danger">
           {t("voice.cardBlockedPrefix", { reason: preview.blocked_reason ?? "" })}
           <br />
           <span className="text-ui-small text-[var(--taomni-text-muted)]">{t("voice.cardBlockedHint")}</span>

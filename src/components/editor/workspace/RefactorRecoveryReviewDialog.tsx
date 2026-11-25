@@ -307,7 +307,7 @@ export function RefactorRecoveryReviewDialog({
                 data-testid="refactor-recovery-dismiss"
                 disabled={!canDismiss}
                 title="Abandon this recovery reminder; files stay as they are"
-                className="h-8 rounded px-3 text-ui-small hover:bg-red-500/15 hover:text-red-300 disabled:opacity-40"
+                className="h-8 rounded px-3 text-ui-small hover:bg-ui-danger-surface hover:text-ui-danger disabled:opacity-40"
                 onClick={() => setConfirmingDismiss(true)}
               >
                 Abandon recovery…

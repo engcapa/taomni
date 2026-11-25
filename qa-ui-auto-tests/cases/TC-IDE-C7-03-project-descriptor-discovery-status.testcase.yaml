@@ -15,6 +15,7 @@ description: 'ED-PROJECT-001 browser slice. Creates a real browser-VFS Maven des
   '
 covers:
 - F25.5
+ui_standard: [UI-FND-03a]
 tags:
 - code-workspace
 - ide-c7
@@ -53,7 +54,7 @@ steps:
 - assert_text_equals:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     equals: <project><artifactId>qa-project</artifactId></project>
-- press: Control+s
+- press: {key: Control+s, macos_key: Meta+s}
 - wait_for: '[data-testid="project-facts-status-badge"]'
 - assert_text:
     selector: '[data-testid="project-facts-discovery-status"]'
@@ -69,6 +70,7 @@ steps:
     contains: Facts Failed
     timeout_sec: 15
 - assert_not_visible: '[data-testid="project-facts-ready-icon"]'
+- assert_solid_text_contrast: {selector: '[data-testid="project-facts-status-badge"]', minimum: 4.5}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -117,6 +119,13 @@ verification:
     - 25
     - 26
     - 27
+  - id: failed-status-contrast
+    ui_standard: [UI-FND-03a]
+    requirement: The confirmed facts failure remains readable on its status surface.
+    actions: [24]
+    checkpoints:
+    - {step: 28, expectation: The failure foreground and background meet 4.5 to 1.}
+    results: [28]
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

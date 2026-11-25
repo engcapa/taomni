@@ -175,9 +175,9 @@ export function RefactoringPreviewDialog({
                     title={source ? `Completeness source: ${source}` : undefined}
                     className={`rounded px-1.5 py-0.5 text-ui-caption font-medium ${
                       isComplete
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        ? "bg-ui-success-surface text-ui-success border border-ui-success-border"
                         : isPartial
-                        ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                        ? "bg-ui-warning-surface text-ui-warning border border-ui-warning-border"
                         : "bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-muted)] border border-[var(--taomni-code-border)]"
                     }`}
                   >
@@ -210,7 +210,7 @@ export function RefactoringPreviewDialog({
         {errorConflicts.length > 0 && (
           <div
             data-testid="refactoring-preview-error-conflicts"
-            className="mx-4 mt-2 flex items-start gap-2 rounded border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-ui-small text-rose-300"
+            className="mx-4 mt-2 flex items-start gap-2 rounded border border-ui-danger-border bg-ui-danger-surface px-3 py-2 text-ui-small text-ui-danger"
           >
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-400" />
             <div>
@@ -226,7 +226,7 @@ export function RefactoringPreviewDialog({
         {warningConflicts.length > 0 && errorConflicts.length === 0 && (
           <div
             data-testid="refactoring-preview-warning-conflicts"
-            className="mx-4 mt-2 flex items-start gap-2 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-ui-small text-amber-300"
+            className="mx-4 mt-2 flex items-start gap-2 rounded border border-ui-warning-border bg-ui-warning-surface px-3 py-2 text-ui-small text-ui-warning"
           >
             <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" />
             <div>
@@ -364,12 +364,12 @@ export function RefactoringPreviewDialog({
                             → {usage.newText || "(empty)"}
                           </span>
                           {usage.annotationLabel && (
-                            <span className="rounded bg-sky-500/10 px-1.5 py-0.2 text-ui-caption text-sky-400">
+                            <span className="rounded bg-ui-info-surface px-1.5 py-0.2 text-ui-caption text-ui-info">
                               {usage.annotationLabel}
                             </span>
                           )}
                           {isRequired && (
-                            <span className="rounded bg-amber-500/10 px-1.5 py-0.2 text-ui-caption text-amber-400 font-sans">
+                            <span className="rounded bg-ui-warning-surface px-1.5 py-0.2 text-ui-caption text-ui-warning font-sans">
                               required
                             </span>
                           )}

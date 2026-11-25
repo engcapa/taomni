@@ -188,7 +188,7 @@ export function DebugConsolePane({ debug, stopped, visible = true, onOpenLocatio
             data-testid="debug-console-follow-tail"
             className={`inline-flex h-5 items-center gap-1 rounded px-1.5 text-ui-caption transition-colors ${
               followTail
-                ? "bg-sky-500/20 text-sky-400 font-medium"
+                ? "bg-ui-info-surface text-ui-info font-medium"
                 : "text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
             }`}
             title="Follow tail (auto-scroll on new output)"

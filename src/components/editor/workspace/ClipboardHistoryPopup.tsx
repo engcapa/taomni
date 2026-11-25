@@ -110,7 +110,7 @@ export function ClipboardHistoryPopup({
                     onClear();
                     setConfirmingClear(false);
                   }}
-                  className="rounded border border-red-500/40 px-2 py-0.5 text-ui-caption text-red-400 hover:bg-red-500/10"
+                  className="rounded border border-ui-danger-border px-2 py-0.5 text-ui-caption text-ui-danger hover:bg-ui-danger-surface"
                 >
                   Clear
                 </button>

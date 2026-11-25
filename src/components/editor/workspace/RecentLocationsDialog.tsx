@@ -133,7 +133,7 @@ export function RecentLocationsDialog({
               onClick={() => setChangedOnly((v) => !v)}
               className={`flex items-center gap-1 rounded px-2.5 py-1 text-ui-small font-medium border transition-colors ${
                 changedOnly
-                  ? "bg-sky-500/20 text-sky-400 border-sky-500/40 font-semibold"
+                  ? "bg-ui-info-surface text-ui-info border-ui-info-border font-semibold"
                   : "border-[var(--taomni-code-border)] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
               }`}
             >
@@ -202,29 +202,29 @@ export function RecentLocationsDialog({
                         :{loc.line + 1}
                       </span>
                       {loc.symbolName && (
-                        <span className="rounded bg-sky-500/20 text-sky-300 px-1.5 py-0.2 text-ui-caption font-mono">
+                        <span className="rounded bg-ui-info-surface text-ui-info px-1.5 py-0.2 text-ui-caption font-mono">
                           {loc.symbolName}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {loc.state === "relocated" && (
-                        <span className="rounded bg-blue-500/20 text-blue-300 px-1.5 py-0.2 text-ui-caption font-medium border border-blue-500/30" title="File moved or renamed">
+                        <span className="rounded bg-ui-info-surface text-ui-info px-1.5 py-0.2 text-ui-caption font-medium border border-ui-info-border" title="File moved or renamed">
                           Relocated
                         </span>
                       )}
                       {loc.state === "stale" && (
-                        <span className="rounded bg-orange-500/20 text-orange-300 px-1.5 py-0.2 text-ui-caption font-medium border border-orange-500/30" title={loc.staleReason ?? "Content modified externally"}>
+                        <span className="rounded bg-ui-warning-surface text-ui-warning px-1.5 py-0.2 text-ui-caption font-medium border border-ui-warning-border" title={loc.staleReason ?? "Content modified externally"}>
                           Stale
                         </span>
                       )}
                       {loc.state === "missing" && (
-                        <span className="rounded bg-red-500/20 text-red-300 px-1.5 py-0.2 text-ui-caption font-medium border border-red-500/30" title="File no longer exists on disk">
+                        <span className="rounded bg-ui-danger-surface text-ui-danger px-1.5 py-0.2 text-ui-caption font-medium border border-ui-danger-border" title="File no longer exists on disk">
                           Missing
                         </span>
                       )}
                       {loc.isEditLocation && (
-                        <span className="rounded bg-amber-500/20 text-amber-300 px-1.5 py-0.2 text-ui-caption font-medium border border-amber-500/30">
+                        <span className="rounded bg-ui-warning-surface text-ui-warning px-1.5 py-0.2 text-ui-caption font-medium border border-ui-warning-border">
                           Edited
                         </span>
                       )}

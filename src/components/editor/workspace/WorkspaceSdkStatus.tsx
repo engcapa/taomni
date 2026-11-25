@@ -94,12 +94,12 @@ function sourceLabel(source: ResolvedSdkSource, t: TranslateFn): string {
 
 function statusTone(status: ResolvedSdkStatus): string {
   if (status === "resolved" || status === "managed") {
-    return "border-emerald-500/35 bg-emerald-500/10 text-emerald-500";
+    return "border-ui-success-border bg-ui-success-surface text-ui-success";
   }
   if (status === "missing" || status === "unresolved") {
-    return "border-amber-500/35 bg-amber-500/10 text-amber-500";
+    return "border-ui-warning-border bg-ui-warning-surface text-ui-warning";
   }
-  return "border-red-500/35 bg-red-500/10 text-red-500";
+  return "border-ui-danger-border bg-ui-danger-surface text-ui-danger";
 }
 
 function javaMajor(version: string | null): number | null {
@@ -414,7 +414,7 @@ export const WorkspaceSdkStatus = memo(function WorkspaceSdkStatus({ roots, auto
         title={t("settings.workspaceSdkTitle")}
         className={`inline-flex h-7 shrink-0 items-center gap-1 rounded border px-2 text-ui-caption ${
           issueCount > 0
-            ? "border-amber-500/40 bg-amber-500/10 text-amber-500"
+            ? "border-ui-warning-border bg-ui-warning-surface text-ui-warning"
             : "border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[var(--taomni-code-muted)]"
         }`}
         onClick={() => setOpen(true)}
@@ -515,13 +515,13 @@ export const WorkspaceSdkStatus = memo(function WorkspaceSdkStatus({ roots, auto
                       </div>
 
                       {rootError && (
-                        <div className="mt-2 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-ui-caption text-red-400">
+                        <div className="mt-2 rounded border border-ui-danger-border bg-ui-danger-surface px-2 py-1.5 text-ui-caption text-ui-danger">
                           {t("settings.workspaceSdkDetectionFailed")}: {rootError}
                         </div>
                       )}
 
                       {resolution?.analysis.warnings.map((warning) => (
-                        <div key={warning} className="mt-2 flex gap-1.5 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-ui-caption text-amber-400">
+                        <div key={warning} className="mt-2 flex gap-1.5 rounded border border-ui-warning-border bg-ui-warning-surface px-2 py-1.5 text-ui-caption text-ui-warning">
                           <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                           {warning}
                         </div>
@@ -543,7 +543,7 @@ export const WorkspaceSdkStatus = memo(function WorkspaceSdkStatus({ roots, auto
                                 </div>
                                 <div className="flex flex-wrap justify-end gap-1">
                                   {profile.buildSystems.map((buildSystem) => (
-                                    <span key={buildSystem} title={t("settings.workspaceSdkBuildSystems")} className="rounded bg-sky-500/10 px-1.5 py-0.5 text-ui-caption font-medium text-sky-400">{buildSystem}</span>
+                                    <span key={buildSystem} title={t("settings.workspaceSdkBuildSystems")} className="rounded bg-ui-info-surface px-1.5 py-0.5 text-ui-caption font-medium text-ui-info">{buildSystem}</span>
                                   ))}
                                   {profile.languages.map((language) => (
                                     <span key={language} title={t("settings.workspaceSdkLanguages")} className="rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 text-ui-caption text-[var(--taomni-code-muted)]">{kindLabel(language)}</span>

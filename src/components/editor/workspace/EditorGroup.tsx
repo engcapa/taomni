@@ -312,7 +312,7 @@ export function EditorGroup({
                 <EditorBanner banners={visibleBanners} onDismiss={onDismissBanner ?? (() => { })} />
               )}
               {activeFile.error && (
-                <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-red-500/30 bg-red-500/10 text-ui-body text-red-500">
+                <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-ui-danger-border bg-ui-danger-surface text-ui-body text-ui-danger">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span className="min-w-0 truncate">{activeFile.error}</span>
                 </div>

@@ -22,14 +22,14 @@ export interface CompareViewProps {
 function statusColor(status: string): string {
   switch (status) {
     case "added":
-      return "bg-emerald-500/15 text-emerald-500";
+      return "bg-ui-success-surface text-ui-success";
     case "deleted":
-      return "bg-red-500/15 text-red-500";
+      return "bg-ui-danger-surface text-ui-danger";
     case "renamed":
     case "copied":
       return "bg-purple-500/15 text-purple-500";
     default:
-      return "bg-blue-500/15 text-blue-500";
+      return "bg-ui-info-surface text-ui-info";
   }
 }
 

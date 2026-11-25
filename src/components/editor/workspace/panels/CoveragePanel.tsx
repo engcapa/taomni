@@ -44,9 +44,9 @@ export function CoveragePanel({
   };
 
   const getPercentageColor = (pct: number) => {
-    if (pct >= 80) return "text-emerald-500 bg-emerald-500/10 border-emerald-500/30";
-    if (pct >= 50) return "text-amber-500 bg-amber-500/10 border-amber-500/30";
-    return "text-rose-500 bg-rose-500/10 border-rose-500/30";
+    if (pct >= 80) return "text-ui-success bg-ui-success-surface border-ui-success-border";
+    if (pct >= 50) return "text-ui-warning bg-ui-warning-surface border-ui-warning-border";
+    return "text-ui-danger bg-ui-danger-surface border-ui-danger-border";
   };
 
   const getBarColor = (pct: number) => {
@@ -121,7 +121,7 @@ export function CoveragePanel({
             title={coverageEnabled ? "Hide coverage marks in editor gutter" : "Show coverage marks in editor gutter"}
             className={`flex items-center gap-1 rounded border px-2 py-0.5 transition-colors ${
               coverageEnabled
-                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                ? "border-ui-success-border bg-ui-success-surface text-ui-success"
                 : "border-[var(--taomni-code-border)] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
             }`}
           >

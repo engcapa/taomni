@@ -66,7 +66,7 @@ function renderEntries(
   }
   if (state.error) {
     return [{ key: `${root.id}:${path}:message`, render: () => (
-      <div className="m-2 rounded border border-red-500/30 bg-red-500/10 p-2 text-ui-body text-red-500">
+      <div className="m-2 rounded border border-ui-danger-border bg-ui-danger-surface p-2 text-ui-body text-ui-danger">
         {state.error}
       </div>
     ) }];

@@ -253,7 +253,7 @@ export function ReplacePreviewDialog({
         <div
           data-testid="code-workspace-replace-commit-error"
           role="alert"
-          className="shrink-0 border-t border-red-500/30 bg-red-500/10 px-3 py-1.5 text-ui-small text-red-500"
+          className="shrink-0 border-t border-ui-danger-border bg-ui-danger-surface px-3 py-1.5 text-ui-small text-ui-danger"
         >
           {commitError}
         </div>

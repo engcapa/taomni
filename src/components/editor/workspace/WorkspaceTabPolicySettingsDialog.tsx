@@ -147,7 +147,7 @@ export function WorkspaceTabPolicySettingsDialog({
             {evictionPreview?.kind === "evicted" && (
               <div
                 data-testid="workspace-tab-policy-eviction-preview"
-                className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-ui-small text-amber-200"
+                className="rounded border border-ui-warning-border bg-ui-warning-surface p-2.5 text-ui-small text-ui-warning"
               >
                 <div className="font-semibold">Candidate Evictions Preview</div>
                 <div className="mt-1">
@@ -172,7 +172,7 @@ export function WorkspaceTabPolicySettingsDialog({
             {evictionPreview?.kind === "over-limit-protected" && (
               <div
                 data-testid="workspace-tab-policy-over-limit-warning"
-                className="rounded border border-blue-500/30 bg-blue-500/10 p-2.5 text-ui-small text-blue-200"
+                className="rounded border border-ui-info-border bg-ui-info-surface p-2.5 text-ui-small text-ui-info"
               >
                 <div className="font-semibold">Protected Over-Limit</div>
                 <div className="mt-1">{evictionPreview.reason}</div>
