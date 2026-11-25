@@ -27,13 +27,16 @@ const MOBILE_RELEASE_EXCEPTION = {
   placement: "core",
   notes: "Mobile remains in the core application, including mobile connections, desktop control, Feishu integration, and headless mode.",
 };
+const LEGACY_UPGRADE_NOTE = "When you first upgrade from a monolithic release, Taomni downloads and installs the original set of official modules automatically. You can disable or uninstall individual modules and keep their data. If you used MFA, unlock your existing accounts with your original Vault password.";
+const OFFICIAL_MODULE_NOTE = "Taomni supports signed official modules. Native module hosts run in separate processes. Module interfaces run in the main WebView with access to the same application commands as the core interface.";
 
 export function appendModuleReleaseNotes(notes, catalog) {
   const exception = catalog?.releaseExceptions?.[MOBILE_ID];
-  if (exception?.placement !== "core" || !exception.notes || notes.includes(exception.notes)) {
-    return notes;
-  }
-  return [notes.trimEnd(), exception.notes].filter(Boolean).join("\n\n");
+  const additions = [];
+  if (exception?.placement === "core" && exception.notes) additions.push(exception.notes);
+  if (catalog?.legacyUpgrade?.length) additions.push(LEGACY_UPGRADE_NOTE, OFFICIAL_MODULE_NOTE);
+  const missing = additions.filter((paragraph) => !notes.includes(paragraph));
+  return missing.length ? [notes.trimEnd(), ...missing].filter(Boolean).join("\n\n") : notes;
 }
 
 function filesIn(directory) {

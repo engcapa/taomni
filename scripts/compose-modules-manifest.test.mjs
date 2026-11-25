@@ -189,7 +189,11 @@ test("the first roster records Mobile as continuing in the core and adds the rel
   assert.equal(mobile.placement, "core");
   assert.deepEqual(manifest.legacyUpgrade, [module.id]);
   const notes = appendModuleReleaseNotes("Modules are now available.", manifest);
-  assert.equal(notes, `Modules are now available.\n\n${mobile.notes}`);
+  assert.ok(notes.startsWith(`Modules are now available.\n\n${mobile.notes}\n\n`));
+  assert.match(notes, /installs the original set of official modules automatically/);
+  assert.match(notes, /original Vault password/);
+  assert.match(notes, /main WebView with access to the same application commands/);
+  assert.equal(appendModuleReleaseNotes(`Modules are now available.\n\n${mobile.notes}`, manifest), notes);
   assert.equal(appendModuleReleaseNotes(notes, manifest), notes);
 
   const delta = composeModulesManifest({ ...config, outputDir: join(f.root, "delta") }).manifest;
