@@ -2159,6 +2159,8 @@
 - `[data-testid="terminal-detach"]` — interactive — F-Detach-1.terminal-detach
 - `[data-testid="terminal-maximize"]` — interactive [optional] — F-Detach-1.terminal-maximize
 - `[data-testid="vnc-detach"]` — interactive [optional] — F-Detach-1.vnc-detach
+- `[data-testid="detached-handoff"]` — display [optional] — F-Detach-1.detached-handoff
+- `[data-testid="detached-handoff-close"]` — interactive [optional] — F-Detach-1.detached-handoff-close
 - `[data-testid="detached-session-window"]` — display [optional] — F-Detach-1.detached-window
 - `[data-testid="detached-reattach"]` — interactive [optional] — F-Detach-1.detached-reattach
 - `[data-testid="detached-os-fullscreen"]` — interactive [optional] — F-Detach-1.detached-os-fullscreen

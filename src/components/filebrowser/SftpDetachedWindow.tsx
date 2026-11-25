@@ -3,6 +3,7 @@ import { PanelRightOpen } from "lucide-react";
 import { FileBrowser } from "./FileBrowser";
 import { subscribeCwdHint, getLatestCwdHint } from "../../lib/sftpSync";
 import { isTauriRuntime } from "../../lib/runtime";
+import { DetachedHandoffStatus } from "../detached/DetachedHandoffStatus";
 import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
 import { sftpWindowPaths, type DetachedSftpParams } from "../../lib/sftpWindowState";
 import { useSftpStore } from "../../stores/sftpStore";
@@ -178,48 +179,7 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   }, [title, t]);
 
   if (!params) {
-    // Use literal colours here (not CSS vars) so that even if the theme
-    // stylesheet hasn't loaded the popup is visibly populated rather than
-    // appearing as a blank white page.
-    return (
-      <div
-        className="w-screen h-screen flex items-center justify-center p-6"
-        style={{ background: "#1e2128", color: "#e6e6e6" }}
-      >
-        <div className="max-w-md text-center text-sm leading-relaxed">
-          {handoffTimedOut ? (
-            <>
-              <div className="text-base font-semibold mb-2">
-                {t("fileBrowser.detachedTimedOutTitle")}
-              </div>
-              <p style={{ color: "#a0a0a0" }}>
-                {t("fileBrowser.detachedTimedOutBody", { sessionId })}
-              </p>
-              <p className="mt-3" style={{ color: "#a0a0a0" }}>
-                {t("fileBrowser.detachedTimedOutHint")}
-              </p>
-              <button
-                type="button"
-                className="mt-4 px-3 py-1.5 text-xs rounded"
-                style={{ background: "#3a3f4a", color: "#e6e6e6" }}
-                onClick={() => window.close()}
-              >
-                {t("fileBrowser.detachedCloseWindow")}
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="text-base font-semibold mb-2">
-                {t("fileBrowser.detachedLoadingTitle")}
-              </div>
-              <p style={{ color: "#a0a0a0" }}>
-                {t("fileBrowser.detachedLoadingBody")}
-              </p>
-            </>
-          )}
-        </div>
-      </div>
-    );
+    return <DetachedHandoffStatus key={sessionId} sessionId={sessionId} failed={handoffTimedOut} />;
   }
 
   return (

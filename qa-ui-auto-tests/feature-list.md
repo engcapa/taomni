@@ -6125,6 +6125,14 @@ controls:
   # Declaring it here too would be a duplicate-selector lint error, so this
   # feature only documents it in prose — TC-111 exercises the click.
   # Detached-window shell + the controls that only exist inside it.
+  - id: detached-handoff
+    selector: '[data-testid="detached-handoff"]'
+    kind: display
+    optional: true
+  - id: detached-handoff-close
+    selector: '[data-testid="detached-handoff-close"]'
+    kind: interactive
+    optional: true
   - id: detached-window
     selector: '[data-testid="detached-session-window"]'
     kind: display

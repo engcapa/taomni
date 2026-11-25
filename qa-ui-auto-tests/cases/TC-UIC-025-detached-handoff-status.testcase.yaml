@@ -1,0 +1,41 @@
+id: TC-UIC-025-detached-handoff-status
+title: Detached SFTP and terminal entry pages explain missing connections in the selected appearance
+covers: [F-Detach-1]
+fixtures: [reset_db]
+tags: [ui-contract, window, theme]
+modes: [browser]
+ui_standard: [UI-FND-03a, UI-FND-13]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-missing-connection
+- click: '[data-testid="theme-cycle"]'
+- open: ${cfg.app.base_url}?sftp=qa-missing-sftp
+- wait_for: 'html[data-app-theme="light"] [data-testid="detached-handoff-close"]'
+- assert_text: {selector: '[data-testid="detached-handoff"] [role="status"]', contains: qa-missing-sftp}
+- assert_solid_text_contrast: {selector: '[data-testid="detached-handoff"] [role="status"] p:first-of-type', minimum: 4.5, composite_ancestors: true}
+- open: ${cfg.app.base_url}
+- click: '[data-testid="theme-cycle"]'
+- open: ${cfg.app.base_url}?terminal=qa-missing-terminal
+- wait_for: 'html[data-app-theme="dark"] [data-testid="detached-handoff-close"]'
+- assert_text: {selector: '[data-testid="detached-handoff"] [role="status"]', contains: qa-missing-terminal}
+- assert_text: {selector: '[data-testid="detached-handoff"] [role="status"] p:last-child', contains: detach the session again}
+- assert_solid_text_contrast: {selector: '[data-testid="detached-handoff"] [role="status"] p:first-of-type', minimum: 4.5, composite_ancestors: true}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: recovery
+    ui_standard: [UI-FND-03a, UI-FND-13]
+    requirement: Both detached entry points identify the missing session and show readable instructions in the selected theme.
+    actions: [3, 4, 9, 10]
+    checkpoints:
+    - {step: 6, expectation: The SFTP recovery message identifies the requested session.}
+    - {step: 7, expectation: Light instructions have at least 4.5 to 1 contrast.}
+    - {step: 12, expectation: The terminal recovery message identifies the requested session.}
+    - {step: 13, expectation: The message tells the user how to reopen the session.}
+    - {step: 14, expectation: Dark instructions have at least 4.5 to 1 contrast.}
+    results: [6, 7, 12, 13, 14]
+  visual:
+  - {check: Recovery text contrast, method: automated, reason: Measures text against its painted background in each appearance.}
+  native:
+  - {check: Detached window lifecycle, method: automated, reason: TC-UIC-006 reloads an actual detached terminal after handoff consumption and closes it.}

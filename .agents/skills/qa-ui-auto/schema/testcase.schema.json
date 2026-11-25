@@ -1425,10 +1425,12 @@
             {
               "type": "object",
               "additionalProperties": false,
-              "properties": {}
+              "properties": {
+                "ready_selector": { "type": "string", "minLength": 1 }
+              }
             }
           ],
-          "description": "Reload the webview document so store bootstraps re-read storage; waits for welcome-panel."
+          "description": "Reload the current WebView, preserve its storage, and wait for its new document. Set ready_selector when a specific route must mount."
         },
         "vault_first_run": {
           "type": "string",

@@ -2698,9 +2698,8 @@ def _do_seed_storage(ctx: NativeStepContext, args: Any) -> str:
 @_verb("reload_window")
 def _do_reload_window(ctx: NativeStepContext, args: Any) -> str:
     """Reload the webview document; wait for the app shell to return."""
-    _ = args
     from .native_reload import reload_window
-    return reload_window(ctx)
+    return reload_window(ctx, ready_selector=(args or {}).get("ready_selector", '[data-testid="welcome-panel"]'))
 
 
 @_verb("parity005_native_fault")

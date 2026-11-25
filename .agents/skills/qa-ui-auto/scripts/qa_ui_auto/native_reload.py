@@ -10,7 +10,7 @@ from .deadline import budget_time as time
 from .steps import StepError
 
 
-def reload_window(ctx, timeout_sec=60):
+def reload_window(ctx, timeout_sec=60, ready_selector='[data-testid="welcome-panel"]'):
     session = ctx.session
     session.execute(
         "window.__QA_UI_AUTO_RELOAD_PENDING__ = true;"
@@ -23,7 +23,7 @@ def reload_window(ctx, timeout_sec=60):
             ready = session.execute(
                 "return window.__QA_UI_AUTO_RELOAD_PENDING__ !== true && "
                 "document.readyState === 'complete' && "
-                "!!document.querySelector('[data-testid=\"welcome-panel\"]');"
+                f"!!document.querySelector({json.dumps(ready_selector)});"
             )
         except (WebDriverError, urllib.error.URLError, OSError, json.JSONDecodeError) as error:
             last_error = str(error)
@@ -31,6 +31,6 @@ def reload_window(ctx, timeout_sec=60):
             if ready is True:
                 session.activate_linux_window()
                 session.install_console_hook()
-                return "reloaded; new document and welcome-panel visible"
+                return f"reloaded; new document contains {ready_selector}"
         time.sleep(max(0.0, min(0.1, end - time.monotonic())))
     raise StepError(f"reload_window: new document did not mount within {timeout_sec}s: {last_error}")
