@@ -1,0 +1,174 @@
+id: TC-AI-869-03-closed-owner-fallback-native
+title: Closing the approval owner window still delivers the next prompt to the main window
+description: 'Issue #869 native regression for the window-closed fallback. A detached terminal window owns the thread and its approval card; the window is then reattached (destroyed). The backend must forget that window''s routing as soon as it is destroyed, so the next request falls back to a broadcast that the main window shows and can decide. macOS is excluded because its WKWebView automation bridge cannot reliably deliver the in-page Reattach click that destroys the window; that platform gap is recorded rather than asserted unreliably.'
+covers:
+- F-AI-2.4
+- F6.3
+tags:
+- ai
+- approval
+- window
+- native-gate
+- regression
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-approval-closed
+- fill:
+    selector: input[aria-label="Keyboard shortcut"]
+    value: Ctrl+Alt+7
+- set_check:
+    selector: '[data-testid="session-open-new-window"]'
+    checked: true
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-approval-closed"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-approval-closed"]'
+- press: Control+Alt+7
+- switch_window:
+    selector: '[data-testid="detached-reattach"]'
+    timeout_sec: 90
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    timeout_sec: 45
+- seed_storage:
+    key: qa.agentApproval.threadId
+    value: '"qa-869-closed-thread"'
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"own"'
+- &id001
+  press: Control+Alt+Shift+F9
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: visible
+    timeout_sec: 45
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 1
+- screenshot: native-closed-owner-card.png
+- click: '[data-testid="ai-chat-cc-permission-allow"]'
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: detached
+    timeout_sec: 30
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    close_with: '[data-testid="detached-reattach"]'
+    timeout_sec: 90
+- seed_storage:
+    key: qa.agentApproval.mode
+    value: '"fallback"'
+- *id001
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: visible
+    timeout_sec: 45
+- assert_count:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    name: data-queue-length
+    equals: '1'
+- screenshot: native-closed-owner-fallback-card.png
+- click: '[data-testid="ai-chat-cc-permission-allow"]'
+- wait_for:
+    selector: '[data-testid="ai-chat-safety-gate"]'
+    state: detached
+    timeout_sec: 30
+- eval_readonly:
+    expression: localStorage.getItem('qa.agentApproval.lastResult')||''
+    contains: '"delivery":"broadcast"'
+    timeout_sec: 20
+- assert_no_runtime_errors: null
+- screenshot: native-closed-owner-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: V1-owner-card
+    requirement: The detached window owns the thread and shows its approval card before it is closed.
+    actions:
+    - 3
+    - 5
+    - 7
+    - 8
+    - 10
+    - 11
+    - 12
+    - 13
+    - 15
+    - 16
+    - 19
+    - 20
+    - 21
+    checkpoints:
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec": 45}}'
+    - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
+    - step: 23
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
+    results:
+    - 18
+    - 22
+    - 23
+  - id: V2-closed-owner-fallback
+    requirement: 'After the owner window is destroyed, the next request is broadcast: the main window shows one card with one queue entry, the decision resolves it, and its delivery reports a broadcast.'
+    actions:
+    - 25
+    - 27
+    - 28
+    - 29
+    - 34
+    checkpoints:
+    - step: 30
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "visible", "timeout_sec": 45}}'
+    - step: 31
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "equal": 1}}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "name": "data-queue-length", "equals": "1"}}'
+    - step: 35
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-safety-gate\"]", "state": "detached", "timeout_sec": 30}}'
+    - step: 36
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''qa.agentApproval.lastResult'')||''''", "contains": "\"delivery\":\"broadcast\"", "timeout_sec": 20}}'
+    results:
+    - 30
+    - 31
+    - 32
+    - 35
+    - 36
+  - id: V3-crash-regression
+    requirement: No uncaught error, unhandled rejection or crash UI appears after the window lifecycle.
+    actions:
+    - 34
+    checkpoints:
+    - step: 37
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 37
+  visual:
+  - check: The owner card in the detached window and the fallback card in the main window are readable and correctly sized.
+    method: manual
+    reason: Counts and delivery reports prove routing; screenshot review covers readability.
+  native:
+  - check: A real detached window is destroyed and the next approval is delivered to the remaining window through the backend fallback.
+    method: automated
+    reason: Only the native window lifecycle and Tauri event delivery can prove the closed-owner fallback.

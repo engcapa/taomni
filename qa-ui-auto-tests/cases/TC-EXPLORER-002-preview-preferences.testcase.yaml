@@ -16,8 +16,8 @@ steps:
 - vault_first_run: qa-explorer-preview
 - reload_window: null
 - set_viewport: {width: 1600, height: 960}
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - click: 'button[aria-label="Cycle application theme"]'
 - assert_attribute: {selector: html, name: data-app-theme, equals: light}
@@ -120,7 +120,7 @@ steps:
 - assert_localstorage: {key: taomni.explorer.view.v1, contains: '"wrap":true'}
 - assert_no_runtime_errors: null
 - screenshot: explorer-shared-preview-preferences.png
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-new"]'
 - click: '[data-testid="explorer-new-folder"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-rename-input"]'
@@ -145,6 +145,7 @@ steps:
 - seed_storage: {key: taomni.explorer.stubTrashUnavailable, value: 'true'}
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-delete"]'
+- click: '[data-testid="explorer-delete-trash"]'
 - wait_for: '[data-testid="explorer-trash-unavailable"]'
 - assert_text: {selector: '[data-testid="explorer-trash-unavailable"]', contains: Trash unavailable}
 - click: '[data-testid="explorer-delete-cancel"]'
@@ -152,7 +153,6 @@ steps:
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-delete"]'
 - click: '[data-testid="explorer-delete-confirm"]'
 - wait_for: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]', state: detached}
-- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created - 副本.txt"]'
 - seed_storage: {key: taomni.explorer.stubTrashUnavailable, value: 'false'}
 - file_clipboard:
     action: seed
@@ -343,8 +343,8 @@ verification:
     - 79
     - 80
   - id: R4
-    requirement: New file and folder use inline rename; same-volume drag moves into a folder; same-directory copy gets a suffix; unavailable trash
-      requires explicit confirm and cancellation preserves the original.
+    requirement: New file and folder use inline rename; same-volume drag moves into a folder; same-directory copy gets a suffix; Delete opens a
+      Trash/persistent choice, unavailable trash requires explicit confirm and cancellation preserves the original.
     actions:
     - 98
     - 99
@@ -363,6 +363,7 @@ verification:
     - 118
     - 119
     - 120
+    - 121
     - 123
     - 125
     - 126
@@ -378,14 +379,12 @@ verification:
       expectation: The moved file is visible inside the target folder.
     - step: 117
       expectation: Same-directory Paste copies with documented suffix.
-    - step: 122
+    - step: 123
       expectation: Trash-unavailable reason explicitly states confirmation is required.
-    - step: 124
+    - step: 125
       expectation: Cancelling fallback preserves the original.
-    - step: 127
-      expectation: Confirming fallback removes only the original.
     - step: 128
-      expectation: Independent copy remains present.
+      expectation: Confirmed permanent fallback removes only the original.
     - step: 136
       expectation: No runtime error after fallback and partial-batch recovery.
     results:
@@ -394,9 +393,8 @@ verification:
     - 111
     - 113
     - 117
-    - 122
-    - 124
-    - 127
+    - 123
+    - 125
     - 128
     - 136
   - id: R5

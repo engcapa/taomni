@@ -1,0 +1,84 @@
+name: Find a QA build artifact
+description: Look up an exact artifact from a dispatch branch or the trusted default branch
+
+inputs:
+  name:
+    description: Exact artifact name
+    required: true
+  trusted:
+    description: Only accept artifacts published by completed runs on the trusted default branch
+    default: 'false'
+  branch:
+    description: Producer branch for dispatch-branch lookups (empty = current ref)
+    default: ''
+  default-branch:
+    description: Trusted default branch name for trusted lookups
+    default: ''
+  events:
+    description: Comma-separated producer events allowed for trusted lookups
+    default: 'schedule,workflow_dispatch,push'
+
+outputs:
+  run-id:
+    description: Earlier producer run containing a finalized artifact
+    value: ${{ steps.find.outputs.run-id }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/github-script@v7
+      id: find
+      env:
+        QA_ARTIFACT_NAME: ${{ inputs.name }}
+        QA_ARTIFACT_TRUSTED: ${{ inputs.trusted }}
+        QA_ARTIFACT_BRANCH: ${{ inputs.branch }}
+        QA_ARTIFACT_DEFAULT_BRANCH: ${{ inputs.default-branch }}
+        QA_ARTIFACT_EVENTS: ${{ inputs.events }}
+        QA_REPO_ID: ${{ github.repository_id }}
+      with:
+        script: |
+          const { owner, repo } = context.repo;
+          const name = process.env.QA_ARTIFACT_NAME;
+          const repoId = Number(process.env.QA_REPO_ID);
+          const trusted = String(process.env.QA_ARTIFACT_TRUSTED || '').toLowerCase() === 'true';
+          const branch = trusted
+            ? String(process.env.QA_ARTIFACT_DEFAULT_BRANCH || '')
+            : String(process.env.QA_ARTIFACT_BRANCH || context.ref.replace(/^refs\/heads\//, ''));
+          const events = String(process.env.QA_ARTIFACT_EVENTS || '')
+            .split(',').map(value => value.trim()).filter(Boolean);
+          const workflowPath = '.github/workflows/qa-ui-auto-platforms.yml';
+          if (!branch) {
+            core.info('No branch supplied for the artifact lookup');
+            return;
+          }
+          try {
+            let candidates = [];
+            for (let page = 1; page <= 3; page += 1) {
+              const { data } = await github.rest.actions.listArtifactsForRepo({ owner, repo, name, per_page: 100, page });
+              candidates = candidates.concat(data.artifacts);
+              if (data.artifacts.length < 100) break;
+            }
+            for (const artifact of candidates) {
+              const producer = artifact.workflow_run;
+              if (artifact.name !== name || artifact.expired || !producer) continue;
+              if (producer.repository_id !== repoId || producer.head_repository_id !== repoId) continue;
+              if (producer.head_branch !== branch || producer.id === context.runId) continue;
+              const { data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: producer.id });
+              if (run.path !== workflowPath) continue;
+              if (run.head_branch !== branch || run.head_repository?.id !== repoId) continue;
+              if (trusted) {
+                // Only a trusted source may feed another branch: a completed
+                // run on the default branch that is not a PR merge ref.
+                if (!events.includes(run.event)) continue;
+                if (run.status !== 'completed') continue;
+              } else if (run.event !== 'workflow_dispatch') {
+                continue;
+              }
+              core.setOutput('run-id', String(run.id));
+              core.info(`Found ${name} in ${trusted ? 'trusted ' : ''}workflow run ${run.id} (${run.event} on ${run.head_branch})`);
+              return;
+            }
+            core.info(`No retained artifact for ${name} on ${trusted ? 'trusted ' : ''}${branch}`);
+          } catch (error) {
+            core.warning(`Unable to look up ${name}: ${error.message}`);
+          }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ChevronDown, Pencil, Settings, X } from "lucide-react";
 import { HtmlThumbnail } from "./HtmlThumbnail";
 import { fileOpenMenu } from "../fileOpenMenu";
-import { openFile, classifyFile, supportsFileViewer } from "../../../lib/openFile";
+import { openFile, classifyFile, supportsFileViewer, UnavailableFileHandlerError } from "../../../lib/openFile";
 import { writeText } from "../../../lib/clipboard";
 import { basename, formatBytes, sftpOpenPath, type FileEntry } from "../../../lib/sftp";
 import { useContextMenu } from "../../ContextMenu";
@@ -27,7 +27,7 @@ export function ExplorerPreviewPane({ entries, currentPath, tabId, workspaceId, 
   const preferences = useExplorerPreferences();
   const preview = useExplorerPreview(entries, currentPath, tabId);
   const menu = useContextMenu();
-  const [actionError, setActionError] = useState<{ key: string; message: string } | null>(null);
+  const [actionError, setActionError] = useState<{ key: string; message: string; fallbackPath?: string } | null>(null);
   const [imageDimensions, setImageDimensions] = useState<{ key: string; width: number; height: number } | null>(null);
   const entry = entries.length === 1 ? entries[0] : undefined;
   const properties = preview.properties?.[0];
@@ -43,7 +43,11 @@ export function ExplorerPreviewPane({ entries, currentPath, tabId, workspaceId, 
     const key = preview.key;
     setActionError(null);
     void action().catch((error) => {
-      setActionError({ key, message: error instanceof Error ? error.message : String(error) });
+      setActionError({
+        key,
+        message: error instanceof Error ? error.message : String(error),
+        fallbackPath: error instanceof UnavailableFileHandlerError ? error.filePath : undefined,
+      });
     });
   };
   const settings = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -115,7 +119,7 @@ export function ExplorerPreviewPane({ entries, currentPath, tabId, workspaceId, 
             <div className="ex-pv-actions">
               {supportsFileViewer(classifyFile(entry.path)) && <button type="button" className="ex-pv-btn ex-pv-btn-primary" data-testid="explorer-preview-open" onClick={() => perform(() => openFile({ path: entry.path }, { context: "explorer-preview", workspaceId, mode: "taomni" }))}>{label("用 Taomni 打开", "Open in Taomni")}</button>}
               {["text", "markdown", "svg", "html"].includes(classifyFile(entry.path)) && <button type="button" className="ex-pv-btn" data-testid="explorer-preview-edit" onClick={() => perform(() => openFile({ path: entry.path }, { context: "explorer-preview", workspaceId, mode: "source" }))}><Pencil />{label("编辑", "Edit")}</button>}
-              <button type="button" className="ex-pv-btn" data-testid="explorer-preview-open-with" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); menu.showAt(rect.left, rect.bottom + 4, fileOpenMenu(entry.path, workspaceId, label, (message) => setActionError({ key: preview.key, message }))); }}>{label("打开方式", "Open with")}<ChevronDown /></button>
+              <button type="button" className="ex-pv-btn" data-testid="explorer-preview-open-with" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); menu.showAt(rect.left, rect.bottom + 4, fileOpenMenu(entry.path, workspaceId, label, (message, error) => setActionError({ key: preview.key, message, fallbackPath: error instanceof UnavailableFileHandlerError ? error.filePath : undefined }))); }}>{label("打开方式", "Open with")}<ChevronDown /></button>
               <button type="button" className="ex-pv-btn" data-testid="explorer-preview-system" onClick={() => perform(() => sftpOpenPath(entry.path))}>{label("系统应用", "System app")}</button>
               <button type="button" className="ex-pv-btn" data-testid="explorer-preview-copy-path" onClick={() => perform(() => writeText(entry.path))}>{label("复制路径", "Copy path")}</button>
             </div>
@@ -146,7 +150,10 @@ export function ExplorerPreviewPane({ entries, currentPath, tabId, workspaceId, 
         {preview.truncated && <div className="ex-pv-hint" data-testid="explorer-preview-truncated">{preview.text !== undefined ? label("已截断，仅显示前 256 KB", "Truncated: showing the first 256 KB") : label("大小统计已达到限制，显示已读取部分", "Size calculation reached its limit; showing the counted portion")}</div>}
         {preview.error && <div className="ex-pv-error" data-testid="explorer-preview-error" role="alert">{label("无法加载预览：", "Unable to load preview: ")}{preview.error}</div>}
         {(preview.propertyErrors?.length ?? 0) > 0 && <div className="ex-pv-error" role="alert">{preview.propertyErrors?.join("\n")}</div>}
-        {actionError?.key === preview.key && <div className="ex-pv-error" data-testid="explorer-preview-action-error" role="alert">{actionError.message}</div>}
+        {actionError?.key === preview.key && <div className="ex-pv-error" data-testid="explorer-preview-action-error" role="alert">
+          <div>{actionError.message}</div>
+          {actionError.fallbackPath && <button type="button" className="ex-pv-btn" data-testid="open-with-fallback-system" onClick={() => perform(() => sftpOpenPath(actionError.fallbackPath!))}>{label("用系统默认应用打开", "Open with system default app")}</button>}
+        </div>}
       </div>
       {menu.render}
     </aside>

@@ -1,0 +1,258 @@
+id: TC-NP-004
+title: Notepad split panes rotate, docked and floating panels open, zoom and EOL/encoding status controls respond
+description: >-
+  AC-33/35/36/37 browser slice. The split toggle mounts a second synchronized CodeMirror pane and Rotate Split flips the orientation.
+  Find All opens the bottom-docked Search Results panel. Zoom in from the View menu changes the status percentage and clicking the zoom
+  cell resets it; the EOL status cell cycles LF/CRLF/CR and the encoding cell opens the encoding dialog (closed with Escape). Finally
+  the character panel opens in the right dock and the document map panel is floated through its dock menu with the floating layout
+  persisted.
+modes:
+- browser
+covers:
+- F-NOTEPAD-3
+tags:
+- p0
+- notepad
+- view
+- editor
+fixtures:
+- reset_db
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab-new-notepad"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="notepad-workbench"]'
+- click: '[data-testid="viewer-editor"]'
+- type: "view split line\nsecond view line\n"
+- click: '[data-testid="notepad-tool-split"]'
+- wait_for: '[data-testid="notepad-editor-secondary"]'
+- assert_count:
+    selector: '[data-testid="viewer-editor"]'
+    equal: 1
+- assert_items:
+    selector: '[data-testid="notepad-editor-secondary"] .cm-line'
+    equals:
+    - view split line
+    - second view line
+    - ''
+- eval_readonly:
+    expression: document.querySelector('.np-panes').classList.contains('orient-v')
+- click: '[data-testid="notepad-menu-view"]'
+- wait_for: '[data-testid="notepad-menu-item-view.rotateSplit"]'
+- click: '[data-testid="notepad-menu-item-view.rotateSplit"]'
+- eval_readonly:
+    expression: document.querySelector('.np-panes').classList.contains('orient-h')
+- click: '[data-testid="notepad-tool-find"]'
+- wait_for: '[data-testid="notepad-find-bar"]'
+- fill:
+    selector: '[data-testid="np-find-input"]'
+    value: view
+- click: '[data-testid="np-find-all-current"]'
+- wait_for: '[data-testid="notepad-panel-results"]'
+- assert_visible: '[data-testid="notepad-dock-bottom"]'
+- assert_count:
+    selector: '[data-testid^="notepad-result-hit-"]'
+    min: 2
+- click: '[data-testid="np-find-close"]'
+- wait_for:
+    selector: '[data-testid="notepad-find-bar"]'
+    state: detached
+- assert_text_equals:
+    selector: '[data-testid="notepad-status-zoom"]'
+    equals: 100%
+- click: '[data-testid="notepad-menu-view"]'
+- wait_for: '[data-testid="notepad-menu-group-zoom"]'
+- hover: '[data-testid="notepad-menu-group-zoom"]'
+- wait_for: '[data-testid="notepad-menu-item-view.zoomIn"]'
+- click: '[data-testid="notepad-menu-item-view.zoomIn"]'
+- assert_text_equals:
+    selector: '[data-testid="notepad-status-zoom"]'
+    equals: 108%
+- click: '[data-testid="notepad-status-zoom"]'
+- assert_text_equals:
+    selector: '[data-testid="notepad-status-zoom"]'
+    equals: 100%
+- assert_text_equals:
+    selector: '[data-testid="notepad-status-eol"]'
+    equals: LF
+- click: '[data-testid="notepad-status-eol"]'
+- assert_text_equals:
+    selector: '[data-testid="notepad-status-eol"]'
+    equals: CRLF
+- click: '[data-testid="notepad-status-eol"]'
+- assert_text_equals:
+    selector: '[data-testid="notepad-status-eol"]'
+    equals: CR
+- click: '[data-testid="notepad-status-eol"]'
+- assert_text_equals:
+    selector: '[data-testid="notepad-status-eol"]'
+    equals: LF
+- click: '[data-testid="notepad-status-encoding"]'
+- wait_for: '[data-testid="notepad-encoding-dialog"]'
+- assert_visible: '[data-testid="notepad-enc-apply"]'
+- assert_visible: '[data-testid="notepad-enc-option-GBK"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="notepad-encoding-dialog"]'
+    state: detached
+- click: '[data-testid="notepad-menu-view"]'
+- wait_for: '[data-testid="notepad-menu-item-view.toggleCharPanel"]'
+- click: '[data-testid="notepad-menu-item-view.toggleCharPanel"]'
+- wait_for: '[data-testid="notepad-panel-chars"]'
+- assert_visible: '[data-testid="notepad-char-panel"]'
+- click: '[data-testid="notepad-tool-docmap"]'
+- wait_for: '[data-testid="notepad-panel-minimap"]'
+- assert_visible: '[data-testid="notepad-dock-right"]'
+- click: '[data-testid="notepad-panel-dock-menu-minimap"]'
+- wait_for: '[data-testid="notepad-panel-dock-minimap-float"]'
+- click: '[data-testid="notepad-panel-dock-minimap-float"]'
+- wait_for: '[data-testid="notepad-float-layer"] [data-testid="notepad-panel-minimap"]'
+- assert_localstorage:
+    key: taomni.notepad.panels.v1
+    contains: '"pos":"float"'
+- assert_no_runtime_errors: null
+- screenshot: np-004-split-panels-view.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Toggling Split mounts a second editor pane that reflects the same content and Rotate Split flips the orientation.
+    actions:
+    - 7
+    - 8
+    - 9
+    - 14
+    - 16
+    checkpoints:
+    - step: 10
+      expectation: The secondary editor pane mounts after the split toggle.
+    - step: 11
+      expectation: The primary editor pane still exists exactly once.
+    - step: 12
+      expectation: The secondary pane renders the same three lines including the trailing empty line.
+    - step: 13
+      expectation: The split layout starts vertically oriented.
+    - step: 15
+      expectation: The Rotate Split menu item is reachable from the View menu.
+    - step: 17
+      expectation: Clicking Rotate Split switches the panes to the horizontal orientation.
+    results:
+    - 12
+    - 13
+    - 17
+  - id: R2
+    requirement: Find All (Current) opens the bottom Search Results panel with real hit rows and closing the find bar removes it.
+    actions:
+    - 18
+    - 20
+    - 21
+    - 25
+    checkpoints:
+    - step: 19
+      expectation: The find bar opens.
+    - step: 22
+      expectation: The search results panel opens.
+    - step: 23
+      expectation: The results panel is docked to the bottom dock.
+    - step: 24
+      expectation: The results panel contains at least two hits for the query.
+    - step: 26
+      expectation: Closing the find bar removes the floating panel.
+    results:
+    - 23
+    - 24
+    - 26
+  - id: R3
+    requirement: Zoom in through the View menu changes the status percentage and the zoom status cell resets it.
+    actions:
+    - 28
+    - 30
+    - 32
+    - 34
+    checkpoints:
+    - step: 27
+      expectation: Zoom starts at 100 percent.
+    - step: 29
+      expectation: The View menu exposes the zoom submenu.
+    - step: 31
+      expectation: Hovering the zoom submenu reveals Zoom In.
+    - step: 33
+      expectation: Zoom In raises the status percentage to 108.
+    - step: 35
+      expectation: Clicking the zoom cell resets it to 100 percent.
+    results:
+    - 33
+    - 35
+  - id: R4
+    requirement: The EOL status cell cycles LF/CRLF/CR and the encoding status cell opens the real encoding dialog, closed with Escape.
+    actions:
+    - 37
+    - 39
+    - 41
+    - 43
+    - 47
+    checkpoints:
+    - step: 36
+      expectation: The document starts with LF line endings.
+    - step: 38
+      expectation: One click switches the document to CRLF.
+    - step: 40
+      expectation: The next click switches it to CR.
+    - step: 42
+      expectation: The final click returns to LF.
+    - step: 44
+      expectation: Clicking the encoding cell opens the encoding dialog.
+    - step: 45
+      expectation: The Apply control is rendered.
+    - step: 46
+      expectation: A non-UTF-8 encoding option is rendered.
+    - step: 48
+      expectation: Escape closes the dialog.
+    - step: 62
+      expectation: The view workflow raises no uncaught runtime errors.
+    results:
+    - 42
+    - 45
+    - 48
+    - 62
+  - id: R5
+    requirement: The character panel opens in the right dock and the document map dock menu floats the map panel, persisting the
+      floating layout.
+    actions:
+    - 49
+    - 51
+    - 54
+    - 57
+    - 59
+    checkpoints:
+    - step: 50
+      expectation: The character panel toggle is reachable from the View menu.
+    - step: 52
+      expectation: The character panel mounts.
+    - step: 53
+      expectation: The character table body is rendered.
+    - step: 55
+      expectation: The document map panel mounts.
+    - step: 56
+      expectation: The document map is docked in the right dock.
+    - step: 58
+      expectation: The dock menu offers the floating option.
+    - step: 60
+      expectation: The floating layer renders the map panel.
+    - step: 61
+      expectation: The floating position is persisted in the panels preference key.
+    results:
+    - 53
+    - 60
+    - 61
+  visual:
+  - check: Split pane geometry, docked/floating panel chrome and status bar layout
+    method: manual
+    reason: The case asserts DOM state, attributes and preference persistence; pixel fidelity is reviewed manually.
+  native:
+  - check: Native zoom wrapping, WebView split rendering and real encoding reopen
+    method: external
+    reason: Browser renderer and VFS stubs only; native behavior is left to native Notepad cases.

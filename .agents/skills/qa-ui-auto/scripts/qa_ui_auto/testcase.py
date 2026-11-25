@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -40,23 +41,46 @@ class TestCase:
         return mode in self.modes
 
 
+# C-accelerated loader when libyaml is available; identical parse results.
+YAML_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
+# path -> ((mtime_ns, size), Draft202012Validator): the schema is read and the
+# validator built once per process and rebuilt only if the schema file changes.
+_VALIDATORS: dict[Path, tuple[tuple[int, int], Any]] = {}
+# path -> ((mtime_ns, size), validated raw doc): re-parsing/re-validating the
+# same unchanged file within a process (audit, plan, tests) is pure repetition.
+_VALIDATED_DOCS: dict[Path, tuple[tuple[int, int], dict]] = {}
+
+
+def _stamp(path: Path) -> tuple[int, int]:
+    stat = path.stat()
+    return stat.st_mtime_ns, stat.st_size
+
+
 def _load_schema(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _validator():
+def cached_validator(schema_path: Path = TESTCASE_SCHEMA_PATH):
     if jsonschema is None:
         return None
-    schema = _load_schema(TESTCASE_SCHEMA_PATH)
-    return jsonschema.Draft202012Validator(schema)
+    stamp = _stamp(schema_path)
+    cached = _VALIDATORS.get(schema_path)
+    if cached is None or cached[0] != stamp:
+        cached = (stamp, jsonschema.Draft202012Validator(_load_schema(schema_path)))
+        _VALIDATORS[schema_path] = cached
+    return cached[1]
+
+
+def _validator():
+    return cached_validator()
 
 
 def validate_doc(doc: dict, *, source: str) -> list[str]:
     """Return a list of human-readable validation errors (empty = ok)."""
     if jsonschema is None:
         return [f"{source}: jsonschema not installed; run `pip install jsonschema pyyaml`."]
-    schema = _load_schema(TESTCASE_SCHEMA_PATH)
-    validator = jsonschema.Draft202012Validator(schema)
+    validator = cached_validator()
     errors: list[str] = []
     for err in validator.iter_errors(doc):
         path = "/".join(str(p) for p in err.absolute_path) or "<root>"
@@ -67,13 +91,31 @@ def validate_doc(doc: dict, *, source: str) -> list[str]:
     return errors
 
 
-def load_case(path: Path) -> TestCase:
-    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+def _validated_raw(path: Path) -> dict:
+    """Parse and validate one case file, memoized on (mtime_ns, size)."""
+    key = path.resolve()
+    stamp = _stamp(key)
+    cached = _VALIDATED_DOCS.get(key)
+    if cached is not None and cached[0] == stamp:
+        return copy.deepcopy(cached[1])
+    raw = yaml.load(path.read_text(encoding="utf-8"), Loader=YAML_LOADER)
     if not isinstance(raw, dict):
         raise ValueError(f"{path}: testcase must be a YAML mapping at the root")
     errors = validate_doc(raw, source=str(path))
     if errors:
         raise ValueError("\n".join(errors))
+    _VALIDATED_DOCS[key] = (stamp, copy.deepcopy(raw))
+    return raw
+
+
+def cache_validated_doc(path: Path, raw: dict) -> None:
+    """Memoize an already schema- and contract-validated raw YAML mapping."""
+    key = path.resolve()
+    _VALIDATED_DOCS[key] = (_stamp(key), copy.deepcopy(raw))
+
+
+def load_case(path: Path) -> TestCase:
+    raw = _validated_raw(path)
     raw.setdefault("modes", ["browser"])
     raw.setdefault("timeout_sec", 90)
     raw.setdefault("tags", [])

@@ -25,8 +25,8 @@ steps:
     key: taomni.explorer.view.v1
     value: '{"view":"details","preview":false,"columnWidths":{"name":260,"mtime":140,"type":96,"size":80}}'
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -100,8 +100,8 @@ steps:
     contains: '"mtime":220'
 - screenshot: explorer-columns-resized.png
 - reload_window: null
-- wait_for: '[data-testid="tab-item"][data-tab-type="file-browser"][data-tab-title="previews"]'
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"][data-tab-title="previews"]'
+- wait_for: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"][data-tab-title="previews"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"][data-tab-title="previews"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -182,7 +182,7 @@ steps:
       219 && document.querySelector('.ex-shell:focus-within .ex-column:nth-child(2)').getBoundingClientRect().width <= 221
     expect_truthy: true
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-newtab"]'
-- wait_for: '[data-testid="tab-item"][data-tab-type="file-browser"][data-active="false"] ~ [data-testid="tab-item"][data-tab-type="file-browser"][data-active="true"]'
+- wait_for: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"][data-active="false"] ~ [data-testid="explorer-workspace-tab"][data-tab-type="file-browser"][data-active="true"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
 - eval_readonly:

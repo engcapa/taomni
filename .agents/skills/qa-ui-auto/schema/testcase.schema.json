@@ -105,6 +105,7 @@
           "markdown_drawio",
         "markdown_drawio_roundtrip",
         "markdown_remote_images",
+        "markdown_missing_assets",
           "markdown_testing",
           "file_open_mail",
           "html_network_test",
@@ -112,6 +113,7 @@
           "markdown_native",
           "file_open_raster",
           "explorer_large_directory",
+          "explorer_search_native",
           "workspace_search_large",
           "workspace_compact_tree",
           "workspace_hidden_entries",
@@ -127,6 +129,7 @@
           "java_sample_projects",
           "java25_projects",
           "git_diff_repo",
+          "git_clone_source",
           "welcome_recents",
           "editor_typing_fixtures",
           "restore_24tab_fixtures",
@@ -596,7 +599,7 @@
           },
           "description": "Independent exact UTF-8/SHA256/absence oracle inside file_open_files fixture or a DOM-observed controlled viewer temp. remember stores the observed path for post-close absence checks. Browser reads VFS only; native reads real host bytes."
         },
-        "assert_export_quality": {"type":"object","additionalProperties":false,"required":["path","kind"],"properties":{"path":{"type":"string","minLength":1},"kind":{"enum":["pdf","docx","drawio","drawio-png","testing-pdf","testing-docx"]}}},
+        "assert_export_quality": {"type":"object","additionalProperties":false,"required":["path","kind"],"properties":{"path":{"type":"string","minLength":1},"kind":{"enum":["pdf","docx","png-doc","drawio","drawio-png","testing-pdf","testing-docx"]}}},
         "assert_drawio_preview": {"enum": ["live", "split"]},
         "assert_drawio_roundtrip": {"enum": ["download", "save"]},
         "assert_download": {
@@ -604,7 +607,7 @@
           "properties": {
             "trigger": {"$ref": "#/$defs/selector"},
             "filename": {"type": "string", "minLength": 1},
-            "artifact": {"enum": ["pdf", "docx", "drawio", "drawio-png", "testing-pdf", "testing-docx"]},
+            "artifact": {"enum": ["pdf", "docx", "png-doc", "drawio", "drawio-png", "testing-pdf", "testing-docx"]},
             "contains": {"type": "array", "items": {"type": "string"}}
           },
           "description": "Browser only: click the real export control, wait for actual Playwright download, retain artifact and assert filename/nonempty/content bytes. Not native disk or dialog evidence."
@@ -640,7 +643,7 @@
         },
         "assert_explorer_files": {
           "type": "object", "additionalProperties": false, "required": ["state"],
-          "properties": {"state": {"enum": ["seeded", "copied", "moved", "renamed", "trashed", "restored", "permanent", "external", "recursive", "drag-folder", "drag-breadcrumb", "drag-tree", "partial"]}},
+          "properties": {"state": {"enum": ["seeded", "trash-seeded", "copied", "moved", "renamed", "trashed", "restored", "permanent", "external", "recursive", "drag-folder", "drag-breadcrumb", "drag-tree", "partial"]}},
           "description": "Read-only complete SHA256/empty-directory oracle for explorer_files. Native independently re-reads host bytes and Linux freedesktop trash metadata/content for trashed; browser reads only actual VFS. No product IPC."
         },
         "assert_workspace_drop_import": {

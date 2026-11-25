@@ -1,7 +1,8 @@
 id: TC-WS-001
-title: Single shared 33px toolbar with left/right sidebar collapse and Ctrl+B
-description: 'Prototype shell: a full-height rail beside aligned rounded navigator and main canvas, one 33px toolbar inside the canvas, 6px gutters and
-  functional sidebar toggles.'
+title: Single shared 33px toolbar with left sidebar collapse and no right context panel
+description: 'Prototype shell: a full-height rail beside aligned rounded navigator and main canvas, one 33px toolbar inside the canvas, 6px gutters
+  and a functional left sidebar toggle. The former right context panel and its top-right collapse trigger are retired from every main view,
+  so no right-sidebar element may remain mounted or reachable.'
 modes:
 - browser
 - native
@@ -29,7 +30,7 @@ steps:
 - assert_visible: '[data-testid="toggle-left-sidebar"]'
 - assert_visible: '[data-testid="window-drag-handle"]'
 - assert_visible: '[data-testid="global-search-trigger"]'
-- assert_visible: '[data-testid="toggle-right-sidebar"]'
+- assert_not_visible: '[data-testid="toggle-right-sidebar"]'
 - assert_visible: '[data-testid="titlebar-actions-more"]'
 - eval_readonly:
     expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"control-bar"]').getBoundingClientRect().height <= 34
@@ -49,28 +50,23 @@ steps:
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
 - press: Mod+b
 - wait_for: '[data-testid="expanded-sidebar-panel"]'
-- click: '[data-testid="toggle-right-sidebar"]'
+- assert_not_visible: '[data-testid="right-sidebar"]'
+- assert_not_visible: '[data-testid="right-sidebar-resize-handle"]'
 - assert_count:
-    selector: '[data-testid="right-sidebar"]'
-    equal: 1
-- click: '[data-testid="toggle-right-sidebar"]'
-- assert_count:
-    selector: '[data-testid="right-sidebar"]'
+    selector: '[data-testid="right-sidebar"], [data-testid="right-sidebar-close"], [data-testid="toggle-right-sidebar"]'
     equal: 0
 - screenshot: ws-001-single-shared-toolbar.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Home 与 Sessions 按原型独立呈现；共享工具栏、对应模式的侧栏控制、保留启动入口和响应式布局均满足断言。
+    requirement: Home 与 Sessions 按原型独立呈现；共享工具栏、对应模式的左栏控制、保留启动入口均满足断言；右侧上下文面板及其收缩按钮在所有主视图被移除且不再挂载任何 DOM。
     actions:
     - 1
     - 2
     - 4
     - 16
     - 18
-    - 20
-    - 22
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -85,7 +81,7 @@ verification:
     - step: 9
       expectation: '{"assert_visible": "[data-testid=\"global-search-trigger\"]"}'
     - step: 10
-      expectation: '{"assert_visible": "[data-testid=\"toggle-right-sidebar\"]"}'
+      expectation: '{"assert_not_visible": "[data-testid=\"toggle-right-sidebar\"]"}'
     - step: 11
       expectation: '{"assert_visible": "[data-testid=\"titlebar-actions-more\"]"}'
     - step: 12
@@ -94,6 +90,8 @@ verification:
     - step: 13
       expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''.taomni-navigator-frame'').getBoundingClientRect().top - document.querySelector(''.taomni-main-canvas-frame'').getBoundingClientRect().top)
         < 1 && document.querySelector(''.taomni-platform-resizer'').getBoundingClientRect().width === 6", "expect_truthy": true}}'
+    - step: 14
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"rail-app-menu-host\"]", "equal": 1}}'
     - step: 15
       expectation: macOS native uses the system application menu and leaves the rail host empty; browser and other native hosts show the rail application
         menu.
@@ -101,12 +99,13 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
     - step: 19
       expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 20
+      expectation: '{"assert_not_visible": "[data-testid=\"right-sidebar\"]"}'
     - step: 21
-      expectation: '{"assert_count": {"selector": "[data-testid=\"right-sidebar\"]", "equal": 1}}'
-    - step: 23
-      expectation: '{"assert_count": {"selector": "[data-testid=\"right-sidebar\"]", "equal": 0}}'
-    - step: 14
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"rail-app-menu-host\"]", "equal": 1}}'
+      expectation: '{"assert_not_visible": "[data-testid=\"right-sidebar-resize-handle\"]"}'
+    - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"right-sidebar\"], [data-testid=\"right-sidebar-close\"], [data-testid=\"toggle-right-sidebar\"]",
+        "equal": 0}}'
     results:
     - 3
     - 5
@@ -118,12 +117,13 @@ verification:
     - 11
     - 12
     - 13
+    - 14
     - 15
     - 17
     - 19
+    - 20
     - 21
-    - 23
-    - 14
+    - 22
   visual:
   - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
     method: manual

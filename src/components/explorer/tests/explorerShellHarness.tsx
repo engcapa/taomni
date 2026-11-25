@@ -22,6 +22,7 @@ const native = vi.hoisted(() => ({
   localCreateEntry: vi.fn(),
   localProperties: vi.fn(),
   explorerCancelOperation: vi.fn(),
+  explorerSearchEntries: vi.fn(),
   readFilesResult: vi.fn(),
   writeText: vi.fn(),
   openExplorer: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock("../../../lib/explorer", () => ({
   localCreateEntry: native.localCreateEntry,
   localProperties: native.localProperties,
   explorerCancelOperation: native.explorerCancelOperation,
+  explorerSearchEntries: native.explorerSearchEntries,
 }));
 vi.mock("../../../lib/clipboard", () => ({ readFilesResult: native.readFilesResult, writeText: native.writeText }));
 vi.mock("../../../lib/runtime", () => ({ getAppPlatform: () => native.platform, isTauriRuntime: () => false }));
@@ -130,7 +132,7 @@ export function installShellHarness() {
     useSftpStore.setState({ sessions: {} });
     sessionRefCounts.clear(); inFlightLocalAttaches.clear(); inFlightAttaches.clear();
     setLocale("en");
-    setExplorerPreferences({ view: "details", sortKey: "name", sortDir: "asc", showHidden: false, preview: true, previewPosition: "right", previewWidth: 300, navVisible: true, navWidth: 210, wrap: false, pinnedPaths: [], expandedPaths: [], columnWidths: {} });
+    setExplorerPreferences({ view: "details", sortKey: "name", sortDir: "asc", showHidden: false, preview: true, previewPosition: "right", previewWidth: 300, navVisible: true, navWidth: 210, wrap: false, expandedPaths: [], columnWidths: {}, searchRecursive: false });
     setExplorerClipboard(null);
     vi.stubGlobal("ResizeObserver", class {
       record: typeof observers[number];
@@ -176,6 +178,7 @@ export function installShellHarness() {
     });
     native.localProperties.mockImplementation(async (path: string) => ({ path, name: path.split("/").at(-1), fileType: "file", size: 10, itemCount: 1, truncated: false, mtime: 1, createdAt: null, mode: 0o644, owner: null, group: null, symlinkTarget: null }));
     native.explorerCancelOperation.mockResolvedValue(undefined);
+    native.explorerSearchEntries.mockResolvedValue({ entries: [], scanned: 0, truncated: false, cancelled: false, failed: [] });
     native.writeText.mockResolvedValue(undefined);
     native.openExplorer.mockResolvedValue("opened-explorer");
     native.sftpOpenPath.mockResolvedValue(undefined);

@@ -4,6 +4,7 @@ import { getAppPlatform } from "../../lib/runtime";
 import type { MenuItem } from "../ContextMenu";
 import type { ExplorerOperations } from "./useExplorerOperations";
 import { fileOpenMenu } from "./fileOpenMenu";
+import { EXPLORER_TEXT_FILE_TYPES } from "./explorerFileTypes";
 
 type Label = (zh: string, en: string) => string;
 export function explorerItemMenu(entries: FileEntry[], path: string, operations: ExplorerOperations, label: Label,
@@ -13,7 +14,7 @@ export function explorerItemMenu(entries: FileEntry[], path: string, operations:
   const directory = !multi && effectiveFileType(first) === "dir";
   const mod = getAppPlatform() === "macos" ? "⌘" : "Ctrl+";
   return [
-    ...(!multi && !directory ? [{ label: label("打开方式", "Open with"), testId: "explorer-context-open-with", children: fileOpenMenu(first.path, workspaceId, label, (message) => operations.notify(message, true)) }] : []),
+    ...(!multi && !directory ? [{ label: label("打开方式", "Open with"), testId: "explorer-context-open-with", children: fileOpenMenu(first.path, workspaceId, label, (message, error) => operations.notify(message, true, error)) }] : []),
     { label: label("打开", "Open"), testId: "explorer-context-open", icon: <ExternalLink />, shortcut: "Enter", onClick: () => { for (const entry of entries) void operations.open(entry); } },
     ...(directory ? [{ label: label("在新的 Explorer 标签中打开", "Open in new Explorer tab"), testId: "explorer-context-newtab", icon: <ExternalLink />, onClick: () => openExplorer(first.path, true) }] : []),
     { label: label("在终端中打开", "Open in terminal"), testId: "explorer-context-terminal", icon: <Terminal />, onClick: () => terminal(directory ? first.path : path) },
@@ -23,7 +24,7 @@ export function explorerItemMenu(entries: FileEntry[], path: string, operations:
     { label: label("复制路径", "Copy path"), testId: "explorer-context-copy-path", icon: <Link />, onClick: () => void operations.copyPath(entries.map((entry) => entry.path)) },
     { label: "", separator: true },
     { label: label("重命名", "Rename"), testId: "explorer-context-rename", icon: <Pencil />, shortcut: "F2", disabled: multi || operations.busy, onClick: () => operations.setRenamePath(first.path) },
-    { label: label("删除（移到回收站）", "Delete (move to Trash)"), testId: "explorer-context-delete", icon: <Trash2 />, shortcut: "Del", danger: true, disabled: operations.busy, onClick: () => operations.remove(entries) },
+    { label: label("删除…", "Delete…"), testId: "explorer-context-delete", icon: <Trash2 />, shortcut: "Del", danger: true, disabled: operations.busy, onClick: () => operations.remove(entries) },
     { label: "", separator: true },
     { label: label("属性", "Properties"), testId: "explorer-context-properties", icon: <Info />, shortcut: "Alt+Enter", onClick: () => operations.setProperties(entries) },
   ];
@@ -31,7 +32,10 @@ export function explorerItemMenu(entries: FileEntry[], path: string, operations:
 export function explorerEmptyMenu(path: string, operations: ExplorerOperations, label: Label, refresh: () => void): MenuItem[] {
   return [
     { label: label("新建文件夹", "New folder"), testId: "explorer-context-new-folder", icon: <FolderPlus />, disabled: operations.busy, onClick: () => void operations.create(true) },
-    { label: label("新建文本文件", "New text file"), testId: "explorer-context-new-file", icon: <FilePlus />, disabled: operations.busy, onClick: () => void operations.create(false) },
+    { label: label("新建文本文件", "New text file"), testId: "explorer-context-new-file", icon: <FilePlus />, children: EXPLORER_TEXT_FILE_TYPES.map((fileType) => ({
+      label: label(fileType.zh, fileType.en), testId: fileType.extension === "txt" ? "explorer-new-file" : `explorer-new-file-${fileType.extension}`,
+      disabled: operations.busy, onClick: () => void operations.create(false, fileType.extension),
+    })) },
     { label: "", separator: true },
     { label: label("粘贴", "Paste"), testId: "explorer-context-paste", icon: <ClipboardPaste />, disabled: operations.busy, onClick: () => void operations.paste() },
     { label: "", separator: true },

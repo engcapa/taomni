@@ -1,7 +1,8 @@
 id: TC-FILE-OPEN-015
-title: Native printer-independent searchable PDF and high-fidelity Word through real save dialogs
-description: Packaged platform WebView rendering, actual OS save chooser and retained PDF/DOCX bytes. No printer or print
-  dialog is invoked. Complete multi-page A4 PDF, original red/blue raster pixels and sharp portable Word SVG/fallback images are independently parsed; cancelling
+title: Native printer-independent searchable PDF, 300 DPI PNG and high-fidelity Word through real save dialogs
+description: Packaged platform WebView rendering, actual OS save chooser and retained PDF/PNG/DOCX bytes. No printer or print
+  dialog is invoked. Complete multi-page A4 PDF, original red/blue raster pixels, a whole-document PNG at the 300 DPI standard
+  and sharp portable Word SVG/fallback images with measured glyph-pinned label positions are independently parsed; cancelling
   PDF chooser preserves source. Actual Microsoft Word typography still needs client visual review.
 modes:
 - native
@@ -9,8 +10,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-export-quality
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -87,6 +88,18 @@ steps:
     path: ${fixture.markdown_quality_exports}/quality.docx
     kind: docx
 - click: '[data-testid="markdown-export"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_quality_exports}/quality.png
+    trigger: '[data-testid="markdown-export-png"]'
+- wait_for:
+    selector: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+    timeout_sec: 120
+- assert_export_quality:
+    path: ${fixture.markdown_quality_exports}/quality.png
+    kind: png-doc
+- click: '[data-testid="markdown-export"]'
 - click: '[data-testid="markdown-export-pdf"]'
 - native_file_dialog:
     kind: save
@@ -110,13 +123,14 @@ tags:
 fixtures:
 - reset_db
 - markdown_quality
-timeout_sec: 300
+timeout_sec: 420
 verification:
   review: reviewed
   requirements:
   - id: DURABLE-RESULT
     requirement: All desktop platforms save genuine PDF directly, retain readable Chinese/multiline Mermaid labels and SVG
-      image vectors in Word, keep raster resolution, cancel explicitly and preserve source bytes.
+      image vectors with measured glyph-pinned label positions in Word, save the whole-document PNG at the 300 DPI standard,
+      keep raster resolution, cancel explicitly and preserve source bytes.
     actions:
     - 3
     - 4
@@ -137,6 +151,10 @@ verification:
     - 35
     - 36
     - 37
+    - 38
+    - 39
+    - 40
+    - 41
     checkpoints:
     - step: 14
       expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
@@ -165,10 +183,13 @@ verification:
     - step: 34
       expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
         original source bytes remain exact.
-    - step: 39
+    - step: 38
+      expectation: The saved PNG long image is independently parsed at the 300 DPI standard (not 96 DPI 1:1 pixels) with
+        nonblank content; the Word vectors satisfy the measured glyph-position contract.
+    - step: 43
       expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
         original source bytes remain exact.
-    - step: 40
+    - step: 44
       expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
         original source bytes remain exact.
     results:
@@ -181,8 +202,9 @@ verification:
     - 22
     - 28
     - 34
-    - 39
-    - 40
+    - 38
+    - 43
+    - 44
   visual:
   - check: Diagram labels, page boundaries and popup placement
     method: manual

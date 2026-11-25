@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { prepareMarkdownExport, DEFAULT_EXPORT_SETTINGS, markdownExportCss } from "./exportModel";
-import { exportMarkdown } from "./markdownExport";
+import { exportMarkdown, pngExportScale, PNG_EXPORT_DPI } from "./markdownExport";
+import { toBlob } from "html-to-image";
 import { readMarkdownImage } from "../../../lib/markdownAssets";
 import { saveExportBlob } from "./exportFiles";
 import { markdownPdf } from "./exportPdf";
+import { renderMermaid } from "../../editor/workspace/model/mermaid";
 
 vi.mock("../../../lib/markdownAssets", async (original) => ({ ...await original<typeof import("../../../lib/markdownAssets")>(), readMarkdownImage: vi.fn() }));
 vi.mock("./exportFiles", () => ({ saveExportBlob: vi.fn(), exportMarkdownFolder: vi.fn() }));
 vi.mock("./exportPdf", () => ({ markdownPdf: vi.fn() }));
+vi.mock("html-to-image", () => ({ toBlob: vi.fn() }));
+vi.mock("../../editor/workspace/model/mermaid", async (original) => {
+  const actual = await original<typeof import("../../editor/workspace/model/mermaid")>();
+  return { ...actual, renderMermaid: vi.fn(actual.renderMermaid) };
+});
 vi.mock("./mathExportCss", () => ({ mathExportCss: async () => ".katex{font-family:KaTeX_Main}" }));
 beforeEach(() => {
   vi.clearAllMocks();
@@ -51,10 +58,62 @@ describe("self-contained sanitized Markdown output", () => {
     expect(result.root.textContent).toContain("Author contents");
     expect(content).toContain("[Details](#details)");
   });
-  it("fails rather than publishing an HTML file with missing images", async () => {
+  it("publishes HTML with an accessible placeholder instead of aborting on a missing image", async () => {
     vi.mocked(readMarkdownImage).mockRejectedValue(new Error("permission denied"));
-    await expect(exportMarkdown("html", "![x](assets/a.png)", "/docs/a.md", DEFAULT_EXPORT_SETTINGS)).rejects.toThrow("permission denied");
-    expect(saveExportBlob).not.toHaveBeenCalled();
+    const prepared = await prepareMarkdownExport("# Keep me\n\n![x](assets/a.png)", "/docs/a.md", DEFAULT_EXPORT_SETTINGS);
+    const placeholder = prepared.root.querySelector<HTMLElement>('[data-testid="markdown-render-placeholder"]');
+    expect(placeholder).toHaveAttribute("data-kind", "image");
+    expect(placeholder).toHaveAttribute("role", "note");
+    expect(placeholder).toHaveTextContent("Image unavailable");
+    expect(placeholder).toHaveTextContent("assets/a.png");
+    expect(placeholder).toHaveAttribute("title", "permission denied");
+    expect(prepared.root.querySelector("img")).toBeNull();
+    expect(prepared.root.textContent).toContain("Keep me");
+
+    await expect(exportMarkdown("html", "![x](assets/a.png)", "/docs/a.md", DEFAULT_EXPORT_SETTINGS)).resolves.toEqual({ status: "saved", path: "/out/doc.html" });
+    expect(saveExportBlob).toHaveBeenCalledOnce();
+  });
+  it("retains readable images and text when only one referenced image is missing", async () => {
+    vi.mocked(readMarkdownImage).mockImplementation(async (_doc, reference) => {
+      if (reference.includes("missing")) throw new Error("ENOENT: missing-image.png");
+      return "data:image/png;base64,AQID";
+    });
+    const result = await prepareMarkdownExport(
+      "Before\n\n![ok](assets/present.png)\n\n![gone](assets/missing.png)\n\nAfter",
+      "/docs/a.md",
+      DEFAULT_EXPORT_SETTINGS,
+    );
+    expect(result.root.querySelectorAll("img")).toHaveLength(1);
+    expect(result.root.querySelector("img")).toHaveAttribute("src", "data:image/png;base64,AQID");
+    expect(result.root.querySelectorAll('[data-kind="image"]')).toHaveLength(1);
+    expect(result.root.textContent).toContain("Before");
+    expect(result.root.textContent).toContain("After");
+    expect(result.root.querySelector('[data-kind="image"]')).toHaveAttribute("title", "ENOENT: missing-image.png");
+  });
+  it("replaces missing raw HTML image references without fetching or emitting a broken img", async () => {
+    vi.mocked(readMarkdownImage).mockRejectedValue(new Error("ENOENT: ./img/header.png"));
+    const result = await prepareMarkdownExport(
+      '<p align="center"><img src="./img/header.png" alt="Mermaid header"></p>\n\nRemaining text.',
+      "/docs/mermaid-readme.md",
+      DEFAULT_EXPORT_SETTINGS,
+    );
+    const placeholder = result.root.querySelector(".fv-md-render-placeholder-image");
+    expect(placeholder).toHaveTextContent("Mermaid header");
+    expect(placeholder).toHaveTextContent("./img/header.png");
+    expect(result.root.querySelector("img")).toBeNull();
+    expect(result.root.textContent).toContain("Remaining text.");
+    expect(result.html).not.toContain('src="./img/header.png"');
+  });
+  it("uses the same non-throwing fallback for invalid Mermaid and draw.io blocks", async () => {
+    vi.mocked(renderMermaid).mockRejectedValueOnce(new Error("Invalid Mermaid source"));
+    const source = "# Diagrams\n\n```mermaid\nflowchart LR\nA --> [\n```\n\n```drawio\n<mxfile>not valid</mxfile>\n```\n\nReadable tail.";
+    const result = await prepareMarkdownExport(source, "/docs/a.md", DEFAULT_EXPORT_SETTINGS);
+    expect(result.root.querySelectorAll('[data-kind="mermaid"]')).toHaveLength(1);
+    expect(result.root.querySelectorAll('[data-kind="drawio"]')).toHaveLength(1);
+    expect(result.root.textContent).toContain("Readable tail.");
+    expect(result.root.textContent).not.toContain("A -->");
+    expect(result.html).toContain("Mermaid diagram unavailable");
+    expect(result.html).not.toContain("undefined");
   });
   it("renders Mermaid, KaTeX math and highlighted fenced code into export HTML", async () => {
     const result = await prepareMarkdownExport("Inline $x^2$ and $$\\frac{1}{2}$$.\n\n```mermaid\nflowchart LR\nA-->B\n```\n\n```rust\nfn main() {}\n```", "/docs/a.md", DEFAULT_EXPORT_SETTINGS);
@@ -84,5 +143,39 @@ describe("self-contained sanitized Markdown output", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: {} });
     await expect(exportMarkdown("richtext", "a", "/a.md", DEFAULT_EXPORT_SETTINGS)).rejects.toThrow("unavailable");
     vi.unstubAllGlobals();
+  });
+  it("rasterizes the whole document at the 300 DPI standard shared with PDF and diagram PNG", async () => {
+    vi.mocked(toBlob).mockResolvedValue(new Blob(["png"], { type: "image/png" }));
+    vi.mocked(saveExportBlob).mockImplementationOnce(async (_name, output) => {
+      expect(await (typeof output === "function" ? output() : output)).toBeInstanceOf(Blob);
+      return "/out/a.png";
+    });
+    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ height: 2000, width: 800 } as DOMRect);
+    try {
+      expect(await exportMarkdown("png", "# PNG\n\n```mermaid\nflowchart LR\nA-->B\n```", "/docs/a.md", DEFAULT_EXPORT_SETTINGS)).toEqual({ status: "saved", path: "/out/a.png" });
+    } finally { rect.mockRestore(); }
+    expect(toBlob).toHaveBeenCalledOnce();
+    const options = vi.mocked(toBlob).mock.calls[0][1]!;
+    expect(options.width).toBe(800);
+    expect(options.height).toBe(2000);
+    expect(options.pixelRatio).toBe(PNG_EXPORT_DPI / 96);
+    expect(options.skipFonts).toBe(true);
+  });
+});
+
+describe("pngExportScale density limits", () => {
+  it("matches the 300 DPI export standard for ordinary documents", () => {
+    expect(pngExportScale(2000)).toBe(PNG_EXPORT_DPI / 96);
+    expect(pngExportScale(100)).toBe(PNG_EXPORT_DPI / 96);
+  });
+  it("degrades density instead of exceeding the safe canvas area for long documents", () => {
+    expect(pngExportScale(10000)).toBeLessThan(PNG_EXPORT_DPI / 96);
+    expect(800 * 10000 * pngExportScale(10000) ** 2).toBeLessThanOrEqual(40_000_000);
+    expect(800 * 20000 * pngExportScale(20000) ** 2).toBeLessThanOrEqual(40_000_000);
+    expect(20000 * pngExportScale(20000)).toBeLessThanOrEqual(32700);
+  });
+  it("never renders below the previous 96 DPI density", () => {
+    expect(pngExportScale(40_000)).toBe(1);
+    expect(pngExportScale(10)).toBeGreaterThanOrEqual(1);
   });
 });

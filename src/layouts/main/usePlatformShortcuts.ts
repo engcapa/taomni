@@ -7,6 +7,7 @@ import { NOTES_WORKSPACE_ID } from "../../stores/workspaceNotes";
 import { createAndOpenWorkspaceNote } from "../../lib/notes/notesWorkspaceNavigation";
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
 import { shellKeyClaimed } from "../../lib/shellKeyClaims";
+import { toggleSidebarForActiveMode } from "./sidebarToggle";
 
 const IS_MAC = getAppPlatform() === "macos";
 
@@ -53,7 +54,8 @@ export function usePlatformShortcuts(): void {
         if (isTypingTarget(event.target)) return;
         event.preventDefault();
         event.stopImmediatePropagation();
-        state.toggleSidebar();
+        // Shared guard: Explorer has no expandable sidebar panel (U6).
+        toggleSidebarForActiveMode();
         return;
       }
       if (mod && !event.shiftKey && !event.altKey && key === "k") {

@@ -1,7 +1,9 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../stores/appStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useTabOverviewStore } from "../../stores/tabOverviewStore";
+import type { Tab } from "../../types";
 import { ControlBar } from "./ControlBar";
 import type { AppCommand } from "../menubar/commands";
 import type { WorkspaceCommandRegistration } from "../editor/workspace/workspaceCommands";
@@ -100,14 +102,22 @@ function renderControlBar(
 }
 
 describe("ControlBar settings button", () => {
-  beforeEach(() => { useAppStore.setState({ activeSideTab: "sessions" }); useTabOverviewStore.getState().close(); });
+  beforeEach(() => {
+    useAppStore.setState({ activeSideTab: "sessions", tabs: [], activeTabId: null });
+    useExplorerStore.setState({ tabs: [], activeTabId: null });
+    useTabOverviewStore.getState().close();
+  });
   it("moves the screenshot entry out of the shared toolbar (rail owns it now)", () => {
     renderControlBar(vi.fn());
     // v6.1 AC-04: the ScreenshotMenuButton lives in the primary rail's bottom
     // tools group; the 33px toolbar must not grow a second entry.
     expect(screen.queryByTestId("system-screenshot")).not.toBeInTheDocument();
     expect(screen.getByTestId("global-search-trigger")).toBeInTheDocument();
-    expect(screen.getByTestId("toggle-right-sidebar")).toBeInTheDocument();
+    // The right context sidebar and its collapse trigger were retired; the
+    // large overview trigger remains the mode-independent top-right action.
+    expect(screen.getByTestId("tab-overview-trigger")).toBeInTheDocument();
+    expect(screen.queryByTestId("toggle-right-sidebar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("right-sidebar")).not.toBeInTheDocument();
   });
   afterEach(() => {
     cleanup();
@@ -150,13 +160,32 @@ describe("ControlBar settings button", () => {
     expect(onWorkspaceCommand).toHaveBeenCalledWith("workspace.findInFiles");
   });
 
-  it("shows main session tabs for Explorer opened from Tools instead of hiding them behind a mode title", () => {
-    useAppStore.setState({ activeSideTab: "tools", tabs: [{ id: "explorer", type: "file-browser", title: "Documents", closable: true, fileBrowser: { initialPath: "/docs", explorer: true } }], activeTabId: "explorer" });
+  it("shows the dedicated Explorer strip and its tab filter when the Explorer rail is active", () => {
+    useAppStore.setState({ activeSideTab: "explorer", tabs: [], activeTabId: null });
+    useExplorerStore.setState({
+      tabs: [{ id: "e1", type: "file-browser", title: "Documents", closable: true, fileBrowser: { initialPath: "/docs", explorer: true } } as Tab],
+      activeTabId: "e1",
+    });
     renderControlBar(vi.fn());
-    expect(screen.getByTestId("tab-bar")).toBeInTheDocument();
+    expect(screen.getByTestId("explorer-workspace-tab")).toBeInTheDocument();
+    expect(screen.getByTestId("explorer-tabs-filter-trigger")).toBeInTheDocument();
+    // U7: Explorer has no expandable left sidebar content, so its collapse
+    // toggle is removed from the title bar in that mode.
+    expect(screen.queryByTestId("toggle-left-sidebar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tab-more")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-tabs-filter-trigger")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tab-bar")).not.toBeInTheDocument();
     expect(screen.queryByTestId("platform-mode-title")).not.toBeInTheDocument();
-    act(() => useAppStore.setState({ tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }], activeTabId: "welcome" }));
+    fireEvent.click(screen.getByTestId("explorer-tabs-filter-trigger"));
+    expect(screen.getByTestId("explorer-tabs-filter-menu")).toBeInTheDocument();
+    act(() => {
+      useExplorerStore.setState({ tabs: [], activeTabId: null });
+      useAppStore.setState({ activeSideTab: "tools", tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }], activeTabId: "welcome" });
+    });
+    expect(screen.queryByTestId("explorer-tabs-filter-trigger")).not.toBeInTheDocument();
     expect(screen.getByTestId("platform-mode-title")).toHaveTextContent("Tools");
+    // Leaving Explorer restores the sidebar collapse affordance.
+    expect(screen.getByTestId("toggle-left-sidebar")).toBeInTheDocument();
   });
 
   it("keeps the tab strip visible in Tools mode while the Local servers tab is open", () => {

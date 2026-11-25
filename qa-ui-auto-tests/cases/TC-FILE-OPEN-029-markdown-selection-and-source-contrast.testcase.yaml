@@ -20,8 +20,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-home-markdown-isolated
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -59,7 +59,8 @@ steps:
     value: theme
 - click: '[data-testid="app-theme-select"]'
 - click: '[data-testid="app-theme-dark"]'
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - assert_attribute:
     selector: html
     name: data-app-theme
@@ -92,6 +93,34 @@ steps:
     expect_truthy: true
     timeout_sec: 8
 - screenshot: dark-source-markers.png
+- click: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+Home
+    macos_key: Meta+ArrowUp
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Shift+ArrowDown
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Shift+ArrowDown
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Shift+ArrowDown
+- eval_readonly:
+    expression: >-
+      /^rgba\(92,\s*143,\s*214,\s*0\.(3[89]|40?)/.test(getComputedStyle(document.querySelector('.fv-md-source-pane .cm-selectionBackground')).backgroundColor) &&
+      getComputedStyle(document.querySelector('.fv-md-source-pane .cm-activeLine')).backgroundColor === 'rgba(0, 0, 0, 0)'
+    expect_truthy: true
+    timeout_sec: 8
+- screenshot: dark-source-selection-focused.png
+- blur: '[data-testid="viewer-editor"] .cm-content'
+- eval_readonly:
+    expression: >-
+      /^rgba\(92,\s*143,\s*214,\s*0\.2[0-5]/.test(getComputedStyle(document.querySelector('.fv-md-source-pane .cm-selectionBackground')).backgroundColor)
+    expect_truthy: true
+    timeout_sec: 8
+- screenshot: dark-source-selection-unfocused.png
 - click: '[data-testid="markdown-mode-live"]'
 - assert_attribute:
     selector: '[data-testid="markdown-editor"]'
@@ -124,24 +153,24 @@ verification:
     - 18
     - 19
     - 20
-    - 21
-    - 23
+    - 22
+    - 24
     checkpoints:
     - step: 14
       expectation: Selected content spans the bold and code nodes.
     - step: 15
       expectation: Light selection uses the inverse canvas colors.
-    - step: 24
-      expectation: Dark selection retains the rendered text range.
     - step: 25
+      expectation: Dark selection retains the rendered text range.
+    - step: 26
       expectation: Dark selection uses the inverse canvas colors.
     results:
     - 14
     - 15
-    - 24
     - 25
+    - 26
   - id: SOURCE-CONTRAST
-    requirement: The dark application theme uses readable punctuation and the interaction leaves the document clean.
+    requirement: The dark application theme uses readable punctuation, high-contrast focused/unfocused source selection without active-line occlusion, and leaves the document clean.
     actions:
     - 1
     - 2
@@ -156,27 +185,39 @@ verification:
     - 18
     - 19
     - 20
-    - 21
-    - 23
-    - 27
-    - 31
-    checkpoints:
-    - step: 28
-      expectation: Heading marker uses the dark punctuation color.
-    - step: 29
-      expectation: List marker uses the dark punctuation color.
-    - step: 32
-      expectation: Live mode returns to browse.
-    - step: 33
-      expectation: The viewer remains clean.
-    - step: 34
-      expectation: Original bytes match.
-    results:
+    - 22
+    - 24
     - 28
-    - 29
     - 32
     - 33
     - 34
+    - 35
+    - 36
+    - 39
+    - 42
+    checkpoints:
+    - step: 29
+      expectation: Heading marker uses the dark punctuation color.
+    - step: 30
+      expectation: List marker uses the dark punctuation color.
+    - step: 37
+      expectation: Focused dark source selection uses readable dark-theme blue fill instead of CodeMirror lavender and suppresses active-line occlusion.
+    - step: 40
+      expectation: Unfocused dark source selection uses softer dark-theme blue fill instead of pale gray.
+    - step: 43
+      expectation: Live mode returns to browse.
+    - step: 44
+      expectation: The viewer remains clean.
+    - step: 45
+      expectation: Original bytes match.
+    results:
+    - 29
+    - 30
+    - 37
+    - 40
+    - 43
+    - 44
+    - 45
   native:
   - check: Packaged WebView drag and independent host-disk digest
     method: automated

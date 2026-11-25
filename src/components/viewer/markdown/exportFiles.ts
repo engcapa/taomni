@@ -3,8 +3,9 @@ import { marked, type Tokens } from "marked";
 import { explorerCanonicalPath, localCreateEntry } from "../../../lib/explorer";
 import { explorerPathKey } from "../../../lib/explorer/openExplorer";
 import { selectSaveDirectory, selectSaveFilePath, writeStreamAbort, writeStreamAppend, writeStreamClose, writeStreamOpen } from "../../../lib/ipc";
-import { markdownBasename, readMarkdownImage, resolveMarkdownAsset, encodeMarkdownPath } from "../../../lib/markdownAssets";
+import { markdownBasename, readMarkdownImage, encodeMarkdownPath } from "../../../lib/markdownAssets";
 import { isTauriRuntime } from "../../../lib/runtime";
+import { createMarkdownRenderWarning, markdownImagePlaceholderDataUrl } from "./markdownRenderFallback";
 import { sftpMkdir } from "../../../lib/sftp";
 import type { MarkdownAssets } from "./markdownOwner";
 import { lastMarkdownExportDirectory, rememberMarkdownExportDirectory } from "./exportDirectory";
@@ -67,25 +68,37 @@ export function markdownImageReferences(content: string): ExportImageReference[]
 }
 
 export interface MarkdownFolderPlan { content: string; files: Array<{ name: string; bytes: Uint8Array }> }
+
+function decodeExportImage(data: string, reference: string): { mime: string; bytes: Uint8Array } {
+  const match = /^data:(image\/[\w.+-]+);base64,([\s\S]+)$/.exec(data);
+  if (!match) throw new Error(`Image data is not supported: ${reference}`);
+  try {
+    const binary = atob(match[2]);
+    return { mime: match[1], bytes: Uint8Array.from(binary, (char) => char.charCodeAt(0)) };
+  } catch {
+    throw new Error(`Image data is not valid base64: ${reference}`);
+  }
+}
+
 export async function planMarkdownFolder(content: string, docPath: string, assets?: MarkdownAssets): Promise<MarkdownFolderPlan> {
   const references = markdownImageReferences(content);
   const files: MarkdownFolderPlan["files"] = [];
   const destinations = new Map<string, string>();
   let rewritten = content;
   for (const reference of [...references].reverse()) {
-    if (!assets?.readImage && !resolveMarkdownAsset(docPath, reference.href) && !reference.href.startsWith("data:image/")) {
-      throw new Error(`Remote image cannot be bundled. Save it locally first: ${reference.href}`);
-    }
     let name = destinations.get(reference.href);
     if (!name) {
-      const data = assets?.readImage ? await assets.readImage(reference.href) : await readMarkdownImage(docPath, reference.href);
-      const match = /^data:(image\/[\w.+-]+);base64,([\s\S]+)$/.exec(data);
-      if (!match) throw new Error(`Image data is not supported: ${reference.href}`);
-      const extension = ({ "image/png": "png", "image/jpeg": "jpg", "image/svg+xml": "svg", "image/webp": "webp", "image/gif": "gif", "image/bmp": "bmp" } as Record<string, string>)[match[1]] || "img";
+      let decoded: { mime: string; bytes: Uint8Array };
+      try {
+        const data = assets?.readImage ? await assets.readImage(reference.href) : await readMarkdownImage(docPath, reference.href);
+        decoded = decodeExportImage(data, reference.href);
+      } catch (error) {
+        const warning = createMarkdownRenderWarning("image", reference.href, reference.alt || reference.href, error);
+        decoded = decodeExportImage(markdownImagePlaceholderDataUrl(warning), reference.href);
+      }
+      const extension = ({ "image/png": "png", "image/jpeg": "jpg", "image/svg+xml": "svg", "image/webp": "webp", "image/gif": "gif", "image/bmp": "bmp" } as Record<string, string>)[decoded.mime] || "img";
       name = `image-${files.length + 1}.${extension}`;
-      const binary = atob(match[2]);
-      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-      files.push({ name, bytes }); destinations.set(reference.href, name);
+      files.push({ name, bytes: decoded.bytes }); destinations.set(reference.href, name);
     }
     const alt = reference.alt.replace(/[\\\[\]]/g, "\\$&");
     const replacement = `![${alt}](${encodeMarkdownPath(`assets/${name}`)})`;

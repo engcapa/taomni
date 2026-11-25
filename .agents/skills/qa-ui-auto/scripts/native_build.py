@@ -73,6 +73,21 @@ def identity_path(binary: Path) -> Path:
     return binary.with_name(binary.name + ".qa-identity.json")
 
 
+def normalize_vendored_cargo_sources() -> None:
+    """Pin vendored Cargo source mtimes before compiling when the cache experiment is on.
+
+    The import stays local because ci_cargo_artifact imports ROOT and
+    configured_environment from this module, so a top-level import would be
+    circular.
+    """
+    from ci_cargo_artifact import normalize_vendor_mtimes, vendor_cache_enabled, vendor_mtime_epoch
+
+    if not vendor_cache_enabled():
+        return
+    count = normalize_vendor_mtimes(ROOT, vendor_mtime_epoch())
+    print(f"qa-ui-auto: normalized mtimes of {count} vendored Cargo files")
+
+
 def verify_identity(binary: Path) -> dict:
     """Reject unrecorded, production, or replaced binaries without launching them."""
     try:
@@ -122,13 +137,49 @@ def configured_environment(base: dict[str, str] | None = None) -> dict[str, str]
     return add_target_bindgen_args(env)
 
 
+def stable_platform() -> str:
+    """Return an OS/architecture/distro identifier stable across kernel patches."""
+    system = platform.system()
+    machine = platform.machine().lower()
+    if system == "Linux":
+        os_release = Path("/etc/os-release")
+        if os_release.is_file():
+            distro = ""
+            version = ""
+            for line in os_release.read_text(encoding="utf-8", errors="replace").splitlines():
+                if line.startswith("ID="):
+                    distro = line.split("=", 1)[1].strip().strip('"')
+                elif line.startswith("VERSION_ID="):
+                    version = line.split("=", 1)[1].strip().strip('"')
+            if distro or version:
+                return f"{system}-{machine}-{distro}-{version}"
+    return f"{system}-{machine}"
+
+
+def recipe_identity() -> str:
+    try:
+        config_rel = str(QA_CONFIG.relative_to(ROOT)).replace("\\", "/")
+    except ValueError:
+        config_rel = ".agents/skills/qa-ui-auto/assets/tauri.qa.conf.json"
+    return fingerprint(
+        ROOT,
+        [config_rel, ".agents/skills/qa-ui-auto/scripts/native_build.py"],
+    )
+
+
+def reusable_cache_key(*, platform_key: str, arch: str, runner: str, profile: str) -> str:
+    return (
+        f"runtime-reuse-v1-{platform_key}-{arch.lower()}-{runner}-{profile}-"
+        f"{source_identity(ROOT)[:16]}-{recipe_identity()[:16]}"
+    )
+
+
 def build_inputs(*, release: bool = False, env: dict[str, str] | None = None) -> dict:
     effective_env = configured_environment(env)
     return {
         "source_sha256": source_identity(ROOT),
-        "recipe_sha256": fingerprint(ROOT, [str(QA_CONFIG.relative_to(ROOT)).replace("\\", "/"),
-                                             ".agents/skills/qa-ui-auto/scripts/native_build.py"]),
-        "platform": platform.platform(),
+        "recipe_sha256": recipe_identity(),
+        "platform": stable_platform(),
         "profile": "release" if release else "debug",
         "cargo": subprocess.check_output(["cargo", "--version"], text=True, env=effective_env).strip(),
         "rustc": subprocess.check_output(["rustc", "--version"], text=True, env=effective_env).strip(),
@@ -136,14 +187,16 @@ def build_inputs(*, release: bool = False, env: dict[str, str] | None = None) ->
         "environment": {key: effective_env.get(key) for key in (
             "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET", "RUSTUP_TOOLCHAIN",
             "CARGO_BUILD_JOBS", "CARGO_PROFILE_DEV_DEBUG", "CC", "CXX", "CFLAGS",
-            "CARGO_PROFILE_DEV_INCREMENTAL", "CXXFLAGS", "BINDGEN_EXTRA_CLANG_ARGS",
+            "CARGO_PROFILE_DEV_INCREMENTAL", "CARGO_PROFILE_RELEASE_CODEGEN_UNITS",
+            "CXXFLAGS", "BINDGEN_EXTRA_CLANG_ARGS",
             "CMAKE_C_FLAGS_RELEASE", "CMAKE_CXX_FLAGS_RELEASE",
             "BINDGEN_EXTRA_CLANG_ARGS_x86_64-unknown-linux-gnu",
             "BINDGEN_EXTRA_CLANG_ARGS_x86_64_unknown_linux_gnu",
             "LIBCLANG_PATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "LIBGSSAPI_IMPL",
             "TAOMNI_REPLIT_NATIVE_QA", "TAOMNI_NATIVE_QA_TOOLCHAIN",
                                              "RUSTC", "OPENSSL_SRC_PERL", "PERL",
-            "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM", "NODE_ENV")},
+            "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM", "NODE_ENV",
+            "QA_VENDOR_CACHE", "QA_VENDOR_MTIME_EPOCH")},
     }
 
 
@@ -221,6 +274,7 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     # on a newer toolchain. The provenance snapshot must describe the exact
     # checkout that was compiled, so a native build is locked.
     command.extend(["--", "--locked"])
+    normalize_vendored_cargo_sources()
     started = time.monotonic()
     subprocess.run(command, cwd=ROOT, env=env, check=True)
     if inputs != build_inputs(release=release, env=env):

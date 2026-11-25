@@ -68,6 +68,10 @@
 - `[data-testid="ai-chat-drawer-opacity-menu"]` — display [optional] — F-AI-2.4.ai-chat-drawer-opacity-menu
 - `[data-testid="ai-chat-drawer-opacity-slider"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-opacity-slider
 - `[data-testid="ai-chat-safety-gate"]` — display [optional] — F-AI-2.4.ai-chat-safety-gate
+- `[data-testid="ai-chat-cc-permission-allow"]` — interactive [optional] — F-AI-2.4.ai-chat-cc-permission-allow
+- `[data-testid="ai-chat-cc-permission-allow-session"]` — interactive [optional] — F-AI-2.4.ai-chat-cc-permission-allow-session
+- `[data-testid="ai-chat-cc-permission-deny"]` — interactive [optional] — F-AI-2.4.ai-chat-cc-permission-deny
+- `[data-testid="ai-chat-acp-permission-option-allow_once"]` — interactive [optional] — F-AI-2.4.ai-chat-acp-permission-option-allow_once
 - `[data-testid="ai-chat-acp-permission-card"]` — display [optional] — F-AI-2.4.ai-chat-acp-permission-card
 - `[data-testid="ai-chat-acp-permission-cancel"]` — interactive [optional] — F-AI-2.4.ai-chat-acp-permission-cancel
 - `select[aria-label="Thread LLM provider"]` — interactive [optional] — F-AI-2.4.ai-chat-provider-select
@@ -1087,6 +1091,161 @@
 - `[data-testid="db-chat-toggle"]` — interactive [optional] — F-DB-1.chat-toggle
 - `[data-testid="db-detach"]` — interactive [optional] — F-DB-1.detach
 
+## editor/notepad (F-NOTEPAD-1)
+
+- `[data-testid="notepad-workbench"]` — display — F-NOTEPAD-1.notepad-workbench
+- `[data-testid="notepad-toolbar"]` — display — F-NOTEPAD-1.notepad-toolbar
+- `[data-testid="notepad-menubar"]` — display — F-NOTEPAD-1.notepad-menubar
+- `[data-testid="notepad-status-bar"]` — display — F-NOTEPAD-1.notepad-status-bar
+- `[data-testid="notepad-status-stats"]` — display — F-NOTEPAD-1.notepad-status-stats
+- `[data-testid="notepad-status-eol"]` — interactive — F-NOTEPAD-1.notepad-status-eol
+- `[data-testid="notepad-status-encoding"]` — interactive — F-NOTEPAD-1.notepad-status-encoding
+- `[data-testid="notepad-status-ovr"]` — interactive — F-NOTEPAD-1.notepad-status-ovr
+- `[data-testid="notepad-status-zoom"]` — interactive — F-NOTEPAD-1.notepad-status-zoom
+- `[data-testid="viewer-tab-dirty"]` — display — F-NOTEPAD-1.viewer-tab-dirty
+- `[data-testid="notepad-status-sel"]` — display [optional] — F-NOTEPAD-1.notepad-status-sel
+- `[data-testid="explorer-tab-new-notepad"]` — interactive — F-NOTEPAD-1.explorer-tab-new-notepad
+- `[data-testid="notepad-tool-wrap"]` — interactive — F-NOTEPAD-1.notepad-tool-wrap
+- `[data-testid="notepad-tool-symbols"]` — interactive — F-NOTEPAD-1.notepad-tool-symbols
+- `[data-testid="notepad-menu-file"]` — interactive — F-NOTEPAD-1.notepad-menu-file
+- `[data-testid="notepad-menu-help"]` — display [optional] — F-NOTEPAD-1.notepad-menu-help
+- `[data-testid="notepad-menu-item-file.new"]` — display — F-NOTEPAD-1.notepad-menu-item-file-new
+- `[data-testid="notepad-menu-item-file.save"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-save
+- `[data-testid="notepad-menu-item-file.saveAs"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-save-as
+- `[data-testid="notepad-menu-item-file.saveCopy"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-save-copy
+- `[data-testid="notepad-menu-item-file.print"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-print
+- `[data-testid="notepad-menu-item-file.close"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-close
+- `[data-testid="notepad-save-as-dialog"]` — display — F-NOTEPAD-1.notepad-save-as-dialog
+- `[data-testid="notepad-save-as-input"]` — interactive — F-NOTEPAD-1.notepad-save-as-input
+- `[data-testid="notepad-save-as-confirm"]` — interactive — F-NOTEPAD-1.notepad-save-as-confirm
+- `[data-testid="file-viewer"][data-active="true"] [data-testid="viewer-editor"]` — interactive — F-NOTEPAD-1.notepad-active-editor
+- `[data-testid="notepad-context-undo"]` — display — F-NOTEPAD-1.notepad-context-undo
+- `[data-testid="notepad-context-redo"]` — display — F-NOTEPAD-1.notepad-context-redo
+- `[data-testid="notepad-context-cut"]` — display — F-NOTEPAD-1.notepad-context-cut
+- `[data-testid="notepad-context-copy"]` — display — F-NOTEPAD-1.notepad-context-copy
+- `[data-testid="notepad-context-paste"]` — display — F-NOTEPAD-1.notepad-context-paste
+- `[data-testid="notepad-context-paste-special"]` — display — F-NOTEPAD-1.notepad-context-paste-special
+- `[data-testid="notepad-context-delete"]` — display — F-NOTEPAD-1.notepad-context-delete
+- `[data-testid="notepad-context-select-all"]` — display — F-NOTEPAD-1.notepad-context-select-all
+- `[data-testid="notepad-context-duplicate-line"]` — display — F-NOTEPAD-1.notepad-context-duplicate-line
+- `[data-testid="notepad-context-delete-line"]` — display — F-NOTEPAD-1.notepad-context-delete-line
+- `[data-testid="notepad-context-move-line-up"]` — display — F-NOTEPAD-1.notepad-context-move-line-up
+- `[data-testid="notepad-context-move-line-down"]` — display — F-NOTEPAD-1.notepad-context-move-line-down
+- `[data-testid="notepad-context-find"]` — display — F-NOTEPAD-1.notepad-context-find
+- `[data-testid="notepad-context-find-next"]` — display — F-NOTEPAD-1.notepad-context-find-next
+- `[data-testid="notepad-context-replace"]` — display — F-NOTEPAD-1.notepad-context-replace
+- `[data-testid="notepad-context-go-to"]` — display — F-NOTEPAD-1.notepad-context-go-to
+- `[data-testid="notepad-context-toggle-bookmark"]` — display — F-NOTEPAD-1.notepad-context-toggle-bookmark
+- `[data-testid="notepad-context-copy-path"]` — display — F-NOTEPAD-1.notepad-context-copy-path
+- `[data-testid="notepad-context-save"]` — interactive — F-NOTEPAD-1.notepad-context-save
+- `[data-testid="notepad-context-save-as"]` — display — F-NOTEPAD-1.notepad-context-save-as
+- `[data-testid="notepad-menu-edit"]` — interactive — F-NOTEPAD-1.notepad-menu-edit
+- `[data-testid="notepad-menu-item-edit.paste"]` — interactive — F-NOTEPAD-1.notepad-menu-item-edit-paste
+- `[data-testid="notepad-menu-item-edit.clipboardHistory"]` — interactive — F-NOTEPAD-1.notepad-menu-item-edit-clipboard-history
+- `[data-testid="notepad-clipboard-history-dialog"]` — display — F-NOTEPAD-1.notepad-clipboard-history-dialog
+- `[data-testid="notepad-clipboard-history-empty"]` — display — F-NOTEPAD-1.notepad-clipboard-history-empty
+- `[data-testid="notepad-clipboard-history-item-0"]` — interactive — F-NOTEPAD-1.notepad-clipboard-history-item
+- `[data-testid="notepad-menu-item-file.toggleReadonly"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-toggle-readonly
+- `[data-testid="notepad-status-readonly"]` — interactive — F-NOTEPAD-1.notepad-status-readonly
+- `[data-testid="notepad-menu-item-file.openWith"]` — interactive — F-NOTEPAD-1.notepad-menu-item-file-open-with
+- `[data-testid="notepad-open-with-dialog"]` — display — F-NOTEPAD-1.notepad-open-with-dialog
+- `[data-testid="notepad-open-with-notepad"]` — display — F-NOTEPAD-1.notepad-open-with-notepad
+- `[data-testid="notepad-open-with-taoffice"]` — display — F-NOTEPAD-1.notepad-open-with-taoffice
+- `[data-testid="notepad-open-with-close"]` — interactive — F-NOTEPAD-1.notepad-open-with-close
+- `[data-testid="notepad-menu-item-edit.selectAll"]` — interactive — F-NOTEPAD-1.notepad-menu-item-edit-select-all
+- `[data-testid="notepad-menu-group-case"]` — interactive — F-NOTEPAD-1.notepad-menu-group-case
+- `[data-testid="notepad-menu-item-edit.toUpperCase"]` — interactive — F-NOTEPAD-1.notepad-menu-item-edit-to-upper-case
+- `[data-testid="notepad-menu-group-line-ops"]` — interactive — F-NOTEPAD-1.notepad-menu-group-line-ops
+- `[data-testid="notepad-menu-group-sort"]` — interactive — F-NOTEPAD-1.notepad-menu-group-sort
+- `[data-testid="notepad-menu-item-edit.sortAsc"]` — interactive — F-NOTEPAD-1.notepad-menu-item-edit-sort-asc
+- `[data-testid="notepad-whole-doc-dialog"]` — display — F-NOTEPAD-1.notepad-whole-doc-dialog
+- `[data-testid="notepad-whole-doc-confirm"]` — interactive — F-NOTEPAD-1.notepad-whole-doc-confirm
+
+## editor/notepad-search (F-NOTEPAD-2)
+
+- `[data-testid="notepad-tool-find"]` — interactive — F-NOTEPAD-2.notepad-tool-find
+- `[data-testid="notepad-find-bar"]` — display — F-NOTEPAD-2.notepad-find-bar
+- `[data-testid="notepad-find-all-current"]` — interactive — F-NOTEPAD-2.notepad-find-all-current
+- `[data-testid="np-find-input"]` — interactive — F-NOTEPAD-2.np-find-input
+- `[data-testid="notepad-find-status"]` — display — F-NOTEPAD-2.notepad-find-status
+- `[data-testid="np-find-next"]` — interactive — F-NOTEPAD-2.np-find-next
+- `[data-testid="np-find-count"]` — interactive — F-NOTEPAD-2.np-find-count
+- `[data-testid="np-find-tab-find"]` — interactive — F-NOTEPAD-2.np-find-tab-find
+- `[data-testid="np-find-tab-replace"]` — interactive — F-NOTEPAD-2.np-find-tab-replace
+- `[data-testid="np-find-tab-mark"]` — interactive — F-NOTEPAD-2.np-find-tab-mark
+- `[data-testid="np-find-tab-files"]` — interactive — F-NOTEPAD-2.np-find-tab-files
+- `[data-testid="np-find-replace-input"]` — interactive — F-NOTEPAD-2.np-find-replace-input
+- `[data-testid="np-find-replace-all"]` — interactive — F-NOTEPAD-2.np-find-replace-all
+- `[data-testid="np-find-all-current"]` — interactive — F-NOTEPAD-2.np-find-all-current
+- `[data-testid="np-find-mark-all"]` — interactive — F-NOTEPAD-2.np-find-mark-all
+- `[data-testid="np-find-in-files"]` — interactive — F-NOTEPAD-2.np-find-in-files
+- `[data-testid="np-find-close"]` — interactive — F-NOTEPAD-2.np-find-close
+- `[data-testid="notepad-files-dir"]` — interactive — F-NOTEPAD-2.notepad-files-dir
+- `[data-testid="notepad-files-filter"]` — interactive — F-NOTEPAD-2.notepad-files-filter
+- `[data-testid="notepad-panel-results"]` — display — F-NOTEPAD-2.notepad-panel-results
+- `[data-testid="notepad-search-results"]` — display — F-NOTEPAD-2.notepad-search-results
+- `[data-testid^="notepad-result-hit-"]` — display — F-NOTEPAD-2.notepad-result-hit
+- `[data-testid="notepad-mode-re"]` — interactive — F-NOTEPAD-2.notepad-mode-re
+
+## editor/notepad-tools (F-NOTEPAD-4)
+
+- `[data-testid="notepad-menu-tools"]` — interactive — F-NOTEPAD-4.notepad-menu-tools
+- `[data-testid="notepad-menu-compare"]` — interactive — F-NOTEPAD-4.notepad-menu-compare
+- `[data-testid="notepad-menu-item-tools.preferences"]` — interactive — F-NOTEPAD-4.notepad-menu-item-tools-preferences
+- `[data-testid="notepad-menu-item-tools.shortcutMapper"]` — interactive — F-NOTEPAD-4.notepad-menu-item-tools-shortcut-mapper
+- `[data-testid="notepad-menu-item-tools.compareDisk"]` — interactive — F-NOTEPAD-4.notepad-menu-item-tools-compare-disk
+- `[data-testid="notepad-menu-item-tools.hashDialog"]` — interactive — F-NOTEPAD-4.notepad-menu-item-tools-hash-dialog
+- `[data-testid="notepad-preferences-dialog"]` — display — F-NOTEPAD-4.notepad-preferences-dialog
+- `[data-testid="notepad-settings"]` — display — F-NOTEPAD-4.notepad-settings
+- `[data-testid="notepad-pref-eol"]` — display — F-NOTEPAD-4.notepad-pref-eol
+- `[data-testid="notepad-pref-encoding"]` — display — F-NOTEPAD-4.notepad-pref-encoding
+- `[data-testid="notepad-pref-backup-mode"]` — display — F-NOTEPAD-4.notepad-pref-backup-mode
+- `[data-testid="notepad-pref-line-numbers"]` — interactive — F-NOTEPAD-4.notepad-pref-line-numbers
+- `[data-testid="notepad-shortcut-mapper-dialog"]` — display — F-NOTEPAD-4.notepad-shortcut-mapper-dialog
+- `[data-testid="notepad-keymap-filter"]` — display — F-NOTEPAD-4.notepad-keymap-filter
+- `[data-testid^="notepad-keymap-bind-"]` — display — F-NOTEPAD-4.notepad-keymap-bind
+- `[data-testid="notepad-compare-dialog"]` — display — F-NOTEPAD-4.notepad-compare-dialog
+- `[data-testid="notepad-hash-dialog"]` — display — F-NOTEPAD-4.notepad-hash-dialog
+- `[data-testid="notepad-hash-generate"]` — interactive — F-NOTEPAD-4.notepad-hash-generate
+- `[data-testid="notepad-hash-output"]` — display — F-NOTEPAD-4.notepad-hash-output
+- `[data-testid="notepad-print-dialog"]` — display — F-NOTEPAD-4.notepad-print-dialog
+- `[data-testid="notepad-print-confirm"]` — display — F-NOTEPAD-4.notepad-print-confirm
+- `[data-testid="notepad-tool-macro-record"]` — interactive — F-NOTEPAD-4.notepad-tool-macro-record
+- `[data-testid="notepad-tool-macro-stop"]` — interactive — F-NOTEPAD-4.notepad-tool-macro-stop
+- `[data-testid="notepad-menubar-recording"]` — display — F-NOTEPAD-4.notepad-menubar-recording
+- `[data-testid="notepad-status-rec"]` — display — F-NOTEPAD-4.notepad-status-rec
+- `[data-testid="notepad-menu-macro"]` — interactive — F-NOTEPAD-4.notepad-menu-macro
+- `[data-testid="notepad-menu-item-macro.saveCurrent"]` — interactive — F-NOTEPAD-4.notepad-menu-item-macro-save-current
+- `[data-testid="notepad-macro-save-dialog"]` — display — F-NOTEPAD-4.notepad-macro-save-dialog
+- `[data-testid="notepad-macro-name-input"]` — interactive — F-NOTEPAD-4.notepad-macro-name-input
+- `[data-testid="notepad-macro-save-confirm"]` — interactive — F-NOTEPAD-4.notepad-macro-save-confirm
+- `[data-testid="notepad-menu-macro-EchoUpper"]` — interactive — F-NOTEPAD-4.notepad-menu-macro-echo-upper
+
+## editor/notepad-view (F-NOTEPAD-3)
+
+- `[data-testid="notepad-tool-split"]` — interactive — F-NOTEPAD-3.notepad-tool-split
+- `[data-testid="notepad-tool-docmap"]` — interactive — F-NOTEPAD-3.notepad-tool-docmap
+- `[data-testid="notepad-editor-secondary"]` — display — F-NOTEPAD-3.notepad-editor-secondary
+- `[data-testid="notepad-menu-view"]` — interactive — F-NOTEPAD-3.notepad-menu-view
+- `[data-testid="notepad-menu-item-view.rotateSplit"]` — interactive — F-NOTEPAD-3.notepad-menu-item-view-rotate-split
+- `[data-testid="notepad-menu-item-view.toggleCharPanel"]` — interactive — F-NOTEPAD-3.notepad-menu-item-view-toggle-char-panel
+- `[data-testid="notepad-menu-group-zoom"]` — interactive — F-NOTEPAD-3.notepad-menu-group-zoom
+- `[data-testid="notepad-menu-item-view.zoomIn"]` — interactive — F-NOTEPAD-3.notepad-menu-item-view-zoom-in
+- `[data-testid="notepad-panel-minimap"]` — display — F-NOTEPAD-3.notepad-panel-minimap
+- `[data-testid="notepad-panel-chars"]` — display — F-NOTEPAD-3.notepad-panel-chars
+- `[data-testid="notepad-char-panel"]` — display — F-NOTEPAD-3.notepad-char-panel
+- `[data-testid="notepad-dock-right"]` — display — F-NOTEPAD-3.notepad-dock-right
+- `[data-testid="notepad-dock-bottom"]` — display — F-NOTEPAD-3.notepad-dock-bottom
+- `[data-testid="notepad-panel-dock-menu-minimap"]` — interactive — F-NOTEPAD-3.notepad-panel-dock-menu-minimap
+- `[data-testid="notepad-panel-dock-minimap-float"]` — interactive — F-NOTEPAD-3.notepad-panel-dock-minimap-float
+- `[data-testid="notepad-float-layer"]` — display — F-NOTEPAD-3.notepad-float-layer
+- `[data-testid="notepad-encoding-dialog"]` — display — F-NOTEPAD-3.notepad-encoding-dialog
+- `[data-testid="notepad-enc-apply"]` — display — F-NOTEPAD-3.notepad-enc-apply
+- `[data-testid="notepad-enc-option-GBK"]` — display — F-NOTEPAD-3.notepad-enc-option-gbk
+- `[data-testid="notepad-menu-item-view.distractionFree"]` — interactive — F-NOTEPAD-3.notepad-menu-item-view-distraction-free
+- `[data-testid="notepad-exit-view-mode"]` — interactive — F-NOTEPAD-3.notepad-exit-view-mode
+- `[data-testid="notepad-char-row-65"]` — interactive — F-NOTEPAD-3.notepad-char-row-65
+
 ## editor/structural-search (F25.6)
 
 - `[data-testid="structural-search-templates"]` — display [optional] — F25.6.structural-search-templates
@@ -1131,9 +1290,29 @@
 - `[data-testid="explorer-delete-dialog"]` — display — F-EXPLORER-1.explorer-delete-dialog
 - `[data-testid="explorer-properties-dialog"]` — display — F-EXPLORER-1.explorer-properties-dialog
 - `[data-testid="explorer-toast"].error` — display — F-EXPLORER-1.explorer-toast-error
-- `[data-testid="workspace-tab"][data-tab-kind="explorer"]` — display — F-EXPLORER-1.explorer-workspace-tab-ready
-  ↳ `:nth-match([data-testid="workspace-tab"][data-tab-kind="explorer"], 1)` — alias
-  ↳ `:nth-match([data-testid="workspace-tab"][data-tab-kind="explorer"], 2)` — alias
+- `[data-testid="side-tab-explorer"]` — interactive — F-EXPLORER-1.explorer-rail-entry
+- `[data-testid="explorer-platform-view"]` — display — F-EXPLORER-1.explorer-platform-view
+- `[data-testid="sidebar-tool-file-explorer"]` — display [optional] — F-EXPLORER-1.explorer-tools-entry-removed
+- `[data-testid="explorer-workspace-tab"]` — interactive — F-EXPLORER-1.explorer-workspace-tab-ready
+  ↳ `:nth-match([data-testid="explorer-workspace-tab"], 1)` — alias
+  ↳ `:nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 1)` — alias
+  ↳ `:nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 2)` — alias
+  ↳ `:nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 5)` — alias
+  ↳ `xpath=(//*[@data-testid="explorer-workspace-tab"][@data-tab-type="file-browser"])[2]` — alias
+- `[data-testid="explorer-tab-new-home"]` — interactive — F-EXPLORER-1.explorer-tab-new-home
+- `[data-testid="explorer-tab-rename-input"]` — interactive — F-EXPLORER-1.explorer-tab-rename-input
+- `[data-testid="explorer-tab-context-close"]` — interactive — F-EXPLORER-1.explorer-tab-context-close
+- `[data-testid="explorer-tab-context-close-others"]` — display — F-EXPLORER-1.explorer-tab-context-close-others
+- `[data-testid="explorer-tab-context-close-all"]` — display — F-EXPLORER-1.explorer-tab-context-close-all
+- `[data-testid="explorer-tab-context-rename"]` — interactive — F-EXPLORER-1.explorer-tab-context-rename
+- `[data-testid="explorer-tab-context-duplicate"]` — display — F-EXPLORER-1.explorer-tab-context-duplicate
+- `[data-testid="explorer-tab-context-copy-path"]` — display — F-EXPLORER-1.explorer-tab-context-copy-path
+- `[data-testid="explorer-tab-context-move-first"]` — interactive — F-EXPLORER-1.explorer-tab-context-move-first
+- `[data-testid="explorer-tab-context-move-left"]` — display — F-EXPLORER-1.explorer-tab-context-move-left
+- `[data-testid="explorer-tab-context-move-right"]` — display — F-EXPLORER-1.explorer-tab-context-move-right
+- `[data-testid="explorer-tab-context-move-last"]` — display — F-EXPLORER-1.explorer-tab-context-move-last
+- `[data-testid="explorer-tab-context-pin"]` — display — F-EXPLORER-1.explorer-tab-context-pin
+- `[data-testid="explorer-sidebar-panel"]` — display [optional] — F-EXPLORER-1.explorer-sidebar-panel-removed
 - `[data-testid="code-workspace-tool-rail-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tool-rail-explorer
 - `[data-testid="code-workspace-tree-open-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer
 - `[data-testid="code-workspace-tree-open-explorer-new"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer-new
@@ -1182,13 +1361,19 @@
   ↳ `[data-testid="explorer-crumb"]${fixture.explorer_crumb_folder_match}` — alias
 - `[data-testid="explorer-delete-cancel"]` — interactive — F-EXPLORER-1.explorer-delete-cancel
 - `[data-testid="explorer-delete-confirm"]` — interactive — F-EXPLORER-1.explorer-delete-confirm
+- `[data-testid="explorer-delete-trash"]` — interactive — F-EXPLORER-1.explorer-delete-trash
 - `[data-testid="explorer-file-list"]` — interactive — F-EXPLORER-1.explorer-file-list
 - `[data-testid="explorer-file-row"]` — interactive — F-EXPLORER-1.explorer-file-row
   ↳ `[data-testid="explorer-file-row"] .ex-name` — alias
-- `[data-testid="tab-item"][data-tab-type="file-browser"] .taomni-explorer-tab-icon path` — display — F-EXPLORER-1.explorer-main-tab-icon
-- `[data-testid="workspace-tab"][data-tab-kind="explorer"] .taomni-explorer-tab-icon path` — display — F-EXPLORER-1.explorer-workspace-tab-icon
+- `[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"] .taomni-explorer-tab-icon path` — display — F-EXPLORER-1.explorer-workspace-tab-icon
 - `[data-testid="explorer-files"]` — display — F-EXPLORER-1.explorer-files
 - `[data-testid="explorer-filter"]` — interactive — F-EXPLORER-1.explorer-filter
+- `[data-testid="explorer-search-recursive"]` — interactive — F-EXPLORER-1.explorer-search-recursive
+- `[data-testid="explorer-search-clear"]` — interactive — F-EXPLORER-1.explorer-search-clear
+- `[data-testid="explorer-search-cancel"]` — interactive — F-EXPLORER-1.explorer-search-cancel
+- `[data-testid="explorer-search-retry"]` — interactive — F-EXPLORER-1.explorer-search-retry
+- `[data-testid="explorer-search-status"]` — display — F-EXPLORER-1.explorer-search-status
+- `[data-testid="explorer-search-result-path"]` — display — F-EXPLORER-1.explorer-search-result-path
 - `[data-testid="explorer-forward"]` — interactive — F-EXPLORER-1.explorer-forward
 - `[data-testid="explorer-nav-newtab"]` — interactive — F-EXPLORER-1.explorer-nav-newtab
 - `[data-testid="explorer-nav-node"]` — interactive — F-EXPLORER-1.explorer-nav-node
@@ -1197,6 +1382,12 @@
 - `[data-testid="explorer-nav-shortcut"]` — interactive — F-EXPLORER-1.explorer-nav-shortcut
 - `[data-testid="explorer-nav-tree"]` — display — F-EXPLORER-1.explorer-nav-tree
 - `[data-testid="explorer-new-file"]` — interactive — F-EXPLORER-1.explorer-new-file
+- `[data-testid="explorer-new-file-md"]` — interactive — F-EXPLORER-1.explorer-new-file-md
+- `[data-testid="explorer-new-file-html"]` — interactive — F-EXPLORER-1.explorer-new-file-html
+- `[data-testid="explorer-new-file-css"]` — interactive — F-EXPLORER-1.explorer-new-file-css
+- `[data-testid="explorer-new-file-js"]` — interactive — F-EXPLORER-1.explorer-new-file-js
+- `[data-testid="explorer-new-file-ts"]` — interactive — F-EXPLORER-1.explorer-new-file-ts
+- `[data-testid="explorer-new-file-json"]` — interactive — F-EXPLORER-1.explorer-new-file-json
 - `[data-testid="explorer-new-folder"]` — interactive — F-EXPLORER-1.explorer-new-folder
 - `[data-testid="explorer-preview"]` — display — F-EXPLORER-1.explorer-preview
 - `[data-testid="explorer-preview-action-error"]` — display — F-EXPLORER-1.explorer-preview-action-error
@@ -1232,6 +1423,17 @@
 - `[data-testid="explorer-status"]` — display — F-EXPLORER-1.explorer-status
 - `[data-testid="explorer-tab"]` — interactive — F-EXPLORER-1.explorer-tab
   ↳ `[data-testid="explorer-tab"]${fixture.explorer_previews_match}` — alias
+- `[data-testid="explorer-tab-filter-chip"]` — interactive — F-EXPLORER-1.explorer-tab-filter-chip
+- `[data-testid="explorer-tab-filter-empty"]` — display — F-EXPLORER-1.explorer-tab-filter-empty
+- `[data-testid="explorer-tab-filter-files"]` — interactive — F-EXPLORER-1.explorer-tab-filter-files
+- `[data-testid="explorer-tab-filter-folders"]` — interactive — F-EXPLORER-1.explorer-tab-filter-folders
+- `[data-testid="explorer-tab-scroll-left"]` — interactive — F-EXPLORER-1.explorer-tab-scroll-left
+- `[data-testid="explorer-tab-scroll-right"]` — interactive — F-EXPLORER-1.explorer-tab-scroll-right
+- `[data-testid="explorer-tabs-filter-clear"]` — interactive — F-EXPLORER-1.explorer-tabs-filter-clear
+- `[data-testid="explorer-tabs-filter-menu"]` — display — F-EXPLORER-1.explorer-tabs-filter-menu
+- `[data-testid="explorer-tabs-filter-row"]` — interactive — F-EXPLORER-1.explorer-tabs-filter-row
+- `[data-testid="explorer-tabs-filter-search"]` — interactive — F-EXPLORER-1.explorer-tabs-filter-search
+- `[data-testid="explorer-tabs-filter-trigger"]` — interactive — F-EXPLORER-1.explorer-tabs-filter-trigger
 - `[data-testid="explorer-toast"]` — display — F-EXPLORER-1.explorer-toast
 - `[data-testid="explorer-trash-unavailable"]` — display — F-EXPLORER-1.explorer-trash-unavailable
 - `[data-testid="explorer-undo"]` — interactive — F-EXPLORER-1.explorer-undo
@@ -1240,7 +1442,6 @@
 - `[data-testid="explorer-view-hidden"]` — interactive — F-EXPLORER-1.explorer-view-hidden
 - `[data-testid="explorer-view-icons"]` — interactive — F-EXPLORER-1.explorer-view-icons
 - `[data-testid="explorer-view-list"]` — interactive — F-EXPLORER-1.explorer-view-list
-- `[data-testid="sidebar-tool-file-explorer"]` — interactive — F-EXPLORER-1.sidebar-tool-file-explorer
 - `[data-testid="terminal-context-explorer"]` — interactive — F-EXPLORER-1.terminal-context-explorer
 - `[data-testid="terminal-context-explorer-new"]` — interactive — F-EXPLORER-1.terminal-context-explorer-new
 
@@ -1286,6 +1487,7 @@
 - `[data-testid="viewer-close-save"]` — interactive — F-FILEOPEN-1.viewer-close-save
 - `[data-testid="viewer-close-discard"]` — interactive — F-FILEOPEN-1.viewer-close-discard
 - `[data-testid="viewer-close-keep-draft"]` — interactive — F-FILEOPEN-1.viewer-close-keep-draft
+- `[data-testid="viewer-close-error"]` — display — F-FILEOPEN-1.viewer-close-error
 - `[data-testid="viewer-close-cancel"]` — interactive — F-FILEOPEN-1.viewer-close-cancel
 - `[data-testid="image-viewer"]` — display — F-FILEOPEN-1.image-viewer
 - `[data-testid="image-render"]` — display — F-FILEOPEN-1.image-render
@@ -1322,6 +1524,9 @@
 - `[data-testid="markdown-mode-split"]` — interactive — F-FILEOPEN-1.markdown-mode-split
 - `[data-testid="markdown-focus"]` — interactive — F-FILEOPEN-1.markdown-focus
 - `[data-testid="markdown-format-bold"]` — interactive — F-FILEOPEN-1.markdown-format-bold
+- `[data-testid="markdown-format-italic"]` — interactive — F-FILEOPEN-1.markdown-format-italic
+- `[data-testid="markdown-format-quote"]` — interactive — F-FILEOPEN-1.markdown-format-quote
+- `[data-testid="markdown-insert-menu"]` — interactive — F-FILEOPEN-1.markdown-insert-menu
 - `[data-testid="markdown-outline"]` — interactive — F-FILEOPEN-1.markdown-outline
 - `[data-testid="markdown-outline-toggle"]` — interactive — F-FILEOPEN-1.markdown-outline-toggle
 - `[data-testid="markdown-preview"]` — display — F-FILEOPEN-1.markdown-preview
@@ -1334,6 +1539,10 @@
 - `[data-testid="markdown-table-widget"]` — interactive — F-FILEOPEN-1.markdown-table-widget
 - `[data-testid="markdown-image-widget"]` — interactive — F-FILEOPEN-1.markdown-image-widget
 - `[data-testid="markdown-paste-status"]` — display — F-FILEOPEN-1.markdown-paste-status
+- `[data-testid="markdown-render-warnings"]` — display — F-FILEOPEN-1.markdown-render-warnings
+- `[data-testid="markdown-render-warning-item"]` — display — F-FILEOPEN-1.markdown-render-warning-item
+- `[data-testid="markdown-render-warning-dismiss"]` — interactive — F-FILEOPEN-1.markdown-render-warning-dismiss
+- `[data-testid="markdown-render-placeholder"]` — display — F-FILEOPEN-1.markdown-render-placeholder
 - `[data-testid="markdown-export-fileHeader"]` — interactive — F-FILEOPEN-1.markdown-export-fileHeader
 - `[data-testid="markdown-export"]` — interactive — F-FILEOPEN-1.markdown-export
 - `[data-testid="markdown-export-menu"]` — display — F-FILEOPEN-1.markdown-export-menu
@@ -1970,6 +2179,7 @@
 ## main/tabs (F1.5)
 
 - `[data-testid="tab-bar"]` — display — F1.5.tab-bar
+- `[data-testid="context-menu-item-close"]` — interactive [optional] — F1.5.tab-context-close
 - `[data-testid="tab-item"]` — interactive — F1.5.tab-item
   ↳ `[data-testid="tab-item"][data-tab-type="welcome"]` — alias
   ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 1)` — alias
@@ -2029,30 +2239,9 @@
 - `[data-testid="welcome-panel"]` — display — F1.6.panel-root
 - `[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]` — interactive — F1.6.open-local-terminal
 - `select[aria-label="Terminal shell"]` — interactive [optional] — F1.6.shell-select
-- `[data-testid="welcome-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
+- `[data-testid="tao-home-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
 - `button[aria-label="Open as administrator"]` — interactive [optional] — F1.6.open-as-administrator
-- `text="New session…"` — display — F1.6.new-session-card
 - `[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]` — interactive — F1.6.new-session-card-testid
-- `[data-testid="welcome-recent-sessions"]` — display — F1.6.recent-sessions-panel
-- `[data-testid="welcome-recent-filter"]` — interactive — F1.6.recent-filter
-- `[data-testid="welcome-recent-type-filter"]` — interactive — F1.6.recent-type-filter
-- `[data-testid="welcome-recent-sort"]` — interactive — F1.6.recent-sort
-- `[data-testid="welcome-recent-open-all"]` — interactive — F1.6.recent-open-all
-- `[data-testid="welcome-recent-open-filtered"]` — interactive — F1.6.recent-open-filtered
-- `[data-testid="welcome-recent-open-selected"]` — interactive — F1.6.recent-open-selected
-- `[data-testid="welcome-recent-select-filtered"]` — interactive — F1.6.recent-select-filtered
-- `[data-testid="welcome-recent-clear-filter"]` — interactive — F1.6.recent-clear-filter
-- `[data-testid="welcome-recent-clear-selection"]` — interactive [optional] — F1.6.recent-clear-selection
-- `[data-testid="welcome-recent-settings"]` — interactive — F1.6.recent-settings
-- `[data-testid="welcome-recent-session-row"]` — display [optional] — F1.6.recent-session-row
-- `[data-testid="welcome-recent-select"]` — interactive [optional] — F1.6.recent-session-select
-- `[data-testid="welcome-recent-open"]` — interactive [optional] — F1.6.recent-session-open
-- `[data-testid="welcome-recent-reveal"]` — interactive [optional] — F1.6.recent-session-reveal
-- `[data-testid="welcome-recent-empty"]` — display [optional] — F1.6.recent-empty
-- `[data-testid="welcome-recent-no-matches"]` — display [optional] — F1.6.recent-no-matches
-- `[data-testid="welcome-recent-workspace-row"]` — interactive [optional] — F1.6.recent-workspace-row
-- `[data-testid="welcome-recent-workspace-filter"]` — interactive [optional] — F1.6.recent-workspace-filter
-- `[data-testid="welcome-history-tab-workspaces"]` — interactive [optional] — F1.6.history-tab-workspaces
 - `[data-testid="welcome-history-tab-sessions"]` — interactive — F1.6.history-tab-sessions
   ↳ `[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-sessions"]` — alias
 - `[data-testid="welcome-history-tab-directories"]` — interactive — F1.6.history-tab-directories
@@ -2069,9 +2258,6 @@
 - `[data-testid="welcome-restore-retry"]` — interactive [optional] — F1.6.restore-retry
 - `[data-testid="welcome-restore-cancel"]` — interactive [optional] — F1.6.restore-cancel
 - `[data-testid="welcome-restore-clear"]` — interactive [optional] — F1.6.restore-clear
-- `text="Tips"` — display — F1.6.tips-section
-- `[data-testid="welcome-version"]` — display — F1.6.version-header
-- `[data-testid="welcome-version-footer"]` — display — F1.6.version-footer
 
 ## main/window (F1.3)
 
@@ -2095,21 +2281,14 @@
 
 - `[data-testid="global-search-trigger"]` — interactive — F-WS-1.global-search-trigger
 - `[data-testid="home-sidebar-panel"]` — display — F-WS-1.home-sidebar-panel
+- `[data-testid="home-nav-agents"]` — interactive — F-WS-1.home-nav-agents
 - `[data-testid="nav-mode-home"]` — interactive — F-WS-1.nav-mode-home
 - `[data-testid="nav-mode-workspaces"]` — interactive — F-WS-1.nav-mode-workspaces
-- `[data-testid="right-sidebar"]` — display — F-WS-1.right-sidebar
 - `[data-testid="sidebar-rail"]` — interactive — F-WS-1.sidebar-rail
 - `[data-testid="toggle-left-sidebar"]` — interactive — F-WS-1.toggle-left-sidebar
-- `[data-testid="toggle-right-sidebar"]` — interactive — F-WS-1.toggle-right-sidebar
 - `[data-testid="main-canvas-frame"]` — display — F-WS-1.main-canvas-frame
 - `[data-testid="platform-mode-title"]` — display — F-WS-1.platform-mode-title
 - `[data-testid="global-session-surface"]` — display — F-WS-1.global-session-surface
-- `[data-testid="right-sidebar-resize-handle"]` — interactive — F-WS-1.right-sidebar-resize-handle
-- `[data-testid="right-sidebar-close"]` — interactive — F-WS-1.right-sidebar-close
-- `[data-testid="right-sidebar-ai-tab"]` — interactive — F-WS-1.right-sidebar-ai-tab
-- `[data-testid="right-sidebar-structure-tab"]` — interactive — F-WS-1.right-sidebar-structure-tab
-- `[data-testid="right-sidebar-content"]` — display — F-WS-1.right-sidebar-content
-- `[data-testid="right-sidebar-open-chat"]` — interactive — F-WS-1.right-sidebar-open-chat
 - `[data-testid="rail-app-menu-host"]` — display — F-WS-1.rail-app-menu-host
 - `[data-testid="home-import-sessions"]` — interactive — F-WS-1.home-import-sessions
 - `[data-testid="home-import-json"]` — interactive — F-WS-1.home-import-json
@@ -2269,6 +2448,8 @@
 - `[data-testid="workspace-editor-save"]` — interactive — F-WS-2.workspace-editor-save
 - `[data-testid="workspace-switcher-option-default-workspace"]` — interactive — F-WS-2.workspace-switcher-option-default-workspace
 - `[data-testid="workspace-switcher-option-second-workspace"]` — interactive — F-WS-2.workspace-switcher-option-second-workspace
+- `[data-testid^="workspace-switcher-option-"]:has-text("QA other")` — interactive [optional] — F-WS-2.workspace-switcher-option-named
+  ↳ `[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])` — alias
 - `[data-testid="workspace-layout-split"]` — interactive — F-WS-2.workspace-layout-split
 - `[data-testid="workspace-toolbar-bottom-dock"]` — interactive — F-WS-2.workspace-toolbar-bottom-dock
 - `[data-testid="workspace-canvas-panes"]` — display — F-WS-2.workspace-canvas-panes
@@ -2315,6 +2496,31 @@
 - `[data-testid="workspace-tab-filter-local"]` — interactive — F-WS-2.workspace-tab-filter-local
 - `[data-testid="workspace-tab-filter-other"]` — interactive — F-WS-2.workspace-tab-filter-other
 - `[data-testid="workspace-tab-categories"]` — display — F-WS-2.workspace-tab-categories
+- `[data-testid="workspace-git-clone-modal"]` — display — F-WS-2.workspace-git-clone-modal
+- `[data-testid="workspace-plus-clone-git"]` — interactive — F-WS-2.workspace-plus-clone-git
+- `[data-testid="workspace-switcher-clone-git"]` — interactive [optional] — F-WS-2.workspace-switcher-clone-git
+- `[data-testid="workspace-git-clone-url"]` — interactive — F-WS-2.workspace-git-clone-url
+- `[data-testid="workspace-git-clone-name"]` — interactive — F-WS-2.workspace-git-clone-name
+- `[data-testid="workspace-git-clone-location"]` — interactive — F-WS-2.workspace-git-clone-location
+- `[data-testid="workspace-git-clone-branch"]` — interactive — F-WS-2.workspace-git-clone-branch
+- `[data-testid="workspace-git-clone-branch-detect"]` — interactive — F-WS-2.workspace-git-clone-branch-detect
+- `[data-testid="workspace-git-clone-user-name"]` — interactive — F-WS-2.workspace-git-clone-user-name
+- `[data-testid="workspace-git-clone-user-email"]` — interactive — F-WS-2.workspace-git-clone-user-email
+- `[data-testid="workspace-git-clone-proxy-app"]` — interactive — F-WS-2.workspace-git-clone-proxy-app
+- `[data-testid="workspace-git-clone-proxy-custom"]` — interactive — F-WS-2.workspace-git-clone-proxy-custom
+- `[data-testid="workspace-git-clone-proxy-none"]` — interactive — F-WS-2.workspace-git-clone-proxy-none
+- `[data-testid="workspace-git-clone-http-proxy"]` — interactive — F-WS-2.workspace-git-clone-http-proxy
+- `[data-testid="workspace-git-clone-https-proxy"]` — interactive — F-WS-2.workspace-git-clone-https-proxy
+- `[data-testid="workspace-git-clone-destination"]` — display — F-WS-2.workspace-git-clone-destination
+- `[data-testid="workspace-git-clone-start"]` — interactive — F-WS-2.workspace-git-clone-start
+- `[data-testid="workspace-git-clone-close"]` — interactive — F-WS-2.workspace-git-clone-close
+- `[data-testid="workspace-git-clone-cancel"]` — interactive — F-WS-2.workspace-git-clone-cancel
+- `[data-testid="workspace-git-clone-retry"]` — interactive — F-WS-2.workspace-git-clone-retry
+- `[data-testid="workspace-git-clone-progress"]` — display — F-WS-2.workspace-git-clone-progress
+- `[data-testid="workspace-git-clone-phase"]` — display — F-WS-2.workspace-git-clone-phase
+- `[data-testid="workspace-git-clone-percent"]` — display — F-WS-2.workspace-git-clone-percent
+- `[data-testid="workspace-git-clone-success"]` — display — F-WS-2.workspace-git-clone-success
+- `[data-testid="workspace-git-clone-cancelled"]` — display — F-WS-2.workspace-git-clone-cancelled
 
 ## main/workspace-platform (F-WS-3)
 
@@ -3532,7 +3738,6 @@
 ## sftp (F7.2)
 
 - `[data-testid="sftp-browser"]` — display — F7.2.panel-root
-- `[role="dialog"][aria-modal="true"]:has-text("Open remote file?")` — display [optional] — F7.2.download-prompt-dialog
 - `[data-testid="sftp-local-pane"]` — display — F7.2.local-pane
 - `[data-testid="sftp-remote-pane"]` — display — F7.2.remote-pane
 - `[data-testid="sftp-local-list"]` — display — F7.2.local-list
@@ -3672,7 +3877,7 @@
 - `[data-testid="tao-home-history-tab-sessions"]` — interactive — F1.11.tao-home-history-tab-sessions
 - `[data-testid="tao-home-history-tab-workspaces"]` — interactive — F1.11.tao-home-history-tab-workspaces
 - `[data-testid="tao-home-history-tab-directories"]` — interactive — F1.11.tao-home-history-tab-directories
-- `.tao-home-history-search input` — interactive — F1.11.tao-home-history-search
+- `[data-testid="tao-home-history-search"]` — interactive — F1.11.tao-home-history-search
 - `[data-testid="tao-home-local-terminal"]` — interactive — F1.11.tao-home-local-terminal
 - `[data-testid="tao-home-wsl"]` — display [optional] — F1.11.tao-home-wsl
 - `[data-testid="tao-home-new-session"]` — interactive — F1.11.tao-home-new-session
@@ -4217,6 +4422,7 @@
 - `[data-testid="vnc-menu-send-f8"]` — interactive [optional] — F9.6.menu-send-f8
 - `[data-testid="vnc-session-info"]` — display [optional] — F9.6.session-info
 - `[data-testid="vnc-reconnect"]` — interactive [optional] — F9.6.reconnect
+- `[data-testid="vnc-reconnect-stop"]` — interactive [optional] — F9.6.reconnect-stop
 - `[data-testid="vnc-unencrypted-continue"]` — interactive [optional] — F9.6.unencrypted-continue
 - `[data-testid="vnc-auth-password"]` — interactive [optional] — F9.6.vnc-auth-password
 - `[data-testid="vnc-auth-username"]` — interactive [optional] — F9.6.vnc-auth-username

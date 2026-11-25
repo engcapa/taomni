@@ -1,0 +1,128 @@
+id: TC-NP-103
+title: Native Notepad Save As defaults to a real absolute HOME path and remembers the last directory
+description: >-
+  AC-2/AC-3 native slice (U2). In the packaged QA app a new untitled document's Ctrl/Cmd+S Save As must prefill a
+  real absolute path under the OS HOME that ends in .txt, and confirming it must write the exact typed bytes to
+  the real host file independently read by the file-open byte oracle. A second untitled document opened after
+  that save must prefill the remembered directory through the real localStorage preference and real get_home_dir
+  IPC, not the default HOME. Browser stubs cannot prove the real OS HOME, real host bytes or the native dialog
+  default, so this case is native only. The native platform boundary is recorded separately; physical OS
+  keyboard delivery is not established by WebView key actions.
+modes:
+- native
+covers:
+- F-NOTEPAD-5
+tags:
+- p1
+- notepad
+- native
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-notepad-native-defaults
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="notepad-workbench"]'
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="viewer-editor"] .cm-content'
+- type: native default save
+- press:
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="viewer-editor"] .cm-content'
+    key: Mod+s
+- wait_for: '[data-testid="notepad-save-as-dialog"]'
+# AC-2: the default is a real absolute path that ends in .txt, not a bare file
+# name. The check accepts a POSIX root or a Windows drive spelling so the same
+# assertion holds on Linux, macOS and Windows hosts.
+- eval_readonly:
+    expression: document.querySelector('.np-modal .np-input').value
+    contains: .txt
+- eval_readonly:
+    expression: document.querySelector('.np-modal .np-input').value.length > 10 && (document.querySelector('.np-modal .np-input').value.startsWith('/') || document.querySelector('.np-modal .np-input').value.indexOf(':') > 0)
+    expect_truthy: true
+    timeout_sec: 5
+- fill:
+    selector: '[data-testid="notepad-save-as-input"]'
+    value: ${fixture.file_open_root}/np-native-default.txt
+- click: '[data-testid="notepad-save-as-confirm"]'
+- wait_for:
+    selector: '[data-testid="notepad-save-as-dialog"]'
+    state: detached
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/np-native-default.txt
+    equals: native default save
+# AC-3: the next untitled Save As reopens in the directory of the successful real
+# save. The product joins the remembered directory with its own separator, so
+# the value is normalized to forward slashes before matching the fixture path.
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="file-viewer"][data-path^="untitled:"]'
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="viewer-editor"] .cm-content'
+- press:
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="viewer-editor"] .cm-content'
+    key: Mod+s
+- wait_for: '[data-testid="notepad-save-as-dialog"]'
+- eval_readonly:
+    expression: document.querySelector('.np-modal .np-input').value.replace(/\\/g, '/')
+    contains: ${fixture.file_open_root}/
+- press: Escape
+- wait_for:
+    selector: '[data-testid="notepad-save-as-dialog"]'
+    state: detached
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: >-
+      The first Save As of an untitled native document prefills a real absolute HOME path ending in .txt and writes the
+      exact typed bytes to the requested real host file.
+    actions:
+    - 6
+    - 8
+    - 9
+    - 10
+    - 14
+    - 15
+    checkpoints:
+    - {step: 7, expectation: The untitled Notepad workbench is mounted.}
+    - {step: 11, expectation: The Save As dialog is shown for the untitled document.}
+    - {step: 12, expectation: The default path ends in .txt.}
+    - {step: 13, expectation: The default path is absolute and longer than a bare file name.}
+    - {step: 16, expectation: Confirming Save closes the dialog.}
+    - {step: 17, expectation: The independent native byte read matches the typed document exactly.}
+    results:
+    - 13
+    - 17
+  - id: R2
+    requirement: >-
+      A second untitled document opened after the real save defaults Save As to the remembered directory, proving the real
+      localStorage preference plus get_home_dir path; the flow raises no uncaught runtime errors.
+    actions:
+    - 15
+    - 18
+    - 20
+    - 21
+    checkpoints:
+    - {step: 19, expectation: The new untitled document is the active viewer.}
+    - {step: 22, expectation: Its Save As dialog is mounted.}
+    - {step: 23, expectation: The default path contains the previous real save directory.}
+    - {step: 25, expectation: Escape closes the dialog without another write.}
+    - {step: 26, expectation: The workflow raises no uncaught runtime errors.}
+    results:
+    - 19
+    - 23
+    - 26
+  visual:
+  - check: Native Save As dialog default path presentation.
+    method: external
+    reason: The default path is asserted through the production input value and real byte oracle; dialog pixels are not reviewed here.
+  native:
+  - check: Real OS HOME resolution, native host bytes and the packaged WebView dialog.
+    method: automated
+    reason: The file-open byte oracle independently reads host bytes; get_home_dir is real Tauri IPC in this mode.
+  - check: Physical OS keyboard delivery for Ctrl/Cmd+S.
+    method: manual
+    reason: WebView key actions do not prove physical OS shortcut delivery on all desktop platforms.

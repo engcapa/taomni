@@ -88,6 +88,17 @@ pub struct AgentRuntime {
     /// Pending CC permission prompts awaiting a human decision, keyed by
     /// per-call id. See [`CcPermissionResponder`].
     pub cc_pending_permissions: Arc<Mutex<HashMap<String, CcPermissionResponder>>>,
+    /// Payload of every pending CC permission prompt, keyed by call id. A
+    /// renderer reload or crash drops its event listener and Tauri does not
+    /// queue events, so a freshly mounted bridge re-reads the prompts addressed
+    /// to its window instead of letting the approval time out
+    /// (`cc_pending_permission_prompts`). Only targeted prompts are stored; a
+    /// broadcast prompt is already visible in every window.
+    pub cc_pending_prompt_payloads: Arc<Mutex<HashMap<String, serde_json::Value>>>,
+    /// Thread id -> label of the webview that started the current chat turn.
+    /// Thread-scoped approval and side-effect events are delivered to that
+    /// window instead of being broadcast into every window (issue #869).
+    pub thread_windows: Arc<crate::windowing::thread_delivery::ThreadWindows>,
     /// Per-thread captured-command store (方案4). Holds the full stdout/stderr
     /// of `run_captured` runs (B path: Taomni-local files) so CC can grep/page
     /// large output without dumping it into context. Reduction happens here.
@@ -108,6 +119,14 @@ pub struct AgentRuntime {
     /// `read_capture`) can resolve the live terminal that `run_in_terminal`
     /// reaches indirectly through the frontend registry. Refreshed on reconnect.
     pub cc_tab_sessions: Arc<Mutex<HashMap<String, String>>>,
+    /// Maps a terminal *tab id* to the window label whose terminal panel
+    /// currently owns it. Side-effect tools that write into a terminal
+    /// (`run_in_terminal`, `read_terminal_tail`) must run in that window: after
+    /// a detach the terminal lives in a detached window while the chat that
+    /// drives the tool stays in the main window. Refreshed on connect; the
+    /// ownership guard in `cc_untrack_terminal` keeps a stale unmount from
+    /// deleting a newer owner.
+    pub cc_tab_windows: Arc<Mutex<HashMap<String, String>>>,
     /// Live DB connection id an agent thread is bound to (Phase 6). The runtime key
     /// for `db_connections` is generated in the frontend (`createRuntimeDbSessionId`)
     /// and isn't derivable backend-side, so the frontend bridges it over each

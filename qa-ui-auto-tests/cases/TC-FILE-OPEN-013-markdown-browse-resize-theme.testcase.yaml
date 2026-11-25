@@ -20,8 +20,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-markdown-browse-resize-theme
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -167,7 +167,8 @@ steps:
 - wait_for: '[data-testid="app-theme-select"]'
 - click: '[data-testid="app-theme-select"]'
 - click: '[data-testid="app-theme-dark"]'
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - assert_attribute:
     selector: html
     name: data-app-theme
@@ -264,7 +265,7 @@ steps:
       flowchart LR
         Explorer --> OpenFile --> Viewer
       ```
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
 - wait_for: '[data-testid="markdown-editor"][data-editing="false"]'
 - click: '[data-testid="markdown-mode-split"]'
@@ -298,7 +299,7 @@ verification:
   requirements:
   - id: MD-LIVE
     requirement: Live starts read-only; explicit Edit permits a task mutation; returning to Live and reopening restores browse mode while saved bytes survive.
-    actions: [10, 15, 20, 23, 27, 41, 43, 45, 48, 86, 87, 89]
+    actions: [10, 15, 20, 23, 27, 41, 43, 45, 48, 87, 88, 90]
     checkpoints:
     - {step: 12, expectation: Initial Live data-editing is false.}
     - {step: 13, expectation: Formatting controls are disabled in browse mode.}
@@ -311,10 +312,10 @@ verification:
     - {step: 44, expectation: Save writes all expected UTF-8 bytes independently of the editor UI.}
     - {step: 46, expectation: Returning from source to Live restores browse.}
     - {step: 49, expectation: A second key attempt still cannot dirty the document.}
-    - {step: 89, expectation: Closing and reopening starts default Live browse again.}
-    - {step: 91, expectation: Reopened rendered task retains completion.}
-    - {step: 92, expectation: Reopened source retains the complete saved bytes.}
-    results: [12, 16, 18, 19, 25, 26, 44, 46, 49, 89, 91, 92]
+    - {step: 90, expectation: Closing and reopening starts default Live browse again.}
+    - {step: 92, expectation: Reopened rendered task retains completion.}
+    - {step: 93, expectation: Reopened source retains the complete saved bytes.}
+    results: [12, 16, 18, 19, 25, 26, 44, 46, 49, 90, 92, 93]
   - id: MD-SPLIT
     requirement: Pointer dragging changes actual source/preview geometry; keyboard clamps and double-click reset work without losing content.
     actions: [27, 32, 35, 37, 39]
@@ -329,30 +330,30 @@ verification:
     results: [30, 33, 34, 36, 38, 40, 44]
   - id: MD-APPEARANCE
     requirement: Local light/dark and auto render readable Mermaid labels, borders and connectors independently of the dark app theme.
-    actions: [50, 51, 52, 53, 54, 56, 57, 63, 70]
+    actions: [50, 51, 52, 53, 54, 57, 58, 64, 71]
     checkpoints:
-    - {step: 59, expectation: Light diagram nodes use the expected light background.}
-    - {step: 60, expectation: All label RGB components are dark enough for text contrast above 4.5 to 1.}
-    - {step: 61, expectation: Node borders use blue with contrast above 3 to 1.}
-    - {step: 62, expectation: Connectors are dark and readable on the light canvas.}
-    - {step: 65, expectation: Dark diagram nodes use the expected dark background.}
-    - {step: 66, expectation: Label components are bright enough for text contrast above 4.5 to 1.}
-    - {step: 67, expectation: Node borders are bright enough for contrast above 3 to 1.}
-    - {step: 68, expectation: Connectors are bright and readable on the dark canvas.}
-    - {step: 69, expectation: Local appearance changes leave the app in dark mode.}
-    - {step: 72, expectation: Auto follows the dark app.}
-    results: [59, 60, 61, 62, 65, 66, 67, 68, 69, 72]
+    - {step: 60, expectation: Light diagram nodes use the expected light background.}
+    - {step: 61, expectation: All label RGB components are dark enough for text contrast above 4.5 to 1.}
+    - {step: 62, expectation: Node borders use blue with contrast above 3 to 1.}
+    - {step: 63, expectation: Connectors are dark and readable on the light canvas.}
+    - {step: 66, expectation: Dark diagram nodes use the expected dark background.}
+    - {step: 67, expectation: Label components are bright enough for text contrast above 4.5 to 1.}
+    - {step: 68, expectation: Node borders are bright enough for contrast above 3 to 1.}
+    - {step: 69, expectation: Connectors are bright and readable on the dark canvas.}
+    - {step: 70, expectation: Local appearance changes leave the app in dark mode.}
+    - {step: 73, expectation: Auto follows the dark app.}
+    results: [60, 61, 62, 63, 66, 67, 68, 69, 70, 73]
   - id: MD-TOC
     requirement: Generated TOC starts unchecked in PDF/Word page setup and can be explicitly enabled; cancelling setup preserves the source.
-    actions: [72, 73, 75, 77, 79, 81, 82, 84]
+    actions: [73, 74, 76, 78, 80, 82, 83, 85]
     checkpoints:
-    - {step: 75, expectation: The default PDF contents checkbox is unchecked.}
-    - {step: 77, expectation: Explicit click enables generated contents.}
-    - {step: 79, expectation: A second click disables generated contents.}
-    - {step: 81, expectation: Escape closes setup.}
-    - {step: 84, expectation: Word setup keeps generated contents unchecked.}
-    - {step: 86, expectation: Cancelled page setups preserve every saved source byte.}
-    results: [75, 77, 79, 81, 84, 86]
+    - {step: 76, expectation: The default PDF contents checkbox is unchecked.}
+    - {step: 78, expectation: Explicit click enables generated contents.}
+    - {step: 80, expectation: A second click disables generated contents.}
+    - {step: 82, expectation: Escape closes setup.}
+    - {step: 85, expectation: Word setup keeps generated contents unchecked.}
+    - {step: 87, expectation: Cancelled page setups preserve every saved source byte.}
+    results: [76, 78, 80, 82, 85, 87]
   visual:
   - check: Split pane widths and real Mermaid fill/stroke/text contrast in both preview themes
     method: automated

@@ -31,7 +31,31 @@ smoke:
 - TC-FILE-OPEN-005
 - TC-FILE-OPEN-006
 unavailable: {}
+# Opt-in fixtures need a credential a hosted runner intentionally does not hold.
+# When none of the listed variables is set at plan time the fixture's cases are
+# recorded as declared capability gaps instead of running and skipping, which
+# the strict report would count as failures. Export the variables locally (or
+# in a dedicated job) to select and execute these cases.
+opt_in:
+  tao_real_provider:
+    env:
+    - TAOMNI_QA_OPENCODE_KEY
+    - TAOMNI_QA_DEEPSEEK_KEY
+    reason: real provider key is not provisioned; real-provider QA is opt-in
+    cases:
+      TC-TAO-HOME-047:
+        env:
+        - TAOMNI_QA_AGNES_KEY
+        reason: Agnes key is not provisioned; the Agnes regression is opt-in
 cases:
+# Issue #869: Tao approval delivery is window-scoped; one browser contract case
+# and one native two-window case.
+- TC-AI-869-01-approval-window-routing-browser
+- TC-AI-869-02-detached-window-approval-native
+- TC-AI-869-03-closed-owner-fallback-native
+- TC-WS-GIT-CLONE-01-defaults-proxy-and-clone-browser
+- TC-WS-GIT-CLONE-02-background-close-cancel-retry-browser
+- TC-WS-GIT-CLONE-03-native-real-clone-config-and-tree
 - TC-FILE-OPEN-029
 - TC-FILE-OPEN-030
 - TC-FILE-OPEN-031
@@ -46,7 +70,14 @@ cases:
 - TC-FILE-OPEN-040
 - TC-FILE-OPEN-041
 - TC-FILE-OPEN-042
+- TC-FILE-OPEN-043
+- TC-FILE-OPEN-044
+- TC-FILE-OPEN-045
+- TC-FILE-OPEN-046
+- TC-FILE-OPEN-047
 - TC-WS-098
+- TC-WS-099
+- TC-WS-100
 - TC-TAO-HOME-048
 - TC-TAO-HOME-049
 - TC-TAO-HOME-050
@@ -134,6 +165,11 @@ cases:
 - TC-EXPLORER-005
 - TC-EXPLORER-006
 - TC-EXPLORER-007
+- TC-EXPLORER-008
+- TC-EXPLORER-009
+- TC-EXPLORER-010
+- TC-EXPLORER-011
+- TC-EXPLORER-012
 - TC-MOBILE-001
 - TC-MOBILE-002
 - TC-MOBILE-003
@@ -357,8 +393,6 @@ cases:
 - TC-MAIN-RAIL-04
 - TC-UPDATE-MACOS-001
 - TC-UPDATE-MACOS-002
-- TC-PATH-LOCAL-01
-- TC-PATH-LOCAL-02
 - TC-PATH-SFTP-01
 - TC-PATH-SFTP-02
 - TC-BACKUP-001
@@ -722,7 +756,6 @@ cases:
 - TC-auto-F1-5-tab-launch-menu
 - TC-auto-F1-5-tab-rename
 - TC-auto-F1-6
-- TC-auto-F1-6-welcome-recent-sessions
 - TC-auto-F1-8
 - TC-auto-F1-9
 - TC-auto-F11-1-sql-completion-settings
@@ -867,3 +900,17 @@ cases:
 - TC-SERVERS-001-tab-singleton-browser
 - TC-SERVERS-002-tab-singleton-native
 - TC-SERVERS-003-tab-functional-native
+- TC-NP-001
+- TC-NP-002
+- TC-NP-003
+- TC-NP-004
+- TC-NP-005
+- TC-NP-006
+- TC-NP-007
+- TC-NP-008
+- TC-NP-101
+- TC-NP-102
+- TC-NP-103
+- TC-NP-104
+- TC-NP-105
+

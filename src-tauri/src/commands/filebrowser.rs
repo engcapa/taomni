@@ -4,6 +4,7 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::filebrowser::local_ops::explorer_same_volume,
         crate::filebrowser::local_ops::local_copy_entries,
         crate::filebrowser::local_ops::local_move_entries,
+        crate::filebrowser::local_ops::explorer_search_entries,
         crate::filebrowser::local_ops::explorer_cancel_operation,
         crate::filebrowser::local_ops::local_trash_entries,
         crate::filebrowser::local_ops::local_trash_restore,

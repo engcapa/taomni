@@ -66,7 +66,7 @@ def inspect_testing(path, kind):
             pages.append(dict(width=image.width, height=image.height, dpi=dpi))
         return dict(pageCount=len(pages), pages=pages, searchableText=text)
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
-        from .markdown_docx_quality import inspect_diagrams
+        from .markdown_docx_quality import inspect_diagrams, inspect_vector_text
         drawings = inspect_diagrams(archive, minimum_dpi=590)
         vectors = [name for name in archive.namelist() if name.startswith("word/media/") and name.endswith(".svg")]
         if len(vectors) != 2 or len(drawings) != 2:
@@ -74,6 +74,7 @@ def inspect_testing(path, kind):
         svgs = [ET.fromstring(archive.read(name)) for name in vectors]
         lines = sum(inspect_word_strokes(svg) for svg in svgs)
         positioned_cjk = sum(inspect_word_text_layout(svg) for svg in svgs)
+        positioned_plain = sum(inspect_vector_text(svg, context="Reported Markdown Word") for svg in svgs)
         if lines != 13:
             raise StepError("Reported Markdown Word lost flowchart line bodies")
         labels = ["".join(node.itertext()) for svg in svgs for node in svg.iter() if node.tag.endswith("}text")]
@@ -83,4 +84,5 @@ def inspect_testing(path, kind):
         document = ET.fromstring(archive.read("word/document.xml"))
         if "幂等性控制" not in "".join(document.itertext()):
             raise StepError("Reported Markdown Word lost the final table")
-        return dict(vectorCount=len(vectors), flowchartLineBodies=lines, positionedCjkGlyphs=positioned_cjk, diagrams=drawings, labels=labels)
+        return dict(vectorCount=len(vectors), flowchartLineBodies=lines, positionedCjkGlyphs=positioned_cjk,
+                    positionedPlainRuns=positioned_plain, diagrams=drawings, labels=labels)

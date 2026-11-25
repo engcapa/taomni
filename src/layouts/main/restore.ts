@@ -307,7 +307,7 @@ export function createBuildRunSnapshotEntries(controllerContext: BuildRunSnapsho
         }
       } else if (
         tab.sessionId &&
-        ["sftp", "vnc", "rdp", "database", "redis", "hbase-shell", "proxy-test", "object-storage", "mail", "file-browser"].includes(tab.type)
+        ["sftp", "vnc", "rdp", "database", "redis", "hbase-shell", "proxy-test", "object-storage", "mail"].includes(tab.type)
       ) {
         const session = sessionsById.get(tab.sessionId);
         if (session && isResumeEligibleSavedSession(session)) {
@@ -328,6 +328,7 @@ export function createBuildRunSnapshotEntries(controllerContext: BuildRunSnapsho
 
 export interface CommitRunSnapshotNowContext {
   welcomeRestoreViewRef: import("react").RefObject<import("../../hooks/useWelcomeSessionResume").RestoreViewState>;
+  welcomeRestoreInstanceRef: import("react").RefObject<import("../../hooks/useWelcomeSessionResume").UseWelcomeSessionResumeResult>;
   buildRunSnapshotEntries: () => { entries: SnapshotEntry[]; activeIdentity: string | null; };
   snapshotFingerprintRef: import("react").RefObject<string>;
   runBatchIdRef: import("react").RefObject<string>;
@@ -353,7 +354,14 @@ export function createCommitRunSnapshotNow(controllerContext: CommitRunSnapshotN
         restored: false,
       });
       if (response.record) controllerContext.snapshotRevisionRef.current = response.record.revision;
-      if (response.applied) controllerContext.snapshotFingerprintRef.current = fingerprint;
+      if (response.applied) {
+        controllerContext.snapshotFingerprintRef.current = fingerprint;
+        // Home reads restore availability once when it becomes active. A
+        // snapshot that lands while Home is already visible must refresh the
+        // row in place (TC-WELCOME-RS-N-01); the owner skips the read while
+        // Home is hidden because activation reloads it.
+        controllerContext.welcomeRestoreInstanceRef.current.refresh();
+      }
     } catch (error) {
       controllerContext.setStatusMessage(tr("welcome.snapshotSaveFailed", { error: String(error) }));
     }

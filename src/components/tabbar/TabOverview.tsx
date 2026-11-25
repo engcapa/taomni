@@ -4,7 +4,9 @@ import { Activity, LayoutGrid, Search, X } from "lucide-react";
 import { buildTabDetailSummary } from "../../lib/tabDetails";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useSessionStore } from "../../stores/sessionStore";
+import { useSftpStore } from "../../stores/sftpStore";
 import { useTabOverviewStore } from "../../stores/tabOverviewStore";
 import { useWorkspaceEditorStore } from "../../stores/workspaceEditorStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
@@ -13,7 +15,7 @@ import { useTerminalPreviews } from "./overview/useTerminalPreviews";
 import { OverviewSummary } from "./overview/OverviewSummary";
 import { OverviewTitle } from "./overview/OverviewTitle";
 import { focusOverviewCard, moveOverviewFocus } from "./overview/overviewNavigation";
-import { useOverviewPreview } from "./overview/useOverviewPreview";
+import { OVERVIEW_PREVIEW_DELAY_MS, useOverviewPreview } from "./overview/useOverviewPreview";
 
 /** Mode-scoped, live text overview. Reading a preview never starts a session. */
 export function TabOverview() {
@@ -31,8 +33,11 @@ function OpenTabOverview() {
   const sessions = useSessionStore((s) => s.sessions);
   const workspaces = useWorkspacePlatformStore((s) => s.workspaces);
   const activeWorkspaceId = useWorkspacePlatformStore((s) => s.activeWorkspaceId);
+  const explorerTabs = useExplorerStore((s) => s.tabs);
+  const explorerActiveTabId = useExplorerStore((s) => s.activeTabId);
+  const localPanes = useSftpStore((s) => s.sessions);
   const documents = useWorkspaceEditorStore((s) => s.documents);
-  const [all, setAll] = useState(mode !== "sessions" && mode !== "workspaces");
+  const [all, setAll] = useState(mode !== "sessions" && mode !== "workspaces" && mode !== "explorer");
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -70,7 +75,7 @@ function OpenTabOverview() {
     for (const tab of tabs.filter((candidate) => candidate.type !== "welcome")) {
       const detail = buildTabDetailSummary(tab, sessions, runtimes[tab.id], cwds[tab.id], t);
       const preview = previews.get(tab.id);
-      items.push({ id: tab.id, title: tab.title, kind: detail.connectionLabel, group: t("platform.sessions"),
+      items.push({ id: tab.id, title: tab.title, kind: detail.connectionLabel, group: t("platform.sessions"), surface: "sessions",
         endpoint: detail.endpoint ?? detail.cwd ?? "", summary: preview?.text || [detail.sessionLabel, detail.activityLabel].join("\n"),
         active: mode === "sessions" && activeId === tab.id, outputActive: preview?.outputActive ?? false, followLatest: !!preview?.text });
     }
@@ -81,7 +86,7 @@ function OpenTabOverview() {
         const session = sessions.find((candidate) => candidate.id === tab.sessionId);
         const doc = documents[tab.id];
         const preview = previews.get(tab.id);
-        items.push({ id: tab.id, title: tab.title, kind: tab.protocol ?? tab.kind.toUpperCase(), group: workspace.name, workspaceId: workspace.id,
+        items.push({ id: tab.id, title: tab.title, kind: tab.protocol ?? tab.kind.toUpperCase(), group: workspace.name, workspaceId: workspace.id, surface: "workspaces",
           endpoint: session?.host ?? tab.filePath ?? tab.focusPath ?? "",
           summary: preview?.text || doc?.text.slice(0, 1800) || [workspace.name, tab.filePath ?? session?.name ?? tab.title].join("\n"),
           active: mode === "workspaces" && workspace.id === activeWorkspaceId && tab.id === workspace.activeTabId,
@@ -89,28 +94,42 @@ function OpenTabOverview() {
       }
     }
   }
+  if (all || mode === "explorer") {
+    for (const tab of explorerTabs) {
+      const pane = localPanes[tab.id]?.local;
+      const endpoint = pane?.path || tab.fileBrowser?.initialPath || tab.fileViewer?.path || "";
+      const doc = tab.fileViewer ? documents[tab.fileViewer.path] : undefined;
+      const itemCount = tab.type === "file-browser" ? pane?.entries.length : undefined;
+      items.push({ id: tab.id, title: tab.title, kind: tab.type === "file-browser" ? "EXPL" : "VIEW", group: t("menu.fileExplorer"),
+        surface: "explorer", endpoint,
+        summary: doc?.text.slice(0, 1800) || [endpoint, itemCount != null ? t("platform.overviewExplorerItems", { count: itemCount }) : ""].filter(Boolean).join("\n"),
+        active: mode === "explorer" && explorerActiveTabId === tab.id, outputActive: false });
+    }
+  }
   const matching = filterOverviewItems(items, query);
   const previewItem = preview && matching.find((item) => item.id === preview.id);
   const previewWidth = preview ? Math.min(Math.max(440, preview.bounds.width * 1.45), window.innerWidth - 24) : 0;
   const activate = (item: PreviewItem) => {
     const app = useAppStore.getState();
-    const sameMode = app.activeSideTab === (item.workspaceId ? "workspaces" : "sessions");
+    const surface = item.surface ?? (item.workspaceId ? "workspaces" : "sessions");
+    const sameMode = app.activeSideTab === surface;
     const sidebarCollapsed = app.sidebarCollapsed;
-    if (item.workspaceId) {
+    if (surface === "explorer") {
+      useExplorerStore.getState().setActiveTab(item.id);
+    } else if (item.workspaceId) {
       const store = useWorkspacePlatformStore.getState();
       store.setActiveWorkspace(item.workspaceId);
       store.setActiveWorkspaceTab(item.workspaceId, item.id);
-      if (!sameMode) app.setActiveSideTab("workspaces");
     } else {
       useAppStore.getState().setTabFilter(null);
       useAppStore.getState().setActiveTab(item.id);
-      if (!sameMode) app.setActiveSideTab("sessions");
     }
+    if (!sameMode) app.setActiveSideTab(surface);
     if (sameMode) app.setSidebarCollapsed(sidebarCollapsed);
     close();
   };
   return createPortal(
-    <div ref={dialogRef} data-testid="tab-overview" data-scope={all ? "all" : mode} role="dialog" aria-modal="true" aria-labelledby="tab-overview-title" className="taomni-tab-overview" onScroll={clearPreview}>
+    <div ref={dialogRef} data-testid="tab-overview" data-scope={all ? "all" : mode} data-preview-delay-ms={OVERVIEW_PREVIEW_DELAY_MS} role="dialog" aria-modal="true" aria-labelledby="tab-overview-title" className="taomni-tab-overview" onScroll={clearPreview}>
       <div className="taomni-overview-header">
         <div><h2 id="tab-overview-title" className="flex items-center gap-2 text-[16px] font-bold"><LayoutGrid className="h-4 w-4" />{t("platform.tabOverview")}<kbd className="text-[11px] font-normal">Ctrl/Cmd+Shift+E</kbd></h2><p className="mt-1 text-[12px] text-[var(--taomni-text-muted)]">{t("platform.overviewHint")}</p></div>
         <button data-testid="tab-overview-close" className="taomni-btn" onClick={close}><X className="mr-1 h-3 w-3" />{t("common.close")} (Esc)</button>
@@ -136,12 +155,12 @@ function OpenTabOverview() {
         </div>
         <span data-testid="tab-overview-results" className="shrink-0 text-[11px] text-[var(--taomni-text-muted)]">{t("platform.overviewResults", { visible: matching.length, total: items.length })}</span>
       </div>
-      {(mode === "sessions" || mode === "workspaces") && <div className="mb-3 flex gap-2">
+      {(mode === "sessions" || mode === "workspaces" || mode === "explorer") && <div className="mb-3 flex gap-2">
         <button data-testid="tab-overview-current" className="taomni-toolbar-pill" aria-pressed={!all} onClick={() => setAll(false)}>{t("platform.overviewCurrent")}</button>
         <button data-testid="tab-overview-all" className="taomni-toolbar-pill" aria-pressed={all} onClick={() => setAll(true)}>{t("platform.overviewAll")}</button>
       </div>}
       <div ref={gridRef} className="taomni-overview-grid" onKeyDown={(event) => { moveOverviewFocus(event); if (event.defaultPrevented) clearPreview(); }}>
-        {matching.map((item) => <button key={item.id} type="button" data-testid="tab-overview-card" data-tab-id={item.id} data-workspace-id={item.workspaceId}
+        {matching.map((item) => <button key={item.id} type="button" data-testid="tab-overview-card" data-tab-id={item.id} data-workspace-id={item.workspaceId} data-surface={item.surface}
           data-active={item.active || undefined} data-output-active={item.outputActive || undefined} className="taomni-overview-card"
           onMouseEnter={(event) => hover(item.id, event.currentTarget)}
           onMouseLeave={(event) => {

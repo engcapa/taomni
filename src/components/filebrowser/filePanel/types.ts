@@ -47,6 +47,8 @@ export interface FilePanelProps {
   onEmptyContext?: (anchor: { x: number; y: number; }) => MenuItem[];
   onCrossPaneDrop?: (entries: FileEntry[]) => void;
   acceptCrossPane?: boolean;
+  /** Explorer search results replace the current listing without mutating its directory state. */
+  entriesOverride?: FileEntry[];
   /** Optional substring filter typed by the user (case-insensitive). */
   filterText?: string;
   /** Mutator wired to the filter text input. */

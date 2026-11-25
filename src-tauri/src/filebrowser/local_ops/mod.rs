@@ -4,6 +4,7 @@ mod inspection;
 mod model;
 mod operation;
 mod paths;
+mod search;
 mod transfer;
 mod trash;
 #[cfg(windows)]
@@ -13,6 +14,7 @@ pub use model::{
     EntryOperationResult, LocalProperties, PreviewBytes, PreviewText, TrashRef, TrashResult,
 };
 use operation::Operation;
+pub use search::{ExplorerSearchResults, SearchOptions};
 use std::path::Path;
 
 async fn blocking<T: Send + 'static>(
@@ -90,6 +92,33 @@ async fn start_transfer(
 }
 
 #[tauri::command]
+pub async fn explorer_search_entries(
+    root: String,
+    query: String,
+    recursive: bool,
+    include_hidden: bool,
+    operation_id: Option<String>,
+    app_handle: tauri::AppHandle,
+) -> Result<ExplorerSearchResults, String> {
+    let mut operation =
+        Operation::register(operation_id, Some(app_handle)).map_err(|e| e.to_string())?;
+    blocking(move || {
+        search::search_entries(
+            Path::new(&root),
+            &query,
+            SearchOptions {
+                recursive,
+                include_hidden,
+                max_results: 1000,
+            },
+            &mut operation,
+        )
+        .map_err(|e| e.to_string())
+    })
+    .await
+}
+
+#[tauri::command]
 pub fn explorer_cancel_operation(operation_id: String) -> Result<(), String> {
     operation::cancel(&operation_id).map_err(|e| e.to_string())
 }
@@ -154,6 +183,17 @@ pub async fn local_create_entry(
         transfer::create_entry(Path::new(&dest_dir), &name, directory).map_err(|e| e.to_string())
     })
     .await
+}
+
+pub(crate) fn trash_single_entry(path: &str) -> Result<String, String> {
+    let result = trash::trash_entries(vec![path.to_string()]);
+    if let Some(first) = result.trashed.into_iter().next() {
+        return Ok(first.original_path);
+    }
+    if let Some(failure) = result.failed.into_iter().next() {
+        return Err(format!("{}: {}", failure.code, failure.message));
+    }
+    Err("trash_unavailable: Unknown trash failure".into())
 }
 
 #[cfg(test)]

@@ -59,6 +59,24 @@ on:
         description: Update deduplicated failure issues
         type: boolean
         default: false
+      nightly_policy:
+        description: Apply the nightly coverage policy to this manual dispatch
+        type: boolean
+        default: false
+      night_label:
+        description: Night label YYYY-MM-DD for manual nightly-policy simulation (empty = now)
+        type: string
+      nightly_sample_percent:
+        description: Native shared-case sample percent per rotation window (1-100; empty = 20)
+        type: string
+      vendor_cache:
+        description: Vendored Cargo dependency cache experiment, enabled by default (true/false)
+        type: string
+        default: 'true'
+      trusted_cache:
+        description: Reuse Cargo dependency archives from the trusted default branch (true/false)
+        type: string
+        default: 'true'
   workflow_call:
     inputs:
       scope: {type: string, default: smoke}
@@ -76,12 +94,18 @@ on:
       features: {type: string, default: ''}
       tags: {type: string, default: ''}
       publish_issues: {type: boolean, default: false}
+      nightly_policy: {type: boolean, default: false}
+      night_label: {type: string, default: ''}
+      nightly_sample_percent: {type: string, default: ''}
+      vendor_cache: {type: string, default: 'true'}
+      trusted_cache: {type: string, default: 'true'}
   pull_request:
     paths:
       - 'src/**'
       - 'mobile-web/**'
       - 'src-tauri/build.rs'
       - 'src-tauri/src/**'
+      - 'src-tauri/crates/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -100,6 +124,7 @@ on:
       - '.agents/skills/qa-ui-auto/**'
       - '.github/workflows/qa-ui-auto-platforms.yml'
       - '.github/workflows/qa-ui-auto-entry.yml'
+      - '.github/actions/qa-branch-artifact/**'
       - '.github/actions/qa-runtime/**'
       - 'docs-feature/code-workspace-idea-parity/**'
   schedule:
@@ -107,6 +132,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 env:
   PYTHONPATH: .agents/skills/qa-ui-auto/scripts
@@ -180,6 +206,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: .agents/skills/qa-ui-auto/requirements-ci.txt
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
       - name: Validate QA tools
         if: inputs.scope != 'selected'
@@ -191,7 +219,7 @@ jobs:
         if: inputs.scope != 'selected'
         run: python -m unittest test_language_startup_observer test_sdk_startup_probe test_workspace_slow_sdk test_sdk_editor_input test_sdk_action_trace test_file_open_probe test_workspace_stage_trace test_project_tree_reveal test_browser_tracing test_workspace_tab_reveal test_native_contenteditable test_native_paced_input test_rdp_deferred_clipboard
       - name: Linux package setup contracts
-        run: python -m unittest test_ci_linux_setup test_ci_setup_protoc
+        run: python -m unittest test_ci_linux_setup test_ci_setup_protoc test_ci_cargo_artifact
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -225,6 +253,8 @@ jobs:
       has_contracts: ${{ steps.plan.outputs.has_contracts }}
       has_cases: ${{ steps.plan.outputs.has_cases }}
       browser_matrix: ${{ steps.plan.outputs.browser_matrix }}
+      macos_browser_matrix: ${{ steps.plan.outputs.macos_browser_matrix }}
+      has_macos_browser: ${{ steps.plan.outputs.has_macos_browser }}
       native_matrix: ${{ steps.plan.outputs.native_matrix }}
       build_matrix: ${{ steps.plan.outputs.build_matrix }}
       has_browser: ${{ steps.plan.outputs.has_browser }}
@@ -238,11 +268,26 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.head || github.sha }}
-          fetch-depth: 0
+          fetch-depth: ${{ inputs.scope == 'impacted' && 0 || 1 }}
           persist-credentials: false
+      # Scheduled runs share the account's Free-plan concurrency (20 jobs, 5
+      # macOS) with other QA runs. Wait for earlier same-workflow runs so the
+      # slow native tail does not compete for macOS slots; fail open on timeout.
+      - name: Wait for earlier QA platform runs
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          QA_GATE_WORKFLOW: qa-ui-auto-platforms.yml
+          QA_GATE_MAX_WAIT_SECONDS: '1200'
+        run: python .github/scripts/qa_capacity_gate.py
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: .agents/skills/qa-ui-auto/requirements-ci.txt
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
       - name: Mandatory crash regression selection and result contracts
         run: python -m unittest test_crash_regressions
@@ -263,8 +308,11 @@ jobs:
           QA_BROWSER_WORKERS: ${{ inputs.browser_workers }}
           QA_CASE_IDS: ${{ inputs.case_ids }}
           QA_FEATURES: ${{ inputs.features }}
-          # New feature PRs always run the packaged crash suite. Focused manual
-          # selections also retain it, even when their feature selectors differ.
+          QA_NIGHTLY_POLICY: ${{ (github.event_name == 'schedule' || inputs.nightly_policy) && 'true' || 'false' }}
+          QA_NIGHT_LABEL: ${{ inputs.night_label }}
+          QA_NIGHTLY_SAMPLE_PERCENT: ${{ inputs.nightly_sample_percent }}
+          # New feature PRs and focused runs always include the packaged crash
+          # suite, even when their feature selectors differ.
           QA_TAGS: ${{ inputs.scope == '' && github.event_name == 'pull_request' && 'crash-regression' || (inputs.scope == 'selected' || inputs.scope == 'impacted') && format('{0},crash-regression', inputs.tags) || inputs.tags }}
         run: python -m qa_ui_auto.ci plan
       - uses: actions/upload-artifact@v4
@@ -284,6 +332,21 @@ jobs:
       operation: run
       run_rdp_unit_contracts: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts }}
 
+  # macOS shares five account-wide slots between the producer, native shards and
+  # browser shards. Schedule browser separately with a smaller cap so native
+  # shards get the slots first.
+  execute-macos-browser:
+    needs: plan
+    if: needs.plan.outputs.has_macos_browser == 'true'
+    uses: ./.github/workflows/qa-ui-auto-entry.yml
+    with:
+      max_parallel: 3
+      matrix: ${{ needs.plan.outputs.macos_browser_matrix }}
+      head: ${{ needs.plan.outputs.head }}
+      artifact_key: ${{ needs.plan.outputs.artifact_key }}
+      operation: run
+      run_rdp_unit_contracts: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts }}
+
   build-linux:
     needs: plan
     if: needs.plan.outputs.has_linux_native == 'true'
@@ -293,6 +356,8 @@ jobs:
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: build
+      vendor_cache: ${{ inputs.vendor_cache }}
+      trusted_cache: ${{ inputs.trusted_cache }}
 
   execute-linux-native:
     needs: [plan, build-linux]
@@ -314,6 +379,8 @@ jobs:
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: build
+      vendor_cache: ${{ inputs.vendor_cache }}
+      trusted_cache: ${{ inputs.trusted_cache }}
 
   execute-windows-native:
     needs: [plan, build-windows]
@@ -335,14 +402,16 @@ jobs:
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: build
+      vendor_cache: ${{ inputs.vendor_cache }}
+      trusted_cache: ${{ inputs.trusted_cache }}
 
   execute-macos-native:
     needs: [plan, build-macos]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-macos.result == 'success' && needs.plan.outputs.has_macos_native == 'true' }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
-      # Bound the burst on hosted ARM runners; retain every planned shard.
-      max_parallel: 2
+      # Run all 4 planned shards in one wave within GitHub's hosted macOS limit.
+      max_parallel: 4
       matrix: ${{ needs.plan.outputs.macos_native_matrix }}
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
@@ -358,12 +427,77 @@ jobs:
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: contracts
+      vendor_cache: ${{ inputs.vendor_cache }}
+      trusted_cache: ${{ inputs.trusted_cache }}
       run_rdp_unit_contracts: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts }}
+
+  # The native packaging hook bundles the frontend on each OS. Check its TS
+  # and source contracts once, including focused runs that omit Vitest.
+  selected-build-checks:
+    name: Selected native frontend build checks
+    needs: plan
+    if: >-
+      inputs.scope == 'selected' && needs.plan.outputs.has_native == 'true' &&
+      github.event_name != 'pull_request' && github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.head }}
+          persist-credentials: false
+      - uses: ./.github/actions/qa-runtime
+        with:
+          mode: contracts
+      - run: pnpm exec tsc -b && pnpm check:refactor
+
+  frontend-contracts:
+    name: Frontend contracts (shard ${{ matrix.shard }}/4)
+    needs: plan
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || inputs.scope != 'selected'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.head }}
+          persist-credentials: false
+      - uses: ./.github/actions/qa-runtime
+        with:
+          mode: contracts
+      - name: Frontend refactor and QA script unit contracts
+        if: matrix.shard == 1
+        run: |
+          set -o pipefail
+          mkdir -p qa-build-output
+          {
+            python -m unittest test_browser_vault_first_run test_tao_provider_observation test_tao_messages_fixture test_tao_real_scenarios test_tao_real_documents test_tao_handoff_persistence test_markdown_docx_quality test_markdown_testing_quality test_export_quality_native
+            node --test .agents/skills/qa-ui-auto/scripts/test_native_paced_input.mjs .agents/skills/qa-ui-auto/scripts/test_native_pointer_activation.mjs
+            python -m unittest test_ci_ssh_features test_ci_x11_session test_ci_build_pipeline test_native_windows_integrity test_native_frame_errors test_native_pointer test_native_element_query test_ci_file_manager test_native_application_restart test_native_application_shutdown test_native_window_close_x11 test_native_external_browser test_native_authorization_route test_backup_cloud test_ci_selection test_terminal_rendering_probe qa_ui_auto.test_mobile_native test_native_drag test_tauri_webdriver.NativeSessionFillTest qa_ui_auto.test_mobile_case_readiness qa_ui_auto.test_mobile_openssh_readiness
+            pnpm exec tsc -b
+            pnpm check:refactor
+            node --test scripts/terminal-webgl-backport.test.mjs
+          } 2>&1 | tee qa-build-output/frontend-unit-contracts.log
+      - name: Frontend Vitest unit regressions
+        run: |
+          set -o pipefail
+          mkdir -p qa-build-output
+          pnpm exec vitest run --shard=${{ matrix.shard }}/4 2>&1 | tee -a qa-build-output/frontend-unit-contracts.log
+      - name: Retain frontend contract logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-unit-contracts-shard-${{ matrix.shard }}-${{ needs.plan.outputs.artifact_key }}
+          path: qa-build-output/frontend-unit-contracts.log
+          if-no-files-found: warn
+          retention-days: 14
 
   summarize:
     name: qa-ui-auto-platforms-result
     if: always() && needs.plan.result != 'skipped'
-    needs: [plan, tool-contracts, sftp-contracts, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
+    needs: [plan, tool-contracts, sftp-contracts, selected-build-checks, frontend-contracts, execute-browser, execute-macos-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -373,6 +507,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: .agents/skills/qa-ui-auto/requirements-ci.txt
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1
       - uses: ./.github/actions/qa-download-artifact
         if: needs.plan.result == 'success'

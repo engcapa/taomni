@@ -70,7 +70,7 @@ steps:
 - assert_not_visible: '[role="dialog"]'
 - click: '[data-testid="tao-home-shell-menu"]'
 - wait_for: '[role="dialog"]'
-- assert_visible: '[role="dialog"] select[aria-label="Choose shell"]'
+- assert_visible: '[role="dialog"] [data-testid="tao-home-shell-options"]'
 - press: Escape
 - assert_not_visible: '[role="dialog"]'
 - click: '[data-testid="ribbon-settings"]'

@@ -27,6 +27,7 @@ mod mail;
 mod mfa;
 mod mobile;
 mod models;
+mod notepad;
 mod notes;
 mod objectstorage;
 mod perf;
@@ -104,6 +105,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "explorer_same_volume"
         | "local_copy_entries"
         | "local_move_entries"
+        | "explorer_search_entries"
         | "explorer_cancel_operation"
         | "local_trash_entries"
         | "local_trash_restore"
@@ -188,7 +190,11 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "git_set_remote"
         | "git_delete_remote"
         | "git_save_settings"
-        | "git_save_remote_auth" => git::handle(invoke),
+        | "git_save_remote_auth"
+        | "git_clone_defaults"
+        | "git_clone_probe"
+        | "git_clone_repository"
+        | "git_clone_cancel" => git::handle(invoke),
         "sdk_get_registry"
         | "sdk_probe_installation"
         | "sdk_discover_installations"
@@ -215,6 +221,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "viewer_release_temp"
         | "viewer_temp_allocate"
         | "viewer_temp_release" => viewer::handle(invoke),
+        command if notepad::handles(command) => notepad::handle(invoke),
         command if workspace::handles(command) => workspace::handle(invoke),
         "workspace_test_results" => test_results::handle(invoke),
         "workspace_execution_model" => workspace_execution::handle(invoke),
@@ -593,6 +600,8 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "cc_cancel_capture"
         | "cc_track_terminal"
         | "cc_untrack_terminal"
+        | "cc_pending_permission_prompts"
+        | "qa_agent_approval_probe"
         | "codex_detect"
         | "codex_get_custom_config"
         | "codex_get_profile_config"

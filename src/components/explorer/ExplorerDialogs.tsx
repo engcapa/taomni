@@ -5,13 +5,13 @@ import { useFocusReturn } from "../editor/workspace/useFocusReturn";
 import { useExplorerLabels } from "./explorerLabels";
 import type { ExplorerOperations } from "./useExplorerOperations";
 
-function ExplorerDialog({ children, onClose, testId }: { children: React.ReactNode; onClose: () => void; testId: string }) {
+function ExplorerDialog({ children, onClose, testId, focusTestId }: { children: React.ReactNode; onClose: () => void; testId: string; focusTestId?: string }) {
   useFocusReturn(true);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const first = ref.current?.querySelector<HTMLButtonElement>("button");
-    first?.focus();
-  }, []);
+    const scoped = focusTestId ? ref.current?.querySelector<HTMLButtonElement>(`[data-testid="${focusTestId}"]`) : null;
+    (scoped ?? ref.current?.querySelector<HTMLButtonElement>("button"))?.focus();
+  }, [focusTestId]);
   return <div className="ex-dialog-back" onPointerDown={(event) => event.stopPropagation()}>
     <div ref={ref} className="ex-dialog" data-testid={testId} role="dialog" aria-modal="true" tabIndex={-1} onKeyDown={(event) => {
       event.stopPropagation();
@@ -67,16 +67,35 @@ export function ExplorerDialogs({ operations }: { operations: ExplorerOperations
   const label = useExplorerLabels();
   const prompt = operations.deletePrompt;
   return <>
-    {prompt && <ExplorerDialog testId="explorer-delete-dialog" onClose={() => operations.setDeletePrompt(null)}>
-      <h3>{label("永久删除", "Permanently delete")} {prompt.entries.length === 1 ? `“${prompt.entries[0].name}”` : label(`${prompt.entries.length} 项`, `${prompt.entries.length} items`)}?</h3>
-      {prompt.reason && <p data-testid="explorer-trash-unavailable" role="alert" style={{ whiteSpace: "pre-wrap" }}>{label("回收站不可用，仅可在确认后永久删除：", "Trash unavailable. Permanent deletion requires confirmation:")}<br />{prompt.reason}</p>}
-      <p>{label("此操作绕过回收站，将永久删除所选项目和文件夹内的内容，无法撤销。", "This bypasses Trash and permanently deletes selected items and folder contents. This cannot be undone.")}</p>
+    {prompt && <ExplorerDialog testId="explorer-delete-dialog" onClose={() => operations.setDeletePrompt(null)}
+      focusTestId={prompt.reason || prompt.defaultIntent === "permanent" ? "explorer-delete-confirm" : "explorer-delete-trash"}>
+      <h3>{prompt.reason ? label("永久删除", "Permanently delete") : label("删除", "Delete")} {prompt.entries.length === 1 ? `“${prompt.entries[0].name}”` : label(`${prompt.entries.length} 项`, `${prompt.entries.length} items`)}?</h3>
+      {prompt.reason ? <>
+        <p data-testid="explorer-trash-unavailable" role="alert" style={{ whiteSpace: "pre-wrap" }}>{label("回收站不可用，仅可在确认后永久删除：", "Trash unavailable. Permanent deletion requires confirmation:")}<br />{prompt.reason}</p>
+        <p>{label("此操作绕过回收站，将永久删除所选项目和文件夹内的内容，无法撤销。", "This bypasses Trash and permanently deletes selected items and folder contents. This cannot be undone.")}</p>
+      </> : <>
+        <p>{label("请选择删除方式：移到回收站可稍后恢复；永久删除会绕过回收站且无法撤销。",
+          "Choose how to delete: move the items to Trash to restore later, or delete them permanently. Permanent deletion bypasses Trash and cannot be undone.")}</p>
+        <p>{label("移到回收站后可在提示中撤销，也可在系统回收站中恢复。", "Moved items can be undone from the prompt or restored from the system Trash.")}</p>
+      </>}
       <p style={{ fontFamily: "var(--ex-mono)", fontSize: 11, overflowWrap: "anywhere" }}>{prompt.entries.slice(0, 3).map((entry) => <span key={entry.path}>{entry.path}<br /></span>)}{prompt.entries.length > 3 ? "…" : ""}</p>
       <div className="ex-dialog-footer">
         <button data-testid="explorer-delete-cancel" onClick={() => operations.setDeletePrompt(null)}>{label("取消", "Cancel")}</button>
-        <button data-testid="explorer-delete-confirm" className="danger" onClick={() => void operations.permanentDelete(prompt.entries)}>{label("永久删除", "Delete permanently")}</button>
+        {!prompt.reason && <button data-testid="explorer-delete-trash" className="primary" disabled={operations.busy} onClick={() => operations.trash(prompt.entries)}>{label("移到回收站", "Move to Trash")}</button>}
+        <button data-testid="explorer-delete-confirm" className="danger" disabled={operations.busy} onClick={() => void operations.permanentDelete(prompt.entries)}>{label("永久删除", "Delete permanently")}</button>
       </div>
     </ExplorerDialog>}
     {operations.properties && <PropertiesDialog entries={operations.properties} onClose={() => operations.setProperties(null)} />}
+    {operations.unavailablePrompt && <ExplorerDialog testId="explorer-unavailable-handler-dialog" onClose={() => operations.setUnavailablePrompt(null)}>
+      <h3>{label(`无法用 ${operations.unavailablePrompt.handlerLabel} 打开`, `Cannot open with ${operations.unavailablePrompt.handlerLabel}`)}</h3>
+      <p role="alert">{label(
+        `${operations.unavailablePrompt.path} 的关联应用（${operations.unavailablePrompt.handlerLabel}）当前不可用（开发中），不会静默改用其他应用。`,
+        `The saved association for ${operations.unavailablePrompt.path} (${operations.unavailablePrompt.handlerLabel}) is currently unavailable (in development).`,
+      )}</p>
+      <div className="ex-dialog-footer">
+        <button data-testid="open-with-fallback-cancel" onClick={() => operations.setUnavailablePrompt(null)}>{label("取消", "Cancel")}</button>
+        <button data-testid="open-with-fallback-system" className="primary" onClick={() => void operations.openWithSystemFallback(operations.unavailablePrompt!.path)}>{label("用系统默认应用打开", "Open with system default app")}</button>
+      </div>
+    </ExplorerDialog>}
   </>;
 }

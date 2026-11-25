@@ -30,8 +30,7 @@ html[data-app-theme="dark"] .taomni-main-window {
   flex-shrink: 0;
 }
 .taomni-navigator-frame,
-.taomni-main-canvas-frame,
-.taomni-right-context-frame {
+.taomni-main-canvas-frame {
   border: 1px solid var(--taomni-chrome-border);
   border-radius: 9px;
   background: var(--taomni-panel-bg);
@@ -151,6 +150,8 @@ html[data-app-theme="dark"] .taomni-main-window {
 }
 .taomni-workspace-tab-scroll { scrollbar-width: none; }
 .taomni-workspace-tab-scroll::-webkit-scrollbar { display: none; }
+.taomni-explorer-tab-scroll { scrollbar-width: none; }
+.taomni-explorer-tab-scroll::-webkit-scrollbar { display: none; }
 .taomni-workspace-tab-drag-region {
   cursor: grab;
   user-select: none;

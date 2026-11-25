@@ -1,8 +1,10 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ControlBar } from "../ControlBar";
 import { useAppStore } from "../../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../../stores/workspacePlatformStore";
+import { useTabOverviewStore } from "../../../stores/tabOverviewStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import type { AppCommand } from "../../menubar/commands";
 
 vi.mock("../../window/WindowControls", () => ({
@@ -58,11 +60,11 @@ beforeEach(() => {
   useAppStore.setState({
     activeSideTab: "sessions",
     sidebarCollapsed: false,
-    rightSidebarCollapsed: true,
     tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }],
     activeTabId: "welcome",
   });
   useWorkspacePlatformStore.getState().reloadFromStorage();
+  useTabOverviewStore.getState().close();
 });
 
 afterEach(() => {
@@ -82,17 +84,17 @@ describe("ControlBar shared toolbar (TASK-03)", () => {
     expect(bar.textContent ?? "").not.toMatch(/●\s*●\s*●/);
   });
 
-  it("UT-WS-03-02 toggles both sidebars from the shared toolbar", () => {
+  it("UT-WS-03-02 toggles the left sidebar and no longer exposes a right-sidebar control", () => {
     const onToggleSidebar = vi.fn();
     renderShell({ onToggleSidebar });
     fireEvent.click(screen.getByTestId("toggle-left-sidebar"));
     expect(onToggleSidebar).toHaveBeenCalledTimes(1);
 
-    expect(useAppStore.getState().rightSidebarCollapsed).toBe(true);
-    fireEvent.click(screen.getByTestId("toggle-right-sidebar"));
-    expect(useAppStore.getState().rightSidebarCollapsed).toBe(false);
-    fireEvent.click(screen.getByTestId("toggle-right-sidebar"));
-    expect(useAppStore.getState().rightSidebarCollapsed).toBe(true);
+    // The right context sidebar collapse trigger and panel were removed in
+    // every main view; only the left navigator toggle remains on the toolbar.
+    expect(screen.queryByTestId("toggle-right-sidebar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("right-sidebar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("right-sidebar-resize-handle")).not.toBeInTheDocument();
   });
 
   it("UT-WS-03-03 switches the middle strip by primary mode without mixing tabs", () => {
@@ -155,6 +157,53 @@ describe("ControlBar shared toolbar (TASK-03)", () => {
     expect(screen.getByTestId("tab-overview-trigger")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("tab-more"));
     expect(screen.getByTestId("open-tabs-menu")).toBeInTheDocument();
+  });
+
+  it("UT-WS-03-07 keeps each main view's top-right actions to search and the large overview", () => {
+    const expected: Record<string, string[]> = {
+      home: ["home-toolbar-workspaces", "home-toolbar-sessions", "global-search-trigger", "tab-overview-trigger"],
+      sessions: ["tab-more", "global-search-trigger", "tab-overview-trigger", "titlebar-actions-more"],
+      workspaces: ["workspace-tabs-filter-trigger", "global-search-trigger", "tab-overview-trigger", "titlebar-actions-more"],
+      explorer: ["explorer-tabs-filter-trigger", "global-search-trigger", "tab-overview-trigger"],
+      tools: ["tools-toolbar-workspaces", "global-search-trigger", "tab-overview-trigger"],
+      agents: ["global-search-trigger", "tab-overview-trigger"],
+    };
+    useExplorerStore.setState({
+      tabs: [{ id: "e1", type: "file-browser", title: "Documents", closable: true,
+        fileBrowser: { initialPath: "/docs", explorer: true } } as never],
+      activeTabId: "e1",
+    });
+    renderShell();
+    for (const [mode, testIds] of Object.entries(expected)) {
+      act(() => useAppStore.setState({ activeSideTab: mode as never }));
+      expect(screen.getByTestId("platform-toolbar-actions")).toHaveAttribute("data-mode", mode);
+      expect(screen.getByTestId("platform-toolbar-actions").querySelectorAll("button"))
+        .toHaveLength(testIds.length);
+      expect(Array.from(screen.getByTestId("platform-toolbar-actions").querySelectorAll("button"))
+        .map((button) => button.getAttribute("data-testid"))).toEqual(testIds);
+      // The retired right context sidebar must not leak back into any mode,
+      // including Home whose two launch pills stay unchanged.
+      expect(screen.queryByTestId("toggle-right-sidebar")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("right-sidebar")).not.toBeInTheDocument();
+      // Home and the rail-only Explorer surface have no expandable navigator.
+      if (mode === "home" || mode === "explorer") {
+        expect(screen.queryByTestId("toggle-left-sidebar")).not.toBeInTheDocument();
+      } else {
+        expect(screen.getByTestId("toggle-left-sidebar")).toBeInTheDocument();
+      }
+    }
+  });
+
+  it("UT-WS-03-08 opens and closes the large overview from every main view", () => {
+    renderShell();
+    for (const mode of ["home", "sessions", "workspaces", "explorer", "tools"] as const) {
+      act(() => useAppStore.setState({ activeSideTab: mode }));
+      expect(useTabOverviewStore.getState().open).toBe(false);
+      fireEvent.click(screen.getByTestId("tab-overview-trigger"));
+      expect(useTabOverviewStore.getState().open).toBe(true);
+      fireEvent.click(screen.getByTestId("tab-overview-trigger"));
+      expect(useTabOverviewStore.getState().open).toBe(false);
+    }
   });
 
   it("UT-WS-03-06 exposes the global search trigger and the sidebar collapse affordance of the shared toolbar", () => {

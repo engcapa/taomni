@@ -36,9 +36,10 @@ that require release still use it, and other native selections retain their
 existing debug profile. Browser selection and production release workflows are
 unchanged. The planner records the choice and the native `release` capability,
 so execution and cache keys cannot disagree about the profile.
-Workspace cache keys use the same source, recipe, toolchain and environment
-fingerprint as the QA build verifier. Test/runner-only commits therefore reuse
-one cache entry instead of saving duplicate binaries under each commit SHA.
+The reusable runtime key includes the platform, architecture, runner baseline,
+profile and source/recipe digests. Documentation, case and independent frontend
+unit-test changes can reuse a verified runtime across commits. The producer
+binds the verified files to this invocation before the shards execute.
 
 `run_rdp_unit_contracts` defaults to `true`. For a focused native reproduction,
 `-f run_rdp_unit_contracts=false` can reuse a recorded successful unit-contract
@@ -50,6 +51,31 @@ contracts. Scheduled runs always run them.
 GitHub only registers `workflow_dispatch` on the default branch. Publishing the
 new file on a feature branch alone is insufficient. Branch validation can use a
 temporary branch-specific caller; do not merge that temporary push trigger.
+
+### Nightly coverage policy
+
+Scheduled runs (19:17 UTC, i.e. the small hours in Beijing) apply the tier-B
+coverage policy to native entries. Each platform keeps the crash-regression
+suite and every case that cannot run on the other native platforms; the fully
+shared remainder is split into five deterministic windows by case ID and only
+one window (20%) runs per night, so every shared case still executes once per
+five nights. Browser entries stay complete. The policy is recorded in
+`selection.json` under `nightly` (night label, weekday, window, selected and
+deferred IDs), so a night can be reproduced locally with
+`QA_NIGHTLY_POLICY=true QA_NIGHT_LABEL=YYYY-MM-DD python -m qa_ui_auto.ci plan`.
+
+Windows only runs on the scheduled runs that start at 03:17 Beijing on Friday,
+Saturday and Sunday. The night label is the UTC date of the nominal trigger, so
+those runs carry the Thursday, Friday and Saturday labels. Other runs plan
+`linux,macos` only: no Windows browser, native shards or producer are scheduled.
+Override the gate with `QA_WINDOWS_NIGHTS` (comma-separated night-label weekday
+names) or simulate a run on a manual dispatch with `nightly_policy=true` plus
+`night_label=YYYY-MM-DD`.
+
+Cases that need an opt-in commercial provider (`tao_real_provider`) follow the
+`policy.yaml` opt-in mapping: without a configured credential they become
+declared capability gaps at planning time, so no native runner is provisioned
+for a case that can only skip. See "Opt-in credentials" below.
 
 ### Shards and reusable native builds
 
@@ -81,20 +107,44 @@ verified independently. Imports preserve original identity and executable modes
 and never compile the app. Local build-cache verification remains unchanged.
 
 Each platform releases its consumers as soon as its own producer completes.
+macOS browser shards use their own matrix (`max-parallel: 3`) so native shards
+win the scarce account-wide macOS slots; scheduled runs also wait up to 20
+minutes for earlier same-workflow runs before planning (fail-open).
 Native matrices list longer estimated shards first. Rust RDP/dual-display
 contracts run once in a separate Ubuntu 22.04 job; the root Rust test binary
 uses the union of selected filters in one invocation. Tool contracts also run
 outside planning. Both contract jobs remain required by the final workflow
 result, including when all UI cases passed.
 
-GitHub remote caches survive disposable runners: app workspaces retain the
-verified build-input key and can seed from the existing Ubuntu 22.04 X11 cache.
-Rust contracts have a separate cache, seeded from app intermediates on a miss.
-Ubuntu 22.04 PipeWire 1.0.9 installs reuse a staged cache keyed by setup recipe
-and architecture; execution adapters cache pinned tauri-driver 2.0.4 separately
-per runner OS/version/architecture. Python packages use setup-python's pip
-cache. Missing/evicted caches rebuild normally; cached application binaries still
-undergo full verification before reuse. Builds/contracts skip desktop provisioning.
+When a dispatch branch has no retained artifact, build and contract producers
+also read the matching Cargo dependency archive published by the trusted
+default branch (completed `schedule`, `workflow_dispatch` or `push` runs only).
+A reusable archive saves a cold dependency compile even on a brand-new branch;
+the artifact key still covers manifests, toolchain, runner image and compile
+environment, and each restore is checksum-validated. Archives are retained for
+three days so the next nightly and the following workday can reuse them.
+
+The vendored Cargo dependency cache experiment is enabled by default: the
+archive key adds a digest of `src-tauri/vendor`, vendored path dependencies are
+no longer excluded from the archive, and their source mtimes are normalized
+before compiling so restored fingerprints stay fresh. The first run after the
+switch republishes a new-key archive; later runs reuse it. Pass
+`vendor_cache=false` to run the previous behavior for a matched A/B; see
+`docs-feature/qa-ui-auto-platform-nightly-coverage-and-cache-design.md`.
+
+When the runtime misses, Cargo can still restore matching compiled dependencies.
+Linux contracts read the producer's Rust cache. The Windows helper contracts
+have their own cache. Direct manual runs against the selected branch's head
+retain the verified runtime for three days and Cargo dependencies for one day
+as workflow artifacts. Restore uses the same repository, branch and workflow.
+A dispatch can also restore compatible Actions caches from its workflow ref or
+the default branch. Each platform provisions a fresh build after a miss.
+Use the `Native runtime cache miss` and `Rust dependency cache miss` steps to
+identify a cold path before it starts compiling during cache measurements.
+
+Ubuntu 22.04 PipeWire, Sherpa native libraries, execution adapters and mobile
+Chromium have separate caches. Builds and contracts install their compilation
+dependencies. Native shards also provision the selected desktop and services.
 
 `selection.json` records logical groups, exact shard membership, worker counts,
 estimates and build IDs. Collection rejects missing/duplicate cases and verifies
@@ -151,6 +201,19 @@ IDs, missing diff refs, unsupported explicit scope, changed inputs or selected
 skips fail. Pure documentation changes can yield an explicit zero-execution
 report. No empty execution is presented as six-platform success.
 
+### Opt-in credentials
+
+Cases whose fixture needs a credential a hosted runner intentionally does not
+hold (`tao_real_provider`, the real commercial provider probes) are opt-in.
+`policy.yaml` maps such a fixture to the variables that satisfy it, with optional
+per-case overrides for a case that pins one provider. When none of the variables
+is set at plan time the case becomes a **declared capability gap** instead of a
+runnable case: no shard is provisioned for it, the summary reports it under
+"Declared capability gaps", and the strict gate does not treat the resulting
+runtime skip as a failure. Export the variables to plan and run those cases
+locally or in a dedicated job. Explicitly selecting an unmet opt-in case still
+fails planning, so a requested case can never silently turn into a gap.
+
 Reusable caller example (opt in from a separate business flow):
 
 ```yaml
@@ -158,6 +221,7 @@ jobs:
   qa:
     permissions:
       contents: read
+      actions: read
       issues: write
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
@@ -361,6 +425,19 @@ whole debug/test extension server directories are retained. Product semantics
 and debugging still require the actual native cases; preparation alone is not
 product coverage.
 
+Maven repository transfers are retried instead of failing the shard. Hosted
+runners share Maven Central egress and can receive HTTP 408/429/5xx or stalled
+connections while Java warmup downloads plugins and dependencies. Both the
+warmup wrapper (`ci_maven_warmup.py`) and the Java 25 online builds retry only
+transient transfer failures, with exponential backoff and a bounded budget;
+retries pass `-U` so a cached failed resolution is re-attempted, and Maven
+commands carry Wagon/Resolver retry-handler options. Java jobs also export
+`MAVEN_OPTS` with the same retry policy. Compile errors, permanent repository
+errors (401/404) and failures after the budget remain fatal on the first or
+last attempt. A cached `~/.m2/repository` would remove the remaining burst
+exposure but is not enabled because the Actions cache quota is already at its
+10 GB limit; keep the retry path quota-free unless cache capacity changes.
+
 Default Linux native uses Xvfb, Openbox, DBus and, when required, fcitx5/wbpy.
 IME preparation waits for the job-owned daemon to acquire its DBus name before
 opening a GTK input context. Preparation and native key injection observe the
@@ -401,16 +478,11 @@ Read the run's **qa-ui-auto-platforms-result** summary and download
 The UUID keeps multiple reusable calls within one caller isolated. The plan
 summary lists exact selected IDs, reasons and changed paths before execution. `selection.json` binds the selected commit, source,
 runner and case hashes. Raw runner summaries and receipts are not rewritten.
-Case failures and selected skips remain in the aggregate report but do not fail
-the report workflow. Missing reports, native build/source mismatch, failed
-setup, selected skips without a completed runner report, and other
-infrastructure errors make the aggregate fail. `build.log`, `runner.log`, `ci-outcome.json`,
-service/desktop readiness and screenshot metadata identify the failing phase.
-Original failures remain available in each Actions run.
-
-`scope=selected` additionally requires `ci-summary.json.passed` to be true: a
-complete report with failed or skipped selected cases fails the final workflow
-gate. Other scopes retain the existing report-completeness behavior.
+Every scope requires `ci-summary.json.passed`. A failed or skipped planned
+case, missing evidence, native identity mismatch, failed setup or failed
+supporting job makes the final check fail. `build.log`, `runner.log`,
+`ci-outcome.json`, service/desktop readiness and screenshot metadata identify
+the failing phase. Each Actions run retains its original failures.
 
 Issue sync deduplicates
 by combination/case and updates the run link; it does not close issues from a

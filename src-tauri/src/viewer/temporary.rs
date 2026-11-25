@@ -73,7 +73,7 @@ fn matches_owned_path(
     })
 }
 
-pub(super) fn is_owned_temp(path: &std::path::Path) -> bool {
+pub(crate) fn is_owned_temp(path: &std::path::Path) -> bool {
     let canonical = path.canonicalize().ok();
     let candidates = registry().lock().unwrap_or_else(|error| error.into_inner());
     candidates

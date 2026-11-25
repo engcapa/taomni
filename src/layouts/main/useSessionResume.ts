@@ -5,6 +5,7 @@ import { getSession, type SessionConfig } from "../../lib/ipc";
 import { type TerminalProfile } from "../../lib/terminalProfile";
 import { primaryViewTypeForEntry } from "../../lib/welcomeSessionResume";
 import { useAppStore } from "../../stores/appStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import type { LocalLaunchOutcome, LocalShellSelection, SnapshotEntry, Tab } from "../../types";
 import {
   createBuildRunSnapshotEntries,
@@ -50,6 +51,9 @@ export function useSessionResume(context: UseSessionResumeContext) {
     setStatusMessage,
   } = context;
   const homeActive = useAppStore((state) => state.activeSideTab === "home");
+  /// Dedicated Explorer tabs own migrated File sessions; subscribe so restore
+  /// waiters bind when those tabs appear without app-tab changes.
+  const explorerTabs = useExplorerStore((state) => state.tabs);
 
   /// Welcome restore orchestration (design §4.2.3): per-entry waiters keyed by
   /// request id, plus tabId bindings and readiness timers.
@@ -109,9 +113,10 @@ export function useSessionResume(context: UseSessionResumeContext) {
 
   // Bind newly created tabs (sessionId match, tab absent at registration) to
   // their waiting restore entry, then start a settle fallback. A bound tab
-  // that closes before readiness completes its entry as cancelled.
+  // that closes before readiness completes its entry as cancelled. Dedicated
+  // Explorer tabs carry migrated File-session ids and bind the same way.
   useEffect(() => {
-    const liveIds = new Set(tabs.map((tab) => tab.id));
+    const liveIds = new Set([...tabs.map((tab) => tab.id), ...explorerTabs.map((tab) => tab.id)]);
     for (const [tabId, requestId] of Array.from(resumeWaiterByTabRef.current.entries())) {
       if (!liveIds.has(tabId)) {
         resumeWaiterByTabRef.current.delete(tabId);
@@ -119,22 +124,27 @@ export function useSessionResume(context: UseSessionResumeContext) {
       }
     }
     if (resumeWaiterBySessionRef.current.size === 0) return;
-    for (const tab of tabs) {
-      if (!tab.sessionId) continue;
-      const requestId = resumeWaiterBySessionRef.current.get(tab.sessionId);
+    const candidates: Array<{ id: string; sessionId?: string; isTerminal: boolean; }> = [
+      ...tabs.map((tab) => ({ id: tab.id, sessionId: tab.sessionId, isTerminal: tab.type === "terminal" })),
+      ...explorerTabs.map((tab) => ({ id: tab.id, sessionId: tab.sessionId, isTerminal: false })),
+    ];
+    for (const candidate of candidates) {
+      if (!candidate.sessionId) continue;
+      const requestId = resumeWaiterBySessionRef.current.get(candidate.sessionId);
       if (!requestId) continue;
       const waiter = resumeWaitersRef.current.get(requestId);
-      if (!waiter || waiter.tabId || waiter.excludeTabIds.has(tab.id)) continue;
-      waiter.tabId = tab.id;
+      if (!waiter || waiter.tabId || waiter.excludeTabIds.has(candidate.id)) continue;
+      waiter.tabId = candidate.id;
       resumeWaiterBySessionRef.current.delete(waiter.sessionId);
-      resumeWaiterByTabRef.current.set(tab.id, requestId);
-      const isTerminalTab = tab.type === "terminal";
+      resumeWaiterByTabRef.current.set(candidate.id, requestId);
+      const isTerminalTab = candidate.isTerminal;
       const settleMs = isTerminalTab ? 15000 : 6000;
       const timer = window.setTimeout(() => {
         resumeSettleTimersRef.current.delete(requestId);
         const tabAlive = useAppStore
-          .getState()
-          .tabs.some((candidate) => candidate.id === waiter.tabId);
+            .getState()
+            .tabs.some((item) => item.id === waiter.tabId) ||
+          useExplorerStore.getState().tabs.some((item) => item.id === waiter.tabId);
         if (tabAlive) {
           resolveResumeWaiter(requestId, {
             tabId: waiter.tabId,
@@ -148,7 +158,7 @@ export function useSessionResume(context: UseSessionResumeContext) {
       }, settleMs);
       resumeSettleTimersRef.current.set(requestId, timer);
     }
-  }, [tabs, resolveResumeWaiter, cancelResumeWaiter]);
+  }, [tabs, explorerTabs, resolveResumeWaiter, cancelResumeWaiter]);
 
   const openSavedSessionForRestore = useCallback(
     createOpenSavedSessionForRestore({
@@ -248,6 +258,7 @@ export function useSessionResume(context: UseSessionResumeContext) {
 
   const commitRunSnapshotNow = useCallback(createCommitRunSnapshotNow({
     welcomeRestoreViewRef,
+    welcomeRestoreInstanceRef,
     buildRunSnapshotEntries,
     snapshotFingerprintRef,
     runBatchIdRef,
@@ -270,5 +281,15 @@ export function useSessionResume(context: UseSessionResumeContext) {
   useEffect(() => {
     commitRunSnapshotSoon();
   }, [tabs, activeTabId, terminalCwds, commitRunSnapshotSoon]);
+
+  // A pending debounce must not commit a snapshot or refresh the Home row
+  // after the layout unmounts.
+  useEffect(() => () => {
+    if (snapshotCommitTimerRef.current != null) {
+      window.clearTimeout(snapshotCommitTimerRef.current);
+      snapshotCommitTimerRef.current = null;
+    }
+  }, []);
+
   return { welcomeRestore, resolveResumeWaiterForTab, cancelResumeWaiter, cancelAllResumeWaiters, resumeWaitersRef, resumeWaiterBySessionRef, resumeWaiterByTabRef, resumeSettleTimersRef, restoreFailedLocalTabsRef, runBatchIdRef, snapshotFingerprintRef, snapshotRevisionRef, snapshotCommitTimerRef };
 }

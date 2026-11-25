@@ -279,7 +279,7 @@ controls:
   selector: '[data-testid="tao-home-history-tab-directories"]'
   kind: interactive
 - id: tao-home-history-search
-  selector: '.tao-home-history-search input'
+  selector: '[data-testid="tao-home-history-search"]'
   kind: interactive
 - id: tao-home-local-terminal
   selector: '[data-testid="tao-home-local-terminal"]'
@@ -919,6 +919,10 @@ controls:
 - id: tab-bar
   selector: '[data-testid="tab-bar"]'
   kind: display
+- id: tab-context-close
+  selector: '[data-testid="context-menu-item-close"]'
+  kind: interactive
+  optional: true       # tab context menu Close item
 - id: tab-item                 # individual tab; pair with [data-tab-type=...] / [data-tab-title=...] when targeting
   selector: '[data-testid="tab-item"]'
   aliases:
@@ -1091,89 +1095,16 @@ controls:
     kind: interactive
     optional: true       # only rendered when >1 local shell detected
   - id: open-home-folder
-    selector: '[data-testid="welcome-open-home-folder"]'
+    selector: '[data-testid="tao-home-open-home-folder"]'
     kind: interactive
     optional: true       # only rendered when onOpenLocalPath prop is set
   - id: open-as-administrator
     selector: 'button[aria-label="Open as administrator"]'
     kind: interactive
     optional: true       # only rendered when selected shell canElevate
-  - id: new-session-card
-    selector: 'text="New session…"'
-    kind: display # card heading; the action is welcome-new-session below
   - id: new-session-card-testid
     selector: '[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]'
     kind: interactive
-  - id: recent-sessions-panel
-    selector: '[data-testid="welcome-recent-sessions"]'
-    kind: display
-  - id: recent-filter
-    selector: '[data-testid="welcome-recent-filter"]'
-    kind: interactive
-  - id: recent-type-filter
-    selector: '[data-testid="welcome-recent-type-filter"]'
-    kind: interactive
-  - id: recent-sort
-    selector: '[data-testid="welcome-recent-sort"]'
-    kind: interactive
-  - id: recent-open-all
-    selector: '[data-testid="welcome-recent-open-all"]'
-    kind: interactive
-  - id: recent-open-filtered
-    selector: '[data-testid="welcome-recent-open-filtered"]'
-    kind: interactive
-  - id: recent-open-selected
-    selector: '[data-testid="welcome-recent-open-selected"]'
-    kind: interactive
-  - id: recent-select-filtered
-    selector: '[data-testid="welcome-recent-select-filtered"]'
-    kind: interactive
-  - id: recent-clear-filter
-    selector: '[data-testid="welcome-recent-clear-filter"]'
-    kind: interactive
-  - id: recent-clear-selection
-    selector: '[data-testid="welcome-recent-clear-selection"]'
-    kind: interactive
-    optional: true       # rendered only after at least one recent row is selected
-  - id: recent-settings
-    selector: '[data-testid="welcome-recent-settings"]'
-    kind: interactive
-  - id: recent-session-row
-    selector: '[data-testid="welcome-recent-session-row"]'
-    kind: display
-    optional: true       # only rendered when saved sessions have last_connected_at
-  - id: recent-session-select
-    selector: '[data-testid="welcome-recent-select"]'
-    kind: interactive
-    optional: true
-  - id: recent-session-open
-    selector: '[data-testid="welcome-recent-open"]'
-    kind: interactive
-    optional: true
-  - id: recent-session-reveal
-    selector: '[data-testid="welcome-recent-reveal"]'
-    kind: interactive
-    optional: true
-  - id: recent-empty
-    selector: '[data-testid="welcome-recent-empty"]'
-    kind: display
-    optional: true
-  - id: recent-no-matches
-    selector: '[data-testid="welcome-recent-no-matches"]'
-    kind: display
-    optional: true
-  - id: recent-workspace-row
-    selector: '[data-testid="welcome-recent-workspace-row"]'
-    kind: interactive
-    optional: true       # rendered only when recent workspaces exist (native gate C0 enters here)
-  - id: recent-workspace-filter
-    selector: '[data-testid="welcome-recent-workspace-filter"]'
-    kind: interactive
-    optional: true       # available in the workspace history section
-  - id: history-tab-workspaces
-    selector: '[data-testid="welcome-history-tab-workspaces"]'
-    kind: interactive
-    optional: true       # template testid welcome-history-tab-${tab.id}; sessions|workspaces|directories
   - id: history-tab-sessions
     selector: '[data-testid="welcome-history-tab-sessions"]'
     aliases: ['[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-sessions"]']
@@ -1224,15 +1155,6 @@ controls:
     selector: '[data-testid="welcome-restore-clear"]'
     kind: interactive
     optional: true       # only when a record is available/finished
-  - id: tips-section
-    selector: 'text="Tips"'
-    kind: display
-  - id: version-header
-    selector: '[data-testid="welcome-version"]'
-    kind: display
-  - id: version-footer
-    selector: '[data-testid="welcome-version-footer"]'
-    kind: display
 -->
 
 - 启动入口：开始本地终端、新建会话、导入 OpenSSH config
@@ -3042,10 +2964,6 @@ controls:
   - id: panel-root
     selector: '[data-testid="sftp-browser"]'
     kind: display
-  - id: download-prompt-dialog      # fixed overlay, no testid — addressed via role+title text
-    selector: '[role="dialog"][aria-modal="true"]:has-text("Open remote file?")'
-    kind: display
-    optional: true       # only after double-clicking a remote file
   - id: local-pane
     selector: '[data-testid="sftp-local-pane"]'
     kind: display
@@ -3699,6 +3617,10 @@ controls:
     selector: '[data-testid="vnc-reconnect"]'
     kind: interactive
     optional: true          # only on disconnected/error state
+  - id: reconnect-stop
+    selector: '[data-testid="vnc-reconnect-stop"]'
+    kind: interactive
+    optional: true          # cancels the automatic reconnect countdown in the disconnected card; TC-157 uses it to keep the reconnect state deterministic
   - id: unencrypted-continue
     selector: '[data-testid="vnc-unencrypted-continue"]'
     kind: interactive
@@ -4841,6 +4763,22 @@ controls:
     selector: '[data-testid="ai-chat-safety-gate"]'
     kind: display
     optional: true       # only while a local-agent permission prompt is pending
+  - id: ai-chat-cc-permission-allow
+    selector: '[data-testid="ai-chat-cc-permission-allow"]'
+    kind: interactive
+    optional: true       # only while a Claude Code permission prompt is pending
+  - id: ai-chat-cc-permission-allow-session
+    selector: '[data-testid="ai-chat-cc-permission-allow-session"]'
+    kind: interactive
+    optional: true       # only while a Claude Code permission prompt is pending
+  - id: ai-chat-cc-permission-deny
+    selector: '[data-testid="ai-chat-cc-permission-deny"]'
+    kind: interactive
+    optional: true       # only while a Claude Code permission prompt is pending
+  - id: ai-chat-acp-permission-option-allow_once
+    selector: '[data-testid="ai-chat-acp-permission-option-allow_once"]'
+    kind: interactive
+    optional: true       # only while an ACP permission option of that kind is offered
   - id: ai-chat-acp-permission-card
     selector: '[data-testid="ai-chat-acp-permission-card"]'
     kind: display
@@ -13405,7 +13343,9 @@ TC-WS-075 keeps the real native execution scan under the same Home responsivenes
 
 > 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-049`。`TC-WS-049` 覆盖 Home、Tools、Sessions、空/多标签 Workspaces 的共享标题栏拖动事件、窄窗口真实命中、双击最大化，以及按钮、标签、弹出输入框和右键的排除；`TC-MAIN-RAIL-03` 验证同一顶部边框及 Home/Tools 标题的真实系统位移。`TC-WS-029/030` 还覆盖工作区标签过多时的左右滚动控制，以及顶部空白区保留原生窗口拖动目标。`TC-WS-044` 在 browser/native 中覆盖从 Home 选择已保存工作区后，树形/详细列表的已展开子目录自动重新加载，保留文档与目录展开状态。`TC-WS-045` 覆盖 Tools / Home 显式进入空编辑器时展示文件区，以及收缩、Project 和 Sessions 工具切换后的恢复。`TC-WS-047` 覆盖普通层级文件树显示依赖/构建目录，避免将父目录误判为 Empty。`TC-WS-018/019` 保留连续快捷键开关回归，`TC-WS-046` 追加 Linux 原生 GTK/fcitx 真实输入及大预览重复打开边界。
 
-### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与右栏收纳
+### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与左栏收纳
+
+> 2026-11-22：右侧上下文面板（Structure/Tao 助手）及其右上角收缩按钮已从全部主视图移除；Home 视图按钮不变，`TC-WS-099` 验证五视图右上角仅保留模式操作、全局搜索与大预览，`TC-WS-100`（browser）验证 0.5-1s 悬停放大边界（不立即放大、离开清除、重新计时），原 `TC-WS-001/020/050` 同步收缩断言。
 
 Issue #797：`TC-WS-091/092` 保护左栏 Terminal 在数据库/shell 画布上只切换 workspace 底部工具窗，不改变当前标签或重建 Code Workspace。底部复用编辑器同一个终端 owner，隐藏/重开及跨模式恢复保留输出；native 额外验证上下 PTY 独立执行及工作区隔离。`TC-IDE-PARITY-010-01/04` 和 `024-03` 保护编辑器工具窗与移动行为。
 
@@ -13446,8 +13386,6 @@ files:
 - src/layouts/main/MainLayoutView.tsx
 - src/styles/platform.css
 - src/styles/platform-home.css
-- src/components/workspace/RightContextPanel.tsx
-- src/components/workspace/useContextPanelWidth.ts
 - src/components/welcome/PlatformLaunchCards.tsx
 controls:
 - id: global-search-trigger
@@ -13456,23 +13394,20 @@ controls:
 - id: home-sidebar-panel
   selector: '[data-testid="home-sidebar-panel"]'
   kind: display
+- id: home-nav-agents
+  selector: '[data-testid="home-nav-agents"]'
+  kind: interactive
 - id: nav-mode-home
   selector: '[data-testid="nav-mode-home"]'
   kind: interactive
 - id: nav-mode-workspaces
   selector: '[data-testid="nav-mode-workspaces"]'
   kind: interactive
-- id: right-sidebar
-  selector: '[data-testid="right-sidebar"]'
-  kind: display
 - id: sidebar-rail
   selector: '[data-testid="sidebar-rail"]'
   kind: interactive
 - id: toggle-left-sidebar
   selector: '[data-testid="toggle-left-sidebar"]'
-  kind: interactive
-- id: toggle-right-sidebar
-  selector: '[data-testid="toggle-right-sidebar"]'
   kind: interactive
 - id: main-canvas-frame
   selector: '[data-testid="main-canvas-frame"]'
@@ -13483,24 +13418,6 @@ controls:
 - id: global-session-surface
   selector: '[data-testid="global-session-surface"]'
   kind: display
-- id: right-sidebar-resize-handle
-  selector: '[data-testid="right-sidebar-resize-handle"]'
-  kind: interactive
-- id: right-sidebar-close
-  selector: '[data-testid="right-sidebar-close"]'
-  kind: interactive
-- id: right-sidebar-ai-tab
-  selector: '[data-testid="right-sidebar-ai-tab"]'
-  kind: interactive
-- id: right-sidebar-structure-tab
-  selector: '[data-testid="right-sidebar-structure-tab"]'
-  kind: interactive
-- id: right-sidebar-content
-  selector: '[data-testid="right-sidebar-content"]'
-  kind: display
-- id: right-sidebar-open-chat
-  selector: '[data-testid="right-sidebar-open-chat"]'
-  kind: interactive
 - id: rail-app-menu-host
   selector: '[data-testid="rail-app-menu-host"]'
   kind: display
@@ -13652,6 +13569,15 @@ files:
 - src/stores/agentsStore.ts
 - src/stores/workspaceEditorStore.ts
 - src/stores/workspaceUiStore.ts
+- src/stores/gitCloneStore.ts
+- src/lib/gitClone.ts
+- src/components/workspace/WorkspaceGitCloneModal.tsx
+- src/components/workspace/gitClone/gitCloneForm.ts
+- src/components/workspace/gitClone/GitCloneFields.tsx
+- src/components/workspace/gitClone/GitCloneProgressView.tsx
+- src-tauri/src/git/clone.rs
+- src-tauri/src/git/clone/runner.rs
+- src-tauri/src/git/clone/settings.rs
 - src/components/editor/workspace/explorerPreferences.ts
 - src/components/editor/workspace/ExplorerSortControls.tsx
 - src/components/editor/workspace/ProjectTreeFlat.tsx
@@ -14092,6 +14018,12 @@ controls:
 - id: workspace-switcher-option-second-workspace
   selector: '[data-testid="workspace-switcher-option-second-workspace"]'
   kind: interactive
+- id: workspace-switcher-option-named
+  selector: '[data-testid^="workspace-switcher-option-"]:has-text("QA other")'
+  aliases:
+  - '[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])'
+  kind: interactive
+  optional: true       # custom workspace created by the case under test
 - id: workspace-layout-split
   selector: '[data-testid="workspace-layout-split"]'
   kind: interactive
@@ -14231,11 +14163,89 @@ controls:
 - id: workspace-tab-categories
   selector: '[data-testid="workspace-tab-categories"]'
   kind: display
+- id: workspace-git-clone-modal
+  selector: '[data-testid="workspace-git-clone-modal"]'
+  kind: display
+- id: workspace-plus-clone-git
+  selector: '[data-testid="workspace-plus-clone-git"]'
+  kind: interactive
+- id: workspace-switcher-clone-git
+  selector: '[data-testid="workspace-switcher-clone-git"]'
+  kind: interactive
+  optional: true
+- id: workspace-git-clone-url
+  selector: '[data-testid="workspace-git-clone-url"]'
+  kind: interactive
+- id: workspace-git-clone-name
+  selector: '[data-testid="workspace-git-clone-name"]'
+  kind: interactive
+- id: workspace-git-clone-location
+  selector: '[data-testid="workspace-git-clone-location"]'
+  kind: interactive
+- id: workspace-git-clone-branch
+  selector: '[data-testid="workspace-git-clone-branch"]'
+  kind: interactive
+- id: workspace-git-clone-branch-detect
+  selector: '[data-testid="workspace-git-clone-branch-detect"]'
+  kind: interactive
+- id: workspace-git-clone-user-name
+  selector: '[data-testid="workspace-git-clone-user-name"]'
+  kind: interactive
+- id: workspace-git-clone-user-email
+  selector: '[data-testid="workspace-git-clone-user-email"]'
+  kind: interactive
+- id: workspace-git-clone-proxy-app
+  selector: '[data-testid="workspace-git-clone-proxy-app"]'
+  kind: interactive
+- id: workspace-git-clone-proxy-custom
+  selector: '[data-testid="workspace-git-clone-proxy-custom"]'
+  kind: interactive
+- id: workspace-git-clone-proxy-none
+  selector: '[data-testid="workspace-git-clone-proxy-none"]'
+  kind: interactive
+- id: workspace-git-clone-http-proxy
+  selector: '[data-testid="workspace-git-clone-http-proxy"]'
+  kind: interactive
+- id: workspace-git-clone-https-proxy
+  selector: '[data-testid="workspace-git-clone-https-proxy"]'
+  kind: interactive
+- id: workspace-git-clone-destination
+  selector: '[data-testid="workspace-git-clone-destination"]'
+  kind: display
+- id: workspace-git-clone-start
+  selector: '[data-testid="workspace-git-clone-start"]'
+  kind: interactive
+- id: workspace-git-clone-close
+  selector: '[data-testid="workspace-git-clone-close"]'
+  kind: interactive
+- id: workspace-git-clone-cancel
+  selector: '[data-testid="workspace-git-clone-cancel"]'
+  kind: interactive
+- id: workspace-git-clone-retry
+  selector: '[data-testid="workspace-git-clone-retry"]'
+  kind: interactive
+- id: workspace-git-clone-progress
+  selector: '[data-testid="workspace-git-clone-progress"]'
+  kind: display
+- id: workspace-git-clone-phase
+  selector: '[data-testid="workspace-git-clone-phase"]'
+  kind: display
+- id: workspace-git-clone-percent
+  selector: '[data-testid="workspace-git-clone-percent"]'
+  kind: display
+- id: workspace-git-clone-success
+  selector: '[data-testid="workspace-git-clone-success"]'
+  kind: display
+- id: workspace-git-clone-cancelled
+  selector: '[data-testid="workspace-git-clone-cancelled"]'
+  kind: display
 -->
 
 Workspaces 模式左栏提供工作区切换器（默认工作区不可删除）、多根文件树（新建文件/目录、添加/移除根目录）、工作区标签条与打开任意会话入口；画布内含编辑器、Git 面板与隔离会话。
 
 Issue #792 的生产 Project 树沿用 F25.1 的根/目录/文件行控件（不新增 QA hook/testid）：根由 `data-root-id`/`data-root-path`/`data-tree-kind=root` 标识，目录由 `data-root-id`/`data-path`/`data-tree-kind=dir` 标识，统一悬停 `data-drop-target=true`。TC-WS-087/088 同时 covers F25.1/F-WS-2，拒绝文件行与实际空白命中，并通过隔离 source/root1/root2 全量哈希与目录集断言证明不污染。两个用例都是合成事件入口；native 额外证明真实导入 IPC/磁盘的边界，不能宣称真实文件管理器/OS 拖拽手势已验证。
+
+工作区 Git 克隆入口位于标签条 `+` 菜单、工作区切换器菜单和 Home 的 Clone 卡片；对话框支持仓库地址、工作区名、可编辑上层目录（默认 `~/taomni-workspaces`）、分支检测、user.name/user.email、http/https 代理三模式与 token/vault 提示。TC-WS-GIT-CLONE-01/02 覆盖 browser 默认值、进度、后台关闭、取消和重试；TC-WS-GIT-CLONE-03 在 native 验证真实 Git、分支、仓库本地配置与磁盘字节。
 
 ### 12.3 左侧主导航条底部工具与左下角 MFA 悬浮窗
 
@@ -15238,19 +15248,37 @@ id: F-EXPLORER-1
 title: Local File Explorer
 status: implemented
 area: files/explorer
-components: [ExplorerShell, ExplorerNavTree, ExplorerFileList, ExplorerPreviewPane]
+components: [ExplorerPlatformView, ExplorerTabStrip, ExplorerTabIcon, ExplorerFileIcon, ExplorerShell, ExplorerNavTree, ExplorerFileList, ExplorerPreviewPane]
 files:
+  - src/components/explorer/ExplorerPlatformView.tsx
+  - src/components/explorer/ExplorerTabStrip.tsx
+  - src/components/explorer/ExplorerTabIcon.tsx
+  - src/components/explorer/ExplorerFileIcon.tsx
+  - src/components/explorer/explorerTabIcon.css
+  - src/components/tabbar/tabs/tabContextMenu.ts
+  - src/components/explorer/ExplorerTabsFilter.tsx
   - src/components/explorer/ExplorerShell.tsx
+  - src/components/explorer/ExplorerAddressBar.tsx
+  - src/components/explorer/ExplorerCommandBar.tsx
   - src/components/explorer/ExplorerNavTree.tsx
   - src/components/explorer/ExplorerFileList.tsx
+  - src/components/explorer/explorerFileTypes.ts
+  - src/components/explorer/useExplorerSearch.ts
   - src/components/explorer/preview/ExplorerPreviewPane.tsx
   - src/components/filebrowser/FilePanel.tsx
   - src/components/filebrowser/LocalFileBrowserPanel.tsx
   - src/lib/explorer.ts
   - src/lib/explorer/openExplorer.ts
+  - src/lib/explorer/tabRecovery.ts
+  - src/lib/explorerTabFilter.ts
+  - src/components/tabbar/tabs/useTabStripScroll.ts
+  - src/stores/explorerStore.ts
+  - src/stores/explorerUiStore.ts
   - src/stores/sftp/navigation.ts
   - src/stores/workspaceExplorerActions.ts
+  - src/stubs/explorerSearch.ts
   - src-tauri/src/filebrowser/local_ops/mod.rs
+  - src-tauri/src/filebrowser/local_ops/search.rs
 controls:
   - id: explorer-main-menu-entry
     selector: '[data-testid="context-menu-item-file-explorer"]'
@@ -15264,12 +15292,68 @@ controls:
   - id: explorer-toast-error
     selector: '[data-testid="explorer-toast"].error'
     kind: display
-  - id: explorer-workspace-tab-ready
-    selector: '[data-testid="workspace-tab"][data-tab-kind="explorer"]'
-    aliases:
-    - ':nth-match([data-testid="workspace-tab"][data-tab-kind="explorer"], 1)'
-    - ':nth-match([data-testid="workspace-tab"][data-tab-kind="explorer"], 2)'
+  - id: explorer-rail-entry
+    selector: '[data-testid="side-tab-explorer"]'
+    kind: interactive
+  - id: explorer-platform-view
+    selector: '[data-testid="explorer-platform-view"]'
     kind: display
+  - id: explorer-tools-entry-removed
+    selector: '[data-testid="sidebar-tool-file-explorer"]'
+    kind: display
+    optional: true   # removed UI; only negative regression assertions remain
+  - id: explorer-workspace-tab-ready
+    selector: '[data-testid="explorer-workspace-tab"]'
+    aliases:
+    - ':nth-match([data-testid="explorer-workspace-tab"], 1)'
+    - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 1)'
+    - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 2)'
+    - ':nth-match([data-testid="explorer-workspace-tab"][data-tab-type="file-browser"], 5)'
+    - 'xpath=(//*[@data-testid="explorer-workspace-tab"][@data-tab-type="file-browser"])[2]'
+    kind: interactive
+  - id: explorer-tab-new-home
+    selector: '[data-testid="explorer-tab-new-home"]'
+    kind: interactive
+  - id: explorer-tab-rename-input
+    selector: '[data-testid="explorer-tab-rename-input"]'
+    kind: interactive
+  - id: explorer-tab-context-close
+    selector: '[data-testid="explorer-tab-context-close"]'
+    kind: interactive
+  - id: explorer-tab-context-close-others
+    selector: '[data-testid="explorer-tab-context-close-others"]'
+    kind: display
+  - id: explorer-tab-context-close-all
+    selector: '[data-testid="explorer-tab-context-close-all"]'
+    kind: display
+  - id: explorer-tab-context-rename
+    selector: '[data-testid="explorer-tab-context-rename"]'
+    kind: interactive
+  - id: explorer-tab-context-duplicate
+    selector: '[data-testid="explorer-tab-context-duplicate"]'
+    kind: display
+  - id: explorer-tab-context-copy-path
+    selector: '[data-testid="explorer-tab-context-copy-path"]'
+    kind: display
+  - id: explorer-tab-context-move-first
+    selector: '[data-testid="explorer-tab-context-move-first"]'
+    kind: interactive
+  - id: explorer-tab-context-move-left
+    selector: '[data-testid="explorer-tab-context-move-left"]'
+    kind: display
+  - id: explorer-tab-context-move-right
+    selector: '[data-testid="explorer-tab-context-move-right"]'
+    kind: display
+  - id: explorer-tab-context-move-last
+    selector: '[data-testid="explorer-tab-context-move-last"]'
+    kind: display
+  - id: explorer-tab-context-pin
+    selector: '[data-testid="explorer-tab-context-pin"]'
+    kind: display
+  - id: explorer-sidebar-panel-removed
+    selector: '[data-testid="explorer-sidebar-panel"]'
+    kind: display
+    optional: true   # removed UI; only negative regression assertions remain
   - id: code-workspace-tool-rail-explorer
     selector: '[data-testid="code-workspace-tool-rail-explorer"]'
     kind: interactive
@@ -15413,6 +15497,9 @@ controls:
   - id: explorer-delete-confirm
     selector: '[data-testid="explorer-delete-confirm"]'
     kind: interactive
+  - id: explorer-delete-trash
+    selector: '[data-testid="explorer-delete-trash"]'
+    kind: interactive
   - id: explorer-file-list
     selector: '[data-testid="explorer-file-list"]'
     kind: interactive
@@ -15421,11 +15508,8 @@ controls:
     aliases:
     - '[data-testid="explorer-file-row"] .ex-name'
     kind: interactive
-  - id: explorer-main-tab-icon
-    selector: '[data-testid="tab-item"][data-tab-type="file-browser"] .taomni-explorer-tab-icon path'
-    kind: display
   - id: explorer-workspace-tab-icon
-    selector: '[data-testid="workspace-tab"][data-tab-kind="explorer"] .taomni-explorer-tab-icon path'
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"] .taomni-explorer-tab-icon path'
     kind: display
   - id: explorer-files
     selector: '[data-testid="explorer-files"]'
@@ -15433,6 +15517,24 @@ controls:
   - id: explorer-filter
     selector: '[data-testid="explorer-filter"]'
     kind: interactive
+  - id: explorer-search-recursive
+    selector: '[data-testid="explorer-search-recursive"]'
+    kind: interactive
+  - id: explorer-search-clear
+    selector: '[data-testid="explorer-search-clear"]'
+    kind: interactive
+  - id: explorer-search-cancel
+    selector: '[data-testid="explorer-search-cancel"]'
+    kind: interactive
+  - id: explorer-search-retry
+    selector: '[data-testid="explorer-search-retry"]'
+    kind: interactive
+  - id: explorer-search-status
+    selector: '[data-testid="explorer-search-status"]'
+    kind: display
+  - id: explorer-search-result-path
+    selector: '[data-testid="explorer-search-result-path"]'
+    kind: display
   - id: explorer-forward
     selector: '[data-testid="explorer-forward"]'
     kind: interactive
@@ -15453,6 +15555,24 @@ controls:
     kind: display
   - id: explorer-new-file
     selector: '[data-testid="explorer-new-file"]'
+    kind: interactive
+  - id: explorer-new-file-md
+    selector: '[data-testid="explorer-new-file-md"]'
+    kind: interactive
+  - id: explorer-new-file-html
+    selector: '[data-testid="explorer-new-file-html"]'
+    kind: interactive
+  - id: explorer-new-file-css
+    selector: '[data-testid="explorer-new-file-css"]'
+    kind: interactive
+  - id: explorer-new-file-js
+    selector: '[data-testid="explorer-new-file-js"]'
+    kind: interactive
+  - id: explorer-new-file-ts
+    selector: '[data-testid="explorer-new-file-ts"]'
+    kind: interactive
+  - id: explorer-new-file-json
+    selector: '[data-testid="explorer-new-file-json"]'
     kind: interactive
   - id: explorer-new-folder
     selector: '[data-testid="explorer-new-folder"]'
@@ -15558,6 +15678,39 @@ controls:
     aliases:
     - '[data-testid="explorer-tab"]${fixture.explorer_previews_match}'
     kind: interactive
+  - id: explorer-tab-filter-chip
+    selector: '[data-testid="explorer-tab-filter-chip"]'
+    kind: interactive
+  - id: explorer-tab-filter-empty
+    selector: '[data-testid="explorer-tab-filter-empty"]'
+    kind: display
+  - id: explorer-tab-filter-files
+    selector: '[data-testid="explorer-tab-filter-files"]'
+    kind: interactive
+  - id: explorer-tab-filter-folders
+    selector: '[data-testid="explorer-tab-filter-folders"]'
+    kind: interactive
+  - id: explorer-tab-scroll-left
+    selector: '[data-testid="explorer-tab-scroll-left"]'
+    kind: interactive
+  - id: explorer-tab-scroll-right
+    selector: '[data-testid="explorer-tab-scroll-right"]'
+    kind: interactive
+  - id: explorer-tabs-filter-clear
+    selector: '[data-testid="explorer-tabs-filter-clear"]'
+    kind: interactive
+  - id: explorer-tabs-filter-menu
+    selector: '[data-testid="explorer-tabs-filter-menu"]'
+    kind: display
+  - id: explorer-tabs-filter-row
+    selector: '[data-testid="explorer-tabs-filter-row"]'
+    kind: interactive
+  - id: explorer-tabs-filter-search
+    selector: '[data-testid="explorer-tabs-filter-search"]'
+    kind: interactive
+  - id: explorer-tabs-filter-trigger
+    selector: '[data-testid="explorer-tabs-filter-trigger"]'
+    kind: interactive
   - id: explorer-toast
     selector: '[data-testid="explorer-toast"]'
     kind: display
@@ -15582,9 +15735,6 @@ controls:
   - id: explorer-view-list
     selector: '[data-testid="explorer-view-list"]'
     kind: interactive
-  - id: sidebar-tool-file-explorer
-    selector: '[data-testid="sidebar-tool-file-explorer"]'
-    kind: interactive
   - id: terminal-context-explorer
     selector: '[data-testid="terminal-context-explorer"]'
     kind: interactive
@@ -15593,7 +15743,7 @@ controls:
     kind: interactive
 -->
 
-已接入 Tools/主菜单、工作区导航与项目树、本地终端右键。保持原 File 会话关联与 SFTP 双栏。原型样式、导航/预览/选择、文件操作、回收站撤销及恢复由 TC-EXPLORER-001..005 验证；当前 GitHub 执行证据见 `docs-feature/file-explorer/implementation.md`，不以静态清单宣称原生通过。
+File Explorer 是 Sessions 下方的独立工作区，Tools 面板不再提供入口；主菜单、工作区导航、项目树、本地终端、Home 与历史恢复统一跳转到这里。目录与支持内部查看的文件共用独立标签，只有显式选择 Code Workspace 或系统应用才离开。新建支持 TXT、MD、HTML、CSS、JS、TS、JSON；搜索支持普通文本、递归、`*`/`?`/`**`/字符类、两种路径分隔符、相对路径、错误重试、进度与取消。Explorer 激活后是 rail-only 表面：左侧重复的 Explorer 边栏与 `toggle-left-sidebar` 不再渲染，切回 Sessions/Workspaces 后各模式的侧栏控件恢复；标签使用 Sessions 同款 `.taomni-tab` 样式、类型图标与共享顺序右键菜单，空白处按下即关闭菜单。TC-EXPLORER-001..011 覆盖导航、预览、选择、文件操作、恢复、多类型新建、真实磁盘搜索、标签溢出分页/过滤、Overview 纳入与删除方式选择、rail-only 侧栏与 Sessions 对齐标签/菜单空白关闭；当前执行证据见 `docs-feature/file-explorer/implementation.md`，不以静态清单宣称原生通过。
 
 ## 全局文件打开 / 预览 / 编辑
 
@@ -15628,6 +15778,8 @@ files:
   - src/components/viewer/markdown/MarkdownDiagramActions.tsx
   - src/components/viewer/markdown/MarkdownDiagramViewer.tsx
   - src/components/viewer/markdown/MarkdownLiveMenu.tsx
+  - src/components/viewer/markdown/MarkdownRenderWarnings.tsx
+  - src/components/viewer/markdown/markdownRenderFallback.ts
   - src/lib/markdownRemoteImages.ts
   - src-tauri/src/viewer/markdown_images.rs
   - src/components/viewer/markdown/drawioCodec.ts
@@ -15778,6 +15930,9 @@ controls:
   - id: viewer-close-keep-draft
     selector: '[data-testid="viewer-close-keep-draft"]'
     kind: interactive
+  - id: viewer-close-error
+    selector: '[data-testid="viewer-close-error"]'
+    kind: display
   - id: viewer-close-cancel
     selector: '[data-testid="viewer-close-cancel"]'
     kind: interactive
@@ -15886,6 +16041,15 @@ controls:
   - id: markdown-format-bold
     selector: '[data-testid="markdown-format-bold"]'
     kind: interactive
+  - id: markdown-format-italic
+    selector: '[data-testid="markdown-format-italic"]'
+    kind: interactive
+  - id: markdown-format-quote
+    selector: '[data-testid="markdown-format-quote"]'
+    kind: interactive
+  - id: markdown-insert-menu
+    selector: '[data-testid="markdown-insert-menu"]'
+    kind: interactive
   - id: markdown-outline
     selector: '[data-testid="markdown-outline"]'
     kind: interactive
@@ -15921,6 +16085,18 @@ controls:
     kind: interactive
   - id: markdown-paste-status
     selector: '[data-testid="markdown-paste-status"]'
+    kind: display
+  - id: markdown-render-warnings
+    selector: '[data-testid="markdown-render-warnings"]'
+    kind: display
+  - id: markdown-render-warning-item
+    selector: '[data-testid="markdown-render-warning-item"]'
+    kind: display
+  - id: markdown-render-warning-dismiss
+    selector: '[data-testid="markdown-render-warning-dismiss"]'
+    kind: interactive
+  - id: markdown-render-placeholder
+    selector: '[data-testid="markdown-render-placeholder"]'
     kind: display
   - id: markdown-export-fileHeader
     selector: '[data-testid="markdown-export-fileHeader"]'
@@ -16399,5 +16575,587 @@ The retired Tao-specific key/save selectors are retained as optional absence ass
 
 真实用户 testing.md 回归由 TC-FILE-OPEN-027/028 验证 Live 表格内联格式、Word 流程图线身、draw.io 时序连接点和可搜索 PDF，并核对原文 SHA。实际 draw.io Desktop / LibreOffice 视觉证据另行留存；不将内部 maxGraph 预览当作外部编辑器验收。
 
-TC-FILE-OPEN-029/030 覆盖 Markdown Live 的实际拖选与选区对比度、深色源码标记以及 Live、源码和分栏的共享查找替换控件。
+TC-FILE-OPEN-029/030 覆盖 Markdown Live 的实际拖选与选区对比度、深色源码标记与深色源码选区（聚焦/失焦且不遮盖活动行），以及 Live、源码和分栏的共享查找替换控件。
 TC-FILE-OPEN-031/032 覆盖左侧工具栏的 draw.io 导入、Live 和分栏预览与 draw.io Desktop 原图的像素比较，以及导出后可编辑节点和连线的往返校验。
+TC-FILE-OPEN-045 覆盖深色主题下 Markdown Live 编辑、源码与分栏模式的选区对比度（含局部浅色/深色预览外观覆盖）、格式工具栏（标题/粗体/斜体/引用）、专注模式、大纲切换与 `/` 插入菜单的真实保存往返。
+
+## 16. Notepad 工作台（Notepad++ 对齐）
+
+### 16.1 Notepad 工作台外壳与文件生命周期
+
+<!-- feature
+id: F-NOTEPAD-1
+title: Notepad Workbench Shell and File Lifecycle
+status: implemented
+area: editor/notepad
+components: [NotepadEditor, NotepadToolbar, NotepadMenuBar, NotepadStatusBar, NotepadCodeMirrorPane, NotepadContextMenu, FileLifecycleDialogs]
+files:
+  - src/components/notepad/NotepadEditor.tsx
+  - src/components/notepad/NotepadToolbar.tsx
+  - src/components/notepad/NotepadMenuBar.tsx
+  - src/components/notepad/NotepadStatusBar.tsx
+  - src/components/notepad/NotepadCodeMirrorPane.tsx
+  - src/components/notepad/NotepadContextMenu.tsx
+  - src/components/notepad/notepad.css
+  - src/components/notepad/dialogs/FileLifecycleDialogs.tsx
+  - src/components/notepad/useNotepadActions.ts
+  - src/components/notepad/actions/coreCommands.ts
+  - src/components/notepad/actions/extraCommands.ts
+  - src/components/notepad/actions/saveDefaults.ts
+  - src/lib/notepad/persistence/savePath.ts
+  - src/lib/notepad/commands/labels.ts
+  - src/components/viewer/ViewerShell.tsx
+  - src/components/viewer/ViewerDirtyIndicator.tsx
+  - src/components/explorer/ExplorerTabStrip.tsx
+  - src/lib/notepad/commands/catalog.ts
+  - src/lib/notepad/commands/menus.ts
+  - src/lib/notepad/host/viewerTabHost.ts
+  - src/stores/notepadStore.ts
+  - src/stores/notepadPreferences.ts
+  - src/stores/documentStore.ts
+  - src/stubs/commands/notepad.ts
+controls:
+  - id: notepad-workbench
+    selector: '[data-testid="notepad-workbench"]'
+    kind: display
+  - id: notepad-toolbar
+    selector: '[data-testid="notepad-toolbar"]'
+    kind: display
+  - id: notepad-menubar
+    selector: '[data-testid="notepad-menubar"]'
+    kind: display
+  - id: notepad-status-bar
+    selector: '[data-testid="notepad-status-bar"]'
+    kind: display
+  - id: notepad-status-stats
+    selector: '[data-testid="notepad-status-stats"]'
+    kind: display
+  - id: notepad-status-eol
+    selector: '[data-testid="notepad-status-eol"]'
+    kind: interactive
+  - id: notepad-status-encoding
+    selector: '[data-testid="notepad-status-encoding"]'
+    kind: interactive
+  - id: notepad-status-ovr
+    selector: '[data-testid="notepad-status-ovr"]'
+    kind: interactive
+  - id: notepad-status-zoom
+    selector: '[data-testid="notepad-status-zoom"]'
+    kind: interactive
+  - id: viewer-tab-dirty
+    selector: '[data-testid="viewer-tab-dirty"]'
+    kind: display
+  - id: notepad-status-sel
+    selector: '[data-testid="notepad-status-sel"]'
+    kind: display
+    optional: true
+    note: Selection chip is rendered only while the editor selection is non-empty.
+  - id: explorer-tab-new-notepad
+    selector: '[data-testid="explorer-tab-new-notepad"]'
+    kind: interactive
+  - id: notepad-tool-wrap
+    selector: '[data-testid="notepad-tool-wrap"]'
+    kind: interactive
+  - id: notepad-tool-symbols
+    selector: '[data-testid="notepad-tool-symbols"]'
+    kind: interactive
+  - id: notepad-menu-file
+    selector: '[data-testid="notepad-menu-file"]'
+    kind: interactive
+  - id: notepad-menu-help
+    selector: '[data-testid="notepad-menu-help"]'
+    kind: display
+    optional: true
+    note: Prototype-parity menu has no Help menu; asserted absent on purpose.
+  - id: notepad-menu-item-file-new
+    selector: '[data-testid="notepad-menu-item-file.new"]'
+    kind: display
+    note: Presence only; the New command itself is exercised through the toolbar.
+  - id: notepad-menu-item-file-save
+    selector: '[data-testid="notepad-menu-item-file.save"]'
+    kind: interactive
+  - id: notepad-menu-item-file-save-as
+    selector: '[data-testid="notepad-menu-item-file.saveAs"]'
+    kind: interactive
+  - id: notepad-menu-item-file-save-copy
+    selector: '[data-testid="notepad-menu-item-file.saveCopy"]'
+    kind: interactive
+  - id: notepad-menu-item-file-print
+    selector: '[data-testid="notepad-menu-item-file.print"]'
+    kind: interactive
+  - id: notepad-menu-item-file-close
+    selector: '[data-testid="notepad-menu-item-file.close"]'
+    kind: interactive
+  - id: notepad-save-as-dialog
+    selector: '[data-testid="notepad-save-as-dialog"]'
+    kind: display
+  - id: notepad-save-as-input
+    selector: '[data-testid="notepad-save-as-input"]'
+    kind: interactive
+  - id: notepad-save-as-confirm
+    selector: '[data-testid="notepad-save-as-confirm"]'
+    kind: interactive
+  - id: notepad-active-editor
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="viewer-editor"]'
+    kind: interactive
+  - id: notepad-context-undo
+    selector: '[data-testid="notepad-context-undo"]'
+    kind: display
+    note: Row presence is asserted; the Undo action itself is exercised through toolbar/menu cases.
+  - id: notepad-context-redo
+    selector: '[data-testid="notepad-context-redo"]'
+    kind: display
+  - id: notepad-context-cut
+    selector: '[data-testid="notepad-context-cut"]'
+    kind: display
+  - id: notepad-context-copy
+    selector: '[data-testid="notepad-context-copy"]'
+    kind: display
+  - id: notepad-context-paste
+    selector: '[data-testid="notepad-context-paste"]'
+    kind: display
+  - id: notepad-context-paste-special
+    selector: '[data-testid="notepad-context-paste-special"]'
+    kind: display
+  - id: notepad-context-delete
+    selector: '[data-testid="notepad-context-delete"]'
+    kind: display
+  - id: notepad-context-select-all
+    selector: '[data-testid="notepad-context-select-all"]'
+    kind: display
+  - id: notepad-context-duplicate-line
+    selector: '[data-testid="notepad-context-duplicate-line"]'
+    kind: display
+  - id: notepad-context-delete-line
+    selector: '[data-testid="notepad-context-delete-line"]'
+    kind: display
+  - id: notepad-context-move-line-up
+    selector: '[data-testid="notepad-context-move-line-up"]'
+    kind: display
+  - id: notepad-context-move-line-down
+    selector: '[data-testid="notepad-context-move-line-down"]'
+    kind: display
+  - id: notepad-context-find
+    selector: '[data-testid="notepad-context-find"]'
+    kind: display
+  - id: notepad-context-find-next
+    selector: '[data-testid="notepad-context-find-next"]'
+    kind: display
+  - id: notepad-context-replace
+    selector: '[data-testid="notepad-context-replace"]'
+    kind: display
+  - id: notepad-context-go-to
+    selector: '[data-testid="notepad-context-go-to"]'
+    kind: display
+  - id: notepad-context-toggle-bookmark
+    selector: '[data-testid="notepad-context-toggle-bookmark"]'
+    kind: display
+  - id: notepad-context-copy-path
+    selector: '[data-testid="notepad-context-copy-path"]'
+    kind: display
+  - id: notepad-context-save
+    selector: '[data-testid="notepad-context-save"]'
+    kind: interactive
+  - id: notepad-context-save-as
+    selector: '[data-testid="notepad-context-save-as"]'
+    kind: display
+  - id: notepad-menu-edit
+    selector: '[data-testid="notepad-menu-edit"]'
+    kind: interactive
+  - id: notepad-menu-item-edit-paste
+    selector: '[data-testid="notepad-menu-item-edit.paste"]'
+    kind: interactive
+  - id: notepad-menu-item-edit-clipboard-history
+    selector: '[data-testid="notepad-menu-item-edit.clipboardHistory"]'
+    kind: interactive
+  - id: notepad-clipboard-history-dialog
+    selector: '[data-testid="notepad-clipboard-history-dialog"]'
+    kind: display
+  - id: notepad-clipboard-history-empty
+    selector: '[data-testid="notepad-clipboard-history-empty"]'
+    kind: display
+  - id: notepad-clipboard-history-item
+    selector: '[data-testid="notepad-clipboard-history-item-0"]'
+    kind: interactive
+  - id: notepad-menu-item-file-toggle-readonly
+    selector: '[data-testid="notepad-menu-item-file.toggleReadonly"]'
+    kind: interactive
+  - id: notepad-status-readonly
+    selector: '[data-testid="notepad-status-readonly"]'
+    kind: interactive
+  - id: notepad-menu-item-file-open-with
+    selector: '[data-testid="notepad-menu-item-file.openWith"]'
+    kind: interactive
+  - id: notepad-open-with-dialog
+    selector: '[data-testid="notepad-open-with-dialog"]'
+    kind: display
+  - id: notepad-open-with-notepad
+    selector: '[data-testid="notepad-open-with-notepad"]'
+    kind: display
+  - id: notepad-open-with-taoffice
+    selector: '[data-testid="notepad-open-with-taoffice"]'
+    kind: display
+  - id: notepad-open-with-close
+    selector: '[data-testid="notepad-open-with-close"]'
+    kind: interactive
+  - id: notepad-menu-item-edit-select-all
+    selector: '[data-testid="notepad-menu-item-edit.selectAll"]'
+    kind: interactive
+  - id: notepad-menu-group-case
+    selector: '[data-testid="notepad-menu-group-case"]'
+    kind: interactive
+  - id: notepad-menu-item-edit-to-upper-case
+    selector: '[data-testid="notepad-menu-item-edit.toUpperCase"]'
+    kind: interactive
+  - id: notepad-menu-group-line-ops
+    selector: '[data-testid="notepad-menu-group-line-ops"]'
+    kind: interactive
+  - id: notepad-menu-group-sort
+    selector: '[data-testid="notepad-menu-group-sort"]'
+    kind: interactive
+  - id: notepad-menu-item-edit-sort-asc
+    selector: '[data-testid="notepad-menu-item-edit.sortAsc"]'
+    kind: interactive
+  - id: notepad-whole-doc-dialog
+    selector: '[data-testid="notepad-whole-doc-dialog"]'
+    kind: display
+  - id: notepad-whole-doc-confirm
+    selector: '[data-testid="notepad-whole-doc-confirm"]'
+    kind: interactive
+-->
+
+### 16.2 Notepad 查找、替换与搜索结果
+
+<!-- feature
+id: F-NOTEPAD-2
+title: Notepad Find Replace and Search Results
+status: implemented
+area: editor/notepad-search
+components: [FindReplaceBar, SearchResultsPanel, NotepadToolbar]
+files:
+  - src/components/notepad/FindReplaceBar.tsx
+  - src/components/notepad/notepad-findbar.css
+  - src/components/notepad/panels/SearchResultsPanel.tsx
+  - src/components/notepad/actions/coreCommands.ts
+  - src/components/notepad/useNotepadActions.ts
+  - src/lib/notepad/search/engine.ts
+  - src/lib/notepad/search/findInFiles.ts
+  - src/lib/notepad/transforms/escape.ts
+  - src/stores/notepadStore.ts
+controls:
+  - id: notepad-tool-find
+    selector: '[data-testid="notepad-tool-find"]'
+    kind: interactive
+  - id: notepad-find-bar
+    selector: '[data-testid="notepad-find-bar"]'
+    kind: display
+  - id: notepad-find-all-current
+    selector: '[data-testid="notepad-find-all-current"]'
+    kind: interactive
+  - id: np-find-input
+    selector: '[data-testid="np-find-input"]'
+    kind: interactive
+  - id: notepad-find-status
+    selector: '[data-testid="notepad-find-status"]'
+    kind: display
+  - id: np-find-next
+    selector: '[data-testid="np-find-next"]'
+    kind: interactive
+  - id: np-find-count
+    selector: '[data-testid="np-find-count"]'
+    kind: interactive
+  - id: np-find-tab-find
+    selector: '[data-testid="np-find-tab-find"]'
+    kind: interactive
+  - id: np-find-tab-replace
+    selector: '[data-testid="np-find-tab-replace"]'
+    kind: interactive
+  - id: np-find-tab-mark
+    selector: '[data-testid="np-find-tab-mark"]'
+    kind: interactive
+  - id: np-find-tab-files
+    selector: '[data-testid="np-find-tab-files"]'
+    kind: interactive
+  - id: np-find-replace-input
+    selector: '[data-testid="np-find-replace-input"]'
+    kind: interactive
+  - id: np-find-replace-all
+    selector: '[data-testid="np-find-replace-all"]'
+    kind: interactive
+  - id: np-find-all-current
+    selector: '[data-testid="np-find-all-current"]'
+    kind: interactive
+  - id: np-find-mark-all
+    selector: '[data-testid="np-find-mark-all"]'
+    kind: interactive
+  - id: np-find-in-files
+    selector: '[data-testid="np-find-in-files"]'
+    kind: interactive
+  - id: np-find-close
+    selector: '[data-testid="np-find-close"]'
+    kind: interactive
+  - id: notepad-files-dir
+    selector: '[data-testid="notepad-files-dir"]'
+    kind: interactive
+  - id: notepad-files-filter
+    selector: '[data-testid="notepad-files-filter"]'
+    kind: interactive
+  - id: notepad-panel-results
+    selector: '[data-testid="notepad-panel-results"]'
+    kind: display
+  - id: notepad-search-results
+    selector: '[data-testid="notepad-search-results"]'
+    kind: display
+  - id: notepad-result-hit
+    selector: '[data-testid^="notepad-result-hit-"]'
+    kind: display
+  - id: notepad-mode-re
+    selector: '[data-testid="notepad-mode-re"]'
+    kind: interactive
+-->
+
+### 16.3 Notepad 分屏、面板与视图状态
+
+<!-- feature
+id: F-NOTEPAD-3
+title: Notepad Split Panes Panels and View State
+status: implemented
+area: editor/notepad-view
+components: [NotepadSplitPanes, NotepadCodeMirrorPane, PanelHost, DocumentMapPanel, CharPanel, EncodingDialog, NotepadMenuBar]
+files:
+  - src/components/notepad/NotepadSplitPanes.tsx
+  - src/components/notepad/NotepadCodeMirrorPane.tsx
+  - src/components/notepad/panels/PanelHost.tsx
+  - src/components/notepad/panels/DocumentMapPanel.tsx
+  - src/components/notepad/panels/CharPanel.tsx
+  - src/components/notepad/panels/DocumentListPanel.tsx
+  - src/components/notepad/dialogs/EncodingDialog.tsx
+  - src/components/notepad/actions/coreCommands.ts
+  - src/components/notepad/actions/extraCommands.ts
+  - src/lib/notepad/cm6/splitSync.ts
+  - src/lib/notepad/cm6/extensions.ts
+  - src/lib/notepad/commands/menus.ts
+  - src/stores/notepadStore.ts
+  - src/stores/notepadPreferences.ts
+controls:
+  - id: notepad-tool-split
+    selector: '[data-testid="notepad-tool-split"]'
+    kind: interactive
+  - id: notepad-tool-docmap
+    selector: '[data-testid="notepad-tool-docmap"]'
+    kind: interactive
+  - id: notepad-editor-secondary
+    selector: '[data-testid="notepad-editor-secondary"]'
+    kind: display
+  - id: notepad-menu-view
+    selector: '[data-testid="notepad-menu-view"]'
+    kind: interactive
+  - id: notepad-menu-item-view-rotate-split
+    selector: '[data-testid="notepad-menu-item-view.rotateSplit"]'
+    kind: interactive
+  - id: notepad-menu-item-view-toggle-char-panel
+    selector: '[data-testid="notepad-menu-item-view.toggleCharPanel"]'
+    kind: interactive
+  - id: notepad-menu-group-zoom
+    selector: '[data-testid="notepad-menu-group-zoom"]'
+    kind: interactive
+  - id: notepad-menu-item-view-zoom-in
+    selector: '[data-testid="notepad-menu-item-view.zoomIn"]'
+    kind: interactive
+  - id: notepad-panel-minimap
+    selector: '[data-testid="notepad-panel-minimap"]'
+    kind: display
+  - id: notepad-panel-chars
+    selector: '[data-testid="notepad-panel-chars"]'
+    kind: display
+  - id: notepad-char-panel
+    selector: '[data-testid="notepad-char-panel"]'
+    kind: display
+  - id: notepad-dock-right
+    selector: '[data-testid="notepad-dock-right"]'
+    kind: display
+  - id: notepad-dock-bottom
+    selector: '[data-testid="notepad-dock-bottom"]'
+    kind: display
+  - id: notepad-panel-dock-menu-minimap
+    selector: '[data-testid="notepad-panel-dock-menu-minimap"]'
+    kind: interactive
+  - id: notepad-panel-dock-minimap-float
+    selector: '[data-testid="notepad-panel-dock-minimap-float"]'
+    kind: interactive
+  - id: notepad-float-layer
+    selector: '[data-testid="notepad-float-layer"]'
+    kind: display
+  - id: notepad-encoding-dialog
+    selector: '[data-testid="notepad-encoding-dialog"]'
+    kind: display
+  - id: notepad-enc-apply
+    selector: '[data-testid="notepad-enc-apply"]'
+    kind: display
+  - id: notepad-enc-option-gbk
+    selector: '[data-testid="notepad-enc-option-GBK"]'
+    kind: display
+  - id: notepad-menu-item-view-distraction-free
+    selector: '[data-testid="notepad-menu-item-view.distractionFree"]'
+    kind: interactive
+  - id: notepad-exit-view-mode
+    selector: '[data-testid="notepad-exit-view-mode"]'
+    kind: interactive
+  - id: notepad-char-row-65
+    selector: '[data-testid="notepad-char-row-65"]'
+    kind: interactive
+-->
+
+### 16.4 Notepad 工具、对话框与设置
+
+<!-- feature
+id: F-NOTEPAD-4
+title: Notepad Tools Dialogs Macro and Settings
+status: implemented
+area: editor/notepad-tools
+components: [PreferencesDialog, ShortcutMapperDialog, CompareOverlay, ToolboxDialogs, PrintDialog, MacroDialogs, NotepadMenuBar, NotepadSettingsPanel]
+files:
+  - src/components/notepad/dialogs/PreferencesDialog.tsx
+  - src/components/notepad/dialogs/ShortcutMapperDialog.tsx
+  - src/components/notepad/dialogs/CompareOverlay.tsx
+  - src/components/notepad/dialogs/ToolboxDialogs.tsx
+  - src/components/notepad/dialogs/PrintDialog.tsx
+  - src/components/notepad/dialogs/MacroDialogs.tsx
+  - src/components/notepad/dialogs/PickerDialogs.tsx
+  - src/components/settings/NotepadSettingsPanel.tsx
+  - src/lib/notepad/commands/keymap.ts
+  - src/lib/notepad/commands/catalog.ts
+  - src/lib/notepad/commands/menus.ts
+  - src/lib/notepad/macro/macroManager.ts
+  - src/lib/notepad/print/printDocument.ts
+  - src/lib/notepad/ipc.ts
+  - src/stores/notepadStore.ts
+  - src/stores/notepadPreferences.ts
+  - src/stubs/commands/notepad.ts
+controls:
+  - id: notepad-menu-tools
+    selector: '[data-testid="notepad-menu-tools"]'
+    kind: interactive
+  - id: notepad-menu-compare
+    selector: '[data-testid="notepad-menu-compare"]'
+    kind: interactive
+  - id: notepad-menu-item-tools-preferences
+    selector: '[data-testid="notepad-menu-item-tools.preferences"]'
+    kind: interactive
+  - id: notepad-menu-item-tools-shortcut-mapper
+    selector: '[data-testid="notepad-menu-item-tools.shortcutMapper"]'
+    kind: interactive
+  - id: notepad-menu-item-tools-compare-disk
+    selector: '[data-testid="notepad-menu-item-tools.compareDisk"]'
+    kind: interactive
+  - id: notepad-menu-item-tools-hash-dialog
+    selector: '[data-testid="notepad-menu-item-tools.hashDialog"]'
+    kind: interactive
+  - id: notepad-preferences-dialog
+    selector: '[data-testid="notepad-preferences-dialog"]'
+    kind: display
+  - id: notepad-settings
+    selector: '[data-testid="notepad-settings"]'
+    kind: display
+  - id: notepad-pref-eol
+    selector: '[data-testid="notepad-pref-eol"]'
+    kind: display
+  - id: notepad-pref-encoding
+    selector: '[data-testid="notepad-pref-encoding"]'
+    kind: display
+  - id: notepad-pref-backup-mode
+    selector: '[data-testid="notepad-pref-backup-mode"]'
+    kind: display
+  - id: notepad-pref-line-numbers
+    selector: '[data-testid="notepad-pref-line-numbers"]'
+    kind: interactive
+  - id: notepad-shortcut-mapper-dialog
+    selector: '[data-testid="notepad-shortcut-mapper-dialog"]'
+    kind: display
+  - id: notepad-keymap-filter
+    selector: '[data-testid="notepad-keymap-filter"]'
+    kind: display
+  - id: notepad-keymap-bind
+    selector: '[data-testid^="notepad-keymap-bind-"]'
+    kind: display
+  - id: notepad-compare-dialog
+    selector: '[data-testid="notepad-compare-dialog"]'
+    kind: display
+  - id: notepad-hash-dialog
+    selector: '[data-testid="notepad-hash-dialog"]'
+    kind: display
+  - id: notepad-hash-generate
+    selector: '[data-testid="notepad-hash-generate"]'
+    kind: interactive
+  - id: notepad-hash-output
+    selector: '[data-testid="notepad-hash-output"]'
+    kind: display
+  - id: notepad-print-dialog
+    selector: '[data-testid="notepad-print-dialog"]'
+    kind: display
+  - id: notepad-print-confirm
+    selector: '[data-testid="notepad-print-confirm"]'
+    kind: display
+  - id: notepad-tool-macro-record
+    selector: '[data-testid="notepad-tool-macro-record"]'
+    kind: interactive
+  - id: notepad-tool-macro-stop
+    selector: '[data-testid="notepad-tool-macro-stop"]'
+    kind: interactive
+  - id: notepad-menubar-recording
+    selector: '[data-testid="notepad-menubar-recording"]'
+    kind: display
+  - id: notepad-status-rec
+    selector: '[data-testid="notepad-status-rec"]'
+    kind: display
+  - id: notepad-menu-macro
+    selector: '[data-testid="notepad-menu-macro"]'
+    kind: interactive
+  - id: notepad-menu-item-macro-save-current
+    selector: '[data-testid="notepad-menu-item-macro.saveCurrent"]'
+    kind: interactive
+  - id: notepad-macro-save-dialog
+    selector: '[data-testid="notepad-macro-save-dialog"]'
+    kind: display
+  - id: notepad-macro-name-input
+    selector: '[data-testid="notepad-macro-name-input"]'
+    kind: interactive
+  - id: notepad-macro-save-confirm
+    selector: '[data-testid="notepad-macro-save-confirm"]'
+    kind: interactive
+  - id: notepad-menu-macro-echo-upper
+    selector: '[data-testid="notepad-menu-macro-EchoUpper"]'
+    kind: interactive
+-->
+
+### 16.2 Notepad 真实磁盘与文件系统边界（native）
+
+<!-- feature
+id: F-NOTEPAD-5
+title: Notepad Native Real-Disk Save Conflict and Copy Semantics
+status: implemented
+area: editor/notepad-native
+components: [NotepadEditor, FileLifecycleDialogs, ViewerShell, ExplorerFileList]
+files:
+  - src/components/notepad/NotepadEditor.tsx
+  - src/components/notepad/dialogs/FileLifecycleDialogs.tsx
+  - src/components/notepad/actions/coreCommands.ts
+  - src/components/notepad/actions/extraCommands.ts
+  - src/components/notepad/useNotepadActions.ts
+  - src/components/viewer/ViewerShell.tsx
+  - src/lib/notepad/ipc.ts
+  - src/stores/notepadStore.ts
+  - src-tauri/src/commands/notepad.rs
+  - src-tauri/src/viewer/text.rs
+controls: []
+-->
+
+TC-NP-101/102 在 Linux/Windows/macOS 的 native 模式下用 `file_open_files` 真实宿主机目录验证：Notepad 打开 `notes.txt` 后
+Ctrl/Cmd+S 通过 `viewer_write_text` 写出真实字节；外部进程改写后保存出现冲突横幅，重新加载应用磁盘内容；另存为把文档重键到
+新路径并更新标签，保存副本写出第二个真实文件而当前文档仍指向另存为目标。浏览器 VFS 无法证明这些主机侧效果，因此这两个用例
+只登记 native；真机平台结果以各次托管运行的 shard 报告为准，未执行平台保持未验证。
+
+TC-NP-103 在同一 native 边界验证 U2 的 Save As 默认目录：未命名文档的默认路径必须是真实 `get_home_dir` 下的绝对 `.txt` 路径，
+确认后由 `assert_file_open_bytes` 独立读取宿主机字节；随后新未命名文档的默认目录必须复用真实 localStorage 记住的上次保存目录。
+TC-NP-007 在浏览器补齐 AC-1..AC-4 的渲染层断言：深浅主题下 Save As 弹窗计算背景/文字色、`/preview` HOME 默认路径与上次目录记忆、
+编辑器右键应用菜单（行 testid、命令执行与外点关闭）。原生 OS HOME、文件对话框与物理快捷输入不由这些浏览器断言证明。

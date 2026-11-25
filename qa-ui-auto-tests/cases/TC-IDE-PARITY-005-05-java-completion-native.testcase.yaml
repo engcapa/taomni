@@ -15,8 +15,10 @@ steps:
       key: taomni.recentWorkspaces.v1
       value: '[{"id":"qa-parity005-native","name":"parity005","roots":[{"id":"parity005","name":"parity005","path":"${fixture.parity005_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"parity005","path":"src/main/java/parity005/Main.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
   - reload_window: null
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity005_root}"]'
+  - click: '[data-testid="tao-home-history"]'
+  - wait_for: '[data-testid="tao-home-history-popover"]'
+  - click: '[data-testid="tao-home-history-tab-workspaces"]'
+  - click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity005_root}"]'
   - wait_for:
       selector: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
       timeout_sec: 90
@@ -416,144 +418,144 @@ verification:
   requirements:
     - id: ED-PARITY-005-V5-type
       requirement: Real ready JDT LS supplies the named class, its original item and import resolve; one acceptance and Undo reconcile with host bytes.
-      actions: [4, 7, 19, 22, 26, 28, 34, 37, 40]
+      actions: [4, 9, 21, 24, 28, 30, 36, 39, 42]
       checkpoints:
-        - step: 9
+        - step: 11
           expectation: Maven project facts are ready before completion.
-        - step: 10
+        - step: 12
           expectation: The Java semantic session is ready.
-        - step: 21
-          expectation: Unsaved prefix editing has not changed the host B0 bytes.
         - step: 23
+          expectation: Unsaved prefix editing has not changed the host B0 bytes.
+        - step: 25
           expectation: The real popup includes the full Commons Lang package identity.
-        - step: 24
+        - step: 26
           expectation: The matching original JSON-RPC item is recorded.
-        - step: 29
-          expectation: Resolve returned a real item with the import additional edit.
-        - step: 30
-          expectation: The type identifier is accepted.
         - step: 31
-          expectation: Exactly one import is visible in the editor.
+          expectation: Resolve returned a real item with the import additional edit.
         - step: 32
+          expectation: The type identifier is accepted.
+        - step: 33
+          expectation: Exactly one import is visible in the editor.
+        - step: 34
           expectation: Acceptance has not saved host bytes implicitly.
-        - step: 35
+        - step: 37
           expectation: Explicit Save writes the import to host bytes.
-        - step: 36
-          expectation: Explicit Save writes the identifier to host bytes.
         - step: 38
+          expectation: Explicit Save writes the identifier to host bytes.
+        - step: 40
           expectation: One Undo restores the prefix.
-        - step: 39
-          expectation: One Undo also removes the import.
         - step: 41
+          expectation: One Undo also removes the import.
+        - step: 43
           expectation: Saving after Undo writes the prefix version to host bytes.
-      results: [9, 10, 21, 23, 24, 29, 30, 31, 32, 35, 36, 38, 39, 41]
+      results: [11, 12, 23, 25, 26, 31, 32, 33, 34, 37, 38, 40, 41, 43]
     - id: ED-PARITY-005-V5-snippet
       requirement: The fixed append(String str) item is provider snippet format, accepts once and Undo restores the method prefix.
-      actions: [49, 53, 55, 59, 61, 65, 66, 67]
+      actions: [51, 55, 57, 61, 63, 67, 68, 69]
       checkpoints:
-        - step: 56
+        - step: 58
           expectation: The fixed method overload is in the real popup.
-        - step: 57
+        - step: 59
           expectation: The original method item is saved before acceptance.
-        - step: 62
+        - step: 64
           expectation: The real resolve preserves snippet format and raw fields.
-        - step: 63
+        - step: 65
           expectation: The accepted call appears in the editor.
-        - step: 68
+        - step: 70
           expectation: One Undo restores the method prefix after snippet navigation.
-      results: [56, 57, 62, 63, 68]
+      results: [58, 59, 64, 65, 70]
     - id: ED-PARITY-005-V5-save-reuse
       requirement: Two changed-and-saved Java buffers continue to obtain real method candidates.
-      actions: [71, 72, 73, 76, 77, 78, 81, 82, 83]
+      actions: [73, 74, 75, 78, 79, 80, 83, 84, 85]
       checkpoints:
-        - step: 74
+        - step: 76
           expectation: The first save leaves member completion available.
-        - step: 75
+        - step: 77
           expectation: The first post-save request appears in the real provider trace.
-        - step: 84
+        - step: 86
           expectation: The second save leaves member completion available.
-        - step: 85
+        - step: 87
           expectation: The second post-save request appears in the real provider trace.
-      results: [74, 75, 84, 85]
+      results: [76, 77, 86, 87]
     - id: ED-PARITY-005-V5-fault
       requirement: Isolated Rust transport null and error faults show a zero-edit gate, recover after null and dismiss after error.
-      actions: [94, 96, 97, 99, 101, 105, 106, 110, 111, 112, 114, 116, 120, 121]
+      actions: [96, 98, 99, 101, 103, 107, 108, 112, 113, 114, 116, 118, 122, 123]
       checkpoints:
-        - step: 102
-          expectation: A controlled null opens the unavailable gate.
-        - step: 103
-          expectation: Rust reports null as unavailable, not resolved.
         - step: 104
+          expectation: A controlled null opens the unavailable gate.
+        - step: 105
+          expectation: Rust reports null as unavailable, not resolved.
+        - step: 106
           expectation: The null response made no primary edit.
-        - step: 107
-          expectation: Retry closes the gate after restoring real provider resolve.
-        - step: 108
-          expectation: Retry records a real resolved import edit.
         - step: 109
+          expectation: Retry closes the gate after restoring real provider resolve.
+        - step: 110
+          expectation: Retry records a real resolved import edit.
+        - step: 111
           expectation: Retry accepts the identifier.
-        - step: 117
-          expectation: A controlled error opens the gate.
-        - step: 118
-          expectation: Rust reports the error as failed, not resolved.
         - step: 119
+          expectation: A controlled error opens the gate.
+        - step: 120
+          expectation: Rust reports the error as failed, not resolved.
+        - step: 121
           expectation: The error response made no primary edit.
-        - step: 122
+        - step: 124
           expectation: Dismiss closes the gate without accepting.
-      results: [102, 103, 104, 107, 108, 109, 117, 118, 119, 122]
+      results: [104, 105, 106, 109, 110, 111, 119, 120, 121, 124]
     - id: ED-PARITY-005-V5-midword
       requirement: Real JDT LS insert and replace ranges produce distinct Enter, Tab and double-click results, each with one import and one Undo.
-      actions: [123, 140, 150, 151, 155, 156, 159, 162, 165, 166, 169, 172, 175, 177, 180]
+      actions: [125, 142, 152, 153, 157, 158, 161, 164, 167, 168, 171, 174, 177, 179, 182]
       checkpoints:
-        - step: 148
+        - step: 150
           expectation: The same Java document has the exact Tmid preimage before all three entries.
-        - step: 149
+        - step: 151
           expectation: The caret is between StringUti and Suffix.
-        - step: 153
+        - step: 155
           expectation: The Commons Lang original item carries the provider's distinct insert and replace ranges.
-        - step: 157
+        - step: 159
           expectation: Enter resolve preserves both ranges and returns the real import edit.
-        - step: 158
-          expectation: Enter keeps Suffix and adds exactly one import.
         - step: 160
+          expectation: Enter keeps Suffix and adds exactly one import.
+        - step: 162
           expectation: One Undo restores the full Tmid preimage after Enter.
-        - step: 164
+        - step: 166
           expectation: The next provider request supplies the same range contract.
-        - step: 167
+        - step: 169
           expectation: Tab resolve preserves both ranges and returns the real import edit.
-        - step: 168
-          expectation: Tab replaces Suffix and adds exactly one import.
         - step: 170
+          expectation: Tab replaces Suffix and adds exactly one import.
+        - step: 172
           expectation: One Undo restores the full Tmid preimage after Tab.
-        - step: 174
-          expectation: The mouse round receives a fresh real provider item.
         - step: 176
-          expectation: A single click changes selection without editing the buffer.
+          expectation: The mouse round receives a fresh real provider item.
         - step: 178
+          expectation: A single click changes selection without editing the buffer.
+        - step: 180
           expectation: Double-click resolve preserves both ranges and returns the real import edit.
-        - step: 179
-          expectation: Double click keeps Suffix and adds exactly one import.
         - step: 181
+          expectation: Double click keeps Suffix and adds exactly one import.
+        - step: 183
           expectation: One Undo restores the full Tmid preimage after double click.
-      results: [148, 149, 153, 157, 158, 160, 164, 167, 168, 170, 174, 176, 178, 179, 181]
+      results: [150, 151, 155, 159, 160, 162, 166, 169, 170, 172, 176, 178, 180, 181, 183]
     - id: ED-PARITY-005-V6-matched-profile
       requirement: The real JDT LS popup is captured with the IDEA reference theme and editor font settings while the Tmid buffer remains unchanged.
-      actions: [183, 184, 186, 188, 189, 190, 191, 193, 194, 195, 196, 197, 198, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 218, 221, 222]
+      actions: [185, 186, 188, 190, 191, 192, 193, 195, 196, 197, 198, 199, 200, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 220, 223, 224]
       checkpoints:
-        - step: 185
+        - step: 187
           expectation: The application is using its dark theme.
-        - step: 192
+        - step: 194
           expectation: The editor appearance action opened the real settings dialog.
-        - step: 199
+        - step: 201
           expectation: Applying the font, line height and color scheme closed settings.
-        - step: 200
+        - step: 202
           expectation: The editor font computes to 16px.
-        - step: 217
+        - step: 219
           expectation: The matching real JDT LS candidate and insert/replace ranges are recorded.
-        - step: 220
+        - step: 222
           expectation: The popup remains within the WebView viewport.
-        - step: 223
+        - step: 225
           expectation: Escape leaves the Tmid buffer unchanged.
-      results: [185, 192, 199, 200, 217, 220, 223]
+      results: [187, 194, 201, 202, 219, 222, 225]
   visual:
     - check: Compare provider popup, selected row, documentation, acceptance and Undo states with IDEA R0-R6 at matching profile.
       method: manual

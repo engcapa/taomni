@@ -1,0 +1,262 @@
+id: TC-NP-001
+title: Notepad workbench shell exposes the nine prototype menus, 21-button toolbar, status fields and live dirty counts
+description: >-
+  AC-01/32/33/44/48 browser slice. Opening an untitled document from the Explorer creates the Notepad workbench and mounts the
+  real CodeMirror editor. The case asserts the prototype shell (nine top-level menus with no Help menu, the ordered 21-button
+  toolbar), the status bar fields (cursor, line/char counts, EOL, encoding, INS, zoom), typing-driven dirty state and live counts,
+  and the wrap/symbols toolbar toggles with their persisted preference. Renderer-only evidence; native save/disk behavior is covered
+  by separate native cases.
+modes:
+- browser
+covers:
+- F-NOTEPAD-1
+tags:
+- p0
+- notepad
+- editor
+- ui
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab-new-notepad"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="notepad-workbench"]'
+- assert_visible: '[data-testid="notepad-toolbar"]'
+- assert_visible: '[data-testid="notepad-menubar"]'
+- assert_visible: '[data-testid="notepad-status-bar"]'
+- assert_visible: '[data-testid="viewer-editor"]'
+- assert_items:
+    selector: '[data-testid="notepad-menubar"] > button'
+    attribute: data-testid
+    equals:
+    - notepad-menu-file
+    - notepad-menu-edit
+    - notepad-menu-search
+    - notepad-menu-view
+    - notepad-menu-encoding
+    - notepad-menu-tools
+    - notepad-menu-macro
+    - notepad-menu-compare
+    - notepad-menu-window
+- assert_count:
+    selector: '[data-testid="notepad-toolbar"] button'
+    equal: 21
+- assert_items:
+    selector: '[data-testid="notepad-toolbar"] button'
+    attribute: data-testid
+    equals:
+    - notepad-tool-new
+    - notepad-tool-open
+    - viewer-save
+    - notepad-tool-saveall
+    - notepad-tool-undo
+    - notepad-tool-redo
+    - notepad-tool-cut
+    - notepad-tool-copy
+    - notepad-tool-paste
+    - notepad-tool-find
+    - notepad-tool-replace
+    - notepad-tool-find-files
+    - notepad-tool-wrap
+    - notepad-tool-symbols
+    - notepad-tool-docmap
+    - notepad-tool-split
+    - notepad-tool-sync-scroll
+    - notepad-tool-macro-record
+    - notepad-tool-macro-stop
+    - notepad-tool-macro-play
+    - notepad-tool-print
+- assert_pattern:
+    selector: '[data-testid="notepad-status-stats"]'
+    regex: ^(1 lines · 0 chars|1 行 · 0 字符)$
+- assert_text_equals:
+    selector: '[data-testid="notepad-status-eol"]'
+    equals: LF
+- assert_text_equals:
+    selector: '[data-testid="notepad-status-encoding"]'
+    equals: UTF-8
+- assert_text_equals:
+    selector: '[data-testid="notepad-status-ovr"]'
+    equals: INS
+- assert_text_equals:
+    selector: '[data-testid="notepad-status-zoom"]'
+    equals: 100%
+- assert_pattern:
+    selector: '[data-testid="viewer-cursor"]'
+    regex: (Ln 1, Col 1|行 1，列 1)
+- click: '[data-testid="viewer-editor"]'
+- type: "alpha beta alpha\nsecond line alpha\n"
+- assert_count:
+    selector: '[data-testid="viewer-tab-dirty"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'true'
+- assert_pattern:
+    selector: '[data-testid="notepad-status-stats"]'
+    regex: ^(3 lines · 35 chars|3 行 · 35 字符)$
+- assert_pattern:
+    selector: '[data-testid="viewer-cursor"]'
+    regex: (Ln 3, Col 1|行 3，列 1)
+- click: '[data-testid="notepad-status-ovr"]'
+- assert_text_equals:
+    selector: '[data-testid="notepad-status-ovr"]'
+    equals: OVR
+- click: '[data-testid="notepad-status-ovr"]'
+- assert_text_equals:
+    selector: '[data-testid="notepad-status-ovr"]'
+    equals: INS
+- assert_attribute:
+    selector: '[data-testid="notepad-tool-wrap"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="notepad-tool-wrap"]'
+- assert_attribute:
+    selector: '[data-testid="notepad-tool-wrap"]'
+    name: aria-pressed
+    equals: 'false'
+- assert_localstorage:
+    key: taomni.notepad.preferences.v1
+    contains: '"wrap":false'
+- assert_attribute:
+    selector: '[data-testid="notepad-tool-symbols"]'
+    name: aria-pressed
+    equals: 'false'
+- click: '[data-testid="notepad-tool-symbols"]'
+- assert_attribute:
+    selector: '[data-testid="notepad-tool-symbols"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="notepad-menu-file"]'
+- wait_for: '[data-testid="notepad-menu-item-file.saveAs"]'
+- assert_visible: '[data-testid="notepad-menu-item-file.new"]'
+- assert_visible: '[data-testid="notepad-menu-item-file.close"]'
+- assert_visible: '[data-testid="notepad-menu-item-file.saveCopy"]'
+- assert_count:
+    selector: '[data-testid="notepad-menu-help"]'
+    equal: 0
+- press: Escape
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: detached
+- assert_no_runtime_errors: null
+- screenshot: np-001-workbench-shell.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Explorer creates an untitled Notepad document whose workbench, nine prototype menus, ordered 21-button toolbar
+      and status-bar defaults match the prototype surface.
+    actions:
+    - 1
+    - 3
+    - 5
+    checkpoints:
+    - step: 2
+      expectation: Application shell is ready before the Explorer navigation.
+    - step: 4
+      expectation: The Explorer tab strip exposes the New Notepad entry.
+    - step: 6
+      expectation: Creating the untitled document mounts the Notepad workbench.
+    - step: 7
+      expectation: The workbench toolbar, menu bar and status bar render.
+    - step: 11
+      expectation: 'Exactly nine top-level menus in prototype order: File, Edit, Search, View, Encoding, Tools, Macro, Compare, Window.'
+    - step: 13
+      expectation: The toolbar renders the ordered 21 prototype buttons, including the shared viewer Save control.
+    - step: 14
+      expectation: A fresh document reports one empty line and zero characters.
+    - step: 18
+      expectation: Default EOL/encoding/insert mode/zoom cells are LF, UTF-8, INS and 100%.
+    - step: 19
+      expectation: The cursor field starts at line 1 column 1.
+    results:
+    - 11
+    - 13
+    - 14
+    - 18
+    - 19
+  - id: R2
+    requirement: Typing into the real editor marks the shared document dirty and updates the live cursor and line/char counts.
+    actions:
+    - 20
+    - 21
+    checkpoints:
+    - step: 22
+      expectation: The Explorer tab shows the shared dirty indicator.
+    - step: 23
+      expectation: The mounted document reports data-dirty=true.
+    - step: 24
+      expectation: The status bar reports the typed three lines and 35 characters.
+    - step: 25
+      expectation: The cursor moved to line 3 column 1 after the trailing newline.
+    results:
+    - 23
+    - 24
+    - 25
+  - id: R3
+    requirement: The OVR chip toggles insert/overwrite and the wrap/symbols toolbar toggles expose their pressed state; wrap is
+      persisted to the Notepad preference store.
+    actions:
+    - 26
+    - 28
+    - 31
+    - 35
+    checkpoints:
+    - step: 27
+      expectation: Clicking the chip switches to OVR.
+    - step: 29
+      expectation: Clicking again returns to INS.
+    - step: 30
+      expectation: Word wrap starts enabled from the shared file-open preference default.
+    - step: 32
+      expectation: The wrap toolbar toggle reports aria-pressed=false after one click.
+    - step: 33
+      expectation: The changed wrap preference is persisted under taomni.notepad.preferences.v1.
+    - step: 34
+      expectation: Show-all-symbols starts disabled.
+    - step: 36
+      expectation: The symbols toolbar toggle reports aria-pressed=true after one click.
+    results:
+    - 29
+    - 32
+    - 33
+    - 36
+  - id: R4
+    requirement: The File menu exposes real lifecycle actions and the workbench intentionally has no Help menu.
+    actions:
+    - 37
+    - 43
+    checkpoints:
+    - step: 38
+      expectation: The File menu opens and renders the Save As lifecycle item.
+    - step: 39
+      expectation: New is present in the File menu.
+    - step: 40
+      expectation: Close is present in the File menu.
+    - step: 41
+      expectation: Save a Copy is present in the File menu.
+    - step: 42
+      expectation: No Help top-level menu or item is rendered.
+    - step: 44
+      expectation: Escape closes the real context menu.
+    - step: 45
+      expectation: The workbench shell flow raises no uncaught runtime errors.
+    results:
+    - 41
+    - 42
+    - 44
+    - 45
+  visual:
+  - check: Workbench layout, toolbar grouping, menu bar and status bar fidelity against the prototype
+    method: manual
+    reason: DOM structure and counts are asserted; pixel-level prototype fidelity is not certified by this case.
+  native:
+  - check: Real disk save, native dialogs and OS-level shortcuts
+    method: external
+    reason: Browser renderer and VFS stubs only; native save/close behavior is owned by later native Notepad cases.

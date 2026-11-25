@@ -1,7 +1,7 @@
 id: TC-WELCOME-RS-02-restore-single
 title: Home restores a saved folder from the top action and locates the same tab from History
-description: Keyboard-activate the new Home restore row, then repeat from History and assert the original active filesystem pane
-  and tab count.
+description: Keyboard-activate the new Home restore row, verify its completed banner disappears, then repeat from History and assert
+  the original active filesystem pane and tab count.
 covers:
 - F1.6
 - F1.11
@@ -38,15 +38,16 @@ steps:
     name: data-path
     equals: /preview
 - assert_count:
-    selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
     equal: 1
 - click: '[data-testid="nav-mode-home"]'
+- assert_not_visible: '[data-testid="welcome-restore-row"]'
 - click: '[data-testid="tao-home-history"]'
 - wait_for: '[data-testid="tao-home-history-restore"]:enabled'
 - click: '[data-testid="tao-home-history-restore"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - assert_count:
-    selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+    selector: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
     equal: 1
 - assert_no_runtime_errors: null
 - screenshot: F1.6-home-history-restore-single.png
@@ -54,14 +55,14 @@ verification:
   review: reviewed
   requirements:
   - id: HOME-RESTORE-FOLDER
-    requirement: Keyboard-activate the new Home restore row, then repeat from History and assert the original active filesystem
-      pane and tab count.
+    requirement: Keyboard-activate the Home restore row, verify its banner disappears after success, then repeat from History and
+      assert the original active filesystem pane and tab count.
     actions:
     - 3
     - 10
     - 14
-    - 15
-    - 17
+    - 16
+    - 18
     - 4
     - 6
     checkpoints:
@@ -69,9 +70,11 @@ verification:
       expectation: Keyboard activation restores the actual fixture folder.
     - step: 13
       expectation: Restoration opens exactly one file-browser tab.
-    - step: 19
-      expectation: Repeated restoration reuses the same single active tab.
+    - step: 15
+      expectation: Successful restoration removes the completed banner from Home.
     - step: 20
+      expectation: Repeated restoration from History reuses the same single active tab.
+    - step: 21
       expectation: Both routes complete without runtime errors.
     - step: 9
       expectation: The restore row is visible directly in Home.
@@ -80,8 +83,9 @@ verification:
     results:
     - 12
     - 13
-    - 19
+    - 15
     - 20
+    - 21
     - 9
     - 7
   visual:

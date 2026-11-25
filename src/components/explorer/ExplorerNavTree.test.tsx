@@ -10,7 +10,7 @@ vi.mock("../../stores/workspacePlatformStore", () => ({ useWorkspacePlatformStor
 const dir = (path: string): FileEntry => ({ path, name: path.split(/[\\/]/).at(-1)!, fileType: "dir", size: 0, mode: 0, mtime: 0, isHidden: false });
 const deferred = () => { let resolve!: (value: { entries: FileEntry[]; skippedCount: number; diagnostics: [] }) => void; const promise = new Promise<{ entries: FileEntry[]; skippedCount: number; diagnostics: [] }>((done) => { resolve = done; }); return { promise, resolve }; };
 beforeEach(() => {
-  vi.clearAllMocks(); setExplorerPreferences({ expandedPaths: [], pinnedPaths: [], showHidden: false });
+  vi.clearAllMocks(); setExplorerPreferences({ expandedPaths: [], showHidden: false });
   vi.mocked(sftpListLocalDetailed).mockImplementation(async (path) => ({ entries: path === "/" ? [dir("/home"), dir("/other")] : path === "/home" ? [dir("/home/qa")] : [], skippedCount: 0, diagnostics: [] }));
 });
 afterEach(cleanup);

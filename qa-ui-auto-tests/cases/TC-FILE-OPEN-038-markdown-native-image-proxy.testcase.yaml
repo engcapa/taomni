@@ -9,8 +9,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-markdown-image-proxy
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
     key: Mod+l
@@ -34,10 +34,9 @@ steps:
     action: choose
     path: ${fixture.markdown_remote_html}
     trigger: '[data-testid="markdown-export-html"]'
-- assert_attribute:
-    selector: '[data-testid="markdown-export-status"]'
-    name: data-export-state
-    equals: saved
+- wait_for:
+    selector: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+    timeout_sec: 30
 - assert_file_contains:
     path: ${fixture.markdown_remote_html}
     contains: 'src="data:image/png;base64,iVBORw0KGgo'
@@ -55,7 +54,8 @@ steps:
 - fill:
     selector: '[data-testid="markdown-image-custom-proxy-panel"] input[type="number"]'
     value: ${fixture.markdown_image_custom_port}
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - assert_file_contains:
     path: ${fixture.markdown_image_log}
     contains: '"forwarded": "custom"'
@@ -64,7 +64,8 @@ steps:
 - select_option:
     selector: '[data-testid="markdown-image-proxy-mode"]'
     value: none
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - assert_file_contains:
     path: ${fixture.markdown_image_log}
     contains: '"forwarded": "direct"'
@@ -72,8 +73,10 @@ steps:
 - set_check:
     selector: '[data-testid="file-open-markdown-restrict-remote"]'
     checked: true
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
+- wait_for: '[data-testid="markdown-image-widget"] [data-testid="markdown-render-placeholder"][data-kind="image"]'
 - assert_text:
-    selector: '[data-testid="markdown-image-widget"] figcaption'
+    selector: '[data-testid="markdown-render-warnings"]'
     contains: Remote images are blocked
 - assert_no_runtime_errors: null

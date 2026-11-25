@@ -4,37 +4,119 @@
 
 ## 实施边界
 
-- 当前分支 `feat/file-explorer` 直接修改；不改原型、不引入原型评审控制条。应用自身标题栏、全局侧栏和标签容器仍沿用产品组件，Explorer 内容区使用原型的浅/深色 token、210px 导航、300px 右预览、190px 底预览、28px 文件行、24px 状态栏与命令栏顺序。
+- 当前分支 `feat/sidebar-file-explorer` 直接修改；不改原型、不引入原型评审控制条。File Explorer 是左侧 Sessions 下方的独立工作区，Tools 面板不再提供入口。应用自身标题栏、全局侧栏和标签容器仍沿用产品组件，Explorer 内容区使用原型的浅/深色 token、210px 导航、300px 右预览、190px 底预览、28px 文件行、24px 状态栏与命令栏顺序。
 - 文件列表仍经过 `LocalFileBrowserPanel` → `FilePanel`，后者保留排序、过滤、选择及 SFTP 默认视图。Explorer 使用明确的 `renderView` / `sortState` 扩展契约，而不是复制一套目录状态；虚拟列表仅存在于 Explorer 视图中。
 - `sftpStore.sessions[tabId].local` 是唯一目录/选择权威。抽出 `sftp/navigation.ts` 的刷新、导航和历史请求所有权，以及 `localAttachment.ts` 本地挂载生命周期；请求序号和 StrictMode 清理使迟到响应不能覆盖更新目录或复活已关闭标签。
-- 主界面与单个工作区各自去重；按当前已提交目录、原生规范路径比较。`forceNew` 显式新开。旧 File 会话保留 `sessionId` 并采用 Explorer 外观；SFTP 双栏继续原视图。
-- 主界面新增独立的 Explorer 恢复开关（更多菜单；默认开），元数据存储 `taomni.explorer.tabs.v1` / `taomni.explorer.restoreTabs.v1`；工作区沿用工作区持久化。恢复只记录路径/标签，不保存剪贴板、撤销标识、预览内容或进行中的任务。
+- 主菜单、Home/历史、Workspace 导航、Project 树和终端入口统一进入全局 Explorer，按当前已提交目录与原生规范路径去重；`forceNew` 显式新开。旧 File 会话保留 `sessionId` 并迁移到独立 Explorer；SFTP 双栏继续原视图。侧栏首次或空状态打开 HOME，已有标签时返回当前工作区而不重置目录。
+- 独立 Explorer 恢复开关（更多菜单；默认开）同时保存目录和本地 viewer 标签，元数据存储 `taomni.explorer.tabs.v1` / `taomni.explorer.restoreTabs.v1`。恢复只记录路径/标签，不保存剪贴板、撤销标识、预览内容或进行中的任务。
 - 共享视图偏好 `taomni.explorer.view.v1`。预览默认开，窄容器自动折叠但保留开关，可手动覆盖展开。文本固定 256 KiB、CSV 前100行、图片固定20 MiB；Markdown/SVG 预览移除外部资源和主动内容，不扩大 asset scope。
 - 原生复制/移动、重命名和创建使用 no-replace 语义；符号链接按链接本身复制，拒绝目录自身/子孙目标；跨卷剪切复制完成后才开始删除源。每项失败汇总，不回滚已完成项。取消保留已写入的部分目标并报告。
 - 拖放使用产品已有指针 DnD（避免 Windows Tauri 拦截 HTML5 drag），同卷默认移动、异卷默认复制，Ctrl（macOS Option）强制复制。目标覆盖列表文件夹、导航树和面包屑。
 - 回收站依赖 trash 5.3；Linux 单元测试直接使用隔离 XDG Trash 验证真实删除/还原，不以 browser stub 代替。macOS 使用 NSFileManager resulting URL 保存还原位置；Windows Explorer 专用 IFileOperation 避免不可回收卷静默永久删除。Shift+Delete 永久删除必须确认；回收站失败仅对失败项提供显式永久删除确认。
 - Windows/Linux 剪切向系统文件剪贴板写入 move 提示。macOS Finder 没有同等 cut 格式，系统移动沿用 Finder 的 Option+Command+V；应用内 Command+X/V 正常移动。不能宣称在 Finder Command+V 会移除源。
-- 工作区入口为已选方案 A，Project 树不切换实现。Alt+3（macOS Option+3）只在工作区有效且让出编辑框、IME、对话框；终端 Explorer 入口不分配新快捷键。本地非 SSH、非命令终端显示当前目录与新标签两项。
+- Workspace 导航与 Project 树入口重定向到全局 Explorer，不再创建工作区作用域 Explorer。Alt+3（macOS Option+3）只在工作区有效且让出编辑框、IME、对话框；终端 Explorer 入口不分配新快捷键。本地非 SSH、非命令终端显示当前目录与新标签两项。
+- Explorer 中双击所有支持内部查看的类型都留在 Explorer，保存的 Workspace association/default 不再按类型分流；只有显式“在 Code Workspace 中打开”才跳转。PDF 与不支持的二进制仍使用系统应用，不新增 PDF 查看器。
+- 新建菜单支持 TXT、MD、HTML、CSS、JS、TS、JSON，沿用 no-replace、冲突自动编号与 inline rename。搜索支持普通文本、`*`/`?`/`**`/字符类、两种路径分隔符与递归子目录；250ms 防抖、旧请求隔离、执行中取消、部分结果、错误重试、隐藏文件偏好和 1000 条上限均有明确状态。原生搜索不跟随目录符号链接。
 
-## 测试执行策略（本轮用户要求）
+## 2026-11-22 标签条溢出、Overview 纳入与删除确认（feat/explorer-tabs-overview-delete）
 
-本地仅执行单元测试和静态检查，不运行 browser/native UI。UI、真实 IPC、系统剪贴板/文件管理器和打包 WebView 验证在 GitHub `qa-ui-auto-platforms.yml` 执行；所有外网命令通过用户提供代理。GitHub 选择包含完整 `crash-regression` 与受影响既有 SFTP 用例。
+设计：[`tab-strip-overview-delete-design.md`](tab-strip-overview-delete-design.md)。用户要求：多标签时标签条不出现原生横向滚动条，像 Sessions 一样左右箭头分页并提供过滤/查找入口；Explorer 视图的 Overview 必须包含 Explorer 标题签，其它视图「全部」也要纳入；删除必须先询问「移到回收站 / 永久删除」；补充 unit/browser/native 用例。
+
+- 共享滚动：新增 `tabbar/tabs/useTabStripScroll.ts`，Workspace 与 Explorer 标签条共用同一溢出测量、活动标签可见、分页与滚轮逻辑；`useWorkspaceTabScroll` 保持原返回契约的薄封装，Sessions/Workspace 行为与 testid 不变。
+- Explorer 标签条：`ExplorerTabStrip` 使用隐藏滚动条类（`platform.css` 新增 `.taomni-explorer-tab-scroll`）、左右箭头（`explorer-tab-scroll-left/right`）、过滤芯片/空提示；打开新标签或被外部激活的标签不会被旧过滤隐藏。
+- 打开标签过滤：`lib/explorerTabFilter.ts` + `stores/explorerUiStore.ts` + `ExplorerTabsFilter.tsx`，工具栏入口与 Sessions/Workspace 过滤同位置；支持标题/路径搜索、全部/文件夹/文件类别与计数、键盘上下/Enter、Esc/外点关闭、IME；过滤只影响显示，不关闭标签。
+- Overview：`PreviewItem` 增加 `surface`；Explorer 视图默认 `data-scope="explorer"` 只展示 Explorer 标签（当前目录、条目数或查看器文本摘要），「全部」包含 Sessions/Workspaces/Explorer；点击 Explorer 卡片激活对应标签并回到 Explorer，侧栏折叠偏好保留。
+- 删除确认：`useExplorerOperations.remove` 只打开选择框，新增 `trash()` 执行回收站；确认框提供「移到回收站」（默认）与「永久删除」；Shift+Delete 直接聚焦永久删除；取消不触盘；回收站失败仅对失败项保留原因与永久删除确认；撤销 toast 与失败汇总沿用原实现。
+- 用例：新增 `TC-EXPLORER-010`（browser/native，16 个恢复标签、分页、过滤、Overview 当前/全部、删除选择/回收站/撤销/永久删除与 `assert_explorer_files` 全树 oracle）；更新 `TC-EXPLORER-002/003` 删除步骤；fixture 新增 `trash-seeded` 状态，schema/verb catalog/feature-list/policy/dependencies 同步；新增 `ExplorerTabStrip`、`ExplorerTabsFilter`、`explorerTabFilter`、共享滚动/Overview/删除操作单测。
+
+验证记录（本地 Windows）：
+
+- 浏览器：`TC-EXPLORER-010` 全 86 步通过（`qa-ui-auto-report/run-20261122-101317-933835400`）；受影响 `TC-EXPLORER-001/002/003、TC-WS-018/027/093` 6/6 通过（`run-20261122-101417-465286900`）；`crash-regression` browser 17 通过 / 1 跳过（`TC-FILE-OPEN-008` 本机缺 POSIX SSH PTY，hosted 覆盖；`run-20261122-101653-989404600`）。
+- native（Windows 本机 QA debug 构建，匹配 WebView2 157 的 msedgedriver）：`TC-EXPLORER-010` 86/86 步通过、30.2s（`run-20261122-101145-964936800`），真实磁盘/回收站由 `assert_explorer_files` 全树 SHA256 校验；受影响的 `TC-EXPLORER-003`（新删除选择/真实回收站/撤销/永久删除）与 `TC-WS-019` 通过（`run-20261122-101832-477750700`）；`crash-regression` native 22 例中 19 通过、2 跳过、1 环境失败（`TC-MOBILE-013` 本机隔离 appcache 未预置 Playwright chromium；`TC-FILE-OPEN-008`/`TC-WS-054` 为本机已知环境 skip；`run-20261122-102020-130664700`）。WebView 按键不宣称物理 OS 键盘证据。本机 WebView2 为 157，需通过临时 `webdriver.native_driver` 指向 `C:/Users/<user>/tools/edgedriver-157/msedgedriver.exe`；未替换全局 `msedgedriver` 或修改用户数据。
+- 单元/静态：全量 Vitest 876 文件 / 7437 通过 / 1 跳过（`qa-ui-auto-report/_local/unit-full-final.log`）；`tsc -b`、`pnpm build`、`pnpm check:refactor`、QA audit/behavior contract 通过。
+
+## 测试执行策略（第一轮 Linux 执行，历史记录）
+
+本地执行 unit、静态检查及 Linux browser/native 用例；native 复用机器现有 desktop，不新建桌面，不触碰生产 `/usr/bin/taomni`。Windows/macOS browser/native 在 GitHub `qa-ui-auto-platforms.yml` 执行。外网使用用户提供的 `http://127.0.0.1:31228`，保留 `http://127.0.0.1:31128` 作为备用；GitHub 选择包含完整 `crash-regression` 与受影响既有用例，job 运行中即下载已完成 shard 的原始报告。
 
 新增可执行用例：
 
 | 用例 | 层级 | 行为 |
 |---|---|---|
-| TC-EXPLORER-001 | browser | Tools/菜单/工作区导航条/项目树入口、去重、新标签、地址/面包屑/导航历史/失败/恢复 |
+| TC-EXPLORER-001 | browser | 独立 rail/HOME、Tools 入口移除、菜单/Workspace/Project 全局去重、导航、viewer 内开与恢复 |
 | TC-EXPLORER-002 | browser | 预览类型、截断、过期响应、浅深色原型尺寸、共享偏好、窄窗、创建和回收站降级 |
 | TC-EXPLORER-003 | browser/native | 选择、复制/剪切/冲突/重命名/属性、回收站/撤销/永久删除、拖放；独立全树字节与目录 oracle |
 | TC-EXPLORER-004 | browser/native | 10,000项真实列表、虚拟DOM、排序、过滤；记录实测，不预造性能目标 |
 | TC-EXPLORER-005 | native | 实际本地PTY cwd、系统文件剪贴板、真实系统文件管理器粘贴、外部修改、预览与标签恢复 |
+| TC-EXPLORER-006 | browser/native | 详细列宽拖动/键盘调整、内容适配、持久化、横向对齐 |
+| TC-EXPLORER-007 | browser | 导航树折叠/展开、焦点与既有目录状态保留 |
+| TC-EXPLORER-008 | browser | 七种文本类型创建、Explorer 内 Markdown viewer、递归 glob、相对路径、两种分隔符、错误重试、延迟 stub 执行中取消 |
+| TC-EXPLORER-009 | native | 真实 MD/HTML 创建与 viewer、真实递归 glob、10,000 文件无匹配搜索的进度与取消 |
+| TC-EXPLORER-010 | browser/native | 标签溢出隐藏滚动条/左右分页、打开标签过滤、Overview 当前/全部纳入、删除方式选择/回收站/撤销/永久删除 |
 
 Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS 进程冷重启。macOS bridge 按键不是物理键盘/AppKit 全局菜单证据。截图仅证明执行状态；尺寸与颜色有命名断言，完整像素/交互保真需结合截图审阅。
 
 快捷键验收范围：Explorer非编辑区的Copy/Cut/Paste/Select-all使用Windows/Linux Ctrl与macOS Command；地址Ctrl/Command+L，预览Alt/Option+P，工作区入口Alt/Option+3。文本输入、IME和对话框优先；terminal Control信号不改。上下文菜单显示⌘编辑命令，工作区入口显示Option+3。预览/导航/属性部分提示仍使用跨平台`Alt`文字，macOS Option功能映射已测但文字一致性为剩余显示缺口；物理键盘、Fn键、AppKit系统菜单加速器/重复分发与IME候选窗仍未进行OS级验证，不从WKWebView合成按键推断通过。
 
-## 当前证据
+## 本轮独立视图迁移验证
+
+- `83afd7a69` 已通过 Node 22 TypeScript、68 项聚焦 Vitest、Rust fmt 与 `pnpm check:refactor`；此前原生 search 7 项 Rust 测试通过。该 checkpoint 已合并当时的 `origin/main` 并解决 QA 冲突。
+- 新增 001/008/009 的 YAML 解析和三模式 dry-run 已通过；`python3 -m qa_ui_auto.audit --gate` 通过，832 个唯一用例 ID、5 个既有 orphan、coverage 无回归。全量 behavior contract 另有 44 个既有未评审/缺失契约，不能用全量红状态否定本轮已评审用例，也不宣称这些既有 gap 已解决。
+- 本轮完整 unit、Linux browser/native、完整 `crash-regression` 与 Windows/macOS hosted 证据仍待执行；迁移前下列 run 只证明当时旧宿主，不作为本轮通过证据。
+
+## 第一轮执行暴露的缺陷与修复（2026-11-21）
+
+本地 Linux browser 全量受影响用例与 GitHub run44873609125（旧提交 `456870395`）共同暴露以下缺陷，均已在源码或用例中修复：
+
+- `explorer_search_entries` 未注册进 browser stub dispatch（`src/stubs/tauri-core.ts`），浏览器模式搜索返回 undefined 并在 hook 内抛 TypeError；已注册并复核。
+- `ViewerCloseDialog` 同时挂载于 `ExplorerPlatformView` 与 `TabContentRouter`，同一全局 `documentStore.closeRequest` 渲染两层 backdrop，Explorer 内 dirty viewer 的关闭确认点击被遮挡；改为仅在 `MainLayoutView` 挂载单一宿主。
+- 独立 Explorer 承接 File 会话后，`useSessionResume` 的 restore waiter 只扫描 app 标签并以 app 标签为依赖，File 会话恢复永不成束并触发 60s guard；waiter 绑定与 settle 计时改为同时订阅并扫描 `explorerStore` 标签（`TC-WELCOME-RS-02` 复现）。
+- ControlBar 仅在 `activeSideTab === "explorer"` 时渲染 ExplorerTabStrip；主题/设置切换离开 Explorer 表面后直接点击 `explorer-workspace-tab` 的既有用例步骤（001 第二/三次入口、004 两轮主题、007 两轮、009 四轮、010、013、029、037、038）全部补上 `side-tab-explorer` rail 返回；001 另对异步入口后的计数断言补 wait。
+- 产品取消搜索后的状态为 `data-state="cancelled"` 而非用例误写的 `done`（stub 缺陷曾掩盖此路径）；008/009 断言已对齐真实状态机。
+- 008 扩展 R5：`Show hidden files` 偏好驱动搜索包含性，`.hidden*` 默认 0 结果、开启后 1 结果、关闭后重新排除；009 扩展 R4：`entry-*.txt` 在 10,000 真实文件上触发 1000 结果上限并显式提示截断。
+- 005 关闭/重开 Sessions 终端标签的两处 `tab-item` 交互发生在 Explorer 表面激活时（ControlBar 此时渲染 Explorer strip 而非 Sessions TabBar），补 `side-tab-sessions` 返回；009 native 端 10,000 文件扫描快于用例观察间隔（GitHub macOS 第一轮同样无法观察到 searching 态），改为断言确定性 settled done 状态，执行中取消由 008 延迟 stub 与 Rust search 取消单测覆盖（`ce9f7327e`、`dabdfc767`）。
+
+## 本轮本地 Linux 证据（qa debug 二进制，复用既有 desktop :40004）
+
+- 合并 `origin/main`（`6b8e350cb`，PR #846 快进）后在合并头重跑受影响 browser 全集 35/35 通过（`qa-ui-auto-report/run-20261121-163*/summary.json`，EXITCODE=0）；Node 22 `tsc -b`、136 项聚焦 Vitest（explorer/viewer/restore/registry/openFile）、`pnpm check:refactor` 与 `audit --gate` 通过。
+- 本地 `keep_runs: 5` 曾旋转删除早期 run 目录（`_local/*.log` 保留逐条结果），已改 `keep_runs: 40` 并在合并头重跑再生收据；早期数字以下列条目为准。
+- 受影响 browser 用例 35/35 全部通过，含 001 入口/去重/恢复、002-008 全部 Explorer 用例、迁移后的 FILE-OPEN browser 集合、TAO-HOME-031 与 WELCOME-RS-02/04。
+- 受影响 native 用例 20 个：修复后 14-16 通过；`TC-EXPLORER-003`（X11 真实指针拖放为 GitHub Xvfb+Openbox 配置调优，本机共享桌面拖放不生效）与 `TC-EXPLORER-005`（本机 bashrc 提示符使 idle-prompt 探测不置 terminal-ready）为本机环境边界，hosted 已通过；drawio 渲染 021/032/036/042 本机 WebKitGTK 2.50.4 不渲染图元（Chromium 与 hosted WebView2/WKWebView 均正常，禁用 dmabuf 无效），属本机 WebView 环境差异，hosted linux Xvfb 待第三轮覆盖。
+- 本机 native 首轮 15 个失败中 12 个为容器重置丢失 `xdotool`/`wmctrl`/`xclip`（已 `apt-get install` 恢复；容器重启后需手工重装）；`TC-FILE-OPEN-009` 三轮改造后本机 native 通过。
+- `crash-regression` browser 16 通过、`TC-FILE-OPEN-008` 因本地无 POSIX SSH PTY 显式 skip（hosted 覆盖）、`TC-MOBILE-012` 首跑因子进程未继承 Node22 PATH 使用系统 pnpm 11 失败，修正 PATH 后单独重跑通过；native 18 通过、`TC-FILE-OPEN-006` 为 main 既有已记录竞态（`docs-issue` f11b37cf3，与本分支无关，hosted 第二轮 Windows/macOS 同样失败）、`TC-MOBILE-013` 需 appcache 内 playwright chromium（本地未预置，hosted 覆盖）、008 与 WS-054 为本地环境 skip。
+- 本机失败与 skip 均有 hosted 对应执行，不以本机边界宣称通过；也不将本机环境差异当作产品回归。
+
+## GitHub hosted 第二轮（run44880061565，head `ce9f7327e`，native release）
+
+- Windows browser 45/45 + 3/3（crash），macOS browser 44/45 + 3/3；唯一失败 `TC-EXPLORER-002`（macOS 预览未按时消失，Windows/本机/第一轮均过，按 flake 处理并入第三轮复验）。
+- macOS native 43/46：除 `TC-EXPLORER-009`（旧即时取消设计如预测败于 cancel 按钮消失竞态，`dabdfc767` 已重设计）与 `TC-FILE-OPEN-006`（既有已记录竞态）外全过。
+- Windows native 42/46：除 009/006 同上、`TC-EXPLORER-005` 终局暴露**真实迁移缺口**——仅剩独立 Explorer 标签时 `confirmExitWithOpenTabs` 只数 Sessions 标签导致静默退出；已修复为同时计入 explorerStore 可关闭标签（`5093be85c`，含 3 项新单测）。另 `TC-FILE-OPEN-023` 败于 QA 对话框自动化脚本自身 WM_GETTEXT 探测（非产品代码），并入第三轮复验。
+- 该轮三端 browser 与 native crash、SFTP 契约 job 全部 success；receipt 与 build hash 已按 shard 流式下载核对（windows release `a3e7d616…`、macos release `ef8459d3…`）。
+
+## GitHub hosted 第三/四轮（run44886766477 `5093be85c` 三端 + run44890986861 `6193c4446` linux）
+
+- 第三轮 browser：linux 19/19+1/1、macOS 19/19+1/1（`TC-EXPLORER-002` 复验通过，确认第二轮为 flake）；windows shard 同批 success。
+- 第三轮 native（Windows+macOS 56/60）：`TC-EXPLORER-009` 新 settled 设计双平台通过；003/021/023/032/036/042 全过；`TC-EXPLORER-005` 三端一致败于第二个标签 nth-match 10s 等待，失败收据显示标签实际已建立——高负载 runner 下建标签超过默认等待（第二轮轻负载通过），该步已显式改 30s（`88838697b`）；`TC-FILE-OPEN-006` 仍为既有已记录竞态。
+- 第三轮 linux build 门禁抓到迁移提交遗漏的 `ControlBar.test.tsx` 旧断言（Explorer 从 Tools 打开仍期望 Sessions TabBar）——按独立视图契约改写为断言 Explorer rail 激活时渲染 `explorer-workspace-tab`（`6193c4446`）；随后全量前端单测 7,320 通过、1 skip。
+- 第四轮 linux native release 28/30：build 门禁通过；009/003/021/023/032/036/042 在 hosted linux Xvfb WebKitGTK 全部通过（drawio 四例 hosted linux 正常渲染，证实本机 WebKitGTK 差异为机器特有）；完整 crash 合并集其余用例全过，linux release crash 门禁除 005（见上）与既有 006 外全绿。
+
+## 第五轮与 005 第二标签调查（run44895878269 `88838697b` 三端 + 本地诊断）
+
+- 第五轮 005 在三端仍败于同一 nth-match 等待：30s 内第二标签未出现，但失败收据 DOM 显示标签实际已建立、无对话框、无控制台错误；分步计时确认点击本身 0.5s、等待 30s 全程空转。
+- 本地 Chromium 诊断完整复现该链路的两个事实：目录导航与 stub 终端 pane 均 <0.5s 即成（JS 路径健康）；stub 终端无真实 cwd 时走 `alertAppDialog` 且不建标签（stub 预期行为，非缺陷）。
+- 二分构建（还原 `5093be85c` 退出修复后重建）同样复现本地挂死，退出修复被排除；本地 WebKitGTK native 的目录导航自 20:0x 起确定性 >90s（browser 模式同路径 0.15s，strace 显示后端整个等待窗口零 execve/openat——渲染主线程未派发命令），早前 15:0x 的本地 native 导航正常；判定为本机环境漂移（7 小时 74% CPU 的 os-backup tar 为首要嫌疑），待机器恢复后补跑本地 linux native 005。
+- 结论处理：005 的第二标签等待预算提升至 90s（`a6f150f86`），如实记录 hosted 分片高并发下 30s+ 的实测建标签延迟；最终复验改在 windows/macos 定向轮完成（run44907070299）。
+- 执行策略更新：此后 Linux browser/native 一律本机执行，GitHub hosted 仅提交 windows/macos。
+
+## 005 第二标签根因与最终修复（run44914440632 插桩探针 → `09f6dd6fc`）
+
+- 诊断分支插桩（resolveCwd/preamble/total 三段计时）在 hosted 双平台读取：resolveCwd 0-3ms、openExplorer preamble 6-28ms、全程 30-75ms——**产品侧瞬时完成**，此前 10/30/90s 等待全部是 runner 判定问题；插桩分支已删除。
+- 读 runner 源码定位：native 路径 `selector_strategy` 对 Playwright 伪选择器不做翻译，`:nth-match` 以原样 CSS 交给 WebDriver——不是合法 CSS，native 模式永远匹配不到（browser 模式由 Playwright 原生支持，001 等 browser 用例不受影响；005 是唯一使用 `:nth-match` 的 native 用例且此前从未在 hosted 走到该步）。
+- 修复：第二标签等待改写为 native 支持的位置 XPath `xpath=(//*[@data-testid='explorer-workspace-tab'][@data-tab-type='file-browser'])[2]`，并登记为 catalog/feature-list 控件别名（orphans 保持 5、门禁全绿）；本地 native 探针验证 cmd-newtab 后该等待 0.06s 解析。
+- 最终 hosted win/mac 复验轮 run44923422331（`09f6dd6fc`）：**macOS 22/23、Windows 22/23，TC-EXPLORER-005 双平台全流程通过**（含第二标签 xpath 等待与 `5093be85c` 退出确认修复的终局步骤）；唯一失败均为 main 既有已记录竞态 `TC-FILE-OPEN-006`（f11b37cf3，与本分支无关）。本轮后该迁移验证闭环完成。
+- 本机 linux native 005：重启后目录导航恢复（20:0x 的导航挂死确认为机器态劣化），但本机 bashrc 提示符使 idle-prompt 探测不置 terminal-ready 的既有环境边界仍在，第二标签段无法本机走通；该段以 hosted 双平台为准。
+
+## 迁移前历史证据
 
 ### 本地单元与静态检查
 

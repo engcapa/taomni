@@ -21,8 +21,10 @@ steps:
 - seed_storage:
     key: taomni.qa.parity005.hover
     value: 'true'
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity005_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity005_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
 - assert_text:
@@ -146,89 +148,89 @@ verification:
   - id: R1
     requirement: A2：悬停类名 Main 弹出文档；指针跨过相邻字符朝弹窗移动并停在弹窗内 1 秒，弹窗保持显示（CodeMirror 默认悬停会在指针离开字符时立即关闭）。
     actions:
-    - 9
-    - 12
-    - 13
-    - 15
-    checkpoints:
-    - step: 10
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "timeout_sec": 10}}'
-    - step: 11
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "contains": "parity005.Main"}}'
-    - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-hover-doc\"]"}'
-    - step: 16
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-hover-doc\"]"}'
-    - step: 17
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "contains": "Browser B-005 documentation"}}'
-    results:
-    - 10
     - 11
     - 14
-    - 16
+    - 15
     - 17
+    checkpoints:
+    - step: 12
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "timeout_sec": 10}}'
+    - step: 13
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "contains": "parity005.Main"}}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-hover-doc\"]"}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-hover-doc\"]"}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "contains": "Browser B-005 documentation"}}'
+    results:
+    - 12
+    - 13
+    - 16
+    - 18
+    - 19
   - id: R2
     requirement: A2：指针移向相反方向（编辑器页签）后在宽限期内关闭；编辑器聚焦时 Esc 关闭悬停文档。
     actions:
-    - 19
     - 21
-    - 22
+    - 23
     - 24
+    - 26
     checkpoints:
-    - step: 20
+    - step: 22
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 23
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "timeout_sec": 10}}'
     - step: 25
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "timeout_sec": 10}}'
+    - step: 27
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "state": "detached", "timeout_sec": 5}}'
     results:
-    - 20
-    - 23
+    - 22
     - 25
+    - 27
   - id: R3
     requirement: A2：点进弹窗后（焦点在弹窗内）指针移走也保持显示；Esc 关闭并把焦点还给编辑器。
     actions:
-    - 26
-    - 27
+    - 28
     - 29
-    - 30
     - 31
+    - 32
     - 33
+    - 35
     checkpoints:
-    - step: 28
+    - step: 30
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "timeout_sec": 10}}'
-    - step: 32
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-hover-doc\"]"}'
     - step: 34
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-hover-doc\"]"}'
+    - step: 36
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 35
+    - step: 37
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.closest(''.cm-editor'') !== null", "expect_truthy": true}}'
     results:
-    - 28
-    - 32
+    - 30
     - 34
-    - 35
+    - 36
+    - 37
   - id: R4
     requirement: A2：弹窗 Pin 把内容固定到 Documentation 工具窗口，悬停弹窗关闭。
     actions:
-    - 36
-    - 37
-    - 39
-    - 40
-    checkpoints:
-    - step: 38
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "timeout_sec": 10}}'
-    - step: 41
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 42
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-documentation-pane\"]", "timeout_sec": 10}}'
-    - step: 43
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-documentation-pane\"]", "contains": "parity005.Main"}}'
-    results:
     - 38
+    - 39
     - 41
     - 42
+    checkpoints:
+    - step: 40
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "timeout_sec": 10}}'
+    - step: 43
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 44
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-documentation-pane\"]", "timeout_sec": 10}}'
+    - step: 45
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-documentation-pane\"]", "contains": "parity005.Main"}}'
+    results:
+    - 40
     - 43
+    - 44
+    - 45
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

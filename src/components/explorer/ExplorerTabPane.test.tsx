@@ -2,6 +2,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExplorerTabPane } from "./ExplorerTabPane";
 import { useAppStore } from "../../stores/appStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useSftpStore } from "../../stores/sftpStore";
 import { freshSession } from "../../stores/sftp/listing";
 import { DEFAULT_WORKSPACE_ID, useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
@@ -15,8 +16,9 @@ beforeEach(() => {
   localStorage.clear();
   useSftpStore.setState({ sessions: {}, refreshPane: originalRefreshPane });
   useWorkspacePlatformStore.getState().reloadFromStorage();
-  useAppStore.setState({ tabs: [{ id: "file", type: "file-browser", title: "Saved session", closable: true,
-    sessionId: "saved", fileBrowser: { initialPath: "/initial" } }] });
+  useAppStore.setState({ tabs: [] });
+  useExplorerStore.setState({ tabs: [{ id: "file", type: "file-browser", title: "Saved session", closable: true,
+    sessionId: "saved", fileBrowser: { initialPath: "/initial" } }], activeTabId: "file" });
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -32,7 +34,7 @@ describe("Explorer tab metadata bridge", () => {
   it("updates title and persisted path without reattaching or losing the saved session", () => {
     const { rerender } = render(<ExplorerTabPane tabId="file" initialPath="/initial" />);
     commitPath("file", "/new/current");
-    expect(useAppStore.getState().tabs[0]).toMatchObject({ title: "current", sessionId: "saved", fileBrowser: { initialPath: "/new/current", explorer: true } });
+    expect(useExplorerStore.getState().tabs[0]).toMatchObject({ title: "current", sessionId: "saved", fileBrowser: { initialPath: "/new/current", explorer: true } });
     rerender(<ExplorerTabPane tabId="file" initialPath="/new/current" />);
     expect(screen.getByTestId("shell")).toHaveAttribute("data-startup", "/initial");
   });
@@ -41,7 +43,7 @@ describe("Explorer tab metadata bridge", () => {
     render(<ExplorerTabPane tabId="file" initialPath="/initial" />);
     commitPath("file", "/loading", true);
     commitPath("file", "/failed", false, "permission denied");
-    expect(useAppStore.getState().tabs[0].fileBrowser?.initialPath).toBe("/initial");
+    expect(useExplorerStore.getState().tabs[0].fileBrowser?.initialPath).toBe("/initial");
   });
 
   it("refreshes once when an inactive tab becomes active without duplicating the initial attach read", () => {
@@ -73,6 +75,6 @@ describe("Explorer tab metadata bridge", () => {
     render(<ExplorerTabPane tabId={tab.id} initialPath="/initial" workspaceId={DEFAULT_WORKSPACE_ID} />);
     commitPath(tab.id, "/workspace/new");
     expect(useWorkspacePlatformStore.getState().getWorkspace()?.openTabs[0]).toMatchObject({ title: "new", explorerPath: "/workspace/new" });
-    expect(useAppStore.getState().tabs[0].fileBrowser?.initialPath).toBe("/initial");
+    expect(useExplorerStore.getState().tabs[0].fileBrowser?.initialPath).toBe("/initial");
   });
 });

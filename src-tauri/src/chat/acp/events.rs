@@ -45,7 +45,13 @@ pub(super) fn emit_acp_permission(
             })
         })
         .collect::<Vec<_>>();
-    let _ = app.emit(
+    // Deliver to the window that owns the thread: a detached session window
+    // mounts `CcAgentBridge` too, and a broadcast rendered the same ACP gate in
+    // both windows (issue #869). Resolution stays a broadcast
+    // (`agent-acp-permission-dismissed`) so every window drops its card.
+    crate::windowing::thread_delivery::emit_thread_event_for_app(
+        app,
+        thread_id,
         "agent-acp-permission",
         json!({
             "callId": permission.call_id,

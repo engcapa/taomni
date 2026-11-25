@@ -1,0 +1,266 @@
+id: TC-NP-006
+title: Notepad macro text playback, read-only Save As/exit, focus mode pill, CharPanel single insert, Open With scope, whole-doc confirm and ReDoS error visibility
+description: >-
+  Regression coverage for P0/P1 workbench behaviors: recording typed text plus Edit commands into a saved macro and replaying
+  the saved macro by its own steps; toggling editor read-only while keeping Save As / Save a Copy / Print enabled and exiting via
+  the clickable status chip; entering and exiting Distraction-Free focus mode; verifying CharPanel single-click inserts once;
+  confirming Open With hides TaOffice for non-office documents; prompting before whole-document sort; and displaying ReDoS regex
+  rejection details verbatim before closing Find on Escape.
+modes:
+- browser
+covers:
+- F-NOTEPAD-1
+- F-NOTEPAD-2
+- F-NOTEPAD-3
+- F-NOTEPAD-4
+tags:
+- p0
+- notepad
+- macro
+- readonly
+- search
+- dialogs
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab-new-notepad"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- wait_for: '[data-testid="notepad-workbench"]'
+- click: '[data-testid="notepad-tool-macro-record"]'
+- wait_for: '[data-testid="notepad-menubar-recording"]'
+- click: '[data-testid="viewer-editor"] .cm-content'
+- type: ab
+- click: '[data-testid="notepad-menu-edit"]'
+- wait_for: '[data-testid="notepad-menu-item-edit.selectAll"]'
+- click: '[data-testid="notepad-menu-item-edit.selectAll"]'
+- click: '[data-testid="notepad-menu-edit"]'
+- wait_for: '[data-testid="notepad-menu-group-case"]'
+- hover: '[data-testid="notepad-menu-group-case"]'
+- wait_for: '[data-testid="notepad-menu-item-edit.toUpperCase"]'
+- click: '[data-testid="notepad-menu-item-edit.toUpperCase"]'
+- click: '[data-testid="notepad-tool-macro-stop"]'
+- wait_for:
+    selector: '[data-testid="notepad-menubar-recording"]'
+    state: detached
+- click: '[data-testid="notepad-menu-macro"]'
+- wait_for: '[data-testid="notepad-menu-item-macro.saveCurrent"]'
+- click: '[data-testid="notepad-menu-item-macro.saveCurrent"]'
+- wait_for: '[data-testid="notepad-macro-save-dialog"]'
+- fill:
+    selector: '[data-testid="notepad-macro-name-input"]'
+    value: EchoUpper
+- click: '[data-testid="notepad-macro-save-confirm"]'
+- wait_for:
+    selector: '[data-testid="notepad-macro-save-dialog"]'
+    state: detached
+- click: '[data-testid="viewer-editor"] .cm-content'
+- press: Mod+a
+- press: Backspace
+- type: seed
+- click: '[data-testid="notepad-menu-macro"]'
+- wait_for: '[data-testid="notepad-menu-macro-EchoUpper"]'
+- click: '[data-testid="notepad-menu-macro-EchoUpper"]'
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - SEEDAB
+- click: '[data-testid="notepad-menu-edit"]'
+- wait_for: '[data-testid="notepad-menu-item-file.toggleReadonly"]'
+- click: '[data-testid="notepad-menu-item-file.toggleReadonly"]'
+- wait_for: '[data-testid="notepad-status-readonly"]'
+- click: '[data-testid="notepad-menu-file"]'
+- wait_for: '[data-testid="notepad-menu-item-file.saveAs"]'
+- assert_disabled: '[data-testid="notepad-menu-item-file.save"]'
+- assert_enabled: '[data-testid="notepad-menu-item-file.saveAs"]'
+- assert_enabled: '[data-testid="notepad-menu-item-file.saveCopy"]'
+- assert_enabled: '[data-testid="notepad-menu-item-file.print"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: detached
+- click: '[data-testid="notepad-status-readonly"]'
+- wait_for:
+    selector: '[data-testid="notepad-status-readonly"]'
+    state: detached
+- assert_count:
+    selector: '[data-testid="notepad-status-readonly"]'
+    equal: 0
+- click: '[data-testid="notepad-menu-view"]'
+- wait_for: '[data-testid="notepad-menu-item-view.distractionFree"]'
+- click: '[data-testid="notepad-menu-item-view.distractionFree"]'
+- wait_for: '[data-testid="notepad-exit-view-mode"]'
+- eval_readonly:
+    expression: document.querySelector('.np-workbench').classList.contains('np-mode-focus')
+- click: '[data-testid="notepad-exit-view-mode"]'
+- wait_for:
+    selector: '[data-testid="notepad-exit-view-mode"]'
+    state: detached
+- assert_visible: '[data-testid="notepad-menubar"]'
+- click: '[data-testid="notepad-menu-view"]'
+- wait_for: '[data-testid="notepad-menu-item-view.toggleCharPanel"]'
+- click: '[data-testid="notepad-menu-item-view.toggleCharPanel"]'
+- wait_for: '[data-testid="notepad-char-row-65"]'
+- click: '[data-testid="viewer-editor"] .cm-content'
+- press: Mod+a
+- press: Backspace
+- click: '[data-testid="notepad-char-row-65"]'
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - A
+- click: '[data-testid="notepad-menu-file"]'
+- wait_for: '[data-testid="notepad-menu-item-file.openWith"]'
+- click: '[data-testid="notepad-menu-item-file.openWith"]'
+- wait_for: '[data-testid="notepad-open-with-dialog"]'
+- assert_visible: '[data-testid="notepad-open-with-notepad"]'
+- assert_count:
+    selector: '[data-testid="notepad-open-with-taoffice"]'
+    equal: 0
+- click: '[data-testid="notepad-open-with-close"]'
+- wait_for:
+    selector: '[data-testid="notepad-open-with-dialog"]'
+    state: detached
+- click: '[data-testid="viewer-editor"] .cm-content'
+- press: Mod+a
+- press: Backspace
+- type: "b\na"
+- click: '[data-testid="notepad-menu-edit"]'
+- wait_for: '[data-testid="notepad-menu-group-line-ops"]'
+- hover: '[data-testid="notepad-menu-group-line-ops"]'
+- wait_for: '[data-testid="notepad-menu-group-sort"]'
+- hover: '[data-testid="notepad-menu-group-sort"]'
+- wait_for: '[data-testid="notepad-menu-item-edit.sortAsc"]'
+- click: '[data-testid="notepad-menu-item-edit.sortAsc"]'
+- wait_for: '[data-testid="notepad-whole-doc-dialog"]'
+- click: '[data-testid="notepad-whole-doc-confirm"]'
+- wait_for:
+    selector: '[data-testid="notepad-whole-doc-dialog"]'
+    state: detached
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - a
+    - b
+- click: '[data-testid="notepad-tool-find"]'
+- wait_for: '[data-testid="notepad-find-bar"]'
+- click: '[data-testid="notepad-mode-re"]'
+- fill:
+    selector: '[data-testid="np-find-input"]'
+    value: (a+)+b
+- assert_text:
+    selector: '[data-testid="notepad-find-status"]'
+    contains: catastrophic backtracking
+- press: Escape
+- wait_for:
+    selector: '[data-testid="notepad-find-bar"]'
+    state: detached
+- assert_count:
+    selector: '[data-testid="notepad-find-bar"]'
+    equal: 0
+- assert_no_runtime_errors: null
+- screenshot: np-006-advanced-regressions.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Recording user text input plus Edit commands saves a real macro whose menu entry replays its saved steps.
+    actions:
+    - 7
+    - 10
+    - 13
+    - 18
+    - 19
+    - 23
+    - 25
+    - 26
+    - 31
+    - 34
+    checkpoints:
+    - step: 35
+      expectation: Replaying the saved EchoUpper macro appends typed text and uppercases the seeded document to SEEDAB.
+    results:
+    - 35
+  - id: R2
+    requirement: Read-only toggle preserves Save As, Save a Copy and Print in the File menu while clicking the status bar chip exits read-only.
+    actions:
+    - 36
+    - 38
+    - 40
+    - 46
+    - 48
+    checkpoints:
+    - step: 39
+      expectation: Read-only status chip appears.
+    - step: 42
+      expectation: Save stays disabled while reading a read-only buffer.
+    - step: 43
+      expectation: Save As remains enabled in read-only mode.
+    - step: 44
+      expectation: Save a Copy remains enabled in read-only mode.
+    - step: 45
+      expectation: Print remains enabled in read-only mode.
+    - step: 50
+      expectation: Clicking the status chip clears read-only state.
+    results:
+    - 42
+    - 43
+    - 44
+    - 45
+    - 50
+  - id: R3
+    requirement: Distraction-Free toggles np-mode-focus with a floating exit pill; CharPanel inserts once; Open With hides TaOffice for non-office files; empty-selection sort prompts; ReDoS errors surface verbatim.
+    actions:
+    - 51
+    - 53
+    - 56
+    - 59
+    - 61
+    - 66
+    - 68
+    - 70
+    - 74
+    - 79
+    - 86
+    - 88
+    - 91
+    - 93
+    - 94
+    - 96
+    checkpoints:
+    - step: 55
+      expectation: Distraction-Free enters np-mode-focus with an exit control.
+    - step: 58
+      expectation: Exit pill restores the menubar.
+    - step: 67
+      expectation: Clicking row 65 inserts exactly one 'A'.
+    - step: 73
+      expectation: TaOffice is omitted for non-office documents.
+    - step: 90
+      expectation: Confirming the whole-doc prompt sorts lines to ['a', 'b'].
+    - step: 95
+      expectation: ReDoS pattern error message mentions catastrophic backtracking before Escape closes Find.
+    - step: 98
+      expectation: Find bar detaches cleanly after Escape.
+    - step: 99
+      expectation: No uncaught runtime errors occur across all flows.
+    results:
+    - 55
+    - 58
+    - 67
+    - 73
+    - 90
+    - 95
+    - 98
+    - 99
+  visual:
+  - check: Focus mode hide chrome, whole-doc confirmation modal and ReDoS message layout
+    method: manual
+    reason: DOM state, classes and text assertions verify behavior; visual polish is reviewed by screenshot.
+  native:
+  - check: Native file attributes and OS dialogs
+    method: external
+    reason: Covered separately by native suites and manual desktop verification.

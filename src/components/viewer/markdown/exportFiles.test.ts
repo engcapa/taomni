@@ -43,12 +43,30 @@ describe("actual Markdown folder and native stream export", () => {
     expect(readMarkdownImage).toHaveBeenCalledTimes(1);
     expect(content).toContain("![b][pic]");
   });
-  it("does not start folder publication when an image is unreadable or remote", async () => {
-    await expect(exportMarkdownFolder("![remote](https://example.test/a.png)", "/docs/document.md")).rejects.toThrow("Remote image");
-    expect(localCreateEntry).not.toHaveBeenCalled();
+  it("bundles a portable SVG placeholder for unreadable local or remote images", async () => {
     vi.mocked(readMarkdownImage).mockRejectedValue(new Error("not found"));
-    await expect(exportMarkdownFolder("![local](assets/a.png)", "/docs/document.md")).rejects.toThrow("not found");
-    expect(localCreateEntry).not.toHaveBeenCalled();
+    const plan = await planMarkdownFolder("![local](assets/a.png)", "/docs/document.md");
+    expect(plan.files).toHaveLength(1);
+    expect(plan.files[0].name).toBe("image-1.svg");
+    expect(plan.content).toContain("![local](assets/image-1.svg)");
+    const svg = new TextDecoder().decode(plan.files[0].bytes);
+    expect(svg).toContain("Image unavailable: local");
+    expect(svg).toContain("assets/a.png");
+    expect(svg).toContain("not found");
+
+    await expect(exportMarkdownFolder("![remote](https://example.test/a.png)", "/docs/document.md")).resolves.toBe("/exports/document (1)");
+    expect(localCreateEntry).toHaveBeenCalledOnce();
+    expect(sftpMkdir).toHaveBeenCalledWith("", "/exports/document (1)/assets", "local");
+    expect(vi.mocked(writeStreamOpen).mock.calls.map(([path]) => path)).toContain("/exports/document (1)/document.md");
+  });
+  it("also replaces malformed image data supplied by a document asset owner", async () => {
+    const plan = await planMarkdownFolder("![broken](note-image)", "/docs/document.md", {
+      readImage: vi.fn(async () => "data:image/png;base64,%%%not-base64%%%"),
+    });
+    expect(plan.files).toHaveLength(1);
+    expect(plan.files[0].name).toBe("image-1.svg");
+    expect(new TextDecoder().decode(plan.files[0].bytes)).toContain("not valid base64");
+    expect(plan.content).toBe("![broken](assets/image-1.svg)");
   });
   it("creates a fresh numbered folder, writes assets first and Markdown last", async () => {
     const path = await exportMarkdownFolder("![a](assets/a.png)", "/docs/document.md");

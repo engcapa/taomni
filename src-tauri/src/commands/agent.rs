@@ -28,6 +28,8 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::agent::cc_bridge::commands::cc_cancel_capture,
         crate::agent::cc_bridge::commands::cc_track_terminal,
         crate::agent::cc_bridge::commands::cc_untrack_terminal,
+        crate::agent::cc_bridge::approval_replay::cc_pending_permission_prompts,
+        crate::agent::approval_probe::qa_agent_approval_probe,
         crate::agent::codex_bridge::commands::codex_detect,
         crate::agent::codex_bridge::commands::codex_get_custom_config,
         crate::agent::codex_bridge::commands::codex_get_profile_config,

@@ -1,0 +1,352 @@
+/*
+ * Notepad find/replace floating panel.
+ * Rebuilt to match docs-feature/notepad-2plus/taomni-notepad-prototype.html (`#find`).
+ * All selectors are scoped under .np-workbench so they win over the legacy
+ * `.np-find*` rules in notepad.css (loaded after this file).
+ */
+
+.np-workbench .np-find-anchor {
+  display: none;
+}
+
+/* Portal anchor: the panel is absolutely positioned against the editor column. */
+.np-workbench .np-editor-column {
+  position: relative;
+}
+
+.np-workbench .np-find-panel {
+  /* Mark-style swatches for the 标记 tab. */
+  --np-mark-1: rgba(34, 211, 238, 0.5);
+  --np-mark-2: rgba(251, 146, 60, 0.5);
+  --np-mark-3: rgba(250, 204, 21, 0.55);
+  --np-mark-4: rgba(168, 85, 247, 0.45);
+  --np-mark-5: rgba(34, 197, 94, 0.45);
+
+  position: absolute;
+  right: 16px;
+  top: 8px;
+  width: 520px;
+  max-width: calc(100% - 32px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--taomni-card-border, var(--taomni-divider));
+  border-radius: 10px;
+  background: var(--taomni-card-bg, var(--taomni-bg));
+  color: var(--taomni-text);
+  box-shadow: var(--taomni-shadow-lg, 0 18px 40px rgba(15, 23, 42, 0.22));
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.np-workbench .np-find-panel.compact .np-find-tabs,
+.np-workbench .np-find-panel.compact .np-find-opts,
+.np-workbench .np-find-panel.compact .np-find-actions {
+  display: none;
+}
+
+/* Header (draggable) */
+.np-workbench .np-find-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--taomni-divider);
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+
+.np-workbench .np-find-title {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--taomni-text);
+}
+
+.np-workbench .np-find-context {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--taomni-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.np-workbench .np-find-spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.np-workbench .np-find-legacy {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.np-workbench .np-find-field {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.np-workbench .np-find-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--taomni-text-muted);
+  cursor: pointer;
+}
+
+.np-workbench .np-find-icon-btn:hover {
+  background: var(--taomni-hover, rgba(128, 128, 128, 0.14));
+  color: var(--taomni-text);
+}
+
+.np-workbench .np-find-opacity {
+  flex: none;
+  width: 60px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--taomni-accent);
+  cursor: pointer;
+}
+
+/* Tab row */
+.np-workbench .np-find-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 4px 8px 0;
+  border-bottom: none;
+}
+
+.np-workbench .np-find-tab {
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 5px 5px 0 0;
+  background: transparent;
+  color: var(--taomni-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.np-workbench .np-find-tab:hover {
+  background: var(--taomni-hover, rgba(128, 128, 128, 0.14));
+  color: var(--taomni-text);
+}
+
+.np-workbench .np-find-tab.on {
+  background: var(--taomni-selected);
+  color: var(--taomni-accent);
+  font-weight: 600;
+}
+
+/* Body */
+.np-workbench .np-find-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  min-width: 0;
+}
+
+.np-workbench .np-find-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.np-workbench .np-find-label {
+  flex: none;
+  width: 62px;
+  color: var(--taomni-text-muted);
+  font-size: 12px;
+}
+
+.np-workbench .np-find-inline-label {
+  flex: none;
+  color: var(--taomni-text-muted);
+  font-size: 12px;
+}
+
+.np-workbench .np-find-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 27px;
+  padding: 0 8px;
+  border: 1px solid var(--taomni-input-border, var(--taomni-divider));
+  border-radius: 6px;
+  background: var(--taomni-input-bg, var(--taomni-bg));
+  color: var(--taomni-text);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.np-workbench .np-find-input:focus {
+  outline: none;
+  border-color: var(--taomni-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--taomni-accent) 18%, transparent);
+}
+
+.np-workbench .np-find-input[readonly] {
+  color: var(--taomni-text-muted);
+  cursor: default;
+}
+
+.np-workbench .np-find-filter {
+  flex: 0 1 110px;
+  max-width: 110px;
+}
+
+/* Segmented controls (mode + mark style) */
+.np-workbench .np-find-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--taomni-hover, rgba(128, 128, 128, 0.14));
+}
+
+.np-workbench .np-find-seg-btn {
+  padding: 2px 9px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--taomni-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.np-workbench .np-find-seg-btn:hover {
+  color: var(--taomni-text);
+}
+
+.np-workbench .np-find-seg-btn.on {
+  background: var(--taomni-card-bg, #ffffff);
+  color: var(--taomni-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+/* Options grid (8 checkboxes) */
+.np-workbench .np-find-opts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px 8px;
+  margin-top: 2px;
+}
+
+.np-workbench .np-find-opt {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.np-workbench .np-find-opt input[type="checkbox"] {
+  flex: none;
+  margin: 0;
+  accent-color: var(--taomni-accent);
+}
+
+/* Message line */
+.np-workbench .np-find-message {
+  min-height: 16px;
+  color: var(--taomni-text-muted);
+  font-size: 11.5px;
+  line-height: 16px;
+}
+
+.np-workbench .np-find-message.error {
+  color: var(--taomni-error, #dc2626);
+}
+
+/* Action buttons */
+.np-workbench .np-find-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.np-workbench .np-find-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--taomni-input-border, var(--taomni-divider));
+  border-radius: 6px;
+  background: var(--taomni-card-bg, #ffffff);
+  color: var(--taomni-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.np-workbench .np-find-btn:hover:not(:disabled) {
+  background: var(--taomni-hover, rgba(128, 128, 128, 0.14));
+}
+
+.np-workbench .np-find-btn.primary {
+  border-color: var(--taomni-accent);
+  background: var(--taomni-accent);
+  color: #ffffff;
+}
+
+.np-workbench .np-find-btn.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.np-workbench .np-find-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Mark style swatches */
+.np-workbench .np-find-mark-swatch {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 4px;
+}
+
+.np-workbench .np-find-mark-1 {
+  background: var(--np-mark-1);
+}
+
+.np-workbench .np-find-mark-2 {
+  background: var(--np-mark-2);
+}
+
+.np-workbench .np-find-mark-3 {
+  background: var(--np-mark-3);
+}
+
+.np-workbench .np-find-mark-4 {
+  background: var(--np-mark-4);
+}
+
+.np-workbench .np-find-mark-5 {
+  background: var(--np-mark-5);
+}

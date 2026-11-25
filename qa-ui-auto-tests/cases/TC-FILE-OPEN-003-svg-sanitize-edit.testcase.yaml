@@ -23,8 +23,8 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-file-open-svg
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -80,8 +80,8 @@ steps:
 - assert_file_open_bytes:
     path: ${fixture.file_open_root}/unsafe.svg
     sha256: ${fixture.file_open_svg_saved_sha}
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
-- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - wait_for: '[data-testid="explorer-file-row"][data-name="unsafe.svg"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'

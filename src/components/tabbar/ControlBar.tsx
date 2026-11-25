@@ -39,6 +39,9 @@ import { WindowDragHandle } from "../window/WindowDragHandle";
 import { startWindowDrag } from "../../lib/windowDrag";
 import { PlatformToolbarActions } from "./PlatformToolbarActions";
 import { WorkspaceTabStrip } from "../workspace/WorkspaceTabStrip";
+import { ExplorerTabStrip } from "../explorer/ExplorerTabStrip";
+import { ExplorerTabsFilter } from "../explorer/ExplorerTabsFilter";
+import { activeExplorerTab } from "../../stores/explorerStore";
 import { WorkspaceTabsFilter } from "../workspace/WorkspaceTabsFilter";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
@@ -101,7 +104,7 @@ export function ControlBar({
   const ctx = useContextMenu();
   const menuHost = useMainRailHostStore((s) => s.menuHost);
   const activeSideTab = useAppStore((state) => state.activeSideTab);
-  const hasToolsSurfaceTabs = useAppStore((state) => state.tabs.some((tab) => tab.type === "file-browser" || tab.type === "servers"));
+  const hasToolsSurfaceTabs = useAppStore((state) => state.tabs.some((tab) => tab.type === "servers"));
   const t = useT();
   const {
     hasSessions,
@@ -124,7 +127,9 @@ export function ControlBar({
     const workspace = useWorkspacePlatformStore.getState().getWorkspace();
     const canCloseActiveTab = useAppStore.getState().activeSideTab === "workspaces"
       ? !!workspace?.openTabs.find((tab) => tab.id === workspace.activeTabId)?.closable
-      : activeTabClosable;
+      : useAppStore.getState().activeSideTab === "explorer"
+        ? !!activeExplorerTab()?.closable
+        : activeTabClosable;
     const importExportItems: MenuItem[] = [
       {
         label: t("menu.importSessions"),
@@ -235,7 +240,7 @@ export function ControlBar({
       {ctx.render}
       {previewNode}
       <div className="flex items-center gap-1 px-1.5 shrink-0">
-        {activeSideTab !== "home" && <BarButton
+        {activeSideTab !== "home" && activeSideTab !== "explorer" && <BarButton
           testId="toggle-left-sidebar"
           title={`${t("platform.toggleLeftSidebar")} (${IS_MAC ? "Cmd+B" : "Ctrl+B"})`}
           icon={leftSidebarCollapsed ? <PanelRight className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
@@ -255,6 +260,8 @@ export function ControlBar({
           <div className="flex h-full min-w-0 items-center gap-1">
             <WorkspaceTabStrip />
           </div>
+        ) : activeSideTab === "explorer" ? (
+          <ExplorerTabStrip />
         ) : activeSideTab === "home" || activeSideTab === "agents" || (activeSideTab === "tools" && !hasToolsSurfaceTabs) ? (
           <div className="flex h-full items-center gap-2 px-2 text-[12px] font-semibold" data-testid="platform-mode-title">
             {t(activeSideTab === "home" ? "platform.homeTitle" : activeSideTab === "tools" ? "platform.tools" : "platform.agentsTitle")}
@@ -274,6 +281,7 @@ export function ControlBar({
       <PlatformToolbarActions onOpenSearch={onOpenGlobalSearch} slotRef={slotRef} onDetachActiveTab={onDetachActiveTab}>
         {activeSideTab === "sessions" && <TabMore onDetachActiveTab={onDetachActiveTab} />}
         {activeSideTab === "workspaces" && <WorkspaceTabsFilter />}
+        {activeSideTab === "explorer" && <ExplorerTabsFilter />}
       </PlatformToolbarActions>
       {!IS_MAC && <WindowControls onClose={onCloseWindow} />}
     </div>

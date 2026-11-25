@@ -3,6 +3,7 @@ import { voiceStub } from "./voiceStub";
 import { installStubMailQaControl } from "./mailServerStub";
 import { stubMfaInvoke } from "./mfaStub";
 import { parity008Handles, parity008Invoke } from "./parity008Git";
+import { invokeGitClone } from "./commands/gitClone";
 import { CommandRegistry } from "./commands/registry";
 import { mailStubSeed, invokeMail } from "./commands/mail";
 import { type InvokeOptions } from "./commands/runtime";
@@ -13,6 +14,7 @@ import { invokeWorkspace } from "./commands/workspace";
 import { invokeSession } from "./commands/session";
 import { invokeFiles } from "./commands/files";
 import { invokeExplorer } from "./commands/explorer";
+import { invokeNotepad } from "./commands/notepad";
 import { invokeViewer } from "./commands/viewer";
 import { invokeSdk } from "./commands/sdk";
 import { invokeLsp } from "./commands/lsp";
@@ -28,9 +30,58 @@ import { invokeScreenshot } from "./commands/screenshot";
 
 const stubCommandRegistry = new CommandRegistry();
 
+/**
+ * Issue #869 QA observation: the local-agent approval bridge calls commands that
+ * only exist in the desktop backend. Browser preview records those calls so a QA
+ * case can assert the renderer reached the IPC boundary with the exact decision
+ * (and did not, for example, resolve a prompt it never owned). Browser-only; this
+ * module never ships in a Tauri build.
+ */
+const APPROVAL_COMMANDS = new Set([
+  "cc_resolve_permission",
+  "cc_resolve_tool_call",
+  "acp_resolve_permission",
+  "acp_cancel_permission",
+  "qa_agent_approval_probe",
+]);
+const approvalInvocations: Array<{ command: string; args: unknown }> = [];
+
+declare global {
+  interface Window {
+    /** Browser-preview approval IPC trace (issue #869 QA cases). */
+    readonly __taomniQaApprovalInvocations?: Array<{ command: string; args: unknown }>;
+  }
+}
+
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "__taomniQaApprovalInvocations", {
+    configurable: true,
+    get: () => approvalInvocations.slice(),
+  });
+}
+
 if (typeof window !== "undefined") installStubMailQaControl(mailStubSeed);
 
+const NOTEPAD_VIEWER_COMMANDS = new Set([
+  "viewer_save_as",
+  "viewer_rename",
+  "viewer_trash",
+  "viewer_set_readonly_attr",
+  "viewer_write_text_elevated",
+]);
+
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  // Issue #869: the bridge re-reads its pending approvals on mount. Browser
+  // preview has no backend registry, so nothing is pending there.
+  if (cmd === "cc_pending_permission_prompts") return [] as T;
+  if (APPROVAL_COMMANDS.has(cmd)) {
+    approvalInvocations.push({ command: cmd, args });
+    if (approvalInvocations.length > 64) approvalInvocations.shift();
+    return undefined as T;
+  }
+  if (NOTEPAD_VIEWER_COMMANDS.has(cmd) || cmd.startsWith("notepad_")) {
+    return await invokeNotepad(cmd, args) as T;
+  }
   if (cmd.startsWith("viewer_")) return await invokeViewer(cmd, args) as T;
   if (cmd.startsWith("mobile_")) return await mobileStub(cmd, args) as T;
   if (cmd === "backup_get_policy") {
@@ -50,6 +101,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
   }
   // ED-PARITY-008 isolated two-repository Git fixture (opt-in via localStorage).
   if (parity008Handles(cmd, args)) return await parity008Invoke(cmd, args) as T;
+  if (cmd.startsWith("git_clone_")) return await invokeGitClone(cmd, args) as T;
   // MFA authenticator: localStorage mirror of mfa.db gated by the stub vault.
   if (cmd.startsWith("mfa_")) {
     const vault = loadStubVault();
@@ -82,11 +134,11 @@ for (const command of ["vault_status","vault_init","vault_unlock","vault_lock","
   stubCommandRegistry.register({ domain: "vault", command, handler: (args) => invokeVault(command, args) });
 }
 
-for (const command of ["select_private_key_file","select_upload_file","select_save_directory","select_save_file_path","select_file_path","select_folder_path","read_file_bytes","check_file_exists","read_plist_session_file","read_stream_open","read_stream_read","read_stream_close","write_stream_open","write_stream_append","write_stream_close","write_stream_abort","temporary_file_path","open_local_shell_as_administrator","sftp_attach","sftp_detach","sftp_list_remote","sftp_list_local","sftp_list_local_detailed","sftp_local_home","sftp_local_drives","sftp_mkdir","sftp_remove","sftp_rename","sftp_stat","sftp_chmod","sftp_upload_dir","sftp_download_dir","sftp_realpath","sftp_read_file_text","sftp_write_file_text","sftp_upload","sftp_download","sftp_upload_bytes","sftp_download_bytes","sftp_cancel_transfer","sftp_pause_transfer","sftp_resume_transfer","sftp_open_path"]) {
+for (const command of ["get_home_dir","select_private_key_file","select_upload_file","select_save_directory","select_save_file_path","select_file_path","select_folder_path","read_file_bytes","check_file_exists","read_plist_session_file","read_stream_open","read_stream_read","read_stream_close","write_stream_open","write_stream_append","write_stream_close","write_stream_abort","temporary_file_path","open_local_shell_as_administrator","sftp_attach","sftp_detach","sftp_list_remote","sftp_list_local","sftp_list_local_detailed","sftp_local_home","sftp_local_drives","sftp_mkdir","sftp_remove","sftp_rename","sftp_stat","sftp_chmod","sftp_upload_dir","sftp_download_dir","sftp_realpath","sftp_read_file_text","sftp_write_file_text","sftp_upload","sftp_download","sftp_upload_bytes","sftp_download_bytes","sftp_cancel_transfer","sftp_pause_transfer","sftp_resume_transfer","sftp_open_path"]) {
   stubCommandRegistry.register({ domain: "files", command, handler: (args, options) => invokeFiles(command, args, options) });
 }
 
-for (const command of ["explorer_canonical_path", "explorer_same_volume", "explorer_write_clipboard_files", "explorer_update_cut_clipboard", "local_copy_entries", "local_move_entries", "local_trash_entries", "local_trash_restore", "local_properties", "explorer_read_preview_text", "explorer_read_preview_bytes", "explorer_cancel_operation", "local_rename_entry", "local_create_entry"]) {
+for (const command of ["explorer_canonical_path", "explorer_same_volume", "explorer_write_clipboard_files", "explorer_update_cut_clipboard", "local_copy_entries", "local_move_entries", "local_trash_entries", "local_trash_restore", "local_properties", "explorer_read_preview_text", "explorer_read_preview_bytes", "explorer_search_entries", "explorer_cancel_operation", "local_rename_entry", "local_create_entry"]) {
   stubCommandRegistry.register({ domain: "explorer", command, handler: (args) => invokeExplorer(command, args) });
 }
 

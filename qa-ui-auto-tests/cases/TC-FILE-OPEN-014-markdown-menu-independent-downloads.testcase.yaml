@@ -1,17 +1,18 @@
 id: TC-FILE-OPEN-014
 title: Markdown dropdown without toolbar scrollbars, independent PDF and portable Word downloads
 description: Production Explorer and export UI. Desktop and narrow layout, keyboard navigation/focus, default settings, real printer-independent
-  searchable PDF and Word downloads. Independent host parsing checks exact Chinese/English, accents, emoji, final-page text and
-  original red/blue raster pixels in the 300DPI A4 PDF, three vector diagrams with explicit label styles and 600DPI Word fallback;
-  original raster stays 1600x800. Browser evidence is not native chooser evidence.
+  searchable PDF, PNG long image and Word downloads. Independent host parsing checks exact Chinese/English, accents, emoji, final-page
+  text and original red/blue raster pixels in the 300DPI A4 PDF, the 300 DPI whole-document PNG (not 96 DPI 1:1 pixels), three
+  vector diagrams with measured glyph-pinned label positions and 600DPI Word fallback; original raster stays 1600x800. Browser
+  evidence is not native chooser evidence.
 modes:
 - browser
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-export-quality
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -103,6 +104,12 @@ steps:
     filename: quality.docx
     artifact: docx
 - wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- click: '[data-testid="markdown-export"]'
+- assert_download:
+    trigger: '[data-testid="markdown-export-png"]'
+    filename: quality.png
+    artifact: png-doc
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
 - assert_file_open_bytes:
     path: ${fixture.markdown_quality_source}
     sha256: ${fixture.markdown_quality_sha}
@@ -125,13 +132,14 @@ tags:
 fixtures:
 - reset_db
 - markdown_quality
-timeout_sec: 300
+timeout_sec: 420
 verification:
   review: reviewed
   requirements:
   - id: DURABLE-RESULT
     requirement: Export dropdown escapes clipping surfaces with no toolbar scrollbars, supports keyboard dismissal and narrow windows,
-      and produces searchable Unicode PDF and complete high-fidelity DOCX artifacts while retaining source bytes.
+      and produces searchable Unicode PDF, a 300 DPI PNG long image with measured glyph-pinned diagram vectors and complete
+      high-fidelity DOCX artifacts while retaining source bytes.
     actions:
     - 3
     - 4
@@ -155,6 +163,9 @@ verification:
     - 39
     - 42
     - 43
+    - 45
+    - 46
+    - 47
     checkpoints:
     - step: 14
       expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
@@ -198,10 +209,13 @@ verification:
     - step: 43
       expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
         source bytes remain exact.
-    - step: 45
+    - step: 46
+      expectation: The saved PNG long image is independently parsed at the 300 DPI standard (not 96 DPI 1:1 pixels) with nonblank
+        content; the DOCX vectors satisfy the measured glyph-position contract.
+    - step: 48
       expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
         source bytes remain exact.
-    - step: 46
+    - step: 49
       expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
         source bytes remain exact.
     results:
@@ -219,8 +233,9 @@ verification:
     - 36
     - 41
     - 43
-    - 45
     - 46
+    - 48
+    - 49
   - id: TAO-RESULT-ACTIONS
     requirement: Successful export shows Tao as the first primary action with system file manager secondary; browser validates
       layout, native TC-FILE-OPEN-023 validates actual file opening.
@@ -228,15 +243,15 @@ verification:
     - 42
     - 43
     results:
-    - 48
-    - 49
-    - 50
+    - 51
+    - 52
+    - 53
     checkpoints:
-    - step: 48
+    - step: 51
       expectation: Tao action is visible after export
-    - step: 49
+    - step: 52
       expectation: System file-manager action remains visible
-    - step: 50
+    - step: 53
       expectation: Tao action precedes the system action
   visual:
   - check: Diagram labels, page boundaries and popup placement

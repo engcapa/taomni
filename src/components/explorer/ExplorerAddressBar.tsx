@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { ArrowLeft, ArrowRight, ArrowUp, ChevronRight, HardDrive, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUp, ChevronRight, FolderSearch, HardDrive, RefreshCw, Search, X } from "lucide-react";
 import { useContextMenu } from "../ContextMenu";
 import { isWindowsPath, resolvePathInput } from "../../lib/pathCompletion";
 import { sftpListLocalDetailed, type FileEntry } from "../../lib/sftp";
@@ -10,9 +10,10 @@ import { normalizeExplorerInput } from "./explorerPathInput";
 import { ExplorerFileIcon } from "./ExplorerFileIcon";
 import { useExplorerLabels } from "./explorerLabels";
 import { useExplorerPreferences } from "./explorerPreferences";
+import type { ExplorerSearchController } from "./useExplorerSearch";
 
-export function ExplorerAddressBar({ tabId, pane, home, filter, onFilter, addressRef }: {
-  tabId: string; pane?: PaneState; home: string; filter: string; onFilter: (value: string) => void;
+export function ExplorerAddressBar({ tabId, pane, home, search, addressRef }: {
+  tabId: string; pane?: PaneState; home: string; search: ExplorerSearchController;
   addressRef: RefObject<HTMLInputElement | null>;
 }) {
   const label = useExplorerLabels();
@@ -79,8 +80,22 @@ export function ExplorerAddressBar({ tabId, pane, home, filter, onFilter, addres
             }
           }} />
       </div>
-      <label className="ex-search"><Search /><input data-testid="explorer-filter" aria-label={label("筛选当前文件夹", "Filter current folder")} placeholder={label("搜索 ", "Search ") + (crumbs.at(-1)?.name ?? "")} value={filter} onChange={(event) => onFilter(event.target.value)} /></label>
+      <label className="ex-search"><Search /><input data-testid="explorer-filter" aria-label={label("搜索文件，支持通配符", "Search files with glob patterns")} placeholder={label("搜索 *.md、**/*.ts", "Search *.md, **/*.ts")} value={search.query}
+        onChange={(event) => search.setQuery(event.target.value)} onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing || event.key !== "Escape") return;
+          event.preventDefault(); event.stopPropagation();
+          if (search.searching) search.cancel(); else search.setQuery("");
+        }} />
+        <button type="button" data-testid="explorer-search-recursive" className={search.recursive ? "on" : ""} aria-pressed={search.recursive} title={label("包含子目录", "Include subfolders")} onClick={() => search.setRecursive(!search.recursive)}><FolderSearch /></button>
+        {search.query && <button type="button" data-testid="explorer-search-clear" title={label("清除搜索", "Clear search")} onClick={() => search.setQuery("")}><X /></button>}
+      </label>
     </div>
+    {search.active && <div className="ex-search-status" data-testid="explorer-search-status" data-state={search.error ? "error" : search.searching ? "searching" : search.cancelled ? "cancelled" : "done"}>
+      {search.error ? <><span role="alert">{search.error}</span><button type="button" data-testid="explorer-search-retry" onClick={search.retry}>{label("重试", "Retry")}</button></>
+        : search.searching ? <span role="status">{label("正在搜索", "Searching")}… · {search.scanned.toLocaleString()} {label("项已扫描", "scanned")}</span>
+          : <span role="status">{search.cancelled ? label("已取消", "Cancelled") + " · " : ""}{search.results.length.toLocaleString()} {label("个结果", "results")} · {search.scanned.toLocaleString()} {label("项已扫描", "scanned")}{search.truncated ? label("（已达 1000 项结果上限）", " (1000-result limit reached)") : ""}</span>}
+      {search.searching && <button type="button" data-testid="explorer-search-cancel" disabled={search.cancelling} onClick={search.cancel}>{search.cancelling ? label("正在取消…", "Cancelling…") : label("取消", "Cancel")}</button>}
+    </div>}
     {pane?.error && <div className="ex-error" data-testid="explorer-address-error" role="alert"><span className="ex-sp">{pane.error}</span><button onClick={() => void refreshPane(tabId, "local")}>{label("重试", "Retry")}</button><button onClick={() => void navigateUp(tabId, "local")}>{label("上一级", "Up")}</button></div>}
     {ctx.render}
   </>;

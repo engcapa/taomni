@@ -1,5 +1,5 @@
 id: TC-FILE-OPEN-037
-title: Markdown remote images render and export until disabled in Settings
+title: Markdown remote images render and export, with placeholders when disabled in Settings
 covers: [F-FILEOPEN-1, F-EXPLORER-1]
 modes: [browser]
 tags: [p1, markdown, file-open, export]
@@ -9,8 +9,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-markdown-remote
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
     key: Mod+l
@@ -40,23 +40,26 @@ steps:
 - set_check:
     selector: '[data-testid="file-open-markdown-restrict-remote"]'
     checked: true
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
+- wait_for: '[data-testid="markdown-image-widget"] [data-testid="markdown-render-placeholder"][data-kind="image"]'
 - assert_text:
-    selector: '[data-testid="markdown-image-widget"] figcaption'
+    selector: '[data-testid="markdown-render-warnings"]'
     contains: Remote images are blocked
 - click: '[data-testid="markdown-mode-split"]'
-- wait_for: '[data-testid="markdown-preview"] img[title*="Remote images are blocked"]:not([src])'
+- wait_for: '[data-testid="markdown-preview"] [data-testid="markdown-render-placeholder"][data-kind="image"]'
 - click: '[data-testid="markdown-export"]'
-- click: '[data-testid="markdown-export-html"]'
-- assert_attribute:
-    selector: '[data-testid="markdown-export-status"]'
-    name: data-export-state
-    equals: failed
+- assert_download:
+    trigger: '[data-testid="markdown-export-html"]'
+    filename: remote-images.html
+    contains: [Image unavailable, Remote images are blocked, 'img-src data:']
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
 - click: '[data-testid="ribbon-settings"]'
 - set_check:
     selector: '[data-testid="file-open-markdown-restrict-remote"]'
     checked: false
-- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"]'
 - eval_readonly:
     expression: document.querySelector('.fv-md-preview-pane img')?.naturalWidth === 96
     expect_truthy: true

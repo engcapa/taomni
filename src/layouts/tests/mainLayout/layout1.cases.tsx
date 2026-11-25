@@ -59,6 +59,32 @@ export function registerMainLayoutLayout1Cases() {
       expect(useAppStore.getState().sidebarCollapsedByGroup.other).toBe(false);
     });
 
+    it("keeps the rail-only Explorer surface collapsed and its sidebar toggles inert (U6/U7)", async () => {
+      render(<MainLayout />);
+      act(() => useAppStore.getState().setActiveSideTab("explorer"));
+      await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
+      // U6 follow-up: Explorer has no sidebar Panel at all, so neither the
+      // empty panel surface nor the draggable divider exists in the DOM.
+      expect(screen.queryByTestId("expanded-sidebar-panel")).toBeNull();
+      expect(screen.queryByTestId("main-sidebar-resize-handle")).toBeNull();
+      // The title-bar/View-menu toggle (the mocked ControlBar button) and Ctrl+B
+      // must not expand an empty explorer panel.
+      fireEvent.click(screen.getByTestId("mock-sidebar-toggle"));
+      expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+      fireEvent.keyDown(document.body, { ctrlKey: true, key: "b", code: "KeyB" });
+      expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+      expect(screen.queryByTestId("main-sidebar-resize-handle")).toBeNull();
+      // Returning to a mode with real sidebar content restores the toggle: the
+      // terminal group's own ED-PARITY-027 preference applies again and the
+      // title-bar/View-menu toggle expands the panel.
+      act(() => useAppStore.getState().setActiveSideTab("sessions"));
+      expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+      await waitFor(() => expect(screen.queryByTestId("main-sidebar-resize-handle")).not.toBeNull());
+      expect(screen.getByTestId("expanded-sidebar-panel")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("mock-sidebar-toggle"));
+      expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    });
+
     it("keeps the store's state over a restored collapsed layout and syncs later drags", async () => {
       render(<MainLayout />);
       const onResize = panelResizeMock.handlers.get("sidebar");
@@ -271,7 +297,7 @@ export function registerMainLayoutLayout1Cases() {
       act(() => useAppStore.getState().setActiveSideTab("home"));
       await waitFor(() => expect(screen.getByTestId("tao-home-history")).toBeInTheDocument());
       fireEvent.click(screen.getByTestId("tao-home-history"));
-      expect(screen.getByRole("button", { name: /恢复上次会话|Restore last session/ })).toBeInTheDocument();
+      expect(screen.getByTestId("tao-home-history-restore")).toBeEnabled();
       expect(useAppStore.getState().activeTabId).toBe("saved-local");
       vi.mocked(getWelcomeRunSnapshot).mockResolvedValue({ record: null, legacyCandidate: null, issue: null });
     });
@@ -315,6 +341,88 @@ export function registerMainLayoutLayout1Cases() {
         shellId: "/bin/bash",
         confirmedCwd: "/work/repo",
       });
+    });
+
+    it("refreshes the Home restore row when a commit lands while Home is active", async () => {
+      act(() => useAppStore.getState().setActiveSideTab("home"));
+      await waitFor(
+        () => expect(screen.getByTestId("welcome-restore-status")).toHaveAttribute("data-state", "empty"),
+      );
+      const commitsBefore = (commitWelcomeRunSnapshot as ReturnType<typeof vi.fn>).mock.calls.length;
+
+      // Opening a whitelist local terminal keeps Home visible while the
+      // collector persists the run in the background.
+      await act(async () => {
+        useAppStore.setState({
+          tabs: [
+            { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+            {
+              id: "local-home",
+              type: "terminal",
+              title: "bash",
+              closable: true,
+              localShell: { id: "/bin/bash", name: "bash" },
+            },
+          ],
+          activeTabId: "local-home",
+        });
+      });
+      await waitFor(() => {
+        const props = terminalPanelMock.props.find((candidate) => candidate.tabId === "local-home");
+        expect(props?.onCwdChange).toBeTruthy();
+      });
+      // The snapshot exists once the commit is applied; the one-shot
+      // activation read already resolved to "empty".
+      vi.mocked(getWelcomeRunSnapshot).mockResolvedValue({
+        record: {
+          schemaVersion: 1,
+          revision: 9,
+          runSequence: 1,
+          batchId: "home-live",
+          committedAtMs: 1,
+          entries: [{
+            kind: "local-terminal",
+            identity: "local:local-home",
+            displayName: "bash",
+            shellId: "/bin/bash",
+            shellArgs: [],
+            confirmedCwd: "/work/repo",
+          }],
+          activeIdentity: "local:local-home",
+        },
+        legacyCandidate: null,
+        issue: null,
+      });
+      await act(async () => {
+        terminalPanelMock.props
+          .filter((candidate) => candidate.tabId === "local-home")
+          .at(-1)
+          ?.onCwdChange?.("/work/repo");
+      });
+
+      await waitFor(
+        () => expect((commitWelcomeRunSnapshot as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(commitsBefore),
+        { timeout: 4000 },
+      );
+      await waitFor(
+        () => expect(screen.getByTestId("welcome-restore-status")).toHaveAttribute("data-state", "available"),
+        { timeout: 4000 },
+      );
+    });
+
+    it("keeps the Home restore row empty when nothing is restorable", async () => {
+      act(() => useAppStore.getState().setActiveSideTab("home"));
+      await waitFor(
+        () => expect(screen.getByTestId("welcome-restore-status")).toHaveAttribute("data-state", "empty"),
+      );
+      const readsBefore = vi.mocked(getWelcomeRunSnapshot).mock.calls.length;
+      const commitsBefore = (commitWelcomeRunSnapshot as ReturnType<typeof vi.fn>).mock.calls.length;
+      // Welcome alone produces no run snapshot, so no refresh may turn the
+      // row into a stale "available".
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      expect(commitWelcomeRunSnapshot).toHaveBeenCalledTimes(commitsBefore);
+      expect(vi.mocked(getWelcomeRunSnapshot).mock.calls.length).toBe(readsBefore);
+      expect(screen.getByTestId("welcome-restore-status")).toHaveAttribute("data-state", "empty");
     });
   });
 }

@@ -39,6 +39,7 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import re
 import sys
@@ -152,7 +153,7 @@ def parse(text: str, *, source: str = "<input>") -> list[Feature]:
             if block_start_offset < len(char_to_line) else 0
         )
         try:
-            doc = yaml.safe_load(block_body) or {}
+            doc = yaml.load(block_body, Loader=getattr(yaml, "CSafeLoader", yaml.SafeLoader)) or {}
         except yaml.YAMLError as e:
             raise FeatureCatalogError(
                 f"{source}: malformed YAML in <!-- feature --> at line "
@@ -246,11 +247,23 @@ def parse(text: str, *, source: str = "<input>") -> list[Feature]:
     return features
 
 
+_FEATURE_CACHE: dict[Path, tuple[tuple[int, int], list[Feature]]] = {}
+
+
 def load_features(path: Path | str = DEFAULT_PATH) -> list[Feature]:
     p = Path(path)
     if not p.exists():
         raise FileNotFoundError(f"feature-list.md not found at {p}")
-    return parse(p.read_text(encoding="utf-8"), source=str(p))
+    # Parsing is ~1s; audit/plan call this repeatedly for an unchanged file.
+    # Callers always receive an independent copy.
+    stat = p.stat()
+    stamp = (stat.st_mtime_ns, stat.st_size)
+    key = p.resolve()
+    cached = _FEATURE_CACHE.get(key)
+    if cached is None or cached[0] != stamp:
+        cached = (stamp, parse(p.read_text(encoding="utf-8"), source=str(p)))
+        _FEATURE_CACHE[key] = cached
+    return copy.deepcopy(cached[1])
 
 
 # Back-compat shim for code that previously did

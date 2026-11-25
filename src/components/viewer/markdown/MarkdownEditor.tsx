@@ -29,6 +29,8 @@ import { MarkdownSplit } from "./MarkdownSplit";
 import { PreviewAppearanceControl, previewThemeStyle, usePreviewTheme, type PreviewAppearance } from "./PreviewAppearance";
 import { MarkdownDiagramActions } from "./MarkdownDiagramActions";
 import { MarkdownLiveMenu } from "./MarkdownLiveMenu";
+import { MarkdownRenderWarnings } from "./MarkdownRenderWarnings";
+import type { MarkdownRenderLabel, MarkdownRenderWarning } from "./markdownRenderFallback";
 import { MarkdownDrawioImport } from "./MarkdownDrawioImport";
 import { markdownSearchHighlights } from "./markdownSearchHighlights";
 import { useMarkdownZoom } from "./useMarkdownZoom";
@@ -63,6 +65,7 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
   const [position, setPosition] = useState(0);
   const [heading, setHeading] = useState(0);
   const [pasteStatus, setPasteStatus] = useState("");
+  const [renderWarningState, setRenderWarningState] = useState<{ warnings: MarkdownRenderWarning[]; dismissed: boolean }>({ warnings: [], dismissed: false });
   const [slash, setSlash] = useState<number | null>(null);
   const [printRequest, setPrintRequest] = useState(0);
   const editor = useRef<EditorView | null>(null);
@@ -78,6 +81,16 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
   ownerRef.current = owner;
   currentRef.current = current; errorRef.current = onError;
   const report = useCallback((message: string) => errorRef.current(message), []);
+  const onRenderWarning = useCallback((warning: MarkdownRenderWarning) => {
+    setRenderWarningState((currentState) => {
+      const index = currentState.warnings.findIndex((item) => item.id === warning.id);
+      if (index >= 0 && currentState.warnings[index].message === warning.message) return currentState;
+      const warnings = [...currentState.warnings];
+      if (index >= 0) warnings[index] = warning;
+      else warnings.push(warning);
+      return { warnings, dismissed: false };
+    });
+  }, []);
   const headings = useMemo(() => markdownHeadings(current.content), [current.content]);
   const activeHeading = headings.filter((item) => item.from <= position).at(-1)?.from;
   const chooseImage = useCallback((from?: number, to?: number) => {
@@ -89,7 +102,7 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
   }, []);
   const context = useMemo<MarkdownWidgetContext>(() => ({ docPath: current.path, readOnly: effectiveReadOnly, theme: previewTheme, readImage,
     onChange: owner?.onChange ?? ((content) => useDocumentStore.getState().edit(current.path, content)), label,
-    onError: report, replaceImage: (from, to) => chooseImage(from, to), revealImage: (reference) => {
+    onError: report, onWarning: onRenderWarning, replaceImage: (from, to) => chooseImage(from, to), revealImage: (reference) => {
       try {
         if (owner?.revealImage) { owner.revealImage(reference); return; }
         const path = resolveMarkdownAsset(current.path, reference);
@@ -97,7 +110,7 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
         void openExplorer(markdownDirectory(path)).catch((error: unknown) => report(String(error)));
       } catch (error) { report(String(error)); }
     },
-  }), [current.path, effectiveReadOnly, previewTheme, readImage, owner?.onChange, owner?.revealImage, label, report, chooseImage]);
+  }), [current.path, effectiveReadOnly, previewTheme, readImage, owner?.onChange, owner?.revealImage, label, report, onRenderWarning, chooseImage]);
   const input = useMemo(() => markdownInput({ docPath: current.path, preferences: () => useFileOpenPreferences.getState(),
     onStatus: setPasteStatus, onError: report, label, saveImage: owner?.saveImage }), [current.path, label, report, owner?.saveImage]);
   const save = useCallback(() => Promise.resolve(ownerRef.current ? ownerRef.current.onSave() : useDocumentStore.getState().save(currentRef.current.path)), []);
@@ -151,6 +164,9 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
   useEffect(() => {
     setPasteStatus(""); setSlash(null); imageRange.current = null; setPosition(0); setEditing(false);
   }, [current.key]);
+  useEffect(() => {
+    setRenderWarningState({ warnings: [], dismissed: false });
+  }, [current.key, current.content, readImage]);
   useEffect(() => { if (requestedMode) { setMode(requestedMode); setEditing(false); } }, [requestedMode]);
   const changeMode = (next: MarkdownMode) => { setSlash(null); setEditing(false); setMode(next); onModeChange?.(next); };
   const insert = (from: number, action: MarkdownFormat | "heading" | "image") => {
@@ -172,6 +188,8 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
       <PreviewAppearanceControl value={appearance} onChange={setAppearance} />
       <MarkdownExportMenu key={`export:${current.key}`} document={current} onError={report} printRequest={printRequest} onExport={owner?.onExport} />
     </div>
+    {!renderWarningState.dismissed ? <MarkdownRenderWarnings warnings={renderWarningState.warnings}
+      onDismiss={() => setRenderWarningState((currentState) => ({ ...currentState, dismissed: true }))} /> : null}
     <div className="fv-md-wrap">
       {outline && <aside className="fv-md-outline" data-testid="markdown-outline" aria-label={label("大纲", "Outline")}>
         <div className="fv-md-outline-title"><ListTree />{label("大纲", "Outline")}</div>
@@ -193,7 +211,8 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
             className={mode === "live" ? "fv-md-live-surface" : "fv-md-source-surface"} nativeSelection={mode === "live" && effectiveReadOnly} createSearchPanel={createWorkspaceSearchPanel} />
           {slash !== null && <MarkdownInsertMenu from={slash} onInsert={insert} />}
         </div>
-        {mode === "split" ? <MarkdownPreviewPane content={current.content} path={current.path} onError={report} theme={previewTheme} readImage={readImage} /> : null}
+        {mode === "split" ? <MarkdownPreviewPane content={current.content} path={current.path} onError={report} onWarning={onRenderWarning}
+          theme={previewTheme} readImage={readImage} label={label} /> : null}
       </MarkdownSplit>
       </div>
     </div>
@@ -214,7 +233,15 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
   </div>;
 }
 
-function MarkdownPreviewPane({ content, path, onError, theme, readImage }: { content: string; path: string; onError: (message: string) => void; theme: "light" | "dark"; readImage?: (reference: string) => Promise<string> }) {
+function MarkdownPreviewPane({ content, path, onError, onWarning, theme, readImage, label }: {
+  content: string;
+  path: string;
+  onError: (message: string) => void;
+  onWarning: (warning: MarkdownRenderWarning) => void;
+  theme: "light" | "dark";
+  readImage?: (reference: string) => Promise<string>;
+  label: MarkdownRenderLabel;
+}) {
   const root = useRef<HTMLDivElement>(null);
   const previous = useRef<{ content: string; path: string; readImage: typeof readImage } | null>(null);
   useEffect(() => {
@@ -224,7 +251,7 @@ function MarkdownPreviewPane({ content, path, onError, theme, readImage }: { con
     const appearanceOnly = previous.current?.content === content && previous.current.path === path && previous.current.readImage === readImage;
     previous.current = { content, path, readImage };
     const rendered = markdownFragment(content);
-    const enhancements = enhanceMarkdown(rendered, { docPath: path, theme, readImage, cancelled: () => cancelled });
+    const enhancements = enhanceMarkdown(rendered, { docPath: path, theme, readImage, onWarning, label, cancelled: () => cancelled });
     const replace = () => {
       if (cancelled) return;
       const pane = container.parentElement;
@@ -237,7 +264,7 @@ function MarkdownPreviewPane({ content, path, onError, theme, readImage }: { con
     if (!appearanceOnly) replace();
     void enhancements.then(() => { if (appearanceOnly) replace(); }).catch((error: unknown) => { if (!cancelled) onError(String(error)); });
     return () => { cancelled = true; };
-  }, [content, path, onError, theme, readImage]);
+  }, [content, path, onError, onWarning, theme, readImage, label]);
   return <div className="fv-md-preview-pane" data-testid="markdown-preview" data-preview-theme={theme} tabIndex={0} style={previewThemeStyle(theme)} onClick={(event) => {
     const anchor = (event.target as Element).closest("a");
     if (!anchor) return;

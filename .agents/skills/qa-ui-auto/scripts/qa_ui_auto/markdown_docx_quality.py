@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import io
+import math
 import posixpath
+import re
 import xml.etree.ElementTree as ET
 
 from .steps import StepError
@@ -14,6 +16,51 @@ NS = {
     "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
     "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
 }
+
+# Contextual shaping, bidi and combining marks keep renderer-owned semantics;
+# every other label must be pinned to measured glyph positions.
+CONTEXTUAL_TEXT = re.compile(
+    "[\u0300-\u036f\u0591-\u05f4\u0600-\u06ff\u0750-\u077f\u0900-\u097f\u0980-\u09ff\u200c\u200d\ufe00-\ufe0f]"
+)
+
+
+def _tag(element):
+    return element.tag.rsplit("}", 1)[-1]
+
+
+def inspect_vector_text(svg, context="Word vector"):
+    """Every plain label in an Office vector must carry explicit glyph runs.
+
+    Office-family SVG importers do not reliably honor text-anchor,
+    dominant-baseline or relative tspan coordinate chains: center-anchored
+    C4-style rows render start-anchored and push labels to the right half of
+    their box. The exporter pins browser-measured positions; a vector that
+    again relies on those attributes is a placement regression.
+    """
+    positioned = 0
+    for text in (node for node in svg.iter() if _tag(node) == "text"):
+        content = "".join(text.itertext())
+        if not content.strip() or CONTEXTUAL_TEXT.search(content):
+            continue
+        anchor = text.get("text-anchor")
+        if anchor not in (None, "start"):
+            raise StepError(f"{context} label relies on the {anchor} text anchor instead of measured positions")
+        leaves = [node for node in text.iter() if _tag(node) == "tspan" and not list(node) and (node.text or "").strip()]
+        if not leaves:
+            raise StepError(f"{context} label was not pinned to measured glyph positions: {content[:24]!r}")
+        for span in leaves:
+            if span.get("text-anchor") not in (None, "start"):
+                raise StepError(f"{context} glyph run still relies on a text anchor: {(span.text or '')[:24]!r}")
+            if span.get("x") is None:
+                raise StepError(f"{context} glyph run inherits its position instead of a measured x: {(span.text or '')[:24]!r}")
+            try:
+                point = [float(span.get(name, "")) for name in ("x", "y")]
+                if not all(math.isfinite(value) for value in point):
+                    raise ValueError()
+            except ValueError as error:
+                raise StepError(f"{context} glyph run has invalid measured coordinates: {(span.text or '')[:24]!r}") from error
+            positioned += 1
+    return positioned
 
 
 def inspect_equations(archive):

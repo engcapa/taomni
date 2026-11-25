@@ -13,13 +13,16 @@ default-run = "taomni"
 # Make the patched protocol crates' unit tests runnable with this application's
 # patch table, while ordinary Cargo commands continue to target Taomni only.
 [workspace]
-members = ["vendor/ironrdp-acceptor", "vendor/ironrdp-bulk", "vendor/ironrdp-server", "vendor/ironrdp-session"]
+members = ["vendor/ironrdp-acceptor", "vendor/ironrdp-bulk", "vendor/ironrdp-server", "vendor/ironrdp-session", "crates/sockscap-helper"]
 default-members = ["."]
 resolver = "2"
 
 [lib]
 name = "taomni_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# Desktop targets (binary, unit tests, and integration tests) link against
+# the Rust library directly; `staticlib`/`cdylib` are mobile-only defaults that
+# otherwise trigger redundant static archiving and a full extra dynamic link.
+crate-type = ["rlib"]
 
 [[bin]]
 name = "acp-fake-agent"
@@ -32,14 +35,6 @@ bench = false
 [[bin]]
 name = "rdp-probe"
 path = "src/bin/rdp-probe/main.rs"
-bench = false
-
-# Elevated SocksCap helper (Windows UAC + WinDivert probe). Built alongside
-# the main app; launch via ShellExecute/PowerShell -Verb RunAs.
-[[bin]]
-name = "sockscap-helper"
-path = "src/bin/sockscap-helper/main.rs"
-test = false
 bench = false
 
 [build-dependencies]

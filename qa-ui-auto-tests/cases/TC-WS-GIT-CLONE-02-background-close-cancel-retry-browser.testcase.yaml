@@ -1,0 +1,122 @@
+id: TC-WS-GIT-CLONE-02-background-close-cancel-retry-browser
+title: Closing the clone dialog keeps cloning; reopening shows progress, cancel and retry stay consistent
+description: A slow controlled clone survives closing the import dialog, the + menu reopens the exact
+  running task, cancel reports cancellation, and Retry starts a fresh task that publishes the workspace.
+  Browser only; progress, cancellation and workspace publication are renderer/stub evidence.
+modes:
+- browser
+covers:
+- F-WS-2
+- F25.1
+tags:
+- p1
+- workspace
+- git
+- clone
+- cancellation
+fixtures:
+- reset_db
+- git_clone_source
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-git-clone-02
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-switcher-button"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-clone-git"]'
+- wait_for: '[data-testid="workspace-git-clone-modal"]'
+- fill:
+    selector: '[data-testid="workspace-git-clone-url"]'
+    value: ${fixture.git_clone_url}
+- fill:
+    selector: '[data-testid="workspace-git-clone-name"]'
+    value: qa-clone-background
+- fill:
+    selector: '[data-testid="workspace-git-clone-location"]'
+    value: ${fixture.git_clone_parent}
+- click: '[data-testid="workspace-git-clone-start"]'
+- wait_for:
+    selector: '[data-testid="workspace-git-clone-progress"]'
+    timeout_sec: 20
+- click: '[data-testid="workspace-git-clone-close"]'
+- assert_not_visible: '[data-testid="workspace-git-clone-modal"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-clone-git"]'
+- wait_for:
+    selector: '[data-testid="workspace-git-clone-progress"]'
+    timeout_sec: 20
+- assert_pattern:
+    selector: '[data-testid="workspace-git-clone-phase"]'
+    regex: (Preparing|Connecting|Counting|Receiving|Resolving|Updating|Writing)
+- click: '[data-testid="workspace-git-clone-cancel"]'
+- wait_for:
+    selector: '[data-testid="workspace-git-clone-cancelled"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="workspace-git-clone-cancelled"]'
+    contains: removed
+- click: '[data-testid="workspace-git-clone-retry"]'
+- wait_for:
+    selector: '[data-testid="workspace-git-clone-progress"]'
+    timeout_sec: 20
+- wait_for:
+    selector: '[data-testid="workspace-git-clone-success"]'
+    timeout_sec: 60
+- click: '[data-testid="workspace-git-clone-close"]'
+- wait_for: '[data-testid="workspace-switcher-button"]'
+- assert_text:
+    selector: '[data-testid="workspace-switcher-button"]'
+    contains: qa-clone-background
+- wait_for: '[data-testid="code-workspace-tree-root"][data-root-path="${fixture.git_clone_parent}/qa-clone-background"]'
+- assert_localstorage:
+    key: taomni.qa.gitClone.lastRequest
+    contains: '"workspaceName":"qa-clone-background"'
+- assert_no_runtime_errors: null
+- screenshot: git-clone-background-cancel-retry-browser.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Closing the dialog while cloning hides it without cancelling; the + menu reopens the
+      same running task with live progress.
+    actions: [11, 13, 15, 16]
+    checkpoints:
+    - step: 17
+      expectation: Reopening the dialog restores the same running clone with progress.
+    results: [17]
+  - id: R2
+    requirement: Cancel ends the task with an explicit cancelled state and cleanup hint.
+    actions: [19]
+    checkpoints:
+    - step: 20
+      expectation: Cancelling reaches the explicit cancelled state.
+    - step: 21
+      expectation: The cancelled view explains that incomplete files were removed.
+    results: [20, 21]
+  - id: R3
+    requirement: Retry starts a fresh task that completes and publishes the named workspace with its root.
+    actions: [22, 25]
+    checkpoints:
+    - step: 24
+      expectation: Retry completes and shows the success summary.
+    - step: 27
+      expectation: The published workspace name is visible in the switcher.
+    - step: 28
+      expectation: The published workspace root is visible in the project tree.
+    results: [24, 27, 28]
+  - id: R4
+    requirement: The browser case completes without uncaught runtime errors.
+    actions: [29]
+    checkpoints:
+    - step: 30
+      expectation: No uncaught runtime errors occurred.
+    results: [30]
+  visual:
+  - check: Background-progress hint, cancelled state and retry success presentation.
+    method: manual
+    reason: The retained git-clone-background-cancel-retry-browser.png screenshot is reviewed for these states.
+  native:
+  - check: Real Git process cancellation and cleanup.
+    method: not-applicable
+    reason: This browser-only case uses the controlled stub; Rust unit tests cover cancellation cleanup and TC-WS-GIT-CLONE-03 covers real Git.

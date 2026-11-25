@@ -28,6 +28,7 @@ import { useWorkspaceCommandRegistry } from "./useWorkspaceCommandRegistry";
 import { useExplorerTabRecovery } from "../../lib/explorer/useExplorerTabRecovery";
 import { useViewerRecovery } from "../../lib/openFile/useViewerRecovery";
 import { activeViewerCommands } from "../../lib/openFile/viewerCommands";
+import { toggleSidebarForActiveMode } from "./sidebarToggle";
 
 
 export interface UseMainLayoutStateContext {
@@ -54,7 +55,6 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
     updateGitTabInfo,
     setActiveTab,
     moveTabToIndex,
-    toggleSidebar,
     setSidebarCollapsed,
     setActiveSideTab,
     toggleXServer,
@@ -83,6 +83,9 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
   // Platform menu state belongs to the menu consumers. Opening the first file
   // must not synchronously redraw the entire window just to enable Close.
   const activeTabClosable = !!activeTab?.closable;
+  // Explorer is rail-only (U6): Ctrl/Cmd+B, the View menu and the title-bar
+  // toggle all dispatch this action, and none may expand an empty panel.
+  const toggleSidebar = useCallback(() => toggleSidebarForActiveMode(), []);
   // ED-PARITY-027 A: every tab group restores its own sidebar state (tool
   // window tabs start collapsed to the rail).
   const activeRailGroup = sidebarRailGroup(activeTab?.type);

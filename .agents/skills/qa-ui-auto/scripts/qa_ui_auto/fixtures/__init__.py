@@ -81,6 +81,7 @@ from . import workspace_ignored_ancestor_root
 from . import parity005_completion
 from . import parity006_replace
 from . import parity008_git
+from . import git_clone_source
 from . import git_change_types
 from . import parity009_ssr
 from . import parity007_extract
@@ -111,6 +112,7 @@ from . import tao_memory
 from . import tao_history
 from . import markdown_quality
 from . import markdown_drawio, markdown_drawio_roundtrip, markdown_remote_images
+from . import markdown_missing_assets
 from . import markdown_testing
 
 
@@ -134,6 +136,7 @@ REGISTRY: dict[str, Fixture] = {
     "markdown_drawio": Fixture("markdown_drawio", markdown_drawio.setup, markdown_drawio.teardown),
     "markdown_drawio_roundtrip": Fixture("markdown_drawio_roundtrip", markdown_drawio_roundtrip.setup),
     "markdown_remote_images": Fixture("markdown_remote_images", markdown_remote_images.setup, markdown_remote_images.teardown),
+    "markdown_missing_assets": Fixture("markdown_missing_assets", markdown_missing_assets.setup, markdown_missing_assets.teardown),
     "tao_llm": Fixture("tao_llm", tao_llm.setup, tao_llm.teardown),
     "tao_custom_llm": Fixture("tao_custom_llm", tao_custom_llm.setup, tao_custom_llm.teardown),
     "tao_messages": Fixture("tao_messages", tao_messages.setup, tao_messages.teardown),
@@ -182,6 +185,7 @@ REGISTRY: dict[str, Fixture] = {
     "html_network_test": Fixture("html_network_test", html_network_test.setup, html_network_test.teardown),
     "file_open_raster": Fixture("file_open_raster", raster_files.setup, raster_files.teardown),
     "explorer_large_directory": Fixture("explorer_large_directory", explorer_files.setup_large, explorer_files.teardown),
+    "explorer_search_native": Fixture("explorer_search_native", explorer_files.setup_search_native, explorer_files.teardown),
     "workspace_compact_tree": Fixture("workspace_compact_tree", workspace_compact_tree.setup),
     "workspace_hidden_entries": Fixture("workspace_hidden_entries", workspace_hidden_entries.setup),
     "workspace_slow_lsp": Fixture("workspace_slow_lsp", workspace_slow_lsp.setup),
@@ -198,6 +202,7 @@ REGISTRY: dict[str, Fixture] = {
     "java_sample_projects": Fixture("java_sample_projects", java_sample_projects.setup),
     "java25_projects": Fixture("java25_projects", java25_projects.setup),
     "git_diff_repo": Fixture("git_diff_repo", git_diff_repo.setup, git_diff_repo.teardown),
+    "git_clone_source": Fixture("git_clone_source", git_clone_source.setup, git_clone_source.teardown),
     "welcome_recents": Fixture("welcome_recents", welcome_recents.setup, welcome_recents.teardown),
     "editor_typing_fixtures": Fixture("editor_typing_fixtures", editor_typing_fixtures.setup, editor_typing_fixtures.teardown),
     "restore_24tab_fixtures": Fixture("restore_24tab_fixtures", restore_24tab_fixtures.setup, restore_24tab_fixtures.teardown),

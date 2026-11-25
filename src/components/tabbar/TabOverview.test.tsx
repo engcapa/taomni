@@ -2,9 +2,19 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { TabOverview } from "./TabOverview";
 import { useAppStore } from "../../stores/appStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useTabOverviewStore } from "../../stores/tabOverviewStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { OVERVIEW_PREVIEW_DELAY_MS } from "./overview/useOverviewPreview";
+import type { Tab } from "../../types";
+
+const explorerFolder = (id: string, title: string, path: string): Tab => ({
+  id, type: "file-browser", title, closable: true, fileBrowser: { initialPath: path, explorer: true },
+});
+const explorerViewer = (id: string, title: string, path: string): Tab => ({
+  id, type: "file-viewer", title, closable: true, fileViewer: { path, kind: "text", mode: "source", source: "local" },
+});
 
 const terminal = vi.hoisted(() => ({ text: "first output", read: vi.fn() }));
 vi.mock("../../lib/terminal/terminalRegistry", () => {
@@ -18,9 +28,10 @@ beforeEach(() => {
   terminal.text = "first output";
   terminal.read.mockClear();
   useSessionStore.setState({ sessions: [] });
+  useExplorerStore.setState({ tabs: [], activeTabId: null });
   useWorkspacePlatformStore.getState().reloadFromStorage();
   useAppStore.setState({
-    activeSideTab: "sessions", activeTabId: "session-1", tabFilter: null,
+    activeSideTab: "sessions", activeTabId: "session-1", tabFilter: null, sidebarCollapsed: false,
     tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false },
       { id: "session-1", type: "terminal", title: "Build", closable: true }],
   });
@@ -81,6 +92,62 @@ it("switches between current and all scopes and activates the correct workspace 
   expect(useAppStore.getState().tabFilter).toBeNull();
 });
 
+it("opens the Explorer overview scope and activates the chosen Explorer tab", () => {
+  useAppStore.setState({ activeSideTab: "explorer", sidebarCollapsed: true });
+  useExplorerStore.setState({
+    tabs: [explorerFolder("f1", "Downloads", "/home/me/Downloads"), explorerViewer("v1", "README.md", "/home/me/Downloads/README.md")],
+    activeTabId: "f1",
+  });
+  render(<TabOverview />);
+  expect(screen.getByTestId("tab-overview")).toHaveAttribute("data-scope", "explorer");
+  const cards = screen.getAllByTestId("tab-overview-card");
+  expect(cards).toHaveLength(2);
+  expect(cards[0]).toHaveAttribute("data-surface", "explorer");
+  expect(cards[0]).toHaveAttribute("data-tab-id", "f1");
+  expect(cards[0]).toHaveAttribute("data-active", "true");
+  expect(cards[0]).toHaveTextContent("EXPL");
+  expect(cards[0]).toHaveTextContent("/home/me/Downloads");
+  expect(cards[1]).toHaveTextContent("VIEW");
+  expect(screen.getByTestId("tab-overview-current")).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(cards[1]);
+  expect(useAppStore.getState().activeSideTab).toBe("explorer");
+  expect(useExplorerStore.getState().activeTabId).toBe("v1");
+  expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+  expect(screen.queryByTestId("tab-overview")).not.toBeInTheDocument();
+});
+
+it("includes Explorer tabs in the all scope from other surfaces and filters them by path", () => {
+  useAppStore.setState({ activeSideTab: "sessions" });
+  useExplorerStore.setState({
+    tabs: [explorerFolder("f1", "Downloads", "/home/me/Downloads")],
+    activeTabId: "f1",
+  });
+  render(<TabOverview />);
+  fireEvent.click(screen.getByTestId("tab-overview-all"));
+  const cards = screen.getAllByTestId("tab-overview-card");
+  expect(cards).toHaveLength(2);
+  expect(cards.filter((card) => card.dataset.surface === "explorer")).toHaveLength(1);
+  fireEvent.change(screen.getByTestId("tab-overview-search"), { target: { value: "Downloads" } });
+  const filtered = screen.getAllByTestId("tab-overview-card");
+  expect(filtered).toHaveLength(1);
+  expect(filtered[0]).toHaveAttribute("data-tab-id", "f1");
+  fireEvent.click(filtered[0]);
+  expect(useAppStore.getState().activeSideTab).toBe("explorer");
+  expect(useExplorerStore.getState().activeTabId).toBe("f1");
+});
+
+it("keeps Workspace and Explorer cards together in the all scope", () => {
+  const ws = useWorkspacePlatformStore.getState();
+  const workspace = ws.createWorkspace({ name: "Explorer mix" });
+  ws.openLocalTerminalInWorkspace(workspace.id);
+  useExplorerStore.setState({ tabs: [explorerFolder("f1", "Downloads", "/home/me/Downloads")], activeTabId: "f1" });
+  useAppStore.setState({ activeSideTab: "home" });
+  render(<TabOverview />);
+  expect(screen.getByTestId("tab-overview")).toHaveAttribute("data-scope", "all");
+  const surfaces = screen.getAllByTestId("tab-overview-card").map((card) => card.dataset.surface);
+  expect(surfaces).toEqual(expect.arrayContaining(["sessions", "workspaces", "explorer"]));
+});
+
 it("filters fuzzy preview text, preserves query across scopes and clears without navigation", () => {
   const ws = useWorkspacePlatformStore.getState();
   const workspace = ws.createWorkspace({ name: "中文 workspace" });
@@ -133,6 +200,12 @@ it("moves focus with arrows and enlarges a hovered card only after the dwell tim
     tabs: [...state.tabs, { id: "session-2", type: "terminal", title: "Review", closable: true }],
   }));
   render(<TabOverview />);
+  // The configured dwell time must stay inside the agreed 0.5-1 s range and be
+  // observable by browser cases without reading React internals.
+  const dialog = screen.getByTestId("tab-overview");
+  expect(OVERVIEW_PREVIEW_DELAY_MS).toBeGreaterThanOrEqual(500);
+  expect(OVERVIEW_PREVIEW_DELAY_MS).toBeLessThanOrEqual(1_000);
+  expect(dialog).toHaveAttribute("data-preview-delay-ms", String(OVERVIEW_PREVIEW_DELAY_MS));
   const [first, second] = screen.getAllByTestId("tab-overview-card");
   fireEvent.keyDown(screen.getByTestId("tab-overview-search"), { key: "ArrowDown" });
   expect(first).toHaveFocus();
@@ -141,14 +214,20 @@ it("moves focus with arrows and enlarges a hovered card only after the dwell tim
   expect(useAppStore.getState().activeTabId).toBe("session-1");
 
   fireEvent.mouseEnter(second);
-  act(() => vi.advanceTimersByTime(1_999));
+  expect(screen.queryByTestId("tab-overview-enlarged")).toBeNull();
+  act(() => vi.advanceTimersByTime(OVERVIEW_PREVIEW_DELAY_MS - 1));
   expect(screen.queryByTestId("tab-overview-enlarged")).toBeNull();
   fireEvent.mouseLeave(second);
   act(() => vi.advanceTimersByTime(1));
   expect(screen.queryByTestId("tab-overview-enlarged")).toBeNull();
 
+  fireEvent.mouseEnter(first);
+  act(() => vi.advanceTimersByTime(OVERVIEW_PREVIEW_DELAY_MS / 2));
+  fireEvent.mouseLeave(first);
   fireEvent.mouseEnter(second);
-  act(() => vi.advanceTimersByTime(2_000));
+  act(() => vi.advanceTimersByTime(OVERVIEW_PREVIEW_DELAY_MS - 1));
+  expect(screen.queryByTestId("tab-overview-enlarged")).toBeNull();
+  act(() => vi.advanceTimersByTime(1));
   const enlarged = screen.getByTestId("tab-overview-enlarged");
   expect(enlarged).toHaveAttribute("data-tab-id", "session-2");
   expect(useAppStore.getState().activeTabId).toBe("session-1");

@@ -19,10 +19,11 @@ pub(crate) use chunks::read_text_chunk;
 pub(crate) use filesystem::{read_bytes, stat};
 pub(crate) use html::{HtmlSession, close_html, open_html, register_protocol};
 pub(crate) use network::resolve_proxy as resolve_preview_proxy;
+pub(crate) use paths::{display as display_path, io_error as path_io_error};
 pub(crate) use temporary::{
-    allocate_temp, create_temp, release_temp, release_temp_token, shutdown,
+    allocate_temp, create_temp, is_owned_temp, release_temp, release_temp_token, shutdown,
 };
-pub(crate) use text::{read_text, write_text};
+pub(crate) use text::{normalize_eol, read_text, write_text};
 
 use serde::Serialize;
 

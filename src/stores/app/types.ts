@@ -10,7 +10,7 @@ import { type SidebarCollapsedByGroup } from "../sidebarRailPolicy";
  * automation and stored preferences stay valid; `home`, `workspaces` and
  * `agents` extend the same rail.
  */
-export type PrimaryNavMode = "home" | "workspaces" | "sessions" | "agents" | "tools";
+export type PrimaryNavMode = "home" | "workspaces" | "sessions" | "explorer" | "agents" | "tools";
 
 /** Backwards-compatible alias for the former two-value sidebar tab type. */
 export type SideTab = PrimaryNavMode;
@@ -146,8 +146,6 @@ export interface AppState {
   /** Sidebar collapsed state remembered per tab group (see sidebarRailPolicy). */
   sidebarCollapsedByGroup: SidebarCollapsedByGroup;
   activeSideTab: SideTab;
-  /** Right context sidebar (`◨`, AI / session assist) collapsed state. */
-  rightSidebarCollapsed: boolean;
   /** Bottom-left floating MFA authenticator window (v6.1 AC-04). */
   floatingMfa: FloatingMfaWindowState;
   /**
@@ -250,8 +248,6 @@ export interface AppState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveSideTab: (tab: SideTab) => void;
-  toggleRightSidebar: () => void;
-  setRightSidebarCollapsed: (collapsed: boolean) => void;
   /** Toggle the bottom-left floating MFA window. */
   toggleFloatingMfa: () => void;
   openFloatingMfa: () => void;

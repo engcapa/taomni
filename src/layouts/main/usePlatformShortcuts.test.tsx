@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { registerShellKeyClaim } from "../../lib/shellKeyClaims";
 import { useTabOverviewStore } from "../../stores/tabOverviewStore";
@@ -52,4 +52,18 @@ it("does not toggle twice for duplicate keydowns and releases its press on windo
   fireEvent.blur(window);
   fireEvent.keyDown(document.body, { ...chord, repeat: true });
   expect(useTabOverviewStore.getState().open).toBe(false);
+});
+
+it("keeps the rail-only Explorer surface collapsed on Ctrl+B and restores the toggle afterwards", () => {
+  render(<Surface />);
+  act(() => useAppStore.setState({ activeSideTab: "explorer", sidebarCollapsed: true }));
+
+  fireEvent.keyDown(document.body, { ctrlKey: true, key: "b", code: "KeyB" });
+  expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+
+  // Returning to a mode with real sidebar content restores the shortcut.
+  act(() => useAppStore.getState().setActiveSideTab("sessions"));
+  expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+  fireEvent.keyDown(document.body, { ctrlKey: true, key: "b", code: "KeyB" });
+  expect(useAppStore.getState().sidebarCollapsed).toBe(true);
 });

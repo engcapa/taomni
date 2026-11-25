@@ -237,6 +237,30 @@ export function registerappStoreLayout3Cases() {
       expect(useAppStore.getState().sidebarCollapsed).toBe(false);
       expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("false");
     });
+
+    it("treats Explorer as a rail-only mode without touching group memory", () => {
+      const groups = { "code-workspace": true, terminal: false, other: false } as const;
+      useAppStore.setState({
+        tabs: [tab("t1"), tab("welcome", { type: "welcome", closable: false })],
+        activeTabId: "welcome",
+        sidebarCollapsed: false,
+        mergeToolWindowRail: true,
+        sidebarCollapsedByGroup: { ...groups },
+      });
+      useAppStore.getState().setActiveSideTab("explorer");
+      // Entering the rail-only surface collapses the (unmounted) sidebar panel
+      // state and never records the transient collapse against a real group.
+      expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+      expect(useAppStore.getState().sidebarCollapsedByGroup).toEqual(groups);
+      useAppStore.getState().setSidebarCollapsed(true);
+      expect(useAppStore.getState().sidebarCollapsedByGroup).toEqual(groups);
+      // A group-state application must not resurrect the removed panel.
+      useAppStore.getState().applySidebarForActiveTab();
+      expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+      // Leaving for Sessions restores a normal, expandable sidebar.
+      useAppStore.getState().setActiveSideTab("sessions");
+      expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    });
   });
 
   describe("appStore.sidebar per tab group (ED-PARITY-027)", () => {

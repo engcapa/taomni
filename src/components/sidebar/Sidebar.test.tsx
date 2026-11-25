@@ -31,6 +31,21 @@ describe("Sidebar rail (ED-PARITY-027)", () => {
     expect(useMainRailHostStore.getState().host).toBe(screen.getByTestId("sidebar-tool-window-rail"));
   });
 
+  it("keeps File Explorer out of Tools and no longer renders a dedicated Explorer sidebar panel", () => {
+    useAppStore.setState({ activeSideTab: "tools" });
+    const { rerender } = render(<Sidebar />);
+    expect(screen.queryByTestId("sidebar-tool-file-explorer")).toBeNull();
+    act(() => useAppStore.getState().setActiveSideTab("explorer"));
+    rerender(<Sidebar />);
+    // U6: Explorer is rail-only; its duplicated left panel and quick-access
+    // entries are removed, and the primary rail stays available.
+    expect(screen.queryByTestId("explorer-sidebar-panel")).toBeNull();
+    expect(screen.queryByTestId("sidebar-explorer-home")).toBeNull();
+    expect(screen.queryByTestId("sidebar-explorer-tab")).toBeNull();
+    expect(screen.queryByTestId("sidebar-explorer-pinned")).toBeNull();
+    expect(screen.getByTestId("sidebar-rail")).toBeVisible();
+  });
+
   it("opens and collapses the permanent panels using the shared tool window buttons", () => {
     const { rerender } = render(<Sidebar compact />);
     const sessions = screen.getByTestId("side-tab-sessions");
