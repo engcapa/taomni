@@ -12,11 +12,11 @@ steps:
   - reload_window: null
   - wait_for: '[data-testid="recovery-observe"]'
   - click: '[data-testid="recovery-observe"]'
-  - assert_text: {selector: '[data-testid="recovery-output-status"]', contains: 未创建新终端}
+  - assert_text: {selector: '[data-testid="recovery-output-status"]', contains: No replacement terminal was created}
   - assert_text_equals: {selector: '[data-testid="recovery-output"]', equals: ''}
   - assert_count: {selector: '[data-testid="terminal-pane"]', equal: 0}
   - click: '[data-testid="recovery-observe"]'
-  - assert_text_equals: {selector: '[data-testid="recovery-output-status"]', equals: 未订阅输出}
+  - assert_text_equals: {selector: '[data-testid="recovery-output-status"]', equals: Output observation is off.}
 verification:
   review: reviewed
   requirements:

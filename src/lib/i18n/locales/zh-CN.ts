@@ -1,3 +1,4 @@
+import { recoveryZh } from "./recovery";
 import { notesWorkspaceZhCN } from "./notesWorkspace";
 import type { en } from "./en";
 import { modelInspectorZh } from "./modelInspector";
@@ -9,6 +10,7 @@ import { moduleFrontendZhCN } from "./moduleFrontend";
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
 export const zhCN: DeepPartial<typeof en> = {
+  recovery: recoveryZh,
   plugins: moduleFrontendZhCN,
   backupUnified: {
     "categories": "备份分类",

@@ -1,5 +1,6 @@
 id: TC-RECOVERY-002
 title: Missing recovery metadata never starts replacement sessions
+ui_standard: [UI-I18N-01, UI-ZOOM-01]
 covers: [F1.10]
 tags: [recovery, p0]
 modes: [browser]
@@ -11,11 +12,25 @@ steps:
       value: '{"version":1,"instanceId":"qa-main","generation":2,"revision":0,"recovering":true,"description":null,"limitation":"terminal-state-unverified"}'
   - reload_window: null
   - wait_for: '[data-testid="recovery-missing"]'
-  - assert_text: {selector: '[data-testid="recovery-missing"]', contains: 未自动新建任何会话}
+  - assert_text: {selector: '[data-testid="recovery-missing"]', contains: No replacement sessions were created}
   - assert_count: {selector: '[data-testid="recovery-tab"]', equal: 0}
   - assert_count: {selector: '[data-testid="recovery-observe"]', equal: 0}
   - assert_count: {selector: '[data-testid="welcome-panel"]', equal: 0}
-  - assert_text: {selector: '[data-testid="recovery-limitations"]', contains: 在飞创建仍可能在后台运行}
+  - assert_text: {selector: '[data-testid="recovery-limitations"]', contains: may still be running}
+  - assert_text_equals: {selector: '[data-testid="recovery-view-menu"]', equals: View}
+  - click: '[data-testid="recovery-view-menu"]'
+  - click: '[data-testid="recovery-zoom-in"]'
+  - assert_computed_style: {selector: '[data-testid="recovery-page"]', property: zoom, equals: '1.1'}
+  - press: {selector: '[data-testid="recovery-view-menu"]', key: Control+0, macos_key: Meta+0}
+  - assert_computed_style: {selector: '[data-testid="recovery-page"]', property: zoom, equals: '1'}
+  - assert_text_equals: {selector: '[data-testid="recovery-background-status"]', equals: Background status has not been checked yet.}
+  - click: '[data-testid="recovery-view-menu"]'
+  - click: '[data-testid="recovery-zoom-out"]'
+  - assert_computed_style: {selector: '[data-testid="recovery-page"]', property: zoom, equals: '0.9'}
+  - click: '[data-testid="recovery-view-menu"]'
+  - click: '[data-testid="recovery-zoom-reset"]'
+  - assert_computed_style: {selector: '[data-testid="recovery-page"]', property: zoom, equals: '1'}
+  - assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -24,5 +39,17 @@ verification:
       actions: [2, 3]
       checkpoints: [{step: 5, expectation: 缺失状态明确}, {step: 6, expectation: 无虚构标签}, {step: 8, expectation: 无Welcome重开入口}, {step: 9, expectation: 在飞创建风险说明}]
       results: [5, 6, 8, 9]
+    - id: recovery-appearance
+      ui_standard: [UI-I18N-01, UI-ZOOM-01]
+      requirement: Recovery opens in the configured language and provides menu and keyboard zoom without starting background queries.
+      actions: [3, 11, 12, 14, 17, 18, 20, 21]
+      checkpoints:
+      - {step: 10, expectation: The view menu is named in the default English locale.}
+      - {step: 13, expectation: Choosing Zoom in enlarges the page.}
+      - {step: 15, expectation: The platform reset binding returns the page to its base scale.}
+      - {step: 16, expectation: The background snapshot is still unqueried.}
+      - {step: 19, expectation: Zoom out reduces the page scale.}
+      - {step: 22, expectation: The shared menu restores the original scale.}
+      results: [10, 13, 15, 16, 19, 22]
   visual: [{check: 空描述提示, method: automated, reason: 文本与控件数量}]
   native: [{check: 在飞PTY保持, method: manual, reason: 见native runbook N02/N03；未执行}]

@@ -2181,6 +2181,11 @@
 
 ## main/recovery (F1.10)
 
+- `[data-testid="recovery-page"]` — display — F1.10.recovery-page
+- `[data-testid="recovery-view-menu"]` — interactive — F1.10.recovery-view-menu
+- `[data-testid="recovery-zoom-in"]` — interactive — F1.10.recovery-zoom-in
+- `[data-testid="recovery-zoom-out"]` — interactive — F1.10.recovery-zoom-out
+- `[data-testid="recovery-zoom-reset"]` — interactive — F1.10.recovery-zoom-reset
 - `[data-testid="recovery-background-refresh"]` — interactive — F1.10.recovery-background-refresh
 - `[data-testid="recovery-background-status"]` — display — F1.10.recovery-background-status
 - `[data-testid="recovery-workspace"]` — display — F1.10.recovery-workspace

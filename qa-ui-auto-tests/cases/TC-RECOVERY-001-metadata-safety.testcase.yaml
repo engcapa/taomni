@@ -12,27 +12,27 @@ steps:
       value: '{"version":1,"instanceId":"qa-main","generation":2,"revision":1,"recovering":true,"limitation":"terminal-state-unverified","description":{"activeTabId":"db","tabs":[{"id":"term","kind":"terminal","title":"Original shell","savedSessionId":"saved-shell","terminalSessionId":"qa-original"},{"id":"mail","kind":"mail","title":"Mail","savedSessionId":"saved-mail","terminalSessionId":null},{"id":"db","kind":"database","title":"Database","savedSessionId":"saved-db","terminalSessionId":null},{"id":"s3","kind":"object-storage","title":"Storage","savedSessionId":"saved-s3","terminalSessionId":null},{"id":"code","kind":"code-workspace","title":"Code","savedSessionId":null,"terminalSessionId":null}]}}'
   - reload_window: null
   - wait_for: '[data-testid="recovery-workspace"]'
-  - assert_text: {selector: '[data-testid="recovery-handshake"]', contains: 有限恢复界面已就绪}
+  - assert_text: {selector: '[data-testid="recovery-handshake"]', contains: The recovery window is ready.}
   - assert_count: {selector: '[data-testid="recovery-tab"]', equal: 5}
   - assert_attribute: {selector: '[data-testid="recovery-tab"][data-kind="database"]', name: aria-pressed, equals: 'true'}
-  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不重发 SQL}
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: does not resend SQL}
   - click: '[data-testid="recovery-tab"][data-kind="mail"]'
-  - assert_text: {selector: '[data-testid="recovery-mail-warning"]', contains: 发件箱自动发送已暂停}
+  - assert_text: {selector: '[data-testid="recovery-mail-warning"]', contains: Automatic sending is paused}
   - click: '[data-testid="recovery-tab"][data-kind="object-storage"]'
-  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不重启或取消任务}
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: before restarting or cancelling a task}
   - click: '[data-testid="recovery-tab"][data-kind="code-workspace"]'
-  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不重跑 build}
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: does not repeat builds}
   - click: '[data-testid="recovery-tab"][data-kind="terminal"]'
   - assert_text: {selector: '[data-testid="recovery-terminal-id"]', contains: qa-original}
   - assert_attribute: {selector: '[data-testid="recovery-observe"]', name: aria-pressed, equals: 'false'}
-  - assert_text: {selector: '[data-testid="recovery-limitations"]', contains: 当前不开放输入}
+  - assert_text: {selector: '[data-testid="recovery-limitations"]', contains: Terminal input is unavailable}
   - assert_count: {selector: '[data-testid="terminal-pane"]', equal: 0}
   - assert_count: {selector: '[data-testid="welcome-panel"]', equal: 0}
   - screenshot: recovery-metadata-and-limits.png
   - click: '[data-testid="recovery-tab"][data-kind="database"]'
   - assert_text: {selector: '[data-testid="recovery-kind"]', contains: database}
   - assert_text: {selector: '[data-testid="recovery-detail"]', contains: Database}
-  - assert_text: {selector: '[data-testid="recovery-unknown"]', contains: 不要直接重复操作}
+  - assert_text: {selector: '[data-testid="recovery-unknown"]', contains: before reopening this page or repeating an operation}
 verification:
   review: reviewed
   requirements:

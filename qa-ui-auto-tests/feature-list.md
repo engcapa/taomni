@@ -607,6 +607,21 @@ files:
   - src-tauri/src/webview_recovery/mod.rs
   - src-tauri/src/webview_recovery/lifecycle.rs
 controls:
+  - id: recovery-page
+    selector: '[data-testid="recovery-page"]'
+    kind: display
+  - id: recovery-view-menu
+    selector: '[data-testid="recovery-view-menu"]'
+    kind: interactive
+  - id: recovery-zoom-in
+    selector: '[data-testid="recovery-zoom-in"]'
+    kind: interactive
+  - id: recovery-zoom-out
+    selector: '[data-testid="recovery-zoom-out"]'
+    kind: interactive
+  - id: recovery-zoom-reset
+    selector: '[data-testid="recovery-zoom-reset"]'
+    kind: interactive
   - id: recovery-background-refresh
     selector: '[data-testid="recovery-background-refresh"]'
     kind: interactive
