@@ -145,7 +145,7 @@ export function InlineRenamePopup({
       data-kind={kind}
       data-list-open={listOpen ? "true" : "false"}
       data-options-open={optionsOpen ? "true" : "false"}
-      className="fixed z-[70]"
+      className="fixed z-[var(--taomni-z-popover)]"
       style={{ left: anchor.left - 3, top: anchor.top - 2 }}
     >
       <input

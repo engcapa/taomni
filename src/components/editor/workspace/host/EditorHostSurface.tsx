@@ -34,7 +34,7 @@ export function EditorHostSurface(props: EditorHostSurfaceProps) {
         <div
           data-testid="completion-resolve-gate"
           role="alert"
-          className="cm-lsp-resolve-gate absolute z-50 flex max-w-[calc(100%-16px)] flex-wrap items-center gap-2 rounded border border-amber-500/70 bg-[var(--taomni-bg-elevated,#1f2228)] px-2 py-1.5 text-xs shadow-lg"
+          className="cm-lsp-resolve-gate absolute z-[var(--taomni-z-popover)] flex max-w-[calc(100%-16px)] flex-wrap items-center gap-2 rounded border border-amber-500/70 bg-[var(--taomni-bg-elevated,#1f2228)] px-2 py-1.5 text-xs shadow-lg"
           style={{ top: resolveGateUi.top, left: resolveGateUi.left, width: "min(460px, calc(100% - 16px))" }}
         >
           <TriangleAlert aria-hidden="true" size={14} className="shrink-0 text-amber-400" />

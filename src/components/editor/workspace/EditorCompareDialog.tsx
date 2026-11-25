@@ -217,7 +217,7 @@ export function EditorCompareDialog({
       tabIndex={-1}
       data-testid="code-workspace-compare-dialog"
       onKeyDown={handleKeyDown}
-      className="fixed inset-0 z-50 flex min-h-0 flex-col bg-[var(--taomni-code-bg)]/95 p-4 text-[var(--taomni-code-text)] backdrop-blur-sm"
+      className="fixed inset-0 z-[var(--taomni-z-modal)] flex min-h-0 flex-col bg-[var(--taomni-code-bg)]/95 p-4 text-[var(--taomni-code-text)] backdrop-blur-sm"
     >
       <div className="flex min-w-0 shrink-0 items-start justify-between gap-3 border-b border-[var(--taomni-code-border)] pb-3">
         <div className="min-w-0">

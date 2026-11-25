@@ -181,7 +181,7 @@ export function ChangesListToolbar({
         </button>
         {filterOpen ? (
           <div
-            className={`absolute ${menuPlacementClass} top-[31px] z-20 w-52 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg`}
+            className={`absolute ${menuPlacementClass} top-[31px] z-[var(--taomni-z-popover)] w-52 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg`}
             role="menu"
             data-testid="git-change-filter-dropdown"
           >
@@ -259,7 +259,7 @@ export function ChangesListToolbar({
         </button>
         {moreOpen ? (
           <div
-            className="absolute right-0 top-[31px] z-20 w-52 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg"
+            className="absolute right-0 top-[31px] z-[var(--taomni-z-popover)] w-52 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg"
             role="menu"
             data-testid="git-change-action-dropdown"
           >

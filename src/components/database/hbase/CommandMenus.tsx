@@ -23,9 +23,9 @@ export function CommandsMenu({
 }) {
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="fixed inset-0 z-[var(--taomni-z-popover)]" onClick={onClose} />
       <div
-        className="absolute left-2 top-9 z-50 w-[360px] max-w-[calc(100vw-24px)] max-h-[min(420px,calc(100vh-48px))] overflow-auto taomni-scroll-y rounded shadow-lg py-1 text-ui-body"
+        className="absolute left-2 top-9 z-[var(--taomni-z-popover)] w-[360px] max-w-[calc(100vw-24px)] max-h-[min(420px,calc(100vh-48px))] overflow-auto taomni-scroll-y rounded shadow-lg py-1 text-ui-body"
         style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)", color: "var(--taomni-text)" }}
       >
         {CATEGORY_ORDER.map((cat) => {
@@ -65,8 +65,8 @@ export function CommandsMenu({
 export function HistoryDropdown({ history, onPick, onClose }: { history: string[]; onPick: (cmd: string) => void; onClose: () => void; }) {
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute right-2 top-9 z-50 w-[420px] max-w-[calc(100vw-24px)] max-h-[min(300px,calc(100vh-48px))] overflow-auto rounded shadow-lg taomni-scroll-y flex flex-col" style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}>
+      <div className="fixed inset-0 z-[var(--taomni-z-popover)]" onClick={onClose} />
+      <div className="absolute right-2 top-9 z-[var(--taomni-z-popover)] w-[420px] max-w-[calc(100vw-24px)] max-h-[min(300px,calc(100vh-48px))] overflow-auto rounded shadow-lg taomni-scroll-y flex flex-col" style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}>
         {history.length === 0 ? (
           <div className="px-3 py-2 text-ui-small text-[var(--taomni-text-muted)]">No command history yet.</div>
         ) : (
@@ -84,7 +84,7 @@ export function HistoryDropdown({ history, onPick, onClose }: { history: string[
 export function HelpDialog({ transport, onClose }: { transport: HBaseTransport; onClose: () => void; }) {
   const t = useT();
   return (
-    <div className="fixed inset-0 z-[950] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.4)" }} onClick={onClose}>
+    <div className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center" onClick={onClose}>
       <div
         role="dialog"
         aria-label={t("hbaseObjects.helpTitle")}

@@ -173,7 +173,7 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
         <button
           type="button"
           data-testid="hbase-sidebar-drawer-handle"
-          className="absolute left-0 top-12 z-30 h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--taomni-hover)]"
+          className="absolute left-0 top-12 z-[var(--taomni-z-sticky)] h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--taomni-hover)]"
           style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}
           title="Show database objects"
           aria-label="Show database objects"
@@ -350,7 +350,7 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
                   </button>
                   {langMenuOpen && (
                     <div
-                      className="absolute left-0 top-full mt-1 z-50 py-1 rounded shadow-lg border text-ui-small min-w-[120px]"
+                      className="absolute left-0 top-full mt-1 z-[var(--taomni-z-popover)] py-1 rounded shadow-lg border text-ui-small min-w-[120px]"
                       style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
                     >
                       {AI_ANSWER_LANGUAGES.map((lang) => (

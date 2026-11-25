@@ -241,7 +241,7 @@ export const RedisCli = forwardRef<RedisCliHandle, RedisCliProps>(function Redis
             </button>
             {langMenuOpen && (
               <div
-                className="absolute left-0 top-full mt-1 z-50 py-1 rounded shadow-lg border text-ui-small min-w-[120px]"
+                className="absolute left-0 top-full mt-1 z-[var(--taomni-z-popover)] py-1 rounded shadow-lg border text-ui-small min-w-[120px]"
                 style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
               >
                 {AI_ANSWER_LANGUAGES.map((lang) => (

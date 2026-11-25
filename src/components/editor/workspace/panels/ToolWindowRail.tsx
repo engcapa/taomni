@@ -226,7 +226,7 @@ export function ToolWindowRailResizeHandle({
       aria-valuemin={STRIPE_MIN_WIDTH}
       aria-valuemax={STRIPE_MAX_WIDTH}
       data-testid={testId}
-      className={`absolute inset-y-0 z-10 w-1.5 touch-none cursor-col-resize hover:bg-[var(--taomni-accent)]/60 focus:bg-[var(--taomni-accent)]/60 ${side === "left" ? "right-0" : "left-0"}`}
+      className={`absolute inset-y-0 z-[var(--taomni-z-sticky)] w-1.5 touch-none cursor-col-resize hover:bg-[var(--taomni-accent)]/60 focus:bg-[var(--taomni-accent)]/60 ${side === "left" ? "right-0" : "left-0"}`}
       onPointerDown={onPointerDown}
       onKeyDown={onKeyDown}
     />
@@ -382,7 +382,7 @@ export function MoreToolWindowsButton({
           aria-label="More tool windows"
           data-testid="code-workspace-bottom-tab-overflow-menu"
           style={{ position: "fixed", left: rect.right + 4, bottom: Math.max(8, window.innerHeight - rect.bottom) }}
-          className="z-50 min-w-48 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 shadow-lg"
+          className="z-[var(--taomni-z-popover)] min-w-48 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 shadow-lg"
         >
           {tools.map((tool) => (
             <button

@@ -72,7 +72,7 @@ export function TabSwitcher({
       aria-modal="true"
       aria-label="Switcher"
       data-testid="workspace-tab-switcher"
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 pt-[12vh]"
+      className="fixed inset-0 taomni-dialog-backdrop flex items-start justify-center pt-[12vh]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onCancel();
       }}

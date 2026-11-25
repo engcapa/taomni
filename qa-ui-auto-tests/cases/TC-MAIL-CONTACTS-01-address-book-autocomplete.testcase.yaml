@@ -19,6 +19,7 @@ description: 'TASK-19 (docs-feature/mail-thunderbird-parity-design.md AC-61, DEC
   through the real backend.
 
   '
+ui_standard: [UI-FND-09]
 covers:
 - F-MAIL-21
 - F-MAIL-2
@@ -117,9 +118,22 @@ steps:
 - fill: {selector: '[data-testid="mail-recipient-to"] input', value: zed.con}
 - assert_text: {selector: '[data-testid="mail-recipient-suggestions"]', contains: Zed Updated, timeout_sec: 20}
 - assert_no_runtime_errors: null
+- assert_computed_style: {selector: '[data-testid="mail-compose-dialog"]', property: z-index, equals: '1000'}
+- assert_computed_style: {selector: '[data-testid="mail-recipient-suggestions"]', property: z-index, equals: '1100'}
+- click: '[data-testid="mail-recipient-suggestion"]'
+- assert_text: {selector: '[data-testid="mail-recipient-to"] [data-testid="mail-recipient-chip"]', contains: zed.contact@example.org}
 verification:
   review: reviewed
   requirements:
+  - id: composer-layers
+    ui_standard: [UI-FND-09]
+    requirement: A recipient suggestion sits above the composer surface and commits to its owning address field.
+    actions: [44, 45, 50]
+    checkpoints:
+    - {step: 48, expectation: The composer uses the application's modal layer.}
+    - {step: 49, expectation: Suggestions use the menu-over-modal layer.}
+    - {step: 51, expectation: Clicking the suggested contact inserts it into To.}
+    results: [48, 49, 51]
   - id: R1
     requirement: 在地址簿对话框新增联系人（姓名 + 邮箱）并保存，联系人出现在列表中（TASK-19）。
     actions:

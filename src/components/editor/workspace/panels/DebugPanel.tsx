@@ -427,7 +427,7 @@ export function DebugPanel({
               <PanelResizeHandle
                 aria-label="Resize debugger frames and variables columns"
                 data-testid="debug-split-resize-handle"
-                className="w-[4px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors cursor-col-resize shrink-0 relative after:absolute after:inset-y-0 after:-left-2 after:-right-2 after:z-20"
+                className="w-[4px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors cursor-col-resize shrink-0 relative after:absolute after:inset-y-0 after:-left-2 after:-right-2 after:z-[var(--taomni-z-sticky)]"
               />
 
               {/* Right Column: Variables & Watches */}

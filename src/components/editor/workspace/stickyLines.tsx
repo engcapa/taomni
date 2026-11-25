@@ -64,7 +64,7 @@ export function StickyLinesOverlay({
   return (
     <div
       data-testid="code-workspace-sticky-lines"
-      className="absolute top-0 left-0 right-0 z-20 flex flex-col bg-[var(--taomni-code-bg)]/95 backdrop-blur border-b border-[var(--taomni-code-border)] shadow-sm pointer-events-auto select-none"
+      className="absolute top-0 left-0 right-0 z-[var(--taomni-z-sticky)] flex flex-col bg-[var(--taomni-code-bg)]/95 backdrop-blur border-b border-[var(--taomni-code-border)] shadow-sm pointer-events-auto select-none"
     >
       {stickyLines.map((item) => (
         <button

@@ -111,7 +111,7 @@ export function RepoSelector({
         {open&&(
           <div
             data-testid="workspace-repo-selector-menu"
-            className="absolute left-0 top-[calc(100%+4px)] z-[70] w-[360px] max-w-[min(360px,calc(100vw-24px))] rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg"
+            className="absolute left-0 top-[calc(100%+4px)] z-[var(--taomni-z-popover)] w-[360px] max-w-[min(360px,calc(100vw-24px))] rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg"
           >
             {roots.length>=5&&(
               <div className="p-2 border-b border-[var(--taomni-divider)]">

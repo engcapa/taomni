@@ -474,7 +474,7 @@ export function BottomDock({
                     ref={overflowMenuRef}
                     role="menu"
                     data-testid="code-workspace-bottom-tab-overflow-menu"
-                    className="absolute bottom-0 left-9 z-50 min-w-44 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 shadow-lg"
+                    className="absolute bottom-0 left-9 z-[var(--taomni-z-popover)] min-w-44 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 shadow-lg"
                   >
                     {tabs.map((tab) => (
                       <button
@@ -524,7 +524,7 @@ export function BottomDock({
                 </button>
                 {optionsOpen && (
                   <div role="menu" data-testid="code-workspace-tool-window-options-menu"
-                    className="absolute right-0 top-7 z-50 min-w-48 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 text-xs shadow-lg">
+                    className="absolute right-0 top-7 z-[var(--taomni-z-popover)] min-w-48 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 text-xs shadow-lg">
                     <button type="button" role="menuitem" className="flex w-full px-3 py-1.5 hover:bg-[var(--taomni-code-active-line-bg)]"
                       onClick={() => { setOptionsOpen(false); onOpenChange(false); onEscape?.(); }}>
                       Hide<span className="ml-auto pl-4 opacity-60">Shift+Esc</span>
@@ -606,7 +606,7 @@ export function BottomDock({
                   ref={overflowMenuRef}
                   role="menu"
                   data-testid="code-workspace-bottom-tab-overflow-menu"
-                  className="absolute left-0 top-9 z-50 min-w-44 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 shadow-lg"
+                  className="absolute left-0 top-9 z-[var(--taomni-z-popover)] min-w-44 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 shadow-lg"
                 >
                   {overflowTabs.map((tab) => (
                     <button

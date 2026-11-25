@@ -196,7 +196,7 @@ export function RecipientField({
         </div>
         {focused && query && (visibleSuggestions.length > 0 || loading) && (
           <div
-            className="absolute left-0 right-0 top-[calc(100%+4px)] z-[170] max-h-52 overflow-auto rounded border bg-[var(--taomni-bg)] shadow-xl"
+            className="absolute left-0 right-0 top-[calc(100%+4px)] z-[var(--taomni-z-menu-over-modal,1100)] max-h-52 overflow-auto rounded border bg-[var(--taomni-bg)] shadow-xl"
             style={{ borderColor: "var(--taomni-divider)" }}
             data-testid="mail-recipient-suggestions"
           >

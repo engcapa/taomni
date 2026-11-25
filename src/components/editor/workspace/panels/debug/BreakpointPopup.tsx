@@ -65,7 +65,7 @@ export function BreakpointPopup({
       role="dialog"
       aria-label={`Breakpoint ${breakpointDisplayName(path, breakpoint.line)}`}
       data-testid="debug-breakpoint-popup"
-      className="fixed z-[80] w-[340px] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-2.5 shadow-lg"
+      className="fixed z-[var(--taomni-z-popover)] w-[340px] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-2.5 shadow-lg"
       style={{ left: position.left, top: position.top }}
       onKeyDown={(event) => {
         if (event.key === "Escape") {

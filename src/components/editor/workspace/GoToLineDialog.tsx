@@ -44,7 +44,7 @@ export function GoToLineDialog({ current, lineCount, onGo, onCancel, restoreFocu
 
   return (
     <div
-      className="fixed inset-0 z-[880] flex items-start justify-center pt-24"
+      className="fixed inset-0 z-[var(--taomni-z-modal)] flex items-start justify-center pt-24"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onCancel();
       }}

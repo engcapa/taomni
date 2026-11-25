@@ -13,7 +13,7 @@ export function GridColumnFilterPopover(context: GridColumnFilterPopoverContext)
   return filters.openColumnFilter && openFilterColumn && (
     <div
       ref={filters.columnFilterPopoverRef}
-      className="fixed z-[10000] w-[280px] rounded shadow-xl p-2 text-ui-body"
+      className="fixed z-[var(--taomni-z-popover)] w-[280px] rounded shadow-xl p-2 text-ui-body"
       style={{
         left: filters.openColumnFilter.left,
         top: filters.openColumnFilter.top,

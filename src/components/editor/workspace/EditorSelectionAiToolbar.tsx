@@ -75,7 +75,7 @@ export function EditorSelectionAiToolbar({
   return (
     <div
       data-testid="code-workspace-ai-selection-toolbar"
-      className="fixed z-[420] flex items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] px-1 py-0.5 shadow-xl"
+      className="fixed z-[var(--taomni-z-popover)] flex items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] px-1 py-0.5 shadow-xl"
       style={{ top, left }}
       onMouseDown={(event) => event.preventDefault()}
     >
@@ -138,7 +138,7 @@ export function EditorSelectionAiToolbar({
             <div
               role="menu"
               data-testid="code-workspace-ai-answer-language-menu"
-              className="absolute right-0 top-full z-[430] mt-1 min-w-[168px] overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] py-0.5 shadow-xl"
+              className="absolute right-0 top-full z-[var(--taomni-z-popover)] mt-1 min-w-[168px] overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] py-0.5 shadow-xl"
             >
               {AI_ANSWER_LANGUAGES.map((language) => (
                 <button

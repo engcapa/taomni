@@ -57,7 +57,7 @@ export function LocationPeek({ open, state, onClose, onOpen }: LocationPeekProps
   return (
     <div
       data-testid="code-workspace-location-peek"
-      className="absolute bottom-24 left-1/2 z-40 w-[min(560px,90vw)] -translate-x-1/2 overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] shadow-xl"
+      className="absolute bottom-24 left-1/2 z-[var(--taomni-z-popover)] w-[min(560px,90vw)] -translate-x-1/2 overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] shadow-xl"
     >
       <div className="flex h-8 items-center border-b border-[var(--taomni-code-border)] px-3 text-ui-small font-semibold text-[var(--taomni-code-text)]">
         <span className="min-w-0 flex-1 truncate">{state.title}</span>

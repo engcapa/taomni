@@ -151,7 +151,7 @@ export function SegmentPopup({
       id={popupId}
       data-testid="code-workspace-breadcrumb-popup"
       data-taomni-context-menu="true"
-      className="fixed z-[500] flex max-h-[min(360px,50vh)] w-[min(320px,calc(100vw-12px))] flex-col overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] text-ui-small text-[var(--taomni-code-text)] shadow-xl"
+      className="fixed z-[var(--taomni-z-popover)] flex max-h-[min(360px,50vh)] w-[min(320px,calc(100vw-12px))] flex-col overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] text-ui-small text-[var(--taomni-code-text)] shadow-xl"
       style={{ left: coords.left, top: coords.top }}
       onKeyDown={onKeyDown}
     >

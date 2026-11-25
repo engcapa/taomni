@@ -43,7 +43,7 @@ export function MailDraftsDialog(context: MailDraftsDialogContext) {
     deleteSavedDraft,
   } = context;
   return draftsOpen && (
-    <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
+    <div className="absolute inset-0 taomni-dialog-backdrop flex items-center justify-center p-5">
       <MailDraggableDialog
         title={draftsTab === "drafts" ? "Drafts" : draftsTab === "templates" ? "Templates" : "Outbox"}
         icon={<FileText className="w-4 h-4 text-[var(--taomni-text-muted)]" />}

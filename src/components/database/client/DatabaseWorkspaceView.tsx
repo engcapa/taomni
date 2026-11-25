@@ -257,7 +257,7 @@ export function DatabaseWorkspaceView(props: DatabaseWorkspaceViewProps) {
         <button
           type="button"
           data-testid="db-schema-drawer-handle"
-          className="absolute left-0 top-12 z-30 h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--taomni-hover)]"
+          className="absolute left-0 top-12 z-[var(--taomni-z-sticky)] h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--taomni-hover)]"
           style={{
             background: "var(--taomni-panel-bg)",
             borderColor: "var(--taomni-divider)",

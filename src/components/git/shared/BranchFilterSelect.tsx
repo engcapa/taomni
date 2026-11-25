@@ -108,7 +108,7 @@ export function BranchFilterSelect({
         <div
           role="listbox"
           data-testid={`${testId}-menu`}
-          className="absolute right-0 top-full z-50 mt-1 w-[min(280px,max(100%,220px))] max-h-64 flex flex-col overflow-hidden rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg"
+          className="absolute right-0 top-full z-[var(--taomni-z-popover)] mt-1 w-[min(280px,max(100%,220px))] max-h-64 flex flex-col overflow-hidden rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg"
         >
           <div className="shrink-0 border-b border-[var(--taomni-divider)] p-1.5">
             <div className="relative">

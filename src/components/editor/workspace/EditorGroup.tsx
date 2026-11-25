@@ -355,7 +355,7 @@ export function EditorGroup({
                   data-testid="code-workspace-file-status"
                   data-role="inspection-widget"
                   title={[formatBytes(activeFile.size), formatMtime(activeFile.mtime)].filter(Boolean).join(" · ")}
-                  className="absolute right-4 top-1 z-10 flex max-w-[70%] items-center gap-1.5 rounded border border-[var(--taomni-code-border)]/60 bg-[var(--taomni-code-gutter-bg)]/90 px-1.5 py-0.5 text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-text)] shadow-sm"
+                  className="absolute right-4 top-1 z-[var(--taomni-z-sticky)] flex max-w-[70%] items-center gap-1.5 rounded border border-[var(--taomni-code-border)]/60 bg-[var(--taomni-code-gutter-bg)]/90 px-1.5 py-0.5 text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-text)] shadow-sm"
                 >
                   {activeFoldProvenance && (
                     <span
@@ -453,7 +453,7 @@ export function EditorGroup({
                   <div
                     role="status"
                     aria-label="Loading file"
-                    className="absolute inset-0 z-20 flex items-center justify-center bg-[var(--taomni-code-bg)]/80 text-[var(--taomni-code-muted)]"
+                    className="absolute inset-0 z-[var(--taomni-z-docked-overlay)] flex items-center justify-center bg-[var(--taomni-code-bg)]/80 text-[var(--taomni-code-muted)]"
                   >
                     <Loader2 className="w-4 h-4 animate-spin" />
                   </div>

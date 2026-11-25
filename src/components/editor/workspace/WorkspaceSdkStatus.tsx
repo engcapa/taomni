@@ -432,7 +432,7 @@ export const WorkspaceSdkStatus = memo(function WorkspaceSdkStatus({ roots, auto
       {open && (
         <div
           data-testid="workspace-sdk-dialog"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
           onClick={() => setOpen(false)}
         >
           <section

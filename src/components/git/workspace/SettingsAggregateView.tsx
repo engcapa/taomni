@@ -71,7 +71,7 @@ export function WorkspaceSettingsAggregateView({
           <EmptyState title="No repositories match" />
         ):(
           <table className="min-w-[1120px] w-full border-collapse text-ui-body">
-            <thead className="sticky top-0 z-10 bg-[var(--taomni-quick-bg)]">
+            <thead className="sticky top-0 z-[var(--taomni-z-sticky)] bg-[var(--taomni-quick-bg)]">
               <tr className="border-b border-[var(--taomni-divider)] text-left">
                 <th className="w-52 px-3 py-2 font-medium">Repository</th>
                 {WORKSPACE_SETTING_FIELDS.map((field) => (

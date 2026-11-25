@@ -54,7 +54,7 @@ export function MailComposer(viewProps: MailComposerProps) {
   const { addDraftAttachmentPaths, attachProgress, composeDragActive, composeRootRef, defaultMailDomain, discardCurrentDraft, draft, handleAddDraftAttachments, handleDropComposeFiles, handleInsertInlineImage, handlePasteImages, handleRecipientQueryChange, handleSendDraft, handleSendLater, identities, identityById, recipientSearch, recipientSuggestionsFor, removeDraftAttachment, saveCurrentAsTemplate, saveCurrentDraft, savingDraft, sendLaterAt, sendLaterOpen, sending, setComposeDragActive, setComposeOpen, setComposePrompt, setDraft, setSendLaterAt, setSendLaterOpen, tabId } = viewProps;
  return (<div
           ref={composeRootRef}
-          className="absolute inset-0 z-[150] bg-black/30 flex items-center justify-center p-4"
+          className="absolute inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
           data-testid="mail-compose-dialog"
           onDragEnter={(event: ReactDragEvent<HTMLDivElement>) => {
             if (sending || !isOsFileDrag(event.dataTransfer)) return;
@@ -311,7 +311,7 @@ export function MailComposer(viewProps: MailComposerProps) {
                 </button>
                 {sendLaterOpen && (
                   <div
-                    className="absolute bottom-9 right-0 z-10 w-72 p-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg text-ui-body flex flex-col gap-2"
+                    className="absolute bottom-9 right-0 z-[var(--taomni-z-menu-over-modal,1100)] w-72 p-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg text-ui-body flex flex-col gap-2"
                     data-testid="mail-send-later-panel"
                   >
                     <label className="flex flex-col gap-1">

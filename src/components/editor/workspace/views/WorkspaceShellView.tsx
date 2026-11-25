@@ -274,7 +274,7 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
                   data-testid="code-workspace-project-resize-handle"
                   disabled={!toolWindowRouting.leftToolAreaOpen}
                   className={toolWindowRouting.leftToolAreaOpen
-                    ? "w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors cursor-col-resize shrink-0 relative after:absolute after:inset-y-0 after:-left-1.5 after:-right-1.5 after:z-20"
+                    ? "w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors cursor-col-resize shrink-0 relative after:absolute after:inset-y-0 after:-left-1.5 after:-right-1.5 after:z-[var(--taomni-z-sticky)]"
                     : "hidden"}
                 />}
                 <Panel

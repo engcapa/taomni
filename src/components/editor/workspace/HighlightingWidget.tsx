@@ -182,7 +182,7 @@ export function HighlightingWidget({
       {menuOpen && (
         <>
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-[var(--taomni-z-popover)]"
             onClick={() => setMenuOpen(false)}
           />
           <div
@@ -190,7 +190,7 @@ export function HighlightingWidget({
             role="menu"
             aria-label="Highlighting level options"
             data-testid="highlighting-widget-menu"
-            className="absolute right-0 top-full z-50 mt-1 min-w-[200px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-1.5 shadow-lg text-ui-small"
+            className="absolute right-0 top-full z-[var(--taomni-z-popover)] mt-1 min-w-[200px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-1.5 shadow-lg text-ui-small"
           >
             <div className="px-2 py-1 font-semibold text-[var(--taomni-code-muted)] uppercase tracking-wider text-ui-caption">
               Highlighting Level

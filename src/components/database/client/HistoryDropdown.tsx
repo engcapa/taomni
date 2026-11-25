@@ -32,10 +32,10 @@ export function HistoryDropdown({
   const iconButton = "h-6 px-1.5 inline-flex items-center gap-1 rounded text-ui-caption hover:bg-[var(--taomni-hover)] disabled:opacity-40";
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="fixed inset-0 z-[var(--taomni-z-popover)]" onClick={onClose} />
       <div
         data-testid="db-query-history-panel"
-        className="absolute right-2 top-9 z-50 w-[620px] max-w-[calc(100vw-24px)] max-h-[440px] overflow-hidden rounded shadow-lg flex flex-col"
+        className="absolute right-2 top-9 z-[var(--taomni-z-popover)] w-[620px] max-w-[calc(100vw-24px)] max-h-[440px] overflow-hidden rounded shadow-lg flex flex-col"
         style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}
       >
         <div

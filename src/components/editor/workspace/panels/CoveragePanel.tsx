@@ -146,7 +146,7 @@ export function CoveragePanel({
       {/* Files Table */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         <table className="w-full text-left border-collapse font-mono text-ui-small">
-          <thead className="sticky top-0 z-10 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-caption text-[var(--taomni-code-muted)] uppercase tracking-wider">
+          <thead className="sticky top-0 z-[var(--taomni-z-sticky)] border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-caption text-[var(--taomni-code-muted)] uppercase tracking-wider">
             <tr>
               <th className="px-3 py-1.5 font-semibold">File</th>
               <th className="px-3 py-1.5 font-semibold w-28 text-right">Lines</th>

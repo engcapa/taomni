@@ -25,10 +25,10 @@ export function StatementDropdown({
   const compactSql = action.range.sql.replace(/\s+/g, " ").trim();
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="fixed inset-0 z-[var(--taomni-z-popover)]" onClick={onClose} />
       <div
         data-testid="db-current-statement-panel"
-        className="absolute right-2 top-9 z-50 w-[560px] max-w-[calc(100vw-24px)] overflow-hidden rounded shadow-lg flex flex-col"
+        className="absolute right-2 top-9 z-[var(--taomni-z-popover)] w-[560px] max-w-[calc(100vw-24px)] overflow-hidden rounded shadow-lg flex flex-col"
         style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}
       >
         <div

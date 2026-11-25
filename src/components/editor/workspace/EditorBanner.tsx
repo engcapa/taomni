@@ -51,7 +51,7 @@ export function EditorBanner({ banners, onDismiss, floating = false }: EditorBan
       data-testid="code-workspace-editor-banners"
       data-floating={floating || undefined}
       className={floating
-        ? "absolute bottom-3 right-4 z-20 flex w-[380px] max-w-[calc(100%-32px)] flex-col overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-ui-small shadow-lg"
+        ? "absolute bottom-3 right-4 z-[var(--taomni-z-docked-overlay)] flex w-[380px] max-w-[calc(100%-32px)] flex-col overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-ui-small shadow-lg"
         : "flex flex-col border-b border-[var(--taomni-code-border)] text-ui-small"}
     >
       {banners.map((banner) => {

@@ -317,7 +317,7 @@ export function ExportDialog({
         <div className="relative h-11 flex items-center gap-2 px-3" style={{ borderTop: "1px solid var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}>
           <button type="button" className="taomni-btn inline-flex items-center gap-1" onClick={() => setSettingsOpen((value) => !value)}><FileText className="w-3.5 h-3.5" />Settings</button>
           {settingsOpen && (
-            <div className="absolute left-3 bottom-10 z-10 min-w-[230px] rounded shadow-lg p-1 text-ui-body" style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}>
+            <div className="absolute left-3 bottom-10 z-[var(--taomni-z-menu-over-modal)] min-w-[230px] rounded shadow-lg p-1 text-ui-body" style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}>
               <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--taomni-hover)]" onClick={saveDefaultSettings}>Save As Default Settings</button>
               <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--taomni-hover)]" onClick={useDefaultSettings}>Use Default Settings</button>
               <button type="button" className="block w-full text-left px-2 py-1 hover:bg-[var(--taomni-hover)]" onClick={removeDefaultSettings}>Remove Default Settings</button>

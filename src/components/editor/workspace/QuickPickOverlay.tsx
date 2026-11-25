@@ -285,7 +285,7 @@ export function QuickPickOverlay<T>({
     <div
       ref={overlayRef}
       data-testid={testId}
-      className="absolute inset-0 z-40 flex justify-center bg-black/30 pt-14"
+      className="absolute inset-0 taomni-dialog-backdrop flex justify-center pt-14"
       onKeyDown={(event) => {
         // Esc closes even before the deferred input focus lands (or after a
         // click moved focus onto a result row).

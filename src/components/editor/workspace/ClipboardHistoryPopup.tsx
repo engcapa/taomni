@@ -90,7 +90,7 @@ export function ClipboardHistoryPopup({
       aria-labelledby="clipboard-history-title"
       data-testid="clipboard-history-popup"
       onKeyDown={handleKeyDown}
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-[10vh]"
+      className="fixed inset-0 taomni-dialog-backdrop flex items-start justify-center p-4 pt-[10vh]"
     >
       <div className="flex w-full max-w-xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-3 py-2">

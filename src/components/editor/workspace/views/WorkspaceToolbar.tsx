@@ -231,7 +231,7 @@ export function WorkspaceToolbar(viewProps: WorkspaceToolbarProps) {
                 aria-label="More editor actions"
                 data-testid="code-workspace-toolbar-more-menu"
                 onClick={() => setToolbarMoreOpen(false)}
-                className="absolute right-0 top-8 z-50 flex w-max max-w-[420px] flex-wrap items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] p-1.5 shadow-lg"
+                className="absolute right-0 top-8 z-[var(--taomni-z-popover)] flex w-max max-w-[420px] flex-wrap items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] p-1.5 shadow-lg"
                 onKeyDown={(event) => {
                   if (event.key === "Escape") {
                     event.stopPropagation();

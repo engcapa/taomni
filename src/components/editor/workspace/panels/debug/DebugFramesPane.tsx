@@ -199,7 +199,7 @@ export function DebugFramesPane({
               role="listbox"
               aria-label="Threads"
               data-testid="debug-thread-list"
-              className="absolute left-0 right-0 top-full z-30 mt-0.5 max-h-60 overflow-auto rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-0.5 shadow-lg"
+              className="absolute left-0 right-0 top-full z-[var(--taomni-z-popover)] mt-0.5 max-h-60 overflow-auto rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-0.5 shadow-lg"
             >
               {threads.map((thread) => (
                 <div

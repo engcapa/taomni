@@ -404,7 +404,7 @@ export function MailClientView(props: MailClientViewProps) {
         {appearanceOwner.mailboxCollapsed && (
           <button
             type="button"
-            className="absolute left-0 top-12 z-30 h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--taomni-hover)]"
+            className="absolute left-0 top-12 z-[var(--taomni-z-sticky,100)] h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--taomni-hover)]"
             style={{
               background: "var(--taomni-panel-bg)",
               borderColor: "var(--taomni-divider)",
@@ -552,7 +552,7 @@ export function MailClientView(props: MailClientViewProps) {
 
       {composerOwner.undoSend && (
         <div
-          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[160] h-9 px-3 rounded shadow-lg border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] flex items-center gap-3 text-ui-body"
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[var(--taomni-z-toast,1200)] h-9 px-3 rounded shadow-lg border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] flex items-center gap-3 text-ui-body"
           role="status"
           data-testid="mail-undo-send"
         >

@@ -173,7 +173,7 @@ export function CommitMessageHover({
           role="dialog"
           aria-label="Commit message"
           data-testid="commit-message-hover"
-          className="fixed z-[600] rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] text-[var(--taomni-text)] shadow-xl"
+          className="fixed z-[var(--taomni-z-tooltip)] rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] text-[var(--taomni-text)] shadow-xl"
           style={{
             top: pos.top,
             left: pos.left,

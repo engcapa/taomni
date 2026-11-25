@@ -47,7 +47,7 @@ export function GitDiffPeek({
           onClose();
         }
       }}
-      className="absolute left-10 top-3 z-20 max-h-[70%] w-[min(640px,calc(100%-4rem))] overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] shadow-2xl"
+      className="absolute left-10 top-3 z-[var(--taomni-z-popover)] max-h-[70%] w-[min(640px,calc(100%-4rem))] overflow-hidden rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] shadow-2xl"
     >
       <div className="flex h-8 items-center gap-1 border-b border-[var(--taomni-code-border)] px-2 text-ui-caption text-[var(--taomni-code-muted)]">
         {onPrevious && (

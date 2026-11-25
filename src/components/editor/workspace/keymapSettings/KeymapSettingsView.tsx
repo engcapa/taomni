@@ -113,7 +113,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
   } = inputs;
   return ((
     <div
-      className="fixed inset-0 z-[900] flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 taomni-dialog-backdrop flex items-center justify-center p-4"
       onMouseDown={(event) => {
         // DEC-03: overlay click is a Cancel path — discards the draft.
         if (event.target === event.currentTarget) onClose();
@@ -316,12 +316,12 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
           const menuItemClass = "block w-full px-3 py-1 text-left hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40";
           return (
             <>
-              <div className="fixed inset-0 z-20" onMouseDown={() => setRowMenu(null)} />
+              <div className="fixed inset-0 z-[var(--taomni-z-menu-over-modal)]" onMouseDown={() => setRowMenu(null)} />
               <div
                 role="menu"
                 aria-label={`${item.title} shortcuts`}
                 data-testid="keymap-row-menu"
-                className="fixed z-30 min-w-[220px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] py-1 text-ui-body shadow-lg"
+                className="fixed z-[var(--taomni-z-menu-over-modal)] min-w-[220px] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] py-1 text-ui-body shadow-lg"
                 style={{
                   left: Math.min(rowMenu.x, (typeof window === "undefined" ? 1200 : window.innerWidth) - 240),
                   top: Math.min(rowMenu.y, (typeof window === "undefined" ? 800 : window.innerHeight) - 160),
@@ -359,7 +359,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
           );
         })()}
         {mouseCapture && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-black/20">
+          <div className="absolute inset-0 taomni-dialog-backdrop flex items-center justify-center rounded-md">
             <div role="dialog" aria-modal="true" aria-label="Mouse Shortcut" data-testid="keymap-mouse-recorder"
               className="w-[400px] max-w-[calc(100%-32px)] rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-3 text-ui-small shadow-xl">
               <div className="mb-2 text-ui-body font-medium">
@@ -420,7 +420,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
           names EVERY action holding the stroke.
         */}
         {capture && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-black/20">
+          <div className="absolute inset-0 taomni-dialog-backdrop flex items-center justify-center rounded-md">
             <div
               role="dialog"
               aria-modal="true"
