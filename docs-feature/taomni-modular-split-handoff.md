@@ -1,16 +1,126 @@
 # Taomni 模块化重构交接
 
-## 2026-11-24 续接进展
+## 0.6.0 当前候选
 
-**公开发行仍是单体 `v0.5.13`。生产发布待同一 `0.6.0` 候选 SHA 收齐四目标实装升级、纯核心与全模块的崩溃回归，以及 G1–G11 回执。** [当前公开版本](https://github.com/engcapa/taomni/releases/tag/v0.5.13)
+当前产品 SHA 为 `f69c52f2e3edbfca37782950d367d637368fe1b4`，包含核对时的 `main` 提交 `284ac1056`。0.6.0 暂缓上线。MFA 包装好后，工作区会提示有旧账户的用户进入模块商店，用原 Vault 密码完成迁移。SocksCap 安装阶段接管原有配置和规则，在用户启用宿主前写入模块数据目录，保留原件供回退使用。[候选提交](https://github.com/engcapa/taomni/commit/f69c52f2e) · [四目标候选构建](https://github.com/engcapa/taomni/actions/runs/45540702292) · [核心构建清点](https://github.com/engcapa/taomni/actions/runs/45540706955) · [纯核心崩溃回归](https://github.com/engcapa/taomni/actions/runs/45540715604) · [双版本生命周期](https://github.com/engcapa/taomni/actions/runs/45540932783)
 
-- Wave 2A 工作流 `#45391530402` 已确认整体成功，18 个分片共通过 150 项。首发 10 个模块中有 6 个已取得 Linux、Windows 和 macOS ARM64 三端双版本生命周期证据。 [Wave 2A 回执](https://github.com/engcapa/taomni/actions/runs/45391530402)
-- Wave 2B 已新增 `TC-MODULES-112`–`115`。VNC Client 和 RDP Client 在 Linux、Windows、macOS ARM64 各通过 10/10 阶段，首发已取得三端生命周期证据的模块共 8/10。两个服务端的旧配置触发了首装流程，用例已改为先装入旧版，再接入更新目录。VNC Server 在 Linux 验证 RFB 认证、监听和 `x11vnc` 回收，在 Windows 和 macOS 托管环境核对外部 VNC 服务和系统屏幕共享的指引。原三端复跑因 macOS 排队已取消，分为 Linux/Windows 和 macOS 26 两次运行。 [首轮回执](https://github.com/engcapa/taomni/actions/runs/45399176436) · [Linux/Windows 复跑](https://github.com/engcapa/taomni/actions/runs/45412993964) · [macOS ARM64 复跑](https://github.com/engcapa/taomni/actions/runs/45414324974)
-- macOS 基座包已移除旧 SocksCap Redirector 桥接程序。旧会话恢复通过验签后的系统 Provider 清除捕获范围，正常捕获继续使用签名 SocksCap 宿主。Linux、Windows 和 macOS 安装包清点会拒绝对应模块运行部件。 [代码](https://github.com/engcapa/taomni/commit/55cdefc0b) · [原生回归](https://github.com/engcapa/taomni/actions/runs/45401294673)
-- Mail `0.1.59` 将协议引擎移出默认基座，旧 SQLite 邮箱、归档对象和备份迁移保留共享存储实现。四目标本地 Cargo 树均排除 `taomni-mail-engine`、`imap`、`imap-proto`、`lettre` 和 `mail-parser`。存储库默认与全特性分别通过 40、70 项单测，独立协议引擎和 Mail 宿主分别通过 23、46 项。基座 Mail 迁移和备份单测各通过 7、3 项，生产前端构建清单的 424 个入口均排除首发模块渲染代码。 [代码](https://github.com/engcapa/taomni/commit/ef895cd1b)
-- 候选升级工作流通过 `package_run` 指定同源码发布构建。崩溃回归的 `module_profile=full` 通过 `first_release_run` 获取同一批签名模块。`module_profile=core-only` 通过 `head` 绑定相同源码并验证空模块列表。 [升级工作流](../.github/workflows/qa-modular-upgrade.yml) · [崩溃回归配置](../qa-ui-auto-tests/ci/README.md)
+实装工作流默认选择当时公开的稳定单体版本，记录 Release ID 和四个目标各自的资产 ID、字节数、SHA-256。四个平台在同一次验收中复用这份记录。放行时再查询 GitHub 公开版并与实装回执匹配。单体发布有更新时使用新基线复验，涉及主线产品改动时同步更新候选和对应回执。历史版本号用于重现已执行的测试。[滚动基线实现](https://github.com/engcapa/taomni/commit/04e6e0497) · [首次自动选择的实装](https://github.com/engcapa/taomni/actions/runs/45538704639) · [公开稳定版](https://github.com/engcapa/taomni/releases/latest)
+
+### 十个独立模块的首次升级验收范围
+
+| 模块 | 旧数据归属和需要验证的用户结果 |
+| --- | --- |
+| RDP Client | 已存 RDP 会话保留在核心会话库。将旧证书 pin 迁入模块数据库，重连和还原后仍识别原服务器。 |
+| VNC Client | 原连接信息和会话标识保留在基座，安装签名 viewer 后从原会话重连。 |
+| RDP Server | 迁入服务配置、TLS 证书和私钥，启动后保持原身份，停止或卸载后释放监听端口。 |
+| VNC Server | 迁入服务配置，凭据经 Vault 保护。验收旧密码认证、停止和禁用。 |
+| Servers | 迁入本地服务配置和 SSH 主机密钥。已有认证配置的服务使用原凭据，客户端继续识别原主机身份。 |
+| SocksCap | 安装签名包时接管旧配置、选用的代理及已有规则缓存，保留原始文件。验证启用前模块文件、启用后规则效果和禁用后保留。 |
+| Mail | 从旧库导入账户、缓存、归档和附件，所需重启由首装流程提示。验证原邮件、升级后新增邮件、卸载与回退。 |
+| MFA | 工作区提示旧账户使用者输入原 Vault 密码，已安装签名包接管加密数据库。验证错误密码、重试、重启及 HOTP 计数连续性。 |
+| Screenshot | 普通截图、滚动截图由基座提供。OCR、脱敏、GIF/MP4 编码由模块提供。验证真实像素、成品可解码和卸载后基础截图可用。 |
+| Local Voice | 沿用已配置模型目录和模型文件，签名宿主负责离线识别。验证同一模型输入的识别结果及禁用后的状态。 |
+
+上述条目定义业务验收范围。安装指针、包签名和空的 `legacyPending` 另行证明十个包已按首发名单装齐。原 Vault 密码由使用者在本机输入。[首发名单](../src-tauri/plugins/legacy-upgrade.json) · [受影响用例](../qa-ui-auto-tests/cases)
+
+### 上一候选 60a4d99dc 的放行复核
+
+产品源码为 `60a4d99dc2ad924963b7e46568b54164f7e5e9fd`，远端候选分支为 `rc/modular-0.6.0`。开发分支上的后续提交修正 QA 驱动并补足实际安装观测。公开版仍为 v0.5.13。 [候选引用](https://github.com/engcapa/taomni/tree/rc/modular-0.6.0) · [公开版](https://github.com/engcapa/taomni/releases/tag/v0.5.13)
+
+| 放行依据 | 结果 |
+| --- | --- |
+| 安装件与签名 | Linux x64、Windows x64、macOS ARM64、Intel 四个目标交付基座，十个 stable 模块各四个包。发布选择器对冻结分支实际选出 4 份基座工件、40 份模块工件、1 份 updater 工件。使用发布脚本复核复用输入，通过 17 个核心资产摘要、40 个模块及 macOS 固定签名身份记录比对。 [构建和验签](https://github.com/engcapa/taomni/actions/runs/45505517152) |
+| 迁移与回退 | 四目标完成 v0.5.13 → 0.6.0 → v0.5.13 → 0.6.0。Linux 邮箱实装迁移保留旧邮件 UID 1 和归档原文，升级后同步新邮件 UID 2，卸载保留模块数据，回退可读旧邮件。deb、RPM、AppImage 三种格式均验证 noexec 拒绝和搬迁恢复。 [Linux](https://github.com/engcapa/taomni/actions/runs/45533440378/artifacts/14985823182) · [Windows](https://github.com/engcapa/taomni/actions/runs/45524159453/artifacts/14981703294) |
+| 原生权限 | macOS 两架构均记录固定签名身份和 Gatekeeper、升级前后屏幕录制与辅助功能状态、签名 MFA 识别外部二维码。Mobile 在桌面端配对，默认拒绝屏幕请求，勾选后取得 PNG，受管窗口收到文本和 Enter。Windows 记录下载宿主在 Defender 开启时运行。 [ARM64](https://github.com/engcapa/taomni/actions/runs/45534494663/artifacts/14987211263) · [Intel](https://github.com/engcapa/taomni/actions/runs/45534494663/artifacts/14986262563) |
+| 生命周期与崩溃回归 | 十个模块在 Linux、Windows、macOS ARM64 各通过十个阶段。纯核心 Browser/Native 共 140/140，全模块 155/155。Windows 原失败分片及同源码补跑已并列归档。 [纯核心](https://github.com/engcapa/taomni/actions/runs/45505570023) · [Windows 补跑](https://github.com/engcapa/taomni/actions/runs/45511844676) · [全模块](https://github.com/engcapa/taomni/actions/runs/45519040386) |
+| RDP 性能 | Linux 安装版 RPM、签名 RDP 服务端和独立探针测得首帧 68 ms、111.08 fps、414.06 kbps，40/40 样本、零超时，输入到画面 p95 为 39.47 ms，上限 130 ms。Wayland 专项 p95 为 68.77 ms。该专项另外四个夹具因 X11 右键或 XDG 目录前置条件失败，已保留原失败，同候选的标准 Linux 路线对应场景通过。 [实装](https://github.com/engcapa/taomni/actions/runs/45533440378/artifacts/14985823182) · [Wayland](https://github.com/engcapa/taomni/actions/runs/45509531362) |
+
+该轮发布输入对应 `60a4d99dc`。更换产品 SHA 后，四目标安装件、十模块、升级回退、两种崩溃回归及 G1–G11 均以新候选重新取证。公开发布时复用最终通过验收的候选包运行，发布作业生成并验签正式 GitHub 地址的模块目录。历史原件路径、runner 镜像和摘要已归档。[上一候选逐门记录](taomni-modular-0.6.0-receipts.md) · [发布工作流](../.github/workflows/release.yml)
+
+### 交付边界与维护方式
+
+| 归属 | 0.6.0 范围 |
+| --- | --- |
+| 基座共享服务 | 主窗口、标签页、工作区壳、会话树与恢复元数据、Settings、网络代理、Vault、profile 和 GUI/headless 租约、备份协调、共享采集、更新器、模块商店、验签、权限、宿主启停和前端加载。 |
+| 随基座发布的业务 | 23 种核心会话含终端、SSH、SFTP、本地文件、数据库、Redis、HBase 和对象存储。另含隧道和代理测试、Code Workspace（Git/LSP/DAP/构建）、Tao 聊天与 Agent、Notes、普通截图与滚动长截图、麦克风采集和云端 ASR。Mobile 首发归核心，含移动端连接、远控、飞书适配及 headless 入口。 |
+| 可独立装卸的十模块 | `rdp-client`、`rdp-server`、`vnc-client`、`vnc-server` 各自发布。另有 `servers`（本地服务）、`sockscap`（按应用代理）、`mail`、`mfa`（验证器）、`screenshot`（OCR、脱敏与录制）、`ai-voice-local`（本地语音识别）。`hello-plugin` 用于 QA。 |
+
+基座与内置业务随主版本更新。模块独立版本化，可启用、禁用、升级、回滚和卸载。已有单体用户首次升级至模块化版时，固定首发名单用于恢复原有功能。卸载清理代码和派生运行文件，用户显式确认永久删除前保留数据。 [首发名单](../src-tauri/plugins/legacy-upgrade.json) · [边界设计](taomni-modular-split-design.md)
+
+开发按数据与接口归属落点。模块实现放在 `src-tauri/plugins/<slug>/`，通过公共 API 和获准共享 crate 使用基座能力，清单声明入口、权限、数据版本、迁移及备份。改模块须同步清单、测试、目录和签名矩阵。核心契约兼容时维持 `coreApiVersion`，破坏性变更才升级契约。测试从功能本身延伸至模块缺席、启停、双版本切换、失败恢复、数据保留，以及纯核心和全模块两种崩溃回归。真实安装、跨进程、系统权限和签名均留 GitHub 原始回执。 [仓库约定](../AGENTS.md)
+
+只改核心时发布安装件和 `latest.json`，沿用已验签的模块目录。只改模块时重建该模块全部声明平台的包，在模块 Release 发布包、签名及递增序号的完整目录，再同步最新核心 Release 的目录。两者同时变更时共用草稿 Release，先传包及签名，再传签名目录和 updater 清单。 [核心与联合发布](../.github/workflows/release.yml) · [模块发布](../.github/workflows/release-modules.yml)
+
+四个目标的基础安装包实测比 v0.5.13 小约 48%–50%。按本次工件大小计，安装全部十模块另需下载约 68.6–76.1 MB（十进制，按平台），因此全装总下载量比旧单体更大。独立发布和回退缩小了单次修复影响范围，代价是兼容、迁移、签名分发和跨进程排错。资源变化也因平台而异，两轮 macOS ARM64 实装的核心进程 RSS 中位数较 v0.5.13 分别高约 106 和 95 MiB。 [候选资产](https://github.com/engcapa/taomni/actions/runs/45505517152) · [ARM64 首轮](https://github.com/engcapa/taomni/actions/runs/45524159453/artifacts/14981658523) · [ARM64 复验](https://github.com/engcapa/taomni/actions/runs/45534494663/artifacts/14987211263)
+
+## 2026-11-25 发布候选验收
+
+公开版为 v0.5.13，0.6.0 暂缓上线。验收源码为 `60a4d99dc2ad924963b7e46568b54164f7e5e9fd`。该版本合入主线的窗口审批修复，审批状态接到 `CoreState`，Mobile 回调沿用现有状态归属。旧 E2E 工作流改用共享 Python 依赖，修复三条入口在 helper 单测导入 Pillow 时的缺失。 [公开版](https://github.com/engcapa/taomni/releases/tag/v0.5.13) · [候选](https://github.com/engcapa/taomni/commit/60a4d99dc) · [主线 #879](https://github.com/engcapa/taomni/pull/879) · [原失败日志](https://github.com/engcapa/taomni/actions/runs/45502680305)
+
+- 上一阶段 `078fe8741` 的 RDP Server、VNC Server 在 Linux 和 Windows 各通过 10 个阶段。纯核心回归的 Windows Native 共 24 项，其中 `TC-FILE-OPEN-010` 在设置页取消脚本复选框时失败。两轮均缺 macOS Native 分片，GitHub 回执记录 runner 未分配。 `d6adb5a7c` 的四目标核心包与 updater 通过，但有七个 macOS 模块构建或签名作业未分配，未生成首装目录。 [服务端](https://github.com/engcapa/taomni/actions/runs/45427030060) · [纯核心](https://github.com/engcapa/taomni/actions/runs/45428206447) · [旧打包](https://github.com/engcapa/taomni/actions/runs/45420902624)
+- 新候选四目标 Cargo、Vite 和入口清点已通过。GitHub 工件 `14973283284` 记录 `ubuntu24` 镜像 `20261116.133.1`，已逐一核对 15 个原始文件的长度和 SHA-256。G9 还需核对四目标实际安装载荷，G11 还需原生租约与入口回执。 [清点运行](https://github.com/engcapa/taomni/actions/runs/45505563614) · [原始工件](https://github.com/engcapa/taomni/actions/runs/45505563614/artifacts/14973283284)
+- 候选采用主线固定签名配置，以 macOS 26 ARM64 构建两种 macOS 安装架构。Release Bundle 使用空 `tag`、`platforms=all`、`macos_arch=both` 和冻结的十模块名单。纯核心回归选 Linux、Windows、macOS 26 ARM64 的 Browser、Native release 模式，含完整崩溃回归和主线三条窗口审批用例。跨进程宿主契约已派发。 [打包](https://github.com/engcapa/taomni/actions/runs/45505517152) · [纯核心](https://github.com/engcapa/taomni/actions/runs/45505570023) · [跨进程契约](https://github.com/engcapa/taomni/actions/runs/45506223399)
+- 十模块双版本生命周期先在 Linux 和 Windows 执行，包含完整崩溃回归、签名安装、后台续传、前三种 MFA 还原状态和 RDP Server 实际捕获与输入。macOS 轮次单独派发。已核对官方 v0.5.13 四个安装件的 GitHub 资产 ID、大小和 SHA-256 与夹具一致。 [生命周期](https://github.com/engcapa/taomni/actions/runs/45508735320) · [升级输入](../.agents/skills/qa-ui-auto/scripts/qa_ui_auto/legacy_release.py)
+- 本地通过 Rust 编译检查和 14 项窗口路由单测、41 项前端单测、37 项 QA helper 单测、TypeScript、rustfmt、`pnpm check:refactor` 和 QA 静态审计。
+- G10 的生产宿主适配器和真实 hello/MFA 进程在 Linux、Windows、macOS ARM64 各通过 38 项。超时、取消、重复请求和 profile 所有权的原始回执分别绑定 `ubuntu24/20261116.133.1`、`win25-vs2026/20261116.315.1`、`macos26/20261117.0516.1` 及宿主摘要。Linux Wayland 已派发采集、输入、RDP 性能和适用崩溃回归。 [Linux 原件](https://github.com/engcapa/taomni/actions/runs/45506223399/artifacts/14973594032) · [Windows 原件](https://github.com/engcapa/taomni/actions/runs/45506223399/artifacts/14972679873) · [macOS 原件](https://github.com/engcapa/taomni/actions/runs/45506223399/artifacts/14973464553) · [Wayland](https://github.com/engcapa/taomni/actions/runs/45509531362)
+- 纯核心 Windows 原生分片在 Chocolatey 返回 503 后未能开始执行。QA 工作流 `508848590` 改用 Tesseract 官方发布的同版安装件，下载重试后核对固定 SHA-256，仍验证可执行文件和两份固定语言数据。已按新工作流派发 Windows 补跑，`head` 继续固定至候选 `60a4d99dc`，用例和产品源码以 selection、build identity 与 runner receipt 核对。 [失败分片](https://github.com/engcapa/taomni/actions/runs/45505570023/job/138854819875) · [QA 修复](https://github.com/engcapa/taomni/commit/508848590) · [Windows 补跑](https://github.com/engcapa/taomni/actions/runs/45511844676)
+- macOS 十模块生命周期使用 macOS 15 ARM64，包含签名 RDP Server 和截图权限相关用例。Wayland 的五个专项用例全部通过，RDP 首帧 119 ms、延迟 p95 68.77 ms（上限 130 ms）、40/40 有效样本、39.33 fps、836.46 kbps。该轮附带选集的 `TC-FILE-OPEN-006/008` 与 `TC-EXPLORER-013` 触发 QA 的 X11 非左键限制，`TC-BACKUP-AUTH-715` 触发授权夹具的 XDG 根目录校验。四个失败原件保留，完整崩溃回归继续以主平台两种配置的完整结果验收。 [macOS 生命周期](https://github.com/engcapa/taomni/actions/runs/45512106167) · [Wayland 性能原件](https://github.com/engcapa/taomni/actions/runs/45509531362/artifacts/14976277019) · [Wayland 全分片](https://github.com/engcapa/taomni/actions/runs/45509531362)
+
+- 四目标核心安装件与 updater 验签已在候选打包运行完成。下载的资产与 `SHA256SUMS` 的 17 个条目逐一吻合，两份 macOS 构建身份绑定候选源码。Windows 纯核心 Native 补跑两个分片各 13/13 通过，包含之前失败的脚本复选框用例。 [updater 原件](https://github.com/engcapa/taomni/actions/runs/45505517152/artifacts/14978490415) · [Windows 补跑](https://github.com/engcapa/taomni/actions/runs/45511844676)
+- 已复核 Linux/Windows 生命周期的 14 个分片，Linux Browser 22/22、Native 44/44，Windows Browser 22/22、Native 43/44。Linux 十模块和 Windows 九模块均有各自的十个阶段回执。Windows 的 `TC-MODULES-112` 在重新附着并交付按键之后，首次枚举旧版 VNC Client 宿主时观测到零个匹配进程，已派发同源码、同断言的复验。Windows 分片的镜像版本取自对应 job 的 Runner Image 日志，二进制摘要取自匹配的 `native_identity` 与 `build-identity.json`。通用回执的 `bundleIdentity.platform` 对 Native 固定写 linux，不能用于区分三端。索引位于 `qa-ui-auto-report/github/45508735320/reviewed-shards.json`。 [原始失败分片](https://github.com/engcapa/taomni/actions/runs/45508735320/job/138866866021) · [Windows 复验](https://github.com/engcapa/taomni/actions/runs/45516576994)
+- QA 提交 `08a4c5d1b` 补入 Windows 与 macOS 回退后的再次升级。检查原位安装路径、候选可执行文件 SHA-256、Windows Installer 注册状态、原 profile 会话与首装目录、九个安装指针和用户移除的 Mail。Linux 性能探针从指定安装包的生产源码构建，实装与全模块回归继续使用 `60a4d99dc` 的包。63 项相关本地单测与边界检查通过。 [实装验收变更](https://github.com/engcapa/taomni/commit/08a4c5d1b) · [协议、采集与包契约](https://github.com/engcapa/taomni/actions/runs/45517779764)
+
+| 放行项 | 验收与凭据 |
+| --- | --- |
+| 四目标候选安装包、40 个模块包和目录 | 核对四目标安装包资产、updater 验签、40 个模块签名及首装目录摘要。Linux 载荷覆盖 deb、RPM 和 AppImage。 |
+| 从公开版实装升级、回退 | 在 Windows x64、Linux x64、macOS ARM64 和 macOS Intel 上，使用候选 `package_run` 复验固定的 v0.5.13 安装件、已有 profile、首装十模块、卸载 Mail 后重开和回退。关联各平台安装件 ID 与 SHA-256。 |
+| 双配置回归 | 归档纯核心和全模块两个 Browser/Native release 选集及逐分片证据。全模块模式通过 `first_release_run` 绑定签名目录与候选包。 |
+| G1、G2、G3 | 两种 macOS 架构采集固定签名证书、Gatekeeper、已安装宿主启动、TCC 与实际采集及输入。Windows 采集 MSI Authenticode、下载区标记、Defender 实时保护及下载的签名宿主启动。 |
+| G4、G5、G6 | Linux 三格式验证 `noexec` 拒绝和 profile 搬迁。签名 RDP 采集首帧、帧率、带宽及 40 个延迟样本，p95 上限 130 ms。实装升级记录强制退出后的宿主清理和数据恢复。 |
+| G7、G8 | 十模块在三端跑双版本无重启生命周期，检查宿主退出、资源释放、原数据与回滚。用签名包和目录验收拒绝篡改并核对候选摘要。 |
+| G9、G10、G11 | 四目标实际安装载荷核对构建清单。保留三端真实进程的 RPC 超时、取消、重复请求回执，以及实装 GUI/headless 互斥、备份静默和 re-exec 归属。 |
+
+### 同候选回执复核（11 月 25 日续）
+
+| 验收项 | 结果与原始回执 |
+| --- | --- |
+| 候选安装件与签名目录 | 打包成功，46 个工件已归档。核对 17 个 updater 清单条目、首装目录中的 40 份模块包与各自的产物记录。签名验收目录 SHA-256 为 `1183d6ec00ec7db317e741e4483e918d6b741676343fde85efb09d175cdf125b`。该目录使用实装测试镜像地址，正式发布流程另行生成带 GitHub Release 地址的 `modules.json`。 [打包](https://github.com/engcapa/taomni/actions/runs/45505517152) · [首装目录](https://github.com/engcapa/taomni/actions/runs/45505517152/artifacts/14979546289) |
+| G7 首发十模块 | Linux、Windows、macOS ARM64 各十模块、每模块十阶段通过。Windows VNC Client 复验同时通过 27/27 项，原失败分片保留。分片索引绑定 runner 镜像日志、产品源码、包摘要、选集、用例、QA 二进制和原始回执。 [Linux 与 Windows](https://github.com/engcapa/taomni/actions/runs/45508735320) · [Windows VNC](https://github.com/engcapa/taomni/actions/runs/45516576994) · [macOS](https://github.com/engcapa/taomni/actions/runs/45512106167) |
+| 纯核心崩溃回归 | 三端 Browser 各 21 项，Linux、Windows Native 各 26 项，macOS Native 25 项，全部通过。原 Windows 四分片在安装 OCR 时失败，补跑的两分片已逐项复核。 [原运行](https://github.com/engcapa/taomni/actions/runs/45505570023) · [Windows Native](https://github.com/engcapa/taomni/actions/runs/45511844676) |
+| Windows 与 macOS 实装 | Windows x64、macOS ARM64、Intel 的 v0.5.13 升级、回退、再次升级均通过。两种 macOS 架构保留同一 designated requirement、屏幕录制及辅助功能授权，原件含 Gatekeeper、签名宿主、MFA 实际扫码、RDP 权限、强退清理与租约记录。Windows 原件包括 Authenticode、Defender 与下载宿主执行记录。 [Windows](https://github.com/engcapa/taomni/actions/runs/45524159453/artifacts/14981703294) · [macOS ARM64](https://github.com/engcapa/taomni/actions/runs/45524159453/artifacts/14981658523) · [macOS Intel](https://github.com/engcapa/taomni/actions/runs/45524159453/artifacts/14982455129) |
+| Linux 实装、全模块回归 | Linux 首次执行在旧版 MFA 页关闭控件处停止，第二次到达旧 Mail 邮箱，未读到预期正文。QA 提交 `9b5144d97` 经消息行打开独立阅读页并保留失败截图，单独派发 Linux 实装。全模块回归使用同一候选打包运行的十个签名包。 [Linux 原失败](https://github.com/engcapa/taomni/actions/runs/45524159453/artifacts/14981554091) · [Linux 复验](https://github.com/engcapa/taomni/actions/runs/45525582190) · [全模块回归](https://github.com/engcapa/taomni/actions/runs/45519040386) |
+| 全模块崩溃回归结果 | 三端 Browser 各 23/23，Linux 与 Windows Native 各 29/29，macOS Native 28/28，全轮 155/155。签名包来自打包运行 45505517152。全部分片的选集、用例 SHA-256、原始回执和 native QA 二进制摘要已核对。 [GitHub 回归](https://github.com/engcapa/taomni/actions/runs/45519040386) |
+| Linux Mail 最新定位 | v0.5.13 的失败截图显示原始邮件正文已加载，阅读器选中 HTML，验收断言查找 Plain 视图。QA 提交 `a64ca9087` 在实时邮件与归档预览中显式切换到 Plain，并继续逐字核对同一封邮件。两种 macOS 与 Windows 的实装验收均已通过。 [失败原件](https://github.com/engcapa/taomni/actions/runs/45525582190/artifacts/14983285387) · [Linux 复验](https://github.com/engcapa/taomni/actions/runs/45526779092) |
+| Linux 旧版应用退出 | 正文断言已通过。旧版同时打开 MFA 和 Mail，退出验证仍匹配单标签提示。QA `8e6bdc3c5` 为这个夹具匹配双标签提示并保留其余场景的单标签检查。81 项相关单测与边界检查通过。 [原失败](https://github.com/engcapa/taomni/actions/runs/45526779092/artifacts/14983141551) · [复验](https://github.com/engcapa/taomni/actions/runs/45528225990) |
+
+
+
+
+原件按运行 ID 保留在 `qa-ui-auto-report/github/`。后续收口逐项记录完整源码 SHA、runner 镜像、包资产 ID、摘要与原件路径。 [仓库发布门禁](../AGENTS.md#modular-product-development) · [实装与升级](taomni-modular-installed-upgrade-verification.md)
+
+## 2026-11-24 生产准备状态
+
+**暂缓发布 `0.6.0`。** 当前公开版本为 `v0.5.13`。`refactor/modules-arch` 已推送至 `078fe874155b28b06ef65ddb204c7d6230acf3d4`，包含当前 `origin/main` 的 `ec8ef63f1`。基座版本已定为 `0.6.0`，十个首发模块清单均已设为 `stable`。`d6adb5a7c` 的四目标打包继续验证构建链路。正式放行须使用含本轮 QA 修正的同源码工件和回执。 [公开版本](https://github.com/engcapa/taomni/releases/tag/v0.5.13) · [分支提交](https://github.com/engcapa/taomni/commit/078fe8741) · [打包 #45420902624](https://github.com/engcapa/taomni/actions/runs/45420902624)
+
+- 基座已接入模块商店、验签和生命周期管理、profile 租约与备份协调。十个业务模块已具备独立打包入口，Mobile 与普通截图保留在基座。MFA 运行、禁用、卸载保留三态还原已有阶段回执，V-008 单模块目录更新演练已通过。 [实施台账](taomni-modular-split-progress.md) · [目录演练 #45314025590](https://github.com/engcapa/taomni/actions/runs/45314025590)
+- Mail `0.1.59` 将协议引擎移出默认基座，历史邮箱、归档和备份兼容保留共享存储实现。macOS 基座包已移除旧 SocksCap Redirector 桥接程序。核心通过验签后的系统 Provider 清除旧捕获范围，签名 SocksCap 宿主负责正常捕获。 [Mail 迁移](https://github.com/engcapa/taomni/commit/ef895cd1b) · [SocksCap 裁剪](https://github.com/engcapa/taomni/commit/55cdefc0b)
+- `d6adb5a7c` 的 G9 构建清点和 G11 入口清点通过。核对了 `ubuntu24` 镜像 `20261116.376.1` 回执中的 15 份文件摘要。四目标默认 Cargo 树排除 Mail 协议引擎及 SocksCap 宿主、工具和 Xray 运行依赖，424 个 Vite 清单条目均排除首发模块渲染器。实际安装载荷和跨进程租约仍待验收。 [清点 #45422710624](https://github.com/engcapa/taomni/actions/runs/45422710624) · [原始清点工件](https://github.com/engcapa/taomni/actions/runs/45422710624/artifacts/14936050990)
+- Wave 2A 的 18 个分片通过 150 项，含完整崩溃回归。加上 Wave 2B 的 VNC、RDP 客户端，十个首发模块中已有八个在阶段提交上取得 Linux、Windows、macOS ARM64 三端双版本生命周期回执。 [Wave 2A #45391530402](https://github.com/engcapa/taomni/actions/runs/45391530402) · [Wave 2B 首轮 #45399176436](https://github.com/engcapa/taomni/actions/runs/45399176436)
+- Wave 2B 服务端复跑 `a403a4a11` 的三个 Linux 原生分片通过 34 项，RDP Server 和 VNC Server 各通过 10 个生命周期阶段。Windows 原生 31/33 项通过，`TC-MODULES-114` 在 RDP 宿主退出后的端口检查失败，`TC-MODULES-115` 在 Windows 外部 VNC 服务指引已显示后的端口检查失败。macOS 26 的 VNC Server 构建和一个浏览器分片未分配到 runner，三个原生分片缺失。两个已收取的 macOS 浏览器分片通过 21 项。 [Linux/Windows #45412993964](https://github.com/engcapa/taomni/actions/runs/45412993964) · [macOS ARM64 #45414324974](https://github.com/engcapa/taomni/actions/runs/45414324974)
+- `078fe8741` 让服务端生命周期检查复用 Windows TCP 监听表来判断回环连接超时，保留实际端口仍在监听时的失败，记录端口关闭的证据方式。29 项相关 Python 单测、`pnpm check:refactor`、`pnpm exec tsc -b`、仓库 rustfmt 检查及 QA 静态审计通过。两个服务端用例和完整崩溃回归已在新 SHA 上派发，用 Linux、Windows 和 macOS 26 ARM64 执行。 [修复](https://github.com/engcapa/taomni/commit/078fe8741) · [服务端复跑 #45427030060](https://github.com/engcapa/taomni/actions/runs/45427030060)
+- 纯核心崩溃回归已切换到新 SHA，旧运行 `#45423650609` 已取消并保留已收分片。新运行使用 `module_profile=core-only`、`native_release=true` 和三端 Browser/Native。 [纯核心回归 #45428206447](https://github.com/engcapa/taomni/actions/runs/45428206447)
+
+### 续接验收
+
+1. 以验收源码重建四目标核心安装件、40 个签名模块包、首装目录和 updater 验签回执。四目标为 Linux x64、Windows x64、macOS ARM64 和 macOS Intel。Linux 安装载荷覆盖 deb、RPM 和 AppImage。 [打包工作流](../.github/workflows/release.yml)
+2. 从同一候选 SHA 的 `package_run` 验收官方 `v0.5.13 → 0.6.0` 四目标实装升级、旧数据迁移、回退与再升级。通过 `first_release_run` 绑定全模块崩溃回归的签名包，归档同一 SHA 下纯核心和全模块两轮结果。 [升级工作流](../.github/workflows/qa-modular-upgrade.yml) · [回归选集](../qa-ui-auto-tests/ci/README.md)
+3. 在候选上收齐 10 个模块的生命周期回执，补测 Windows 和 macOS ARM64 的服务端场景。按 G1–G11 逐门归档候选源码、runner 镜像、包资产 ID 与 SHA-256、用例摘要及原始工件。G5 实装输入到画面 p95 上限为 130 ms。 [放行规则](../AGENTS.md#modular-product-development)
+
+Wave 2B 原始分片位于 `qa-ui-auto-report/github/45412993964/wave2b-linux-windows/` 和 `qa-ui-auto-report/github/45414324974/wave2b-macos/`。`selection.json`、`build-identity.json`、`ci-outcome.json`、`runner_receipt.json`、`summary.json` 和各用例的生命周期记录随分片保留。构建清点在 `qa-ui-auto-report/github/45422710624/artifacts/modular-core-build-inventory/`。当前两个回归的分片正在收取，目录为 `qa-ui-auto-report/github/45427030060/server-lifecycle/` 和 `qa-ui-auto-report/github/45428206447/core-only/`。
 
 ## 2026-11-24 20:34 原交接快照
+
+本节及下方台账保留原交接时的记录。当前验收状态见上方「生产准备状态」。
 
 本阶段已完成 Mail `0.1.57` POP3 附件与 `0.1.58` 引擎/解析迁移、MFA 三态自动还原、SocksCap Linux 启动器/冷启与草稿修复、V-008 只读单模块目录演练、基座 `ironrdp`/`rcgen`/`mail-parser` 依赖裁剪，以及 Wave 1 + Wave 2A 的 6 个首发业务模块三端双版本无重启生命周期验证。 [实施台账](taomni-modular-split-progress.md#接下来的执行顺序)
 

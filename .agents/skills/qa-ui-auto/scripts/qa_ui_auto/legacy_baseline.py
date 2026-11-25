@@ -1,4 +1,5 @@
 """Resolve the public monolith once and carry its four immutable installer identities through QA."""
+import argparse
 import json
 import os
 from pathlib import Path
@@ -83,7 +84,23 @@ def current():
     return resolve(os.environ.get("QA_FIRST_UPGRADE_VERSION", ""))
 
 
+def verify_current(receipt):
+    actual = resolve()
+    if actual != receipt:
+        raise ValueError(f"Public monolith or installer assets changed since QA selected "
+                         f"{receipt['tag']} (Release {receipt['releaseId']}). "
+                         f"Repeat the installed upgrade with {actual['tag']} (Release {actual['releaseId']}).")
+    return actual
+
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--verify-current", type=Path, metavar="RECEIPT")
+    args = parser.parse_args()
+    if args.verify_current:
+        verified = verify_current(json.loads(args.verify_current.read_text(encoding="utf-8")))
+        print(f"Public monolith {verified['tag']} and its four installers still match the QA receipt")
+        raise SystemExit(0)
     record = resolve(os.environ.get("QA_FIRST_UPGRADE_VERSION", ""))
     target = os.environ.get("PACKAGE_VERSION")
     if target and tuple(map(int, record["version"].split("."))) >= tuple(map(int, target.split("."))):

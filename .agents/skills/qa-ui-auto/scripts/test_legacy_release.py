@@ -57,6 +57,17 @@ class PinnedReleaseTests(unittest.TestCase):
                     self.assertEqual(selected_asset("Linux", "amd64", version=version).name,
                                      f"Taomni_{version}_amd64.deb")
 
+    def test_release_review_detects_a_new_version_and_replaced_assets_under_the_same_tag(self):
+        receipt = legacy_baseline.freeze(self.published(), "")
+        same_tag = self.published()
+        same_tag["assets"][0]["id"] += 1
+        for public in (self.published("0.5.15"), same_tag):
+            with self.subTest(tag=public["tag_name"]), patch.object(legacy_baseline, "metadata", return_value=public):
+                with self.assertRaisesRegex(ValueError, "Repeat the installed upgrade"):
+                    legacy_baseline.verify_current(receipt)
+        with patch.object(legacy_baseline, "metadata", return_value=self.published()):
+            self.assertEqual(legacy_baseline.verify_current(receipt), receipt)
+
     def test_finds_latest_monolith_after_a_modular_release(self):
         modular = self.published("0.6.0")
         modular["assets"].append({"name": "modules.json"})

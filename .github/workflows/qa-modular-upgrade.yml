@@ -282,6 +282,28 @@ jobs:
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
 
+  verify-current-first-upgrade:
+    needs: [first-upgrade-baseline, installed-linux-mfa, release-bundle-samples]
+    if: >-
+      ${{ !cancelled() && needs.first-upgrade-baseline.result == 'success' &&
+      (inputs.package_first_release_version == '' || inputs.package_first_release_version == 'latest') &&
+      (!inputs.package_first_release_linux || needs.installed-linux-mfa.result == 'success') &&
+      (!inputs.package_first_release_desktop || needs.release-bundle-samples.result == 'success') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: first-upgrade-baseline-${{ github.run_id }}
+          path: checked-baseline
+      - name: Compare the tested installers to the current public monolith
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m qa_ui_auto.legacy_baseline --verify-current checked-baseline/first-upgrade-baseline.json
+
   protocol-contracts:
     if: ${{ !inputs.signed_mfa_only && !inputs.package_run && inputs.protocol_only }}
     uses: ./.github/workflows/qa-modular-protocol.yml
