@@ -32,11 +32,29 @@ export function scanUI(path, text) {
   const ast = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true,
     /\.[jt]sx$/.test(path) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const icons = importedIconNames(ast);
+  const dialogNames = new Set(["alert", "confirm", "prompt"]);
+  let checker;
+  function isGlobal(identifier) {
+    if (!checker) {
+      // Bind this file only. A name with no local symbol resolves to the host global.
+      const options = { noLib: true, noResolve: true, allowJs: true, jsx: ts.JsxEmit.Preserve };
+      const host = ts.createCompilerHost(options);
+      host.getSourceFile = (name) => name === ast.fileName ? ast : undefined;
+      checker = ts.createProgram([ast.fileName], options, host).getTypeChecker();
+    }
+    return !checker.getSymbolAtLocation(identifier);
+  }
   function visit(node) {
-    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+    if (ts.isCallExpression(node)) {
       const callee = node.expression;
-      if (ts.isIdentifier(callee.expression) && callee.expression.text === "window"
-        && ["alert", "confirm", "prompt"].includes(callee.name.text)) add("L01");
+      if (ts.isIdentifier(callee) && dialogNames.has(callee.text) && isGlobal(callee)) add("L01");
+      if (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) {
+        const owner = callee.expression;
+        const name = ts.isPropertyAccessExpression(callee) ? callee.name.text
+          : ts.isStringLiteralLike(callee.argumentExpression) ? callee.argumentExpression.text : "";
+        if (ts.isIdentifier(owner) && ["window", "globalThis", "self"].includes(owner.text)
+            && dialogNames.has(name) && isGlobal(owner)) add("L01");
+      }
     }
     if (ts.isStringLiteralLike(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node) || ts.isTemplateHead(node)) {
       classes(node.text);

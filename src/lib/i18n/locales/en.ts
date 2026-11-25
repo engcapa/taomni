@@ -4245,6 +4245,13 @@ const dict = {
     confirmDelete: "Delete session '{name}'?",
   },
   sessionEditor2: {
+    pathBrowseFailed: "Could not open the file picker. Enter the path or try Browse again. {detail}",
+    pathAnalyzeFailed: "Could not read this file. Check the path and permissions, then try again. {detail}",
+    analyzeSite: "Analyze",
+    analyzeSiteHint: "Read hbase-site.xml and populate the connection fields",
+    parseKeytab: "Parse",
+    parseKeytabHint: "Read the client principal from the keytab",
+    hbaseThriftMode: "Thrift2 (Lindorm / HBase Enhanced Edition, 9190)",
     titleNew: "Session settings",
     titleEdit: "Edit session",
     closeTitle: "Close",

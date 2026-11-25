@@ -4222,6 +4222,13 @@ export const zhCN: DeepPartial<typeof en> = {
     confirmDelete: "确定删除会话 “{name}” 吗？",
   },
   sessionEditor2: {
+    pathBrowseFailed: "无法打开文件选择器。请输入路径或再次浏览。{detail}",
+    pathAnalyzeFailed: "无法读取此文件。请检查路径和访问权限，然后重试。{detail}",
+    analyzeSite: "分析",
+    analyzeSiteHint: "读取 hbase-site.xml 并填充连接字段",
+    parseKeytab: "解析",
+    parseKeytabHint: "从 keytab 读取客户端主体",
+    hbaseThriftMode: "Thrift2（Lindorm / HBase 增强版，9190）",
     titleNew: "会话设置",
     titleEdit: "编辑会话",
     closeTitle: "关闭",

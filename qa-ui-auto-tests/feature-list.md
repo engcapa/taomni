@@ -7097,6 +7097,22 @@ controls:
     selector: '[data-testid="hbase-connection-mode"]'
     kind: interactive
     optional: true
+  - id: site-path
+    selector: 'input[aria-label="HBase site config file path"]'
+    kind: interactive
+    optional: true
+  - id: connection-quorum
+    selector: 'input[aria-label="HBase ZooKeeper quorum"]'
+    kind: interactive
+    optional: true
+  - id: analyze-site
+    selector: '[data-testid="hbase-settings"] button[title="Read hbase-site.xml and populate the connection fields"]'
+    kind: interactive
+    optional: true
+  - id: site-analysis-error
+    selector: '[data-testid="hbase-settings"] [role="alert"]'
+    kind: display
+    optional: true
   - id: remote-host
     selector: 'input[aria-label="Remote host"]'
     kind: interactive

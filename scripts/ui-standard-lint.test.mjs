@@ -57,3 +57,13 @@ test("ratchets hand-written color and layer declarations on rendered styles", ()
   assert.deepEqual(scanUI("src/Card.tsx", jsx), { "L04-inline": 2, "L05-inline": 1 });
   assert.deepEqual(scanUI("src/Card.tsx", '<Card style={{ color: userColor, zIndex: "var(--taomni-z-popover)" }} />'), {});
 });
+
+test("distinguishes global system dialogs from locally owned actions", () => {
+  const source = `
+    import { prompt } from "./ownPrompt";
+    alert(message); globalThis.confirm(message); self["prompt"](message);
+    function decide(confirm) { confirm(); prompt(); }
+    function local(window) { window.alert(); }
+  `;
+  assert.deepEqual(scanUI("src/Session.tsx", source), { L01: 3 });
+});

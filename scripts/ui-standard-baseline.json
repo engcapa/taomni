@@ -235,8 +235,6 @@
   "src/components/session/MfaPrompt.tsx": {"L04-inline":1},
   "src/components/session/ObjectStorageSettings.tsx": {"L04-inline":2},
   "src/components/session/SessionImportPreview.tsx": {"L02":1,"L04-inline":2},
-  "src/components/session/editor/BookmarkSettings.tsx": {"L04-inline":1},
-  "src/components/session/editor/HBaseSettings.tsx": {"L08":1},
   "src/components/session/editor/MailSettings.tsx": {"L04-inline":2},
   "src/components/session/editor/NetworkSettings.tsx": {"L04":1},
   "src/components/session/editor/SessionEditorView.tsx": {"L04":1,"L04-inline":1},

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { sessionCapabilities } from "../../../lib/sessionCapabilities";
 import type { SessionBookmark } from "../../../lib/sessionBookmark";
 import { Terminal as TerminalIcon, FolderPlus } from "lucide-react";
-import { selectFilePath } from "../../../lib/ipc";
+import { SessionFilePathInput } from "./SessionFilePathInput";
 import { type TranslateFn } from "../../../lib/i18n";
 import { type Proto } from "./sessionPolicy";
 import { Field, Select, Checkbox } from "./Fields";
@@ -47,15 +47,6 @@ export function BookmarkSettings({
   const setReconnect = (reconnect: boolean) => patch({ reconnect });
   const setShortcut = (shortcut: string) => patch({ shortcut });
 
-  const handleBrowseBgImage = async () => {
-    try {
-      const selected = await selectFilePath(bgImage || undefined);
-      if (selected) setBgImage(selected.trim());
-    } catch (err) {
-      alert("Failed to choose file: " + err);
-    }
-  };
-
   return (
     <div data-testid="bookmark-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-ui-body">
       <Field label={t("sessionEditor2.fieldSessionName")}>
@@ -87,7 +78,7 @@ export function BookmarkSettings({
           className="inline-flex items-center gap-1 px-2 py-1 rounded border"
           style={{ borderColor: "var(--taomni-input-border)", background: "var(--taomni-input-bg)" }}
         >
-          {value.customIcon ? <span>{value.customIcon}</span> : <TerminalIcon className="w-4 h-4" style={{ color: "#2b5d8b" }} />}
+          {value.customIcon ? <span>{value.customIcon}</span> : <TerminalIcon className="w-4 h-4 text-[var(--taomni-accent)]" />}
           {proto.toLowerCase()}
         </span>
         <button data-testid="session-custom-icon" className="taomni-btn ml-2" type="button" onClick={() => setIconPickerOpen((open) => !open)} aria-expanded={iconPickerOpen}>{t("sessionEditor2.customIconChange")}</button>
@@ -97,22 +88,9 @@ export function BookmarkSettings({
       </Field>
 
       {capabilities.terminal && <Field label={t("sessionEditor2.fieldBackgroundImage")}>
-        <input
-          className="taomni-input flex-1"
+        <SessionFilePathInput value={bgImage} onChange={setBgImage} label={t("sessionEditor2.backgroundImageAria")}
           placeholder={t("sessionEditor2.backgroundImagePlaceholder")}
-          value={bgImage}
-          aria-label={t("sessionEditor2.backgroundImageAria")}
-          onChange={(e) => setBgImage(e.target.value)}
-        />
-        <button
-          data-testid="session-background-browse"
-          className="taomni-btn ml-1"
-          type="button"
-          title={t("sessionEditor2.backgroundImageTitle")}
-          onClick={handleBrowseBgImage}
-        >
-          {t("sessionEditor2.backgroundImageBrowse")}
-        </button>
+          browseText={{ label: t("sessionEditor2.backgroundImageBrowse"), title: t("sessionEditor2.backgroundImageTitle"), testId: "session-background-browse" }} />
         <span className="ml-2 text-[var(--taomni-text-muted)]">{t("sessionEditor2.backgroundImageOpacity")}</span>
         <input
           className="taomni-input w-16 ml-1"

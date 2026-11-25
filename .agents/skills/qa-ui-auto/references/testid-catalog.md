@@ -947,6 +947,10 @@
 ## database/hbase (F-DB-3)
 
 - `[data-testid="hbase-connection-mode"]` — interactive [optional] — F-DB-3.connection-mode
+- `input[aria-label="HBase site config file path"]` — interactive [optional] — F-DB-3.site-path
+- `input[aria-label="HBase ZooKeeper quorum"]` — interactive [optional] — F-DB-3.connection-quorum
+- `[data-testid="hbase-settings"] button[title="Read hbase-site.xml and populate the connection fields"]` — interactive [optional] — F-DB-3.analyze-site
+- `[data-testid="hbase-settings"] [role="alert"]` — display [optional] — F-DB-3.site-analysis-error
 - `input[aria-label="Remote host"]` — interactive [optional] — F-DB-3.remote-host
 - `input[aria-label="HBase namespace"]` — interactive [optional] — F-DB-3.namespace
 - `[data-testid="hbase-schema-tree"]` — display [optional] — F-DB-3.schema-tree
