@@ -8,6 +8,8 @@ import time
 
 import psutil
 
+from installed_macos_allocations import allocation_profile, measure_interaction, window_driver
+
 from installed_core_resources import sample_rss
 from installed_core_resources_desktop import compile_macos_probe, fresh_profiles, observe_status
 from installed_macos_store import installed_macos_desktop
@@ -145,6 +147,27 @@ def compare(executable, profile, work, report, stages, identity):
                 profile.mkdir()
                 result["readyRegions"][label] = ready_regions(driver, executable, work, evidence / f"{label}-ready")
                 profile.rename(staging / f"{label}-ready")
+        window = window_driver(work)
+        result["windowSamples"] = []
+        for pair, labels in enumerate(PAIRS[:2], 1):
+            for label in labels:
+                sample_id = f"window-{pair}-{label}"
+                with app_version(label, target, work / "original.app", work / "memory-sample-candidate.app"):
+                    profile.mkdir()
+                    row = measure_interaction(window, driver, executable, evidence / sample_id, work, footprint)
+                    result["windowSamples"].append({"label": label, "pair": pair, **row})
+                    profile.rename(staging / sample_id)
+                    write_json(index, result)
+        result["allocationProfiles"] = {}
+        for label in ("original", "candidate"):
+            sample_id = f"allocations-{label}"
+            with app_version(label, target, work / "original.app", work / "memory-sample-candidate.app"):
+                profile.mkdir()
+                result["allocationProfiles"][label] = allocation_profile(
+                    window, driver, executable, evidence / sample_id, work, footprint,
+                )
+                profile.rename(staging / sample_id)
+                write_json(index, result)
     for label in ("original", "candidate"):
         rows = [s for s in result["samples"] if s["label"] == label]
         result[label] = {
