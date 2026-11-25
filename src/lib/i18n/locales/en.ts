@@ -153,6 +153,12 @@ const dict = {
     keepEditing: "Keep editing",
     discard: "Discard changes",
   },
+  goToLine: {
+    title: "Go to Line:Column",
+    position: "Line and optional column",
+    jump: "Go to line",
+    range: "Enter a line between 1 and {count}, optionally followed by :column.",
+  },
   keymapReference: {
     title: "Keyboard Shortcuts & Keymap",
     count: "{count} shortcut keybindings configured",

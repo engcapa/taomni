@@ -322,6 +322,7 @@ cases:
 - TC-UIC-024-tunnel-validation
 - TC-UIC-025-detached-handoff-status
 - TC-UIC-026-mfa-add-draft
+- TC-UIC-027-editor-go-to-line-native
 - TC-UIC-DLG-explorer-new-file
 - TC-UIC-DLG-mail-attachment-reminder
 - TC-UIC-DLG-workspace-build-tools

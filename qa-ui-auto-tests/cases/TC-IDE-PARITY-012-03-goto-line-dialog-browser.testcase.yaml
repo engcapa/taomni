@@ -8,6 +8,7 @@ description: 'ED-PARITY-012 DEC-012-06: Ctrl+G opens IDEA''s small Go to Line:Co
   '
 covers:
 - F25.5
+ui_standard: [UI-DLG-06, UI-DLG-07, UI-INP-02]
 tags:
 - code-workspace
 - ed-parity-012
@@ -81,7 +82,7 @@ steps:
     value: '99'
 - assert_visible: '[data-testid="code-workspace-goto-line-error"]'
 - eval_readonly:
-    expression: document.getElementById('code-workspace-goto-line-input')?.getAttribute('aria-invalid') === 'true' && document.getElementById('code-workspace-goto-line-input')?.closest('div[aria-modal]')?.querySelector('button')?.disabled === true
+    expression: document.getElementById('code-workspace-goto-line-input')?.getAttribute('aria-invalid') === 'true' && document.getElementById('code-workspace-goto-line-input')?.closest('dialog')?.querySelector('button[data-primary]')?.disabled === true
     expect_truthy: true
 - click: '[data-testid="code-workspace-goto-line-cancel"]'
 - wait_for:
@@ -98,6 +99,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
+    ui_standard: [UI-DLG-06, UI-DLG-07]
     requirement: DEC-012-06：Ctrl+G 打开 Go to Line:Column 对话框，预填当前 行:列 并全选；输入 3:5 Enter 跳到 3:5，焦点回编辑器。
     actions:
     - 17
@@ -134,6 +136,7 @@ verification:
     - 30
     - 31
   - id: R3
+    ui_standard: [UI-INP-02]
     requirement: DEC-012-06：非法输入显示提示且 OK 禁用；Cancel 零移动；不再出现 CodeMirror 默认底部面板。
     actions:
     - 32
@@ -143,7 +146,7 @@ verification:
     - step: 35
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-goto-line-error\"]"}'
     - step: 36
-      expectation: '{"eval_readonly": {"expression": "document.getElementById(''code-workspace-goto-line-input'')?.getAttribute(''aria-invalid'') === ''true'' && document.getElementById(''code-workspace-goto-line-input'')?.closest(''div[aria-modal]'')?.querySelector(''button'')?.disabled === true", "expect_truthy": true}}'
+      expectation: The position field reports the invalid value and the jump button stays disabled.
     - step: 38
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-goto-line-dialog\"]", "state": "detached", "timeout_sec": 5}}'
     - step: 39

@@ -47,7 +47,7 @@ export function ModalSurface({ initialFocus, returnFocus, onCancel, role = "dial
         event.preventDefault();
         onCancel();
       } else if (event.key === "Tab") {
-        const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(focusable))
+        const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(`:is(${focusable})`))
           .filter((control) => control.tabIndex >= 0 && !control.closest("[hidden], [inert]") && control.checkVisibility?.() !== false);
         const edge = event.shiftKey ? controls[0] : controls.at(-1);
         if (edge && document.activeElement === edge) {

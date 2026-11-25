@@ -33,7 +33,6 @@
   "src/components/editor/workspace/FileEncodingDialog.tsx": {"L02":1},
   "src/components/editor/workspace/FileTemplateSettingsDialog.tsx": {"L02":1},
   "src/components/editor/workspace/GenerateCodeDialog.tsx": {"L02":1},
-  "src/components/editor/workspace/GoToLineDialog.tsx": {"L02":1},
   "src/components/editor/workspace/HighlightingWidget.tsx": {"L13":1},
   "src/components/editor/workspace/LocalHistoryDialog.tsx": {"L02":1},
   "src/components/editor/workspace/LspMessageRequestDialog.tsx": {"L02":1},

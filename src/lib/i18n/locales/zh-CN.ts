@@ -152,6 +152,12 @@ export const zhCN: DeepPartial<typeof en> = {
     keepEditing: "继续编辑",
     discard: "放弃修改",
   },
+  goToLine: {
+    title: "转到行和列",
+    position: "行号和可选列号",
+    jump: "转到指定行",
+    range: "请输入 1 至 {count} 的行号，可在行号后用冒号指定列号。",
+  },
   keymapReference: {
     title: "键盘快捷键与键位方案",
     count: "已配置 {count} 个动作的快捷键",
