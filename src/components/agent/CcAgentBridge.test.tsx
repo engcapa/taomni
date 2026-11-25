@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
+import { getLocale, setLocale } from "../../lib/i18n";
 import { CcAgentBridge } from "./CcAgentBridge";
 import {
   sftpStat,
@@ -205,15 +206,24 @@ describe("CcAgentBridge permission gate", () => {
 
     const card = screen.getByTestId("ai-chat-acp-permission-card");
     expect(card).toHaveTextContent("Write README.md");
-    expect(card).toHaveTextContent("来源：本地 Grok CLI · 后台对话");
-    expect(card).toHaveTextContent("仅允许这一次");
-    expect(card).toHaveTextContent("拒绝这一次");
+    expect(card).toHaveTextContent("Source: local Grok CLI · background conversation");
+    expect(card).toHaveTextContent("Allow once");
+    expect(card).toHaveTextContent("Reject once");
     expect(card).not.toHaveTextContent("Ignore this agent-supplied label");
     expect(screen.getByTestId("ai-chat-acp-permission-option-allow_once"))
-      .toHaveClass("border-emerald-500/50");
+      .toHaveClass("border-ui-success-border");
     expect(screen.getByTestId("ai-chat-acp-permission-option-reject_once"))
-      .toHaveClass("border-red-500/50");
-    fireEvent.click(screen.getByTestId("ai-chat-acp-permission-option-allow_once"));
+      .toHaveClass("border-ui-danger-border");
+    const initialLocale = getLocale();
+    try {
+      act(() => setLocale("zh-CN"));
+      expect(card).toHaveTextContent("来源：本地 Grok CLI · 后台对话");
+      expect(card).toHaveTextContent("Write README.md");
+      expect(screen.getByRole("button", { name: "拒绝这一次" })).toBeEnabled();
+      fireEvent.click(screen.getByRole("button", { name: "仅允许这一次" }));
+    } finally {
+      act(() => setLocale(initialLocale));
+    }
 
     await waitFor(() => {
       expect(tauriInvoke).toHaveBeenCalledWith("acp_resolve_permission", {

@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useState, type CSSProperties } from "react";
+import { useT } from "../../../lib/i18n";
 import { type AcpPermissionOption, type QueuedPermission } from "./types";
 
 export const SAFETY_GATE_DRAWER_SELECTOR = '[data-testid="ai-chat-drawer"]';
@@ -89,23 +90,23 @@ export function useSafetyGatePlacement(active: boolean): SafetyGatePlacement {
 
 export const ACP_PERMISSION_OPTION_PRESENTATION: Record<
   AcpPermissionOption["kind"],
-  { label: string; className: string }
+  { labelKey: string; className: string }
 > = {
   allow_once: {
-    label: "仅允许这一次",
-    className: "border border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/10",
+    labelKey: "agent.allowOnce",
+    className: "border border-ui-success-border text-ui-success hover:bg-ui-success-surface",
   },
   allow_always: {
-    label: "始终允许",
-    className: "border border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/10",
+    labelKey: "agent.allowAlways",
+    className: "border border-ui-success-border text-ui-success hover:bg-ui-success-surface",
   },
   reject_once: {
-    label: "拒绝这一次",
-    className: "border border-red-500/50 text-red-300 hover:bg-red-500/10",
+    labelKey: "agent.rejectOnce",
+    className: "border border-ui-danger-border text-ui-danger hover:bg-ui-danger-surface",
   },
   reject_always: {
-    label: "始终拒绝",
-    className: "border border-red-500/50 text-red-300 hover:bg-red-500/10",
+    labelKey: "agent.rejectAlways",
+    className: "border border-ui-danger-border text-ui-danger hover:bg-ui-danger-surface",
   },
 };
 
@@ -123,23 +124,25 @@ export function AcpPermissionCard({
   onSelect: (optionId: string) => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   return (
     <div
-      className="max-w-md w-full rounded-lg border border-yellow-500/50 bg-[var(--taomni-panel-bg)] p-3 shadow-md"
+      className="max-w-md w-full rounded border border-ui-warning-border bg-[var(--taomni-panel-bg)] p-3 shadow-[var(--taomni-shadow-md)]"
+      aria-busy={executing || undefined}
       data-testid="ai-chat-acp-permission-card"
     >
       <div className="mb-2 flex items-center gap-2">
-        <span className="text-ui-body font-semibold">本地 Agent 请求执行操作</span>
-        <span className="rounded border border-yellow-500/40 px-1.5 py-0.5 text-ui-caption text-yellow-400">
-          需要确认
+        <span className="text-ui-body font-semibold">{t("agent.localApprovalTitle")}</span>
+        <span className="rounded border border-ui-warning-border px-1.5 py-0.5 text-ui-caption text-ui-warning">
+          {t("agent.confirmationRequired")}
         </span>
       </div>
       <div className="mb-1 text-ui-caption text-[var(--taomni-text-muted)]">
-        来源：本地 {prompt.sourceLabel}{isActiveThread ? "" : " · 后台对话"}
+        {t(isActiveThread ? "agent.activeApprovalSource" : "agent.backgroundApprovalSource", { name: prompt.sourceLabel })}
       </div>
       <div className="mb-1 text-ui-small text-[var(--taomni-text-muted)]">{prompt.title}</div>
       <div className="mb-2 text-ui-caption text-[var(--taomni-text-muted)]">
-        操作类型：{prompt.kind}
+        {t("agent.approvalOperation", { kind: prompt.kind })}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {prompt.options.map((option) => {
@@ -153,7 +156,7 @@ export function AcpPermissionCard({
               data-testid={`ai-chat-acp-permission-option-${option.kind}`}
               onClick={() => onSelect(option.optionId)}
             >
-              {presentation.label}
+              {t(presentation.labelKey)}
             </button>
           );
         })}
@@ -164,7 +167,7 @@ export function AcpPermissionCard({
           data-testid="ai-chat-acp-permission-cancel"
           onClick={onCancel}
         >
-          取消操作
+          {t("agent.cancelOperation")}
         </button>
       </div>
     </div>

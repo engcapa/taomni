@@ -22,7 +22,7 @@ import { addressesThisWindow } from "../../lib/windowLabel";
 import { QA_APPROVAL_PROBE_ENABLED, installApprovalProbe } from "./approvalProbe";
 
 import { sameApproval, usePendingApprovals } from "./bridge/usePendingApprovals";
-import { useT } from "../../lib/i18n";
+import { getLocale, useT } from "../../lib/i18n";
 
 export function CcAgentBridge() {
   const t = useT();
@@ -246,21 +246,21 @@ export function CcAgentBridge() {
   return (
     <>
       {captures.length > 0 && (
-        <div className="fixed bottom-4 left-4 z-[1000] flex max-w-[360px] flex-col gap-2">
+        <div className="fixed bottom-4 left-4 z-[var(--taomni-z-toast)] flex max-w-[360px] flex-col gap-2">
           {captures.map((c) => (
             <div
               key={c.captureId}
-              className="flex items-center justify-between gap-3 rounded bg-[var(--taomni-bg-elevated,#222)] px-3 py-2 text-xs shadow-lg"
+              className="flex items-center justify-between gap-3 rounded bg-[var(--taomni-panel-bg)] px-3 py-2 text-ui-body shadow-[var(--taomni-shadow-md)]"
             >
               <span className="truncate text-[var(--taomni-text-muted)]">
-                捕获中 {c.lines.toLocaleString()} 行 · {fmtBytes(c.bytes)}
+                {t("agent.captureProgress", { lines: c.lines.toLocaleString(getLocale()), size: fmtBytes(c.bytes) })}
               </span>
               <button
                 type="button"
-                className="shrink-0 rounded border border-[var(--taomni-divider,#444)] px-2 py-0.5 hover:bg-[var(--taomni-hover,#333)]"
+                className="shrink-0 rounded border border-[var(--taomni-divider)] px-2 py-0.5 hover:bg-[var(--taomni-hover)]"
                 onClick={() => void cancelCapture(c.captureId)}
               >
-                取消
+                {t("common.cancel")}
               </button>
             </div>
           ))}
@@ -268,7 +268,7 @@ export function CcAgentBridge() {
       )}
       {head && (
         <div
-          className="fixed z-[1000] shadow-lg"
+          className="fixed z-[var(--taomni-z-blocking-gate)]"
           style={safetyGatePlacement.style}
           data-testid="ai-chat-safety-gate"
           data-call-id={head.callId}

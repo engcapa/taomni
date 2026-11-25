@@ -44,9 +44,10 @@ export function ActionCard({
 
   return (
     <div
-      className={`rounded-lg border p-3 shadow-md max-w-md w-full bg-[var(--taomni-panel-bg)] ${
+      aria-busy={executing || undefined}
+      className={`rounded border p-3 shadow-[var(--taomni-shadow-md)] max-w-md w-full bg-[var(--taomni-panel-bg)] ${
         isWrite
-          ? "border-yellow-500/50"
+          ? "border-ui-warning-border"
           : "border-[var(--taomni-divider)]"
       }`}
     >
@@ -55,11 +56,12 @@ export function ActionCard({
           {t("agent.agentWants", { label })}
         </span>
         {isWrite && (
-          <span className="text-ui-caption text-yellow-400 border border-yellow-500/40 rounded px-1.5 py-0.5">
+          <span className="text-ui-caption text-ui-warning border border-ui-warning-border rounded px-1.5 py-0.5">
             {t("agent.writeBadge")}
           </span>
         )}
         <IconButton labelKey="denyRequest"
+          disabled={executing}
           type="button"
           className="ml-auto text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
           onClick={() => onDecide("deny")}
