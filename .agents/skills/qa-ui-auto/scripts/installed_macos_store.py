@@ -43,7 +43,7 @@ def controls(driver, owner, executable, phase, evidence, **inputs):
     receipt = json.loads(observed.stdout)
     if receipt["ownerPid"] != owner.pid or receipt["phase"] != phase:
         raise RuntimeError(f"Unexpected macOS accessibility receipt during {phase}")
-    write_json(evidence / f"{phase}.json", receipt)
+    write_json(evidence / f"{phase}.json", {k: v for k, v in receipt.items() if k != "pairingCode"})
     return receipt
 
 

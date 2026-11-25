@@ -28,6 +28,8 @@ struct Observation: Encodable {
     var rdpRowClick: [String: Double]?
     var codes: [String]?
     var scannedIssuer: String?
+    var endpoint: String?
+    var pairingCode: String?
     let transport = "macOS AppKit accessibility"
 }
 
@@ -257,6 +259,31 @@ func observe(_ request: Request) throws -> Observation {
     }
 
     switch request.phase {
+    case "mobile-pair":
+        try unlockVault()
+        try openSettings("mobile")
+        try press(try wait("Enable mobile service") { button(contents(), "Enable mobile service") })
+        result.endpoint = try wait("loopback Mobile endpoint") {
+            contents().flatMap(labels).compactMap { label -> String? in
+                guard let range = label.range(of: #"http://127[.]0[.]0[.]1:[0-9]+"#, options: .regularExpression),
+                      label.hasPrefix("Running") else { return nil }
+                return String(label[range])
+            }.first
+        }
+        try press(try wait("pairing button") { button(contents(), "Generate one-time pairing code") })
+        result.pairingCode = try wait("one-time pairing code") {
+            contents().flatMap(labels).first { $0.range(of: #"^[0-9a-f]{32}$"#, options: .regularExpression) != nil }
+        }
+    case "mobile-opt-in":
+        let checkbox = try wait("Mobile screen capture checkbox") {
+            contents().first {
+                attribute($0, kAXRoleAttribute) as? String == kAXCheckBoxRole
+                    && labels($0).contains("Allow paired phones and the Feishu adapter to view the current desktop screen")
+            }
+        }
+        guard (attribute(checkbox, kAXValueAttribute) as? NSNumber)?.boolValue == false
+        else { throw CheckFailure("Expected Mobile screen capture to start disabled") }
+        try press(checkbox)
     case "permissions":
         defer { NSPasteboard.general.clearContents() }
         try unlockVault()

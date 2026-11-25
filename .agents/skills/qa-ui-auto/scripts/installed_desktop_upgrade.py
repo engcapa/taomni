@@ -14,6 +14,7 @@ from installed_core_resources_desktop import ProfileRestoreError, record_desktop
 
 from installed_desktop_mfa_crash import verify_crash_recovery
 from installed_desktop_mode_lease import check_mode_lease, finish_first_release_mode_lease, reserve_default_profile
+from installed_macos_mobile import observe_mobile
 from installed_macos_permissions import compare_permissions, observe_hosted_screen_scan, observe_permissions
 from installed_windows_host_security import enable_defender
 from modular_bundle_inventory import digest, inventory, write_json
@@ -111,6 +112,12 @@ def exercise_desktop_contracts(candidate, desktop_profile, stages, args, identit
         except Exception as error:
             permission_failure = permission_failure or error
             stages["mfaScreenScan"] = {"passed": False, "error": str(error)}
+    if system == "Darwin" and first_release is not None:
+        try:
+            stages["mobileDesktop"] = observe_mobile(candidate, work, report, identity["producerSource"])
+        except Exception as error:
+            permission_failure = permission_failure or error
+            stages["mobileDesktop"] = {"passed": False, "error": str(error)}
     return recovery_failure, permission_failure
 
 

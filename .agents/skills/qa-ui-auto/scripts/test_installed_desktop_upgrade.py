@@ -84,7 +84,7 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
             "installed_desktop_upgrade.observe_permissions", return_value=permission,
         ) as permission_probe, patch("installed_desktop_upgrade.verify_crash_recovery", return_value=recovered) as crash, patch(
             "installed_desktop_upgrade.observe_hosted_screen_scan", return_value={"passed": True},
-        ) as screen:
+        ) as screen, patch("installed_desktop_upgrade.observe_mobile", return_value={"passed": True}) as mobile:
             recovery_error, permission_error = exercise_desktop_contracts(
                 "app", profile, stages, args, {"producerSource": "source"}, "work", "evidence", None,
                 first_release=roster,
@@ -98,6 +98,7 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
         )
         permission_probe.assert_called_once_with("app", "evidence", "candidate", work="work")
         screen.assert_called_once_with("app", "evidence", recovered, work="work")
+        mobile.assert_called_once_with("app", "work", "evidence", "source")
         self.assertTrue(stages["permissionContinuity"]["retainedBothGrants"])
 
     def test_windows_retries_inspection_after_timeout_with_one_msi_install(self):
