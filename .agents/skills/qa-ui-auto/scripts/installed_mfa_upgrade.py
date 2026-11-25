@@ -257,7 +257,8 @@ def execute(args):
                 original_resources = sample_linux(ctx, old_executable, work, report, "original")
             catalog_source = f"{installed_first_release.ORIGIN}/{origin.start_catalog}" if origin else None
             profile = run_legacy_desktop(ctx, old_executable, work, legacy_install,
-                                         catalog_source=catalog_source, after_seed=seed_mail)
+                                         catalog_source=catalog_source, after_seed=seed_mail,
+                                         open_tabs=2 if seed_mail else 1)
             result["profile"] = str(profile)
             if origin:
                 mail_input = installed_mail_upgrade.LegacyMailbox.observe(profile)

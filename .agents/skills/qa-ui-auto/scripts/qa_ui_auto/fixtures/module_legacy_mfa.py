@@ -156,14 +156,16 @@ def installed_desktop(ctx, executable, desktop, evidence, label, *, environment=
         yield driver, session
 
 
-def close_installed_desktop(driver, session, executable):
+def close_installed_desktop(driver, session, executable, *, open_tabs=1):
     system = platform.system()
     windows_owner = None
     if system == "Windows":
         windows_owner = driver.application_process
     processes = linux_storage_processes(driver, executable) if system == "Linux" else {}
+    message = ("There is 1 open tab. Exit Taomni and close it?" if open_tabs == 1 else
+               f"There are {open_tabs} open tabs. Exit Taomni and close them?")
     close = close_application_window(session, processes=processes, expect_exit_confirmation={
-        "title": "Exit", "message": "There is 1 open tab. Exit Taomni and close it?",
+        "title": "Exit", "message": message,
         "confirm_label": "Exit",
     })
     session.session_id = None
@@ -183,7 +185,7 @@ def close_installed_desktop(driver, session, executable):
 
 
 def seed_legacy_desktop(ctx, executable, desktop, evidence, profile, *,
-                        catalog_source=None, environment=None, after_seed=None):
+                        catalog_source=None, environment=None, after_seed=None, open_tabs=1):
     with installed_desktop(ctx, executable, desktop, evidence, "legacy-window", environment=environment) as (driver, session):
         create_account(session, ctx, evidence)
         if after_seed is not None:
@@ -191,20 +193,20 @@ def seed_legacy_desktop(ctx, executable, desktop, evidence, profile, *,
         if catalog_source:
             session.execute("localStorage.setItem('taomni.module-catalog-source.v1', "
                             + json.dumps(catalog_source) + "); return true;")
-        close = close_installed_desktop(driver, session, executable)
+        close = close_installed_desktop(driver, session, executable, open_tabs=open_tabs)
         write_json(evidence, "legacy-desktop.json", {
             "appId": APP_ID, "profile": str(profile), "executable": str(executable),
             "uiHotpCodes": ["755 224", "287 082"], "catalogSource": catalog_source, **close,
         })
 
 
-def run_legacy_desktop(ctx, executable, work, evidence, *, catalog_source=None, after_seed=None):
+def run_legacy_desktop(ctx, executable, work, evidence, *, catalog_source=None, after_seed=None, open_tabs=1):
     desktop = work / "desktop"
     _, profile = desktop_environment(desktop)
     if profile.exists() or profile.is_symlink():
         raise RuntimeError("The installed desktop requires a fresh isolated profile")
     seed_legacy_desktop(ctx, executable, desktop, evidence, profile,
-                        catalog_source=catalog_source, after_seed=after_seed)
+                        catalog_source=catalog_source, after_seed=after_seed, open_tabs=open_tabs)
     return profile
 
 
