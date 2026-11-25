@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { NotepadDialog } from "./NotepadDialog";
 import { useEffect, useState } from "react";
 import { Copy } from "lucide-react";
@@ -113,14 +114,14 @@ export function ToolboxDialogs({
               data-testid="notepad-hash-output"
               value={hashHex}
             />
-            <button
+            <IconButton
               type="button"
               className="np-btn"
               onClick={() => void writeText(hashHex)}
-              title={label("复制", "Copy")}
+              label={label("复制", "Copy")}
             >
               <Copy size={13} />
-            </button>
+            </IconButton>
           </div>
         )}
         {hashErr && <div className="text-ui-body text-red-500">{hashErr}</div>}

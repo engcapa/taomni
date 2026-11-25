@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { NotepadDialog } from "./NotepadDialog";
 import { useEffect, useState } from "react";
 import { ArchiveRestore, Trash2 } from "lucide-react";
@@ -113,17 +114,17 @@ export function SessionBackupDialogs({
               >
                 {label("恢复", "Restore")}
               </button>
-              <button
+              <IconButton
                 type="button"
                 className="np-btn"
                 onClick={async () => {
                   await notepadBackupPrune(item.docId);
                   setEntries((prev) => prev.filter((e) => e.docId !== item.docId));
                 }}
-                title={label("丢弃快照", "Discard Snapshot")}
+                label={label("丢弃快照", "Discard Snapshot")}
               >
                 <Trash2 size={13} />
-              </button>
+              </IconButton>
             </div>
           ))}
         </div>

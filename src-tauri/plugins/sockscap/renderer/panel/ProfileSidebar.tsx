@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../../src/components/ui/IconButton";
 import { ArrowDown, ArrowUp, Copy, PanelLeftClose, Plus, Trash2 } from "lucide-react";
 import { type SocksCapConfig, type SocksCapProfile } from "../../../../../src/lib/sockscap";
 import { MIN_PROFILE_PRIORITY, MAX_PROFILE_PRIORITY } from "./configuration";
@@ -133,26 +134,26 @@ export function ProfileSidebar(viewProps: ProfileSidebarProps) {
                 <span className="font-semibold truncate">{p.name}</span>
               </div>
               <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                <button
+                <IconButton
                   type="button"
                   className="p-1 text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] rounded disabled:opacity-40 disabled:cursor-not-allowed"
-                  title={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : viewProps.t("sockscap.duplicateProfileTooltip")}
+                  label={viewProps.t("sockscap.duplicateProfileTooltip")} hint={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
                   onClick={() => void viewProps.duplicateProfile(p)}
                   disabled={viewProps.locked}
                 >
                   <Copy className="w-3 h-3" />
-                </button>
+                </IconButton>
                 {viewProps.cfg.profiles.length > 1 && (
-                  <button
+                  <IconButton
                     type="button"
                     data-testid={`sockscap-delete-profile-${p.id}`}
                     className="p-1 text-[var(--taomni-text-muted)] hover:text-red-500 rounded disabled:opacity-40 disabled:cursor-not-allowed"
-                    title={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : viewProps.t("sockscap.deleteProfileTooltip")}
+                    label={viewProps.t("sockscap.deleteProfileTooltip")} hint={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
                     onClick={() => void viewProps.deleteProfile(p.id)}
                     disabled={viewProps.locked}
                   >
                     <Trash2 className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 )}
               </div>
             </div>

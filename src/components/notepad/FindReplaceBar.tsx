@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { SectionTabs, sectionTab } from "../ui/SectionTabs";
 import {
   useEffect,
@@ -313,15 +314,15 @@ export function FindReplaceBar({
           <option key={item} value={item} />
         ))}
       </datalist>
-      <button
+      <IconButton
         type="button"
         className="np-find-icon-btn"
         data-testid="np-find-swap"
-        title={label("互换", "Swap")}
+        label={label("互换", "Swap")}
         onClick={swapFindReplace}
       >
         <Replace size={13} />
-      </button>
+      </IconButton>
     </div>
   );
 
@@ -458,15 +459,15 @@ export function FindReplaceBar({
           <b className="np-find-title">{label(FIND_TABS.find((tab) => tab.id === find.tab)?.zh ?? "查找", FIND_TABS.find((tab) => tab.id === find.tab)?.en ?? "Find")}</b>
           <span className="np-find-context">{label("· 当前文档 / 打开文档 / 目录", "· Current document / Open documents / Directory")}</span>
           <span className="np-find-spacer" />
-          <button
+          <IconButton
             type="button"
             className="np-find-icon-btn"
             data-testid="np-find-compact"
-            title={label("紧凑模式", "Compact mode")}
+            label={label("紧凑模式", "Compact mode")}
             onClick={() => onPatch({ compact: !find.compact })}
           >
             <List size={13} />
-          </button>
+          </IconButton>
           <input
             type="range"
             className="np-find-opacity"

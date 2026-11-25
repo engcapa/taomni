@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../../src/components/ui/IconButton";
 import type { useRootlessApplicationDraft } from "./useRootlessApplicationDraft";
 import { ChevronDown, ChevronRight, FolderOpen, Loader2, Pencil, Play, Plus, Square, Trash2, X } from "lucide-react";
 import { type AppSelector, type LaunchedAppInfo, type ScopeMode, type SocksCapCapabilities, type SocksCapConfig, type SocksCapProfile } from "../../../../../src/lib/sockscap";
@@ -553,11 +554,11 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                       <Pencil className="w-3 h-3" />
                     </button>
                   )}
-                  <button
+                  <IconButton
                     type="button"
                     className="p-1 hover:text-red-500 disabled:opacity-40 disabled:cursor-not-allowed"
                     disabled={viewProps.locked}
-                    title={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
+                    labelKey="removeApplication" hint={viewProps.locked ? viewProps.t("sockscap.lockedTooltip") : undefined}
                     onClick={() =>
                       void viewProps.patchSelectedProfile({
                         apps: viewProps.selectedProf.apps.filter(
@@ -573,7 +574,7 @@ export function ApplicationsSection(viewProps: ApplicationsSectionProps) {
                     }
                   >
                     <Trash2 className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 </li>
               );
             })}

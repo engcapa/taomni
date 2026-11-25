@@ -105,16 +105,16 @@ export function QuickConnect({ onConnectInput, onConnectSession, onHome }: Quick
           );
         })
       )}
-      <button
+      <IconButton
         data-testid="qc-refresh"
         className="p-0.5 hover:bg-[var(--taomni-control-hover)] rounded disabled:opacity-50"
-        title={refreshing ? t("quickConnect.refreshingTitle") : t("quickConnect.refreshTitle")}
+        label={refreshing ? t("quickConnect.refreshingTitle") : t("quickConnect.refreshTitle")}
         onClick={() => void refreshSessions()}
         disabled={refreshing}
         type="button"
       >
         <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-      </button>
+      </IconButton>
       {refreshing && <span className="text-[var(--taomni-text-muted)]">{t("quickConnect.refreshing")}</span>}
     </div>
   );

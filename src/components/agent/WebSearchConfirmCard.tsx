@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { Globe, X } from "lucide-react";
 import { useT } from "../../lib/i18n";
 
@@ -19,13 +20,13 @@ export function WebSearchConfirmCard({ query, provider, providerUrl, onDecide }:
       <div className="flex items-center gap-2 mb-2">
         <Globe className="w-4 h-4 text-[var(--taomni-accent)] shrink-0" />
         <span className="text-ui-body font-semibold flex-1">{t("agent.webSearchTitle")}</span>
-        <button
+        <IconButton labelKey="denyRequest"
           type="button"
           className="text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
           onClick={() => onDecide("deny")}
         >
           <X className="w-3.5 h-3.5" />
-        </button>
+        </IconButton>
       </div>
 
       <div className="space-y-1 mb-3">

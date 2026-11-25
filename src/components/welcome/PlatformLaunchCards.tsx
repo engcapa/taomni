@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { showAgentsComingSoon } from "../agents/comingSoon";
 import { Bot, Boxes, ChevronDown, FileText, GitBranch, Monitor, Plus, Upload, Wrench } from "lucide-react";
 import { useContextMenu } from "../ContextMenu";
@@ -32,13 +33,13 @@ export function PlatformLaunchCards({ onNewSession, onOpenNewWorkspace }: {
         <p>{t("welcome.newSessionDesc")}</p>
         <div className="taomni-home-card-actions">
           <button type="button" data-testid="welcome-new-session" className="taomni-btn taomni-btn-primary" onClick={onNewSession}><Plus />{t("menu.newSession")}</button>
-          <button type="button" data-testid="home-import-sessions" className="taomni-btn" onClick={(event) => menu.show(event, [
+          <IconButton labelKey="importSessions" type="button" data-testid="home-import-sessions" className="taomni-btn" onClick={(event) => menu.show(event, [
             { label: t("menu.importTaomni"), testId: "home-import-json", onClick: imports.importJson },
             { label: t("menu.importMobaXterm"), testId: "home-import-mobaxterm", onClick: imports.importMoba },
             { label: t("menu.importCsv"), testId: "home-import-csv", onClick: imports.importCsv },
             { label: t("menu.downloadCsvTemplate"), testId: "home-download-csv-template", onClick: imports.downloadCsvTemplate },
             { label: t("menu.importOpenSsh"), testId: "home-import-openssh", onClick: imports.importOpenSsh },
-          ])}><Upload /><ChevronDown /></button>
+          ])}><Upload /><ChevronDown /></IconButton>
         </div>
         <div className="taomni-home-card-footer"><button type="button" onClick={() => mode("sessions")}>{t("platform.sessions")} →</button></div>
       </section>

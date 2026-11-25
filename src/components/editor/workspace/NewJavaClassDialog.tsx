@@ -137,14 +137,14 @@ export function NewJavaClassDialog({
                 <Settings2 className="h-4 w-4" />
               </IconButton>
             )}
-            <button
+            <IconButton labelKey="close"
               type="button"
               onClick={onClose}
               data-testid="new-java-class-cancel"
               className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
             >
               <X className="h-4 w-4" />
-            </button>
+            </IconButton>
           </div>
         </div>
 

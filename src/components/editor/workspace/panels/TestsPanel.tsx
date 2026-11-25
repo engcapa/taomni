@@ -72,16 +72,16 @@ function TestRow({
         )}
         {resultStatus && <span className="shrink-0">{statusIcon(resultStatus)}</span>}
         <span className="truncate">{item.name}</span>
-        <button
+        <IconButton
           type="button"
           data-testid={`tests-run-${item.fullName}`}
           className="ml-auto shrink-0 opacity-0 group-hover:opacity-100 disabled:opacity-30"
           onClick={() => onRun(item)}
           disabled={runDisabled}
-          title={runDisabled ? "No Maven/Gradle runner detected" : "Run in terminal"}
+          labelKey="runInTerminal" hintKey={runDisabled ? "noTestRunner" : undefined}
         >
           <Play className="h-3 w-3" />
-        </button>
+        </IconButton>
         <IconButton
           type="button"
           data-testid={`tests-debug-${item.fullName}`}

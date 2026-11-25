@@ -4,7 +4,7 @@ covers: [F1.5]
 fixtures: [reset_db]
 modes: [browser, native]
 tags: [ui-contract, accessibility, keyboard]
-ui_standard: [UI-A11Y-02]
+ui_standard: [UI-A11Y-02, UI-TIP-02, UI-TIP-03]
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-icon-names
@@ -19,6 +19,11 @@ steps:
 - wait_for: '[data-testid="launch-menu-new-session"]'
 - press: Escape
 - assert_not_visible: '[data-testid="launch-menu-new-session"]'
+- hover: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="new-local-terminal"][aria-describedby~="taomni-control-tooltip"]'
+- assert_text: {selector: '[role="tooltip"]', contains: 新建标签页}
+- press: Escape
+- assert_not_visible: '[role="tooltip"]'
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -35,6 +40,15 @@ verification:
     - {step: 11, expectation: The launch menu is visible.}
     - {step: 13, expectation: Escape dismisses that menu.}
     results: [4, 5, 8, 9, 11, 13]
+  - id: localized-tooltip
+    requirement: The focused or hovered quick launch action presents a translated, dismissible description.
+    ui_standard: [UI-TIP-02, UI-TIP-03]
+    actions: [14, 17]
+    checkpoints:
+    - {step: 15, expectation: The control references its visible tooltip.}
+    - {step: 16, expectation: The tooltip shows the current locale.}
+    - {step: 18, expectation: Escape removes the tooltip.}
+    results: [15, 16, 18]
   visual:
   - {check: Action names, method: automated, reason: Reads the accessible labels from the two adjacent controls.}
   native:

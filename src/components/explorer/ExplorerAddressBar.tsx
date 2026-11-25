@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { ArrowLeft, ArrowRight, ArrowUp, ChevronRight, FolderSearch, HardDrive, RefreshCw, Search, X } from "lucide-react";
 import { useContextMenu } from "../ContextMenu";
@@ -51,10 +52,10 @@ export function ExplorerAddressBar({ tabId, pane, home, search, addressRef }: {
   };
   return <>
     <div className="ex-top">
-      <button type="button" className="ex-nbtn" data-testid="explorer-back" title={label("后退 (Alt+←)", "Back (Alt+←)")} disabled={!pane || pane.historyIndex <= 0} onClick={() => void navigateBack(tabId, "local")}><ArrowLeft /></button>
-      <button type="button" className="ex-nbtn" data-testid="explorer-forward" title={label("前进 (Alt+→)", "Forward (Alt+→)")} disabled={!pane || pane.historyIndex >= pane.history.length - 1} onClick={() => void navigateForward(tabId, "local")}><ArrowRight /></button>
-      <button type="button" className="ex-nbtn" data-testid="explorer-up" title={label("上一级 (Alt+↑)", "Up (Alt+↑)")} disabled={!path || path === "/" || path === "\\\\"} onClick={() => void navigateUp(tabId, "local")}><ArrowUp /></button>
-      <button type="button" className="ex-nbtn" data-testid="explorer-refresh" title={label("刷新 (F5)", "Refresh (F5)")} disabled={pane?.loading} onClick={() => void refreshPane(tabId, "local")}><RefreshCw className={pane?.loading ? "animate-spin" : ""} /></button>
+      <IconButton type="button" className="ex-nbtn" data-testid="explorer-back" label={label("后退 (Alt+←)", "Back (Alt+←)")} disabled={!pane || pane.historyIndex <= 0} onClick={() => void navigateBack(tabId, "local")}><ArrowLeft /></IconButton>
+      <IconButton type="button" className="ex-nbtn" data-testid="explorer-forward" label={label("前进 (Alt+→)", "Forward (Alt+→)")} disabled={!pane || pane.historyIndex >= pane.history.length - 1} onClick={() => void navigateForward(tabId, "local")}><ArrowRight /></IconButton>
+      <IconButton type="button" className="ex-nbtn" data-testid="explorer-up" label={label("上一级 (Alt+↑)", "Up (Alt+↑)")} disabled={!path || path === "/" || path === "\\\\"} onClick={() => void navigateUp(tabId, "local")}><ArrowUp /></IconButton>
+      <IconButton type="button" className="ex-nbtn" data-testid="explorer-refresh" label={label("刷新 (F5)", "Refresh (F5)")} disabled={pane?.loading} onClick={() => void refreshPane(tabId, "local")}><RefreshCw className={pane?.loading ? "animate-spin" : ""} /></IconButton>
       <div className="ex-address" data-testid="explorer-address-bar" onClick={(event) => {
         if ((event.target as HTMLElement).closest("button")) return;
         setEditing(true);
@@ -64,7 +65,7 @@ export function ExplorerAddressBar({ tabId, pane, home, search, addressRef }: {
         {!editing && <div className="ex-crumbs" ref={crumbContainer}>
           {crumbs.map((crumb, index) => <span key={crumb.path} className="inline-flex shrink-0 items-center">
             <button type="button" className={`ex-crumb ${index === crumbs.length - 1 ? "last" : ""}`} data-explorer-drop={crumb.path} data-testid="explorer-crumb" data-path={crumb.path} title={crumb.path} onClick={() => go(crumb.path)}>{index === 0 ? <HardDrive /> : crumb.name}</button>
-            {index < crumbs.length - 1 && <button type="button" className="ex-csep" title={label("显示子目录", "Show subfolders")} onClick={(event) => void subfolders(event, crumb)}><ChevronRight /></button>}
+            {index < crumbs.length - 1 && <IconButton type="button" className="ex-csep" label={label("显示子目录", "Show subfolders")} onClick={(event) => void subfolders(event, crumb)}><ChevronRight /></IconButton>}
           </span>)}
         </div>}
         <input ref={addressRef} data-testid="explorer-address" aria-label={label("地址", "Address")} spellCheck={false} value={value}
@@ -86,8 +87,8 @@ export function ExplorerAddressBar({ tabId, pane, home, search, addressRef }: {
           event.preventDefault(); event.stopPropagation();
           if (search.searching) search.cancel(); else search.setQuery("");
         }} />
-        <button type="button" data-testid="explorer-search-recursive" className={search.recursive ? "on" : ""} aria-pressed={search.recursive} title={label("包含子目录", "Include subfolders")} onClick={() => search.setRecursive(!search.recursive)}><FolderSearch /></button>
-        {search.query && <button type="button" data-testid="explorer-search-clear" title={label("清除搜索", "Clear search")} onClick={() => search.setQuery("")}><X /></button>}
+        <IconButton type="button" data-testid="explorer-search-recursive" className={search.recursive ? "on" : ""} aria-pressed={search.recursive} label={label("包含子目录", "Include subfolders")} onClick={() => search.setRecursive(!search.recursive)}><FolderSearch /></IconButton>
+        {search.query && <IconButton type="button" data-testid="explorer-search-clear" label={label("清除搜索", "Clear search")} onClick={() => search.setQuery("")}><X /></IconButton>}
       </label>
     </div>
     {search.active && <div className="ex-search-status" data-testid="explorer-search-status" data-state={search.error ? "error" : search.searching ? "searching" : search.cancelled ? "cancelled" : "done"}>

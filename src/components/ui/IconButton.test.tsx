@@ -10,10 +10,10 @@ it("updates the accessible name and pointer hint together when the interface lan
   const click = vi.fn();
   render(<IconButton labelKey="deleteDraft" onClick={click}><svg aria-hidden="true" /></IconButton>);
   const button = screen.getByRole("button", { name: "Delete draft" });
-  expect(button).toHaveAttribute("title", "Delete draft");
+  expect(button).toHaveAttribute("data-taomni-tooltip", "Delete draft");
   act(() => setLocale("zh-CN"));
   expect(screen.getByRole("button", { name: "删除草稿" })).toBe(button);
-  expect(button).toHaveAttribute("title", "删除草稿");
+  expect(button).toHaveAttribute("data-taomni-tooltip", "删除草稿");
   fireEvent.click(button);
   expect(click).toHaveBeenCalledTimes(1);
 });

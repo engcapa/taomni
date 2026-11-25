@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../../src/components/ui/IconButton";
 import { Trash2 } from "lucide-react";
 import { type Decision, type RuleMode, type SocksCapConfig, type SocksCapProfile, type UserRule } from "../../../../../src/lib/sockscap";
 import { Field } from "./Field";
@@ -100,7 +101,7 @@ export function RulesSection(viewProps: RulesSectionProps) {
                 <span className="text-ui-small text-[var(--taomni-text-muted)] uppercase">
                   {r.action}
                 </span>
-                <button
+                <IconButton labelKey="removeRule"
                   type="button"
                   className="p-1 hover:text-red-500"
                   onClick={() =>
@@ -110,7 +111,7 @@ export function RulesSection(viewProps: RulesSectionProps) {
                   }
                 >
                   <Trash2 className="w-3 h-3" />
-                </button>
+                </IconButton>
               </li>
             ))}
           </ul>

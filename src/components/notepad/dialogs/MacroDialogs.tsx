@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { NotepadDialog } from "./NotepadDialog";
 import { useEffect, useState } from "react";
 import { Play, ShieldAlert, Trash2 } from "lucide-react";
@@ -204,9 +205,9 @@ export function MacroDialogs({
                 <>
                   <span className="flex-1 font-medium">{m.name}</span>
                   <span className="text-ui-small text-[var(--taomni-text-muted)]">{m.steps.length} steps</span>
-                  <button type="button" className="np-btn" onClick={() => void onRunSavedMacro(m)} title={label("运行", "Run")}><Play size={12} /></button>
+                  <IconButton type="button" className="np-btn" onClick={() => void onRunSavedMacro(m)} label={label("运行", "Run")}><Play size={12} /></IconButton>
                   <button type="button" className="np-btn" onClick={() => setRenaming({ old: m.name, next: m.name })}>{label("重命名", "Rename")}</button>
-                  <button type="button" className="np-btn" data-testid={`notepad-macro-del-${m.name}`} onClick={() => void onDeleteMacro(m.name)}><Trash2 size={12} /></button>
+                  <IconButton labelKey="deleteMacro" type="button" className="np-btn" data-testid={`notepad-macro-del-${m.name}`} onClick={() => void onDeleteMacro(m.name)}><Trash2 size={12} /></IconButton>
                 </>
               )}
             </div>

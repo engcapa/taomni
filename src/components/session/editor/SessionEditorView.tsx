@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { Button } from "../../ui/Button";
 import { Bookmark, FileText, FlaskConical, Folder, HelpCircle, RotateCcw, Save, Terminal as TerminalIcon, Wifi, X } from "lucide-react";
 import type { SessionConfig } from "../../../lib/ipc";
@@ -48,24 +49,24 @@ export function SessionEditorView(props: SessionEditorViewProps) {
             {form.isEdit ? form.t("sessionEditor2.titleEdit") : form.t("sessionEditor2.titleNew")}
           </div>
           <div className="ml-auto flex items-center gap-2 text-[length:var(--taomni-fs-small)] opacity-95">
-            <button
+            <IconButton
               data-testid="session-help"
-              title={form.t("sessionEditor2.helpTitle")}
+              label={form.t("sessionEditor2.helpTitle")}
               className="hover:bg-white/15 rounded p-0.5"
               onClick={() => form.setTestResult({ ok: true, msg: form.t("sessionEditor2.helpMessage") })}
               type="button"
             >
               <HelpCircle className="w-3.5 h-3.5" />
-            </button>
-            <button
+            </IconButton>
+            <IconButton
               data-testid="session-close"
-              title={form.t("sessionEditor2.closeTitle")}
+              label={form.t("sessionEditor2.closeTitle")}
               className="hover:bg-red-500 rounded p-0.5"
               onClick={onClose}
               type="button"
             >
               <X className="w-3.5 h-3.5" />
-            </button>
+            </IconButton>
           </div>
         </div>
 
@@ -214,22 +215,22 @@ export function SessionEditorView(props: SessionEditorViewProps) {
                   aria-label={form.t("sessionEditor2.fileTargetAria")}
                   placeholder={form.t("sessionEditor2.fileTargetPlaceholder")}
                 />
-                <button
-                  title={form.t("sessionEditor2.browseFolder")}
+                <IconButton
+                  label={form.t("sessionEditor2.browseFolder")}
                   className="taomni-btn px-2"
                   onClick={() => void actions.handleBrowseFolderTarget()}
                   type="button"
                 >
                   <Folder className="w-3.5 h-3.5 inline -mt-0.5" />
-                </button>
-                <button
-                  title={form.t("sessionEditor2.browseFile")}
+                </IconButton>
+                <IconButton
+                  label={form.t("sessionEditor2.browseFile")}
                   className="taomni-btn px-2"
                   onClick={() => void actions.handleBrowseFileTarget()}
                   type="button"
                 >
                   <FileText className="w-3.5 h-3.5 inline -mt-0.5" />
-                </button>
+                </IconButton>
               </div>
               <div className="col-span-12 text-[length:var(--taomni-fs-small)] text-[var(--taomni-text-muted)]">
                 {form.t("sessionEditor2.fileTargetHint")}

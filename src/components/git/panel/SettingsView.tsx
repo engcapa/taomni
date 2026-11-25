@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { useState,type ReactNode } from "react";
 import { GitBranch,Plus,Save,Settings,Trash2 } from "lucide-react";
 import { type GitRemote,type GitRepoSettings,type GitSnapshot } from "../../../lib/git";
@@ -117,9 +118,9 @@ export function SettingsView({
                     <div className="flex-1" />
                     <button className="taomni-btn h-6 px-2" type="button" disabled={busy} onClick={() => onSaveRemote(remote,draft)}>Save</button>
                     <button className="taomni-btn h-6 px-2 ml-1" type="button" disabled={busy||!remote.tokenRef} onClick={() => onClearToken(remote)}>Clear token</button>
-                    <button className="taomni-btn h-6 px-2 ml-1 text-red-500" type="button" disabled={busy} onClick={() => onDeleteRemote(remote)}>
+                    <IconButton labelKey="deleteRemote" className="taomni-btn h-6 px-2 ml-1 text-red-500" type="button" disabled={busy} onClick={() => onDeleteRemote(remote)}>
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </IconButton>
                   </div>
                   <div className="grid gap-3 p-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
                     <SettingInput label="name" value={draft.name} onChange={(value) => updateDraft({ ...draft,name: value??"" })} />

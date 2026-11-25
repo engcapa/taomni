@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../../src/components/ui/IconButton";
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, HelpCircle, Info, Layers, Loader2, Lock, Play, RefreshCw, Shield, Square, X } from "lucide-react";
 import { type HelperStatus, type SocksCapCapabilities, type SocksCapConfig, type SocksCapProfile, type SocksCapStatus, type StatsSnapshot } from "../../../../../src/lib/sockscap";
 import { type MacosSetupGuideMode, phaseTone } from "./configuration";
@@ -188,16 +189,16 @@ export function SocksCapHeader(viewProps: SocksCapHeaderProps) {
         <span>{viewProps.t("sockscap.macosSetupHelp")}</span>
       </button>
     )}
-    <button
+    <IconButton
       type="button"
       data-testid="sockscap-refresh-status"
       className="inline-flex items-center gap-1 px-2 py-1.5 rounded text-ui-body border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
       onClick={() => void viewProps.onRefreshStatus()}
       disabled={viewProps.busy}
-      title={viewProps.t("sockscap.refreshStatus")}
+      label={viewProps.t("sockscap.refreshStatus")}
     >
       <RefreshCw className={`w-3.5 h-3.5 ${viewProps.busy ? "animate-spin" : ""}`} />
-    </button>
+    </IconButton>
     <button
       type="button"
       data-testid="sockscap-recover"

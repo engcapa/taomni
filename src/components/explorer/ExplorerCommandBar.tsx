@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { ArrowDownWideNarrow, ChevronDown, ClipboardPaste, Copy, ExternalLink, FolderPlus, LayoutGrid, List, MoreHorizontal, PanelLeftClose, PanelLeftOpen, PanelRight, Pencil, Plus, Scissors, Terminal, Trash2 } from "lucide-react";
 import type { FileEntry } from "../../lib/sftp";
 import { readExplorerRestoreEnabled, setExplorerRestoreEnabled } from "../../lib/explorer/tabRecovery";
@@ -64,11 +65,11 @@ export function ExplorerCommandBar({ path, workspaceId, selected, operations, on
       </button>
       <button type="button" className="ex-cbtn pri" data-testid="explorer-cmd-new" disabled={operations.busy || !path} onClick={(event) => show(event, newMenu)}><Plus />{label("新建", "New")}<ChevronDown className="ex-car" /></button>
       <span className="ex-vsep" />
-      <button type="button" className="ex-cbtn icon" data-testid="explorer-cmd-cut" title={label("剪切", "Cut")} disabled={operations.busy || !selected.length} onClick={() => void operations.copy(selected, true)}><Scissors /></button>
-      <button type="button" className="ex-cbtn icon" data-testid="explorer-cmd-copy" title={label("复制", "Copy")} disabled={!selected.length} onClick={() => void operations.copy(selected, false)}><Copy /></button>
-      <button type="button" className="ex-cbtn icon" data-testid="explorer-cmd-paste" title={label("粘贴", "Paste")} disabled={operations.busy || !path} onClick={() => void operations.paste()}><ClipboardPaste /></button>
-      <button type="button" className="ex-cbtn icon" data-testid="explorer-cmd-rename" title={label("重命名 (F2)", "Rename (F2)")} disabled={operations.busy || selected.length !== 1} onClick={() => operations.setRenamePath(selected[0].path)}><Pencil /></button>
-      <button type="button" className="ex-cbtn icon" data-testid="explorer-cmd-delete" title={label("删除 (Del)", "Delete (Del)")} disabled={operations.busy || !selected.length} onClick={() => operations.remove(selected)}><Trash2 /></button>
+      <IconButton type="button" className="ex-cbtn icon" data-testid="explorer-cmd-cut" label={label("剪切", "Cut")} disabled={operations.busy || !selected.length} onClick={() => void operations.copy(selected, true)}><Scissors /></IconButton>
+      <IconButton type="button" className="ex-cbtn icon" data-testid="explorer-cmd-copy" label={label("复制", "Copy")} disabled={!selected.length} onClick={() => void operations.copy(selected, false)}><Copy /></IconButton>
+      <IconButton type="button" className="ex-cbtn icon" data-testid="explorer-cmd-paste" label={label("粘贴", "Paste")} disabled={operations.busy || !path} onClick={() => void operations.paste()}><ClipboardPaste /></IconButton>
+      <IconButton type="button" className="ex-cbtn icon" data-testid="explorer-cmd-rename" label={label("重命名 (F2)", "Rename (F2)")} disabled={operations.busy || selected.length !== 1} onClick={() => operations.setRenamePath(selected[0].path)}><Pencil /></IconButton>
+      <IconButton type="button" className="ex-cbtn icon" data-testid="explorer-cmd-delete" label={label("删除 (Del)", "Delete (Del)")} disabled={operations.busy || !selected.length} onClick={() => operations.remove(selected)}><Trash2 /></IconButton>
       <span className="ex-vsep" />
       <button type="button" className="ex-cbtn" data-testid="explorer-cmd-sort" onClick={(event) => show(event, sortMenu)}><ArrowDownWideNarrow />{label("排序", "Sort")}<ChevronDown className="ex-car" /></button>
       <button type="button" className="ex-cbtn" data-testid="explorer-cmd-view" onClick={(event) => show(event, viewMenu)}>{preferences.view === "icons" ? <LayoutGrid /> : <List />}{label("查看", "View")}<ChevronDown className="ex-car" /></button>
@@ -77,10 +78,10 @@ export function ExplorerCommandBar({ path, workspaceId, selected, operations, on
         <button type="button" className="ex-cbtn" data-testid="explorer-cmd-open-with" onClick={(event) => show(event, fileOpenMenu(selected[0].path, workspaceId, label, (message, error) => operations.notify(message, true, error)))}>{label("打开方式", "Open with")}<ChevronDown /></button>
       </>}
       <span className="ex-sp" />
-      <button type="button" className="ex-cbtn icon" data-testid="explorer-cmd-terminal" title={label("在此处打开终端", "Open terminal here")} disabled={!path} onClick={() => onOpenTerminal(path)}><Terminal /></button>
-      <button type="button" className="ex-cbtn icon" data-testid="explorer-cmd-newtab" title={label("在新的 Explorer 标签中打开此目录", "Open current folder in new Explorer tab")} disabled={!path} onClick={() => onOpenExplorer(path, true)}><ExternalLink /></button>
+      <IconButton type="button" className="ex-cbtn icon" data-testid="explorer-cmd-terminal" label={label("在此处打开终端", "Open terminal here")} disabled={!path} onClick={() => onOpenTerminal(path)}><Terminal /></IconButton>
+      <IconButton type="button" className="ex-cbtn icon" data-testid="explorer-cmd-newtab" label={label("在新的 Explorer 标签中打开此目录", "Open current folder in new Explorer tab")} disabled={!path} onClick={() => onOpenExplorer(path, true)}><ExternalLink /></IconButton>
       <button type="button" className={`ex-cbtn ${previewVisible ? "on" : ""}`} data-testid="explorer-cmd-preview" title={label("预览窗格 (Alt+P)", "Preview pane (Alt+P)")} aria-pressed={preferences.preview} onClick={onTogglePreview}><PanelRight />{label("预览", "Preview")}</button>
-      <button type="button" className="ex-cbtn icon" data-testid="explorer-cmd-more" title={label("更多", "More")} onClick={(event) => show(event, moreMenu)}><MoreHorizontal /></button>
+      <IconButton type="button" className="ex-cbtn icon" data-testid="explorer-cmd-more" label={label("更多", "More")} onClick={(event) => show(event, moreMenu)}><MoreHorizontal /></IconButton>
     </div>
     {ctx.render}
   </>;

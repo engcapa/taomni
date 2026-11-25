@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import type { CodeStyleSource } from "./codeStyleModel";
@@ -506,7 +507,7 @@ export function CodeStyleSettingsDialog({
                       <div key={pat} className="flex items-center justify-between rounded bg-[var(--taomni-code-active-line-bg)] px-2 py-0.5 text-ui-small">
                         <span className="font-mono">{pat}</span>
                         {!isBuiltIn && (
-                          <button
+                          <IconButton labelKey="removeExclusion"
                             type="button"
                             data-testid={`code-style-remove-exclusion-${idx}`}
                             className="text-[var(--taomni-code-muted)] hover:text-red-400"
@@ -516,7 +517,7 @@ export function CodeStyleSettingsDialog({
                             }}
                           >
                             <X className="h-3 w-3" />
-                          </button>
+                          </IconButton>
                         )}
                       </div>
                     ))}

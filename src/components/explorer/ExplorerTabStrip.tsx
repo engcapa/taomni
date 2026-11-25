@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { ChevronLeft, ChevronRight, FilePlus2 as NpFilePlus, Pin as NpPin, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { writeText } from "../../lib/clipboard";
@@ -261,12 +262,12 @@ export function ExplorerTabStrip() {
       onClick={() => useExplorerUiStore.getState().clearTabFilter()}>
       <span className="truncate">{filterChipText}</span><span aria-hidden="true"> ×</span>
     </button>}
-    <button type="button" data-testid="explorer-tab-new-home" title={label("新建主目录标签", "New home tab")} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => {
+    <IconButton type="button" data-testid="explorer-tab-new-home" label={label("新建主目录标签", "New home tab")} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => {
       void openExplorer(undefined, { forceNew: true }).catch((error) => useAppStore.getState().setStatusMessage(String(error)));
-    }}><Plus className="h-3.5 w-3.5" /></button>
-    <button type="button" data-testid="explorer-tab-new-notepad" title={label("新建文本文档", "New Notepad document")} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => {
+    }}><Plus className="h-3.5 w-3.5" /></IconButton>
+    <IconButton type="button" data-testid="explorer-tab-new-notepad" label={label("新建文本文档", "New Notepad document")} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => {
       openUntitledNotepadDocument({ host: "explorer" });
-    }}><NpFilePlus className="h-3.5 w-3.5" /></button>
+    }}><NpFilePlus className="h-3.5 w-3.5" /></IconButton>
     <div className="h-full min-w-[24px] flex-1" data-window-drag />
     {menu && <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={menuItems(menu.tab)} />}
   </div>;

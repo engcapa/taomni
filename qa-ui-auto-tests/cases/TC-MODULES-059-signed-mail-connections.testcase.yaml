@@ -169,7 +169,7 @@ steps:
 - wait_for: {selector: '[data-testid="mail-compose-dialog"]', state: detached}
 - click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-drafts-open"]'
 - assert_text: {selector: '[data-testid="mail-draft-row"][data-subject="Discardable server draft"]', contains: Discardable server draft}
-- click: '[data-testid="mail-draft-row"][data-subject="Discardable server draft"] button[title="Delete draft"]'
+- click: '[data-testid="mail-draft-row"][data-subject="Discardable server draft"] button[aria-label="Delete draft"]'
 - mail_server_assert_folder_count: {folder: Drafts, lacks_subject: Discardable server draft}
 - wait_for: {selector: '[data-testid="mail-draft-row"][data-subject="Discardable server draft"]', state: detached}
 - click: '[role="dialog"][aria-label="Drafts and templates"] [aria-label="Close dialog"]'

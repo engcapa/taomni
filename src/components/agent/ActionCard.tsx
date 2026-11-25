@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { CheckCircle, Loader2, X, XCircle } from "lucide-react";
 import { useT, type TranslateFn } from "../../lib/i18n";
 
@@ -58,13 +59,13 @@ export function ActionCard({
             {t("agent.writeBadge")}
           </span>
         )}
-        <button
+        <IconButton labelKey="denyRequest"
           type="button"
           className="ml-auto text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
           onClick={() => onDecide("deny")}
         >
           <X className="w-3.5 h-3.5" />
-        </button>
+        </IconButton>
       </div>
 
       <div className="text-ui-small text-[var(--taomni-text-muted)] mb-2">{description}</div>

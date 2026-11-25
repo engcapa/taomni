@@ -128,9 +128,9 @@ describe("HBaseShellTab workspace", () => {
     await waitFor(() => expect(ipcMock.hbaseConnect).toHaveBeenCalled());
     expect(screen.getByTestId("hbase-tab-limit")).toHaveValue(2);
 
-    fireEvent.click(screen.getByTitle("New query panel"));
+    fireEvent.click(screen.getByRole("button", { name: "New query panel" }));
     await waitFor(() => expect(screen.getByTitle("Query 2")).toBeInTheDocument());
-    expect(screen.queryByTitle("New query panel")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New query panel" })).not.toBeInTheDocument();
 
     for (let run = 0; run < 3; run += 1) {
       fireEvent.click(screen.getByTestId("mock-editor"));

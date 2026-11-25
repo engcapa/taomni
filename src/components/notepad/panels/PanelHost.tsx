@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { GripVertical, MoreHorizontal, X } from "lucide-react";
@@ -41,15 +42,15 @@ function DockMenuButton({ id }: { id: NotepadPanelId }) {
   return (
     <>
       {menu.render}
-      <button
+      <IconButton
         type="button"
         className="np-status-btn"
         data-testid={`notepad-panel-dock-menu-${id}`}
-        title={label("停靠位置", "Dock position")}
+        label={label("停靠位置", "Dock position")}
         onClick={(event) => open(event.currentTarget)}
       >
         <MoreHorizontal size={12} />
-      </button>
+      </IconButton>
     </>
   );
 }

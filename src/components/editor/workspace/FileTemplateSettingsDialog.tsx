@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { useEffect, useId, useState } from "react";
 import { Settings2, RotateCcw, Save, X } from "lucide-react";
 import {
@@ -79,14 +80,14 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
             <Settings2 className="h-4 w-4 text-blue-400" />
             <span id={titleId}>File and Code Templates</span>
           </div>
-          <button
+          <IconButton labelKey="close"
             type="button"
             onClick={onClose}
             data-testid="file-template-close-button"
             className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
           >
             <X className="h-4 w-4" />
-          </button>
+          </IconButton>
         </div>
 
         {/* Tab Navigation */}

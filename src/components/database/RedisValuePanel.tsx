@@ -323,9 +323,9 @@ function PairEditor({
                 />
               </td>
               <td>
-                <button type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
+                <IconButton labelKey="removeRow" type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
                   <Trash2 className="w-3 h-3" style={{ color: "#d9534f" }} />
-                </button>
+                </IconButton>
               </td>
             </tr>
           ))}
@@ -380,9 +380,9 @@ function ListEditor({
               value={item}
               onChange={(e) => setRows((r) => r.map((x, j) => (j === i ? e.target.value : x)))}
             />
-            <button type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
+            <IconButton labelKey="removeRow" type="button" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => setRows((r) => r.filter((_, j) => j !== i))}>
               <Trash2 className="w-3 h-3" style={{ color: "#d9534f" }} />
-            </button>
+            </IconButton>
           </div>
         ))}
       </div>

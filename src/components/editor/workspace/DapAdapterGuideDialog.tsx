@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { useState } from "react";
 import {
   Bug,
@@ -207,14 +208,14 @@ export function DapAdapterGuideDialog({
               </p>
             </div>
           </div>
-          <button
+          <IconButton labelKey="close"
             type="button"
             data-testid="dap-guide-close-btn"
             onClick={onClose}
             className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
           >
             <X className="h-4 w-4" />
-          </button>
+          </IconButton>
         </div>
 
         {/* Language Tabs */}
