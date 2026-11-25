@@ -198,7 +198,8 @@ def read_original(steps):
     row = element("mail-message-row") + f'[data-subject="{LEGACY_SUBJECT}"]'
     desktop_action(steps, "wait_for", {"selector": row, "timeout_sec": 45})
     try:
-        desktop_action(steps, "dblclick", row)
+        desktop_action(steps, "click", row)
+        desktop_action(steps, "wait_for", row + '[aria-pressed="true"]')
         assert_original_body(steps)
     except RuntimeError:
         steps.session.screenshot(steps.case_dir / "installed-mail-reader-failure.png")
