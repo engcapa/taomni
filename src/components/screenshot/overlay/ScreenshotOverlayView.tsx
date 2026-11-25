@@ -160,10 +160,10 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
           <p className="font-medium mb-2">{state.t("screenshot.pinDoneTitle")}</p>
           <p className="mb-4">{state.t("screenshot.pinDoneHint")}</p>
           <div className="flex flex-wrap gap-2">
-            <button data-testid="screenshot-pin-done-replace" disabled={state.busy} onClick={() => void actions.finishPinEdit("replace")}>{state.t("screenshot.pinReplace")}</button>
-            <button data-testid="screenshot-pin-done-new" disabled={state.busy} onClick={() => void actions.finishPinEdit("new")}>{state.t("screenshot.pinNew")}</button>
-            <button data-testid="screenshot-pin-done-copy" disabled={state.busy} onClick={() => void actions.finishPinEdit("copy")}>{state.t("screenshot.copyOnly")}</button>
-            <button data-testid="screenshot-pin-done-cancel" disabled={state.busy} onClick={() => state.setPinDoneOpen(false)}>{state.t("screenshot.cancel")}</button>
+            <button type="button" data-testid="screenshot-pin-done-replace" disabled={state.busy} onClick={() => void actions.finishPinEdit("replace")}>{state.t("screenshot.pinReplace")}</button>
+            <button type="button" data-testid="screenshot-pin-done-new" disabled={state.busy} onClick={() => void actions.finishPinEdit("new")}>{state.t("screenshot.pinNew")}</button>
+            <button type="button" data-testid="screenshot-pin-done-copy" disabled={state.busy} onClick={() => void actions.finishPinEdit("copy")}>{state.t("screenshot.copyOnly")}</button>
+            <button type="button" data-testid="screenshot-pin-done-cancel" disabled={state.busy} onClick={() => state.setPinDoneOpen(false)}>{state.t("screenshot.cancel")}</button>
           </div>
         </div>
       </div>}

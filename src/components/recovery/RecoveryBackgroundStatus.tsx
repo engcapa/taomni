@@ -43,7 +43,7 @@ export function RecoveryBackgroundStatus() {
   };
   return <section aria-label="后台工具状态">
     <p>可读取 Servers、隧道和 SocksCap 当前状态。查询不会启动、停止或修复服务；结果仅代表查询时刻。</p>
-    <button data-testid="recovery-background-refresh" disabled={busy} onClick={() => void refresh()}>
+    <button type="button" data-testid="recovery-background-refresh" disabled={busy} onClick={() => void refresh()}>
       {busy ? "正在读取后台状态…" : "查看 / 刷新后台状态"}
     </button>
     <pre data-testid="recovery-background-status" aria-live="polite" style={{ whiteSpace: "pre-wrap" }}>

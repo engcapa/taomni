@@ -39,10 +39,10 @@ export function PlatformToolbarActions({ children, onOpenSearch, slotRef, onDeta
   return (
     <div data-testid="platform-toolbar-actions" data-mode={mode} className="taomni-platform-toolbar-actions">
       {mode === "home" && <>
-        <button data-testid="home-toolbar-workspaces" className="taomni-toolbar-pill" onClick={() => useAppStore.getState().setActiveSideTab("workspaces")}>{t("platform.enterWorkspaces")}</button>
-        <button data-testid="home-toolbar-sessions" className="taomni-toolbar-pill" data-primary="true" onClick={() => useAppStore.getState().setActiveSideTab("sessions")}>{t("platform.enterSessions")}</button>
+        <button type="button" data-testid="home-toolbar-workspaces" className="taomni-toolbar-pill" onClick={() => useAppStore.getState().setActiveSideTab("workspaces")}>{t("platform.enterWorkspaces")}</button>
+        <button type="button" data-testid="home-toolbar-sessions" className="taomni-toolbar-pill" data-primary="true" onClick={() => useAppStore.getState().setActiveSideTab("sessions")}>{t("platform.enterSessions")}</button>
       </>}
-      {mode === "tools" && <button data-testid="tools-toolbar-workspaces" className="taomni-toolbar-pill" onClick={() => useAppStore.getState().setActiveSideTab("workspaces")}>{t("platform.returnToWorkspace")}</button>}
+      {mode === "tools" && <button type="button" data-testid="tools-toolbar-workspaces" className="taomni-toolbar-pill" onClick={() => useAppStore.getState().setActiveSideTab("workspaces")}>{t("platform.returnToWorkspace")}</button>}
       {children}
       <span className="taomni-toolbar-divider" />
       <ToolbarButton testId="global-search-trigger" title={`${t("platform.globalSearch")} (Ctrl/Cmd+K)`} onClick={onOpenSearch}><Search /></ToolbarButton>

@@ -44,6 +44,13 @@
     border-color: var(--taomni-danger-border);
     color: var(--taomni-danger-text);
   }
+  .taomni-btn[aria-busy="true"] { gap: 6px; cursor: progress; }
+  .taomni-btn:is([data-variant="ghost"], [data-variant="link"]) {
+    border-color: transparent;
+    background: transparent;
+  }
+  .taomni-btn[data-variant="ghost"]:enabled:hover { background: var(--taomni-control-hover); }
+  .taomni-btn[data-variant="link"] { color: var(--taomni-accent); text-decoration: underline; }
   .taomni-btn:focus-visible { outline: 2px solid var(--taomni-focus-ring); outline-offset: 1px; }
 }
 

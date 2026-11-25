@@ -63,8 +63,8 @@ export function ScreenshotFavorites({ onClose }: { onClose: () => void }) {
     <div data-testid="screenshot-favorites" role="dialog" aria-modal="true" aria-label={t("screenshot.favorites")} className="w-[640px] max-w-[calc(100vw-32px)] max-h-[80vh] flex flex-col rounded-xl border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] text-[var(--taomni-text)] shadow-2xl">
       <div className="flex items-center gap-2 border-b border-[var(--taomni-divider)] px-4 py-3">
         <h2 className="flex-1 text-ui-title font-medium">{t("screenshot.favorites")}</h2>
-        <button data-testid="screenshot-favorites-refresh" aria-label={t("screenshot.favoritesRefresh")} title={t("screenshot.favoritesRefresh")} disabled={loading || !!busyId} onClick={() => setRevision((v) => v + 1)} className="p-1.5 rounded hover:bg-[var(--taomni-hover)]"><RefreshCw size={16} /></button>
-        <button data-testid="screenshot-favorites-close" aria-label={t("screenshot.cancel")} onClick={onClose} className="p-1.5 rounded hover:bg-[var(--taomni-hover)]"><X size={16} /></button>
+        <button type="button" data-testid="screenshot-favorites-refresh" aria-label={t("screenshot.favoritesRefresh")} title={t("screenshot.favoritesRefresh")} disabled={loading || !!busyId} onClick={() => setRevision((v) => v + 1)} className="p-1.5 rounded hover:bg-[var(--taomni-hover)]"><RefreshCw size={16} /></button>
+        <button type="button" data-testid="screenshot-favorites-close" aria-label={t("screenshot.cancel")} onClick={onClose} className="p-1.5 rounded hover:bg-[var(--taomni-hover)]"><X size={16} /></button>
       </div>
       <p className="px-4 pt-3 text-ui-body text-[var(--taomni-text-muted)]">{t("screenshot.favoritesHint")}</p>
       {error && <p data-testid="screenshot-favorites-error" role="alert" className="px-4 pt-3 text-ui-body text-red-500">{error}</p>}
@@ -76,8 +76,8 @@ export function ScreenshotFavorites({ onClose }: { onClose: () => void }) {
             <p className="mt-2 text-ui-small text-[var(--taomni-text-muted)]">{new Date(item.createdAt).toLocaleString()}</p>
             <div className="flex items-center gap-1 mt-2 text-ui-body">
               <span className="flex-1 tabular-nums">{item.width} × {item.height}</span>
-              <button data-testid="screenshot-favorite-open" disabled={!!busyId} onClick={() => void open(item.id)} className="rounded px-2 py-1 bg-[var(--taomni-accent)] text-white disabled:opacity-40">{t("screenshot.pin")}</button>
-              <button data-testid="screenshot-favorite-remove" disabled={!!busyId} aria-label={t("screenshot.favoriteRemove")} title={t("screenshot.favoriteRemove")} onClick={() => void remove(item.id)} className="rounded p-1.5 hover:bg-[var(--taomni-hover)] disabled:opacity-40"><Trash2 size={14} /></button>
+              <button type="button" data-testid="screenshot-favorite-open" disabled={!!busyId} onClick={() => void open(item.id)} className="rounded px-2 py-1 bg-[var(--taomni-accent)] text-white disabled:opacity-40">{t("screenshot.pin")}</button>
+              <button type="button" data-testid="screenshot-favorite-remove" disabled={!!busyId} aria-label={t("screenshot.favoriteRemove")} title={t("screenshot.favoriteRemove")} onClick={() => void remove(item.id)} className="rounded p-1.5 hover:bg-[var(--taomni-hover)] disabled:opacity-40"><Trash2 size={14} /></button>
             </div>
           </div>)}
         </div>}

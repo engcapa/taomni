@@ -1,0 +1,60 @@
+id: TC-UIC-005-explorer-keyboard-menu
+title: Explorer opens the selected files' command menu from the keyboard and restores list focus
+covers: [F-EXPLORER-1]
+modes: [browser, native]
+tags: [ui-contract, explorer, keyboard]
+ui_standard: [UI-MNU-02, UI-MNU-04, UI-MNU-09, UI-MNU-10]
+fixtures: [reset_db, explorer_files]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-uic-menu
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-tab"]'
+- press: {selector: '[data-testid="explorer-tab"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_previews}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- click: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- press: {selector: '[data-testid="explorer-file-list"]', key: Shift+ArrowUp}
+- assert_count: {selector: '[data-testid="explorer-file-row"][aria-selected="true"]', equal: 2}
+- press: {selector: '[data-testid="explorer-file-list"]', key: Shift+F10}
+- assert_attribute: {selector: '[data-testid="context-menu"]', name: role, equals: menu}
+- assert_attribute: {selector: '[data-testid="explorer-context-rename"]', name: title, equals: Select a single item}
+- assert_disabled: '[data-testid="explorer-context-rename"]'
+- press: {selector: '[data-testid="context-menu"]', key: End}
+- eval_readonly:
+    expression: document.getElementById(document.activeElement.getAttribute('aria-activedescendant')).dataset.testid === 'explorer-context-delete'
+    expect_truthy: true
+- press: {selector: '[data-testid="context-menu"]', key: Escape}
+- assert_not_visible: '[data-testid="context-menu"]'
+- eval_readonly: {expression: "document.activeElement.dataset.testid === 'explorer-file-list'", expect_truthy: true}
+- assert_count: {selector: '[data-testid="explorer-file-row"][aria-selected="true"]', equal: 2}
+- click: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- press: {selector: '[data-testid="explorer-file-list"]', key: Shift+F10}
+- click: '[data-testid="explorer-context-rename"]'
+- assert_visible: '[data-testid="explorer-rename-input"]'
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Escape}
+- assert_visible: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-MNU-02, UI-MNU-04, UI-MNU-09, UI-MNU-10]
+    requirement: Opening the multi-file menu with Shift+F10 exposes its role and explains disabled rename. End targets the last destructive action. Escape returns to the file list with the two-item selection intact.
+    actions: [9, 10, 12, 16, 18, 22, 23, 24, 26]
+    checkpoints:
+    - {step: 11, expectation: Both rows are selected before opening the menu.}
+    - {step: 13, expectation: The focused popup is a menu.}
+    - {step: 14, expectation: The unavailable command explains its single-item requirement.}
+    - {step: 15, expectation: Rename is disabled for this selection.}
+    - {step: 17, expectation: End highlights Delete without executing it.}
+    - {step: 20, expectation: Escape restores keyboard focus to the list.}
+    - {step: 21, expectation: The two original rows remain selected.}
+    - {step: 25, expectation: The same Rename action opens an editor for a single file.}
+    - {step: 27, expectation: Cancelling inline editing keeps the original file name.}
+    results: [11, 13, 14, 15, 17, 20, 21, 25, 27]
+  visual:
+  - {check: Menu order and selection, method: automated, reason: Reads the last accessible command and selected rows from the rendered list.}
+  native:
+  - {check: WebView keyboard activation, method: automated, reason: Exercises the real file list and focus return in the packaged app.}

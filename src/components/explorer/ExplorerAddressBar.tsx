@@ -51,10 +51,10 @@ export function ExplorerAddressBar({ tabId, pane, home, search, addressRef }: {
   };
   return <>
     <div className="ex-top">
-      <button className="ex-nbtn" data-testid="explorer-back" title={label("后退 (Alt+←)", "Back (Alt+←)")} disabled={!pane || pane.historyIndex <= 0} onClick={() => void navigateBack(tabId, "local")}><ArrowLeft /></button>
-      <button className="ex-nbtn" data-testid="explorer-forward" title={label("前进 (Alt+→)", "Forward (Alt+→)")} disabled={!pane || pane.historyIndex >= pane.history.length - 1} onClick={() => void navigateForward(tabId, "local")}><ArrowRight /></button>
-      <button className="ex-nbtn" data-testid="explorer-up" title={label("上一级 (Alt+↑)", "Up (Alt+↑)")} disabled={!path || path === "/" || path === "\\\\"} onClick={() => void navigateUp(tabId, "local")}><ArrowUp /></button>
-      <button className="ex-nbtn" data-testid="explorer-refresh" title={label("刷新 (F5)", "Refresh (F5)")} disabled={pane?.loading} onClick={() => void refreshPane(tabId, "local")}><RefreshCw className={pane?.loading ? "animate-spin" : ""} /></button>
+      <button type="button" className="ex-nbtn" data-testid="explorer-back" title={label("后退 (Alt+←)", "Back (Alt+←)")} disabled={!pane || pane.historyIndex <= 0} onClick={() => void navigateBack(tabId, "local")}><ArrowLeft /></button>
+      <button type="button" className="ex-nbtn" data-testid="explorer-forward" title={label("前进 (Alt+→)", "Forward (Alt+→)")} disabled={!pane || pane.historyIndex >= pane.history.length - 1} onClick={() => void navigateForward(tabId, "local")}><ArrowRight /></button>
+      <button type="button" className="ex-nbtn" data-testid="explorer-up" title={label("上一级 (Alt+↑)", "Up (Alt+↑)")} disabled={!path || path === "/" || path === "\\\\"} onClick={() => void navigateUp(tabId, "local")}><ArrowUp /></button>
+      <button type="button" className="ex-nbtn" data-testid="explorer-refresh" title={label("刷新 (F5)", "Refresh (F5)")} disabled={pane?.loading} onClick={() => void refreshPane(tabId, "local")}><RefreshCw className={pane?.loading ? "animate-spin" : ""} /></button>
       <div className="ex-address" data-testid="explorer-address-bar" onClick={(event) => {
         if ((event.target as HTMLElement).closest("button")) return;
         setEditing(true);
@@ -63,8 +63,8 @@ export function ExplorerAddressBar({ tabId, pane, home, search, addressRef }: {
       }}>
         {!editing && <div className="ex-crumbs" ref={crumbContainer}>
           {crumbs.map((crumb, index) => <span key={crumb.path} className="inline-flex shrink-0 items-center">
-            <button className={`ex-crumb ${index === crumbs.length - 1 ? "last" : ""}`} data-explorer-drop={crumb.path} data-testid="explorer-crumb" data-path={crumb.path} title={crumb.path} onClick={() => go(crumb.path)}>{index === 0 ? <HardDrive /> : crumb.name}</button>
-            {index < crumbs.length - 1 && <button className="ex-csep" title={label("显示子目录", "Show subfolders")} onClick={(event) => void subfolders(event, crumb)}><ChevronRight /></button>}
+            <button type="button" className={`ex-crumb ${index === crumbs.length - 1 ? "last" : ""}`} data-explorer-drop={crumb.path} data-testid="explorer-crumb" data-path={crumb.path} title={crumb.path} onClick={() => go(crumb.path)}>{index === 0 ? <HardDrive /> : crumb.name}</button>
+            {index < crumbs.length - 1 && <button type="button" className="ex-csep" title={label("显示子目录", "Show subfolders")} onClick={(event) => void subfolders(event, crumb)}><ChevronRight /></button>}
           </span>)}
         </div>}
         <input ref={addressRef} data-testid="explorer-address" aria-label={label("地址", "Address")} spellCheck={false} value={value}
@@ -96,7 +96,7 @@ export function ExplorerAddressBar({ tabId, pane, home, search, addressRef }: {
           : <span role="status">{search.cancelled ? label("已取消", "Cancelled") + " · " : ""}{search.results.length.toLocaleString()} {label("个结果", "results")} · {search.scanned.toLocaleString()} {label("项已扫描", "scanned")}{search.truncated ? label("（已达 1000 项结果上限）", " (1000-result limit reached)") : ""}</span>}
       {search.searching && <button type="button" data-testid="explorer-search-cancel" disabled={search.cancelling} onClick={search.cancel}>{search.cancelling ? label("正在取消…", "Cancelling…") : label("取消", "Cancel")}</button>}
     </div>}
-    {pane?.error && <div className="ex-error" data-testid="explorer-address-error" role="alert"><span className="ex-sp">{pane.error}</span><button onClick={() => void refreshPane(tabId, "local")}>{label("重试", "Retry")}</button><button onClick={() => void navigateUp(tabId, "local")}>{label("上一级", "Up")}</button></div>}
+    {pane?.error && <div className="ex-error" data-testid="explorer-address-error" role="alert"><span className="ex-sp">{pane.error}</span><button type="button" onClick={() => void refreshPane(tabId, "local")}>{label("重试", "Retry")}</button><button type="button" onClick={() => void navigateUp(tabId, "local")}>{label("上一级", "Up")}</button></div>}
     {ctx.render}
   </>;
 }

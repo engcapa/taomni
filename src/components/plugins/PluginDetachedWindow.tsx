@@ -71,7 +71,7 @@ export function PluginDetachedWindow({ id }: { id: string }) {
   return <div data-testid="plugin-detached-window" className="flex h-screen min-h-0 flex-col">
     <header className="flex shrink-0 items-center gap-3 border-b border-[var(--taomni-divider)] p-2 text-ui-body">
       <span className="min-w-0 flex-1 truncate">{tab?.title}</span>
-      <button data-testid="plugin-tab-reattach" className="taomni-btn px-2 py-1" disabled={!tab} onClick={() => { void reattach(); }}>{t(returned ? "plugins.closeWindow" : "plugins.reattach")}</button>
+      <button type="button" data-testid="plugin-tab-reattach" className="taomni-btn px-2 py-1" disabled={!tab} onClick={() => { void reattach(); }}>{t(returned ? "plugins.closeWindow" : "plugins.reattach")}</button>
     </header>
     {error && <p role="alert" className="p-2 text-ui-body text-red-600">{error}</p>}
     <div className="min-h-0 flex-1">{returned

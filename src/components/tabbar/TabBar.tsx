@@ -603,7 +603,7 @@ export function TabBar({
       )}
 
       <div className="flex shrink-0 items-end" data-testid="new-tab-split">
-        <button
+        <button type="button"
           data-testid="new-local-terminal"
           className="taomni-tab"
           style={{ paddingRight: 4, borderTopRightRadius: 0 }}
@@ -613,7 +613,7 @@ export function TabBar({
         >
           <Plus className="w-3 h-3" />
         </button>
-        <button
+        <button type="button"
           data-testid="new-tab-launch-menu"
           className="taomni-tab"
           style={{ paddingLeft: 2, paddingRight: 4, borderTopLeftRadius: 0, marginLeft: -1 }}

@@ -26,7 +26,7 @@ export function RecoveryTerminalOutput({ sessionId }: { sessionId: string }) {
   }, [enabled, sessionId]);
   return <div>
     <p>仅观察接回后的原始输出，最多保留 64K 字符；此前画面、历史、光标和模式未恢复，不支持输入。</p>
-    <button data-testid="recovery-observe" aria-pressed={enabled} onClick={() => setEnabled((value) => !value)}>
+    <button type="button" data-testid="recovery-observe" aria-pressed={enabled} onClick={() => setEnabled((value) => !value)}>
       {enabled ? "停止观察（保留后台）" : "观察原终端输出（只读）"}
     </button>
     <p data-testid="recovery-output-status" role="status">{status}</p>

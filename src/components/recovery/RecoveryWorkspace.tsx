@@ -31,7 +31,7 @@ export function RecoveryWorkspace({ bootstrap }: { bootstrap: RecoveryBootstrap 
       </p>
       {tabs.length === 0 && <p data-testid="recovery-missing">没有可用的标签描述。后台仍可能运行，未自动新建任何会话。</p>}
       <nav aria-label="恢复的标签" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {tabs.map((entry) => <button key={entry.id} data-testid="recovery-tab" data-kind={entry.kind}
+        {tabs.map((entry) => <button type="button" key={entry.id} data-testid="recovery-tab" data-kind={entry.kind}
           aria-pressed={entry.id === selected} onClick={() => setSelected(entry.id)}>{entry.title}</button>)}
       </nav>
       {tab && <section data-testid="recovery-detail" aria-live="polite">

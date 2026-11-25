@@ -120,7 +120,7 @@ export function MailArchiveDialog({ accountId, onClose, onChanged }: { accountId
     <div className="flex h-full min-h-0 flex-col text-sm">
       <header className="flex items-start justify-between gap-3 border-b border-[var(--taomni-divider)] px-5 py-4">
         <div><h2 id="mail-archive-title" className="text-lg font-semibold">Local archive</h2><p className="mt-1 text-xs text-[var(--taomni-text-muted)]">Find and manage saved originals. Server messages are kept.</p></div>
-        <button className="taomni-btn" data-testid="mail-archive-close" disabled={busy} onClick={onClose}>Close</button>
+        <button type="button" className="taomni-btn" data-testid="mail-archive-close" disabled={busy} onClick={onClose}>Close</button>
       </header>
       <fieldset disabled={busy || !!preview} className="min-w-0 border-b border-[var(--taomni-divider)] px-5 py-3 space-y-3">
         <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (input.query) void load(input.query, 0); }}>
@@ -142,19 +142,19 @@ export function MailArchiveDialog({ accountId, onClose, onChanged }: { accountId
       {notice && <p role="status" data-testid="mail-archive-notice" className="px-5 py-2">{notice}</p>}
       <div className="flex flex-wrap items-center gap-2 border-b border-[var(--taomni-divider)] px-5 py-2">
         <label className="flex items-center gap-2"><input ref={pageCheckbox} type="checkbox" data-testid="mail-archive-select-page" checked={!!page.entries.length && pageSelected === page.entries.length} disabled={disabled || !!preview || !page.entries.length} onChange={(e) => select(page.entries, e.target.checked)} />Select page</label>
-        <button data-testid="mail-archive-select-all" className="taomni-btn" disabled={disabled || !!preview || !page.total || all} onClick={() => { setAll(true); setExcluded({}); setSelected({}); }}>Select all {page.total} matching</button>
-        <button data-testid="mail-archive-clear-selection" className="taomni-btn" disabled={busy || !!preview || !count} onClick={clearSelection}>Clear selection</button>
+        <button type="button" data-testid="mail-archive-select-all" className="taomni-btn" disabled={disabled || !!preview || !page.total || all} onClick={() => { setAll(true); setExcluded({}); setSelected({}); }}>Select all {page.total} matching</button>
+        <button type="button" data-testid="mail-archive-clear-selection" className="taomni-btn" disabled={busy || !!preview || !count} onClick={clearSelection}>Clear selection</button>
         <span data-testid="mail-archive-selection-count" className="text-xs">{count} selected{all ? " across all pages" : ""}</span>
-        <button data-testid="mail-archive-cleanup" className="taomni-btn" disabled={disabled || !!preview || !count} onClick={review}>Clean up ({count})</button>
+        <button type="button" data-testid="mail-archive-cleanup" className="taomni-btn" disabled={disabled || !!preview || !count} onClick={review}>Clean up ({count})</button>
         <div className="flex-1" />
         <select data-testid="mail-archive-sort" aria-label="Sort archive" className="taomni-input text-xs" disabled={busy || !!preview} value={sort} onChange={(e) => { ++request.current; setLoading(true); setSort(e.target.value as MailArchiveQuery["sort"]); }}><option value="savedNewest">Saved: newest first</option><option value="savedOldest">Saved: oldest first</option><option value="dateNewest">Mail date: newest first</option><option value="dateOldest">Mail date: oldest first</option><option value="largest">Size: largest first</option><option value="smallest">Size: smallest first</option></select>
-        <button className="taomni-btn" data-testid="mail-archive-refresh" disabled={disabled || !!preview} onClick={() => void load(applied.current, page.offset)}>Refresh</button>
+        <button type="button" className="taomni-btn" data-testid="mail-archive-refresh" disabled={disabled || !!preview} onClick={() => void load(applied.current, page.offset)}>Refresh</button>
       </div>
       {preview && <section role="alertdialog" aria-label="Confirm local cleanup" data-testid="mail-archive-confirm" className="mx-5 my-3 rounded-lg border border-amber-500/50 bg-amber-500/10 p-4">
         <h3 className="font-semibold">Remove {preview.count} local originals?</h3>
         <p data-testid="mail-archive-cleanup-estimate" className="my-2">Selected stored size: {archiveBytes(preview.storedBytes)} · Up to {archiveBytes(preview.reclaimableBytes)} reclaimable</p>
         <p className="text-xs text-[var(--taomni-text-muted)]">Shared originals are kept until their last copy is removed. Backups may retain disk space. This cannot be undone. Server messages are kept; full storage pauses and these originals will not download automatically again.</p>
-        <div className="mt-3 flex gap-2"><button className="taomni-btn" data-testid="mail-archive-confirm-cancel" disabled={busy} onClick={() => setPreview(null)}>Cancel</button><button className="taomni-btn text-red-600" data-testid="mail-archive-confirm-remove" disabled={busy} onClick={() => void action(async () => {
+        <div className="mt-3 flex gap-2"><button type="button" className="taomni-btn" data-testid="mail-archive-confirm-cancel" disabled={busy} onClick={() => setPreview(null)}>Cancel</button><button type="button" className="taomni-btn text-red-600" data-testid="mail-archive-confirm-remove" disabled={busy} onClick={() => void action(async () => {
           const removed = await mailArchiveCleanup(accountId, preview.token); clearSelection(); ++readVersion.current; setBody(null); setEntry(null); await load(applied.current, page.offset); await onChanged(); setNotice(`Removed ${removed} local originals. Server messages kept.`);
         })}>{busy ? "Cleaning up…" : "Remove local originals"}</button></div>
       </section>}
@@ -167,7 +167,7 @@ export function MailArchiveDialog({ accountId, onClose, onChanged }: { accountId
               const shift = (e.nativeEvent as MouseEvent).shiftKey;
               select(shift && rangeAnchor.current !== null ? page.entries.slice(Math.min(index, rangeAnchor.current), Math.max(index, rangeAnchor.current) + 1) : [value], e.target.checked); rangeAnchor.current = index;
             }} />
-            <button className="min-w-0 flex-1 text-left" data-testid="mail-archive-read" onClick={() => void read(value)}>
+            <button type="button" className="min-w-0 flex-1 text-left" data-testid="mail-archive-read" onClick={() => void read(value)}>
               <span className="flex items-start justify-between gap-2"><span className="truncate font-medium">{value.subject || "(no subject)"}</span><span className="shrink-0 text-xs text-[var(--taomni-text-muted)]">{archiveBytes(value.rawSize)}</span></span>
               <span className="mt-1 block truncate text-xs">{value.from || "Unknown sender"}</span>
               <span className="mt-1 block truncate text-xs text-[var(--taomni-text-muted)]">{folderLabel({ name: value.folder })} · {dateLabel(value.dateTs)}{value.hasAttachments ? " · Attachment" : ""}</span>
@@ -177,15 +177,15 @@ export function MailArchiveDialog({ accountId, onClose, onChanged }: { accountId
         </div>
         <div data-testid="mail-archive-preview" className="min-h-0 min-w-0 overflow-auto p-5">
           {!entry && <div className="flex h-full min-h-32 items-center justify-center text-[var(--taomni-text-muted)]">Select a message to preview its saved original.</div>}
-          {entry && <><h3 className="break-words font-semibold">{entry.subject}</h3><p className="mt-2 break-words text-xs">From: {entry.from || "Unknown sender"}<br />To: {entry.to || "Unknown recipients"}</p><button className="taomni-btn my-3" data-testid="mail-archive-export" disabled={busy} onClick={() => void action(() => save())}>Save original EML</button></>}
-          {body && <><div className="mb-3 flex flex-wrap gap-2">{body.attachments.map((attachment, index) => <button key={index} className="taomni-btn" data-testid="mail-archive-attachment" disabled={busy} onClick={() => void action(() => save(index))}>{attachment.name || `Attachment ${index + 1}`}</button>)}</div><MailMessageBodyView html={body.html} text={body.text} title={body.subject} allowRemoteImages={false} /></>}
+          {entry && <><h3 className="break-words font-semibold">{entry.subject}</h3><p className="mt-2 break-words text-xs">From: {entry.from || "Unknown sender"}<br />To: {entry.to || "Unknown recipients"}</p><button type="button" className="taomni-btn my-3" data-testid="mail-archive-export" disabled={busy} onClick={() => void action(() => save())}>Save original EML</button></>}
+          {body && <><div className="mb-3 flex flex-wrap gap-2">{body.attachments.map((attachment, index) => <button type="button" key={index} className="taomni-btn" data-testid="mail-archive-attachment" disabled={busy} onClick={() => void action(() => save(index))}>{attachment.name || `Attachment ${index + 1}`}</button>)}</div><MailMessageBodyView html={body.html} text={body.text} title={body.subject} allowRemoteImages={false} /></>}
         </div>
       </div>
       <footer className="flex flex-wrap items-center gap-3 border-t border-[var(--taomni-divider)] px-5 py-3 text-xs">
         <span data-testid="mail-archive-results" role="status">{loading ? "Searching…" : `${page.total ? page.offset + 1 : 0}–${page.offset + page.entries.length} of ${page.total} messages · ${archiveBytes(page.storedBytes)} stored`}</span>
         <span className="hidden flex-1 text-[var(--taomni-text-muted)] lg:block">Ctrl+F search · Ctrl+A select page · Delete review cleanup</span>
-        <button className="taomni-btn" data-testid="mail-archive-prev" disabled={disabled || !!preview || page.offset === 0} onClick={() => void load(applied.current, Math.max(0, page.offset - 200))}>Previous</button>
-        <button className="taomni-btn" data-testid="mail-archive-next" disabled={disabled || !!preview || page.offset + page.entries.length >= page.total} onClick={() => void load(applied.current, page.offset + 200)}>Next</button>
+        <button type="button" className="taomni-btn" data-testid="mail-archive-prev" disabled={disabled || !!preview || page.offset === 0} onClick={() => void load(applied.current, Math.max(0, page.offset - 200))}>Previous</button>
+        <button type="button" className="taomni-btn" data-testid="mail-archive-next" disabled={disabled || !!preview || page.offset + page.entries.length >= page.total} onClick={() => void load(applied.current, page.offset + 200)}>Next</button>
       </footer>
     </div>
   </dialog>;

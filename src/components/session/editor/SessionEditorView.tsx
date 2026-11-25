@@ -1,3 +1,4 @@
+import { Button } from "../../ui/Button";
 import { Bookmark, FileText, FlaskConical, Folder, HelpCircle, RotateCcw, Save, Terminal as TerminalIcon, Wifi, X } from "lucide-react";
 import type { SessionConfig } from "../../../lib/ipc";
 import { SESSION_ROOT_LABEL, folderOptionLabel } from "../../../lib/sessionPaths";
@@ -407,25 +408,22 @@ export function SessionEditorView(props: SessionEditorViewProps) {
                 {form.t("sessionEditor2.delete")}
               </button>
             )}
-            <button
+            <Button
               data-testid="session-cancel"
-              className="taomni-btn"
               onClick={onClose}
-              type="button"
               aria-label={form.t("sessionEditor2.cancel")}
             >
               {form.t("sessionEditor2.cancel")}{shortcuts.cancel}
-            </button>
-            <button
-              className="taomni-btn"
+            </Button>
+            <Button
               data-testid="session-save"
-              data-primary="true"
+              variant="primary"
+              busy={actions.saving}
               onClick={actions.handleSave}
-              type="button"
               aria-label={form.t("sessionEditor2.ok")}
             >
               {form.t("sessionEditor2.ok")}{shortcuts.save}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

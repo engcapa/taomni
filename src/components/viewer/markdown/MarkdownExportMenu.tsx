@@ -93,7 +93,7 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
   ];
   return <>
     <div className="fv-md-export-control" ref={root}>
-      <button ref={trigger} className="fv-button primary" data-testid="markdown-export" disabled={busy || current.loading} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}><Download />{label("导出", "Export")}<ChevronDown /></button>
+      <button type="button" ref={trigger} className="fv-button primary" data-testid="markdown-export" disabled={busy || current.loading} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}><Download />{label("导出", "Export")}<ChevronDown /></button>
       {open && createPortal(<div className="fv" style={{ display: "contents" }}><div ref={menu} className="fv-menu fv-md-export-menu" style={{ position: "fixed", ...position }} role="menu" data-testid="markdown-export-menu" onKeyDown={(event) => {
         if (event.key === "Tab") { setOpen(false); trigger.current?.focus(); return; }
         if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
@@ -103,14 +103,14 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
         buttons[event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length]?.focus();
       }}>
         <div className="fv-md-menu-title">{label("导出为", "Export as")}</div>
-        {entries.map(([kind, zh, en, Icon]) => <button key={kind} role="menuitem" className={kind === "richtext" ? "fv-md-menu-divider" : ""} data-testid={`markdown-export-${kind}`} onClick={() => {
+        {entries.map(([kind, zh, en, Icon]) => <button type="button" key={kind} role="menuitem" className={kind === "richtext" ? "fv-md-menu-divider" : ""} data-testid={`markdown-export-${kind}`} onClick={() => {
           setOpen(false);
           if (kind === "pdf" || kind === "print" || kind === "docx" || kind === "drawio") setDialog(kind);
           else void run(kind);
         }}><Icon /><span>{label(zh, en)}</span>{kind === "pdf" && <small>{label("页面设置", "Page setup")}</small>}{kind === "print" && <small>{/Mac/i.test(navigator.platform) ? "⌘P" : "Ctrl+P"}</small>}</button>)}
       </div></div>, window.document.body)}
     </div>
-    {notice && <div className="fv-md-export-notice" role="status" data-testid="markdown-export-status" data-export-state={exportState} data-export-path={saved || undefined}><span>{notice}</span>{saved && savedFile && <MarkdownExportResultActions path={saved} filePath={savedFile} workspaceId={savedWorkspace} onError={onError} />}<button className="fv-icon-button" aria-label={label("关闭提示", "Dismiss")} onClick={() => setNotice("")}><X /></button></div>}
+    {notice && <div className="fv-md-export-notice" role="status" data-testid="markdown-export-status" data-export-state={exportState} data-export-path={saved || undefined}><span>{notice}</span>{saved && savedFile && <MarkdownExportResultActions path={saved} filePath={savedFile} workspaceId={savedWorkspace} onError={onError} />}<button type="button" className="fv-icon-button" aria-label={label("关闭提示", "Dismiss")} onClick={() => setNotice("")}><X /></button></div>}
     {dialog && createPortal(<div className="fv" style={{ display: "contents" }}>{dialog === "drawio" ? <DrawioExportSettings settings={settings} onChange={setSettings} onCancel={() => { setDialog(null); trigger.current?.focus(); }} onConfirm={(kind) => void run(kind)} /> : <ExportSettings kind={dialog} filename={markdownBasename(current.path)} settings={settings} onChange={setSettings} onCancel={() => { setDialog(null); trigger.current?.focus(); }} onConfirm={() => void run(dialog)} />}</div>, window.document.body)}
   </>;
 }
@@ -154,6 +154,6 @@ function ExportSettings({ kind, filename, settings, onChange, onCancel, onConfir
       <div className="fv-md-field"><span>{label("代码块", "Code blocks")}</span>{check("wrapCode", "保持换行", "Wrap lines")}{check("highlight", "语法高亮", "Syntax highlighting")}</div>
       <p className="fv-md-export-hint">{kind === "print" ? label("打印使用系统打印窗口。", "Printing uses the system print dialog.") : label("图片以内嵌方式导出；本地相对路径图片已解析。PDF 直接保存为文件，无需打印机。", "Images are embedded; local relative images are resolved. PDF saves directly to a file without a printer.")}</p>
     </div>
-    <footer><button className="fv-button outline" onClick={onCancel}>{label("取消", "Cancel")}</button><button className="fv-button primary" data-testid="markdown-export-confirm" onClick={onConfirm}>{label("导出…", "Export…")}</button></footer>
+    <footer><button type="button" className="fv-button outline" onClick={onCancel}>{label("取消", "Cancel")}</button><button type="button" className="fv-button primary" data-testid="markdown-export-confirm" onClick={onConfirm}>{label("导出…", "Export…")}</button></footer>
   </div></div>;
 }

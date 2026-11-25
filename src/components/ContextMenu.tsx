@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useLayoutEffect, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { forwardRef, useCallback, useLayoutEffect, useId, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { ChevronRight } from "lucide-react";
 import { useFocusReturn } from "./editor/workspace/useFocusReturn";
@@ -13,6 +13,7 @@ export interface MenuItem {
   danger?: boolean;
   separator?: boolean;
   disabled?: boolean;
+  disabledReason?: string;
   children?: MenuItem[];
   openOnClick?: boolean;
   customPanel?: React.ReactNode;
@@ -85,7 +86,7 @@ export function ContextMenu({ items, x, y, onClose, appearance, testId }: Contex
     position: "fixed",
     left: position.left,
     top: position.top,
-    zIndex: 9999,
+    zIndex: "var(--taomni-z-menu-over-modal, 1100)",
   };
 
   return <MenuSurface ref={ref} appearance={appearance} items={items} onClose={onClose} style={style} testId={testId} />;
@@ -100,6 +101,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   testId?: string;
 }>(({ items, onClose, style, isSubmenu, onBack, appearance, testId }, forwardedRef) => {
   const innerRef = useRef<HTMLDivElement | null>(null);
+  const menuId = useId();
 
   const selectableIndices = useMemo(() => {
     return items
@@ -133,7 +135,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // If a submenu is currently open, let the child submenu handle the key event
-      if (openSubmenuIndex !== null) return;
+      if (openSubmenuIndex !== null || e.isComposing || e.keyCode === 229 || e.defaultPrevented) return;
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -202,6 +204,8 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   return (
     <div
       ref={setRef}
+      role="menu"
+      aria-activedescendant={activeIndex >= 0 ? `${menuId}-${activeIndex}` : undefined}
       tabIndex={-1}
       data-testid={testId ?? "context-menu"}
       data-taomni-context-menu=""
@@ -219,6 +223,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
       {items.map((item, i) => (
         <MenuRow
           key={i}
+          id={`${menuId}-${i}`}
           appearance={appearance}
           item={item}
           active={activeIndex === i}
@@ -284,16 +289,17 @@ function PortalFlyout({
         left: pos?.left ?? -9999,
         top: pos?.top ?? -9999,
         visibility: pos ? "visible" : "hidden",
-        zIndex: 9999,
+        zIndex: "var(--taomni-z-menu-over-modal, 1100)",
       }}
     >
       {children}
     </div>,
-    document.body,
+    triggerRef.current?.closest("dialog[open]") ?? document.body,
   );
 }
 
 function MenuRow({
+  id,
   appearance,
   item,
   active,
@@ -303,6 +309,7 @@ function MenuRow({
   onCloseSubmenu,
   onClose,
 }: {
+  id: string;
   appearance?: "default" | "code-candidates";
   item: MenuItem;
   active: boolean;
@@ -352,10 +359,18 @@ function MenuRow({
   }, [active]);
 
   if (item.separator) {
-    return <div className="h-px mx-2 my-1" style={{ background: "var(--taomni-divider)" }} />;
+    return <div role="separator" className="h-px mx-2 my-1" style={{ background: "var(--taomni-divider)" }} />;
   }
 
   const hasChildren = !!item.children?.length || !!item.customPanel;
+  const semantics = {
+    id,
+    role: item.checked === undefined ? "menuitem" : "menuitemcheckbox",
+    "aria-checked": item.checked,
+    "aria-disabled": item.disabled || undefined,
+    tabIndex: -1,
+    title: item.disabled ? item.disabledReason : undefined,
+  };
   const content = (
     <>
       <span className="w-4 flex-shrink-0 text-center">{item.checked ? "✓" : item.icon}</span>
@@ -396,11 +411,14 @@ function MenuRow({
         onMouseLeave={scheduleClose}
       >
         <button
+          {...semantics}
+          aria-haspopup={item.children?.length ? "menu" : "dialog"}
+          aria-expanded={open}
           ref={triggerRef}
           data-testid={item.testId ?? `context-menu-item-${slugForTestId(item.label)}`}
           data-active={active ? "true" : undefined}
           className={rowClassName}
-          style={item.danger ? { color: "#b22222" } : undefined}
+          style={item.danger ? { color: "var(--taomni-danger-text)" } : undefined}
           disabled={item.disabled}
           onClick={item.openOnClick ? () => {
             if (open) {
@@ -428,6 +446,7 @@ function MenuRow({
                 onBack={() => {
                   setOpenByHover(false);
                   onCloseSubmenu();
+                  triggerRef.current?.closest<HTMLElement>('[role="menu"]')?.focus({ preventScroll: true });
                 }}
               />
             )}
@@ -439,11 +458,12 @@ function MenuRow({
 
   return (
     <button
+      {...semantics}
       ref={triggerRef}
       data-testid={item.testId ?? `context-menu-item-${slugForTestId(item.label)}`}
       data-active={active ? "true" : undefined}
       className={rowClassName}
-      style={item.danger ? { color: "#b22222" } : undefined}
+      style={item.danger ? { color: "var(--taomni-danger-text)" } : undefined}
       onMouseEnter={handleHover}
       onMouseMove={handleMouseMove}
       onClick={() => {

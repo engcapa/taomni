@@ -89,11 +89,11 @@ export function ExplorerNavTree({ id, hidden = false, home, path, dropPath, onNa
           if (event.key === "ArrowRight" && !open) toggle(directory, false);
           if (event.key === "ArrowLeft" && open) toggle(directory, true);
         }}>
-        <button className="ex-tw" aria-label={label(open ? "折叠" : "展开", open ? "Collapse" : "Expand") + " " + name} onClick={(event) => { event.stopPropagation(); toggle(directory, open); }}>{open ? <ChevronDown /> : <ChevronRight />}</button>
+        <button type="button" className="ex-tw" aria-label={label(open ? "折叠" : "展开", open ? "Collapse" : "Expand") + " " + name} onClick={(event) => { event.stopPropagation(); toggle(directory, open); }}>{open ? <ChevronDown /> : <ChevronRight />}</button>
         {drive ? <HardDrive /> : <ExplorerFileIcon directory />}<span className="ex-nav-label">{name}</span>
       </div>
       {open && <div role="group">
-        {cached?.error ? <button className="ex-warning" title={cached.error} onClick={() => void load(directory, true)}>{label("读取失败，点击重试", "Unable to read; retry")}</button>
+        {cached?.error ? <button type="button" className="ex-warning" title={cached.error} onClick={() => void load(directory, true)}>{label("读取失败，点击重试", "Unable to read; retry")}</button>
           : cached ? children.map((item) => tree(item.path, item.name, depth + 1, false, branch)) : <div className="ex-warning">{label("正在加载…", "Loading…")}</div>}
       </div>}
     </div>;

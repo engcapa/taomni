@@ -262,18 +262,18 @@ export function PinnedImage() {
     </div>
     <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: "inset 0 0 0 1px rgba(22,119,255,0.6)" }} />
     {collapsed ? <>
-      <button data-pin-controls data-testid="screenshot-pin-expand" title={t("screenshot.pinExpand")} aria-label={t("screenshot.pinExpand")} onClick={() => void collapse()}
+      <button type="button" data-pin-controls data-testid="screenshot-pin-expand" title={t("screenshot.pinExpand")} aria-label={t("screenshot.pinExpand")} onClick={() => void collapse()}
         className="absolute bottom-0 right-0 p-1 rounded-tl bg-black/75 text-white"><Maximize2 size={16} /></button>
       {note && <p data-pin-controls data-testid="screenshot-pin-thumb-note" title={note}
         className="absolute top-0 left-0 right-0 truncate bg-black/75 text-white text-ui-caption leading-4 px-1 cursor-help">{note}</p>}
     </> : <>
       <div data-pin-controls data-testid="screenshot-pin-toolbar" className="absolute top-1 right-1 flex gap-0.5 p-1 rounded-lg bg-black/80 text-white cursor-default">
-        <button data-testid="screenshot-pin-copy" className={buttonClass} title={`${t("screenshot.copy")} (Ctrl/Cmd+C)`} aria-label={t("screenshot.copy")} disabled={busy} onClick={() => void copy()}><Copy size={16} /></button>
-        <button data-testid="screenshot-pin-save" className={buttonClass} title={`${t("screenshot.save")} (Ctrl/Cmd+S)`} aria-label={t("screenshot.save")} disabled={busy} onClick={() => void save()}><Download size={16} /></button>
-        <button data-testid="screenshot-pin-favorite" className={buttonClass} title={t(favoriteId ? "screenshot.pinUnfavorite" : "screenshot.pinFavorite")} aria-label={t(favoriteId ? "screenshot.pinUnfavorite" : "screenshot.pinFavorite")} aria-pressed={!!favoriteId} disabled={busy} onClick={() => void favorite()}><Star size={16} fill={favoriteId ? "#faad14" : "none"} color={favoriteId ? "#faad14" : "currentColor"} /></button>
-        <button data-testid="screenshot-pin-collapse" className={buttonClass} title={t("screenshot.pinCollapse")} aria-label={t("screenshot.pinCollapse")} onClick={() => void collapse()}><Minimize2 size={16} /></button>
-        <button data-testid="screenshot-pin-menu-toggle" className={buttonClass} title={t("screenshot.pinOptions")} aria-label={t("screenshot.pinOptions")} aria-expanded={menuOpen} onClick={() => (menuOpen ? hideTools() : openMenu())}><MoreHorizontal size={16} /></button>
-        <button data-testid="screenshot-pin-close" className={buttonClass} title={t("screenshot.cancel")} aria-label={t("screenshot.cancel")} onClick={() => void close()}><X size={16} /></button>
+        <button type="button" data-testid="screenshot-pin-copy" className={buttonClass} title={`${t("screenshot.copy")} (Ctrl/Cmd+C)`} aria-label={t("screenshot.copy")} disabled={busy} onClick={() => void copy()}><Copy size={16} /></button>
+        <button type="button" data-testid="screenshot-pin-save" className={buttonClass} title={`${t("screenshot.save")} (Ctrl/Cmd+S)`} aria-label={t("screenshot.save")} disabled={busy} onClick={() => void save()}><Download size={16} /></button>
+        <button type="button" data-testid="screenshot-pin-favorite" className={buttonClass} title={t(favoriteId ? "screenshot.pinUnfavorite" : "screenshot.pinFavorite")} aria-label={t(favoriteId ? "screenshot.pinUnfavorite" : "screenshot.pinFavorite")} aria-pressed={!!favoriteId} disabled={busy} onClick={() => void favorite()}><Star size={16} fill={favoriteId ? "#faad14" : "none"} color={favoriteId ? "#faad14" : "currentColor"} /></button>
+        <button type="button" data-testid="screenshot-pin-collapse" className={buttonClass} title={t("screenshot.pinCollapse")} aria-label={t("screenshot.pinCollapse")} onClick={() => void collapse()}><Minimize2 size={16} /></button>
+        <button type="button" data-testid="screenshot-pin-menu-toggle" className={buttonClass} title={t("screenshot.pinOptions")} aria-label={t("screenshot.pinOptions")} aria-expanded={menuOpen} onClick={() => (menuOpen ? hideTools() : openMenu())}><MoreHorizontal size={16} /></button>
+        <button type="button" data-testid="screenshot-pin-close" className={buttonClass} title={t("screenshot.cancel")} aria-label={t("screenshot.cancel")} onClick={() => void close()}><X size={16} /></button>
       </div>
 
     </>}

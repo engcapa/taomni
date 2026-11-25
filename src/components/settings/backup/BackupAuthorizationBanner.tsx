@@ -25,9 +25,9 @@ export function BackupAuthorizationBanner() {
       <p role="status">{t(session.cancelRequested && !authClean(session) ? "backupUnified.cancelling" : `remoteBackup.auth.${session.phase}`)}{session.userCode && !session.cancelRequested && ` · ${t("remoteBackup.verificationCode", { code: session.userCode })}`}</p>
       {session.error && <BackupError t={t} error={session.error} />}
       <div className="flex flex-wrap gap-2">
-        {session.verificationUrl && !session.cancelRequested && !authTerminal(session) && <button className={backupButton} onClick={() => void action(session.id, () => open(session.verificationUrl!))}>{t("remoteBackup.openAuthorization")}</button>}
-        {authBlocking(session) && <button data-testid="backup-authorization-cancel" className={backupButton} disabled={busy === session.id || session.cancelRequested || authTerminal(session)} onClick={() => void action(session.id, () => cancelAuthorization(session.id))}>{t("remoteBackup.cancelConnection")}</button>}
-        {authTerminal(session) && authClean(session) && <button data-testid="backup-authorization-forget" className={backupButton} disabled={busy === session.id} onClick={() => void action(session.id, () => forget(session.id))}>{t("backupUnified.dismissAuthorization")}</button>}
+        {session.verificationUrl && !session.cancelRequested && !authTerminal(session) && <button type="button" className={backupButton} onClick={() => void action(session.id, () => open(session.verificationUrl!))}>{t("remoteBackup.openAuthorization")}</button>}
+        {authBlocking(session) && <button type="button" data-testid="backup-authorization-cancel" className={backupButton} disabled={busy === session.id || session.cancelRequested || authTerminal(session)} onClick={() => void action(session.id, () => cancelAuthorization(session.id))}>{t("remoteBackup.cancelConnection")}</button>}
+        {authTerminal(session) && authClean(session) && <button type="button" data-testid="backup-authorization-forget" className={backupButton} disabled={busy === session.id} onClick={() => void action(session.id, () => forget(session.id))}>{t("backupUnified.dismissAuthorization")}</button>}
       </div>
     </div>)}
     {(actionError || error) && <BackupError error={actionError || error!} t={t} />}

@@ -160,8 +160,8 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
         </div>
       </div>
       <ExplorerStatusBar entries={visible} selected={selected} />
-      {operations.busy && <div className="ex-toast" role="status" data-testid="explorer-progress"><span>{operations.progress ? `${operations.progress.items} ${label("项", "items")} · ${formatBytes(operations.progress.bytes)}` : label("正在处理…", "Working…")}</span><button onClick={operations.cancel}>{label("取消", "Cancel")}</button></div>}
-      {operations.toast && <div className={`ex-toast ${operations.toast.error ? "error" : ""}`} role="status" data-testid="explorer-toast"><span>{operations.toast.message}</span>{operations.toast.undo && <button data-testid="explorer-undo" onClick={operations.toast.undo}>{label("撤销", "Undo")}</button>}</div>}
+      {operations.busy && <div className="ex-toast" role="status" data-testid="explorer-progress"><span>{operations.progress ? `${operations.progress.items} ${label("项", "items")} · ${formatBytes(operations.progress.bytes)}` : label("正在处理…", "Working…")}</span><button type="button" onClick={operations.cancel}>{label("取消", "Cancel")}</button></div>}
+      {operations.toast && <div className={`ex-toast ${operations.toast.error ? "error" : ""}`} role="status" data-testid="explorer-toast"><span>{operations.toast.message}</span>{operations.toast.undo && <button type="button" data-testid="explorer-undo" onClick={operations.toast.undo}>{label("撤销", "Undo")}</button>}</div>}
       <ExplorerDialogs operations={operations} />
     </div>
   </ExplorerContext.Provider>;

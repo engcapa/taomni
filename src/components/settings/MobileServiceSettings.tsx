@@ -66,7 +66,7 @@ export function MobileServiceSettings() {
         {t("mobileSettings.port")}{" "}
         <input data-testid="mobile-settings-port" className="w-20 border rounded px-2 py-1" type="number" value={port} min={0} max={65535} disabled={busy || status.enabled} onChange={e => setPort(Number(e.target.value))} />
       </label>
-      <button data-testid="mobile-settings-toggle" className="border rounded px-3 py-1.5" disabled={busy || !Number.isInteger(port) || port < 0 || port > 65535} onClick={() => void act(async () => {
+      <button type="button" data-testid="mobile-settings-toggle" className="border rounded px-3 py-1.5" disabled={busy || !Number.isInteger(port) || port < 0 || port > 65535} onClick={() => void act(async () => {
         const next = await invoke<Status>(status.enabled ? "mobile_stop" : "mobile_start", status.enabled ? {} : { lan, port });
         setStatus(next); setCode(""); setQr(null);
         if (next.address) setEndpoint(next.address);
@@ -104,7 +104,7 @@ export function MobileServiceSettings() {
         {t("mobileSettings.endpoint")}
         <input data-testid="mobile-settings-endpoint" className="mt-1 block w-full border rounded px-2 py-1" value={endpoint} onChange={e => setEndpoint(e.target.value)} placeholder="https://pc.example.com" />
       </label>
-      <button data-testid="mobile-settings-pair" className="border rounded px-3 py-1.5" disabled={busy} onClick={() => void act(async () => {
+      <button type="button" data-testid="mobile-settings-pair" className="border rounded px-3 py-1.5" disabled={busy} onClick={() => void act(async () => {
         setCode(await invoke<string>("mobile_pairing_code"));
         setExpires(Date.now() + 300000);
         setStatus(await invoke<Status>("mobile_status"));
@@ -121,12 +121,12 @@ export function MobileServiceSettings() {
     </div>}
     <div className="mt-4">
       <h4 className="font-medium">{t("mobileSettings.devices")}</h4>
-      <button data-testid="mobile-settings-refresh" className="border rounded px-2 py-1 mt-2" disabled={busy} onClick={() => void act(async () => {
+      <button type="button" data-testid="mobile-settings-refresh" className="border rounded px-2 py-1 mt-2" disabled={busy} onClick={() => void act(async () => {
         setStatus(await invoke<Status>("mobile_status"));
       })}>{t("mobileSettings.refreshDevices")}</button>
       {status.devices.map(device => <div key={device.device_id} data-testid="mobile-settings-device" className="flex flex-wrap items-center justify-between gap-2 border-t mt-2 pt-2">
         <span>{device.label} · {device.origin || t("mobileSettings.nonBrowser")} · {new Date(device.last_used_at * 1000).toLocaleString(locale)}</span>
-        <button data-testid="mobile-settings-revoke" className="border rounded px-2 py-1" disabled={busy} onClick={() => void act(async () => {
+        <button type="button" data-testid="mobile-settings-revoke" className="border rounded px-2 py-1" disabled={busy} onClick={() => void act(async () => {
           await invoke("mobile_revoke", { deviceId: device.device_id });
           setStatus(await invoke<Status>("mobile_status"));
         })}>{t("mobileSettings.revokeDevice")}</button>

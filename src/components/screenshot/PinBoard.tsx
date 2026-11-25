@@ -51,21 +51,21 @@ export function PinBoard() {
       <select data-testid="screenshot-board-layout" aria-label={t("screenshot.pinArrange")} value={mode} onChange={(e) => setMode(e.target.value as PinArrangement)}>
         {(["tile", "cascade", "stackRight", "stackBottom"] as const).map((m) => <option key={m} value={m}>{t(`screenshot.pin${m[0].toUpperCase()}${m.slice(1)}`)}</option>)}
       </select>
-      <button data-testid="screenshot-board-select-all" onClick={() => setSelected(pins.map((p) => p.label))}>{t("screenshot.selectAllPins")}</button>
-      <button data-testid="screenshot-board-collapse" onClick={() => setCompact(!compact)}>{t(compact ? "screenshot.batchExpand" : "screenshot.batchCollapse")}</button>
-      <button data-testid="screenshot-board-close-selected" disabled={!selected.length} onClick={() => setConfirm(true)}>{t("screenshot.closeSelectedPins")}</button>
-      <button data-testid="screenshot-board-close" onClick={() => void getCurrentWindow().close()}>{t("screenshot.cancel")}</button>
+      <button type="button" data-testid="screenshot-board-select-all" onClick={() => setSelected(pins.map((p) => p.label))}>{t("screenshot.selectAllPins")}</button>
+      <button type="button" data-testid="screenshot-board-collapse" onClick={() => setCompact(!compact)}>{t(compact ? "screenshot.batchExpand" : "screenshot.batchCollapse")}</button>
+      <button type="button" data-testid="screenshot-board-close-selected" disabled={!selected.length} onClick={() => setConfirm(true)}>{t("screenshot.closeSelectedPins")}</button>
+      <button type="button" data-testid="screenshot-board-close" onClick={() => void getCurrentWindow().close()}>{t("screenshot.cancel")}</button>
     </header>
     {confirm && <div role="alert" className="p-3 text-ui-body">{t("screenshot.closeAllPinsConfirm")}
-      <button data-testid="screenshot-board-confirm" onClick={() => { void Promise.all(selected.map(closePin)).then(() => { setConfirm(false); setSelected([]); return refresh(); }).catch((e) => setError(String(e))); }}>{t("screenshot.done")}</button>
-      <button onClick={() => setConfirm(false)}>{t("screenshot.cancel")}</button></div>}
+      <button type="button" data-testid="screenshot-board-confirm" onClick={() => { void Promise.all(selected.map(closePin)).then(() => { setConfirm(false); setSelected([]); return refresh(); }).catch((e) => setError(String(e))); }}>{t("screenshot.done")}</button>
+      <button type="button" onClick={() => setConfirm(false)}>{t("screenshot.cancel")}</button></div>}
     {error && <p role="alert">{error}</p>}
     <main className="flex-1 min-h-0 overflow-auto p-3" style={{ display: "grid", gridTemplateColumns: columns, gap: mode === "cascade" ? 0 : 12, alignContent: "start" }}>
       {pins.map((pin, i) => <article data-testid="screenshot-board-pin" key={pin.label} className="rounded-lg border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-2 flex flex-col"
         style={{ height: compact ? 110 : 300, marginTop: mode === "cascade" ? (i % 6) * 24 : 0 }}>
         <div className="flex gap-2 text-ui-body mb-2"><input data-testid="screenshot-board-select" aria-label={pin.note || pin.label} type="checkbox" checked={selected.includes(pin.label)} onChange={(e) => setSelected((all) => e.target.checked ? [...all, pin.label] : all.filter((l) => l !== pin.label))} />
           <span className="truncate flex-1">{pin.note || pin.label}</span>
-          <button data-testid="screenshot-board-copy" onClick={() => void copyImageToClipboard(pin.path).catch((e) => setError(String(e)))}>{t("screenshot.copy")}</button></div>
+          <button type="button" data-testid="screenshot-board-copy" onClick={() => void copyImageToClipboard(pin.path).catch((e) => setError(String(e)))}>{t("screenshot.copy")}</button></div>
         <BoardImage pin={pin} />
       </article>)}
     </main>

@@ -84,6 +84,19 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
   const selectNow = (paths: string[]) => useSftpStore.getState().setSelection(inputs.sessionId, "local", paths);
   const handleKeys = (event: React.KeyboardEvent) => {
     if (event.nativeEvent.isComposing || (event.target as HTMLElement).closest("input,textarea,button,[role=columnheader],[contenteditable=true]")) return;
+    if ((event.key === "ContextMenu" || (event.shiftKey && event.key === "F10"))
+      && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const list = event.currentTarget;
+      const row = list.ownerDocument.getElementById(list.getAttribute("aria-activedescendant") ?? "");
+      const target = row && list.contains(row) ? row : list;
+      const bounds = target.getBoundingClientRect();
+      event.preventDefault();
+      event.stopPropagation();
+      target.dispatchEvent(new MouseEvent("contextmenu", {
+        bubbles: true, cancelable: true, clientX: bounds.left + 8, clientY: bounds.top + 8,
+      }));
+      return;
+    }
     const mod = getAppPlatform() === "macos" ? event.metaKey : event.ctrlKey;
     if (mod && !event.altKey && !event.shiftKey && !(getAppPlatform() === "macos" ? event.ctrlKey : event.metaKey) && event.key.toLowerCase() === "a") {
       event.preventDefault(); event.stopPropagation(); selectNow(entries.map((entry) => entry.path)); return;

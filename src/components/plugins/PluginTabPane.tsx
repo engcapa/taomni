@@ -74,7 +74,7 @@ export function PluginTabPane<Props extends object = Record<never, never>>({ tab
     <div data-testid="plugin-tab-error" role="alert" className="m-auto max-w-lg space-y-3 p-6 text-ui-body">
       <p className="font-semibold">{t("plugins.loadFailed")}</p>
       <p className="break-words text-[var(--taomni-text-muted)]">{message}</p>
-      <button data-testid="plugin-tab-retry" className="taomni-btn px-3 py-1" onClick={retryLoad}>{t("plugins.retry")}</button>
+      <button type="button" data-testid="plugin-tab-retry" className="taomni-btn px-3 py-1" onClick={retryLoad}>{t("plugins.retry")}</button>
       {unavailableActions}
     </div>
   );
@@ -86,7 +86,7 @@ export function PluginTabPane<Props extends object = Record<never, never>>({ tab
   } else if (!available) {
     const reason = record?.lifecycle === "uninstalled" || !record ? "missing" : record.lifecycle !== "enabled" ? "disabled" : "unavailable";
     content = <PluginUnavailablePane reason={reason} detail={record?.reason} onOpenSettings={onOpenSettings}>
-      <button data-testid="plugin-tab-retry" className="taomni-btn px-3 py-1" onClick={retryLoad}>{t("plugins.retry")}</button>
+      <button type="button" data-testid="plugin-tab-retry" className="taomni-btn px-3 py-1" onClick={retryLoad}>{t("plugins.retry")}</button>
       {unavailableActions}
     </PluginUnavailablePane>;
   } else if (failure?.identity === identity) {

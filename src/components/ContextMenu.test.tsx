@@ -329,3 +329,24 @@ describe("ContextMenu", () => {
   });
 });
 
+
+it("exposes the active command, checked value and unavailable state to assistive technology", () => {
+  const apply = vi.fn();
+  render(<ContextMenu x={20} y={20} onClose={vi.fn()} items={[
+    { label: "Show details", checked: true, onClick: apply },
+    { label: "Remove", disabled: true, disabledReason: "Select a file" },
+    { label: "Refresh", onClick: apply },
+  ]} />);
+  const menu = screen.getByRole("menu");
+  expect(menu).toHaveFocus();
+  const checked = screen.getByRole("menuitemcheckbox", { name: /Show details/ });
+  expect(checked).toHaveAttribute("aria-checked", "true");
+  expect(menu).toHaveAttribute("aria-activedescendant", checked.id);
+  expect(screen.getByRole("menuitem", { name: "Remove" })).toHaveAttribute("title", "Select a file");
+  fireEvent.keyDown(menu, { key: "Enter", isComposing: true });
+  expect(apply).not.toHaveBeenCalled();
+  fireEvent.keyDown(menu, { key: "ArrowDown" });
+  expect(menu).toHaveAttribute("aria-activedescendant", screen.getByRole("menuitem", { name: "Refresh" }).id);
+  fireEvent.keyDown(menu, { key: "Enter" });
+  expect(apply).toHaveBeenCalledTimes(1);
+});

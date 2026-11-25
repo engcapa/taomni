@@ -175,7 +175,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     {viewProps.showHome === false && (!activeTab || activeTab.type === "welcome") && (
       <div data-testid={viewProps.toolsView ? "tools-empty-state" : "sessions-empty-state"} className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-ui-body">
         <span className="text-ui-title font-semibold">{t(viewProps.toolsView ? "platform.toolsEmpty" : "platform.sessionsEmpty")}</span>
-        {!viewProps.toolsView && <button data-testid="sessions-empty-new-session" className="taomni-btn" onClick={() => handleNewSession()}>{t("menu.newSession")}</button>}
+        {!viewProps.toolsView && <button type="button" data-testid="sessions-empty-new-session" className="taomni-btn" onClick={() => handleNewSession()}>{t("menu.newSession")}</button>}
       </div>
     )}
 

@@ -52,7 +52,7 @@ export function PluginTabPanels({ tabs, activeTabId, onOpenSettings, onClose, on
         onEditMailSession={onEditMailSession}
       /> : <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 justify-end border-b border-[var(--taomni-divider)] p-1">
-          <button data-testid="plugin-tab-detach" className="taomni-btn px-2 py-1 text-ui-body" onClick={() => {
+          <button type="button" data-testid="plugin-tab-detach" className="taomni-btn px-2 py-1 text-ui-body" onClick={() => {
             void detachPluginTab(tab).catch((error) => useAppStore.getState().setStatusMessage(String(error)));
           }}>{t("plugins.detach")}</button>
         </div>

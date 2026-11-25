@@ -1,3 +1,4 @@
+import { Button } from "../ui/Button";
 import { confirmAppDialog } from "../../lib/appDialogs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -450,13 +451,12 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
             </span>
           )}
           <div className="flex-1" />
-          <button className="taomni-btn" onClick={onClose} disabled={saving} type="button">
+          <Button onClick={onClose} disabled={saving}>
             {t("common.cancel")}
-          </button>
-          <button className="taomni-btn" data-primary="true" onClick={save} disabled={saving} type="button">
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1 inline" /> : null}
+          </Button>
+          <Button variant="primary" onClick={save} busy={saving}>
             {t("common.save")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

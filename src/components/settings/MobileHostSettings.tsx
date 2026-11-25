@@ -68,8 +68,8 @@ export function MobileHostSettings() {
       }} />
     </label>
     <p className="text-[var(--taomni-text-muted)]">{t("mobileSettings.hostsApplyHint")}</p>
-    <button data-testid="mobile-settings-save-hosts" className="border rounded px-3 py-1.5" disabled={!loaded || busy} onClick={() => void save()}>{t("mobileSettings.saveHosts")}</button>
-    {!loaded && error && <button data-testid="mobile-settings-reload-hosts" className="ml-2 border rounded px-3 py-1.5" onClick={() => { setError(""); setReload(value => value + 1); }}>{t("mobileSettings.retryHosts")}</button>}
+    <button type="button" data-testid="mobile-settings-save-hosts" className="border rounded px-3 py-1.5" disabled={!loaded || busy} onClick={() => void save()}>{t("mobileSettings.saveHosts")}</button>
+    {!loaded && error && <button type="button" data-testid="mobile-settings-reload-hosts" className="ml-2 border rounded px-3 py-1.5" onClick={() => { setError(""); setReload(value => value + 1); }}>{t("mobileSettings.retryHosts")}</button>}
     {saved && <p role="status" data-testid="mobile-settings-hosts-saved">{t("mobileSettings.hostsSaved")}</p>}
     {error && <p role="alert" data-testid="mobile-settings-hosts-error" className="text-red-400">{mobileSettingsError(error, t)}</p>}
   </section>;

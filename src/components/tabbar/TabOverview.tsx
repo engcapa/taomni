@@ -132,7 +132,7 @@ function OpenTabOverview() {
     <div ref={dialogRef} data-testid="tab-overview" data-scope={all ? "all" : mode} data-preview-delay-ms={OVERVIEW_PREVIEW_DELAY_MS} role="dialog" aria-modal="true" aria-labelledby="tab-overview-title" className="taomni-tab-overview" onScroll={clearPreview}>
       <div className="taomni-overview-header">
         <div><h2 id="tab-overview-title" className="flex items-center gap-2 text-ui-heading font-bold"><LayoutGrid className="h-4 w-4" />{t("platform.tabOverview")}<kbd className="text-ui-small font-normal">Ctrl/Cmd+Shift+E</kbd></h2><p className="mt-1 text-ui-body text-[var(--taomni-text-muted)]">{t("platform.overviewHint")}</p></div>
-        <button data-testid="tab-overview-close" className="taomni-btn" onClick={close}><X className="mr-1 h-3 w-3" />{t("common.close")} (Esc)</button>
+        <button type="button" data-testid="tab-overview-close" className="taomni-btn" onClick={close}><X className="mr-1 h-3 w-3" />{t("common.close")} (Esc)</button>
       </div>
       <div className="taomni-overview-search-row">
         <div className="taomni-overview-search">
@@ -156,8 +156,8 @@ function OpenTabOverview() {
         <span data-testid="tab-overview-results" className="shrink-0 text-ui-small text-[var(--taomni-text-muted)]">{t("platform.overviewResults", { visible: matching.length, total: items.length })}</span>
       </div>
       {(mode === "sessions" || mode === "workspaces" || mode === "explorer") && <div className="mb-3 flex gap-2">
-        <button data-testid="tab-overview-current" className="taomni-toolbar-pill" aria-pressed={!all} onClick={() => setAll(false)}>{t("platform.overviewCurrent")}</button>
-        <button data-testid="tab-overview-all" className="taomni-toolbar-pill" aria-pressed={all} onClick={() => setAll(true)}>{t("platform.overviewAll")}</button>
+        <button type="button" data-testid="tab-overview-current" className="taomni-toolbar-pill" aria-pressed={!all} onClick={() => setAll(false)}>{t("platform.overviewCurrent")}</button>
+        <button type="button" data-testid="tab-overview-all" className="taomni-toolbar-pill" aria-pressed={all} onClick={() => setAll(true)}>{t("platform.overviewAll")}</button>
       </div>}
       <div ref={gridRef} className="taomni-overview-grid" onKeyDown={(event) => { moveOverviewFocus(event); if (event.defaultPrevented) clearPreview(); }}>
         {matching.map((item) => <button key={item.id} type="button" data-testid="tab-overview-card" data-tab-id={item.id} data-workspace-id={item.workspaceId} data-surface={item.surface}
