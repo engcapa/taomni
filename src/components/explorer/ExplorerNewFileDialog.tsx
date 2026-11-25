@@ -14,7 +14,7 @@ export function ExplorerNewFileDialog({ operations }: { operations: ExplorerOper
   const explorer = useRef<HTMLElement | null>(null);
   const titleId = useId();
   const error = newFileNameError(name, label);
-  const message = attempted && error || (operations.toast?.error ? operations.toast.message : null);
+  const message = attempted && error || operations.newFileError;
   useLayoutEffect(() => { explorer.current = root.current?.closest<HTMLElement>(".ex-shell") ?? null; }, []);
   useFocusReturn(true, () => explorer.current?.querySelector<HTMLElement>('[data-testid="explorer-cmd-new"]')?.focus());
   const close = () => { if (!operations.busy) operations.setNewFile(false); };

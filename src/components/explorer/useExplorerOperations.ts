@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { readFilesResult, writeText } from "../../lib/clipboard";
 import { notifyClipboardWritten } from "../../lib/clipboardOwnership";
@@ -13,17 +13,26 @@ import { clipboardMatches, getExplorerClipboard, setExplorerClipboard } from "./
 import { useExplorerLabels } from "./explorerLabels";
 import { openFile, UnavailableFileHandlerError } from "../../lib/openFile";
 import { EXPLORER_TEXT_FILE_TYPES, newFileNameError, uniqueNewFileName, type ExplorerQuickExtension } from "./explorerFileTypes";
+import { useToastQueue } from "../ui/Toast";
 import { setExplorerPreferences } from "./explorerPreferences";
 
-export interface ExplorerToast { message: string; error?: boolean; undo?: () => void }
 export interface DeletePrompt { entries: FileEntry[]; reason?: string; defaultIntent?: "trash" | "permanent" }
 export interface UnavailableHandlerPrompt { path: string; handlerLabel: string; message: string }
 export function useExplorerOperations(tabId: string, workspaceId?: string) {
   const label = useExplorerLabels();
-  const [toast, setToast] = useState<ExplorerToast | null>(null);
+  const { entries: toasts, publish, dismiss } = useToastQueue();
+  const [newFileError, setNewFileError] = useState("");
   const [deletePrompt, setDeletePrompt] = useState<DeletePrompt | null>(null);
   const [unavailablePrompt, setUnavailablePrompt] = useState<UnavailableHandlerPrompt | null>(null);
-  const [renamePath, setRenamePath] = useState<string | null>(null);
+  const [renamePath, updateRenamePath] = useState<string | null>(null);
+  const [renameError, setRenameError] = useState("");
+  const renameErrorId = useId();
+  const renameOwner = useRef(0);
+  const setRenamePath = useCallback((path: string | null) => {
+    renameOwner.current++;
+    setRenameError("");
+    updateRenamePath(path);
+  }, []);
   const [properties, setProperties] = useState<FileEntry[] | null>(null);
   const [progress, setProgress] = useState<ExplorerProgress | null>(null);
   const [busy, setBusy] = useState(false);
@@ -39,13 +48,8 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
       setUnavailablePrompt({ path: rawError.filePath, handlerLabel: rawError.handlerLabel, message });
       return;
     }
-    setToast({ message, error });
-  }, []);
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), toast.undo ? 10000 : toast.error ? 12000 : 4000);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+    publish({ message, error });
+  }, [publish]);
   const refreshAll = useCallback(async () => {
     const store = useSftpStore.getState();
     await Promise.all(Object.keys(store.sessions).filter((id) => store.sessions[id].local.path && !store.sessions[id].local.loading)
@@ -57,7 +61,7 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
       ...failed.map((failure) => `${failure.path}: ${failure.message}`),
     ].join("\n"), failed.length > 0);
   }, [label, notify]);
-  const run = useCallback(async (task: (id: string) => Promise<void>) => {
+  const run = useCallback(async (task: (id: string) => Promise<void>, reportError?: (reason: string) => void) => {
     if (lock.current) return;
     lock.current = true;
     cancelled.current = false;
@@ -68,7 +72,10 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
     const listening = listen<ExplorerProgress>("explorer:progress", ({ payload }) => {
       if (!disposed && mounted.current && payload.operationId === id) setProgress(payload);
     }).catch(() => () => {});
-    try { await task(id); } catch (error) { notify(String(error), true, error); }
+    try { await task(id); } catch (error) {
+      if (reportError) reportError(String(error));
+      else notify(String(error), true, error);
+    }
     finally {
       disposed = true;
       void listening.then((unlisten) => unlisten());
@@ -172,26 +179,38 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
       }
       if (result.trashed.length) {
         const items: TrashRef[] = result.trashed;
-        setToast({ message: label(`已将 ${items.length} 项移到回收站`, `Moved ${items.length} item(s) to Trash`), undo: () => {
-          void run(async () => {
-            setToast(null);
-            const restored = await localTrashRestore(items);
-            await refreshAll(); summarize(restored.done.length, restored.failed);
-          });
-        } });
+        publish({
+          message: label(`已将 ${items.length} 项移到回收站`, `Moved ${items.length} item(s) to Trash`),
+          action: {
+            label: label("撤销", "Undo"),
+            testId: "explorer-undo",
+            run: () => void run(async () => {
+              const restored = await localTrashRestore(items);
+              await refreshAll();
+              summarize(restored.done.length, restored.failed);
+            }),
+          },
+        });
       }
     });
-  }, [label, refreshAll, run, summarize]);
+  }, [label, publish, refreshAll, run, summarize]);
   const rename = useCallback(async (entry: FileEntry, name: string): Promise<boolean> => {
+    const owner = renameOwner.current;
     if (entry.name === name) { setRenamePath(null); return true; }
+    setRenameError("");
     try {
       const path = await localRenameEntry(entry.path, name);
       await refreshAll();
-      useSftpStore.getState().setSelection(tabId, "local", [path]);
-      setRenamePath(null);
+      if (owner === renameOwner.current && mounted.current) {
+        useSftpStore.getState().setSelection(tabId, "local", [path]);
+        setRenamePath(null);
+      }
       return true;
-    } catch (error) { notify(String(error), true); return false; }
-  }, [notify, refreshAll, tabId]);
+    } catch (error) {
+      if (owner === renameOwner.current && mounted.current) setRenameError(String(error));
+      return false;
+    }
+  }, [refreshAll, setRenamePath, tabId]);
   const suggestFileName = useCallback((name: string) => uniqueNewFileName(name,
     useSftpStore.getState().sessions[tabId]?.local.entries.map((entry) => entry.name) ?? []), [tabId]);
   const createEntry = useCallback(async (name: string, directory: boolean) => {
@@ -202,7 +221,7 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
     await refreshAll();
     useSftpStore.getState().setSelection(tabId, "local", [path]);
     setRenamePath(path);
-  }, [label, refreshAll, tabId]);
+  }, [label, refreshAll, setRenamePath, tabId]);
   const create = useCallback((directory: boolean, extension: ExplorerQuickExtension = "txt") => run(async () => {
     const fileType = EXPLORER_TEXT_FILE_TYPES.find((type) => type.extension === extension)!;
     const name = directory ? label("新建文件夹", "New folder") : `${label(fileType.name[0], fileType.name[1])}.${extension}`;
@@ -211,7 +230,7 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
   const createFile = useCallback(async (name: string) => {
     let created = false;
     await run(async () => {
-      setToast(null);
+      setNewFileError("");
       const error = newFileNameError(name, label);
       if (error) throw new Error(error);
       const entries = useSftpStore.getState().sessions[tabId]?.local.entries ?? [];
@@ -221,10 +240,10 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
       await createEntry(name, false);
       setNewFile(false);
       created = true;
-    });
+    }, setNewFileError);
     return created;
   }, [createEntry, label, run, tabId]);
-  const startNewFile = useCallback(() => { setToast(null); setNewFile(true); }, []);
+  const startNewFile = useCallback(() => { setNewFileError(""); setNewFile(true); }, []);
   const copyPath = useCallback(async (paths: string[]) => {
     try { await writeText(paths.join("\n")); notify(label("已复制路径", "Path copied")); }
     catch (error) { notify(String(error), true); }
@@ -236,8 +255,8 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
     cancelled.current = true;
     if (operation.current) void explorerCancelOperation(operation.current).catch((error) => notify(String(error), true));
   }, [notify]);
-  return { toast, notify, busy, progress, cancel, open, openWithSystemFallback, copy, paste, drop, transfer, remove, trash, permanentDelete,
-    rename, renamePath, setRenamePath, create, createFile, suggestFileName, newFile, setNewFile, startNewFile,
+  return { toasts, dismiss, newFileError, notify, busy, progress, cancel, open, openWithSystemFallback, copy, paste, drop, transfer, remove, trash, permanentDelete,
+    rename, renamePath, setRenamePath, renameError, renameErrorId, create, createFile, suggestFileName, newFile, setNewFile, startNewFile,
     copyPath, reveal, deletePrompt, setDeletePrompt, unavailablePrompt, setUnavailablePrompt, properties, setProperties };
 }
 

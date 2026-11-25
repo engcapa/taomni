@@ -167,6 +167,12 @@ export const zhCN: DeepPartial<typeof en> = {
     index: "索引",
     partial: "部分可用",
   },
+  feedback: {
+    renameFailed: "无法重命名。请修改名称后重试。{detail}",
+    dismiss: "关闭通知",
+    copyDetails: "复制错误详情",
+    copyFailed: "无法复制详情。请选择错误信息并手动复制。{detail}",
+  },
   common: {
     ok: "确定",
     cancel: "取消",

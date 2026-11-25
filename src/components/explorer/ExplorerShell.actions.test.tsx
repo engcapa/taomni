@@ -47,7 +47,7 @@ describe("Explorer mounted context and command workflows", () => {
     const input = await screen.findByTestId("explorer-rename-input");
     fireEvent.change(input, { target: { value: "changed.txt" } });
     fireEvent.keyDown(input, { key: "Enter" });
-    expect(await screen.findByTestId("explorer-toast")).toHaveTextContent("Permission denied");
+    expect(await screen.findByTestId("explorer-rename-error")).toHaveTextContent("Permission denied");
     expect(input).toHaveFocus();
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(rows()).toContain("changed.txt"));

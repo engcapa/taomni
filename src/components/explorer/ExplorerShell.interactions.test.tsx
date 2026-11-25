@@ -131,7 +131,7 @@ describe("Explorer editing and shortcut ownership", () => {
     expect(input).toHaveFocus(); expect(input.selectionStart).toBe(0); expect(input.selectionEnd).toBe(5);
     fireEvent.change(input, { target: { value: "beta.md" } });
     fireEvent.keyDown(input, { key: "Enter" });
-    expect(await screen.findByTestId("explorer-toast")).toHaveTextContent("same name");
+    expect(await screen.findByTestId("explorer-rename-error")).toHaveTextContent("same name");
     expect(input).toHaveFocus(); expect(screen.getByTestId("explorer-rename-input")).toBe(input);
     fireEvent.change(input, { target: { value: "renamed.txt" } });
     fireEvent.keyDown(input, { key: "Enter" });

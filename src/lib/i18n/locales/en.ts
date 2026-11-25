@@ -168,6 +168,12 @@ const dict = {
     index: "Index",
     partial: "Partial",
   },
+  feedback: {
+    renameFailed: "Could not rename the item. Edit its name and try again. {detail}",
+    dismiss: "Dismiss notification",
+    copyDetails: "Copy error details",
+    copyFailed: "Could not copy the details. Select the message to copy it manually. {detail}",
+  },
   common: {
     ok: "OK",
     cancel: "Cancel",

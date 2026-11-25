@@ -16688,6 +16688,9 @@ controls:
   - id: explorer-refresh
     selector: '[data-testid="explorer-refresh"]'
     kind: interactive
+  - id: explorer-rename-error
+    selector: '[data-testid="explorer-rename-error"]'
+    kind: display
   - id: explorer-rename-input
     selector: '[data-testid="explorer-rename-input"]'
     kind: interactive

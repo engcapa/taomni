@@ -22,3 +22,40 @@
   --color-ui-info-surface: var(--taomni-info-bg, var(--taomni-selected));
   --color-ui-info-border: var(--taomni-info-border, var(--taomni-accent));
 }
+
+.taomni-toast-stack {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: var(--taomni-z-toast, 1200);
+  display: grid;
+  gap: 8px;
+  max-width: min(460px, calc(100% - 24px));
+  pointer-events: none;
+}
+.taomni-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--taomni-card-border);
+  border-radius: var(--taomni-radius-lg, 4px);
+  box-shadow: var(--taomni-shadow-md);
+  background: var(--taomni-card-bg);
+  color: var(--taomni-text);
+  font-size: var(--taomni-fs-body);
+  pointer-events: auto;
+}
+.taomni-toast[data-tone="error"] {
+  border-color: var(--taomni-danger-border);
+  color: var(--taomni-danger-text);
+  background: var(--taomni-danger-bg);
+}
+.taomni-toast-message {
+  min-width: 0;
+  max-height: 8em;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}

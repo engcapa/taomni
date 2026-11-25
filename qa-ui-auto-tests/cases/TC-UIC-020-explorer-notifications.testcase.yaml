@@ -1,0 +1,51 @@
+id: TC-UIC-020-explorer-notifications
+title: Explorer merges repeated clipboard notices and dismisses only the focused notice
+covers: [F-EXPLORER-1]
+modes: [browser, native]
+tags: [ui-contract, explorer, clipboard]
+fixtures: [reset_db, explorer_files]
+ui_standard: [UI-FBK-01, UI-FBK-07]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-notifications
+- click: '[data-testid="side-tab-explorer"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_source}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="alpha.txt"]'
+- file_clipboard: {action: seed, paths: []}
+- click: '[data-testid="explorer-cmd-paste"]'
+- assert_text: {selector: '[data-testid="explorer-toast"] [role="status"]', contains: No files in clipboard}
+- click: '[data-testid="explorer-cmd-paste"]'
+- assert_text: {selector: '[data-testid="explorer-toast"] [role="status"]', contains: '×2'}
+- assert_count: {selector: '[data-testid="explorer-toast"] [role="status"]', equal: 1}
+- press: {selector: '[data-testid="explorer-toast"] [role="status"]', key: Escape}
+- assert_not_visible: '[data-testid="explorer-toast"]'
+- assert_focus_on: '[data-testid="explorer-file-list"]'
+- assert_explorer_files: {state: seeded}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: repeated
+    requirement: Repeated identical feedback updates the same visible live status.
+    ui_standard: [UI-FBK-07]
+    actions: [9, 11]
+    checkpoints:
+    - {step: 10, expectation: An empty clipboard produces a readable explanation.}
+    - {step: 12, expectation: The status counts the second occurrence.}
+    - {step: 13, expectation: Only one notification is shown.}
+    results: [10, 12, 13]
+  - id: keyboard
+    requirement: Escape dismisses the focused notification and returns to the file list.
+    ui_standard: [UI-FBK-01]
+    actions: [14]
+    checkpoints:
+    - {step: 15, expectation: The notice is gone.}
+    - {step: 16, expectation: The file list regains keyboard focus.}
+    - {step: 17, expectation: The directory retains its original files and contents.}
+    results: [15, 16, 17]
+  visual:
+  - {check: Visible notice count and message, method: automated, reason: Checks that the repeated message has one visible status with its occurrence count.}
+  native:
+  - {check: Desktop file-list clipboard, method: automated, reason: Reads the empty file list on the isolated desktop and verifies fixture files.}

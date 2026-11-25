@@ -1429,6 +1429,7 @@
 - `[data-testid="explorer-properties-close"]` — interactive — F-EXPLORER-1.explorer-properties-close
 - `[data-testid="explorer-properties-size"]` — display — F-EXPLORER-1.explorer-properties-size
 - `[data-testid="explorer-refresh"]` — interactive — F-EXPLORER-1.explorer-refresh
+- `[data-testid="explorer-rename-error"]` — display — F-EXPLORER-1.explorer-rename-error
 - `[data-testid="explorer-rename-input"]` — interactive — F-EXPLORER-1.explorer-rename-input
 - `[data-testid="explorer-restore-tabs"]` — interactive — F-EXPLORER-1.explorer-restore-tabs
 - `[data-testid="explorer-sort-asc"]` — interactive — F-EXPLORER-1.explorer-sort-asc
