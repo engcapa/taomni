@@ -8,7 +8,13 @@
 
 Linux 原生历史升级回归 30/30 通过，覆盖当前及旧 NewMob 数据库文件名下的 SQLite WAL、先前待应用的备份和跨版本安装冻结名单。三端真实宿主、协议及系统执行专项已通过。Wayland 五项截图、MFA 和 RDP 专项均通过，可见动画帧率 41.81 fps，40/40 个延迟样本的 p95 为 52.16 ms。附带用例的四个失败已逐项与历史运行对照，失败步骤和错误相同。三个右键用例在本候选的 Xvfb 原生环境通过，第四项是授权夹具拒绝当前 XDG 目录。[历史配置](https://github.com/engcapa/taomni/actions/runs/45564802462) · [协议](https://github.com/engcapa/taomni/actions/runs/45564723372) · [宿主](https://github.com/engcapa/taomni/actions/runs/45564732594) · [Wayland](https://github.com/engcapa/taomni/actions/runs/45566118029) · [Wayland 历史对照](https://github.com/engcapa/taomni/actions/runs/45509531362)
 
-纯核心回归 12/12 个分片、132/132 项均已通过。四端首次安装十模块与全模块回归等待完整签名目录。四端实装使用验收代码 `78836ff10` 和冻结产品包，检查升级及再次安装后的 SSH 主机密钥与 RDP TLS 身份，Linux 另查迁移及回退后的邮件附件字节。验收时区分自动安装、用户启用和旧 Vault 密码解锁。[四端实装验收代码](https://github.com/engcapa/taomni/commit/78836ff10) · [系统权限](https://github.com/engcapa/taomni/actions/runs/45564747627)
+四目标各自验证了正式单体 → 模块化候选 → 正式单体 → 模块化候选。首次升级自动装齐十个签名模块，手动卸载 Mail 后重新打开仍保留九个。SSH 主机密钥和 RDP TLS 身份跨升级与回退保持一致，Linux 另行复核了附件字节、旧邮件与新邮件、MFA 计数。Mac 两种架构验证权限延续。Windows 另用默认 updater 的 NSIS 载荷验证语音 DLL 清理和回退恢复。旧 Vault 密码仍由用户本机解锁。[四端实装](https://github.com/engcapa/taomni/actions/runs/45571113510) · [Linux 补验](https://github.com/engcapa/taomni/actions/runs/45572953475) · [Windows NSIS](https://github.com/engcapa/taomni/actions/runs/45568698025/artifacts/15001931217)
+
+十模块生命周期在 Linux、Windows、macOS ARM64 分别通过 100 个阶段，业务迁移专项覆盖全部十模块。签名 MFA 和 Mail 额外通过 48 和 6 次专项执行。生产发布演练使用同一产品 SHA，成功复用四目标的 17 个基座文件、40 个签名模块包，并用正式下载地址生成签名目录。公开发布步骤已跳过。[生命周期与业务迁移](https://github.com/engcapa/taomni/actions/runs/45556693711) · [MFA](https://github.com/engcapa/taomni/actions/runs/45571328671) · [Mail](https://github.com/engcapa/taomni/actions/runs/45571340099) · [生产演练](https://github.com/engcapa/taomni/actions/runs/45573947330/artifacts/15003203574)
+
+纯核心三端 Browser/Native 回归通过 132/132。全模块回归的 Linux 原生分片首次初始化时，工件下载工具漏取第二页中的 Mail 包，原件保留。验收工具已修正分页，并以相同源提交与签名包补跑 Linux。[纯核心](https://github.com/engcapa/taomni/actions/runs/45556300017) · [全模块原运行](https://github.com/engcapa/taomni/actions/runs/45571123435) · [Linux 补跑](https://github.com/engcapa/taomni/actions/runs/45573044507)
+
+macOS ARM64 的纯核心在窗口就绪时测得 RSS 中位数从 221.84 MiB 升至 396.69 MiB，启动就绪快 815 ms。每个版本各启动三次，单体的第三次读数明显高于前两次。设计 §11 要求纯核心内存不劣于现版，已派发四轮配对复测，使用相同权限、交替启动顺序，分别采集就绪与稳态 RSS、physical footprint 和内存分区。Windows、macOS Intel 和 Linux 的原运行核心 RSS 分别减少 8.45、2.92、11.95 MiB。[ARM64 原始采样](https://github.com/engcapa/taomni/actions/runs/45571113510/artifacts/15001309935) · [配对复测](https://github.com/engcapa/taomni/actions/runs/45577594130) · [性能目标](taomni-modular-split-design.md#11-测试与验收)
 
 上一候选 `f69c52f2e` 加入旧 MFA 账户迁移提示和 SocksCap 安装时的数据接管。该轮纯核心 Browser/Native 通过 132 项，Linux Mobile 原配置补跑通过。旧 MFA 导出测试因缺少测试依赖首次编译失败，修正后在同一候选迁移源码上通过 Linux、Windows、macOS Intel 原生导出。打包和生命周期任务已移交至新候选。[纯核心](https://github.com/engcapa/taomni/actions/runs/45540715604) · [导出复验](https://github.com/engcapa/taomni/actions/runs/45554945039)
 
