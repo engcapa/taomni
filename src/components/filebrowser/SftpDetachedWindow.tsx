@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PanelRightOpen } from "lucide-react";
 import { FileBrowser } from "./FileBrowser";
-import { useAppTheme } from "../../lib/appTheme";
 import { subscribeCwdHint, getLatestCwdHint } from "../../lib/sftpSync";
-import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
+import { isTauriRuntime } from "../../lib/runtime";
 import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
 import { sftpWindowPaths, type DetachedSftpParams } from "../../lib/sftpWindowState";
 import { useSftpStore } from "../../stores/sftpStore";
@@ -84,27 +83,6 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   const t = useT();
   const reattachingRef = useRef(false);
   const [reattachError, setReattachError] = useState<string | null>(null);
-  const { mode, resolvedTheme } = useAppTheme();
-  const [uiFontFamily, setUiFontFamily] = useState(() => {
-    try {
-      return localStorage.getItem("taomni.uiFontFamily") || "Inter";
-    } catch {
-      return "Inter";
-    }
-  });
-  const [uiFontSize, setUiFontSize] = useState<number>(() => {
-    try {
-      const val = localStorage.getItem("taomni.uiFontSize");
-      if (val) {
-        const parsed = parseInt(val, 10);
-        if (!isNaN(parsed) && parsed >= 10 && parsed <= 18) return parsed;
-      }
-      return 12;
-    } catch {
-      return 12;
-    }
-  });
-
   const [params, setParams] = useState<DetachedSftpParams | null>(() =>
     consumeDetachedHandoff(sessionId),
   );
@@ -136,35 +114,6 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   const [cwdHint, setCwdHint] = useState<string | null>(() =>
     getLatestCwdHint(cwdSubscriptionId),
   );
-
-  useEffect(() => {
-    const handler = (event: StorageEvent) => {
-      if (event.key === "taomni.uiFontFamily" && event.newValue) {
-        setUiFontFamily(event.newValue);
-      } else if (event.key === "taomni.uiFontSize" && event.newValue) {
-        const parsed = parseInt(event.newValue, 10);
-        if (!isNaN(parsed) && parsed >= 10 && parsed <= 18) {
-          setUiFontSize(parsed);
-        }
-      }
-    };
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
-  }, []);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.appTheme = resolvedTheme;
-    root.dataset.appThemeMode = mode;
-    root.style.colorScheme = resolvedTheme;
-    root.dataset.appPlatform = getAppPlatform();
-  }, [mode, resolvedTheme]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.style.setProperty("--taomni-ui-font-family", uiFontFamily);
-    root.style.setProperty("--taomni-ui-font-size", `${uiFontSize}px`);
-  }, [uiFontFamily, uiFontSize]);
 
   useEffect(() => {
     if (params) return;

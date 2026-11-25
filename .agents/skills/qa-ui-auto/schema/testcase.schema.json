@@ -1140,6 +1140,18 @@
         "eval_readonly": {
           "$ref": "#/$defs/eval_readonly_arg"
         },
+        "assert_focus_on": {"$ref": "#/$defs/selector"},
+        "assert_focus_within": {"$ref": "#/$defs/selector"},
+        "assert_computed_style": {
+          "type": "object",
+          "required": ["selector", "property", "equals"],
+          "additionalProperties": false,
+          "properties": {
+            "selector": {"$ref": "#/$defs/selector"},
+            "property": {"type": "string", "minLength": 1},
+            "equals": {"type": "string"}
+          }
+        },
         "assert_solid_text_contrast": {
           "type": "object",
           "required": ["selector", "minimum"],

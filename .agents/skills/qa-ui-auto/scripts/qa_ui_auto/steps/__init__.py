@@ -96,3 +96,8 @@ verb("assert_no_runtime_errors")(browser_assert)
 
 from . import os_file_drag  # noqa: E402,F401
 from . import file_clipboard  # noqa: E402,F401
+
+from .. import ui_control_assertions
+
+for name in ui_control_assertions.VERBS:
+    verb(name)(ui_control_assertions.browser(name))

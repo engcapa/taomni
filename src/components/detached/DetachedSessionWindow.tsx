@@ -41,7 +41,6 @@ import type { TerminalProfile } from "../../lib/terminalProfile";
 import type { CommandTerminalConnectInfo, SshConnectInfo } from "../terminal/TerminalPanel";
 import type { LocalShellSelection } from "../../types";
 import { useT, t as tr } from "../../lib/i18n";
-import { useAppTheme } from "../../lib/appTheme";
 import { isTauriRuntime } from "../../lib/runtime";
 import { redactVncHandoff, vncConsumeDetachClaim, vncCreateDetachClaim } from "../../lib/vnc";
 import { deserializeVncViewerOptions, serializeVncViewerOptions, type VncViewerOptions } from "../../lib/vncOptions";
@@ -132,9 +131,6 @@ export default function DetachedSessionWindow({
   id,
 }: DetachedSessionWindowProps) {
   const t = useT();
-  const { mode, resolvedTheme } = useAppTheme();
-  const uiFontFamily = useAppStore((s) => s.uiFontFamily);
-  const uiFontSize = useAppStore((s) => s.uiFontSize);
   const addTab = useAppStore((s) => s.addTab);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
   const tabs = useAppStore((s) => s.tabs);
@@ -207,20 +203,6 @@ export default function DetachedSessionWindow({
       window.removeEventListener("storage", onStorage);
     };
   }, [kind, id, params]);
-
-  // Theme + font side-effects (mirrors App.tsx so the detached window
-  // looks consistent with the main app).
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.appTheme = resolvedTheme;
-    root.dataset.appThemeMode = mode;
-    root.style.colorScheme = resolvedTheme;
-  }, [mode, resolvedTheme]);
-  useEffect(() => {
-    const root = document.documentElement;
-    root.style.setProperty("--taomni-ui-font-family", uiFontFamily);
-    root.style.setProperty("--taomni-ui-font-size", `${uiFontSize}px`);
-  }, [uiFontFamily, uiFontSize]);
 
   const title = useMemo(() => {
     const titled = (params as { title?: string } | null)?.title;
@@ -676,7 +658,7 @@ function LoadingScreen({ label }: { label: string }) {
   return (
     <div
       className="w-screen h-screen flex items-center justify-center"
-      style={{ background: "#000", color: "#aaa" }}
+      style={{ background: "var(--taomni-bg)", color: "var(--taomni-text-muted)" }}
     >
       {label}
     </div>

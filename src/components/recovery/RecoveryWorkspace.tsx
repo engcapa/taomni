@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useWindowAppearance } from "../../hooks/useWindowAppearance";
 import { invoke } from "@tauri-apps/api/core";
 import type { RecoveryBootstrap } from "../../lib/runtimeRecovery";
 import { RecoveryTerminalOutput } from "./RecoveryTerminalOutput";
@@ -7,6 +8,7 @@ import { RecoveryBackgroundStatus } from "./RecoveryBackgroundStatus";
 
 /** Recovery is deliberately not a normal Tab mount: no connect / cleanup / autosave side effects. */
 export function RecoveryWorkspace({ bootstrap }: { bootstrap: RecoveryBootstrap }) {
+  useWindowAppearance();
   const tabs = bootstrap.description?.tabs ?? [];
   const [selected, setSelected] = useState(bootstrap.description?.activeTabId ?? tabs[0]?.id ?? "");
   const [handshake, setHandshake] = useState("正在确认恢复界面…");
@@ -21,7 +23,7 @@ export function RecoveryWorkspace({ bootstrap }: { bootstrap: RecoveryBootstrap 
     return () => { current = false; };
   }, [bootstrap]);
   return (
-    <main data-testid="recovery-workspace" style={{ padding: 24, color: "#ddd", background: "#202124", minHeight: "100vh" }}>
+    <main data-testid="recovery-workspace" style={{ padding: 24, color: "var(--taomni-text)", background: "var(--taomni-bg)", minHeight: "100vh" }}>
       <h1>界面已重新打开，后台任务未被关闭</h1>
       <p data-testid="recovery-handshake" role="status">{handshake}</p>
       <p data-testid="recovery-limitations">

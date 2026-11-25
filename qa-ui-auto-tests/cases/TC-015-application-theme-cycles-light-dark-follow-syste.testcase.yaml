@@ -2,7 +2,9 @@ id: TC-015
 title: Application theme cycles Light → Dark → Follow system and persists
 covers:
 - F5.5
+ui_standard: [UI-FND-14]
 tags:
+- ui-contract
 - legacy-imported
 - p0
 - persistence
@@ -54,6 +56,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
+    ui_standard: [UI-FND-14]
     requirement: 主题从系统切换为浅色、深色、系统，渲染属性与保存值一致，重载仍跟随系统
     actions:
     - 3

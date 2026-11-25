@@ -27,7 +27,7 @@ steps:
     expect_truthy: true
 - press: {selector: '[data-testid="context-menu"]', key: Escape}
 - assert_not_visible: '[data-testid="context-menu"]'
-- eval_readonly: {expression: "document.activeElement.dataset.testid === 'explorer-file-list'", expect_truthy: true}
+- assert_focus_on: '[data-testid="explorer-file-list"]'
 - assert_count: {selector: '[data-testid="explorer-file-row"][aria-selected="true"]', equal: 2}
 - click: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
 - press: {selector: '[data-testid="explorer-file-list"]', key: Shift+F10}

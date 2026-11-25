@@ -18,6 +18,7 @@ export function useTaoPopover() {
     const otherOpened = (event: Event) => { if ((event as CustomEvent<string>).detail !== id) setOpen(false); };
     const pointer = (event: PointerEvent) => {
       if (!(event.target instanceof Node)) return;
+      if (document.querySelector("dialog[open]")) return;
       const list = event.target instanceof Element ? event.target.closest(".taomni-select-options") : null;
       const trigger = list && document.getElementById(list.getAttribute("aria-labelledby") ?? "");
       if (trigger && contentRef.current?.contains(trigger)) return;
@@ -28,7 +29,7 @@ export function useTaoPopover() {
       if (event.target instanceof Element && contentRef.current?.contains(event.target)
         && event.target.closest('[role="combobox"][aria-expanded="true"]')) return;
       // An inner confirmation owns Escape until it is dismissed.
-      if (contentRef.current?.querySelector('[aria-modal="true"]')) return;
+      if (document.querySelector("dialog[open]") || contentRef.current?.querySelector('[aria-modal="true"]')) return;
       event.preventDefault(); event.stopPropagation(); close();
     };
     window.addEventListener("tao:popover-open", otherOpened);

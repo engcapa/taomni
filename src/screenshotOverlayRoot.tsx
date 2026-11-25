@@ -3,40 +3,15 @@
 // renderer guards), so the window does not evaluate the main layout and
 // every other feature module before it can draw the captured desktop.
 
-import { useEffect } from "react";
 import { ScreenshotOverlay } from "./components/screenshot/ScreenshotOverlay";
 import { ScreenshotSessionHost } from "./components/screenshot/overlay/ScreenshotSessionHost";
 import { AppDialogProvider } from "./lib/appDialogs";
-import { useAppTheme } from "./lib/appTheme";
-import { getAppPlatform } from "./lib/runtime";
+import { useWindowAppearance } from "./hooks/useWindowAppearance";
 import { useWebviewGuards } from "./lib/webviewGuards";
-import { UI_FONT_FAMILY_KEY, UI_FONT_SIZE_KEY, readUiFontFamily, readUiFontSize } from "./stores/app/preferences";
 
 export function ScreenshotOverlayRoot() {
-  const { mode, resolvedTheme } = useAppTheme();
+  useWindowAppearance();
   useWebviewGuards();
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.appTheme = resolvedTheme;
-    root.dataset.appThemeMode = mode;
-    root.style.colorScheme = resolvedTheme;
-    root.dataset.appPlatform = getAppPlatform();
-  }, [mode, resolvedTheme]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const refresh = () => {
-      root.style.setProperty("--taomni-ui-font-family", readUiFontFamily());
-      root.style.setProperty("--taomni-ui-font-size", `${readUiFontSize()}px`);
-    };
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === null || event.key === UI_FONT_FAMILY_KEY || event.key === UI_FONT_SIZE_KEY) refresh();
-    };
-    refresh();
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
 
   return (
     <AppDialogProvider>

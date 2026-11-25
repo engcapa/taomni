@@ -25,13 +25,13 @@ import { PinBoard } from "./components/screenshot/PinBoard";
 import { RecorderBar } from "./components/screenshot/RecorderBar";
 import { ScrollCaptureBar } from "./components/screenshot/ScrollCaptureBar";
 import { ScreenshotQaFixture } from "./components/screenshot/ScreenshotQaFixture";
-import { useAppTheme } from "./lib/appTheme";
+import { useWindowAppearance } from "./hooks/useWindowAppearance";
 import { applyCodeViewProfile, loadCodeViewProfile } from "./lib/codeViewProfile";
 import { attachSftpSync } from "./lib/sftpSync";
 import { sweepExpiredHandoffs } from "./components/filebrowser/SftpDetachedWindow";
 import { dispatchNativeDragDrop } from "./lib/nativeFileDrag";
 import { useWebviewGuards } from "./lib/webviewGuards";
-import { isTauriRuntime, getAppPlatform } from "./lib/runtime";
+import { isTauriRuntime } from "./lib/runtime";
 import { subscribeUiAppearanceStorage, useAppStore } from "./stores/appStore";
 import { AppDialogProvider } from "./lib/appDialogs";
 import { VaultGateProvider } from "./lib/vaultGate";
@@ -40,9 +40,9 @@ import { DEFAULT_TERMINAL_PROFILE } from "./lib/terminalProfile";
 import { PluginDetachedWindow } from "./components/plugins/PluginDetachedWindow";
 
 function App() {
-  const { mode, resolvedTheme } = useAppTheme();
   const uiFontFamily = useAppStore((s) => s.uiFontFamily);
   const uiFontSize = useAppStore((s) => s.uiFontSize);
+  const resolvedTheme = useWindowAppearance(uiFontFamily, uiFontSize);
   // Track the URL hash so in-app navigations (e.g. the browser stub for
   // `screenshot_open_overlay`) re-render the route immediately.
   const [routeHash, setRouteHash] = useState(
@@ -56,20 +56,6 @@ function App() {
 
   // App-local fallback for the screenshot hotkey (see screenshotShortcut.ts).
   useScreenshotAppShortcut();
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.appTheme = resolvedTheme;
-    root.dataset.appThemeMode = mode;
-    root.style.colorScheme = resolvedTheme;
-    root.dataset.appPlatform = getAppPlatform();
-  }, [mode, resolvedTheme]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.style.setProperty("--taomni-ui-font-family", uiFontFamily);
-    root.style.setProperty("--taomni-ui-font-size", `${uiFontSize}px`);
-  }, [uiFontFamily, uiFontSize]);
 
   useEffect(() => subscribeUiAppearanceStorage(), []);
 

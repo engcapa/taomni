@@ -9,18 +9,18 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ui-folder
 - click: '[data-testid="side-tab-sessions"]'
-- right_click: {selector: '[data-testid="session-tree"]', position: {x: 16, y: 16}}
-- click: '[data-testid="context-menu"] >> text=/new folder|new group|create folder/i'
+- right_click: '[data-testid="session-tree-folder"][data-folder-path=""]'
+- click: '[data-testid="context-menu-item-new-folder"]'
 - wait_for: '[data-testid="folder-name-dialog"][aria-modal="true"][aria-labelledby]'
-- eval_readonly: {expression: 'document.activeElement?.dataset.testid === "folder-name-dialog-input"', expect_truthy: true}
+- assert_focus_on: '[data-testid="folder-name-dialog-input"]'
 - fill: {selector: '[data-testid="folder-name-dialog-input"]', value: ''}
 - assert_disabled: '[data-testid="folder-name-dialog-confirm"]'
 - press: Enter
 - assert_visible: '[data-testid="folder-name-dialog"]'
 - press: Shift+Tab
-- eval_readonly: {expression: 'document.activeElement?.dataset.testid === "folder-name-dialog-cancel"', expect_truthy: true}
+- assert_focus_on: '[data-testid="folder-name-dialog-cancel"]'
 - press: Tab
-- eval_readonly: {expression: 'document.activeElement?.dataset.testid === "folder-name-dialog-input"', expect_truthy: true}
+- assert_focus_on: '[data-testid="folder-name-dialog-input"]'
 - fill: {selector: '[data-testid="folder-name-dialog-input"]', value: 'QA discarded folder'}
 - press: Escape
 - assert_not_visible: '[data-testid="folder-name-dialog"]'
