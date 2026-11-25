@@ -1,3 +1,4 @@
+import { useZoomTarget } from "../../hooks/useZoomTarget";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { ChevronLeft, ChevronRight, Lock } from "lucide-react";
@@ -172,6 +173,8 @@ export function NotepadEditor({
   }, [store.macro.loaded]);
 
   const zoom = useNotepadZoom(prefs.fontSize, docState.split ? docState.activePane : 0);
+  const zoomRoot = useRef<HTMLDivElement>(null);
+  useZoomTarget(zoomRoot, true, zoom.change);
   const actions = useNotepadActions({
     zoom: zoom.change,
     docKey,
@@ -377,7 +380,7 @@ export function NotepadEditor({
   return (
     <div
       className={`np-workbench ${store.viewMode ? `np-mode-${store.viewMode}` : ""}`}
-      data-testid="notepad-workbench"
+      ref={zoomRoot} data-testid="notepad-workbench"
       onKeyDown={(e) => {
         if (e.defaultPrevented || isImeComposing(e.nativeEvent)) return;
         // Design §4.2: every Notepad dialog closes on Esc and returns to the editor.

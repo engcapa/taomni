@@ -1,0 +1,52 @@
+id: TC-UIC-007-page-zoom
+title: Explorer page zoom changes painted rows and preserves scale across Settings
+covers: [F5.5, F-EXPLORER-1]
+fixtures: [reset_db, explorer_files]
+tags: [ui-contract, zoom, explorer]
+modes: [browser, native]
+ui_standard: [UI-ZOOM-01, UI-ZOOM-02, UI-ZOOM-03]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-page-zoom
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- press: {selector: '#ui-font-size-slider', key: Home}
+- click: '[data-testid="side-tab-explorer"]'
+- press: {selector: '[data-testid="explorer-tab"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_previews}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- click: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- eval_readonly: {expression: "Math.round(document.querySelector('.ex-frow.sel').getBoundingClientRect().height) === 28", expect_truthy: true}
+- press: {selector: '[data-testid="explorer-file-list"]', key: Control+=, macos_key: Meta+=}
+- eval_readonly: {expression: "Math.round(document.querySelector('.ex-frow.sel').getBoundingClientRect().height) === 31", expect_truthy: true}
+- click: '[data-testid="ribbon-settings"]'
+- assert_computed_style: {selector: '[data-testid="settings-tab-panel"]', property: zoom, equals: '1'}
+- press: {selector: '#ui-font-size-slider', key: End}
+- click: '[data-testid="side-tab-explorer"]'
+- eval_readonly: {expression: "Math.round(document.querySelector('.ex-frow.sel').getBoundingClientRect().height) === 40", expect_truthy: true}
+- press: {selector: '[data-testid="explorer-file-list"]', key: Control+0, macos_key: Meta+0}
+- eval_readonly: {expression: "Math.round(document.querySelector('.ex-frow.sel').getBoundingClientRect().height) === 36", expect_truthy: true}
+- press: {selector: '[data-testid="explorer-file-list"]', key: Control+-, macos_key: Meta+-}
+- eval_readonly: {expression: "Math.round(document.querySelector('.ex-frow.sel').getBoundingClientRect().height) === 32", expect_truthy: true}
+- assert_localstorage: {key: taomni.uiFontSize, equals: '18'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-ZOOM-01, UI-ZOOM-02, UI-ZOOM-03]
+    requirement: Only the active Explorer page zooms. Its selection and scale survive a tab change, and reset tracks the new Settings base.
+    actions: [5, 10, 12, 14, 16, 17, 19, 21]
+    checkpoints:
+    - {step: 11, expectation: The selected entry starts at the small Settings size.}
+    - {step: 13, expectation: One platform zoom chord increases its painted height from 28 to 31 pixels.}
+    - {step: 15, expectation: Settings still has its own default scale.}
+    - {step: 18, expectation: Returning retains the 110 percent scale at the new base.}
+    - {step: 20, expectation: Reset restores the current 36 pixel row.}
+    - {step: 22, expectation: Zoom out shrinks the same row to 32 pixels.}
+    - {step: 23, expectation: The saved interface size remains 18.}
+    results: [11, 13, 15, 18, 20, 22, 23]
+  visual:
+  - {check: Actual zoom, method: automated, reason: Measures the painted bounds of the selected row.}
+  native:
+  - {check: Packaged WebView zoom, method: automated, reason: Exercises the same Settings and Explorer page instances with platform modifiers.}

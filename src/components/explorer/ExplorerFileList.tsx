@@ -126,13 +126,14 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
     if (!element) return;
     event.preventDefault(); element.focus();
     const rect = element.getBoundingClientRect();
-    const startX = event.clientX - rect.left + element.scrollLeft;
-    const startY = event.clientY - rect.top + element.scrollTop;
+    const scale = element.offsetWidth > 0 ? rect.width / element.offsetWidth || 1 : 1;
+    const startX = (event.clientX - rect.left) / scale + element.scrollLeft;
+    const startY = (event.clientY - rect.top) / scale + element.scrollTop;
     const original = event.ctrlKey || event.metaKey ? pane.selection : [];
     let moved = false;
     const update = (next: PointerEvent) => {
-      const x = next.clientX - rect.left + element.scrollLeft;
-      const y = next.clientY - rect.top + element.scrollTop;
+      const x = (next.clientX - rect.left) / scale + element.scrollLeft;
+      const y = (next.clientY - rect.top) / scale + element.scrollTop;
       const box = { left: Math.min(x, startX), top: Math.min(y, startY), width: Math.abs(x - startX), height: Math.abs(y - startY) };
       if (!moved && box.width + box.height < 4) return;
       moved = true; setRubber({ ...box, top: box.top - headerHeight });

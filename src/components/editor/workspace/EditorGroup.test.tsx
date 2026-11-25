@@ -199,20 +199,20 @@ describe("EditorGroup tabs", () => {
     render(<EditorGroup {...props({ onPin, onCloseOthers })} />);
 
     fireEvent.contextMenu(screen.getByTitle("repo / b.ts"), { clientX: 10, clientY: 10 });
-    fireEvent.click(screen.getByRole("button", { name: "Pin Tab" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Pin Tab" }));
     expect(onPin).toHaveBeenCalledWith("b", true);
 
     fireEvent.contextMenu(screen.getByTitle("repo / b.ts"), { clientX: 10, clientY: 10 });
-    fireEvent.click(screen.getByRole("button", { name: "Close Other Tabs" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Close Other Tabs" }));
     expect(onCloseOthers).toHaveBeenCalledWith("b");
   });
 
   it("ED-PARITY-021: disables Close Other Tabs with a single tab and lists IDEA's order", () => {
     render(<EditorGroup {...props({ openOrder: ["b"], activeKey: "b" })} />);
     fireEvent.contextMenu(screen.getByTitle("repo / b.ts"), { clientX: 10, clientY: 10 });
-    expect(screen.getByRole("button", { name: "Close Other Tabs" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Close Tabs to the Right" })).toBeDisabled();
-    const labels = screen.getAllByRole("button")
+    expect(screen.getByRole("menuitem", { name: "Close Other Tabs" })).toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: "Close Tabs to the Right" })).toBeDisabled();
+    const labels = screen.getAllByRole("menuitem")
       .map((button) => button.textContent?.trim() ?? "")
       .filter((label) => /^(Close|Copy Path|Split Right|Pin Tab|Open In)/.test(label));
     expect(labels[0]).toMatch(/^Close/);
@@ -236,8 +236,8 @@ describe("EditorGroup tabs", () => {
 
     const openMenuAndClick = (label: string, submenu?: string) => {
       fireEvent.contextMenu(screen.getByTitle("repo / b.ts"), { clientX: 10, clientY: 10 });
-      if (submenu) fireEvent.mouseEnter(screen.getByRole("button", { name: new RegExp(`^${submenu}`) }));
-      fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${label}`) }));
+      if (submenu) fireEvent.mouseEnter(screen.getByRole("menuitem", { name: new RegExp(`^${submenu}`) }));
+      fireEvent.click(screen.getByRole("menuitem", { name: new RegExp(`^${label}`) }));
     };
     openMenuAndClick("Copy Path");
     openMenuAndClick("Copy Relative Path");

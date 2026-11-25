@@ -1,3 +1,4 @@
+import { useZoomTarget } from "../../hooks/useZoomTarget";
 import { useCallback, useEffect, useState, type RefObject } from "react";
 
 import { contentZoomShortcut, nextFontOffset, zoomedFontSize, type ContentZoomAction } from "../../lib/contentZoomShortcut";
@@ -30,6 +31,8 @@ export function useDbSessionFontSize(visible: boolean, rootRef: RefObject<HTMLEl
   const change = useCallback((action: ContentZoomAction) => {
     setOffset((current) => nextFontOffset(action, base, current));
   }, [base]);
+
+  useZoomTarget(rootRef, visible, change);
 
   useEffect(() => {
     if (!visible) return;

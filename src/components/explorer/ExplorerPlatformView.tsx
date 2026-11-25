@@ -1,3 +1,4 @@
+import { PageZoomPanel } from "../ui/PageZoomPanel";
 import { useEffect, useState } from "react";
 import { FolderOpen } from "lucide-react";
 import { openExplorer } from "../../lib/explorer/openExplorer";
@@ -17,7 +18,7 @@ export function ExplorerPlatformView({ visible, onOpenTerminal }: {
   useEffect(() => { if (visible) setStarted(true); }, [visible]);
   if (!started && !visible) return null;
   return <div data-testid="explorer-platform-view" className="relative min-h-0 min-w-0 flex-1" style={{ display: visible ? "block" : "none" }}>
-    {tabs.map((tab) => <div key={tab.id} className="absolute inset-0" style={{ display: activeTabId === tab.id ? "block" : "none" }}>
+    {tabs.map((tab) => <PageZoomPanel active={visible && activeTabId === tab.id && tab.type === "file-browser"} key={tab.id} className="absolute inset-0" style={{ display: activeTabId === tab.id ? "block" : "none" }}>
       {tab.type === "file-browser" && tab.fileBrowser && <ExplorerTabPane
         tabId={tab.id}
         initialPath={tab.fileBrowser.initialPath}
@@ -29,7 +30,7 @@ export function ExplorerPlatformView({ visible, onOpenTerminal }: {
         active={visible && activeTabId === tab.id}
         host="explorer"
       />}
-    </div>)}
+    </PageZoomPanel>)}
     {!tabs.length && <div data-testid="explorer-empty-state" className="flex h-full flex-col items-center justify-center gap-3 text-[var(--taomni-text-muted)]">
       <FolderOpen className="h-8 w-8" />
       <span>{label("在独立工作区中浏览和编辑本地文件。", "Browse and edit local files in the dedicated workspace.")}</span>

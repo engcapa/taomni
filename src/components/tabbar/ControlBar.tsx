@@ -1,3 +1,4 @@
+import { pageZoomCommands, zoomBinding } from "../../lib/pageZoom";
 import {
   Download,
   FileText,
@@ -181,6 +182,8 @@ export function ControlBar({
         testId: "context-menu-item-view",
         icon: <PanelLeft className="w-3 h-3" />,
         children: [
+          ...pageZoomCommands.map(({ id, label, key }) => ({ label: t(label), shortcut: zoomBinding(key), onClick: () => onCommand(id) })),
+          { label: "", separator: true },
           { label: t("sidebar.headerTitle"), testId: "context-menu-item-toggle-sidebar", icon: <PanelLeft className="w-3 h-3" />, onClick: onToggleSidebar },
           { label: t("menu.quickConnectToolbar"), testId: "context-menu-item-toggle-quick-connect", icon: <Search className="w-3 h-3" />, checked: quickConnectVisible, onClick: () => onCommand("toggle-quick-connect") },
           { label: t("menu.splitTerminal"), testId: "context-menu-item-split-terminal", icon: <SplitSquareVertical className="w-3 h-3" />, onClick: () => onCommand("split") },

@@ -1,3 +1,4 @@
+import { PageZoomPanel } from "../ui/PageZoomPanel";
 import type { Tab } from "../../types";
 import { useEffect } from "react";
 import { usePluginFrontendRegistry } from "../../lib/usePluginFrontendRegistry";
@@ -31,7 +32,7 @@ export function PluginTabPanels({ tabs, activeTabId, onOpenSettings, onClose, on
   const t = useT();
   useEffect(() => attachPluginTabPersistence(), []);
   return tabs.filter((tab) => tab.type === "plugin" || isLegacyPluginTab(tab)).map((tab) => (
-    <div
+    <PageZoomPanel active={tab.id === activeTabId && !["rdp", "vnc", "mail"].includes(tab.type)}
       key={tab.id}
       data-testid={tab.type === "servers" ? "servers-tab-panel" : undefined}
       className="absolute inset-0"
@@ -61,6 +62,6 @@ export function PluginTabPanels({ tabs, activeTabId, onOpenSettings, onClose, on
           onOpenSettings();
         }} /></div>
       </div>}
-    </div>
+    </PageZoomPanel>
   ));
 }

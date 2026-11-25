@@ -81,7 +81,7 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
     await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
-    fireEvent.click(await screen.findByRole("button", { name: "Update two files" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Update two files" }));
     const preview = await screen.findByTestId("refactoring-preview-dialog");
     expect(within(preview).getByText("/repo/app/src/main.ts")).toBeInTheDocument();
     expect(within(preview).getByText("/repo/app/src/other.ts")).toBeInTheDocument();
@@ -256,15 +256,15 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
 
     const fileRow = await screen.findByTestId("code-workspace-tree-file");
     fireEvent.contextMenu(fileRow);
-    fireEvent.click(await screen.findByRole("button", { name: "Copy Relative Path" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Copy Relative Path" }));
     await waitFor(() => expect(caseContext.workspaceTestHarness.clipboardMocks.writeText).toHaveBeenCalledWith("README.md"));
 
     fireEvent.contextMenu(fileRow);
-    fireEvent.click(await screen.findByRole("button", { name: "Copy Path" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Copy Path" }));
     await waitFor(() => expect(caseContext.workspaceTestHarness.clipboardMocks.writeText).toHaveBeenCalledWith("/repo/app/README.md"));
 
     fireEvent.contextMenu(fileRow);
-    fireEvent.click(await screen.findByRole("button", { name: "Add to .gitignore" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Add to .gitignore" }));
     await waitFor(() => expect(caseContext.workspaceTestHarness.gitMocks.gitIgnorePath).toHaveBeenCalledWith(
       "/repo/app",
       "README.md",
@@ -273,12 +273,12 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
 
     const dirRow = await screen.findByTestId("code-workspace-tree-dir");
     fireEvent.contextMenu(dirRow);
-    fireEvent.click(await screen.findByRole("button", { name: "Find in Directory..." }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Find in Directory..." }));
     expect(screen.getByRole("tab", { name: /Search/, selected: true })).toBeInTheDocument();
     expect(screen.getByLabelText("Include globs")).toHaveValue("src/**");
 
     fireEvent.contextMenu(fileRow);
-    fireEvent.click(await screen.findByRole("button", { name: "Open in Terminal" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Open in Terminal" }));
     expect(screen.getByRole("tab", { name: /Terminal/, selected: true })).toBeInTheDocument();
     expect(await screen.findByTestId("mock-workspace-terminal")).toHaveAttribute("data-initial-cwd", "/repo/app");
   });
@@ -464,9 +464,9 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
 
     // Return to tree and right-click -> Esc restores selection and focus without mutating text
     fireEvent.contextMenu(exampleFile);
-    expect(await screen.findByRole("button", { name: "Open" })).toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Open" })).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("menuitem", { name: "Open" })).not.toBeInTheDocument());
     expect(document.activeElement).toBe(exampleFile);
     expect(view.state.doc.toString()).toBe(originalText);
   });

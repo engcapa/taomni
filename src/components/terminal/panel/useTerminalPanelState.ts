@@ -1,3 +1,4 @@
+import { useZoomTarget } from "../../../hooks/useZoomTarget";
 import { nextFontOffset, zoomedFontSize, type ContentZoomAction } from "../../../lib/contentZoomShortcut";
 import { useSessionStore } from "../../../stores/sessionStore";
 import { useBookmarkBackground } from "./useBookmarkBackground";
@@ -158,6 +159,7 @@ export function useTerminalPanelState(context: UseTerminalPanelStateContext) {
   const zoom = useCallback((action: ContentZoomAction) => {
     setZoomOffset((offset) => nextFontOffset(action, currentTerminalProfileRef.current.fontSize, offset));
   }, []);
+  useZoomTarget(containerRef, true, zoom);
   const [fontLigatures, setFontLigatures] = useState(initialProfile.fontLigatures);
   const [showScrollbar, setShowScrollbar] = useState(initialProfile.showScrollbar);
   const [webglRenderer, setWebglRenderer] = useState(initialProfile.webglRenderer);

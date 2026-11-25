@@ -278,7 +278,7 @@ export function registerlanguageLifecycle1Cases(caseContext: registerlanguageLif
     await act(() => new Promise((resolve) => setTimeout(resolve, 250)));
 
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
-    fireEvent.click(await screen.findByRole("button", { name: "Insert space" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Insert space" }));
 
     await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Applied code action"));
     expect(selectCodeWorkspaceUi(
@@ -350,7 +350,7 @@ export function registerlanguageLifecycle1Cases(caseContext: registerlanguageLif
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspCodeActions).toHaveBeenCalledTimes(1));
     fireEvent.mouseDown(rendered.container.querySelector('[data-testid="code-workspace-lightbulb"]')!);
     expect(await screen.findByRole(
-      "button",
+      "menuitem",
       { name: "Newer candidate" },
       { timeout: 5_000 },
     )).toBeInTheDocument();
@@ -359,7 +359,7 @@ export function registerlanguageLifecycle1Cases(caseContext: registerlanguageLif
       releaseOlder({ status, actions: [olderAction] });
       await Promise.resolve();
     });
-    expect(screen.getByRole("button", { name: "Newer candidate" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Newer candidate" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Older candidate" })).not.toBeInTheDocument();
     expect(useAppStore.getState().statusMessage).not.toContain("No code actions");
   });
@@ -439,19 +439,19 @@ export function registerlanguageLifecycle1Cases(caseContext: registerlanguageLif
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspCodeActions).toHaveBeenCalledTimes(1));
     fireEvent.click(await screen.findByRole(
-      "button",
+      "menuitem",
       { name: "Deferred old fix" },
       { timeout: 5_000 },
     ));
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspCodeActionResolve).toHaveBeenCalledTimes(1));
     fireEvent.mouseDown(rendered.container.querySelector('[data-testid="code-workspace-lightbulb"]')!);
-    expect(await screen.findByRole("button", { name: "Current fix" })).toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Current fix" })).toBeInTheDocument();
 
     await act(async () => {
       releaseResolve({ status, action: resolvedOldAction });
       await Promise.resolve();
     });
-    expect(screen.getByRole("button", { name: "Current fix" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Current fix" })).toBeInTheDocument();
     expect(selectCodeWorkspaceUi(
       useCodeWorkspaceStore.getState(),
       "instance-action-resolve-owner",
