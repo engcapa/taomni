@@ -59,7 +59,7 @@
 - `[data-testid="ai-chat-composer-resize"]` — interactive [optional] — F-AI-2.4.ai-chat-composer-resize
 - `[data-testid="ai-chat-attachment-error"]` — display [optional] — F-AI-2.4.ai-chat-attachment-error
 - `button[title="New chat"]` — interactive [optional] — F-AI-2.4.ai-chat-new
-- `button[title="History"]` — interactive [optional] — F-AI-2.4.ai-chat-history
+- `button[aria-label="History"]` — interactive [optional] — F-AI-2.4.ai-chat-history
 - `button[aria-label="Copy entire conversation"]` — interactive [optional] — F-AI-2.4.ai-chat-copy-all
 - `[data-testid="ai-chat-drawer-hide"]` — interactive [optional] — F-AI-2.4.ai-chat-close
 - `[data-testid="ai-chat-drawer-position"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-position
@@ -1703,7 +1703,7 @@
 - `[data-testid="mail-attachment-open"]` — interactive — F-FILEOPEN-1.mail-attachment-open
 - `[data-testid="mail-attachment-preview"]` — interactive — F-FILEOPEN-1.mail-attachment-preview
 - `[data-testid="mail-attachment-system"]` — interactive — F-FILEOPEN-1.mail-attachment-system
-- `[data-testid="ai-chat-drawer"] button[title="History"]` — interactive — F-FILEOPEN-1.file-open-chat-history
+- `[data-testid="ai-chat-drawer"] button[aria-label="History"]` — interactive — F-FILEOPEN-1.file-open-chat-history
 - `xpath=//*[@data-testid="ai-chat-drawer"]//div[text()="QA file path entry"]` — interactive — F-FILEOPEN-1.file-open-chat-thread
 - `[data-testid="ai-file-link"]` — interactive — F-FILEOPEN-1.ai-file-link
 

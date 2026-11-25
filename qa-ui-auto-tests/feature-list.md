@@ -5363,7 +5363,7 @@ controls:
     kind: interactive
     optional: true
   - id: ai-chat-history
-    selector: 'button[title="History"]'
+    selector: 'button[aria-label="History"]'
     kind: interactive
     optional: true
   - id: ai-chat-copy-all
@@ -17568,7 +17568,7 @@ controls:
     selector: '[data-testid="mail-attachment-system"]'
     kind: interactive
   - id: file-open-chat-history
-    selector: '[data-testid="ai-chat-drawer"] button[title="History"]'
+    selector: '[data-testid="ai-chat-drawer"] button[aria-label="History"]'
     kind: interactive
   - id: file-open-chat-thread
     selector: 'xpath=//*[@data-testid="ai-chat-drawer"]//div[text()="QA file path entry"]'
