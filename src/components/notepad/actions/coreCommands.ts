@@ -139,8 +139,7 @@ export function createCoreCommandMap(ctx: NotepadActionContext): Record<string, 
         return "";
       });
       if (txt) {
-        const sel = v.state.selection.main;
-        v.dispatch({ changes: { from: sel.from, to: sel.to, insert: txt }, selection: { anchor: sel.from + txt.length } });
+        v.dispatch(v.state.replaceSelection(txt));
       }
     },
     "edit.selectAll": () => { const v = ctx.getActiveView(); if (v) selectAll(v); },

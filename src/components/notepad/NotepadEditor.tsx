@@ -771,9 +771,8 @@ export function NotepadEditor({
         onPasteSpecial={(text, kind) => {
           const view = viewsRef.current[docState.activePane] ?? viewsRef.current[0];
           if (!view) return;
-          const sel = view.state.selection.main;
           const value = kind === "binary" ? text : text.replace(/\0/g, "");
-          view.dispatch({ changes: { from: sel.from, to: sel.to, insert: value }, selection: { anchor: sel.from + value.length } });
+          view.dispatch(view.state.replaceSelection(value));
         }}
         onInsertText={actions.sessionAndMacroHelpers.insertChar}
         onReturnFocus={focusActiveEditor}
