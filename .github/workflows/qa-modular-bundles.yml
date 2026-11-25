@@ -26,6 +26,8 @@ on:
       first_release:
         type: boolean
         default: false
+      experiment_run: {type: string, default: ''}
+      experiment_source: {type: string, default: ''}
       first_release_version: {type: string, default: ''}
       first_release_baseline: {type: string, default: ''}
       include_linux_inventory:
@@ -68,6 +70,7 @@ jobs:
           SAMPLE_TARGETS: ${{ inputs.package_targets }}
           SAMPLE_UPGRADE_DESKTOP: ${{ inputs.upgrade_desktop }}
           SAMPLE_INCLUDE_LINUX_INVENTORY: ${{ inputs.include_linux_inventory }}
+          EXPERIMENT_RUN: ${{ inputs.experiment_run }}
           SAMPLE_MACOS_HARDENED_MFA: ${{ inputs.macos_hardened_mfa }}
           SAMPLE_MACOS_ARM_RUNNER: ${{ inputs.macos_arm_runner }}
         run: |
@@ -263,9 +266,26 @@ jobs:
         with:
           name: qa-modular-package-${{ matrix.target }}-installed-desktop-${{ github.run_id }}
           path: signed-mfa-input
+      - name: Download the selected experimental ARM64 release artifact
+        if: inputs.experiment_run != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPERIMENT_RUN: ${{ inputs.experiment_run }}
+          EXPERIMENT_SOURCE: ${{ inputs.experiment_source }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPERIMENT_RUN" =~ ^[1-9][0-9]*$ && "$EXPERIMENT_SOURCE" =~ ^[0-9a-f]{40}$ ]]
+          mkdir experiment-input
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$EXPERIMENT_RUN" \
+            --jq '{id,head_sha,path,event,status,conclusion,repository:.repository.full_name}' > experiment-input/producer.json
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg sha "$EXPERIMENT_SOURCE" \
+            '.repository == $repo and .head_sha == $sha and .path == ".github/workflows/release.yml" and
+             .event == "workflow_dispatch" and .status == "completed" and .conclusion == "success"' experiment-input/producer.json
+          gh run download "$EXPERIMENT_RUN" -n taomni-0.6.0-macos-aarch64 -D experiment-input
       - name: Replace the installed application, reopen its profile and roll back
         if: inputs.upgrade_desktop && runner.os != 'Linux'
         env:
+          EXPERIMENT_RUN: ${{ inputs.experiment_run }}
           SAMPLE_MACOS_HARDENED_MFA: ${{ inputs.macos_hardened_mfa }}
           MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
           COMPARE_MACOS_MEMORY: ${{ inputs.first_release && inputs.package_targets == 'darwin-aarch64' }}

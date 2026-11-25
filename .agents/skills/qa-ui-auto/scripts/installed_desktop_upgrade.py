@@ -287,7 +287,10 @@ def execute(args):
             stages["afterReinstall"]["enrollment"] = installed_first_release.enrollment(profile, origin)
             stages["afterReinstall"]["activePointers"] = observe_legacy_roster(profile / "plugins", origin, "mail")
             if getattr(args, "compare_macos_memory", False):
-                from installed_macos_memory import compare
+                if os.environ.get("EXPERIMENT_RUN"):
+                    from installed_macos_threeway import compare
+                else:
+                    from installed_macos_memory import compare
                 stages["pairedCoreMemory"] = compare(reopened, profile, work, report, stages, identity)
         result.update(passed=True, sessionTypes=[row["session_type"] for row in expected_rows], retainedFiles=retained)
     finally:
