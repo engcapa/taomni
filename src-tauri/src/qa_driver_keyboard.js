@@ -51,6 +51,18 @@ function dispatchQaKeyDefault(el, key, event, modifiers) {
   if (moveQaInputSelection(el, key, modifiers)) return;
   if (modifiers.Control || modifiers.Meta || modifiers.Alt ||
       ["Control", "Shift", "Alt", "Meta"].includes(key)) return;
+  if (el instanceof HTMLInputElement && el.type === "range") {
+    if (el.disabled || (key !== "Home" && key !== "End")) return;
+    const previous = el.value;
+    const boundary = key === "Home" ? (el.min || "0") : (el.max || "100");
+    // Use the host setter so React sees the same value change as a native edit.
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, boundary);
+    if (el.value !== previous) {
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    return;
+  }
   if (el.isContentEditable) {
     if (key === "Enter") document.execCommand("insertParagraph", false, null);
     else if (key === "Backspace") document.execCommand("delete", false, null);

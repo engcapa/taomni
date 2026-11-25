@@ -16,18 +16,18 @@ steps:
 - fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_previews}'}
 - press: {selector: '[data-testid="explorer-address"]', key: Enter}
 - click: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
-- eval_readonly: {expression: "Math.round(document.querySelector('.ex-frow.sel').getBoundingClientRect().height) === 28", expect_truthy: true}
+- assert_element_geometry: {selector: '.ex-frow.sel', min_width: 24, min_height: 24, hit_height: 28, tolerance: 1}
 - press: {selector: '[data-testid="explorer-file-list"]', key: Control+=, macos_key: Meta+=}
-- eval_readonly: {expression: "Math.round(document.querySelector('.ex-frow.sel').getBoundingClientRect().height) === 31", expect_truthy: true}
+- assert_element_geometry: {selector: '.ex-frow.sel', min_width: 24, min_height: 24, hit_height: 31, tolerance: 1}
 - click: '[data-testid="ribbon-settings"]'
 - assert_computed_style: {selector: '[data-testid="settings-tab-panel"]', property: zoom, equals: '1'}
 - press: {selector: '#ui-font-size-slider', key: End}
 - click: '[data-testid="side-tab-explorer"]'
-- eval_readonly: {expression: "Math.round(document.querySelector('.ex-frow.sel').getBoundingClientRect().height) === 40", expect_truthy: true}
+- assert_element_geometry: {selector: '.ex-frow.sel', min_width: 24, min_height: 24, hit_height: 40, tolerance: 1}
 - press: {selector: '[data-testid="explorer-file-list"]', key: Control+0, macos_key: Meta+0}
-- eval_readonly: {expression: "Math.round(document.querySelector('.ex-frow.sel').getBoundingClientRect().height) === 36", expect_truthy: true}
+- assert_element_geometry: {selector: '.ex-frow.sel', min_width: 24, min_height: 24, hit_height: 36, tolerance: 1}
 - press: {selector: '[data-testid="explorer-file-list"]', key: Control+-, macos_key: Meta+-}
-- eval_readonly: {expression: "Math.round(document.querySelector('.ex-frow.sel').getBoundingClientRect().height) === 32", expect_truthy: true}
+- assert_element_geometry: {selector: '.ex-frow.sel', min_width: 24, min_height: 24, hit_height: 32, tolerance: 1}
 - assert_localstorage: {key: taomni.uiFontSize, equals: '18'}
 - assert_no_runtime_errors: null
 verification:

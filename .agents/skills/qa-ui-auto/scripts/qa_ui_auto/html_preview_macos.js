@@ -1,4 +1,4 @@
-// One genuine OS click into the opaque HTML frame. No cross-origin DOM access.
+// Translate a QA WebView point to a physical system pointer event.
 ObjC.import("AppKit");
 ObjC.import("CoreGraphics");
 const env = $.NSProcessInfo.processInfo.environment;
@@ -43,9 +43,15 @@ const area=candidates[0];
 const px=area.position[0]+x, py=area.position[1]+y;
 if(x<=0||y<=0||x>=area.size[0]||y>=area.size[1]) throw new Error("HTML target outside owned WebArea");
 const point=$.CGPointMake(px,py);
-const down=$.CGEventCreateMouseEvent(null,1,point,0);
-const up=$.CGEventCreateMouseEvent(null,2,point,0);
-if(!down||!up)throw new Error("CoreGraphics mouse event unavailable; Accessibility/input permission required");
-$.CGEventPost(0,down);
-$.CGEventPost(0,up);
+if (read("QA_WEBVIEW_POINTER_ACTION") === "hover") {
+  const move = $.CGEventCreateMouseEvent(null, 5, point, 0);
+  if (!move) throw new Error("CoreGraphics mouse move unavailable");
+  $.CGEventPost(0, move);
+} else {
+  const down=$.CGEventCreateMouseEvent(null,1,point,0);
+  const up=$.CGEventCreateMouseEvent(null,2,point,0);
+  if(!down||!up)throw new Error("CoreGraphics mouse event unavailable; Accessibility/input permission required");
+  $.CGEventPost(0,down);
+  $.CGEventPost(0,up);
+}
 JSON.stringify({transport:"CoreGraphics OS pointer",pid:owners[0],application,point:{x:px,y:py},webArea:area});

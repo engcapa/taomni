@@ -27,6 +27,22 @@ function formFixture(markup = '<input name="username"><input name="password" typ
 describe("macOS QA WebView keyboard defaults", () => {
   beforeEach(() => document.body.replaceChildren());
 
+  it("moves a range to each endpoint and emits exactly one change for each movement", () => {
+    const { input } = formFixture('<input type="range" min="10" max="18" value="12">');
+    const values: string[] = [];
+    for (const type of ["input", "change"]) {
+      input.addEventListener(type, () => values.push(type + "=" + input.value));
+    }
+    press(input, "Home");
+    press(input, "Home");
+    press(input, "End");
+    press(input, "Home", { ...plain, Meta: true });
+    input.disabled = true;
+    press(input, "Home");
+    expect(values).toEqual(["input=10", "change=10", "input=18", "change=18"]);
+    expect(input.value).toBe("18");
+  });
+
   it("submits a credential form once without changing the password", () => {
     const { form, submit } = formFixture();
     const password = form.querySelector<HTMLInputElement>('[type="password"]')!;

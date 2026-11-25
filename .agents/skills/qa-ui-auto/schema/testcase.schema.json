@@ -1178,6 +1178,7 @@
             "selector": {"type": "string", "minLength": 1},
             "min_width": {"type": "number", "minimum": 1},
             "min_height": {"type": "number", "minimum": 1},
+            "hit_height": {"type": "number", "minimum": 1},
             "min_count": {"type": "integer", "minimum": 1},
             "same_width": {"type": "boolean"},
             "icon_size": {"type": "number", "minimum": 1},
@@ -2354,7 +2355,16 @@
       ]
     },
     "hover_arg": {
-      "$ref": "#/$defs/selector"
+      "oneOf": [
+        {"$ref": "#/$defs/selector"},
+        {
+          "type": "object", "required": ["selector"], "additionalProperties": false,
+          "properties": {
+            "selector": {"$ref": "#/$defs/selector"},
+            "macos_system_pointer": {"type": "boolean"}
+          }
+        }
+      ]
     },
     "drag_arg": {
       "type": "object",

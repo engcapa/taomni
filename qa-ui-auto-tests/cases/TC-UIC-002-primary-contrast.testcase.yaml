@@ -14,7 +14,7 @@ steps:
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-save"]:enabled'
 - assert_solid_text_contrast: {selector: '[data-testid="session-save"]', minimum: 4.5}
-- hover: '[data-testid="session-save"]'
+- hover: {selector: '[data-testid="session-save"]', macos_system_pointer: true}
 - assert_solid_text_contrast: {selector: '[data-testid="session-save"]:hover', minimum: 4.5}
 - assert_element_geometry: {selector: '[data-testid="session-save"]', min_width: 24, min_height: 26, viewport_margin: 0}
 - click: '[data-testid="session-cancel"]'
@@ -23,7 +23,7 @@ steps:
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-save"]:enabled'
 - assert_solid_text_contrast: {selector: '[data-testid="session-save"]', minimum: 4.5}
-- hover: '[data-testid="session-save"]'
+- hover: {selector: '[data-testid="session-save"]', macos_system_pointer: true}
 - assert_solid_text_contrast: {selector: '[data-testid="session-save"]:hover', minimum: 4.5}
 - assert_element_geometry: {selector: '[data-testid="session-save"]', min_width: 24, min_height: 26, viewport_margin: 0}
 - assert_no_runtime_errors: null
