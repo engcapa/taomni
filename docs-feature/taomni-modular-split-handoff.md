@@ -12,7 +12,7 @@ Linux 原生历史升级回归 30/30 通过，覆盖当前及旧 NewMob 数据�
 
 十模块生命周期在 Linux、Windows、macOS ARM64 分别通过 100 个阶段，业务迁移专项覆盖全部十模块。签名 MFA 和 Mail 额外通过 48 和 6 次专项执行。生产发布演练使用同一产品 SHA，成功复用四目标的 17 个基座文件、40 个签名模块包，并用正式下载地址生成签名目录。公开发布步骤已跳过。[生命周期与业务迁移](https://github.com/engcapa/taomni/actions/runs/45556693711) · [MFA](https://github.com/engcapa/taomni/actions/runs/45571328671) · [Mail](https://github.com/engcapa/taomni/actions/runs/45571340099) · [生产演练](https://github.com/engcapa/taomni/actions/runs/45573947330/artifacts/15003203574)
 
-纯核心三端 Browser/Native 回归通过 132/132。全模块回归的 Linux 原生分片首次初始化时，工件下载工具漏取第二页中的 Mail 包，原件保留。验收工具已修正分页，并以相同源提交与签名包补跑 Linux。[纯核心](https://github.com/engcapa/taomni/actions/runs/45556300017) · [全模块原运行](https://github.com/engcapa/taomni/actions/runs/45571123435) · [Linux 补跑](https://github.com/engcapa/taomni/actions/runs/45573044507)
+纯核心三端 Browser/Native 回归通过 132/132。全模块回归的 Linux 原生分片首次初始化时，工件下载工具漏取第二页中的 Mail 包，原件保留。验收工具已修正分页，Linux 两分片以相同源提交与签名包补验 26/26 项。全模块三端合计通过 144/144 项。G1–G11 已按 runner 镜像、包身份和原件逐条复核。[本候选逐门回执](taomni-modular-0.6.0-5e53df106-receipts.md) · [纯核心](https://github.com/engcapa/taomni/actions/runs/45556300017) · [全模块原运行](https://github.com/engcapa/taomni/actions/runs/45571123435) · [Linux 补跑](https://github.com/engcapa/taomni/actions/runs/45573044507)
 
 macOS ARM64 的纯核心在窗口就绪时测得 RSS 中位数从 221.84 MiB 升至 396.69 MiB，启动就绪快 815 ms。每个版本各启动三次，单体的第三次读数明显高于前两次。设计 §11 要求纯核心内存不劣于现版，已派发四轮配对复测，使用相同权限、交替启动顺序，分别采集就绪与稳态 RSS、physical footprint 和内存分区。Windows、macOS Intel 和 Linux 的原运行核心 RSS 分别减少 8.45、2.92、11.95 MiB。[ARM64 原始采样](https://github.com/engcapa/taomni/actions/runs/45571113510/artifacts/15001309935) · [配对复测](https://github.com/engcapa/taomni/actions/runs/45577594130) · [性能目标](taomni-modular-split-design.md#11-测试与验收)
 
