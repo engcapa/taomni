@@ -82,7 +82,6 @@
   "src/components/explorer/ExplorerDialogs.tsx": {"L02":1,"L04-inline":1},
   "src/components/explorer/ExplorerNewFileDialog.tsx": {"L02":1},
   "src/components/filebrowser/FileToolbar.tsx": {"L04-inline":1},
-  "src/components/filebrowser/FileTransferQueue.tsx": {"L04-inline":5},
   "src/components/filebrowser/SftpDetachedWindow.tsx": {"L04-inline":7},
   "src/components/filebrowser/browser/Dialogs.tsx": {"L02":2},
   "src/components/filebrowser/browser/FileBrowserView.tsx": {"L04-inline":2},

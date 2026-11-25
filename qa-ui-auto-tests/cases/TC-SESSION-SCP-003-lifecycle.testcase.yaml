@@ -54,22 +54,22 @@ steps:
     timeout_sec: 45
 - click: '[data-testid="sftp-remote-list"] tr[title$="/scp-large.bin"]'
 - click: '[data-testid="sftp-remote-download-selected"]'
-- wait_for: '[data-testid="sftp-transfer-queue"] [data-transfer-state="running"] button[title="Pause"]'
-- click: '[data-testid="sftp-transfer-queue"] button[title="Pause"]'
+- wait_for: '[data-testid="sftp-transfer-queue"] [data-transfer-state="running"] button[aria-label="Pause"]'
+- click: '[data-testid="sftp-transfer-queue"] button[aria-label="Pause"]'
 - wait_for: '[data-testid="sftp-transfer-queue"] [data-transfer-state="paused"]'
 - click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-transfer-queue"] [data-transfer-state="paused"]'
-- click: '[data-testid="sftp-transfer-queue"] button[title="Resume"]'
+- click: '[data-testid="sftp-transfer-queue"] button[aria-label="Resume"]'
 - wait_for: '[data-testid="sftp-transfer-queue"] [data-transfer-state="running"]'
 - wait_for:
     selector: '[data-testid="sftp-transfer-queue"] [data-transfer-state="running"][data-transfer-bytes]:not([data-transfer-bytes="0"])'
     timeout_sec: 45
-- click: '[data-testid="sftp-transfer-queue"] button[title="Cancel"]'
+- click: '[data-testid="sftp-transfer-queue"] button[aria-label="Cancel"]'
 - wait_for: '[data-testid="sftp-transfer-queue"] [data-transfer-state="cancelled"]'
-- click: '[data-testid="sftp-transfer-queue"] button[title="Retry"]'
+- click: '[data-testid="sftp-transfer-queue"] button[aria-label="Retry"]'
 - assert_file_sha256:
     path: ${cfg.ssh_features.large_downloaded}
     equals: 6b4be392164b2c21ce9cd339a9846f9de7afb4407b46becb7ddf98081e3c6cac
@@ -119,7 +119,7 @@ verification:
     - step: 18
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "scp-upload.txt", "timeout_sec": 45}}'
     - step: 21
-      expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"running\"] button[title=\"Pause\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"running\"] button[aria-label=\"Pause\"]"}'
     - step: 23
       expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"paused\"]"}'
     - step: 28

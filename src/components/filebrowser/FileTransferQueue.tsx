@@ -317,7 +317,7 @@ export function FileTransferQueue({
               style={{ borderColor: "var(--taomni-divider)" }}
             >
               <div className="flex items-center gap-2 truncate">
-                <span style={{ color: it.direction === "upload" ? "#3a7ac0" : "#3da064" }}>
+                <span style={{ color: it.direction === "upload" ? "var(--taomni-info-icon)" : "var(--taomni-success-icon)" }}>
                   {it.direction === "upload" ? "↑" : "↓"}
                 </span>
                 <span className="truncate flex-1">
@@ -399,11 +399,11 @@ export function FileTransferQueue({
                     width: `${pct}%`,
                     background:
                       it.state === "error"
-                        ? "#c0432a"
+                        ? "var(--taomni-danger-icon)"
                         : it.state === "done"
-                          ? "#3da064"
+                          ? "var(--taomni-success-icon)"
                           : it.state === "paused"
-                            ? "#d99a2b"
+                            ? "var(--taomni-warning-icon)"
                             : "var(--taomni-accent)",
                   }}
                 />
