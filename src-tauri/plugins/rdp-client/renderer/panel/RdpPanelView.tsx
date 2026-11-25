@@ -83,7 +83,10 @@ export function RdpPanelView(inputs: RdpPanelViewProps) {
       onKeyDown={input.onKey(true)}
       onKeyUp={input.onKey(false)}
       onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) connection.releaseRemoteInput();
+        const next = e.relatedTarget;
+        if (!next || (next !== e.currentTarget && next !== canvasRef.current && next !== imeInputRef.current)) {
+          connection.releaseRemoteInput();
+        }
       }}
       style={{
         outline: "none",
@@ -99,8 +102,8 @@ export function RdpPanelView(inputs: RdpPanelViewProps) {
         <span
           data-testid="rdp-status"
           style={{
-            fontSize: 11,
-            color: "#ddd",
+            fontSize: "var(--taomni-fs-small, var(--taomni-ui-font-size))",
+            color: "var(--taomni-text)",
             padding: "0 6px",
             display: "inline-flex",
             alignItems: "center",
@@ -109,9 +112,9 @@ export function RdpPanelView(inputs: RdpPanelViewProps) {
           }}
         >
           {t(`rdp.status.${status}`)}
-          {protocol && <span style={{ opacity: 0.65 }}>· {protocol}</span>}
-          {dims && <span style={{ opacity: 0.65 }}>· {dims}</span>}
-          {showStage && <span style={{ opacity: 0.45 }}>· {stage}</span>}
+          {protocol && <span>· {protocol}</span>}
+          {dims && <span>· {dims}</span>}
+          {showStage && <span>· {stage}</span>}
         </span>
         <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
         {/* Action group — operations on the live session. */}
@@ -298,18 +301,19 @@ export function RdpPanelView(inputs: RdpPanelViewProps) {
           style={{
             position: "absolute",
             inset: 0,
-            background: "rgba(0,0,0,0.4)",
-            color: "#fff",
+            background: "var(--taomni-overlay, rgba(0,0,0,0.4))",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             pointerEvents: "none",
-            fontSize: 14,
+            fontSize: "var(--taomni-fs-title, var(--taomni-ui-font-size))",
           }}
         >
-          {status === "connecting" && t("rdp.connecting")}
-          {status === "disconnected" && t("rdp.disconnected")}
-          {status === "error" && (conn?.error ?? t("rdp.errorGeneric"))}
+          <span role="status" style={{ padding: "4px 8px", color: "var(--taomni-text)", background: "var(--taomni-card-bg)" }}>
+            {status === "connecting" && t("rdp.connecting")}
+            {status === "disconnected" && t("rdp.disconnected")}
+            {status === "error" && (conn?.error ?? t("rdp.errorGeneric"))}
+          </span>
         </div>
       )}
     </div>

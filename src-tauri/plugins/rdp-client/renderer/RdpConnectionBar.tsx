@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Minimize2, Minus, Pin, PinOff, X } from "lucide-react";
 
 import { useT } from "../../../../src/lib/rdpViewerHost";
+import { IconButton } from "../../../crates/taomni-plugin-api/frontend/ui/IconButton";
 import { rdpNetworkQuality, type RdpNetworkInfo } from "./wire";
 
 const PINNED_KEY = "taomni.rdp.connectionBar.pinned";
@@ -40,17 +41,17 @@ const BAR_STYLE: React.CSSProperties = {
   position: "absolute",
   top: 0,
   left: "50%",
-  zIndex: 31,
+  zIndex: "var(--taomni-z-docked-overlay, 31)",
   display: "flex",
   alignItems: "center",
   gap: 4,
   padding: "3px 8px",
-  borderRadius: "0 0 6px 6px",
-  background: "rgba(24, 28, 34, 0.94)",
-  color: "#e8ecf1",
-  fontSize: 12,
-  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.45)",
-  transition: "transform 160ms ease",
+  maxWidth: "100%",
+  borderRadius: "0 0 var(--taomni-radius-lg, 4px) var(--taomni-radius-lg, 4px)",
+  background: "var(--taomni-card-bg)",
+  color: "var(--taomni-text)",
+  fontSize: "var(--taomni-ui-font-size, 12px)",
+  boxShadow: "var(--taomni-shadow-lg)",
 };
 
 const BUTTON_STYLE: React.CSSProperties = {
@@ -58,14 +59,14 @@ const BUTTON_STYLE: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   minWidth: 26,
-  height: 24,
+  minHeight: "max(24px, 1.5em)",
   padding: "0 6px",
   border: 0,
   borderRadius: 4,
   background: "transparent",
   color: "inherit",
   cursor: "pointer",
-  fontSize: 12,
+  fontSize: "var(--taomni-ui-font-size, 12px)",
 };
 
 /**
@@ -143,9 +144,10 @@ export function RdpConnectionBar({
         // input paths); mouse enter or any move over the edge shows the bar.
         onMouseEnter={reveal}
         onMouseMove={shown ? undefined : reveal}
-        style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, zIndex: 30 }}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, zIndex: "var(--taomni-z-docked-overlay, 30)" }}
       />
       <div
+        className="motion-safe:transition-transform"
         role="toolbar"
         aria-label={t("rdp.bar.label")}
         data-testid="rdp-connection-bar"
@@ -176,17 +178,16 @@ export function RdpConnectionBar({
           transform: `translate(-50%, ${visible ? "0" : "calc(-100% + 3px)"})`,
         }}
       >
-        <button
+        <IconButton
           type="button"
           data-testid="rdp-bar-pin"
           aria-pressed={pinned}
-          aria-label={pinned ? t("rdp.bar.unpin") : t("rdp.bar.pin")}
-          title={pinned ? t("rdp.bar.unpin") : t("rdp.bar.pin")}
+          label={pinned ? t("rdp.bar.unpin") : t("rdp.bar.pin")}
           onClick={togglePinned}
-          style={BUTTON_STYLE}
+          style={pinned ? { ...BUTTON_STYLE, background: "var(--taomni-selected)" } : BUTTON_STYLE}
         >
           {pinned ? <Pin size={14} /> : <PinOff size={14} />}
-        </button>
+        </IconButton>
         <span
           role="img"
           data-testid="rdp-bar-quality"
@@ -202,7 +203,7 @@ export function RdpConnectionBar({
                 width: 3,
                 height: 3 + bar * 2.5,
                 borderRadius: 1,
-                background: bar <= level ? "#7ad37a" : "rgba(232, 236, 241, 0.28)",
+                background: bar <= level ? "var(--taomni-success-icon, var(--taomni-accent))" : "var(--taomni-divider)",
               }}
             />
           ))}
@@ -220,46 +221,42 @@ export function RdpConnectionBar({
         >
           {title}
         </span>
-        <button
+        <IconButton
           type="button"
           data-testid="rdp-bar-ctrl-alt-del"
-          aria-label={t("rdp.ctrlAltDel")}
-          title={t("rdp.ctrlAltDel")}
+          label={t("rdp.ctrlAltDel")}
           onClick={onCtrlAltDel}
           style={BUTTON_STYLE}
         >
           Ctrl+Alt+Del
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           type="button"
           data-testid="rdp-bar-minimize"
-          aria-label={t("rdp.bar.minimize")}
-          title={t("rdp.bar.minimize")}
+          label={t("rdp.bar.minimize")}
           onClick={onMinimize}
           style={BUTTON_STYLE}
         >
           <Minus size={14} />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           type="button"
           data-testid="rdp-bar-restore"
-          aria-label={t("rdp.bar.restore")}
-          title={t("rdp.bar.restore")}
+          label={t("rdp.bar.restore")}
           onClick={onRestore}
           style={BUTTON_STYLE}
         >
           <Minimize2 size={14} />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           type="button"
           data-testid="rdp-bar-disconnect"
-          aria-label={t("rdp.bar.disconnect")}
-          title={t("rdp.bar.disconnect")}
+          label={t("rdp.bar.disconnect")}
           onClick={onDisconnect}
           style={BUTTON_STYLE}
         >
           <X size={14} />
-        </button>
+        </IconButton>
       </div>
     </>
   );

@@ -4292,7 +4292,7 @@ controls:
 id: F9.7
 status: partial
 area: rdp
-components: [RdpPanel, RdpOptionsForm]
+components: [RdpPanel, RdpConnectionBar, RdpOptionsForm]
 files:
   - src-tauri/plugins/rdp-client/**
   - src-tauri/crates/taomni-rdp-client-api/**
@@ -4396,6 +4396,8 @@ controls:
     kind: interactive
     optional: true       # only in OS full screen while connected
 -->
+
+全屏连接栏的按钮在本地响应 Tab、Enter 和 Space。画布和 IME 输入继续向远端投递按键。连接状态文字及工具栏跟随当前窗口主题和界面字号。
 
 - Tauri desktop 模式下通过 IronRDP 0.17 驱动真实 RDP 会话：CredSSP/NLA、active-stage 图像解码、键盘/鼠标/滚轮输入、画布绘制
 - 传输路径支持 direct TCP、HTTP/SOCKS5 proxy，以及 RD Gateway（MS-TSGU）代码路径；RD Gateway 当前无真实环境，只以 unit test + ignored live smoke 作为验收

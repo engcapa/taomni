@@ -1,8 +1,8 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { rdpConnect, rdpDisconnect } from "../../../../src/lib/rdpViewerHost";
-import { OUT_FRAME, OUT_FRAME_END } from "./wire";
+import { encodeKey, OUT_FRAME, OUT_FRAME_END } from "./wire";
 import { useRdpStore, type RdpConnectionState } from "./rdpStore";
 import { DEFAULT_RDP_OPTIONS } from "../../../../src/types/rdp";
 import RdpPanel from "./RdpPanel";
@@ -160,6 +160,35 @@ describe("RdpPanel framebuffer lifecycle", () => {
     expect(readPixel()).toEqual([255, 255, 255, 255]);
     return { canvas, readPixel, socket };
   }
+
+  it("keeps fullscreen toolbar activation local and sends keys from the remote input surface", async () => {
+    const controls = { osFullscreen: true, onReattach: vi.fn(), onToggleOsFullscreen: vi.fn() };
+    render(<RdpPanel tabId="rdp-tab" host="rdp.test" port={3389} options={DEFAULT_RDP_OPTIONS}
+      visible detachedWindowControls={controls} />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    const socket = TestRdpSocket.instances[0];
+    act(() => { socket.connected(994, 750); });
+    socket.send.mockClear();
+
+    const pin = screen.getByTestId("rdp-bar-pin");
+    pin.focus();
+    for (const key of ["Space", "Tab", "Enter"]) {
+      expect(fireEvent.keyDown(pin, { code: key })).toBe(true);
+      expect(fireEvent.keyUp(pin, { code: key })).toBe(true);
+    }
+    expect(socket.send).not.toHaveBeenCalled();
+    const ime = screen.getByRole("textbox");
+    fireEvent.keyDown(ime, { code: "KeyA" });
+    fireEvent.keyUp(ime, { code: "KeyA" });
+    expect(socket.send.mock.calls.map(([frame]) => frame)).toEqual([encodeKey(true, 0x1e), encodeKey(false, 0x1e)]);
+    socket.send.mockClear();
+    fireEvent.keyDown(ime, { code: "ShiftLeft" });
+    fireEvent.blur(ime, { relatedTarget: pin });
+    fireEvent.keyUp(pin, { code: "ShiftLeft" });
+    expect(socket.send.mock.calls.map(([frame]) => frame)).toEqual([
+      encodeKey(true, 0x2a), JSON.stringify({ type: "release_input" }),
+    ]);
+  });
 
   it("draws initial frames and retains them on a same-size reactivation", async () => {
     const { readPixel, socket } = await connectPanel(994, 750);

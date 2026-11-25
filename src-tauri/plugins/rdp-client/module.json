@@ -3,7 +3,7 @@
   "slug": "rdp-client",
   "name": "RDP Client",
   "description": "Connect to remote desktops with RDP, including RD Gateway, clipboard, audio and drive redirection.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "coreApiVersion": "1",
   "kind": "remote-client",
   "status": "stable",
