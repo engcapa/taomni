@@ -55,11 +55,13 @@ impl InstalledMfa {
         assert_eq!(source.len(), 40);
         let receipt: Value =
             serde_json::from_slice(&fs::read(artifact.join("provenance.json")).unwrap()).unwrap();
+        let mut expected: ModuleManifest =
+            serde_json::from_str(include_str!("../../plugins/mfa/module.json")).unwrap();
         for (field, value) in [
             ("schema", "taomni.plugin-package.v1"),
             ("id", "taomni-plugin-mfa"),
             ("slug", "mfa"),
-            ("version", "0.1.0"),
+            ("version", expected.version.as_str()),
             ("coreApiVersion", "1"),
             ("trust", "plugins.updater.pubkey"),
             ("sourceSha", source.as_str()),
@@ -85,8 +87,6 @@ impl InstalledMfa {
         let package =
             VerifiedPackage::from_offline(&archive, &signature, crate::plugin::current_platform())
                 .unwrap();
-        let mut expected: ModuleManifest =
-            serde_json::from_str(include_str!("../../plugins/mfa/module.json")).unwrap();
         if cfg!(windows) {
             expected.entry.host.as_mut().unwrap().push_str(".exe");
         }

@@ -7,6 +7,10 @@ on:
         description: Repository commit/ref to test (QA artifacts only)
         type: string
         default: ''
+      package_run:
+        description: Completed Release Bundle run of the selected source to test its signed module
+        type: string
+        default: ''
       network_only:
         description: Compile the core and run persisted proxy contracts without signed MFA packages
         type: boolean
@@ -28,6 +32,7 @@ on:
   workflow_call:
     inputs:
       head: {type: string, default: ''}
+      package_run: {type: string, default: ''}
       network_only: {type: boolean, default: false}
       module: {type: string, default: mfa}
       macos_runner: {type: string, default: macos-latest}
@@ -41,6 +46,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 defaults:
   run:
@@ -58,9 +64,19 @@ jobs:
           persist-credentials: false
       - id: source
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Verify the candidate package producer
+        if: inputs.package_run != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_RUN: ${{ inputs.package_run }}
+          SOURCE: ${{ steps.source.outputs.sha }}
+        run: |
+          [[ "$PACKAGE_RUN" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN" |
+            jq -e --arg source "$SOURCE" '.path == ".github/workflows/release.yml" and .event == "workflow_dispatch" and .head_sha == $source and .conclusion == "success"'
 
   packages:
-    if: ${{ !inputs.network_only }}
+    if: ${{ !inputs.network_only && inputs.package_run == '' }}
     needs: source
     uses: ./.github/workflows/qa-modular-packages.yml
     with:
@@ -74,7 +90,7 @@ jobs:
   installed-host:
     name: ${{ inputs.network_only && 'Core network' || format('Installed {0}', inputs.module) }} (${{ matrix.platform }})
     needs: [source, packages]
-    if: ${{ !cancelled() && needs.source.result == 'success' && (inputs.network_only || needs.packages.result == 'success') }}
+    if: ${{ !cancelled() && needs.source.result == 'success' && (inputs.network_only || inputs.package_run != '' || needs.packages.result == 'success') }}
     strategy:
       fail-fast: false
       # Intel macOS has a release-target build/signature above. These gates
@@ -151,10 +167,42 @@ jobs:
           "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
           'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
       - uses: actions/download-artifact@v4
-        if: ${{ !inputs.network_only }}
+        if: ${{ !inputs.network_only && inputs.package_run == '' }}
         with:
           name: qa-modular-package-${{ matrix.platform }}-${{ inputs.module }}-install-${{ github.run_id }}
           path: signed-module-package
+      - name: Download the candidate's signed module
+        if: ${{ !inputs.network_only && inputs.package_run != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: module-signed-${{ inputs.module }}-${{ matrix.platform }}-${{ inputs.package_run }}
+          run-id: ${{ inputs.package_run }}
+          github-token: ${{ github.token }}
+          path: candidate-module
+      - name: Select the release package and record its producer
+        if: ${{ !inputs.network_only && inputs.package_run != '' }}
+        env:
+          PACKAGE_RUN: ${{ inputs.package_run }}
+        run: |
+          mv candidate-module/signed-module signed-module-package
+          mkdir -p modular-mfa-install
+          echo "$PACKAGE_RUN" > modular-mfa-install/package-run.txt
+      - name: Read the signed MFA test fixture for this verification
+        if: inputs.module == 'mfa' && !inputs.network_only && needs.source.outputs.sha != github.sha
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: verification-source
+          sparse-checkout-cone-mode: false
+          sparse-checkout: /src-tauri/src/plugin/signed_mfa_support.rs
+          persist-credentials: false
+      - name: Record the test fixture used with the candidate's module manifest
+        if: inputs.module == 'mfa' && !inputs.network_only && needs.source.outputs.sha != github.sha
+        run: |
+          mkdir -p modular-mfa-install
+          cp verification-source/src-tauri/src/plugin/signed_mfa_support.rs src-tauri/src/plugin/
+          git diff HEAD -- src-tauri/src/plugin/signed_mfa_support.rs > modular-mfa-install/test-fixture.patch
+          echo "$GITHUB_SHA" > modular-mfa-install/verification-sha.txt
       - name: Compile a dedicated harness with the production pinned trust anchor
         run: |
           mkdir -p modular-mfa-install

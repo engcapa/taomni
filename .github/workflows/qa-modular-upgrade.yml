@@ -343,6 +343,7 @@ jobs:
     uses: ./.github/workflows/qa-modular-mfa-install.yml
     with:
       head: ${{ inputs.head || github.sha }}
+      package_run: ${{ inputs.signed_mfa_only && inputs.package_run || '' }}
       network_only: ${{ !inputs.signed_mfa_only && inputs.network_only || false }}
       module: ${{ inputs.signed_mfa_only && inputs.signed_migration_module || 'mfa' }}
       macos_runner: ${{ inputs.signed_mfa_only && (inputs.signed_migration_module == 'mail' || inputs.signed_native_macos) && inputs.package_macos_arm_runner || 'macos-latest' }}
