@@ -1141,6 +1141,8 @@
 - `[data-testid="notepad-context-save-as"]` — display — F-NOTEPAD-1.notepad-context-save-as
 - `[data-testid="notepad-menu-edit"]` — interactive — F-NOTEPAD-1.notepad-menu-edit
 - `[data-testid="notepad-menu-item-edit.paste"]` — interactive — F-NOTEPAD-1.notepad-menu-item-edit-paste
+- `[data-testid="notepad-menu-item-edit.pasteSpecial"]` — interactive — F-NOTEPAD-1.notepad-menu-item-edit-paste-special
+- `[data-testid="notepad-paste-plain"]` — interactive — F-NOTEPAD-1.notepad-paste-plain
 - `[data-testid="notepad-menu-item-edit.clipboardHistory"]` — interactive — F-NOTEPAD-1.notepad-menu-item-edit-clipboard-history
 - `[data-testid="notepad-clipboard-history-dialog"]` — display — F-NOTEPAD-1.notepad-clipboard-history-dialog
 - `[data-testid="notepad-clipboard-history-empty"]` — display — F-NOTEPAD-1.notepad-clipboard-history-empty
