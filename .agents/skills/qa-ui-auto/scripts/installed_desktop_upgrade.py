@@ -286,6 +286,9 @@ def execute(args):
             stages["afterReinstall"]["serverIdentities"] = installed_server_identities.verify(profile, stages["legacyServerIdentities"])
             stages["afterReinstall"]["enrollment"] = installed_first_release.enrollment(profile, origin)
             stages["afterReinstall"]["activePointers"] = observe_legacy_roster(profile / "plugins", origin, "mail")
+            if getattr(args, "compare_macos_memory", False):
+                from installed_macos_memory import compare
+                stages["pairedCoreMemory"] = compare(reopened, profile, work, report, stages, identity)
         result.update(passed=True, sessionTypes=[row["session_type"] for row in expected_rows], retainedFiles=retained)
     finally:
         if origin:
@@ -297,6 +300,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("identity", "legacy", "candidate", "evidence", "work"):
         parser.add_argument("--" + name, required=True, type=Path)
+    parser.add_argument("--compare-macos-memory", action="store_true")
     inputs = parser.add_mutually_exclusive_group(required=True)
     inputs.add_argument("--first-release", type=Path)
     inputs.add_argument("--signed", type=Path)

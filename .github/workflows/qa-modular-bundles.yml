@@ -268,6 +268,7 @@ jobs:
         env:
           SAMPLE_MACOS_HARDENED_MFA: ${{ inputs.macos_hardened_mfa }}
           MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
+          COMPARE_MACOS_MEMORY: ${{ inputs.first_release && inputs.package_targets == 'darwin-aarch64' }}
         run: |
           args=(--signed signed-mfa-input)
           if [[ "$FIRST_RELEASE" == true ]]; then
@@ -278,6 +279,9 @@ jobs:
               > bundle-evidence/macos-fixture-consent.log 2>&1 &
             consent_pid=$!
             trap 'kill "$consent_pid" 2>/dev/null || true; wait "$consent_pid" 2>/dev/null || true' EXIT
+          fi
+          if [[ "$COMPARE_MACOS_MEMORY" == true ]]; then
+            args+=(--compare-macos-memory)
           fi
           if [[ "$SAMPLE_MACOS_HARDENED_MFA" == true ]]; then
             args+=(--macos-hardened-mfa)
