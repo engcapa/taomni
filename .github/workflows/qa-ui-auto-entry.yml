@@ -775,15 +775,14 @@ jobs:
           run-id: ${{ inputs.first_release_run }}
           github-token: ${{ github.token }}
           path: first-release-input/catalog
-      - name: Download matching business packages for this runner
+      - name: Download the target's signed packages across all artifact pages
         if: steps.first_release.outcome == 'success'
-        uses: actions/download-artifact@v4
-        with:
-          pattern: module-signed-*-${{ steps.module_platform.outputs.platform }}-${{ inputs.first_release_run }}
-          merge-multiple: false
-          run-id: ${{ inputs.first_release_run }}
-          github-token: ${{ github.token }}
-          path: first-release-input/packages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODULE_RUN: ${{ inputs.first_release_run }}
+          MODULE_TARGET: ${{ steps.module_platform.outputs.platform }}
+        run: gh run download "$MODULE_RUN" --repo "$GITHUB_REPOSITORY" --pattern "module-signed-*-$MODULE_TARGET-$MODULE_RUN" --dir first-release-input/packages
       - name: Download this invocation's production-signed module
         if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-module')
         uses: ./.github/actions/qa-download-artifact

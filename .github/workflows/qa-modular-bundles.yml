@@ -240,14 +240,14 @@ jobs:
           run-id: ${{ inputs.package_run }}
           github-token: ${{ github.token }}
           path: first-release-input/catalog
-      - uses: actions/download-artifact@v4
+      - name: Download the target's signed packages across all artifact pages
         if: inputs.first_release && runner.os != 'Linux'
-        with:
-          pattern: module-signed-*-${{ matrix.target }}-${{ inputs.package_run }}
-          run-id: ${{ inputs.package_run }}
-          github-token: ${{ github.token }}
-          path: first-release-input/packages
-          merge-multiple: false
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODULE_RUN: ${{ inputs.package_run }}
+          MODULE_TARGET: ${{ matrix.target }}
+        run: gh run download "$MODULE_RUN" --repo "$GITHUB_REPOSITORY" --pattern "module-signed-*-$MODULE_TARGET-$MODULE_RUN" --dir first-release-input/packages
       - name: Fetch the platform's pinned legacy installer
         if: inputs.upgrade_desktop && runner.os != 'Linux'
         env:
