@@ -1,3 +1,4 @@
+import { SectionTabs, sectionTab } from "../../../../src/components/ui/SectionTabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ExternalLink, Inbox, Loader2, MailOpen, Mail as MailIcon, RefreshCw, Star, Trash2 } from "lucide-react";
 import type { MailTabInfo } from "../../../../src/types";
@@ -218,13 +219,12 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
       <div className="h-10 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-ui-body">
         <Inbox className="w-4 h-4 text-[var(--taomni-text-muted)]" />
         <span className="font-semibold">Unified mail</span>
-        <div className="ml-2 inline-flex rounded border border-[var(--taomni-divider)] overflow-hidden" role="tablist" aria-label="Unified folder">
+        <SectionTabs className="ml-2 inline-flex rounded border border-[var(--taomni-divider)] overflow-hidden" aria-label="Unified folder">
           {MAIL_UNIFIED_VIEWS.map((entry) => (
             <button
               key={entry.value}
               type="button"
-              role="tab"
-              aria-selected={view === entry.value}
+              {...sectionTab(view === entry.value)}
               data-testid={`mail-unified-view-${entry.value}`}
               className={`h-7 px-3 ${view === entry.value ? "bg-[var(--taomni-selected)] font-semibold" : "hover:bg-[var(--taomni-hover)]"}`}
               onClick={() => {
@@ -236,7 +236,7 @@ export function MailUnifiedTab({ accounts, visible, onOpenAccount }: MailUnified
               {entry.label}
             </button>
           ))}
-        </div>
+        </SectionTabs>
         <span className="text-[var(--taomni-text-muted)]" data-testid="mail-unified-count" data-count={entries.length} data-unread={unreadCount}>
           {entries.length} message{entries.length === 1 ? "" : "s"}{unreadCount ? `, ${unreadCount} unread` : ""} · {accounts.length} account{accounts.length === 1 ? "" : "s"}
         </span>

@@ -1,3 +1,4 @@
+import { SectionTabs, sectionTab } from "../../../../src/components/ui/SectionTabs";
 import { useEffect, useState } from "react";
 import { Camera, Image as ImageIcon, KeyRound, ScanLine, X } from "lucide-react";
 import { useT } from "../../../../src/lib/i18n";
@@ -91,15 +92,14 @@ export function MfaAddDialog({
           </button>
         </div>
         {!preview ? (
-          <div role="tablist" aria-label={t("mfa.addTitle")} className="flex gap-1 border-b px-3 pt-2" style={{ borderColor: "var(--taomni-divider)" }}>
+          <SectionTabs aria-label={t("mfa.addTitle")} className="flex gap-1 border-b px-3 pt-2" style={{ borderColor: "var(--taomni-divider)" }}>
             {MFA_ADD_MODES.map((entry) => {
               const Icon = MODE_ICONS[entry];
               return (
                 <button
                   key={entry}
                   type="button"
-                  role="tab"
-                  aria-selected={mode === entry}
+                  {...sectionTab(mode === entry)}
                   data-testid={`mfa-add-mode-${entry}`}
                   className="inline-flex items-center gap-1 rounded-t px-2.5 py-1.5 text-ui-body hover:bg-[var(--taomni-hover)]"
                   style={mode === entry ? { boxShadow: "inset 0 -2px 0 var(--taomni-accent)", fontWeight: 600 } : undefined}
@@ -110,7 +110,7 @@ export function MfaAddDialog({
                 </button>
               );
             })}
-          </div>
+          </SectionTabs>
         ) : null}
         <div className="p-4">
           {preview ? (

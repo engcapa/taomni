@@ -1,0 +1,60 @@
+id: TC-UIC-012-section-tabs
+title: Keyboard section changes keep focus on the chosen MFA and Notepad tab
+covers: [F-MFA-2, F-NOTEPAD-1]
+fixtures: [reset_db]
+modes: [browser, native]
+tags: [ui-contract, keyboard, mfa, notepad]
+ui_standard: [UI-TAB-02]
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- vault_first_run: qa-section-tabs
+- click: '[data-testid="mfa-empty-add-secret"]'
+- wait_for: '[data-testid="mfa-secret-form"]'
+- press: {selector: '[data-testid="mfa-add-mode-secret"]', key: ArrowRight}
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="image"]'
+- assert_focus_on: '[data-testid="mfa-add-mode-image"]'
+- assert_attribute: {selector: '[data-testid="mfa-add-mode-secret"]', name: tabindex, equals: '-1'}
+- press: Home
+- wait_for: '[data-testid="mfa-secret-form"]'
+- assert_focus_on: '[data-testid="mfa-add-mode-secret"]'
+- press: Escape
+- click: '[data-testid="side-tab-explorer"]'
+- click: '[data-testid="explorer-tab-new-notepad"]'
+- click: '[data-testid="notepad-tool-find"]'
+- press: {selector: '[data-testid="np-find-tab-find"]', key: ArrowRight}
+- assert_visible: '[data-testid="np-find-replace-input"]'
+- assert_focus_on: '[data-testid="np-find-tab-replace"]'
+- press: Home
+- assert_not_visible: '[data-testid="np-find-replace-input"]'
+- assert_attribute: {selector: '[data-testid="np-find-tab-find"]', name: aria-selected, equals: 'true'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: module-tabs
+    ui_standard: [UI-TAB-02]
+    requirement: MFA reveals the chosen entry method and keeps the selected tab as the keyboard stop.
+    actions: [5, 7, 11]
+    checkpoints:
+    - {step: 8, expectation: Image import is visible.}
+    - {step: 9, expectation: The image tab keeps keyboard focus.}
+    - {step: 10, expectation: The former tab leaves the Tab order.}
+    - {step: 12, expectation: Home reopens the form.}
+    - {step: 13, expectation: The secret tab retains focus.}
+    results: [8, 9, 10, 12, 13]
+  - id: document-tabs
+    ui_standard: [UI-TAB-02]
+    requirement: ArrowRight and Home switch the active find panel and its visible fields.
+    actions: [17, 18, 21]
+    checkpoints:
+    - {step: 19, expectation: The replacement input appears.}
+    - {step: 20, expectation: The replace tab owns focus.}
+    - {step: 22, expectation: The replacement input disappears.}
+    - {step: 23, expectation: The find tab is selected.}
+    results: [19, 20, 22, 23]
+  visual:
+  - {check: Panel changes, method: automated, reason: The corresponding form controls must appear and disappear.}
+  native:
+  - {check: WebView tab ownership, method: automated, reason: Reads focus after changing panes in two separate feature entries.}

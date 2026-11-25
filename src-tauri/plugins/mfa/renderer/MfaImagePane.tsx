@@ -52,7 +52,11 @@ export function MfaImagePane({ onTexts }: { onTexts: (texts: string[]) => MfaTex
   };
 
   useEffect(() => {
-    zoneRef.current?.focus();
+    const control = zoneRef.current;
+    const dialog = control?.closest('[role="dialog"]');
+    const focus = document.activeElement;
+    if (focus?.getAttribute("role") === "tab" && dialog?.contains(focus)) return;
+    control?.focus();
   }, []);
 
   // Tauri delivers OS file drops as paths (see App.tsx dispatchNativeFileDrop).

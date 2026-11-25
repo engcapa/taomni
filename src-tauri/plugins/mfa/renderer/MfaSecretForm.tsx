@@ -32,7 +32,11 @@ export function MfaSecretForm({
   const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    firstRef.current?.focus();
+    const control = firstRef.current;
+    const dialog = control?.closest('[role="dialog"]');
+    const focus = document.activeElement;
+    if (focus?.getAttribute("role") === "tab" && dialog?.contains(focus)) return;
+    control?.focus();
   }, []);
 
   const update = (patch: Partial<MfaAccountInput>) => {

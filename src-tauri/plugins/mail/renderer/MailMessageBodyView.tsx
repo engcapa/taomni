@@ -1,3 +1,4 @@
+import { SectionTabs, sectionTab } from "../../../../src/components/ui/SectionTabs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Code, FileText, Loader2, Minus, Plus, Search, X } from "lucide-react";
 import { MailHtmlReader, type MailHtmlReaderHandle } from "./MailHtmlReader";
@@ -128,16 +129,14 @@ export function MailMessageBodyView({
     >
       <div className="flex flex-wrap items-center gap-1.5">
         {showToggle && (
-          <div
+          <SectionTabs
             className="flex items-center gap-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] p-0.5"
             data-testid="mail-body-mode-toggle"
-            role="tablist"
             aria-label="Message body format"
           >
             <button
               type="button"
-              role="tab"
-              aria-selected={activeMode === "html"}
+              {...sectionTab(activeMode === "html")}
               className={`h-6 px-2 inline-flex items-center gap-1 rounded text-ui-small ${
                 activeMode === "html"
                   ? "bg-[var(--taomni-bg)] text-[var(--taomni-accent)] shadow-sm"
@@ -151,8 +150,7 @@ export function MailMessageBodyView({
             </button>
             <button
               type="button"
-              role="tab"
-              aria-selected={activeMode === "plain"}
+              {...sectionTab(activeMode === "plain")}
               className={`h-6 px-2 inline-flex items-center gap-1 rounded text-ui-small ${
                 activeMode === "plain"
                   ? "bg-[var(--taomni-bg)] text-[var(--taomni-accent)] shadow-sm"
@@ -164,7 +162,7 @@ export function MailMessageBodyView({
               <FileText className="w-3 h-3" />
               Plain
             </button>
-          </div>
+          </SectionTabs>
         )}
 
         <div

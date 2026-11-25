@@ -1,3 +1,4 @@
+import { SectionTabs, sectionTab } from "../ui/SectionTabs";
 import { FolderOpen, Folder, History } from "lucide-react";
 import { type TranslateFn } from "../../lib/i18n";
 import { type WelcomeHistoryTab } from "./types";
@@ -57,9 +58,8 @@ export function WelcomeHistoryPanel({
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
     >
       <div className="flex flex-wrap items-center gap-2 border-b p-2" style={{ borderColor: "var(--taomni-divider)" }}>
-        <div
+        <SectionTabs
           className="flex min-w-0 flex-1 flex-wrap items-center gap-1"
-          role="tablist"
           aria-label={t("welcome.historyTabsLabel")}
         >
           {tabs.map((tab) => {
@@ -76,8 +76,7 @@ export function WelcomeHistoryPanel({
                   border: `1px solid ${selected ? "var(--taomni-selected-border)" : "transparent"}`,
                 }}
                 type="button"
-                role="tab"
-                aria-selected={selected}
+                {...sectionTab(selected)}
                 aria-controls={`welcome-history-tabpanel-${tab.id}`}
                 onClick={() => onActiveTabChange(tab.id)}
               >
@@ -89,7 +88,7 @@ export function WelcomeHistoryPanel({
               </button>
             );
           })}
-        </div>
+        </SectionTabs>
       </div>
       <div
         id={`welcome-history-tabpanel-${activeTab}`}

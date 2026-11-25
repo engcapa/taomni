@@ -1,3 +1,4 @@
+import { SectionTabs, sectionTab } from "../ui/SectionTabs";
 import {
   useEffect,
   useId,
@@ -489,13 +490,12 @@ export function FindReplaceBar({
           </LegacyId>
         </div>
 
-        <div className="np-find-tabs" role="tablist">
+        <SectionTabs className="np-find-tabs">
           {FIND_TABS.map((tab) => (
             <LegacyId key={tab.id} id={`notepad-find-tab-${tab.id}`}>
               <button
                 type="button"
-                role="tab"
-                aria-selected={find.tab === tab.id}
+                {...sectionTab(find.tab === tab.id)}
                 className={`np-find-tab${find.tab === tab.id ? " on active" : ""}`}
                 data-testid={`np-find-tab-${tab.id}`}
                 onClick={() => onPatch({ tab: tab.id })}
@@ -504,7 +504,7 @@ export function FindReplaceBar({
               </button>
             </LegacyId>
           ))}
-        </div>
+        </SectionTabs>
 
         <div className="np-find-body">
           {findRow}

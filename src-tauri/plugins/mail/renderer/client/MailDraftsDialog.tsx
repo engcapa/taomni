@@ -1,3 +1,4 @@
+import { SectionTabs, sectionTab } from "../../../../../src/components/ui/SectionTabs";
 import { IconButton } from "../../../../../src/components/ui/IconButton";
 import { FileText, Loader2, RefreshCw, Send, Trash2 } from "lucide-react";
 import { type SetStateAction } from "react";
@@ -54,13 +55,12 @@ export function MailDraftsDialog(context: MailDraftsDialogContext) {
           <button type="button" className="taomni-btn h-7 px-2 text-ui-body" onClick={() => void refreshDrafts()} disabled={draftsLoading}>
             {draftsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           </button>
-          <div className="flex items-center gap-1" role="tablist" aria-label="Drafts and templates">
+          <SectionTabs className="flex items-center gap-1" aria-label="Drafts and templates">
             {(["drafts", "templates", "outbox"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
-                role="tab"
-                aria-selected={draftsTab === tab}
+                {...sectionTab(draftsTab === tab)}
                 data-testid={`mail-drafts-tab-${tab}`}
                 className={`taomni-btn h-7 px-2 text-ui-body ${draftsTab === tab ? "text-[var(--taomni-accent)]" : ""}`}
                 onClick={() => setDraftsTab(tab)}
@@ -68,7 +68,7 @@ export function MailDraftsDialog(context: MailDraftsDialogContext) {
                 {tab === "drafts" ? "Drafts" : tab === "templates" ? "Templates" : `Outbox${outboxCount > 0 ? ` (${outboxCount})` : ""}`}
               </button>
             ))}
-          </div>
+          </SectionTabs>
           <span className="text-ui-body text-[var(--taomni-text-muted)]">
             {visibleDrafts.length} {draftsTab === "drafts" ? "draft" : draftsTab === "templates" ? "template" : "queued message"}{visibleDrafts.length === 1 ? "" : "s"}
           </span>
