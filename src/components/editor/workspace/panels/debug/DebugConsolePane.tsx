@@ -247,7 +247,7 @@ export function DebugConsolePane({ debug, stopped, visible = true, onOpenLocatio
         <span className="font-mono text-ui-small text-[var(--taomni-text-muted)]">&gt;</span>
         <input
           data-testid="debug-console-input"
-          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none disabled:opacity-40"
+          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline disabled:opacity-40"
           placeholder={stopped ? "Evaluate expression or command (↑↓ History)" : "REPL active when target is stopped"}
           value={consoleInput}
           disabled={!stopped}

@@ -137,7 +137,7 @@ export function QuickDocPopup({
       aria-label="Quick documentation"
       tabIndex={0}
       data-testid="code-workspace-quick-doc"
-      className="absolute right-6 top-16 z-40 flex flex-col overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] shadow-xl outline-none"
+      className="absolute right-6 top-16 z-40 flex flex-col overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-tooltip-bg)] shadow-xl focus-visible:keyboard-outline"
       style={{
         width: `${size.width}px`,
         height: `${size.height}px`,

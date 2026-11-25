@@ -330,7 +330,7 @@ export function LanguageServersSettings() {
                 {t("settings.languageServersCommand")}
                 <select
                   value={selected}
-                  className="mt-0.5 h-7 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-ui-body text-[var(--taomni-text)] outline-none"
+                  className="mt-0.5 h-7 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-ui-body text-[var(--taomni-text)] focus-visible:keyboard-outline"
                   onChange={(event) => updateCommand(status.presetId, event.target.value)}
                   aria-label={`${status.displayName} language server command`}
                 >
@@ -350,14 +350,14 @@ export function LanguageServersSettings() {
                 <div className="mt-1.5 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                   <input
                     value={custom.command}
-                    className="h-7 min-w-0 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-ui-small text-[var(--taomni-text)] outline-none"
+                    className="h-7 min-w-0 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                     placeholder={t("settings.languageServersCommandPlaceholder")}
                     aria-label={`${status.displayName} custom command`}
                     onChange={(event) => updateCustom(status.presetId, { command: event.target.value })}
                   />
                   <input
                     value={custom.args}
-                    className="h-7 min-w-0 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-ui-small text-[var(--taomni-text)] outline-none"
+                    className="h-7 min-w-0 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                     placeholder={t("settings.languageServersArgsPlaceholder")}
                     aria-label={`${status.displayName} custom args`}
                     onChange={(event) => updateCustom(status.presetId, { args: event.target.value })}
@@ -405,7 +405,7 @@ export function LanguageServersSettings() {
                           <input
                             data-testid="language-servers-java-home"
                             value={javaHome}
-                            className="h-7 min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-ui-small text-[var(--taomni-text)] outline-none"
+                            className="h-7 min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                             placeholder={t("settings.languageServersJavaHomePlaceholder")}
                             aria-label={t("settings.languageServersJavaHome")}
                             onChange={(event) => setJavaHome(event.target.value)}
@@ -453,7 +453,7 @@ export function LanguageServersSettings() {
                             value={javaVmargs}
                             rows={2}
                             spellCheck={false}
-                            className="min-h-14 min-w-0 flex-1 resize-y rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small leading-snug text-[var(--taomni-text)] outline-none"
+                            className="min-h-14 min-w-0 flex-1 resize-y rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small leading-snug text-[var(--taomni-text)] focus-visible:keyboard-outline"
                             placeholder={t("settings.languageServersJavaVmargsPlaceholder")}
                             aria-label={t("settings.languageServersJavaVmargs")}
                             onChange={(event) => setJavaVmargs(event.target.value)}
@@ -522,7 +522,7 @@ export function LanguageServersSettings() {
                               type="text"
                               spellCheck={false}
                               data-testid="language-servers-java-lombok-jar"
-                              className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small text-[var(--taomni-text)] outline-none"
+                              className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                               placeholder={t("settings.languageServersJavaLombokJarPlaceholder")}
                               defaultValue={javaSettings.lombokJarPath}
                               onBlur={(event) => {
@@ -542,7 +542,7 @@ export function LanguageServersSettings() {
                             type="text"
                             spellCheck={false}
                             data-testid="language-servers-java-format-profile"
-                            className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small text-[var(--taomni-text)] outline-none"
+                            className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                             placeholder={t("settings.languageServersJavaFormatProfilePlaceholder")}
                             defaultValue={javaSettings.formatSettingsUrl}
                             onBlur={(event) => {
@@ -558,7 +558,7 @@ export function LanguageServersSettings() {
                             type="text"
                             spellCheck={false}
                             data-testid="language-servers-java-import-order"
-                            className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small text-[var(--taomni-text)] outline-none"
+                            className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                             placeholder="java, javax, jakarta, com, org"
                             defaultValue={javaSettings.completionImportOrder.join(", ")}
                             onBlur={(event) => {
@@ -612,7 +612,7 @@ export function LanguageServersSettings() {
                                 type="text"
                                 spellCheck={false}
                                 data-testid={`language-servers-bundle-${id}`}
-                                className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small text-[var(--taomni-text)] outline-none"
+                                className="mt-0.5 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-ui-small text-[var(--taomni-text)] focus-visible:keyboard-outline"
                                 placeholder={t("settings.languageServersJavaBundlePlaceholder")}
                                 defaultValue={javaBundles[field]}
                                 onBlur={(event) => {

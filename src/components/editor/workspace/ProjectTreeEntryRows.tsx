@@ -45,7 +45,7 @@ export const ProjectTreeDirectoryRow = memo(function ProjectTreeDirectoryRow({
     >
       <ProjectTreeEntryName depth={depth} list={list}>
         <span
-          role="button" tabIndex={-1} aria-label={expanded ? "Collapse directory" : "Expand directory"}
+          aria-hidden="true"
           data-testid="code-workspace-tree-dir-arrow"
           className="inline-flex items-center justify-center p-0.5 -m-0.5 rounded hover:bg-[var(--taomni-code-active-line-bg)]"
           onClick={(event) => { event.stopPropagation(); onSelect(selection); onToggleDir(rootId, displayPath); }}

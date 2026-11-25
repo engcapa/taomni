@@ -375,7 +375,7 @@ export function DatabaseWorkspaceView(props: DatabaseWorkspaceViewProps) {
                       value={workspace.panelDraftTitle}
                       maxLength={MAX_PANEL_NAME_LENGTH}
                       aria-label={t("tabs.rename")}
-                      className="px-2 h-5 w-[160px] rounded text-ui-small outline-none"
+                      className="px-2 h-5 w-[160px] rounded text-ui-small focus-visible:keyboard-outline"
                       style={{
                         background: "var(--taomni-selected)",
                         color: "var(--taomni-accent)",

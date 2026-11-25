@@ -325,7 +325,7 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab, show
               if (target) { event.preventDefault(); pickTab(target); }
             }
           }}
-          className="flex-1 min-w-0 bg-transparent outline-none"
+          className="flex-1 min-w-0 bg-transparent focus-visible:keyboard-outline"
           aria-label={t("tabs.filterPlaceholder")}
         />
       </div>

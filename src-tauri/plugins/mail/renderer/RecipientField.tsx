@@ -179,7 +179,7 @@ export function RecipientField({
           })}
           <input
             id={id}
-            className="min-w-[120px] flex-1 h-6 bg-transparent outline-none text-ui-body"
+            className="min-w-[120px] flex-1 h-6 bg-transparent focus-visible:keyboard-outline text-ui-body"
             value={input}
             disabled={disabled}
             aria-label={label}

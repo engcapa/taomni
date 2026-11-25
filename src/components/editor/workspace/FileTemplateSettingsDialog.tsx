@@ -129,7 +129,7 @@ export function FileTemplateSettingsDialog({ open, onClose }: FileTemplateSettin
               }
               rows={10}
               data-testid="file-template-editor-textarea"
-              className="w-full font-mono rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] p-2.5 text-ui-body text-[var(--taomni-code-text)] outline-none focus:border-blue-500"
+              className="w-full font-mono rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] p-2.5 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-blue-500"
             />
           </div>
 

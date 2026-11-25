@@ -322,7 +322,7 @@ export function FileTreePane({
             }}
             placeholder="Search for"
             aria-label="Filter files"
-            className="min-w-0 flex-1 bg-transparent outline-none text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)]"
+            className="min-w-0 flex-1 bg-transparent focus-visible:keyboard-outline text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)]"
             style={{ fontSize: "var(--taomni-code-tree-font-size)" }}
           />
           <button

@@ -30,7 +30,7 @@ export function ExceptionBreakpointsView({ debug }: ExceptionBreakpointsViewProp
     .map((breakpoint) => [breakpoint.filterId, breakpoint]));
   const supportsFilterOptions = debug.capabilities.supportsExceptionFilterOptions === true;
   const exceptionModes = breakpointModesFor(parseBreakpointModes(debug.capabilities), "exception");
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline";
   return (
     <div data-testid="debug-exception-breakpoints">
       {debug.availableExceptionFilters.map((filter, index) => {
@@ -98,7 +98,7 @@ export function ExceptionBreakpointsView({ debug }: ExceptionBreakpointsViewProp
                       data-testid={`debug-exception-breakpoint-mode-${index}`}
                       aria-label={`Breakpoint mode for ${filter.label}`}
                       title={exceptionModes.find((entry) => entry.mode === mode)?.description}
-                      className="h-5 min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-ui-small outline-none"
+                      className="h-5 min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-ui-small focus-visible:keyboard-outline"
                       value={mode ?? exceptionModes[0].mode}
                       onChange={(event) => debug.setExceptionBreakpointOptions(
                         filter.filter,
@@ -154,7 +154,7 @@ export function ExceptionBreakpointRulesView({
     setNewRule("");
     setEditingRuleId(id);
   };
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline";
   return (
     <div data-testid="debug-exception-rules" className="border-t border-[var(--taomni-code-border)]/60 pt-1">
       {supported ? (
@@ -291,7 +291,7 @@ export function ExceptionBreakpointRuleEditor({
   onChange: (options: Partial<DebugExceptionBreakpointRule>) => void;
 }) {
   const [newSegment, setNewSegment] = useState("");
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline";
   const setSegment = (segmentIndex: number, names: string[]) => {
     const path = names.length > 0
       ? rule.path.map((segment, index) => (index === segmentIndex ? { ...segment, names } : segment))

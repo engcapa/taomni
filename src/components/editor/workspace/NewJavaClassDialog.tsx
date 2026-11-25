@@ -163,7 +163,7 @@ export function NewJavaClassDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. MyService"
               data-testid="new-java-class-name-input"
-              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] outline-none focus:border-blue-500"
+              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-blue-500"
             />
           </div>
 
@@ -176,7 +176,7 @@ export function NewJavaClassDialog({
               value={kind}
               onChange={(e) => setKind(e.target.value as JavaTemplateKind)}
               data-testid="new-java-class-kind-select"
-              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] outline-none focus:border-blue-500"
+              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-blue-500"
             >
               {TEMPLATE_KIND_OPTIONS.map((opt) => (
                 <option key={opt.kind} value={opt.kind}>

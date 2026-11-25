@@ -63,7 +63,7 @@ export function WorkspaceTabsFilter() {
         <input ref={inputRef} type="search" role="combobox" aria-expanded="true" aria-controls="workspace-filter-tab-list"
           aria-activedescendant={highlightedId ? `workspace-filter-row-${highlightedId}` : undefined}
           data-testid="workspace-tabs-filter-search" aria-label={t("tabs.filterPlaceholder")} placeholder={t("tabs.filterPlaceholder")}
-          value={filter.query} className="min-w-0 flex-1 bg-transparent outline-none"
+          value={filter.query} className="min-w-0 flex-1 bg-transparent focus-visible:keyboard-outline"
           onChange={(event) => apply({ ...filter, query: event.target.value })}
           onKeyDown={(event) => {
             if (event.nativeEvent.isComposing) return;

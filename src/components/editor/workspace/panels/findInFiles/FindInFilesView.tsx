@@ -151,7 +151,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
             list={workspaceInstanceId ? "code-workspace-search-history" : undefined}
             placeholder="Search in files (Enter to run)"
             aria-label="Search query"
-            className="h-6 min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            className="h-6 min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] focus-visible:keyboard-outline placeholder:text-[var(--taomni-code-muted)]"
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") void search.startSearch();
@@ -187,7 +187,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
             data-testid="code-workspace-find-scope-select"
             value={scopeKind}
             onChange={(event) => setScopeKind(event.target.value as FindInFilesScopeKind)}
-            className="h-full bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none"
+            className="h-full bg-transparent text-ui-small text-[var(--taomni-code-text)] focus-visible:keyboard-outline"
           >
             <option value="project">Project</option>
             <option value="module">Module</option>
@@ -202,7 +202,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
               data-testid="code-workspace-find-module-select"
               value={scopeModuleId || factsModules[0]?.id || ""}
               onChange={(event) => setScopeModuleId(event.target.value)}
-              className="h-full min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none"
+              className="h-full min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] focus-visible:keyboard-outline"
             >
               {factsModules.length === 0 && <option value="">No modules</option>}
               {factsModules.map((mod) => (
@@ -219,7 +219,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
               placeholder="subdir (empty = root)"
               aria-label="Search directory"
               data-testid="code-workspace-find-directory-input"
-              className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+              className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] focus-visible:keyboard-outline placeholder:text-[var(--taomni-code-muted)]"
               onChange={(event) => setScopeDirectory(event.target.value)}
               onKeyDown={(event) => event.key === "Enter" && void search.startSearch()}
             />
@@ -231,7 +231,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
             value={includeGlobs}
             placeholder="include: *.ts, src/**"
             aria-label="Include globs"
-            className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] focus-visible:keyboard-outline placeholder:text-[var(--taomni-code-muted)]"
             onChange={(event) => setIncludeGlobs(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && void search.startSearch()}
           />
@@ -242,7 +242,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
             value={excludeGlobs}
             placeholder="exclude: dist/**"
             aria-label="Exclude globs"
-            className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] focus-visible:keyboard-outline placeholder:text-[var(--taomni-code-muted)]"
             onChange={(event) => setExcludeGlobs(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && void search.startSearch()}
           />
@@ -253,7 +253,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
             value={replacement}
             placeholder="Replace with"
             aria-label="Replace text"
-            className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] focus-visible:keyboard-outline placeholder:text-[var(--taomni-code-muted)]"
             onChange={(event) => setReplacement(event.target.value)}
           />
         </label>

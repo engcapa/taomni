@@ -234,7 +234,7 @@ export function ExplorerTabStrip() {
               }}
               onFocus={(event) => event.currentTarget.select()}
               onBlur={commitRename}
-              className="bg-transparent border-b border-[var(--taomni-accent)] outline-none text-ui-body leading-none w-[160px] px-0"
+              className="bg-transparent border-b border-[var(--taomni-accent)] focus-visible:keyboard-outline text-ui-body leading-none w-[160px] px-0"
               style={{ color: "inherit", font: "inherit" }}
             />
           ) : tab.title}

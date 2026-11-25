@@ -73,7 +73,7 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
           <input
             data-testid="debug-instruction-breakpoint-reference"
             aria-label="Instruction reference"
-            className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none disabled:opacity-40"
+            className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline disabled:opacity-40"
             placeholder="Address or instruction reference"
             maxLength={4096}
             value={reference}
@@ -101,7 +101,7 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
               <input
                 data-testid="debug-instruction-breakpoint-offset"
                 aria-label="Instruction breakpoint offset"
-                className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none disabled:opacity-40"
+                className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline disabled:opacity-40"
                 inputMode="numeric"
                 placeholder="optional"
                 value={offset}
@@ -238,7 +238,7 @@ export function InstructionBreakpointEditor({
     options: Partial<Pick<DebugInstructionBreakpoint, "condition" | "hitCondition" | "mode">>,
   ) => void;
 }) {
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline";
   const mode = resolveBreakpointMode(breakpoint.mode, modes, "instruction");
   return (
     <div className="space-y-1 bg-[var(--taomni-code-bg)] px-3 pb-1.5 pt-1">

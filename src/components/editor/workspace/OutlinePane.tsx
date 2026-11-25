@@ -118,7 +118,7 @@ export function OutlinePane({
             aria-label="Filter outline"
             value={query}
             placeholder="Filter symbols"
-            className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] outline-none"
+            className="min-w-0 flex-1 bg-transparent text-ui-small text-[var(--taomni-code-text)] focus-visible:keyboard-outline"
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
@@ -128,7 +128,7 @@ export function OutlinePane({
             <select
               aria-label="Outline sort"
               value={sort}
-              className="h-6 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 outline-none"
+              className="h-6 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 focus-visible:keyboard-outline"
               onChange={(event) => setSort(event.target.value as OutlineSortMode)}
             >
               <option value="position">Position</option>

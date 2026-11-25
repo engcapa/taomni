@@ -437,7 +437,7 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
       // Mounted on first open and kept, so the commit message and
       // selection survive hiding the tool window.
       renderContent: () => gitSnapshotOwner.gitRoots.length > 0 && (gitToolWindowMounted || (bottomDockOpen && bottomDockTab === "git")) ? (
-        <div data-testid="code-workspace-git-tool-window" tabIndex={-1} className="relative h-full min-h-0 outline-none">
+        <div data-testid="code-workspace-git-tool-window" tabIndex={-1} className="relative h-full min-h-0 focus-visible:keyboard-outline">
           <WorkspaceGitManager
             workspaceName={title}
             roots={gitSnapshotOwner.gitRoots}

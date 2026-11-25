@@ -117,7 +117,7 @@ export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | 
                         setInspectError(null);
                       }}
                       placeholder={t("backupSettings.restoreVaultPasswordPh")}
-                      className="w-full rounded border px-3 py-1.5 text-xs text-[var(--taomni-text)] outline-none focus:border-[var(--taomni-accent)] placeholder:text-[var(--taomni-text-muted)]"
+                      className="w-full rounded border px-3 py-1.5 text-xs text-[var(--taomni-text)] focus-visible:keyboard-outline focus:border-[var(--taomni-accent)] placeholder:text-[var(--taomni-text-muted)]"
                       style={{
                         background: "var(--taomni-input-bg)",
                         borderColor: "var(--taomni-input-border)",
@@ -159,7 +159,7 @@ export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | 
                     value={restorePassword}
                     onChange={(e) => setRestorePassword(e.target.value)}
                     data-testid="backup-restore-password" placeholder={t("backupSettings.archivePasswordPh")}
-                    className="w-full rounded border px-3 py-2 text-xs text-[var(--taomni-text)] outline-none focus:border-[var(--taomni-accent)] placeholder:text-[var(--taomni-text-muted)]"
+                    className="w-full rounded border px-3 py-2 text-xs text-[var(--taomni-text)] focus-visible:keyboard-outline focus:border-[var(--taomni-accent)] placeholder:text-[var(--taomni-text-muted)]"
                     style={{
                       background: "var(--taomni-input-bg)",
                       borderColor: "var(--taomni-input-border)",

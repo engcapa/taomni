@@ -90,7 +90,7 @@ export function EvaluateExpressionDialog({ debug, initialExpression = "", onClos
             data-testid="debug-evaluate-expression"
             aria-label="Expression"
             rows={2}
-            className="w-full resize-y rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-2 py-1 font-mono text-ui-body outline-none focus:border-[var(--taomni-accent)]"
+            className="w-full resize-y rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-2 py-1 font-mono text-ui-body focus-visible:keyboard-outline focus:border-[var(--taomni-accent)]"
             placeholder={stopped ? "Expression" : "Evaluation needs a suspended program"}
             value={expression}
             onChange={(event) => setExpression(event.target.value)}

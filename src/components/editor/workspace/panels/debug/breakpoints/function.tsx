@@ -33,7 +33,7 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
         <input
           data-testid="debug-function-breakpoint-input"
           aria-label="Function breakpoint name"
-          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none disabled:opacity-40"
+          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline disabled:opacity-40"
           placeholder="Type a qualified function name"
           maxLength={1024}
           value={name}
@@ -140,7 +140,7 @@ export function FunctionBreakpointEditor({
   index: number;
   onChange: (options: Partial<DebugFunctionBreakpoint>) => void;
 }) {
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline";
   return (
     <div className="space-y-1 bg-[var(--taomni-code-bg)] px-3 pb-1.5 pt-1">
       <CommitField

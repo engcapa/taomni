@@ -112,7 +112,7 @@ export function useMarkdownPreviewSearch(
       else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") { event.preventDefault(); openSearch(); }
     }}>
     <input ref={input} type="search" aria-label="Find in preview" value={query}
-      className="min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-transparent px-2 py-1 outline-none"
+      className="min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-transparent px-2 py-1 focus-visible:keyboard-outline"
       onChange={(event) => setQuery(event.target.value)} />
     <span data-testid="markdown-search-count" aria-live="polite">{count ? `${index + 1}/${count}` : "0/0"}</span>
     <button type="button" aria-label="Previous match" disabled={!count} onClick={() => move(-1)}>↑</button>

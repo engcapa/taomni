@@ -102,7 +102,7 @@ export function VariableRow({
           <input
             autoFocus
             data-testid="debug-variable-edit-input"
-            className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1 font-mono text-ui-small outline-none"
+            className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1 font-mono text-ui-small focus-visible:keyboard-outline"
             value={edit?.value ?? ""}
             onChange={(e) => onEditChange?.(e.target.value)}
             onKeyDown={(e) => {

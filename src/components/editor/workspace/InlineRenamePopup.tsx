@@ -166,7 +166,7 @@ export function InlineRenamePopup({
           setActiveIndex(-1);
         }}
         onKeyDown={onKeyDown}
-        className="rounded-[2px] border border-[var(--taomni-code-accent,#3574f0)] bg-[var(--taomni-code-bg)] px-[2px] text-[var(--taomni-code-text)] outline-none"
+        className="rounded-[2px] border border-[var(--taomni-code-accent,#3574f0)] bg-[var(--taomni-code-bg)] px-[2px] text-[var(--taomni-code-text)] focus-visible:keyboard-outline"
         style={{
           fontFamily: anchor.fontFamily,
           fontSize: anchor.fontSize,

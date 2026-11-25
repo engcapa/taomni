@@ -65,7 +65,7 @@ export function GoToLineDialog({ current, lineCount, onGo, onCancel, restoreFocu
           data-testid="code-workspace-goto-line-input"
           value={value}
           aria-invalid={!target}
-          className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 py-1 outline-none focus:border-[var(--taomni-accent)]"
+          className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 py-1 focus-visible:keyboard-outline focus:border-[var(--taomni-accent)]"
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {

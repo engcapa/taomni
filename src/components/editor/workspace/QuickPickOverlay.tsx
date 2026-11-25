@@ -308,7 +308,7 @@ export function QuickPickOverlay<T>({
             value={query}
             placeholder={placeholder}
             aria-label={inputLabel}
-            className="h-6 min-w-0 flex-1 bg-transparent text-ui-body text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            className="h-6 min-w-0 flex-1 bg-transparent text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline placeholder:text-[var(--taomni-code-muted)]"
             onChange={(event) => {
               const next = event.target.value;
               setQuery(next);

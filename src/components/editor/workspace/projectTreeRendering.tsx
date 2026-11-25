@@ -163,9 +163,7 @@ export function projectTreeRows(props: ProjectTreeRenderProps): ProjectTreeRow[]
               onContextMenu={(event) => onContextMenu(event, { kind: "root", rootId: root.id })}
             >
               <span
-                role="button"
-                tabIndex={-1}
-                aria-label={expanded ? "Collapse root" : "Expand root"}
+                aria-hidden="true"
                 data-testid="code-workspace-tree-root-arrow"
                 className="inline-flex items-center justify-center p-0.5 -m-0.5 rounded hover:bg-[var(--taomni-code-active-line-bg)]"
                 onClick={(event) => {

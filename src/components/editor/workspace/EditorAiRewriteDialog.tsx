@@ -77,7 +77,7 @@ export function EditorAiRewriteDialog({
               <input
                 value={instruction}
                 onChange={(event) => onInstructionChange(event.target.value)}
-                className="h-8 min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 text-ui-small text-[var(--taomni-code-text)] outline-none"
+                className="h-8 min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 text-ui-small text-[var(--taomni-code-text)] focus-visible:keyboard-outline"
                 placeholder="e.g. simplify this function and keep behavior"
               />
               <button
@@ -97,7 +97,7 @@ export function EditorAiRewriteDialog({
               value={proposal}
               onChange={(event) => onProposalChange(event.target.value)}
               rows={5}
-              className="w-full resize-y rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 font-mono text-ui-small text-[var(--taomni-code-text)] outline-none"
+              className="w-full resize-y rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 py-1 font-mono text-ui-small text-[var(--taomni-code-text)] focus-visible:keyboard-outline"
             />
           </div>
           <p className="text-ui-caption text-[var(--taomni-code-muted)]">

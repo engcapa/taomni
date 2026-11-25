@@ -122,7 +122,7 @@ export function FileEncodingDialog({
               aria-label="Encoding"
               value={encoding}
               disabled={busy}
-              className="mt-1 h-8 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 text-ui-body text-[var(--taomni-code-text)] outline-none focus:border-[var(--taomni-accent)]"
+              className="mt-1 h-8 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2 text-ui-body text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-[var(--taomni-accent)]"
               onChange={(event) => {
                 const next = event.target.value;
                 setEncoding(next);

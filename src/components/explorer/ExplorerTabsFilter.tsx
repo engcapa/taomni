@@ -81,7 +81,7 @@ export function ExplorerTabsFilter() {
           aria-activedescendant={highlightedId ? `explorer-filter-row-${highlightedId}` : undefined}
           data-testid="explorer-tabs-filter-search" aria-label={label("搜索打开的标签", "Search open tabs")}
           placeholder={label("搜索打开的标签…", "Search open tabs…")}
-          value={filter.query} className="min-w-0 flex-1 bg-transparent outline-none"
+          value={filter.query} className="min-w-0 flex-1 bg-transparent focus-visible:keyboard-outline"
           onChange={(event) => apply({ ...filter, query: event.target.value })}
           onKeyDown={(event) => {
             if (event.nativeEvent.isComposing) return;

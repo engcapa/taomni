@@ -139,7 +139,7 @@ export function BreakpointsDialog({ debug, initial = null, onOpenBreakpoint, onC
               aria-label="Breakpoints"
               tabIndex={0}
               data-testid="debug-breakpoints-dialog-tree"
-              className="min-h-0 flex-1 overflow-auto py-1 outline-none"
+              className="min-h-0 flex-1 overflow-auto py-1 focus-visible:keyboard-outline"
               onKeyDown={(event) => {
                 if (event.key === "ArrowDown" || event.key === "ArrowUp") {
                   event.preventDefault();

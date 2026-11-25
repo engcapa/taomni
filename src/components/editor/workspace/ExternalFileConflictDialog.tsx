@@ -121,7 +121,7 @@ export function ExternalFileConflictDialog({
                   aria-label="Merge result"
                   value={mergeText}
                   spellCheck={false}
-                  className="min-h-0 flex-1 resize-none bg-transparent p-3 font-mono text-ui-small leading-5 text-[var(--taomni-code-text)] outline-none"
+                  className="min-h-0 flex-1 resize-none bg-transparent p-3 font-mono text-ui-small leading-5 text-[var(--taomni-code-text)] focus-visible:keyboard-outline"
                   onChange={(event) => setMergeText(event.target.value)}
                 />
               </section>

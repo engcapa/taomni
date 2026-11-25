@@ -112,7 +112,7 @@ export function MarkdownPreview({
       data-testid="code-workspace-markdown-preview"
       data-preview-theme={theme}
       style={{ ...previewThemeStyle(theme), background: "var(--bg)", color: "var(--text)" }}
-      className="taomni-chat-md h-full min-h-0 overflow-auto bg-[var(--taomni-code-bg)] px-5 py-4 text-[length:var(--taomni-code-font-size)] leading-6 text-[var(--taomni-code-text)] outline-none"
+      className="taomni-chat-md h-full min-h-0 overflow-auto bg-[var(--taomni-code-bg)] px-5 py-4 text-[length:var(--taomni-code-font-size)] leading-6 text-[var(--taomni-code-text)] focus-visible:keyboard-outline"
       onClick={(event) => {
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;

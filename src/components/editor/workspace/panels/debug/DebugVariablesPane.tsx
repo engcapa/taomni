@@ -199,7 +199,7 @@ export function DebugVariablesPane({
           ref={inputRef}
           data-testid="debug-watch-input"
           aria-label="Evaluate expression or add a watch"
-          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none focus:border-[var(--taomni-accent)]"
+          className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline focus:border-[var(--taomni-accent)]"
           placeholder="Evaluate expression (Enter) or add a watch (Ctrl+Shift+Enter)"
           value={watchInput}
           onChange={(e) => onWatchInputChange(e.target.value)}
@@ -225,7 +225,7 @@ export function DebugVariablesPane({
               <input
                 data-testid="debug-variables-search"
                 aria-label="Filter variables"
-                className="w-16 sm:w-24 bg-transparent text-ui-caption outline-none"
+                className="w-16 sm:w-24 bg-transparent text-ui-caption focus-visible:keyboard-outline"
                 placeholder="Filter..."
                 value={filterQuery}
                 autoFocus={filterOpen && !filterQuery}
@@ -275,7 +275,7 @@ export function DebugVariablesPane({
         aria-label="Variables"
         tabIndex={0}
         data-testid="debug-variables-tree"
-        className="flex-1 min-h-0 overflow-auto py-1 outline-none"
+        className="flex-1 min-h-0 overflow-auto py-1 focus-visible:keyboard-outline"
         onKeyDown={onTreeKeyDown}
         onFocus={() => {
           if (!selectedKey && rows[0]) setSelectedKey(rows[0].key);

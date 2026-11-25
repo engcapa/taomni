@@ -126,7 +126,7 @@ export function TodosBookmarksPanel({
                     <input
                       data-testid="code-workspace-bookmark-group-input"
                       aria-label={`Rename bookmark group ${groupName}`}
-                      className="min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 py-0.5 font-normal normal-case tracking-normal text-[var(--taomni-code-text)] outline-none focus:border-[var(--taomni-accent)]"
+                      className="min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 py-0.5 font-normal normal-case tracking-normal text-[var(--taomni-code-text)] focus-visible:keyboard-outline focus:border-[var(--taomni-accent)]"
                       value={groupDraft}
                       autoFocus
                       onChange={(event) => setGroupDraft(event.target.value)}

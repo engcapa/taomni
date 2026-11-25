@@ -1,0 +1,55 @@
+id: TC-UIC-014-explorer-filter-focus
+title: Explorer gives the open-tab search a visible keyboard focus ring in each theme
+covers: [F-EXPLORER-1]
+fixtures: [reset_db]
+modes: [browser, native]
+tags: [ui-contract, explorer, keyboard]
+ui_standard: [UI-FOC-01, UI-FOC-02]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-filter
+- click: 'button[aria-label="Cycle application theme"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: light}
+- click: '[data-testid="side-tab-explorer"]'
+- press: {selector: '[data-testid="explorer-tabs-filter-trigger"]', key: Enter}
+- assert_focus_on: '[data-testid="explorer-tabs-filter-search"]'
+- assert_computed_style: {selector: '[data-testid="explorer-tabs-filter-search"]:focus-visible', property: outline-width, equals: 2px}
+- assert_computed_style: {selector: '[data-testid="explorer-tabs-filter-search"]', property: outline-color, equals: 'rgb(29, 78, 216)'}
+- press: Escape
+- assert_focus_on: '[data-testid="explorer-tabs-filter-trigger"]'
+- click: 'button[aria-label="Cycle application theme"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: dark}
+- press: {selector: '[data-testid="explorer-tabs-filter-trigger"]', key: Enter}
+- assert_focus_on: '[data-testid="explorer-tabs-filter-search"]'
+- assert_computed_style: {selector: '[data-testid="explorer-tabs-filter-search"]:focus-visible', property: outline-width, equals: 2px}
+- assert_computed_style: {selector: '[data-testid="explorer-tabs-filter-search"]', property: outline-color, equals: 'rgb(147, 197, 253)'}
+- press: Escape
+- assert_focus_on: '[data-testid="explorer-tabs-filter-trigger"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: focus-ring
+    requirement: Keyboard entry paints a two-pixel focus ring using the active light or dark theme.
+    ui_standard: [UI-FOC-01]
+    actions: [3, 6, 12, 14]
+    checkpoints:
+    - {step: 8, expectation: The keyboard-focused light search field has a two-pixel outline.}
+    - {step: 9, expectation: The light theme supplies its dark blue focus indicator.}
+    - {step: 16, expectation: The keyboard-focused dark search field has a two-pixel outline.}
+    - {step: 17, expectation: The dark theme supplies its light blue focus indicator.}
+    results: [8, 9, 16, 17]
+  - id: focus-return
+    requirement: Opening the filter places focus in search and Escape restores its toolbar trigger.
+    ui_standard: [UI-FOC-02]
+    actions: [6, 10, 14, 18]
+    checkpoints:
+    - {step: 7, expectation: The search field owns initial focus.}
+    - {step: 11, expectation: The filter trigger receives focus after Escape.}
+    - {step: 15, expectation: The next keyboard open focuses the search field again.}
+    - {step: 19, expectation: The trigger regains focus after closing the dark filter.}
+    results: [7, 11, 15, 19]
+  visual:
+  - {check: Keyboard focus appearance, method: automated, reason: Measures the focused search field in both application themes.}
+  native:
+  - {check: Focus in the packaged WebView, method: automated, reason: Opens and dismisses the portalled filter from its real Explorer trigger.}

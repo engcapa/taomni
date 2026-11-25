@@ -104,7 +104,7 @@ export function DataBreakpointsView({
             <input
               data-testid="debug-data-breakpoint-target"
               aria-label="Data breakpoint expression or address"
-              className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none"
+              className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline"
               placeholder={supportsBytes ? "Expression or address" : "Expression"}
               maxLength={4096}
               value={targetName}
@@ -130,7 +130,7 @@ export function DataBreakpointsView({
                 <input
                   data-testid="debug-data-breakpoint-bytes"
                   aria-label="Data breakpoint byte count"
-                  className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none"
+                  className="min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline"
                   inputMode="numeric"
                   placeholder="optional range size"
                   value={targetBytes}
@@ -283,7 +283,7 @@ export function DataBreakpointEditor({
   index: number;
   onChange: (options: Partial<DebugDataBreakpoint>) => void;
 }) {
-  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small outline-none";
+  const field = "min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-0.5 font-mono text-ui-small focus-visible:keyboard-outline";
   return (
     <div className="space-y-1 bg-[var(--taomni-code-bg)] px-3 pb-1.5 pt-1">
       <CommitField

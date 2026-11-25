@@ -123,7 +123,7 @@ export function NotesSelect({
                     type="button"
                     role="option"
                     aria-selected={isSelected}
-                    className="w-full h-6 px-1.5 text-left text-ui-small rounded flex items-center select-none cursor-pointer hover:bg-[var(--taomni-hover)] focus:bg-[var(--taomni-hover)] outline-none"
+                    className="w-full h-6 px-1.5 text-left text-ui-small rounded flex items-center select-none cursor-pointer hover:bg-[var(--taomni-hover)] focus:bg-[var(--taomni-hover)] focus-visible:keyboard-outline"
                     style={{
                       backgroundColor: isSelected ? "var(--taomni-selected)" : "transparent",
                       color: isSelected ? "var(--taomni-accent)" : selectColor,

@@ -11,7 +11,7 @@
 @import "@fontsource/inter/700.css";
 
 @import "tailwindcss";
-@import "./styles/ui-typography.css";
+@import "./styles/ui-foundations.css";
 
 @import "./styles/theme.css";
 @import "./styles/base.css";

@@ -569,7 +569,7 @@ export function RichMailEditor({
       <div className="relative flex-1 min-h-[240px] flex flex-col">
         <div
           ref={editorRef}
-          className="flex-1 min-h-[240px] overflow-auto px-3 py-2 text-ui-body leading-6 outline-none bg-[var(--taomni-input-bg)] empty:before:content-['']"
+          className="flex-1 min-h-[240px] overflow-auto px-3 py-2 text-ui-body leading-6 focus-visible:keyboard-outline bg-[var(--taomni-input-bg)] empty:before:content-['']"
           contentEditable={!disabled}
           suppressContentEditableWarning
           role="textbox"

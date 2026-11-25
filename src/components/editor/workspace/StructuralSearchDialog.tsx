@@ -126,7 +126,7 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
         role="dialog"
         aria-modal="true"
         aria-label="Structural Search"
-        className="flex h-[460px] w-[900px] max-w-[calc(100vw-32px)] flex-col rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)] shadow-xl outline-none"
+        className="flex h-[460px] w-[900px] max-w-[calc(100vw-32px)] flex-col rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)] shadow-xl focus-visible:keyboard-outline"
         onMouseDown={(event) => event.stopPropagation()}
         onKeyDown={onKeyDown}
       >
@@ -201,7 +201,7 @@ export function StructuralSearchDialog({ session }: StructuralSearchDialogProps)
               ref={templateRef}
               data-testid="structural-search-template"
               spellCheck={false}
-              className="mx-3 min-h-0 flex-1 resize-none rounded border border-[var(--taomni-code-border)] bg-transparent p-2 font-mono text-ui-body outline-none focus:border-[var(--taomni-accent)]"
+              className="mx-3 min-h-0 flex-1 resize-none rounded border border-[var(--taomni-code-border)] bg-transparent p-2 font-mono text-ui-body focus-visible:keyboard-outline focus:border-[var(--taomni-accent)]"
               value={draft.pattern}
               onChange={(event) => setDraft((current) => ({ ...current, pattern: event.target.value }))}
             />

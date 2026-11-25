@@ -235,7 +235,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
               tabIndex={0}
               aria-label="Find actions by shortcut"
               data-testid="keymap-shortcut-filter"
-              className="min-w-0 flex-1 rounded border border-[var(--taomni-code-accent,#4b9edd)] px-2 py-1 text-sm outline-none"
+              className="min-w-0 flex-1 rounded border border-[var(--taomni-code-accent,#4b9edd)] px-2 py-1 text-sm focus-visible:keyboard-outline"
               onFocus={() => { overlayStateRef.current.findField = true; }}
               onBlur={() => { overlayStateRef.current.findField = false; }}
               onKeyDown={handleShortcutFilterKeyDown}
@@ -251,7 +251,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
               placeholder="Find actions by name…"
               aria-label="Find actions"
               data-testid="keymap-action-filter"
-              className="min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-transparent px-2 py-1 text-sm outline-none focus:border-[var(--taomni-code-accent, #4b9edd)]"
+              className="min-w-0 flex-1 rounded border border-[var(--taomni-code-border)] bg-transparent px-2 py-1 text-sm focus-visible:keyboard-outline focus:border-[var(--taomni-code-accent, #4b9edd)]"
             />
           )}
           {shortcutFilter && (
@@ -438,7 +438,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
                 tabIndex={0}
                 aria-label="Press shortcut keys"
                 aria-readonly="true"
-                className="flex min-h-7 items-center gap-2 rounded border border-[var(--taomni-code-accent,#4b9edd)] px-2 py-1 outline-none"
+                className="flex min-h-7 items-center gap-2 rounded border border-[var(--taomni-code-accent,#4b9edd)] px-2 py-1 focus-visible:keyboard-outline"
               >
                 <span data-testid="keymap-recorder-strokes" className="font-mono">
                   {capturedStrokes.length > 0
