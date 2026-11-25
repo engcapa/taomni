@@ -388,6 +388,19 @@ func observe(_ request: Request) throws -> Observation {
             storeAction(contents(), module: mail, roster: modules, action: "Install")
         }
         result.confirmation = message
+    case "enable-rdp-server":
+        guard let modules = request.modules, let rdp = modules.first(where: { $0.id == "taomni-plugin-rdp-server" })
+        else { throw CheckFailure("RDP Server is missing from the signed roster") }
+        let action = try wait("RDP Server activation control") {
+            let elements = contents()
+            return storeAction(elements, module: rdp, roster: modules, action: "Disable")
+                ?? storeAction(elements, module: rdp, roster: modules, action: "Enable")
+        }
+        if labels(action).contains("Enable") { try press(action) }
+        _ = try wait("enabled RDP Server before checking installed permissions") {
+            storeAction(contents(), module: rdp, roster: modules, action: "Disable")
+        }
+        result.currentModules = [rdp.id]
     case "confirm-close":
         try press(try wait("installed window close button") {
             window().flatMap { elementAttribute($0, kAXCloseButtonAttribute) }

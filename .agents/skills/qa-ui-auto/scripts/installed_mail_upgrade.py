@@ -207,7 +207,6 @@ def open_account(steps, *, signed=False):
 
 def seed_original(ctx, session, evidence, server):
     steps = NativeStepContext(session, evidence, ctx.cfg)
-    close_tab(steps, "mfa")
     desktop_action(steps, "click", element("nav-mode-home"))
     desktop_action(steps, "click", element("side-tab-sessions"))
     desktop_action(steps, "click", element("session-new"))

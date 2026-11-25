@@ -85,6 +85,9 @@ def exercise_stage(executable, work, profile, evidence, origin, label, removed, 
         if removed is None:
             controls(driver, owner, executable, "remove-mail", folder, modules=modules)
         else:
+            stage["rdpServerForPermissions"] = controls(
+                driver, owner, executable, "enable-rdp-server", folder, modules=modules,
+            )
             stage["desktopModeLease"] = observe_desktop_owner(executable, profile, evidence, owner)
         closed = controls(driver, owner, executable, "confirm-close", folder)
         code = owner.wait(timeout=30)

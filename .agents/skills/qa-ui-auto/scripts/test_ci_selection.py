@@ -162,7 +162,8 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(set(after["capabilities"]), expected)
 
     def test_only_mstsc_cases_require_windows_debugger_tools(self):
-        client = SimpleNamespace(fixtures=["rdp_server_required"], steps=[{"open": "/"}], tags=[])
+        client = SimpleNamespace(id="TC-RDPJ-02-joint-clipboard-no-echo", fixtures=["rdp_server_required"],
+                                 steps=[{"open": "/"}], tags=[])
         self.assertNotIn("mstsc", capabilities([client], "native"))
         client.steps.append({"host_mstsc": {"action": "start"}})
         self.assertIn("mstsc", capabilities([client], "native"))
