@@ -1,4 +1,5 @@
 @import "./ui-typography.css";
+@import "./modal.css";
 
 /* Inline outlines remain visible inside scrollports and clipped list rows. */
 @utility keyboard-outline {

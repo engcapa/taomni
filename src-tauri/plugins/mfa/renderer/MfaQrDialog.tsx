@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ModalSurface } from "../../../../src/components/ui/ModalSurface";
+import { Button } from "../../../../src/components/ui/Button";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { AlertTriangle, Check, Copy, Eye, EyeOff, Link2 } from "lucide-react";
 import { useT } from "../../../../src/lib/i18n";
 import { writeText } from "../../../../src/lib/clipboard";
@@ -14,6 +16,7 @@ const labelStyle = { color: "var(--taomni-text-muted)" };
 export interface MfaQrDialogProps {
   account: MfaAccount;
   initialAction?: "qr" | "copy-secret";
+  returnFocus?: HTMLElement | null;
   onClose: () => void;
   onCopiedSecret?: (accountName: string) => void;
 }
@@ -27,6 +30,7 @@ export interface MfaQrDialogProps {
 export function MfaQrDialog({
   account,
   initialAction = "qr",
+  returnFocus,
   onClose,
   onCopiedSecret,
 }: MfaQrDialogProps) {
@@ -49,7 +53,8 @@ export function MfaQrDialog({
   const dismissed = useRef(false);
   const request = useRef(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const passwordRef = useRef<HTMLInputElement>(null);
+  const titleId = useId();
+  const formId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
   const close = useCallback(() => {
     dismissed.current = true;
@@ -76,15 +81,6 @@ export function MfaQrDialog({
   useEffect(() => {
     if (!closed && (!vaultReady || vaultEpoch !== openedEpoch.current)) close();
   }, [vaultReady, vaultEpoch, closed, close]);
-
-  useEffect(() => {
-    passwordRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [close]);
 
   useEffect(() => {
     if (qr) closeRef.current?.focus();
@@ -159,23 +155,15 @@ export function MfaQrDialog({
   if (closed || !vaultReady || vaultEpoch !== openedEpoch.current) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={close}>
-      <form
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("mfa.qrTitle", { name })}
-        data-testid="mfa-qr-dialog"
-        data-state={qr ? "shown" : "locked"}
-        className="w-[420px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-32px)] overflow-y-auto space-y-3.5 rounded-xl p-5 shadow-2xl"
-        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)", color: "var(--taomni-text)" }}
-        onClick={(event) => event.stopPropagation()}
-        onSubmit={(event) => {
-          event.preventDefault();
-          void reveal();
-        }}
-      >
-        <div className="text-ui-title font-semibold tracking-tight">{t("mfa.qrTitle", { name })}</div>
-        <div className="flex gap-2 rounded-md p-2.5 text-ui-body" style={{ background: "rgba(234, 179, 8, 0.08)", color: "var(--taomni-warning-text, #b7791f)", border: "1px solid rgba(234, 179, 8, 0.2)" }}>
+    <ModalSurface className="taomni-modal" aria-labelledby={titleId} onCancel={close}
+      returnFocus={returnFocus} initialFocus='[data-testid="mfa-qr-password"]' data-testid="mfa-qr-dialog"
+      data-state={qr ? "shown" : "locked"}>
+      <h2 id={titleId}>{t("mfa.qrTitle", { name })}</h2>
+      <form id={formId} className="taomni-modal-body space-y-3.5" onSubmit={(event) => {
+        event.preventDefault();
+        void reveal();
+      }}>
+        <div className="flex gap-2 rounded border border-ui-warning-border bg-ui-warning-surface p-2.5 text-ui-body text-ui-warning">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>{t("mfa.qrWarning")}</span>
         </div>
@@ -257,7 +245,6 @@ export function MfaQrDialog({
           <label className="block text-ui-body" style={labelStyle}>
             {t("mfa.qrPassword")}
             <input
-              ref={passwordRef}
               type="password"
               data-testid="mfa-qr-password"
               className="taomni-input mt-1.5 w-full h-8 text-ui-body"
@@ -271,17 +258,15 @@ export function MfaQrDialog({
           </label>
         )}
         {error ? <div data-testid="mfa-qr-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-danger-text, #c33)" }}>{error}</div> : null}
-        <div className="flex justify-end gap-2 pt-1">
-          <button ref={closeRef} type="button" data-testid="mfa-qr-close" className="px-3.5 py-1.5 text-ui-body rounded-md border font-medium hover:bg-[var(--taomni-hover)] transition-colors" style={{ borderColor: "var(--taomni-input-border)" }} onClick={close}>
-            {t("mfa.close")}
-          </button>
-          {qr ? null : (
-            <button type="submit" data-testid="mfa-qr-reveal" className="px-3.5 py-1.5 text-ui-body rounded-md text-white font-medium disabled:opacity-50 transition-colors" style={{ background: "var(--taomni-accent)" }} disabled={busy}>
-              {t("mfa.qrReveal")}
-            </button>
-          )}
-        </div>
       </form>
-    </div>
+      <footer className="taomni-modal-footer">
+        <button ref={closeRef} type="button" data-testid="mfa-qr-close" className="taomni-btn" onClick={close}>
+          {t("mfa.close")}
+        </button>
+        {!qr && <Button form={formId} type="submit" variant="primary" busy={busy} data-testid="mfa-qr-reveal">
+          {t("mfa.qrReveal")}
+        </Button>}
+      </footer>
+    </ModalSurface>
   );
 }

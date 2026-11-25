@@ -16,7 +16,6 @@
   "src-tauri/plugins/mail/renderer/client/MailSubscriptionsDialog.tsx": {"L05":1},
   "src-tauri/plugins/mfa/renderer/MfaAddDialog.tsx": {"L05":1,"L02":1},
   "src-tauri/plugins/mfa/renderer/MfaEditDialog.tsx": {"L05":1,"L02":1},
-  "src-tauri/plugins/mfa/renderer/MfaQrDialog.tsx": {"L05":1,"L02":1},
   "src-tauri/plugins/sockscap/renderer/SocksCapMacosSetupGuide.tsx": {"L05":1,"L02":1,"L04":2},
   "src-tauri/plugins/sockscap/renderer/UpstreamSourcePicker.tsx": {"L05":1},
   "src-tauri/plugins/sockscap/renderer/panel/SocksCapDialogs.tsx": {"L05":5,"L02":1,"L04":2},

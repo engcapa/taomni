@@ -47,6 +47,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
   const listRef = useRef<HTMLUListElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const lastRefreshRef = useRef(0);
+  const accountMenuTrigger = useRef<HTMLElement | null>(null);
 
   const announce = useCallback(
     (message: string) => {
@@ -114,6 +115,9 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
   };
 
   const openMenu = (event: React.MouseEvent, account: MfaAccount, index: number) => {
+    const owner = event.currentTarget;
+    accountMenuTrigger.current = owner instanceof HTMLButtonElement ? owner
+      : owner.querySelector<HTMLButtonElement>('[data-testid="mfa-account-menu"]');
     const items: MenuItem[] = [
       { label: t("mfa.menuEdit"), testId: "mfa-menu-edit", onClick: () => setEditing(account) },
       { label: t("mfa.menuShowQr"), testId: "mfa-menu-qr", onClick: () => setQrDialogState({ account, action: "qr" }) },
@@ -400,6 +404,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
         <MfaQrDialog
           account={qrDialogState.account}
           initialAction={qrDialogState.action}
+          returnFocus={accountMenuTrigger.current}
           onClose={() => setQrDialogState(null)}
           onCopiedSecret={(name) => announce(t("mfa.copiedSecret", { name }))}
         />

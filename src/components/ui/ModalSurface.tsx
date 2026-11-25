@@ -2,17 +2,18 @@ import { useLayoutEffect, useRef, type ComponentProps } from "react";
 
 interface ModalSurfaceProps extends Omit<ComponentProps<"dialog">, "onCancel" | "open"> {
   initialFocus: string;
+  returnFocus?: HTMLElement | null;
   onCancel: () => void;
 }
 
 const focusable = 'button:enabled, input:enabled:not([type="hidden"]), textarea:enabled, select:enabled, a[href], [tabindex="0"]';
 
 /** The native top layer keeps the opener's theme scope and makes the background inert. */
-export function ModalSurface({ initialFocus, onCancel, role = "dialog", children, ...props }: ModalSurfaceProps) {
+export function ModalSurface({ initialFocus, returnFocus, onCancel, role = "dialog", children, ...props }: ModalSurfaceProps) {
   const ref = useRef<HTMLDialogElement>(null);
   useLayoutEffect(() => {
     const panel = ref.current!;
-    const opener = document.activeElement;
+    const opener = returnFocus ?? document.activeElement;
     if (typeof panel.showModal === "function") panel.showModal();
     else panel.setAttribute("open", "");
     const first = panel.querySelector<HTMLElement>(initialFocus);
@@ -31,7 +32,7 @@ export function ModalSurface({ initialFocus, onCancel, role = "dialog", children
       // Retry after both cleanups, when the child no longer owns focus.
       queueMicrotask(restore);
     };
-  }, [initialFocus]);
+  }, [initialFocus, returnFocus]);
 
   return <dialog {...props} ref={ref} role={role} aria-modal="true"
     onCancel={(event) => { event.preventDefault(); onCancel(); }}

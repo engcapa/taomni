@@ -64,29 +64,6 @@
   border-color: var(--taomni-accent-soft);
 }
 
-.taomni-modal {
-  position: fixed;
-  inset: 0;
-  margin: auto;
-  width: min(460px, calc(100vw - 32px));
-  max-height: calc(100vh - 32px);
-  padding: 16px;
-  border: 1px solid var(--taomni-card-border);
-  border-radius: var(--taomni-radius-lg);
-  color: var(--taomni-text);
-  background: var(--taomni-card-bg);
-  box-shadow: var(--taomni-shadow-lg);
-  font-size: var(--taomni-fs-body);
-}
-.taomni-modal[open] { display: flex; flex-direction: column; gap: 16px; }
-.taomni-modal::backdrop { background: var(--taomni-overlay); }
-.taomni-modal > h2 { flex: none; font-size: var(--taomni-fs-title); font-weight: 600; }
-.taomni-modal[data-tone="error"] > h2 { color: var(--taomni-danger-text); }
-.taomni-modal[data-tone="success"] > h2 { color: var(--taomni-success-text); }
-.taomni-modal-body { min-height: 0; overflow: auto; overflow-wrap: anywhere; }
-.taomni-modal-body p { white-space: pre-wrap; user-select: text; }
-.taomni-modal-footer { display: flex; flex: none; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-
 .taomni-control-tooltip {
   position: fixed;
   z-index: var(--taomni-z-tooltip);

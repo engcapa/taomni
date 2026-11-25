@@ -72,7 +72,10 @@ describe("MfaQrDialog", () => {
     fireEvent.click(screen.getByTestId("mfa-qr-copy-uri"));
     expect(writeText).toHaveBeenLastCalledWith(expect.stringContaining("otpauth://totp/QA%20Bank:qa%40example.com"));
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    const close = screen.getByTestId("mfa-qr-close");
+    fireEvent.keyDown(close, { key: "Escape", isComposing: true });
+    expect(screen.getByTestId("mfa-qr-dialog")).toBeInTheDocument();
+    fireEvent.keyDown(close, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
