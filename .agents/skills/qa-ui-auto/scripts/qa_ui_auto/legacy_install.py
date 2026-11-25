@@ -11,19 +11,20 @@ from .legacy_release import release_assets, RELEASE_VERSION, selected_asset, ver
 
 
 def command(args, evidence, label, *, accepted=(0,), timeout=180, env=None):
+    invocation = {"commandLine": args} if isinstance(args, str) else {"argv": [str(arg) for arg in args]}
     try:
         result = subprocess.run(args, capture_output=True, timeout=timeout, env=env)
     except subprocess.TimeoutExpired as error:
         (evidence / (label + ".stdout.txt")).write_bytes(error.stdout or b"")
         (evidence / (label + ".stderr.txt")).write_bytes(error.stderr or b"")
         (evidence / (label + ".command.json")).write_text(json.dumps({
-            "argv": [str(arg) for arg in args], "exitCode": None, "timeoutSeconds": timeout,
+            **invocation, "exitCode": None, "timeoutSeconds": timeout,
         }, indent=2) + "\n", encoding="utf-8")
         raise
     (evidence / (label + ".stdout.txt")).write_bytes(result.stdout)
     (evidence / (label + ".stderr.txt")).write_bytes(result.stderr)
     (evidence / (label + ".command.json")).write_text(json.dumps({
-        "argv": [str(arg) for arg in args], "exitCode": result.returncode,
+        **invocation, "exitCode": result.returncode,
     }, indent=2) + "\n", encoding="utf-8")
     if result.returncode not in accepted:
         raise RuntimeError(f"Legacy installation {label} exited {result.returncode}; see retained command evidence")

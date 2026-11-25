@@ -19,6 +19,7 @@ on:
         type: string
         required: false
         default: all
+      windows_nsis: {type: boolean, default: false}
       upgrade_desktop:
         type: boolean
         default: false
@@ -207,6 +208,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./.agents/skills/qa-ui-auto/scripts/modular_bundle_windows.ps1 -Directory package-input -OutputDirectory bundle-evidence -Version $env:SAMPLE_VERSION
+      - name: Exercise actual NSIS replacement and rollback of the monolith's voice runtime
+        if: runner.os == 'Windows' && inputs.windows_nsis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .agents/skills/qa-ui-auto/scripts/installed_windows_nsis.py
       - name: Inspect the real DMG, updater app, signatures and quarantine assessment
         if: runner.os == 'macOS'
         env:

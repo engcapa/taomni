@@ -23,6 +23,10 @@ on:
         description: Package targets to inspect (all or comma-separated release targets)
         type: string
         default: all
+      package_windows_nsis:
+        description: Exercise the Windows NSIS upgrade and removal of legacy voice DLLs
+        type: boolean
+        default: false
       package_upgrade_linux:
         description: Validate Linux deb replacement and rollback with the installed MFA account
         type: boolean
@@ -124,6 +128,7 @@ on:
         type: string
         required: false
         default: all
+      package_windows_nsis: {type: boolean, default: false}
       package_upgrade_linux:
         type: boolean
         default: false
@@ -200,7 +205,7 @@ concurrency:
         inputs.package_first_release_linux && 'first-release-linux' || inputs.package_rdp_perf && 'rdp-perf-linux' ||
         inputs.package_relocation_linux && 'relocate-linux' || inputs.package_upgrade_linux && 'upgrade-linux' ||
         inputs.package_first_release_desktop && 'first-release-desktop' ||
-        inputs.package_upgrade_desktop && 'upgrade-desktop' || 'inventory') ||
+        inputs.package_upgrade_desktop && 'upgrade-desktop' || inputs.package_windows_nsis && 'windows-nsis' || 'inventory') ||
       inputs.protocol_only && 'protocol' || inputs.host_only && 'host' || inputs.system_execution_only && 'system-execution' ||
       inputs.network_only && 'network' || inputs.download_only || false) }}
   cancel-in-progress: true
@@ -213,7 +218,7 @@ env:
 
 jobs:
   first-upgrade-baseline:
-    if: inputs.package_run && (inputs.package_first_release_linux || inputs.package_first_release_desktop)
+    if: inputs.package_run && (inputs.package_first_release_linux || inputs.package_first_release_desktop || inputs.package_windows_nsis)
     runs-on: ubuntu-latest
     outputs:
       baseline: ${{ steps.freeze.outputs.baseline }}
@@ -268,6 +273,7 @@ jobs:
       package_source: ${{ inputs.package_source }}
       package_version: ${{ inputs.package_version }}
       package_targets: ${{ inputs.package_targets }}
+      windows_nsis: ${{ inputs.package_windows_nsis }}
       upgrade_desktop: ${{ inputs.package_upgrade_desktop || inputs.package_first_release_desktop }}
       first_release: ${{ inputs.package_first_release_desktop }}
       first_release_baseline: ${{ needs.first-upgrade-baseline.outputs.baseline }}

@@ -20,6 +20,18 @@ def metadata(endpoint):
     return json.loads(subprocess.check_output(["gh", "api", f"repos/{REPOSITORY}/releases{endpoint}"]))
 
 
+def asset_identity(assets, name):
+    matches = [a for a in assets if a["name"] == name]
+    if len(matches) != 1:
+        raise ValueError(f"Expected one published installer named {name}")
+    asset = matches[0]
+    if (asset.get("state") != "uploaded" or type(asset.get("id")) is not int or asset["id"] <= 0
+            or type(asset.get("size")) is not int or asset["size"] <= 0
+            or not re.fullmatch(r"sha256:[a-f0-9]{64}", asset.get("digest") or "")):
+        raise ValueError(f"Incomplete public identity for {name}")
+    return {"name": name, "asset_id": asset["id"], "size": asset["size"], "sha256": asset["digest"][7:]}
+
+
 def freeze(release, requested):
     tag = release.get("tag_name", "")
     version = tag.removeprefix("v")
@@ -36,16 +48,7 @@ def freeze(release, requested):
               "publishedAt": release["published_at"], "installers": {}}
     for target, suffix in TARGETS.items():
         name = f"Taomni_{version}_{suffix}"
-        matches = [a for a in assets if a["name"] == name]
-        if len(matches) != 1:
-            raise ValueError(f"Expected one published installer for {target} in {tag}")
-        asset = matches[0]
-        if (asset.get("state") != "uploaded" or type(asset.get("id")) is not int or asset["id"] <= 0
-                or type(asset.get("size")) is not int or asset["size"] <= 0
-                or not re.fullmatch(r"sha256:[a-f0-9]{64}", asset.get("digest") or "")):
-            raise ValueError(f"Incomplete public identity for {name}")
-        record["installers"][target] = {"name": name, "asset_id": asset["id"],
-                                       "size": asset["size"], "sha256": asset["digest"][7:]}
+        record["installers"][target] = asset_identity(assets, name)
     return record
 
 
