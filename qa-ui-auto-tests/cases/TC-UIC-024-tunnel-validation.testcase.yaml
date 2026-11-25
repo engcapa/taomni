@@ -30,9 +30,9 @@ steps:
 - assert_focus_on: 'input[placeholder="0"][aria-invalid="true"]'
 - assert_text: {selector: '[data-testid="tunnel-editor"] [role="alert"]', contains: '65535'}
 - fill: {selector: 'input[placeholder="0"]', value: '1080'}
-- click: 'label:has-text("Dynamic port forwarding (SOCKS proxy)") input[type="radio"]'
+- click: '[data-testid="tunnel-editor"] input[type="radio"][value="Dynamic"]'
 - click: '[data-testid="tunnel-editor-save"]'
-- wait_for: '[data-testid="tunnel-list"] tr:has-text("qa-tunnel-validation")'
+- assert_text: {selector: '[data-testid="tunnel-list"] tbody', contains: qa-tunnel-validation}
 - click: '[data-testid="theme-cycle"]'
 - wait_for: 'html[data-app-theme="dark"]'
 - click: '[data-testid="tunnel-new"]'

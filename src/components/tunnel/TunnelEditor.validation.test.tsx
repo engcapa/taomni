@@ -24,6 +24,10 @@ it("focuses the invalid gateway, associates its error and retains the tunnel dra
   expect(host).toHaveAttribute("aria-invalid", "true");
   expect(host).toHaveAccessibleDescription("SSH server host is required");
   expect(name).toHaveValue("db replica");
+  const socks = screen.getByRole("radio", { name: /Dynamic port forwarding/ });
+  expect(socks).toHaveAttribute("value", "Dynamic");
+  fireEvent.click(socks);
+  expect(socks).toBeChecked();
   expect(save).not.toHaveBeenCalled();
 });
 

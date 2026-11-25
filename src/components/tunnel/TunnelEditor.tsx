@@ -247,6 +247,7 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
               <input
                 name={fieldId("kind")}
                 type="radio"
+                value={opt.id}
                 className="taomni-radio mt-0.5"
                 checked={draft.kind === opt.id}
                 onChange={() => update("kind", opt.id)}
