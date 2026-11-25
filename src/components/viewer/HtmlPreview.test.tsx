@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { AppDialogProvider } from "../../lib/appDialogs";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -211,9 +212,9 @@ describe("HTML preview renderer", () => {
     expect(screen.queryByText("https://replacement.invalid/")).toBeNull();
     expect(mocks.external).not.toHaveBeenCalled();
     expect(screen.getByTestId("html-external-cancel")).toHaveFocus();
-    fireEvent.keyDown(window, { key: "Tab" });
+    await userEvent.tab();
     expect(screen.getByTestId("html-external-open")).toHaveFocus();
-    fireEvent.keyDown(window, { key: "Tab" });
+    await userEvent.tab();
     expect(screen.getByTestId("html-external-cancel")).toHaveFocus();
     fireEvent.click(screen.getByTestId("html-external-cancel"));
     expect(screen.queryByTestId("html-external-dialog")).toBeNull();
@@ -227,7 +228,7 @@ describe("HTML preview renderer", () => {
     const { rerender } = render(<HtmlPreview document={doc()} onError={vi.fn()} />);
     const frame = await readyFrame();
     bridge(frame, "session-1", { kind: "external", href: "https://example.invalid/" });
-    fireEvent.keyDown(window, { key: "Escape" });
+    await userEvent.keyboard("{Escape}");
     expect(screen.queryByTestId("html-external-dialog")).toBeNull();
     expect(mocks.external).not.toHaveBeenCalled();
     // A new renderer tab gets a fresh gate, but hidden previews cannot prompt.
