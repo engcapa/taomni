@@ -18,7 +18,7 @@ export function NotepadSplitPanes({
   readOnly,
   wrap,
   showLineNumbers,
-  fontSizePx,
+  fontSizes,
   insertMode,
   virtualSpace,
   showChangeHistory,
@@ -51,7 +51,7 @@ export function NotepadSplitPanes({
   readOnly: boolean;
   wrap: boolean;
   showLineNumbers: boolean;
-  fontSizePx: number;
+  fontSizes: [number, number];
   insertMode: boolean;
   virtualSpace: boolean;
   showChangeHistory: boolean;
@@ -110,7 +110,7 @@ export function NotepadSplitPanes({
           readOnly={readOnly}
           wrap={wrap}
           showLineNumbers={showLineNumbers}
-          fontSizePx={fontSizePx}
+          fontSizePx={fontSizes[0]}
           insertMode={insertMode}
           virtualSpace={virtualSpace}
           showChangeHistory={showChangeHistory}
@@ -145,7 +145,7 @@ export function NotepadSplitPanes({
               readOnly={readOnly}
               wrap={wrap}
               showLineNumbers={showLineNumbers}
-              fontSizePx={fontSizePx}
+              fontSizePx={fontSizes[1]}
               insertMode={insertMode}
               virtualSpace={virtualSpace}
               showChangeHistory={showChangeHistory}

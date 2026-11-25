@@ -64,6 +64,7 @@ function renderActions(document: ViewerDocument, docState = createDefaultDocStat
   const setLifecycleModal = vi.fn();
   const hook = renderHook(() =>
     useNotepadActions({
+      zoom: vi.fn(),
       docKey: document.key,
       document,
       docState,

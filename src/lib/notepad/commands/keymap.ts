@@ -1,3 +1,4 @@
+import { contentZoomShortcut } from "../../contentZoomShortcut";
 import { create } from "zustand";
 import { NOTEPAD_COMMAND_BY_ID, NOTEPAD_COMMAND_CATALOG } from "./catalog";
 import type { ShortcutConflict } from "./types";
@@ -210,6 +211,10 @@ export const useNotepadKeymap = create<NotepadKeymapState>((set, get) => ({
     for (const [commandId, shortcut] of Object.entries(bindings)) {
       if (shortcut === pressed) return commandId;
     }
+    // Accept the layout-specific plus sign as an alias for the default '='
+    // binding. Explicit bindings above, including an unbound zoom, take priority.
+    if (contentZoomShortcut(event, isMac) === "in" && event.key === "+"
+      && bindings["view.zoomIn"] === defaultShortcutFor("view.zoomIn", isMac)) return "view.zoomIn";
     return null;
   },
 

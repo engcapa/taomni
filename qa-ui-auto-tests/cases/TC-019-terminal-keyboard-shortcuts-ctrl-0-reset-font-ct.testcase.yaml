@@ -1,7 +1,8 @@
 id: TC-019
-title: Terminal keyboard shortcuts (Ctrl+0 reset font, Ctrl+Shift+F find)
+title: The terminal finds output and zooms and resets the active terminal font
 covers:
 - F4.8
+ui_standard: [UI-ZOOM-01, UI-ZOOM-02]
 tags:
 - legacy-imported
 - p1
@@ -29,8 +30,15 @@ steps:
     selector: span:has-text("Match")
     regex: ^(Match \d+/\d+|No matches)$
 - press: Escape
-- press: Control+0
-- wait: 1
+- click: '[data-testid="terminal-pane"]'
+- press: {key: Control+=, macos_key: Meta+=}
+- eval_readonly:
+    expression: window.__TAOMNI_QA_TERMINALS__.get(document.querySelector('.terminal-host')).term.options.fontSize === 15
+    expect_truthy: true
+- press: {key: Control+0, macos_key: Meta+0}
+- eval_readonly:
+    expression: window.__TAOMNI_QA_TERMINALS__.get(document.querySelector('.terminal-host')).term.options.fontSize === 14
+    expect_truthy: true
 - screenshot: 019-terminal-shortcuts.png
 verification:
   review: reviewed
@@ -55,6 +63,14 @@ verification:
       expectation: '{"assert_pattern": {"selector": "span:has-text(\"Match\")", "regex": "^(Match \\d+/\\d+|No matches)$"}}'
     results:
     - 12
+  - id: R2
+    ui_standard: [UI-ZOOM-01, UI-ZOOM-02]
+    requirement: The active terminal takes one font step with the platform shortcut and resets to its profile size.
+    actions: [14, 15, 17]
+    checkpoints:
+    - {step: 16, expectation: Rendered terminal rows grow to 15px.}
+    - {step: 18, expectation: The same terminal returns to the configured 14px font.}
+    results: [16, 18]
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

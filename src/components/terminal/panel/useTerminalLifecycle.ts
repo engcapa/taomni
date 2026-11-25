@@ -103,7 +103,7 @@ export function useTerminalLifecycle(context: UseTerminalLifecycleContext) {
     decreaseFontSize: commands.decreaseFontSize,
     resetFontSize: commands.resetFontSize,
     fontFamily: panel.fontFamily,
-    fontSize: panel.fontSize,
+    fontSize: panel.baseFontSize,
     commitTerminalProfilePatch: panel.commitTerminalProfilePatch,
     saveCurrentAppearanceAsTerminalDefault: commands.saveCurrentAppearanceAsTerminalDefault,
     saveCurrentProfileAsTerminalDefault: commands.saveCurrentProfileAsTerminalDefault,

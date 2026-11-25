@@ -18,6 +18,7 @@ import type { NotepadToolboxKind } from "../dialogs/ToolboxDialogs";
 
 /** State owners injected by the NotepadEditor workbench shell. */
 export interface NotepadActionDeps {
+  zoom: (action: import("../../../lib/contentZoomShortcut").ContentZoomAction) => void;
   docKey: string;
   document: ViewerDocument;
   docState: NotepadDocState;

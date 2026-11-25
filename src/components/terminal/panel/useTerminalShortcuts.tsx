@@ -187,7 +187,7 @@ export function useTerminalShortcuts(context: UseTerminalShortcutsContext) {
       gitToggle.onOpen();
       return false;
     }
-    const zoom = contentZoomShortcut(event);
+    const zoom = contentZoomShortcut(event, isMac);
     if (zoom) {
       event.preventDefault();
       if (zoom === "in") increaseFontSize();

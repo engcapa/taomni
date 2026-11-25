@@ -4,7 +4,7 @@ import { selectUploadFile, sendTerminalSignal } from "../../../lib/ipc";
 import { loadTerminalDefaultProfile, saveTerminalDefaultProfile, type TerminalSyntaxMode } from "../../../lib/terminalProfile";
 import { type ZmodemSendFile } from "../../../lib/zmodem";
 import { collectTerminalBlockSelectionText } from "./buffer";
-import { DEFAULT_FONT_SIZE, terminalCursorCell } from "./policy";
+import { terminalCursorCell } from "./policy";
 import { type TerminalBlockSelectionCell } from "./types";
 import { useTerminalInteraction } from "./useTerminalInteraction";
 import { useTerminalPanelState } from "./useTerminalPanelState";
@@ -44,19 +44,9 @@ export function useTerminalCommands(context: UseTerminalCommandsContext) {
     interaction.focusTerminal();
   }, [interaction.focusTerminal]);
 
-  const increaseFontSize = useCallback(() => {
-    const nextSize = Math.min(panel.currentTerminalProfileRef.current.fontSize + 1, 32);
-    panel.commitTerminalProfilePatch({ fontSize: nextSize });
-  }, [panel.commitTerminalProfilePatch]);
-
-  const decreaseFontSize = useCallback(() => {
-    const nextSize = Math.max(panel.currentTerminalProfileRef.current.fontSize - 1, 8);
-    panel.commitTerminalProfilePatch({ fontSize: nextSize });
-  }, [panel.commitTerminalProfilePatch]);
-
-  const resetFontSize = useCallback(() => {
-    panel.commitTerminalProfilePatch({ fontSize: DEFAULT_FONT_SIZE });
-  }, [panel.commitTerminalProfilePatch]);
+  const increaseFontSize = useCallback(() => panel.zoom("in"), [panel.zoom]);
+  const decreaseFontSize = useCallback(() => panel.zoom("out"), [panel.zoom]);
+  const resetFontSize = useCallback(() => panel.zoom("reset"), [panel.zoom]);
 
   const setSyntaxModeAndFocus = useCallback((mode: TerminalSyntaxMode) => {
     panel.commitTerminalProfilePatch({ syntaxMode: mode });

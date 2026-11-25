@@ -1,3 +1,4 @@
+import { nextFontOffset, zoomedFontSize, type ContentZoomAction } from "../../../lib/contentZoomShortcut";
 import { useSessionStore } from "../../../stores/sessionStore";
 import { useBookmarkBackground } from "./useBookmarkBackground";
 import { FitAddon } from "@xterm/addon-fit";
@@ -153,6 +154,10 @@ export function useTerminalPanelState(context: UseTerminalPanelStateContext) {
 
   const [fontFamily, setFontFamily] = useState(initialProfile.fontFamily);
   const [fontSize, setFontSize] = useState(initialProfile.fontSize);
+  const [zoomOffset, setZoomOffset] = useState(0);
+  const zoom = useCallback((action: ContentZoomAction) => {
+    setZoomOffset((offset) => nextFontOffset(action, currentTerminalProfileRef.current.fontSize, offset));
+  }, []);
   const [fontLigatures, setFontLigatures] = useState(initialProfile.fontLigatures);
   const [showScrollbar, setShowScrollbar] = useState(initialProfile.showScrollbar);
   const [webglRenderer, setWebglRenderer] = useState(initialProfile.webglRenderer);
@@ -198,7 +203,10 @@ export function useTerminalPanelState(context: UseTerminalPanelStateContext) {
     currentTerminalProfileRef.current = next;
 
     if (patch.fontFamily !== undefined) setFontFamily(next.fontFamily);
-    if (patch.fontSize !== undefined) setFontSize(next.fontSize);
+    if (patch.fontSize !== undefined) {
+      setFontSize(next.fontSize);
+      setZoomOffset(0);
+    }
     if (patch.fontLigatures !== undefined) setFontLigatures(next.fontLigatures);
     if (patch.showScrollbar !== undefined) setShowScrollbar(next.showScrollbar);
     if (patch.webglRenderer !== undefined) setWebglRenderer(next.webglRenderer);
@@ -366,7 +374,9 @@ export function useTerminalPanelState(context: UseTerminalPanelStateContext) {
     resolvePanelTheme,
     themeName,
     fontFamily,
-    fontSize,
+    fontSize: zoomedFontSize(fontSize, zoomOffset),
+    baseFontSize: fontSize,
+    zoom,
     multilinePasteConfirm,
     confirmPaste,
     t,

@@ -121,6 +121,7 @@ describe("Notepad actions & command regressions", () => {
     const setLifecycleModal = vi.fn();
     const { result } = renderHook(() =>
       useNotepadActions({
+        zoom: vi.fn(),
         docKey: doc.key,
         document: doc,
         docState: createDefaultDocState(doc.key),
@@ -177,6 +178,7 @@ describe("Notepad actions & command regressions", () => {
 
     const { result } = renderHook(() =>
       useNotepadActions({
+        zoom: vi.fn(),
         docKey: doc.key,
         document: doc,
         docState,
@@ -213,6 +215,7 @@ describe("Notepad actions & command regressions", () => {
     const emptyFake = makeFakeView("b\na", 0, 0);
     const { result: res2 } = renderHook(() =>
       useNotepadActions({
+        zoom: vi.fn(),
         docKey: doc.key,
         document: doc2,
         docState: createDefaultDocState(doc.key),
@@ -282,6 +285,7 @@ describe("Notepad actions & command regressions", () => {
 
     const { result } = renderHook(() =>
       useNotepadActions({
+        zoom: vi.fn(),
         docKey: untitledKey,
         document: doc,
         docState: useNotepadStore.getState().docs[untitledKey],

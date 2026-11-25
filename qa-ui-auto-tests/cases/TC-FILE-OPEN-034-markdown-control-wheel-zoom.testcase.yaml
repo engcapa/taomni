@@ -38,9 +38,11 @@ steps:
 - press:
     selector: '[data-testid="markdown-source"]'
     key: Control+=
+    macos_key: Meta+=
 - press:
     selector: '[data-testid="markdown-source"]'
     key: Control+0
+    macos_key: Meta+0
 - wait_for: '[data-testid="markdown-source"][data-zoom="100"]'
 - assert_no_runtime_errors: null
 verification:

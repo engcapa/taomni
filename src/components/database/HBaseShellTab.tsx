@@ -36,7 +36,7 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
   const setTabHasNewOutput = useAppStore((s) => s.setTabHasNewOutput);
   const confirmDialog = useConfirmDialog();
   const rootRef = useRef<HTMLDivElement | null>(null);
-  useDbSessionFontSize(visible, rootRef);
+  const { fontSize } = useDbSessionFontSize(visible, rootRef);
 
   const transport: HBaseTransport = (info.connectionMode as HBaseTransport) ?? "rest";
 
@@ -276,6 +276,7 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
 
   return <HBaseWorkspaceView
     rootRef={rootRef}
+    fontSize={fontSize}
     chatToggle={chatToggle}
     visible={visible}
     t={t}

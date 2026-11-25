@@ -8,10 +8,10 @@ export function useMarkdownZoom(content: RefObject<HTMLDivElement | null>, activ
   }, []);
   const onKeyDown = useCallback((event: KeyboardEvent | React.KeyboardEvent) => {
     const native = "nativeEvent" in event ? event.nativeEvent : event;
-    if (!active || event.defaultPrevented || native.isComposing || event.altKey || event.metaKey) return;
+    if (!active || event.defaultPrevented) return;
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest("input,textarea,select")) return;
-    const action = contentZoomShortcut(event);
+    const action = contentZoomShortcut(native);
     if (!action) return;
     event.preventDefault();
     event.stopPropagation();

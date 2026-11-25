@@ -42,6 +42,7 @@ import { useHBaseExecution } from "./useHBaseExecution";
 import { useHBaseWorkspace } from "./useHBaseWorkspace";
 
 export interface HBaseWorkspaceViewProps {
+  fontSize: number;
   rootRef: import("react").RefObject<HTMLDivElement | null>;
   chatToggle: { open: boolean; onToggle: () => void; } | undefined;
   visible: boolean;
@@ -90,6 +91,7 @@ export interface HBaseWorkspaceViewProps {
 
 export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
   const {
+    fontSize,
     rootRef,
     chatToggle,
     visible,
@@ -136,7 +138,7 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
     confirmDialog,
   } = props;
   return ((
-    <div ref={rootRef} className="h-full w-full flex flex-col relative" style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
+    <div ref={rootRef} className="h-full w-full flex flex-col relative" style={{ "--taomni-db-font-size": `${fontSize}px`, background: "var(--taomni-bg)", color: "var(--taomni-text)" } as import("react").CSSProperties}>
       {chatToggle && (
         <TabActions active={visible}>
           <button

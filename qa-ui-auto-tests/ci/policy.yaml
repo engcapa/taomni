@@ -298,6 +298,7 @@ cases:
 - TC-UIC-001-folder-dialog
 - TC-UIC-002-primary-contrast
 - TC-UIC-003-explorer-font-navigation
+- TC-UIC-004-notepad-split-zoom
 - TC-MOBILE-001
 - TC-MOBILE-002
 - TC-MOBILE-003
