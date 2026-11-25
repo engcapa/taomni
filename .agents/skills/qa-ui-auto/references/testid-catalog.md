@@ -2877,6 +2877,7 @@
 - `[data-testid="module-release-notice"]` — display — F-Modules-1.module-release-notice
 - `[data-testid="module-release-new"]` — display — F-Modules-1.module-release-new
 - `[data-testid="module-release-new-item"]` — display — F-Modules-1.module-release-new-item
+- `[data-testid="module-release-mfa"]` — display — F-Modules-1.module-release-mfa
 - `[data-testid="module-release-open-store"]` — interactive — F-Modules-1.module-release-open-store
 - `[data-testid="module-release-later"]` — interactive — F-Modules-1.module-release-later
 - `[data-testid="module-release-legacy"]` — display [optional] — F-Modules-1.module-release-legacy

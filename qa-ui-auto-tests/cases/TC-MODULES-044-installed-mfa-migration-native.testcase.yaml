@@ -47,8 +47,8 @@ steps:
     selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="mfa"] [data-testid="mfa-load-error"][data-code="MFA_LEGACY_MIGRATION_REQUIRED"]'
     contains: Migrate your existing MFA accounts from the Module Store in Settings
 - assert_count: {selector: '[data-testid="mfa-account-code"]', equal: 0}
-- click: '[data-testid="ribbon-settings"]'
-- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- assert_visible: '[data-testid="module-release-mfa"]'
+- click: '[data-testid="module-release-open-store"]'
 - press: {selector: '[data-testid="module-upgrade-mfa-open"]', key: Enter}
 - assert_count: {selector: '[data-testid="module-upgrade-mfa-archive"]', equal: 0}
 - assert_count: {selector: '[data-testid="module-upgrade-mfa-signature"]', equal: 0}
@@ -88,6 +88,7 @@ verification:
     - {step: 28, expectation: The settings registry lists the signed package as installed.}
     - {step: 34, expectation: The signed manager instructs the user to migrate the existing account through Settings.}
     - {step: 35, expectation: The signed manager shows no codes before the data is migrated.}
+    - {step: 36, expectation: The workspace displays the pending MFA migration and links to the module store.}
     - {step: 39, expectation: The upgrade form selects the installed package automatically.}
     - {step: 40, expectation: The upgrade form selects the installed detached signature automatically.}
     - {step: 43, expectation: The wrong Vault password leaves the original app open.}

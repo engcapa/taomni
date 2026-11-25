@@ -137,6 +137,9 @@ controls:
   - id: module-release-new-item
     selector: '[data-testid="module-release-new-item"]'
     kind: display
+  - id: module-release-mfa
+    selector: '[data-testid="module-release-mfa"]'
+    kind: display
   - id: module-release-open-store
     selector: '[data-testid="module-release-open-store"]'
     kind: interactive

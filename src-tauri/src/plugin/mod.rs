@@ -24,6 +24,7 @@ pub(crate) mod migration_rdp_pins;
 mod migration_rdp_server;
 mod migration_rdp_server_identity;
 mod migration_server_config;
+mod migration_sockscap;
 mod migration_vnc_server;
 pub(crate) mod network;
 pub mod protocol;

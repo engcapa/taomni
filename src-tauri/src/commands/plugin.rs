@@ -462,6 +462,19 @@ pub async fn plugin_mfa_migrate_and_restart(
 }
 
 #[tauri::command]
+pub async fn plugin_mfa_migration_required(state: State<'_, AppState>) -> Result<bool, String> {
+    if state.legacy.mfa.legacy_store()?.is_none() {
+        return Ok(false);
+    }
+    let profile = legacy_profile_root(&state);
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::mfa::ownership::legacy_has_accounts(&profile)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 pub fn plugin_mfa_migration_result(state: State<'_, AppState>) -> Option<&'static str> {
     let result = crate::runtime::mfa_restart::last_result()?;
     if result == "complete" && !matches!(state.legacy.mfa.legacy_store(), Ok(None)) {
@@ -500,6 +513,7 @@ pub(super) fn handles(command: &str) -> bool {
             | "plugin_migration_inspect"
             | "plugin_migration_execute"
             | "plugin_mfa_migrate_and_restart"
+            | "plugin_mfa_migration_required"
             | "plugin_mfa_migration_result"
     )
 }
@@ -533,6 +547,7 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::commands::plugin::plugin_migration_inspect,
         crate::commands::plugin::plugin_migration_execute,
         crate::commands::plugin::plugin_mfa_migrate_and_restart,
+        crate::commands::plugin::plugin_mfa_migration_required,
         crate::commands::plugin::plugin_mfa_migration_result,
     ];
     handler(invoke)

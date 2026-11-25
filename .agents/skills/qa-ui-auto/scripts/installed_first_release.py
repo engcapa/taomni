@@ -64,8 +64,10 @@ def exercise(ctx, executable, work, profile, evidence, origin, *, environment=No
                 steps = unlock_vault(ctx, session, evidence)
                 stage["enrollment"] = enrollment(profile, origin)
                 stage["activePointers"] = observe_legacy_roster(profile / "plugins", origin, removed)
-                desktop_action(steps, "click", element("ribbon-settings"))
-                desktop_action(steps, "fill", {"selector": element("settings-search-input"), "value": "module store"})
+                desktop_action(steps, "wait_for", element("module-release-mfa"))
+                desktop_action(steps, "click", element("module-release-open-store"))
+                desktop_action(steps, "wait_for", element("module-upgrade-mfa-open"))
+                stage["mfaMigrationOfferedInWorkspace"] = True
                 mfa = '[data-module-id="taomni-plugin-mfa"] ' + element("module-marketplace-current")
                 desktop_action(steps, "wait_for", mfa)
                 stage["currentModules"] = current_roster_modules(session, origin.roster, removed)

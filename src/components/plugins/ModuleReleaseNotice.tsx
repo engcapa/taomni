@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { isMfaMigrationRequired } from "../../lib/ipc/plugin";
+import { usePluginFrontendStore } from "../../stores/pluginFrontendStore";
 import { useT } from "../../lib/i18n";
 import { isTauriRuntime } from "../../lib/runtime";
 import { openSettingsSection } from "../../lib/settingsNavigation";
@@ -21,6 +23,24 @@ export function ModuleReleaseNotice({ openSettings }: { openSettings(): void }) 
     };
   }, [refresh]);
 
+  const mfa = usePluginFrontendStore((state) => state.records.mfa);
+  const installedMfa = !!mfa?.manifest && !mfa.reason && (mfa.lifecycle === "installed" || mfa.lifecycle === "enabled");
+  const [mfaNotice, setMfaNotice] = useState<"required" | Error | null>(null);
+  useEffect(() => {
+    if (!installedMfa) {
+      setMfaNotice(null);
+      return;
+    }
+    let active = true;
+    void isMfaMigrationRequired().then((required) => {
+      if (active) setMfaNotice(required ? "required" : null);
+    }).catch((reason: unknown) => {
+      if (active) setMfaNotice(new Error(String(reason)));
+    });
+    return () => { active = false; };
+  }, [installedMfa]);
+
+  const showMfaNotice = installedMfa && mfaNotice !== null;
   const plan = snapshot?.release;
   const newModules = (plan?.newModules ?? []).flatMap((id) => {
     const entry = snapshot?.catalog.plugins[id];
@@ -29,9 +49,12 @@ export function ModuleReleaseNotice({ openSettings }: { openSettings(): void }) 
   const waitingForRestart = plan?.legacyRestartRequired?.length ?? 0;
   const importFailed = plan?.legacyImportFailed?.length ?? 0;
   const legacyPending = (plan?.legacyPending.length ?? 0) - waitingForRestart - importFailed;
-  if (!newModules.length && !legacyPending && !waitingForRestart && !importFailed && !plan?.legacyWaiting) return null;
+  if (!showMfaNotice && !newModules.length && !legacyPending && !waitingForRestart && !importFailed && !plan?.legacyWaiting) return null;
 
   return <aside data-testid="module-release-notice" className="max-h-40 overflow-y-auto border-t border-[var(--taomni-divider)] px-3 py-2 text-[12px]">
+    {showMfaNotice && <p data-testid="module-release-mfa" role={mfaNotice instanceof Error ? "alert" : "status"}>
+      {mfaNotice instanceof Error ? mfaNotice.message : t("plugins.marketMfaMigrationRequired")}
+    </p>}
     {!!legacyPending && <p data-testid="module-release-legacy">{t("plugins.marketLegacyPending", { count: legacyPending })}</p>}
     {!!waitingForRestart && <p data-testid="module-release-legacy">{t("plugins.marketMailRestartRequired")}</p>}
     {!!importFailed && <p data-testid="module-release-legacy">{t("plugins.marketMailImportFailed")}</p>}

@@ -37,6 +37,8 @@ export async function invokePlugin<T>(command: string, args?: Record<string, unk
     case "plugin_list":
     case "plugin_refresh":
       return invokeModulePreview(command, args) as T;
+    case "plugin_mfa_migration_required":
+      return false as T;
     case "plugin_mfa_migration_result":
       return null as T;
     case "plugin_mfa_migrate_and_restart":

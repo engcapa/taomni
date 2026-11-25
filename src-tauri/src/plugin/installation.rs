@@ -204,6 +204,8 @@ impl PluginRegistry {
                     .map_err(PluginError::HostRequest)?;
             }
             if !previous.was_uninstalled() {
+                super::migration_sockscap::prepare(&self.root, manifest)
+                    .map_err(PluginError::HostRequest)?;
                 super::migration_rdp_server::prepare(&self.root, manifest)
                     .map_err(PluginError::HostRequest)?;
                 super::migration_local_servers::prepare(&self.root, manifest)

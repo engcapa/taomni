@@ -254,6 +254,10 @@ fn valid_commit(entry: &MigrationJournalEntry) -> bool {
         || valid_mail_commit(entry)
         || valid_rdp_pin_commit(entry)
         || valid_server_commit(entry)
+        || (entry.item == MigrationItem::SocksCap
+            && entry.source_path == Path::new("sockscap/config.json")
+            && entry.target == Path::new(taomni_sockscap_api::CONFIG_PATH)
+            && source::valid_fingerprint(&entry.source_fingerprint))
 }
 
 pub(super) fn valid_server_commit(entry: &MigrationJournalEntry) -> bool {

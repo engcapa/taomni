@@ -346,6 +346,10 @@ export function migrateMfaAndRestart(archive: string | undefined, signature: str
   return invoke<void>("plugin_mfa_migrate_and_restart", { archive, signature, masterPassword });
 }
 
+export function isMfaMigrationRequired(): Promise<boolean> {
+  return invoke<boolean>("plugin_mfa_migration_required");
+}
+
 export function getMfaMigrationResult(): Promise<"complete" | "failed" | null> {
   return invoke<"complete" | "failed" | null>("plugin_mfa_migration_result");
 }

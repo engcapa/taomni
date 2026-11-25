@@ -16,13 +16,13 @@ steps:
 - click: '[data-testid="module-offline-submit"]'
 - wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
 - assert_file_sha256: {path: '${fixture.sockscap_signed_host}', equals: '${fixture.sockscap_signed_host_sha256}'}
+- assert_file_contains: {path: '${fixture.sockscap_module_config}', contains: 'route.example.test', timeout_sec: 15}
 - click: '[data-testid="module-action-enable-sockscap"]'
 - wait_for: '[data-testid="module-action-disable-sockscap"]'
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-sockscap"]'
 - wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]'
-- assert_file_contains: {path: '${fixture.sockscap_module_config}', contains: 'route.example.test', timeout_sec: 15}
 - show_sockscap_section: test
 - fill: {selector: '[data-testid="sockscap-test-host"]', value: route.example.test}
 - click: '[data-testid="sockscap-test-target"]'
@@ -76,18 +76,18 @@ verification:
   requirements:
   - id: signed-policy-probe
     requirement: Testing the target uses the installed host and shows the matching rule from the legacy profile.
-    actions: [6, 9, 13, 16, 17, 18, 22]
+    actions: [6, 10, 14, 16, 17, 18, 22]
     checkpoints:
     - {step: 8, expectation: The executable identity matches the signed package.}
-    - {step: 15, expectation: Opening the tool imports the old routing rule into the signed host's configuration.}
+    - {step: 9, expectation: Installation imports the old routing rule before the host is enabled or its tool is opened.}
     - {step: 19, expectation: The result reports that the target is blocked.}
     - {step: 20, expectation: The result identifies the exact retained rule.}
     - {step: 21, expectation: The signed module holds its writer lease after the target test.}
     - {step: 23, expectation: The dry-run completes without runtime errors.}
-    results: [8, 15, 19, 20, 21, 23]
+    results: [8, 9, 19, 20, 21, 23]
   - id: adopted-rules
     requirement: The host adopts legacy GFWList rules once and uses them again after a disable and enable cycle.
-    actions: [6, 9, 13, 27, 28, 34, 37, 41, 45]
+    actions: [6, 10, 14, 27, 28, 34, 37, 41, 45]
     checkpoints:
     - {step: 24, expectation: The module owns the original AutoProxy rule.}
     - {step: 25, expectation: The saved rule cache preserves the legacy refresh date.}
