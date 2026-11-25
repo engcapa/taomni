@@ -2,7 +2,6 @@
   "src-tauri/plugins/mail/renderer/MailArchiveDialog.tsx": {"L02":1},
   "src-tauri/plugins/mail/renderer/client/MailDraggableDialog.tsx": {"L02":1},
   "src-tauri/plugins/mfa/renderer/MfaAccountRow.tsx": {"L04-inline":1},
-  "src-tauri/plugins/mfa/renderer/MfaAddDialog.tsx": {"L02":1},
   "src-tauri/plugins/mfa/renderer/MfaCameraPane.tsx": {"L04-inline":1},
   "src-tauri/plugins/mfa/renderer/MfaFloatingWindow.tsx": {"L05-inline":2,"L04-inline":1},
   "src-tauri/plugins/rdp-client/renderer/panel/RdpPanelView.tsx": {"L04-inline":3},

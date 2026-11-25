@@ -3896,6 +3896,7 @@ const dict = {
     kindLabelTotp: "TOTP · {digits} digits · {period}s",
     kindLabelHotp: "HOTP · {digits} digits · counter {counter}",
     savingEdit: "Saving…",
+    discardAddMessage: "Discard the changes you entered for this account?",
     discardEditTitle: "Discard account changes?",
     discardEditMessage: "Close the editor and discard your changes to this account?",
     discardEdit: "Discard changes",

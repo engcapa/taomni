@@ -10,7 +10,8 @@ covers: [F-MFA-1, F-MFA-2]
 tags: [mfa, p1]
 modes: [browser]
 fixtures: [reset_db]
-timeout_sec: 90
+ui_standard: [UI-DLG-06, UI-DLG-10]
+timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
@@ -55,6 +56,8 @@ steps:
 - click: '[data-testid="mfa-add-submit"]'
 - assert_text: {selector: '[data-testid="mfa-add-error"]', contains: already exists}
 - click: '[data-testid="mfa-add-cancel"]'
+- assert_focus_on: '[data-testid="confirm-dialog-cancel"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
 - assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 1}
 - screenshot: mfa-003-totp-row.png
@@ -85,14 +88,16 @@ verification:
     - {step: 37, expectation: countdown between 1 and 30 seconds}
     results: [36, 37]
   - id: R3
+    ui_standard: [UI-DLG-06, UI-DLG-10]
     requirement: The same secret cannot be added twice; cancelling leaves one account (AC-03).
-    actions: [38, 40, 41, 43]
+    actions: [38, 40, 41, 43, 45]
     checkpoints:
+    - {step: 44, expectation: Cancelling a populated duplicate draft focuses Keep editing.}
     - {step: 39, expectation: add dialog reopened}
     - {step: 42, expectation: duplicate refused}
-    - {step: 44, expectation: dialog closed}
-    - {step: 45, expectation: still exactly one account}
-    results: [45]
+    - {step: 46, expectation: dialog closed}
+    - {step: 47, expectation: still exactly one account}
+    results: [44, 47]
   visual:
   - check: Error and notice lines are readable and the TOTP row countdown is not clipped.
     method: manual

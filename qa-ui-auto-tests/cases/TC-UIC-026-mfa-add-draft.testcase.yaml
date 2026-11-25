@@ -1,0 +1,63 @@
+id: TC-UIC-026-mfa-add-draft
+title: MFA keeps an unsaved manual account until the user confirms leaving it
+covers: [F-MFA-1, F-MFA-2]
+fixtures: [reset_db]
+modes: [browser, native]
+tags: [ui-contract, mfa, dialog]
+ui_standard: [UI-DLG-04, UI-DLG-06, UI-DLG-10, UI-FND-03a]
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mfa-draft
+- press: {selector: '[data-testid="mfa-empty-add-secret"]', key: Enter}
+- assert_focus_on: '[data-testid="mfa-add-issuer"]'
+- assert_solid_text_contrast: {selector: '[data-testid="mfa-add-submit"]', minimum: 4.5}
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: Draft issuer}
+- click: '[data-testid="mfa-add-submit"]'
+- assert_focus_on: '[data-testid="mfa-add-secret"]'
+- assert_text: {selector: '[data-testid="mfa-add-error"]', contains: Enter the secret key}
+- press: {selector: '[data-testid="mfa-add-secret"]', key: Escape}
+- assert_focus_on: '[data-testid="confirm-dialog-cancel"]'
+- press: Enter
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- assert_attribute: {name: value, selector: '[data-testid="mfa-add-issuer"]', equals: Draft issuer}
+- click: '[data-testid="mfa-add-mode-image"]'
+- assert_focus_on: '[data-testid="confirm-dialog-cancel"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="image"]'
+- click: '[data-testid="mfa-add-close"]'
+- assert_not_visible: '[data-testid="mfa-add-dialog"]'
+- assert_visible: '[data-testid="mfa-empty"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: form
+    ui_standard: [UI-DLG-06, UI-FND-03a]
+    requirement: The form focuses the issuer on open and the missing secret on submit, and its primary action stays readable.
+    actions: [6, 9, 10]
+    checkpoints:
+    - {step: 7, expectation: Initial focus reaches the issuer.}
+    - {step: 8, expectation: The Save label clears the text contrast threshold.}
+    - {step: 11, expectation: Focus moves to the missing secret.}
+    - {step: 12, expectation: The missing secret is identified.}
+    results: [7, 8, 11, 12]
+  - id: discard
+    ui_standard: [UI-DLG-04, UI-DLG-10]
+    requirement: Escape and changing entry methods protect the draft. Keeping it preserves its issuer, and explicit discard opens the selected source without creating an account.
+    actions: [9, 13, 15, 18, 20, 22]
+    checkpoints:
+    - {step: 14, expectation: Keep editing owns focus after Escape.}
+    - {step: 16, expectation: Keeping the draft closes only the decision.}
+    - {step: 17, expectation: The issuer survives the decision.}
+    - {step: 19, expectation: Switching source also requires an explicit decision.}
+    - {step: 21, expectation: Discard switches to the requested source.}
+    - {step: 23, expectation: The clean import dialog closes directly.}
+    - {step: 24, expectation: The original account collection remains empty.}
+    results: [14, 16, 17, 19, 21, 23, 24]
+  visual:
+  - {check: Primary action contrast, method: automated, reason: Reads the foreground and solid button surface from the live form.}
+  native:
+  - {check: Module dialog keyboard ownership, method: automated, reason: Exercises the layered discard decision inside the packaged desktop WebView.}

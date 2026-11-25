@@ -3873,6 +3873,7 @@ export const zhCN: DeepPartial<typeof en> = {
     kindLabelTotp: "TOTP · {digits} 位 · {period} 秒",
     kindLabelHotp: "HOTP · {digits} 位 · 计数 {counter}",
     savingEdit: "正在保存…",
+    discardAddMessage: "放弃刚才对账户信息的修改吗？",
     discardEditTitle: "放弃账户修改？",
     discardEditMessage: "关闭编辑窗口并放弃对此账户的修改吗？",
     discardEdit: "放弃修改",

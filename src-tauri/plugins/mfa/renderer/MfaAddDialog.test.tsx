@@ -45,6 +45,26 @@ describe("MfaAddDialog import sources", () => {
     useMfaStore.setState({ accounts: [], codes: {} });
   });
 
+  it("retains manual entry on IME Escape and opens one discard decision before switching source", () => {
+    const close = vi.fn();
+    render(<MfaAddDialog initialMode="secret" onClose={close} onAdded={vi.fn()} />);
+    const issuer = screen.getByTestId("mfa-add-issuer");
+    expect(issuer).toHaveFocus();
+    fireEvent.click(screen.getByTestId("mfa-add-submit"));
+    expect(issuer).toHaveAccessibleDescription("Enter an issuer or an account name.");
+    fireEvent.change(issuer, { target: { value: "Accounts" } });
+    fireEvent.keyDown(issuer, { key: "Escape", isComposing: true });
+    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    fireEvent.click(screen.getByTestId("mfa-add-mode-image"));
+    expect(screen.getByTestId("confirm-dialog-cancel")).toHaveFocus();
+    fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
+    expect(issuer).toHaveValue("Accounts");
+    fireEvent.click(screen.getByTestId("mfa-add-mode-image"));
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+    expect(screen.getByTestId("mfa-image-dropzone")).toBeInTheDocument();
+    expect(close).not.toHaveBeenCalled();
+  });
+
   it("imports a chosen QR image through the preview and flags duplicates afterwards", async () => {
     const onAdded = vi.fn();
     const { unmount } = render(<MfaAddDialog initialMode="image" onClose={vi.fn()} onAdded={onAdded} />);
