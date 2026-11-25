@@ -2,7 +2,9 @@
 
 ## 0.6.0 当前候选
 
-当前产品 SHA 为 `f69c52f2e3edbfca37782950d367d637368fe1b4`，包含核对时的 `main` 提交 `284ac1056`。0.6.0 暂缓上线。MFA 包装好后，工作区会提示有旧账户的用户进入模块商店，用原 Vault 密码完成迁移。SocksCap 安装阶段接管原有配置和规则，在用户启用宿主前写入模块数据目录，保留原件供回退使用。[候选提交](https://github.com/engcapa/taomni/commit/f69c52f2e) · [四目标候选构建](https://github.com/engcapa/taomni/actions/runs/45540702292) · [核心构建清点](https://github.com/engcapa/taomni/actions/runs/45540706955) · [纯核心崩溃回归](https://github.com/engcapa/taomni/actions/runs/45540715604) · [双版本生命周期](https://github.com/engcapa/taomni/actions/runs/45540932783)
+当前产品 SHA 为 `5e53df106549b9fa8a49e435120fc820c8e608ca`，已合入 `main` 的 `07031c6f5`。Windows 更新后首次启动使用桌面环境，基座继续清理旧单体语音 DLL，SocksCap 和 VNC 的宿主入口归各自模块。0.6.0 暂缓上线。四目标依赖清点已通过。三端原生运行合并验证十模块的双版本生命周期、业务迁移、备份还原和篡改拒绝。最新稳定单体实装与全模块回归复用这轮打包的签名资产。[候选提交](https://github.com/engcapa/taomni/commit/5e53df106) · [四目标构建](https://github.com/engcapa/taomni/actions/runs/45556290903) · [核心清点](https://github.com/engcapa/taomni/actions/runs/45556295313) · [纯核心回归](https://github.com/engcapa/taomni/actions/runs/45556300017) · [十模块原生验收](https://github.com/engcapa/taomni/actions/runs/45556693711)
+
+上一候选 `f69c52f2e` 加入旧 MFA 账户迁移提示和 SocksCap 安装时的数据接管。该轮纯核心 Browser/Native 通过 132 项，Linux Mobile 原配置补跑通过。旧 MFA 导出测试因缺少测试依赖首次编译失败，修正后在同一候选迁移源码上通过 Linux、Windows、macOS Intel 原生导出。打包和生命周期任务已移交至新候选。[纯核心](https://github.com/engcapa/taomni/actions/runs/45540715604) · [导出复验](https://github.com/engcapa/taomni/actions/runs/45554945039)
 
 实装工作流默认选择当时公开的稳定单体版本，记录 Release ID 和四个目标各自的资产 ID、字节数、SHA-256。四个平台在同一次验收中复用这份记录。放行时再查询 GitHub 公开版并与实装回执匹配。单体发布有更新时使用新基线复验，涉及主线产品改动时同步更新候选和对应回执。历史版本号用于重现已执行的测试。[滚动基线实现](https://github.com/engcapa/taomni/commit/04e6e0497) · [首次自动选择的实装](https://github.com/engcapa/taomni/actions/runs/45538704639) · [公开稳定版](https://github.com/engcapa/taomni/releases/latest)
 
