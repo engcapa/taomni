@@ -1,0 +1,38 @@
+id: TC-UIC-008-rail-tooltip
+title: Rail descriptions follow the pointed control and dismiss without activating the command
+covers: [F5.5]
+fixtures: [reset_db]
+modes: [browser, native]
+tags: [ui-contract, keyboard]
+ui_standard: [UI-TIP-01, UI-TIP-03]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-rail-tooltip
+- hover: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="side-tab-explorer"][aria-describedby~="taomni-control-tooltip"]'
+- eval_readonly: {expression: "document.getElementById('taomni-control-tooltip').textContent === 'File Explorer'", expect_truthy: true}
+- hover: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="side-tab-tools"][aria-describedby~="taomni-control-tooltip"]'
+- assert_count: {selector: '[role="tooltip"]', equal: 1}
+- press: {selector: '[data-testid="side-tab-tools"]', key: Escape}
+- assert_not_visible: '[role="tooltip"]'
+- assert_count: {selector: '[data-testid="side-tab-tools"][aria-describedby~="taomni-control-tooltip"]', equal: 0}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-TIP-01, UI-TIP-03]
+    requirement: Exactly one description belongs to the current rail control and Escape releases its accessible description.
+    actions: [3, 6, 9]
+    checkpoints:
+    - {step: 5, expectation: The tooltip displays the translated Explorer control name.}
+    - {step: 7, expectation: The next control describes itself with the live tooltip.}
+    - {step: 8, expectation: Only one tooltip is mounted.}
+    - {step: 10, expectation: Escape closes the tooltip.}
+    - {step: 11, expectation: The control no longer references the dismissed tooltip.}
+    results: [5, 7, 8, 10, 11]
+  visual:
+  - {check: Tooltip ownership, method: automated, reason: Reads visible text and the accessible relationship on the pointed control.}
+  native:
+  - {check: Desktop WebView hover and dismissal, method: automated, reason: Sends native-runner hover and keyboard actions to the rail.}

@@ -302,6 +302,7 @@ cases:
 - TC-UIC-005-explorer-keyboard-menu
 - TC-UIC-006-detached-appearance
 - TC-UIC-007-page-zoom
+- TC-UIC-008-rail-tooltip
 - TC-MOBILE-001
 - TC-MOBILE-002
 - TC-MOBILE-003

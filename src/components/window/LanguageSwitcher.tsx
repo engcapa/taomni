@@ -43,7 +43,7 @@ export function LanguageSwitcher({ variant = "titlebar", showLabel = true }: { v
       <button
         type="button"
         data-testid="language-switcher"
-        title={title}
+        data-taomni-tooltip={title}
         aria-label={t("language.ariaLabel")}
         className={variant === "rail"
           ? "relative flex min-h-[32px] w-full shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-0 py-1 hover:bg-[var(--taomni-hover)]"

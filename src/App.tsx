@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { VoiceSettingsDialog } from "./components/voice/VoiceSettingsDialog";
+import { installTooltips } from "./components/ui/Tooltip";
 import { MainLayout } from "./layouts/MainLayout";
 import {
   SftpDetachedWindow,
@@ -57,6 +58,7 @@ function App() {
   // App-local fallback for the screenshot hotkey (see screenshotShortcut.ts).
   useScreenshotAppShortcut();
 
+  useEffect(() => installTooltips(document), []);
   useEffect(() => subscribeUiAppearanceStorage(), []);
 
   useEffect(() => {

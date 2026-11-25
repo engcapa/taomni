@@ -285,7 +285,7 @@ function RailIconButton({
       aria-label={ariaLabel ?? label}
       aria-pressed={active}
       data-active={active || undefined}
-      title={label}
+      data-taomni-tooltip={label}
       className="relative flex min-h-[32px] w-full shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-0 py-1 text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--taomni-accent)] data-[active=true]:bg-[var(--taomni-selected)] data-[active=true]:text-[var(--taomni-accent)]"
       onClick={onClick}
     >

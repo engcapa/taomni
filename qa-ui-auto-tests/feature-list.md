@@ -2710,6 +2710,10 @@ controls:
     selector: 'button[aria-label="Cycle application theme"]'
     kind: interactive
     optional: true       # AppThemeIconButton — currently unused outside the title-bar tray
+  - id: desktop-control-tooltip
+    selector: '[role="tooltip"]'
+    kind: display
+    optional: true
   - id: root-theme-attr
     selector: 'html'
     kind: display
