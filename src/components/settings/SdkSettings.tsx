@@ -1,3 +1,4 @@
+import { confirmAppDialog } from "../../lib/appDialogs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -205,8 +206,8 @@ export function SdkSettings() {
     });
   }, [availableDiscoveries, runMutation]);
 
-  const remove = useCallback((installation: SdkInstallation) => {
-    if (!window.confirm(t("settings.sdkRemoveConfirm", { name: installation.name }))) return;
+  const remove = useCallback(async (installation: SdkInstallation) => {
+    if (!await confirmAppDialog({ message: t("settings.sdkRemoveConfirm", { name: installation.name }), danger: true })) return;
     void runMutation(`remove:${installation.id}`, () => sdkRemoveInstallation(installation.id));
   }, [runMutation, t]);
 

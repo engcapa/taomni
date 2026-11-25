@@ -1,3 +1,5 @@
+import { t } from "../../../../lib/i18n";
+import { promptAppDialog } from "../../../../lib/appDialogs";
 import { ChevronDown, ChevronRight, Keyboard, X } from "lucide-react";
 import { ShortcutKeyCaps } from "../ShortcutKeyCaps";
 import type { ActionSnapshotItem } from "../workspaceActionHost";
@@ -165,12 +167,12 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
             data-testid="keymap-scheme-rename"
             className="rounded px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
             disabled={!draftScheme || draftScheme.readOnly}
-            onClick={() => {
+            onClick={async () => {
               if (!draftScheme) return;
-              const name = window.prompt("Scheme name", draftScheme.name);
+              const name = await promptAppDialog({ title: t("uiDecision.schemeName"), initialValue: draftScheme.name });
               if (!name) return;
-              const renamed = { ...draftScheme, name, updatedAt: Date.now() };
-              setDraftSchemes(draftSchemes.map((scheme) => (scheme.id === renamed.id ? renamed : scheme)));
+              setDraftSchemes((schemes) => schemes.map((scheme) =>
+                scheme.id === draftScheme.id ? { ...scheme, name, updatedAt: Date.now() } : scheme));
             }}
           >
             Rename

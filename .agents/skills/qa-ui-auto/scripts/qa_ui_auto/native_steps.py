@@ -1792,6 +1792,13 @@ def _do_assert_attribute(ctx: NativeStepContext, args: Any) -> str:
     return _assert_attribute(ctx, args)
 
 
+@_verb("assert_solid_text_contrast")
+def _do_assert_solid_text_contrast(ctx: NativeStepContext, args: Any) -> str:
+    from .ui_contrast import run_contrast
+
+    return run_contrast(args, lambda expression: ctx.session.execute(f"return ({expression});"), ctx.case_dir)
+
+
 @_verb("assert_element_geometry")
 def _do_assert_element_geometry(ctx: NativeStepContext, args: Any) -> str:
     from .element_geometry import run_geometry

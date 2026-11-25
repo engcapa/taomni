@@ -74,6 +74,11 @@ const dict = {
     ariaLabel: "Switch language",
     pickerTitle: "Choose language",
   },
+  uiDecision: {
+    clearClipboard: "Clear clipboard history for this workspace session?",
+    schemeName: "Scheme name",
+    sendMailBody: "Send this email body to the configured Taomni AI provider?",
+  },
   common: {
     ok: "OK",
     cancel: "Cancel",

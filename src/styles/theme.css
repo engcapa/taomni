@@ -1,4 +1,39 @@
 :root {
+  --taomni-fs-caption: calc(var(--taomni-ui-font-size) - 2px);
+  --taomni-fs-small: calc(var(--taomni-ui-font-size) - 1px);
+  --taomni-fs-body: var(--taomni-ui-font-size);
+  --taomni-fs-title: calc(var(--taomni-ui-font-size) + 2px);
+  --taomni-fs-heading: calc(var(--taomni-ui-font-size) + 4px);
+  --taomni-control-h-sm: max(22px, calc(1em + 6px));
+  --taomni-control-h-md: max(26px, calc(1em + 8px));
+  --taomni-radius-sm: 2px;
+  --taomni-radius-md: 3px;
+  --taomni-radius-lg: 4px;
+  --taomni-z-content: 0;
+  --taomni-z-sticky: 100;
+  --taomni-z-docked-overlay: 500;
+  --taomni-z-popover: 900;
+  --taomni-z-modal: 1000;
+  --taomni-z-menu-over-modal: 1100;
+  --taomni-z-tooltip: 1150;
+  --taomni-z-toast: 1200;
+  --taomni-z-blocking-gate: 1300;
+  --taomni-z-drag-ghost: 1400;
+  --taomni-overlay: rgb(0 0 0 / 40%);
+  --taomni-focus-ring: #1d4ed8;
+  --taomni-primary-bg: #1e40af;
+  --taomni-primary-hover: #1d4ed8;
+  --taomni-primary-active: #1e3a8a;
+  --taomni-primary-text: #ffffff;
+  --taomni-danger: #991b1b;
+  --taomni-danger-bg: #fef2f2;
+  --taomni-danger-border: #b91c1c;
+  --taomni-danger-text: #991b1b;
+  --taomni-danger-icon: var(--taomni-danger-text);
+  --taomni-info-bg: var(--taomni-selected);
+  --taomni-info-border: var(--taomni-primary-bg);
+  --taomni-info-text: var(--taomni-accent);
+  --taomni-info-icon: var(--taomni-info-text);
   --taomni-color-scheme: light;
   --taomni-bg: #f8fafc;
   --taomni-chrome-bg: #f1f5f9;
@@ -172,6 +207,16 @@ button, input, select, textarea, optgroup {
 }
 
 html[data-app-theme="dark"] {
+  --taomni-overlay: rgb(0 0 0 / 55%);
+  --taomni-focus-ring: #93c5fd;
+  --taomni-primary-bg: #8bbcff;
+  --taomni-primary-hover: #a7ceff;
+  --taomni-primary-active: #6aa6f8;
+  --taomni-primary-text: #0f172a;
+  --taomni-danger: #fca5a5;
+  --taomni-danger-bg: #450a0a;
+  --taomni-danger-border: #f87171;
+  --taomni-danger-text: #fecaca;
   --taomni-color-scheme: dark;
   --taomni-bg: #1e1f22;
   --taomni-chrome-bg: #191a1c;

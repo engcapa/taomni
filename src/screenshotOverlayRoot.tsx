@@ -10,7 +10,7 @@ import { AppDialogProvider } from "./lib/appDialogs";
 import { useAppTheme } from "./lib/appTheme";
 import { getAppPlatform } from "./lib/runtime";
 import { useWebviewGuards } from "./lib/webviewGuards";
-import { readUiFontFamily, readUiFontSize } from "./stores/app/preferences";
+import { UI_FONT_FAMILY_KEY, UI_FONT_SIZE_KEY, readUiFontFamily, readUiFontSize } from "./stores/app/preferences";
 
 export function ScreenshotOverlayRoot() {
   const { mode, resolvedTheme } = useAppTheme();
@@ -26,8 +26,16 @@ export function ScreenshotOverlayRoot() {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--taomni-ui-font-family", readUiFontFamily());
-    root.style.setProperty("--taomni-ui-font-size", `${readUiFontSize()}px`);
+    const refresh = () => {
+      root.style.setProperty("--taomni-ui-font-family", readUiFontFamily());
+      root.style.setProperty("--taomni-ui-font-size", `${readUiFontSize()}px`);
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === UI_FONT_FAMILY_KEY || event.key === UI_FONT_SIZE_KEY) refresh();
+    };
+    refresh();
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   return (

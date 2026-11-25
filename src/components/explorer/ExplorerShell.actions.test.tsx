@@ -134,11 +134,11 @@ describe("Explorer mounted context and command workflows", () => {
     expect(native.localTrashRestore).toHaveBeenCalledWith([{ id: "trash-alpha", originalPath: "/fixture/alpha.txt" }]);
   });
 
-  it("cancels without touching disk, focuses permanent for Shift+Delete and degrades when Trash is unavailable", async () => {
+  it("cancels without touching disk, focuses Cancel for Shift+Delete and degrades when Trash is unavailable", async () => {
     const { list } = await mountShell();
     fireEvent.click(row("alpha.txt")); fireEvent.keyDown(list, { key: "Delete", shiftKey: true });
     expect(screen.getByTestId("explorer-delete-dialog")).toHaveTextContent("cannot be undone");
-    expect(document.activeElement).toBe(screen.getByTestId("explorer-delete-confirm"));
+    expect(document.activeElement).toBe(screen.getByTestId("explorer-delete-cancel"));
     expect(native.sftpRemove).not.toHaveBeenCalled(); expect(native.localTrashEntries).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("explorer-delete-cancel"));
     expect(screen.queryByTestId("explorer-delete-dialog")).toBeNull();
@@ -147,6 +147,7 @@ describe("Explorer mounted context and command workflows", () => {
     fireEvent.click(screen.getByTestId("explorer-delete-trash"));
     expect(await screen.findByTestId("explorer-trash-unavailable")).toHaveTextContent("No trash service");
     expect(screen.queryByTestId("explorer-delete-trash")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByTestId("explorer-delete-cancel"));
     expect(native.sftpRemove).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("explorer-delete-confirm"));
     await waitFor(() => expect(native.sftpRemove).toHaveBeenCalledWith(TAB, "/fixture/alpha.txt", "local", true));

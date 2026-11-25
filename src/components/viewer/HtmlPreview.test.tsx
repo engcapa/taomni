@@ -1,3 +1,4 @@
+import { AppDialogProvider } from "../../lib/appDialogs";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ViewerDocument } from "../../lib/viewer";
@@ -279,15 +280,13 @@ describe("HTML preview renderer", () => {
 
   it("asks before one-tab network opt-in when configured and preserves saved/draft distinction", async () => {
     mocks.preferences.htmlNetwork = "ask";
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    render(<HtmlPreview document={doc({ dirty: true })} onError={vi.fn()} />);
+    render(<AppDialogProvider><HtmlPreview document={doc({ dirty: true })} onError={vi.fn()} /></AppDialogProvider>);
     await screen.findByTestId("html-frame");
     fireEvent.click(screen.getByTestId("html-network-allow"));
-    expect(confirm).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
     expect(mocks.open).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByTestId("html-save-refresh"));
     await waitFor(() => expect(mocks.save).toHaveBeenCalledWith("/docs/report.html"));
-    confirm.mockRestore();
   });
 
   it("closes stale late-created tokens and defers initially invisible preview creation", async () => {

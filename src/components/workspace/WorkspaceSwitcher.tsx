@@ -1,3 +1,4 @@
+import { alertAppDialog } from "../../lib/appDialogs";
 import { ChevronDown, Plus } from "lucide-react";
 import { useState } from "react";
 import { ContextMenu } from "../ContextMenu";
@@ -57,7 +58,7 @@ export function WorkspaceSwitcher({ onAddFolder }: WorkspaceSwitcherProps) {
           danger: true,
           onClick: () => {
             if (!deleteWorkspace(workspace.id)) {
-              window.alert(t("platform.defaultWorkspaceLocked"));
+              void alertAppDialog({ message: t("platform.defaultWorkspaceLocked") });
             }
           },
         }]),

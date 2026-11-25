@@ -295,6 +295,8 @@ cases:
 - TC-EXPLORER-010
 - TC-EXPLORER-011
 - TC-EXPLORER-012
+- TC-UIC-001-folder-dialog
+- TC-UIC-002-primary-contrast
 - TC-MOBILE-001
 - TC-MOBILE-002
 - TC-MOBILE-003

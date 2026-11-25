@@ -9,7 +9,8 @@ description: >-
   hashes the real disk and trash payload. WebView input is not physical OS input evidence.
 modes: [browser, native]
 covers: [F-EXPLORER-1, F-WS-2]
-tags: [p0, explorer, tabs, overview, trash, native-boundary, regression]
+ui_standard: [UI-DLG-05, UI-DLG-06]
+tags: [ui-contract, p0, explorer, tabs, overview, trash, native-boundary, regression]
 fixtures: [reset_db, explorer_files]
 timeout_sec: 300
 steps:
@@ -103,10 +104,10 @@ steps:
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="delete-me.txt"]'
 - press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-list"]', key: Shift+Delete}
 - eval_readonly:
-    expression: 'document.activeElement && document.activeElement.dataset.testid === "explorer-delete-confirm"'
+    expression: 'document.activeElement && document.activeElement.dataset.testid === "explorer-delete-cancel"'
     timeout_sec: 10
     expect_truthy: true
-- click: '[data-testid="explorer-delete-cancel"]'
+- press: Enter
 - assert_explorer_files: {state: seeded}
 - press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-list"]', key: Shift+Delete}
 - click: '[data-testid="explorer-delete-confirm"]'
@@ -155,7 +156,8 @@ verification:
     - {step: 54, expectation: Activating an Explorer card selects that Explorer tab.}
     results: [43, 44, 50, 51, 53, 54]
   - id: R4
-    requirement: Delete asks Trash versus permanent first, cancel keeps the file, choosing Trash uses real recoverable trash with Undo, ShiftDelete focuses permanent confirmation and only confirmed permanent deletion removes the file.
+    ui_standard: [UI-DLG-05, UI-DLG-06]
+    requirement: Delete asks Trash versus permanent first, cancel keeps the file, choosing Trash uses real recoverable trash with Undo, ShiftDelete focuses Cancel and Enter keeps the file and only confirmed permanent deletion removes the file.
     actions: [55, 56, 60, 61, 65, 68, 73, 76, 79, 81]
     checkpoints:
     - {step: 59, expectation: Seeded fixture bytes are complete before any delete action.}
@@ -168,7 +170,7 @@ verification:
     - {step: 72, expectation: The exact tree with the trashed file removed matches the fixture oracle.}
     - {step: 74, expectation: Undo restores the original row.}
     - {step: 75, expectation: Undo restores the exact original bytes.}
-    - {step: 78, expectation: ShiftDelete focuses the permanent confirmation.}
+    - {step: 78, expectation: ShiftDelete focuses Cancel.}
     - {step: 80, expectation: Cancelling permanent deletion leaves the restored tree.}
     - {step: 83, expectation: Confirmed permanent deletion removes the row.}
     - {step: 84, expectation: Only the intended fixtured file is permanently deleted.}

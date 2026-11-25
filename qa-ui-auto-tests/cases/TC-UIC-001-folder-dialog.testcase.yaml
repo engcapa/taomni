@@ -1,0 +1,61 @@
+id: TC-UIC-001-folder-dialog
+title: Session folder form owns keyboard focus and only submits a valid name
+covers: [F6.2]
+tags: [ui-contract, session]
+modes: [browser, native]
+fixtures: [reset_db]
+ui_standard: [UI-DLG-03, UI-DLG-04, UI-DLG-05, UI-DLG-06, UI-DLG-07]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ui-folder
+- click: '[data-testid="side-tab-sessions"]'
+- right_click: {selector: '[data-testid="session-tree"]', position: {x: 16, y: 16}}
+- click: '[data-testid="context-menu"] >> text=/new folder|new group|create folder/i'
+- wait_for: '[data-testid="folder-name-dialog"][aria-modal="true"][aria-labelledby]'
+- eval_readonly: {expression: 'document.activeElement?.dataset.testid === "folder-name-dialog-input"', expect_truthy: true}
+- fill: {selector: '[data-testid="folder-name-dialog-input"]', value: ''}
+- assert_disabled: '[data-testid="folder-name-dialog-confirm"]'
+- press: Enter
+- assert_visible: '[data-testid="folder-name-dialog"]'
+- press: Shift+Tab
+- eval_readonly: {expression: 'document.activeElement?.dataset.testid === "folder-name-dialog-cancel"', expect_truthy: true}
+- press: Tab
+- eval_readonly: {expression: 'document.activeElement?.dataset.testid === "folder-name-dialog-input"', expect_truthy: true}
+- fill: {selector: '[data-testid="folder-name-dialog-input"]', value: 'QA discarded folder'}
+- press: Escape
+- assert_not_visible: '[data-testid="folder-name-dialog"]'
+- assert_count: {selector: '[data-testid="session-tree"] [data-folder-path="QA discarded folder"]', equal: 0}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    ui_standard: [UI-DLG-03, UI-DLG-06]
+    requirement: Opening New folder mounts a named modal and selects the name input.
+    actions: [4, 5]
+    checkpoints:
+    - {step: 6, expectation: The modal references its heading.}
+    - {step: 7, expectation: The input owns focus.}
+    results: [6, 7]
+  - id: R2
+    ui_standard: [UI-DLG-05, UI-DLG-07]
+    requirement: An empty name cannot submit. Focus wraps in both directions around the disabled action.
+    actions: [8, 10, 12, 14]
+    checkpoints:
+    - {step: 9, expectation: Confirm is disabled.}
+    - {step: 11, expectation: Enter keeps the form open.}
+    - {step: 13, expectation: Backward Tab reaches Cancel.}
+    - {step: 15, expectation: Forward Tab returns to the input.}
+    results: [9, 11, 13, 15]
+  - id: R3
+    ui_standard: [UI-DLG-04]
+    requirement: Escape dismisses the draft without creating a folder.
+    actions: [16, 17]
+    checkpoints:
+    - {step: 18, expectation: The form is closed.}
+    - {step: 19, expectation: The tree contains no discarded folder.}
+    results: [18, 19]
+  visual:
+  - {check: Dialog positioning at the minimum window size, method: manual, reason: This case checks focus and semantics.}
+  native:
+  - {check: Physical keyboard delivery, method: external, reason: WebDriver exercises the packaged WebView focus chain.}

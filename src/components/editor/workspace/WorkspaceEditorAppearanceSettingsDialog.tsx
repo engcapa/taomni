@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { t } from "../../../lib/i18n";
+import { confirmAppDialog } from "../../../lib/appDialogs";
+import { useEffect, useState } from "react";
 import { RotateCcw, X } from "lucide-react";
 import {
   cloneEditorAppearanceProfile,
@@ -36,7 +38,6 @@ export function WorkspaceEditorAppearanceSettingsDialog({
   const [draft, setDraft] = useState(() => cloneEditorAppearanceProfile(profile));
   const [softWrapPatterns, setSoftWrapPatterns] = useState(() => listText(profile.softWrap.patterns));
   const [breadcrumbLanguages, setBreadcrumbLanguages] = useState(() => listText(profile.breadcrumbs.languages));
-  const clearButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -386,13 +387,11 @@ export function WorkspaceEditorAppearanceSettingsDialog({
             {onClearClipboardHistory && (
               <div className="pt-1">
                 <button
-                  ref={clearButtonRef}
                   type="button"
                   data-testid="workspace-editor-appearance-clipboard-clear"
-                  onClick={() => {
-                    if (window.confirm("Clear clipboard history for current workspace session?")) {
+                  onClick={async () => {
+                    if (await confirmAppDialog({ danger: true, message: t("uiDecision.clearClipboard") })) {
                       onClearClipboardHistory();
-                      clearButtonRef.current?.focus();
                     }
                   }}
                   className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-3 py-1 hover:bg-[var(--taomni-code-active-line-bg)]"

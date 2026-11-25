@@ -43,10 +43,10 @@ export function SessionEditorView(props: SessionEditorViewProps) {
           }}
         >
           <Bookmark className="w-3.5 h-3.5 mr-1.5" />
-          <div className="text-[12px] font-semibold">
+          <div className="text-[length:var(--taomni-fs-body)] font-semibold">
             {form.isEdit ? form.t("sessionEditor2.titleEdit") : form.t("sessionEditor2.titleNew")}
           </div>
-          <div className="ml-auto flex items-center gap-2 text-[11px] opacity-95">
+          <div className="ml-auto flex items-center gap-2 text-[length:var(--taomni-fs-small)] opacity-95">
             <button
               data-testid="session-help"
               title={form.t("sessionEditor2.helpTitle")}
@@ -129,7 +129,7 @@ export function SessionEditorView(props: SessionEditorViewProps) {
         {form.isPlannedClient && (
           <div
             data-testid="session-planned-client-note"
-            className="mx-4 mt-3 px-3 py-2 rounded border text-[12px]"
+            className="mx-4 mt-3 px-3 py-2 rounded border text-[length:var(--taomni-fs-body)]"
             style={{
               borderColor: "var(--taomni-input-border)",
               background: "var(--taomni-panel-bg)",
@@ -148,14 +148,14 @@ export function SessionEditorView(props: SessionEditorViewProps) {
             style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
           >
             <div
-              className="text-[12px] font-semibold mb-2 flex items-center gap-2"
+              className="text-[length:var(--taomni-fs-body)] font-semibold mb-2 flex items-center gap-2"
               style={{ color: "var(--taomni-accent)" }}
             >
               <Wifi className="w-3.5 h-3.5" />
               {form.t("sessionEditor2.basicSerialTitle")}
             </div>
             <div className="grid grid-cols-12 gap-2 items-center">
-              <label className="col-span-2 text-[12px] text-right" htmlFor="session-serial-device">
+              <label className="col-span-2 text-[length:var(--taomni-fs-body)] text-right" htmlFor="session-serial-device">
                 {form.t("sessionEditor2.serialDeviceLabel")}
               </label>
               <input
@@ -167,7 +167,7 @@ export function SessionEditorView(props: SessionEditorViewProps) {
                 aria-label={form.t("sessionEditor2.serialDeviceLabel")}
                 placeholder={form.t("sessionEditor2.serialDevicePlaceholder")}
               />
-              <label className="col-span-2 text-[12px] text-right" htmlFor="session-serial-baud">
+              <label className="col-span-2 text-[length:var(--taomni-fs-body)] text-right" htmlFor="session-serial-baud">
                 {form.t("sessionEditor2.serialBaudLabel")}
               </label>
               <input
@@ -180,7 +180,7 @@ export function SessionEditorView(props: SessionEditorViewProps) {
                 aria-label={form.t("sessionEditor2.serialBaudLabel")}
                 placeholder="115200"
               />
-              <div className="col-span-12 text-[11px] text-[var(--taomni-text-muted)]">
+              <div className="col-span-12 text-[length:var(--taomni-fs-small)] text-[var(--taomni-text-muted)]">
                 {form.t("sessionEditor2.serialHint")}
               </div>
             </div>
@@ -194,14 +194,14 @@ export function SessionEditorView(props: SessionEditorViewProps) {
             style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
           >
             <div
-              className="text-[12px] font-semibold mb-2 flex items-center gap-2"
+              className="text-[length:var(--taomni-fs-body)] font-semibold mb-2 flex items-center gap-2"
               style={{ color: "var(--taomni-accent)" }}
             >
               <FileText className="w-3.5 h-3.5" />
               {form.t("sessionEditor2.basicFileTitle")}
             </div>
             <div className="grid grid-cols-12 gap-2 items-center">
-              <label className="col-span-2 text-[12px] text-right">
+              <label className="col-span-2 text-[length:var(--taomni-fs-body)] text-right">
                 {form.t("sessionEditor2.fileTargetLabel")}
               </label>
               <div className="col-span-10 flex items-center gap-1">
@@ -230,7 +230,7 @@ export function SessionEditorView(props: SessionEditorViewProps) {
                   <FileText className="w-3.5 h-3.5 inline -mt-0.5" />
                 </button>
               </div>
-              <div className="col-span-12 text-[11px] text-[var(--taomni-text-muted)]">
+              <div className="col-span-12 text-[length:var(--taomni-fs-small)] text-[var(--taomni-text-muted)]">
                 {form.t("sessionEditor2.fileTargetHint")}
               </div>
             </div>
@@ -244,7 +244,7 @@ export function SessionEditorView(props: SessionEditorViewProps) {
             style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
           >
             <div
-              className="text-[12px] font-semibold mb-2 flex items-center gap-2"
+              className="text-[length:var(--taomni-fs-body)] font-semibold mb-2 flex items-center gap-2"
               style={{ color: "var(--taomni-accent)" }}
             >
               <TerminalIcon className="w-3.5 h-3.5" />
@@ -267,7 +267,7 @@ export function SessionEditorView(props: SessionEditorViewProps) {
             style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
           >
             <div
-              className="text-[12px] font-semibold mb-2 flex items-center gap-2"
+              className="text-[length:var(--taomni-fs-body)] font-semibold mb-2 flex items-center gap-2"
               style={{ color: "var(--taomni-accent)" }}
             >
               <TerminalIcon className="w-3.5 h-3.5" />
@@ -375,9 +375,9 @@ export function SessionEditorView(props: SessionEditorViewProps) {
 
             {(form.testResult || form.saveError) && (
               <span
-                className="text-[11px] min-w-0 max-w-[280px] truncate"
+                className="text-[length:var(--taomni-fs-small)] min-w-0 max-w-[280px] truncate"
                 title={form.saveError ?? form.testResult?.msg}
-                style={{ color: form.testResult?.ok && !form.saveError ? "#2f8a3e" : "#b22222" }}
+                style={{ color: form.testResult?.ok && !form.saveError ? "var(--taomni-success-text)" : "var(--taomni-danger-text)" }}
                 data-testid="session-test-result-summary"
               >
                 {form.saveError ?? form.testResult?.msg}
@@ -385,7 +385,7 @@ export function SessionEditorView(props: SessionEditorViewProps) {
             )}
 
             <span
-              className="min-w-0 basis-40 flex-1 truncate text-[11px] text-[var(--taomni-text-muted)]"
+              className="min-w-0 basis-40 flex-1 truncate text-[length:var(--taomni-fs-small)] text-[var(--taomni-text-muted)]"
               title={`${form.t("sessionEditor2.willBeSavedTo")} ${form.groupPath ? folderOptionLabel(form.groupPath) : SESSION_ROOT_LABEL} / ${form.name || form.host || "..."}`}
             >
               {form.t("sessionEditor2.willBeSavedTo")}{" "}
@@ -402,7 +402,7 @@ export function SessionEditorView(props: SessionEditorViewProps) {
                 className="taomni-btn"
                 onClick={actions.handleDelete}
                 type="button"
-                style={{ color: "#b22222" }}
+                style={{ color: "var(--taomni-danger-text)" }}
               >
                 {form.t("sessionEditor2.delete")}
               </button>

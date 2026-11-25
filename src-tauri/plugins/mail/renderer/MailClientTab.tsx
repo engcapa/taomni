@@ -1,3 +1,4 @@
+import { t } from "../../../../src/lib/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 import { selectUploadFile } from "../../../../src/lib/ipc";
 import {
@@ -428,7 +429,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
     if (!currentBody) return;
     if (!info.ai.skipBodyConfirm) {
-      const confirmed = window.confirm("Send this email body to the configured Taomni AI provider?");
+      const confirmed = await confirmDialog.confirm({ message: t("uiDecision.sendMailBody"), danger: true });
       if (!confirmed) return;
     }
     try {

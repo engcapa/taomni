@@ -1140,6 +1140,15 @@
         "eval_readonly": {
           "$ref": "#/$defs/eval_readonly_arg"
         },
+        "assert_solid_text_contrast": {
+          "type": "object",
+          "required": ["selector", "minimum"],
+          "additionalProperties": false,
+          "properties": {
+            "selector": {"$ref": "#/$defs/selector"},
+            "minimum": {"type": "number", "minimum": 1, "maximum": 21}
+          }
+        },
         "assert_element_geometry": {
           "type": "object",
           "additionalProperties": false,

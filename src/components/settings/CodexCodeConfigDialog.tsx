@@ -1,3 +1,4 @@
+import { confirmAppDialog } from "../../lib/appDialogs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
@@ -154,11 +155,11 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
     if (!activeProfileId) setActiveProfileId(id);
   };
 
-  const deleteProfile = (id: string, e: React.MouseEvent) => {
+  const deleteProfile = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const p = profiles.find((x) => x.id === id);
     if (!p) return;
-    if (!window.confirm(t("aiSettings.ccCustomConfirmDelete", { name: p.name }))) return;
+    if (!await confirmAppDialog({ message: t("aiSettings.ccCustomConfirmDelete", { name: p.name }), danger: true })) return;
     setDeleted((cur) => new Set(cur).add(id));
     if (selectedProfileId === id) {
       const rest = sortedProfiles.filter((x) => x.id !== id);

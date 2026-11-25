@@ -1,3 +1,4 @@
+import { AppDialogProvider } from "../../lib/appDialogs";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -143,14 +144,15 @@ describe("SdkSettings", () => {
 
   it("changes defaults and removes an installation after confirmation", async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(<SdkSettings />);
+    render(<AppDialogProvider><SdkSettings /></AppDialogProvider>);
     await screen.findByTestId("sdk-row-jdk-21");
 
     fireEvent.change(screen.getByTestId("sdk-default-java"), { target: { value: "" } });
     await waitFor(() => expect(sdkMocks.setDefault).toHaveBeenCalledWith("java", null));
 
     await user.click(screen.getByRole("button", { name: "Remove Temurin 21" }));
+    expect(sdkMocks.remove).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("confirm-dialog-confirm"));
     await waitFor(() => expect(sdkMocks.remove).toHaveBeenCalledWith("jdk-21"));
   });
 });

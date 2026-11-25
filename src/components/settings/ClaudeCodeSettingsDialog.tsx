@@ -1,3 +1,4 @@
+import { confirmAppDialog } from "../../lib/appDialogs";
 import { useEffect, useState, useRef } from "react";
 import { Sliders, Loader2, X, Plus, Trash2, Shield, AlertTriangle } from "lucide-react";
 import { useAiStore, CcCustomSettingsProfile } from "../../stores/aiStore";
@@ -234,12 +235,12 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
     }
   };
 
-  const handleDeleteProfile = (id: string, e: React.MouseEvent) => {
+  const handleDeleteProfile = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const profile = profiles.find(p => p.id === id);
     if (!profile) return;
 
-    if (!window.confirm(t("aiSettings.ccCustomConfirmDelete", { name: profile.name }))) {
+    if (!await confirmAppDialog({ message: t("aiSettings.ccCustomConfirmDelete", { name: profile.name }), danger: true })) {
       return;
     }
 

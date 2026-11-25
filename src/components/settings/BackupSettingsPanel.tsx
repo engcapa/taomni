@@ -1,3 +1,4 @@
+import { confirmAppDialog } from "../../lib/appDialogs";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import type { BackupManifest } from "../../lib/backup";
@@ -226,7 +227,7 @@ export function BackupSettingsPanel() {
   };
 
   const handleDeleteItem = async (fileName: string) => {
-    if (window.confirm(t("backupSettings.confirmDelete"))) {
+    if (await confirmAppDialog({ message: t("backupSettings.confirmDelete"), danger: true })) {
       try {
         await deleteBackup(fileName);
       } catch (e) {

@@ -181,6 +181,14 @@ def step_assert_count(ctx: StepContext, args: Any) -> None:
         raise StepError(f"{selector}: expected ≤{args['max']}, got {count}")
 
 
+@verb("assert_solid_text_contrast")
+def step_assert_solid_text_contrast(ctx: StepContext, args: Any) -> None:
+    from ..ui_contrast import run_contrast
+
+    if not ctx.dry_run:
+        run_contrast(args, lambda expression: ctx.page.evaluate(f"() => ({expression})"), ctx.case_dir)
+
+
 @verb("assert_element_geometry")
 def step_assert_element_geometry(ctx: StepContext, args: Any) -> None:
     if ctx.dry_run:

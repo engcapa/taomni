@@ -73,6 +73,11 @@ export const zhCN: DeepPartial<typeof en> = {
     ariaLabel: "切换语言",
     pickerTitle: "选择语言",
   },
+  uiDecision: {
+    clearClipboard: "清空当前工作区会话的剪贴板历史？",
+    schemeName: "方案名称",
+    sendMailBody: "将这封邮件的正文发送给已配置的 Taomni AI 提供方？",
+  },
   common: {
     ok: "确定",
     cancel: "取消",

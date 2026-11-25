@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useId, useState, type ReactNode } from "react";
+import { Modal } from "../ui/Modal";
 import { useT } from "../../lib/i18n";
 
 export interface ConfirmDialogProps {
@@ -145,284 +146,52 @@ export function useTextInputDialog(): {
   };
 }
 
-// Drop-in replacement for window.confirm. Tauri 2's macOS WKWebView ignores
-// window.confirm/alert by default, so any flow that relied on them silently
-// no-ops on macOS. This in-app dialog renders as a normal React modal so it
-// works uniformly on every platform without pulling in tauri-plugin-dialog.
-export function ConfirmDialog({
-  title,
-  message,
-  confirmLabel,
-  cancelLabel,
-  danger = false,
-  onCancel,
-  onConfirm,
-}: ConfirmDialogProps) {
+export function ConfirmDialog({ title, message, confirmLabel, cancelLabel, danger, onCancel, onConfirm }: ConfirmDialogProps) {
   const t = useT();
-  const confirmRef = useRef<HTMLButtonElement>(null);
-  const resolvedTitle = title ?? t("common.confirm");
-  const resolvedConfirm = confirmLabel ?? t("common.ok");
-  const resolvedCancel = cancelLabel ?? t("common.cancel");
-
-  useEffect(() => {
-    confirmRef.current?.focus();
-  }, []);
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      onCancel();
-    } else if (event.key === "Enter") {
-      const target = event.target as HTMLElement;
-      if (target.tagName !== "BUTTON") {
-        event.preventDefault();
-        onConfirm();
-      }
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-[950] flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)" }}
-      onClick={onCancel}
-      onKeyDown={handleKeyDown}
-    >
-      <div
-        role="dialog"
-        aria-label={resolvedTitle}
-        aria-modal="true"
-        data-testid="confirm-dialog"
-        className="w-[420px] rounded shadow-lg p-4"
-        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="text-sm font-semibold mb-3">{resolvedTitle}</div>
-        <div
-          data-testid="confirm-dialog-message"
-          className="text-[12px] mb-4 whitespace-pre-line"
-          style={{ color: "var(--taomni-text)" }}
-        >
-          {message}
-        </div>
-        <div className="flex gap-2 justify-end">
-          <button
-            type="button"
-            data-testid="confirm-dialog-cancel"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
-            onClick={onCancel}
-          >
-            {resolvedCancel}
-          </button>
-          <button
-            ref={confirmRef}
-            type="button"
-            data-testid="confirm-dialog-confirm"
-            className="px-3 py-1 text-[12px] rounded text-white"
-            style={{ background: danger ? "#b22222" : "var(--taomni-accent)" }}
-            onClick={onConfirm}
-          >
-            {resolvedConfirm}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return <Modal title={title ?? t("common.confirm")} testId="confirm-dialog"
+    initialFocus={danger ? '[data-testid="confirm-dialog-cancel"]' : '[data-testid="confirm-dialog-confirm"]'}
+    onCancel={onCancel} footer={<>
+      <button type="button" className="taomni-btn" data-testid="confirm-dialog-cancel" onClick={onCancel}>{cancelLabel ?? t("common.cancel")}</button>
+      <button type="button" className="taomni-btn" data-primary={!danger} data-danger={danger}
+        data-testid="confirm-dialog-confirm" onClick={onConfirm}>{confirmLabel ?? t("common.ok")}</button>
+    </>}>
+    <p data-testid="confirm-dialog-message">{message}</p>
+  </Modal>;
 }
 
-export function ChoiceDialog({
-  title,
-  message,
-  primaryLabel,
-  secondaryLabel,
-  cancelLabel,
-  danger = false,
-  onCancel,
-  onPrimary,
-  onSecondary,
-}: ChoiceDialogProps) {
+export function ChoiceDialog({ title, message, primaryLabel, secondaryLabel, cancelLabel, danger, onCancel, onPrimary, onSecondary }: ChoiceDialogProps) {
   const t = useT();
-  const primaryRef = useRef<HTMLButtonElement>(null);
-  const resolvedTitle = title ?? t("common.confirm");
-  const resolvedCancel = cancelLabel ?? t("common.cancel");
-
-  useEffect(() => {
-    primaryRef.current?.focus();
-  }, []);
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      onCancel();
-    } else if (event.key === "Enter") {
-      const target = event.target as HTMLElement;
-      if (target.tagName !== "BUTTON") {
-        event.preventDefault();
-        onPrimary();
-      }
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-[950] flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)" }}
-      onClick={onCancel}
-      onKeyDown={handleKeyDown}
-    >
-      <div
-        role="dialog"
-        aria-label={resolvedTitle}
-        aria-modal="true"
-        data-testid="choice-dialog"
-        className="w-[460px] rounded shadow-lg p-4"
-        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="text-sm font-semibold mb-3">{resolvedTitle}</div>
-        <div
-          data-testid="choice-dialog-message"
-          className="text-[12px] mb-4 whitespace-pre-line"
-          style={{ color: "var(--taomni-text)" }}
-        >
-          {message}
-        </div>
-        <div className="flex gap-2 justify-end">
-          <button
-            type="button"
-            data-testid="choice-dialog-cancel"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
-            onClick={onCancel}
-          >
-            {resolvedCancel}
-          </button>
-          <button
-            type="button"
-            data-testid="choice-dialog-secondary"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
-            style={{ border: "1px solid var(--taomni-divider)" }}
-            onClick={onSecondary}
-          >
-            {secondaryLabel}
-          </button>
-          <button
-            ref={primaryRef}
-            type="button"
-            data-testid="choice-dialog-primary"
-            className="px-3 py-1 text-[12px] rounded text-white"
-            style={{ background: danger ? "#b22222" : "var(--taomni-accent)" }}
-            onClick={onPrimary}
-          >
-            {primaryLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return <Modal title={title ?? t("common.confirm")} testId="choice-dialog"
+    initialFocus={danger ? '[data-testid="choice-dialog-cancel"]' : '[data-testid="choice-dialog-primary"]'}
+    onCancel={onCancel} footer={<>
+      <button type="button" className="taomni-btn" data-testid="choice-dialog-cancel" onClick={onCancel}>{cancelLabel ?? t("common.cancel")}</button>
+      <button type="button" className="taomni-btn" data-testid="choice-dialog-secondary" onClick={onSecondary}>{secondaryLabel}</button>
+      <button type="button" className="taomni-btn" data-primary={!danger} data-danger={danger}
+        data-testid="choice-dialog-primary" onClick={onPrimary}>{primaryLabel}</button>
+    </>}>
+    <p data-testid="choice-dialog-message">{message}</p>
+  </Modal>;
 }
 
-// Async replacement for window.prompt for the same macOS WKWebView reason as
-// ConfirmDialog above.
-export function TextInputDialog({
-  title,
-  label,
-  initialValue = "",
-  placeholder,
-  allowEmpty = false,
-  confirmLabel,
-  cancelLabel,
-  onCancel,
-  onConfirm,
-}: TextInputDialogProps) {
+export function TextInputDialog({ title, label, initialValue = "", placeholder, allowEmpty = false,
+  confirmLabel, cancelLabel, onCancel, onConfirm }: TextInputDialogProps) {
   const t = useT();
   const inputId = useId();
-  const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(initialValue);
-  const resolvedConfirm = confirmLabel ?? t("common.ok");
-  const resolvedCancel = cancelLabel ?? t("common.cancel");
   const canConfirm = allowEmpty || value.trim().length > 0;
-
-  useEffect(() => {
-    setValue(initialValue);
-  }, [initialValue]);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }, []);
-
-  const submit = () => {
-    if (!canConfirm) return;
-    onConfirm(value);
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      onCancel();
-    } else if (event.key === "Enter") {
-      if ((event.nativeEvent as KeyboardEvent).isComposing) return;
-      event.preventDefault();
-      submit();
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-[950] flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)" }}
-      onClick={onCancel}
-      onKeyDown={handleKeyDown}
-    >
-      <div
-        role="dialog"
-        aria-label={title}
-        aria-modal="true"
-        data-testid="text-input-dialog"
-        className="w-[420px] rounded shadow-lg p-4"
-        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="text-sm font-semibold mb-3">{title}</div>
-        <label
-          htmlFor={inputId}
-          className="block text-[12px] mb-1"
-          style={{ color: "var(--taomni-text-muted)" }}
-        >
-          {label ?? title}
-        </label>
-        <input
-          ref={inputRef}
-          id={inputId}
-          data-testid="text-input-dialog-input"
-          className="taomni-input w-full mb-4"
-          value={value}
-          placeholder={placeholder}
-          onChange={(event) => setValue(event.target.value)}
-        />
-        <div className="flex gap-2 justify-end">
-          <button
-            type="button"
-            data-testid="text-input-dialog-cancel"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
-            onClick={onCancel}
-          >
-            {resolvedCancel}
-          </button>
-          <button
-            type="button"
-            data-testid="text-input-dialog-confirm"
-            className="px-3 py-1 text-[12px] rounded text-white disabled:opacity-50"
-            style={{ background: "var(--taomni-accent)" }}
-            onClick={submit}
-            disabled={!canConfirm}
-          >
-            {resolvedConfirm}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return <Modal title={title} testId="text-input-dialog" initialFocus="input" onCancel={onCancel} footer={<>
+    <button type="button" className="taomni-btn" data-testid="text-input-dialog-cancel" onClick={onCancel}>{cancelLabel ?? t("common.cancel")}</button>
+    <button type="button" className="taomni-btn" data-primary="true" data-testid="text-input-dialog-confirm"
+      disabled={!canConfirm} onClick={() => onConfirm(value)}>{confirmLabel ?? t("common.ok")}</button>
+  </>}>
+    <label htmlFor={inputId}>{label ?? title}</label>
+    <input id={inputId} className="taomni-input w-full" data-testid="text-input-dialog-input" value={value}
+      placeholder={placeholder} onChange={(event) => setValue(event.target.value)} onKeyDown={(event) => {
+        if (event.key !== "Enter" || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+        event.preventDefault();
+        if (canConfirm) onConfirm(value);
+      }} />
+  </Modal>;
 }
 
 export type AlertDialogTone = "default" | "success" | "error";
@@ -431,86 +200,16 @@ export interface AlertDialogProps {
   title?: string;
   message: string;
   okLabel?: string;
-  /** Visual cue for connection test outcomes and similar notices. */
   tone?: AlertDialogTone;
   onClose: () => void;
 }
 
-export function AlertDialog({
-  title,
-  message,
-  okLabel,
-  tone = "default",
-  onClose,
-}: AlertDialogProps) {
+export function AlertDialog({ title, message, okLabel, tone = "default", onClose }: AlertDialogProps) {
   const t = useT();
-  const okRef = useRef<HTMLButtonElement>(null);
-  const resolvedTitle = title ?? t("common.message");
-  const resolvedOk = okLabel ?? t("common.ok");
-  const titleColor =
-    tone === "success" ? "#2f8a3e" : tone === "error" ? "#b22222" : "var(--taomni-text)";
-  const accent =
-    tone === "success" ? "#2f8a3e" : tone === "error" ? "#b22222" : "var(--taomni-accent)";
-
-  useEffect(() => {
-    okRef.current?.focus();
-  }, []);
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape" || event.key === "Enter") {
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
-    }
-  };
-
-  return (
-    // True modal: backdrop dims the app but does NOT dismiss on outside click.
-    // Users often need to select/copy long error text; accidental outside clicks
-    // must not discard the message. Close only via OK or Escape (or Enter).
-    <div
-      className="fixed inset-0 z-[950] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.4)" }}
-      onKeyDown={handleKeyDown}
-      role="presentation"
-    >
-      <div
-        role="alertdialog"
-        aria-label={resolvedTitle}
-        aria-modal="true"
-        data-testid="alert-dialog"
-        data-tone={tone}
-        className="w-[520px] max-w-[min(520px,92vw)] max-h-[min(80vh,720px)] flex flex-col rounded shadow-lg p-4"
-        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
-      >
-        <div className="text-sm font-semibold mb-3 shrink-0" style={{ color: titleColor }}>
-          {resolvedTitle}
-        </div>
-        <div
-          data-testid="alert-dialog-message"
-          className="text-[12px] mb-4 min-h-0 overflow-auto whitespace-pre-wrap break-words taomni-mono select-text"
-          style={{
-            color: "var(--taomni-text)",
-            maxHeight: "min(50vh, 420px)",
-            lineHeight: 1.45,
-            userSelect: "text",
-          }}
-        >
-          {message}
-        </div>
-        <div className="flex gap-2 justify-end shrink-0">
-          <button
-            ref={okRef}
-            type="button"
-            data-testid="alert-dialog-ok"
-            className="px-3 py-1 text-[12px] rounded text-white"
-            style={{ background: accent }}
-            onClick={onClose}
-          >
-            {resolvedOk}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return <Modal title={title ?? t("common.message")} role="alertdialog" testId="alert-dialog" initialFocus="button"
+    tone={tone} onCancel={onClose} footer={
+      <button type="button" data-testid="alert-dialog-ok" className="taomni-btn" data-primary="true" onClick={onClose}>{okLabel ?? t("common.ok")}</button>
+    }>
+    <p data-testid="alert-dialog-message" className="taomni-mono">{message}</p>
+  </Modal>;
 }

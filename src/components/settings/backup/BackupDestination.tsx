@@ -1,3 +1,4 @@
+import { confirmAppDialog } from "../../../lib/appDialogs";
 import { useEffect, useState } from "react";
 import { useT } from "../../../lib/i18n";
 import type { BackupTarget, FeishuApplication } from "../../../lib/remoteBackup";
@@ -74,7 +75,7 @@ export function BackupDestination({ target, applications, initiallyOpen = false 
       </div>}
       {status?.error && <BackupError error={status.error} t={t} />}
       {error && <BackupError error={error} t={t} />}
-      <button data-testid="backup-cloud-remove" className={backupButton} disabled={busy || sessions.some((s) => s.targetId === target.id && authBlocking(s))} onClick={() => { if (window.confirm(t("backupUnified.removeConfirm"))) editControl({ op: "removeTarget", targetId: target.id }); }}>{t("backupUnified.removeDestination")}</button>
+      <button data-testid="backup-cloud-remove" className={backupButton} disabled={busy || sessions.some((s) => s.targetId === target.id && authBlocking(s))} onClick={async () => { if (await confirmAppDialog({ message: t("backupUnified.removeConfirm"), danger: true })) editControl({ op: "removeTarget", targetId: target.id }); }}>{t("backupUnified.removeDestination")}</button>
     </div>
   </details>;
 }
