@@ -24,6 +24,7 @@ from qa_ui_auto.fixtures.module_upgrade import input_sessions
 from qa_ui_auto.legacy_install import command, macos_install, windows_install
 from qa_ui_auto.legacy_process import initialize_profile
 from qa_ui_auto.legacy_release import RELEASE_VERSION, first_upgrade_version, selected_asset, verify_asset
+from qa_ui_auto.module_marketplace_observation import observe_legacy_roster
 
 
 def install(package, slot, evidence, version):
@@ -258,6 +259,21 @@ def execute(args):
             raise RuntimeError("The installed upgrade did not establish both macOS grants under the same identity")
         if resource_failures:
             raise RuntimeError(f"Installed core resource samples are incomplete: {resource_failures}")
+        if origin:
+            if system == "Darwin":
+                rollback.parents[2].rename(work / "rollback.app")
+            reopened, stages["candidateReinstall"] = install(package, slot, report / "candidate-reinstall", version)
+            if reopened != candidate or stages["candidateReinstall"]["binarySha256"] != stages["candidate"]["binarySha256"]:
+                raise RuntimeError("Re-upgrade did not restore the verified candidate executable in place")
+            if system == "Windows":
+                require_registration(msi_registration(old_package, report, "original-after-reinstall"),
+                                     msi_registration(package, report, "candidate-after-reinstall"), upgraded=True)
+            stages["afterReinstall"] = start_profile(
+                reopened, profile, work, report, "candidate-reinstalled-reopen", expected_rows,
+                stages["afterRollback"]["retainedFiles"],
+            )
+            stages["afterReinstall"]["enrollment"] = installed_first_release.enrollment(profile, origin)
+            stages["afterReinstall"]["activePointers"] = observe_legacy_roster(profile / "plugins", origin, "mail")
         result.update(passed=True, sessionTypes=[row["session_type"] for row in expected_rows], retainedFiles=retained)
     finally:
         if origin:

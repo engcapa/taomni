@@ -157,15 +157,22 @@ jobs:
             args+=(--first-upgrade)
           fi
           python -m qa_ui_auto.legacy_release legacy-input "${args[@]}"
+      - name: Check out the package producer for the RDP probe
+        if: inputs.verify_rdp_perf
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.package_source }}
+          path: rdp-probe-source
+          persist-credentials: false
       - name: Build the standalone release RDP probe
         if: inputs.verify_rdp_perf
         run: |
           sudo apt-get -o Acquire::Retries=3 update
           sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends libasound2-dev libpipewire-0.3-dev libclang-dev python3-tk
-          cargo build --locked --release --manifest-path src-tauri/Cargo.toml --package taomni-rdp-probe
+          (cd rdp-probe-source && cargo build --locked --release --manifest-path src-tauri/Cargo.toml --package taomni-rdp-probe)
           mkdir -p installed-mfa-evidence/rdp-probe
-          git rev-parse HEAD > installed-mfa-evidence/rdp-probe/source-sha.txt
-          sha256sum src-tauri/target/release/rdp-probe > installed-mfa-evidence/rdp-probe/sha256.txt
+          git -C rdp-probe-source rev-parse HEAD > installed-mfa-evidence/rdp-probe/source-sha.txt
+          sha256sum rdp-probe-source/src-tauri/target/release/rdp-probe > installed-mfa-evidence/rdp-probe/sha256.txt
       - name: Exercise apt replacement, signed module migration and rollback
         env:
           VERIFY_RELOCATION: ${{ inputs.verify_relocation }}
@@ -179,7 +186,7 @@ jobs:
           python -m unittest test_installed_mfa_crash test_installed_mfa_mode_lease
           if [[ "$VERIFY_RDP_PERF" == true ]]; then
             python -m unittest test_installed_rdp_baseline
-            extra+=(--rdp-probe src-tauri/target/release/rdp-probe)
+            extra+=(--rdp-probe rdp-probe-source/src-tauri/target/release/rdp-probe)
           fi
           if [[ "$VERIFY_RELOCATION" == true ]]; then
             python -m unittest test_installed_mfa_profile test_installed_linux_formats
