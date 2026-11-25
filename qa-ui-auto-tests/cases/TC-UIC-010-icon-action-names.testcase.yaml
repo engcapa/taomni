@@ -19,7 +19,7 @@ steps:
 - wait_for: '[data-testid="launch-menu-new-session"]'
 - press: Escape
 - assert_not_visible: '[data-testid="launch-menu-new-session"]'
-- hover: '[data-testid="new-local-terminal"]'
+- hover: {selector: '[data-testid="new-local-terminal"]', macos_system_pointer: true}
 - wait_for: '[data-testid="new-local-terminal"][aria-describedby~="taomni-control-tooltip"]'
 - assert_text: {selector: '[role="tooltip"]', contains: 新建标签页}
 - press: Escape

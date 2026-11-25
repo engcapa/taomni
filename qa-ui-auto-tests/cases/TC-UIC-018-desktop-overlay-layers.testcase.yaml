@@ -7,7 +7,7 @@ fixtures: [reset_db]
 ui_standard: [UI-FND-09, UI-DLG-01]
 steps:
 - open: ${cfg.app.base_url}
-- vault_first_run: qa-overlay-layers
+- wait_for: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
@@ -23,6 +23,7 @@ steps:
 - assert_focus_on: '[data-testid="explorer-tabs-filter-trigger"]'
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
 - vault_first_run: qa-overlay-layers
 - click: '[data-testid="mfa-empty-add-secret"]'
 - wait_for: '[data-testid="mfa-secret-form"]'
@@ -37,15 +38,15 @@ verification:
   - id: modal-backdrops
     requirement: An application form and an independently packaged module resolve the same backdrop color and stacking level.
     ui_standard: [UI-DLG-01, UI-FND-09]
-    actions: [4, 8, 19, 23]
+    actions: [4, 8, 20, 24]
     checkpoints:
     - {step: 6, expectation: The session form paints the shared translucent backdrop.}
     - {step: 7, expectation: The form uses the modal layer.}
     - {step: 9, expectation: Cancel removes the session form.}
-    - {step: 21, expectation: MFA paints the same backdrop.}
-    - {step: 22, expectation: MFA resolves the same modal layer.}
-    - {step: 24, expectation: Closing MFA returns to the empty account page.}
-    results: [6, 7, 9, 21, 22, 24]
+    - {step: 22, expectation: MFA paints the same backdrop.}
+    - {step: 23, expectation: MFA resolves the same modal layer.}
+    - {step: 25, expectation: Closing MFA returns to the empty account page.}
+    results: [6, 7, 9, 22, 23, 25]
   - id: filter-popover
     requirement: Open-tab search is a popover below the modal layer and returns focus on Escape.
     ui_standard: [UI-FND-09]

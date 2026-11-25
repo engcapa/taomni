@@ -9,6 +9,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
 - vault_first_run: qa-section-tabs
 - click: '[data-testid="mfa-empty-add-secret"]'
 - wait_for: '[data-testid="mfa-secret-form"]'
@@ -22,13 +23,13 @@ steps:
 - press: Escape
 - click: '[data-testid="side-tab-explorer"]'
 - click: '[data-testid="explorer-tab-new-notepad"]'
-- click: '[data-testid="notepad-tool-find"]'
-- press: {selector: '[data-testid="np-find-tab-find"]', key: ArrowRight}
-- assert_visible: '[data-testid="np-find-replace-input"]'
-- assert_focus_on: '[data-testid="np-find-tab-replace"]'
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="notepad-tool-find"]'
+- press: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="np-find-tab-find"]', key: ArrowRight}
+- assert_visible: '[data-testid="file-viewer"][data-active="true"] [data-testid="np-find-replace-input"]'
+- assert_focus_on: '[data-testid="file-viewer"][data-active="true"] [data-testid="np-find-tab-replace"]'
 - press: Home
-- assert_not_visible: '[data-testid="np-find-replace-input"]'
-- assert_attribute: {selector: '[data-testid="np-find-tab-find"]', name: aria-selected, equals: 'true'}
+- assert_not_visible: '[data-testid="file-viewer"][data-active="true"] [data-testid="np-find-replace-input"]'
+- assert_attribute: {selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="np-find-tab-find"]', name: aria-selected, equals: 'true'}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -36,24 +37,24 @@ verification:
   - id: module-tabs
     ui_standard: [UI-TAB-02]
     requirement: MFA reveals the chosen entry method and keeps the selected tab as the keyboard stop.
-    actions: [5, 7, 11]
+    actions: [6, 8, 12]
     checkpoints:
-    - {step: 8, expectation: Image import is visible.}
-    - {step: 9, expectation: The image tab keeps keyboard focus.}
-    - {step: 10, expectation: The former tab leaves the Tab order.}
-    - {step: 12, expectation: Home reopens the form.}
-    - {step: 13, expectation: The secret tab retains focus.}
-    results: [8, 9, 10, 12, 13]
+    - {step: 9, expectation: Image import is visible.}
+    - {step: 10, expectation: The image tab keeps keyboard focus.}
+    - {step: 11, expectation: The former tab leaves the Tab order.}
+    - {step: 13, expectation: Home reopens the form.}
+    - {step: 14, expectation: The secret tab retains focus.}
+    results: [9, 10, 11, 13, 14]
   - id: document-tabs
     ui_standard: [UI-TAB-02]
     requirement: ArrowRight and Home switch the active find panel and its visible fields.
-    actions: [17, 18, 21]
+    actions: [18, 19, 22]
     checkpoints:
-    - {step: 19, expectation: The replacement input appears.}
-    - {step: 20, expectation: The replace tab owns focus.}
-    - {step: 22, expectation: The replacement input disappears.}
-    - {step: 23, expectation: The find tab is selected.}
-    results: [19, 20, 22, 23]
+    - {step: 20, expectation: The replacement input appears.}
+    - {step: 21, expectation: The replace tab owns focus.}
+    - {step: 23, expectation: The replacement input disappears.}
+    - {step: 24, expectation: The find tab is selected.}
+    results: [20, 21, 23, 24]
   visual:
   - {check: Panel changes, method: automated, reason: The corresponding form controls must appear and disappear.}
   native:
