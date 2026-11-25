@@ -107,3 +107,16 @@ describe("FileLifecycleDialogs Save As (U2)", () => {
 });
 
 
+
+it("keeps a destructive file operation on Cancel until the user chooses otherwise", () => {
+  const { props } = renderDialog({ kind: "trash", name: "notes.txt", path: "/tmp/notes.txt" });
+  const dialog = screen.getByRole("dialog", { name: /Move to Trash/i });
+  const cancel = screen.getByRole("button", { name: "Cancel" });
+  expect(dialog).toContainElement(cancel);
+  expect(cancel).toHaveFocus();
+  fireEvent.keyDown(cancel, { key: "Escape", isComposing: true });
+  expect(props.onClose).not.toHaveBeenCalled();
+  fireEvent.click(cancel);
+  expect(props.onClose).toHaveBeenCalledOnce();
+  expect(props.onTrash).not.toHaveBeenCalled();
+});

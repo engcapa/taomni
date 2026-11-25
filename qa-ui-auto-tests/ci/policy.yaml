@@ -306,6 +306,7 @@ cases:
 - TC-UIC-008-rail-tooltip
 - TC-UIC-009-git-change-keys
 - TC-UIC-010-icon-action-names
+- TC-UIC-011-notepad-save-dialog
 - TC-MOBILE-001
 - TC-MOBILE-002
 - TC-MOBILE-003

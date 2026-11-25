@@ -411,27 +411,32 @@
   background-position: 6px 0;
 }
 
-/* Modal Backdrop */
-.np-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.38);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
+.np-modal::backdrop { background: var(--taomni-overlay); }
 
 .np-modal {
+  position: fixed;
+  inset: 0;
+  margin: auto;
   width: min(560px, calc(100vw - 32px));
-  max-height: calc(100vh - 48px);
-  overflow: auto;
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
   background: var(--taomni-panel-bg, #ffffff);
   color: var(--taomni-text, #111827);
   border: 1px solid var(--taomni-divider);
-  border-radius: 8px;
+  border-radius: var(--taomni-radius-lg);
   padding: 16px;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--taomni-shadow-lg);
+}
+
+.np-modal[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.np-modal-body {
+  min-height: 0;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -442,10 +447,11 @@
 }
 
 .np-modal-header {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 14px;
+  font-size: var(--taomni-fs-title);
   font-weight: 600;
 }
 

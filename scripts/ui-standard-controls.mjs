@@ -38,7 +38,7 @@ export function checkElement(node, attrs, icons, path, add) {
 
   // A canvas that fills a window and a listbox popup have their own contracts.
   if ((tag === "dialog" || (["dialog", "alertdialog"].includes(role) && attrs.has("aria-modal")))
-      && path !== "src/components/ui/Modal.tsx") add("L02");
+      && path !== "src/components/ui/ModalSurface.tsx") add("L02");
   if (role === "menu" && path !== "src/components/ContextMenu.tsx") add("L13");
   if (classes.includes("outline-none") && !classes.includes("taomni-btn")
       && !classes.some((name) => name.startsWith("focus-visible:"))) add("L07");
