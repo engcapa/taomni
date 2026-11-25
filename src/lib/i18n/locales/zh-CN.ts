@@ -3238,6 +3238,7 @@ export const zhCN: DeepPartial<typeof en> = {
     actionAllowSessionTitle: "本会话内不再询问此工具",
     actionDeny: "拒绝",
     writeBadge: "写操作",
+    approvalWindow: "来自 {name} 的审批",
     agentWants: "Agent 想要：{label}",
     toolListSessions: "列出会话",
     toolSearchHistory: "搜索历史",

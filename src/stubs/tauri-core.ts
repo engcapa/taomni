@@ -76,7 +76,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
   if (cmd.startsWith("plugin_")) return await invokePlugin<T>(cmd, args);
   // Issue #869: the bridge re-reads its pending approvals on mount. Browser
   // preview has no backend registry, so nothing is pending there.
-  if (cmd === "cc_pending_permission_prompts") return [] as T;
+  if (cmd === "cc_pending_permission_prompts" || cmd === "acp_pending_permission_prompts") return [] as T;
   if (APPROVAL_COMMANDS.has(cmd)) {
     approvalInvocations.push({ command: cmd, args });
     if (approvalInvocations.length > 64) approvalInvocations.shift();

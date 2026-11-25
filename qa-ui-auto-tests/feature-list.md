@@ -5280,6 +5280,8 @@ files:
   - src/components/settings/GoProviderFields.tsx
   - src/components/settings/LlmProvidersPanel.tsx
   - src/stores/opencodeGoStore.ts
+  - src/components/agent/bridge/usePendingApprovals.ts
+  - src-tauri/src/windowing/pending_approvals.rs
   - src-tauri/src/llm/opencode_go/
   - src/components/chat/ChatThreadList.tsx
   - src/components/chat/Composer.tsx

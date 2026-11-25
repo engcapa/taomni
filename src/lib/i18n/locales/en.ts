@@ -3261,6 +3261,7 @@ const dict = {
     actionAllowSessionTitle: "Don't ask again for this tool in this session",
     actionDeny: "Deny",
     writeBadge: "Write action",
+    approvalWindow: "Approval from {name}",
     agentWants: "Agent wants to: {label}",
     toolListSessions: "List sessions",
     toolSearchHistory: "Search history",

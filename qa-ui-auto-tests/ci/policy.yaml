@@ -176,6 +176,7 @@ cases:
 - TC-AI-869-01-approval-window-routing-browser
 - TC-AI-869-02-detached-window-approval-native
 - TC-AI-869-03-closed-owner-fallback-native
+- TC-AI-869-04-pending-owner-reattach-native
 - TC-WS-GIT-CLONE-01-defaults-proxy-and-clone-browser
 - TC-WS-GIT-CLONE-02-background-close-cancel-retry-browser
 - TC-WS-GIT-CLONE-03-native-real-clone-config-and-tree

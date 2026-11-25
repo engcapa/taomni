@@ -439,11 +439,17 @@ pub async fn cc_resolve_tool_call(
 /// stale card cannot be clicked a second time (issue #869).
 #[tauri::command]
 pub async fn cc_resolve_permission(
+    window: tauri::WebviewWindow,
     app: AppHandle,
     call_id: String,
     decision: crate::state::CcPermissionDecision,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    state
+        .core
+        .agent
+        .pending_approvals
+        .take_cc(&call_id, window.label())?;
     let thread_id = state
         .legacy
         .mobile

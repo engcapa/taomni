@@ -217,6 +217,7 @@ describe("CcAgentBridge permission gate", () => {
 
     await waitFor(() => {
       expect(tauriInvoke).toHaveBeenCalledWith("acp_resolve_permission", {
+        permissionOwnerId: "grok-process-1",
         threadId: "thread-1",
         callId: "acp-permission-1",
         optionId: "allow-once",
@@ -242,6 +243,7 @@ describe("CcAgentBridge permission gate", () => {
 
     await waitFor(() => {
       expect(tauriInvoke).toHaveBeenCalledWith("acp_cancel_permission", {
+        permissionOwnerId: "grok-process-2",
         threadId: "thread-1",
         callId: "acp-permission-2",
       });
@@ -704,6 +706,27 @@ describe("CcAgentBridge window-scoped approval delivery", () => {
     });
 
     expect(screen.getByTestId("ai-chat-safety-gate")).toHaveAttribute("data-queue-length", "1");
+  });
+
+  it("keeps an ACP prompt scoped to its process when two providers reuse a call id", async () => {
+    setWindowLabel("main");
+    render(<CcAgentBridge />);
+    await act(async () => {
+      for (const owner of ["chat", "media", "media"]) {
+        await emit("agent-acp-permission", {
+          threadId: "thread-1", permissionOwnerId: owner, callId: "shared",
+          sourceLabel: owner, kind: "edit", title: owner + " request",
+          windowLabel: "main", sourceWindow: "terminal-a", sourceWindowTitle: "Build terminal",
+          options: [{ optionId: "once", kind: "allow_once" }],
+        });
+      }
+    });
+    const gate = screen.getByTestId("ai-chat-safety-gate");
+    expect(gate).toHaveTextContent("Build terminal");
+    expect(gate).toHaveAttribute("data-queue-length", "2");
+    fireEvent.click(screen.getByTestId("ai-chat-acp-permission-option-allow_once"));
+    await waitFor(() => expect(gate).toHaveTextContent("media request"));
+    expect(gate).toHaveAttribute("data-queue-length", "1");
   });
 
   it("ignores an ACP gate addressed to a different window", async () => {

@@ -492,6 +492,8 @@ export default function DetachedSessionWindow({
   return (
     <TabActionSlotProvider slot={actionSlot}>
       <div
+        role="region"
+        aria-label={title}
         data-testid="detached-session-window"
         data-detached-kind={kind}
         data-detached-id={id}

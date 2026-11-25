@@ -97,26 +97,14 @@ pub(crate) async fn request_permission(
         "args": input,
         "trust": trust,
     });
-    let delivery = crate::windowing::thread_delivery::emit_thread_event_for_app(
+    let state = app.state::<AppState>();
+    state.core.agent.pending_approvals.publish(
         app,
+        &state.core.agent.thread_windows,
+        crate::windowing::pending_approvals::ApprovalId::Cc(call_id.clone()),
         thread_id,
-        "agent-cc-permission",
-        payload.clone(),
+        payload,
     );
-    // Remember a targeted prompt so a bridge that mounts later (renderer reload,
-    // crash recovery) can re-read it instead of leaving the approval to time out.
-    if let Some(label) = delivery.label() {
-        let mut stored = payload;
-        stored["windowLabel"] = serde_json::json!(label);
-        let state = app.state::<AppState>();
-        state
-            .core
-            .agent
-            .cc_pending_prompt_payloads
-            .lock()
-            .unwrap()
-            .insert(call_id.clone(), stored);
-    }
 
     let decision =
         match tokio::time::timeout(Duration::from_secs(PERMISSION_TIMEOUT_SECS), rx).await {
@@ -145,10 +133,8 @@ pub(crate) async fn request_permission(
     state
         .core
         .agent
-        .cc_pending_prompt_payloads
-        .lock()
-        .unwrap()
-        .remove(&call_id);
+        .pending_approvals
+        .dismiss_cc(Some(thread_id), Some(&call_id));
     let pending: std::collections::HashSet<_> = state
         .core
         .agent
