@@ -308,6 +308,7 @@ cases:
 - TC-UIC-010-icon-action-names
 - TC-UIC-011-notepad-save-dialog
 - TC-UIC-012-section-tabs
+- TC-UIC-DLG-explorer-new-file
 - TC-MOBILE-001
 - TC-MOBILE-002
 - TC-MOBILE-003

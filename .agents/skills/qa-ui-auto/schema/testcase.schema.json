@@ -1142,6 +1142,15 @@
         },
         "assert_focus_on": {"$ref": "#/$defs/selector"},
         "assert_focus_within": {"$ref": "#/$defs/selector"},
+        "assert_labelledby_text": {
+          "type": "object",
+          "required": ["selector", "equals"],
+          "additionalProperties": false,
+          "properties": {
+            "selector": {"$ref": "#/$defs/selector"},
+            "equals": {"type": "string", "minLength": 1}
+          }
+        },
         "assert_computed_style": {
           "type": "object",
           "required": ["selector", "property", "equals"],

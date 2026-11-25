@@ -11,6 +11,7 @@ class ControlObservationTests(TestCase):
         ctx = Mock(dry_run=False)
         for verb, args, value in [
             ("assert_computed_style", {"selector": "label", "property": "font-size", "equals": "18px"}, "18px"),
+            ("assert_labelledby_text", {"selector": "dialog", "equals": "New file"}, "New file"),
             ("assert_focus_on", "button.save", True),
             ("assert_focus_within", "dialog", True),
         ]:

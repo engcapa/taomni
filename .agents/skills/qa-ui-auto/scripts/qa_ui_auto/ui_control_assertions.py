@@ -13,6 +13,10 @@ def observe(verb: str, args: Any, evaluate: Callable[[str], Any]) -> str:
     if verb == "assert_computed_style":
         value = f"getComputedStyle(element).getPropertyValue({json.dumps(args['property'])}).trim()"
         expected = args["equals"]
+    elif verb == "assert_labelledby_text":
+        value = """(element.getAttribute('aria-labelledby') || '').trim().split(/\\s+/)
+          .map(id => element.ownerDocument.getElementById(id)?.textContent.trim() ?? '').join(' ')"""
+        expected = args["equals"]
     else:
         value = ("element.contains(document.activeElement)" if verb == "assert_focus_within"
                  else "element === document.activeElement")
@@ -45,4 +49,4 @@ def native(verb):
     return run
 
 
-VERBS = ("assert_focus_on", "assert_focus_within", "assert_computed_style")
+VERBS = ("assert_focus_on", "assert_focus_within", "assert_computed_style", "assert_labelledby_text")
