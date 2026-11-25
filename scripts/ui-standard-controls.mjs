@@ -29,6 +29,33 @@ export function importedIconNames(ast) {
   return names;
 }
 
+// Only inspect author-supplied inline style values. User content, code samples,
+// color picker values and protocol payloads can also contain literal colors.
+export function checkInlineStyle(initializer, add) {
+  if (!initializer || !ts.isJsxExpression(initializer)
+      || !initializer.expression || !ts.isObjectLiteralExpression(initializer.expression)) return;
+  const colorProperty = /^(?:color|background(?:Color)?|border(?:Top|Bottom|Left|Right)?Color|outlineColor|textDecorationColor|boxShadow)$/;
+  const fixedColor = /(?:#(?:[\da-f]{8}|[\da-f]{6}|[\da-f]{4}|[\da-f]{3})\b|rgba?\()/i;
+  function inspectValue(property, value) {
+    if (ts.isConditionalExpression(value)) {
+      inspectValue(property, value.whenTrue);
+      inspectValue(property, value.whenFalse);
+    } else if (property === "zIndex" && (ts.isNumericLiteral(value)
+        || (ts.isPrefixUnaryExpression(value) && ts.isNumericLiteral(value.operand))
+        || (ts.isStringLiteralLike(value) && /^-?\d+$/.test(value.text)))) {
+      add("L05-inline");
+    } else if (colorProperty.test(property) && ts.isStringLiteralLike(value)
+        && fixedColor.test(value.text.replace(/var\(\s*--taomni-[\w-]+\s*,\s*(?:#[\da-f]+|rgba?\([^)]*\))\s*\)/gi, ""))) {
+      add("L04-inline");
+    }
+  }
+  for (const property of initializer.expression.properties) {
+    if (ts.isPropertyAssignment(property) && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))) {
+      inspectValue(property.name.text, property.initializer);
+    }
+  }
+}
+
 export function checkElement(node, attrs, icons, path, add) {
   const tag = node.tagName.getText();
   if (!/^[a-z]+$/.test(tag)) return;

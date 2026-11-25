@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
-import { checkElement, importedIconNames } from "./ui-standard-controls.mjs";
+import { checkElement, checkInlineStyle, importedIconNames } from "./ui-standard-controls.mjs";
 
 import { tokenScopes, unresolvedTokens } from "./ui-standard-tokens.mjs";
 
@@ -45,6 +45,7 @@ export function scanUI(path, text) {
       const attrs = new Map(node.attributes.properties.filter(ts.isJsxAttribute)
         .map((attr) => [attr.name.getText(ast), attr.initializer]));
       checkElement(node, attrs, icons, path, add);
+      checkInlineStyle(attrs.get("style"), add);
       if (node.tagName.getText(ast) === "button" && !attrs.has("type")) add("L10");
       for (const key of ["aria-label", "title", "placeholder"]) {
         const value = attrs.get(key);

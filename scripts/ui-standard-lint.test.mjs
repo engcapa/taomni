@@ -46,3 +46,14 @@ test("requires a theme, local or owning container declaration for every unguarde
   assert.deepEqual(unresolvedTokens("src/shell.css", css, scopes), ["--taomni-tree-height"]);
   assert.deepEqual(unresolvedTokens("src/example.tsx", "var(--taomni-old, var(--taomni-typo))", scopes), ["--taomni-typo"]);
 });
+
+test("ratchets hand-written color and layer declarations on rendered styles", () => {
+  const jsx = `<Card style={{
+    color: failed ? "#c20" : "var(--taomni-text)",
+    background: "linear-gradient(#12345678, #abc)",
+    zIndex: -2,
+    borderColor: "var(--taomni-divider, rgba(0,0,0,.2))"
+  }} value="#abcdef" />`;
+  assert.deepEqual(scanUI("src/Card.tsx", jsx), { "L04-inline": 2, "L05-inline": 1 });
+  assert.deepEqual(scanUI("src/Card.tsx", '<Card style={{ color: userColor, zIndex: "var(--taomni-z-popover)" }} />'), {});
+});
