@@ -116,7 +116,7 @@ steps:
 - eval_readonly:
     expression: localStorage.getItem('qa.agentApproval.lastResult')||''
     contains: '"decision":"allow"'
-- click: '[data-testid="session-tree-item"][data-session-name="qa-origin"]'
+- click: '[data-testid="side-tab-sessions"]'
 - press: Control+Alt+7
 - switch_window:
     selector: '[data-testid="detached-session-window"][aria-label*="qa-origin"]'
