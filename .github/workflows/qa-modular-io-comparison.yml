@@ -42,7 +42,8 @@ jobs:
             test "${#packages[@]}" = 1
             mv "${packages[0]}" "$group/"
           done
-          gh run download "$candidate_run" -n "module-signed-mfa-linux-x86_64-$candidate_run" -D module
+          # The M0 package parser predates the description field in current module manifests.
+          gh run download 44198966336 -n qa-modular-package-linux-x86_64-mfa-install-44198966336 -D module/signed-module
       - name: Prepare the production X11 adapter
         run: |
           python -m pip install -r .agents/skills/qa-ui-auto/requirements-ci.txt psutil==7.2.2

@@ -63,9 +63,10 @@ def main():
                                    "producer": json.loads((directory / 'producer.json').read_text())}
     spec = Path('module/signed-module').resolve()
     provenance = json.loads((spec/'provenance.json').read_text())
-    expected = record["sources"]["candidate"]["producer"]["head_sha"]
-    if provenance['sourceSha'] != expected or sha(spec/provenance['archive']) != provenance['sha256']:
-        raise RuntimeError("Signed benchmark package differs from candidate")
+    expected = 'e0cb552e3d6a8c086fe302ac1df4df631dc4269f5d93379cc1ecb24c650b1c53'
+    if provenance['sourceSha'] != 'cdbef387142cdf98bb5341fa6fab9d692b38c27f' or provenance['sha256'] != expected or sha(spec/provenance['archive']) != expected:
+        raise RuntimeError("Historical signed benchmark package differs from the retained original")
+    record['moduleProducer'] = {'runId':'44198966336', 'artifactId':'14379924062'}
     record["module"] = provenance
     module = dict(archive=str(spec/provenance['archive']), signature=(spec/provenance['signature']).read_text(),
                   moduleId=provenance['id'], version=provenance['version'], slug=provenance['slug'],
@@ -78,6 +79,9 @@ def main():
                     entry = {"build":key,"pair":attempt,"samples":sample(key,attempt,packages,module)}
                     record['comparison'].append(entry)
                     (EVIDENCE/'samples.json').write_text(json.dumps(record,indent=2)+'\n')
+        for row in record['comparison']:
+            if len(row['samples']['moduleInstallMs']) != 5:
+                raise RuntimeError(f"Historical install missing on {row['build']}: {row['samples'].get('installError')}")
     finally:
         (EVIDENCE/'samples.json').write_text(json.dumps(record,indent=2)+'\n')
 
