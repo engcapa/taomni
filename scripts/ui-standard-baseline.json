@@ -298,7 +298,6 @@
   "src/components/theme/ThemePreviewSelect.tsx": {"L05":1},
   "src/components/tunnel/TunnelEditor.tsx": {"L05":1,"L04":1},
   "src/components/vault/VaultEntriesDialog.tsx": {"L05":1,"L04":3},
-  "src/components/vault/VaultSetupDialog.tsx": {"L05":1,"L02":1},
   "src/components/vault/VaultUnlockDialog.tsx": {"L02":1},
   "src/components/viewer/HtmlPreviewExternalLinkDialog.tsx": {"L02":1},
   "src/components/viewer/ViewerDialogs.tsx": {"L02":2},

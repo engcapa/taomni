@@ -1,0 +1,59 @@
+id: TC-UIC-013-vault-setup-draft
+title: Vault setup associates validation with its fields and protects an unfinished password
+covers: [F12.1]
+fixtures: [reset_db]
+modes: [browser, native]
+tags: [ui-contract, vault, keyboard]
+ui_standard: [UI-DLG-06, UI-DLG-07, UI-DLG-09, UI-DLG-10]
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: vault}
+- click: '[data-testid="vault-init-button"]'
+- assert_focus_on: '[data-testid="vault-setup-pw1"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: short}
+- assert_visible: '[data-testid="vault-setup-too-short"]'
+- assert_attribute: {selector: '[data-testid="vault-setup-pw1"]', name: aria-invalid, equals: 'true'}
+- assert_disabled: '[data-testid="vault-setup-confirm"]'
+- press: Escape
+- assert_focus_on: '[data-testid="confirm-dialog-cancel"]'
+- press: Enter
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- assert_focus_on: '[data-testid="vault-setup-pw1"]'
+- assert_visible: '[data-testid="vault-setup-too-short"]'
+- press: Escape
+- click: '[data-testid="confirm-dialog-confirm"]'
+- assert_not_visible: '[data-testid="vault-setup-dialog"]'
+- assert_focus_on: '[data-testid="vault-init-button"]'
+- assert_text: {selector: '[data-testid="vault-state-badge"]', contains: empty}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: invalid-password
+    requirement: The first password field receives focus and its validation prevents creation.
+    ui_standard: [UI-DLG-06, UI-DLG-09]
+    actions: [4, 6]
+    checkpoints:
+    - {step: 5, expectation: The first password field has focus.}
+    - {step: 7, expectation: The short-password explanation is visible.}
+    - {step: 8, expectation: The field reports its invalid state.}
+    - {step: 9, expectation: The invalid form cannot submit.}
+    results: [5, 7, 8, 9]
+  - id: discard-or-continue
+    requirement: Continuing setup returns to the draft. Discard closes both layers and leaves the vault empty.
+    ui_standard: [UI-DLG-07, UI-DLG-10]
+    actions: [10, 12, 16, 17]
+    checkpoints:
+    - {step: 11, expectation: Continuing setup is the default decision.}
+    - {step: 13, expectation: Enter closes the confirmation.}
+    - {step: 14, expectation: Focus returns to the original field.}
+    - {step: 15, expectation: The original invalid draft still has its error.}
+    - {step: 18, expectation: Setup closes after explicit discard.}
+    - {step: 19, expectation: The Settings action regains focus.}
+    - {step: 20, expectation: The vault remains empty.}
+    results: [11, 13, 14, 15, 18, 19, 20]
+  visual:
+  - {check: Inline validation, method: automated, reason: Observes the field and message in Settings.}
+  native:
+  - {check: Vault setup and nested WebView focus, method: automated, reason: Reads the packaged Settings view and vault state after discard.}

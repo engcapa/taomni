@@ -20,9 +20,16 @@ export function ModalSurface({ initialFocus, onCancel, role = "dialog", children
     if (first instanceof HTMLInputElement) first.select();
     return () => {
       if (panel.open && typeof panel.close === "function") panel.close();
-      if (opener instanceof HTMLElement && opener.isConnected && (document.activeElement === document.body || panel.contains(document.activeElement))) {
-        opener.focus({ preventScroll: true });
-      }
+      const restore = () => {
+        if (opener instanceof HTMLElement && opener.isConnected &&
+            (document.activeElement === document.body || panel.contains(document.activeElement))) {
+          opener.focus({ preventScroll: true });
+        }
+      };
+      restore();
+      // A parent and its portalled confirmation can unmount in one commit.
+      // Retry after both cleanups, when the child no longer owns focus.
+      queueMicrotask(restore);
     };
   }, [initialFocus]);
 
