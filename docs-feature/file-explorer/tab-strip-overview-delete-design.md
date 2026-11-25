@@ -1,6 +1,8 @@
 # File Explorer 标签条溢出、Overview 归档与删除确认设计
 
-- 状态：实现完成，本地验证通过（分支 `feat/explorer-tabs-overview-delete`，基线 `main@4e19707e4`）。
+> 2026-11-25 修订。UI v0.3 的 DEC-01 将 Shift+Delete 和回收站失败时的初始焦点定为“取消”。AC-05 / V-03 已更新；该行为待实现与重验。下列记录对应 11 月 22 日版本。[统一规范与决定](../ui-standard/ENFORCEMENT.md)
+
+- 原版交付记录（分支 `feat/explorer-tabs-overview-delete`，基线 `main@4e19707e4`）。
   - 单元/静态：全量 Vitest 876 文件 / 7437 通过、1 跳过；`tsc -b`、`pnpm check:refactor`、QA audit/behavior contract 通过。
   - browser：`TC-EXPLORER-010` 86/86 步通过（`qa-ui-auto-report/run-20261122-101317-933835400`）；受影响 `TC-EXPLORER-001/002/003、TC-WS-018/027/093` 6/6 通过（`run-20261122-101417-465286900`）；crash-regression browser 17 通过/1 已知环境跳过（`run-20261122-101653-989404600`）。
   - native：Windows 本机 QA 构建执行 `TC-EXPLORER-010` 86/86 通过（`run-20261122-101145-964936800`，真实磁盘/回收站全树 oracle）；受影响 `TC-EXPLORER-003` 与 `TC-WS-019` 通过（`run-20261122-101832-477750700`）；crash-regression native 19 通过/2 已知环境 skip/1 本机缺 Playwright chromium 的环境失败（`run-20261122-102020-130664700`），hosted 覆盖该环境边界。
@@ -24,7 +26,7 @@
 | AC-02 | Explorer 标签溢出或需要查找标签 | 点击工具栏过滤按钮；搜索名称/路径；选择类别；点击行；清除过滤/芯片 | 弹出可搜索的已打开标签菜单，含全部/文件夹/文件类别与计数；搜索即时过滤；点击行激活对应 Explorer 标签；标签条只显示匹配标签但不关闭任何标签；出现可清除的过滤芯片；活动标签被过滤时自动选首个匹配；新开标签不会被隐藏；Esc/外点关闭并把焦点还给触发按钮；IME 组合输入不触发快捷键 |
 | AC-03 | Explorer 视图 | 打开 Overview | 默认 `data-scope="explorer"`，仅显示 Explorer 已打开标签（含文件查看器标签），卡片展示类别、标题、路径/条目信息；可切「当前视图/全部」，全部包含 Sessions、Workspaces 与 Explorer；点击 Explorer 卡片回到 Explorer 视图并激活该标签；搜索可匹配标题/路径；无标签/无匹配有明确提示 |
 | AC-04 | 其它视图 | Overview 切「全部」 | 关闭再打开 Overview 时按当前视图重置作用域；全部模式仍包含原有 Sessions/Workspace 卡片且新增 Explorer 卡片，原有点击激活与侧栏折叠偏好不变 |
-| AC-05 | Explorer 中选中文件/文件夹 | Del；Shift+Del；取消 | Del 先打开确认框，明确提供「移到回收站」与「永久删除」两个选择；取消不触碰磁盘；选择回收站成功后出现带撤销的提示；Shift+Del 打开同一确认框且默认聚焦永久删除；回收站失败时保留失败项并显示原因，只提供永久删除确认 |
+| AC-05 | Explorer 中选中文件/文件夹 | Del；Shift+Del；取消 | Del 先打开确认框，明确提供「移到回收站」与「永久删除」两个选择；取消不触碰磁盘；选择回收站成功后出现带撤销的提示；Shift+Del 打开同一确认框，默认聚焦取消，直接按 Enter 保留原文件。回收站失败时只对失败项显示原因与取消/永久删除，默认聚焦取消 |
 | AC-06 | 既有路径回归 | 右键/命令栏删除、Sessions/Workspace 标签条与 Overview、Explorer 标签关闭/固定/中键 | 行为不退化；删除入口均走同一确认框；Sessions/Workspace 标签条与 Overview 原有断言继续通过 |
 
 ## 3. 设计
@@ -62,7 +64,7 @@
   - `remove(entries, permanent?)` 只打开确认框（`defaultIntent` 由是否 Shift 决定），不直接调用后端。
   - 新增 `trash(entries)`：执行 `localTrashEntries`；成功刷新并给出带撤销的提示；部分/全部失败对失败项保留确认框并带原因，只允许永久删除。
   - 保留 `permanentDelete(entries)` 作为确认后的永久删除路径。
-- `ExplorerDialogs`：标题「删除 …?」，正文说明回收站可恢复、永久删除不可撤销；主按钮「移到回收站」（回收站不可用时隐藏）、危险按钮「永久删除」；取消/Esc 不变。testid：`explorer-delete-dialog`、`explorer-delete-cancel`、`explorer-delete-trash`、`explorer-delete-confirm`、`explorer-trash-unavailable`。Shift+Del 打开时聚焦永久删除按钮。
+- `ExplorerDialogs`：标题「删除 …?」，正文说明回收站可恢复、永久删除不可撤销；主按钮「移到回收站」（回收站不可用时隐藏）、危险按钮「永久删除」；取消/Esc 不变。testid：`explorer-delete-dialog`、`explorer-delete-cancel`、`explorer-delete-trash`、`explorer-delete-confirm`、`explorer-trash-unavailable`。Shift+Del 或回收站失败时聚焦 `explorer-delete-cancel`。用户可明确移焦并激活永久删除。普通 Del 聚焦可撤销的回收站选项。
 - 右键菜单与命令栏文案改为「删除…/Delete…」；键盘 Del/Shift+Del、命令栏、右键菜单共用该确认框。
 
 ## 4. 改动清单
@@ -90,7 +92,7 @@
 |---|---|---|
 | V-01 | Vitest | 过滤纯函数类别/查询/计数/空过滤；滚动 hook 溢出、首尾、翻页、活动标签可见、用户滚动；ExplorerTabStrip 箭头显示/禁用/滚动、过滤芯片/空提示、关闭/固定/中键不退化 |
 | V-02 | Vitest | Overview explorer 作用域、全部包含三类、激活切换、搜索、空/无匹配；原 Sessions/Workspace overview 断言保持 |
-| V-03 | Vitest | 删除流程：Del 打开确认框且未触盘；回收站成功/撤销/部分失败降级；Shift+Del 聚焦永久删除；取消/Esc 不触盘；命令栏/右键同路径 |
+| V-03 | Vitest | 删除流程：Del 打开确认框且未触盘；回收站成功/撤销/部分失败降级；Shift+Del 或回收站失败后聚焦取消，紧接 Enter/Esc 不触盘，显式激活永久删除才执行；命令栏/右键同路径 |
 | V-04 | 静态 | `pnpm exec tsc -b`、`pnpm check:refactor`、聚焦 Vitest：通过（全量 Vitest 876 文件 / 7437 通过 / 1 跳过） |
 | V-05 | browser QA | Windows 本地运行：多 Explorer 标签箭头/无滚动条/过滤菜单；Overview explorer/全部；删除确认两选项与取消；`assert_no_runtime_errors`。通过：`TC-EXPLORER-010`（86 步，browser），受影响 002/003 通过 |
 | V-06 | native QA | Windows 本地 QA 构建：真实标签条/Overview 切换与真实回收站/永久删除确认（浏览器 stub 不能替代原生删除语义）。Windows 本机 native 运行 `TC-EXPLORER-010`：全树 `assert_explorer_files` 校验真实磁盘删除/撤销/永久删除 |
