@@ -2269,6 +2269,7 @@
   ↳ `[data-testid="app-theme-light"]` — alias
   ↳ `[data-testid="app-theme-system"]` — alias
 - `button[aria-label="Cycle application theme"]` — interactive [optional] — F5.5.theme-icon-button
+- `[role="tooltip"]` — display [optional] — F5.5.desktop-control-tooltip
 - `html` — display — F5.5.root-theme-attr
 
 ## main/welcome (F1.6)
