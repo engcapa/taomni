@@ -47,16 +47,19 @@ def run():
     payload = inventory(directory, identity)
     setup, = [f for f in payload["files"] if f["name"].endswith("-setup.exe")]
     candidate = directory / setup["name"]
-    msi = json.loads((report / "windows-payload.json").read_text(encoding="utf-8-sig"))
     baseline = legacy_baseline.current()
     old = nsis_asset(legacy_baseline.metadata("/tags/" + baseline["tag"]), baseline)
     work = Path("nsis-upgrade-work").resolve()
     work.mkdir()
+    payload_dir = work / "nsis-payload"
+    command(["7z", "e", str(candidate), "taomni.exe", "-o" + str(payload_dir)], report, "extract-nsis-core")
+    core_hash = digest(payload_dir / "taomni.exe")
     slot = work / "application"
     profile = work / "profile"
     profile.mkdir()
     download_asset(work, old, token=os.environ.pop("GH_TOKEN"))
-    result = {"passed": False, "producer": identity, "legacyReleaseId": baseline["releaseId"],
+    result = {"passed": False, "producer": identity, "candidatePayloadSha256": core_hash,
+              "legacyReleaseId": baseline["releaseId"],
               "legacyAsset": asdict(old), "runner": json.loads((report / "runner.json").read_bytes()),
               "stages": {}}
     stages = result["stages"]
@@ -65,7 +68,7 @@ def run():
         for phase, package in (("original", work / old.name), ("upgrade", candidate), ("rollback", work / old.name)):
             stage = stages[phase] = install(package, slot, report, phase)
             if phase == "upgrade":
-                if (stage["binarySha256"] != msi["executableSha256"] or stage["voiceDlls"]
+                if (stage["binarySha256"] != core_hash or stage["voiceDlls"]
                         or stage["binarySha256"] == stages["original"]["binarySha256"]):
                     raise RuntimeError("NSIS upgrade did not install the modular core and remove old voice DLLs")
             if phase == "rollback" and any(stage[k] != stages["original"][k] for k in ("installerSha256", "binarySha256", "voiceDlls")):
