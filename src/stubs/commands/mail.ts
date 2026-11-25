@@ -1,7 +1,7 @@
 import { mailArchiveStub } from "../mailArchiveStub";
 import { stubMailAppend, stubMailChangeFolder, stubMailClearCache, stubMailExpunge, stubMailFindHeader, stubMailListCached, stubMailListFolders, stubMailMarkBodyCached, stubMailSearch, stubMailSyncAll, stubMailSyncFolder, stubMailSyncHeaders, stubMailIdleStart, stubMailSetSubscription, stubMailIdleStop, stubMailRecordSent, stubMailMutation, stubMailUpdateCachedFlags, stubMailMarkRead, stubMailPrefetchBodies, type Seed as MailStubSeed, type StubMailSearchQuery } from "../mailServerStub";
 import { stubApplyFilters, stubListFilters, stubSaveFilters } from "../mailFiltersStub";
-import { stubAddressBookSuggestions, stubDeleteAddressBookEntry, stubListAddressBook, stubSaveAddressBookEntry } from "../mailContactsStub";
+import { stubAddressBookSuggestions, stubRememberSentRecipients, stubSentRecipientSuggestions, stubDeleteAddressBookEntry, stubListAddressBook, stubSaveAddressBookEntry } from "../mailContactsStub";
 import type { MailAddressBookEntry } from "../../lib/mailContacts";
 import { stubAddInviteToCalendar, stubCalDavSync, stubListAgenda } from "../mailCalendarStub";
 import type { MailFilter } from "../../lib/mailFilters";
@@ -438,6 +438,8 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
       const accountId = stubMailAccountId(invokeArgs);
       const request = (invokeArgs?.request as {
         to?: string[];
+        cc?: string[];
+        bcc?: string[];
         subject?: string;
         textBody?: string | null;
         htmlBody?: string | null;
@@ -464,6 +466,7 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
       if (drafted?.remoteDraftFolder && drafted.remoteDraftUid) {
         stubMailExpunge(accountId, mailStubSeed, drafted.remoteDraftFolder, drafted.remoteDraftUid);
       }
+      stubRememberSentRecipients(accountId, [...(request.to ?? []), ...(request.cc ?? []), ...(request.bcc ?? [])]);
       return { accepted: true, response: "browser-preview accepted", sentCopyFolder: "Sent" } as T;
     }
 
@@ -635,7 +638,8 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
       const limit = Math.max(1, Math.min(20, Number((invokeArgs?.limit as number | undefined) ?? 8)));
       // Address book entries first, like the backend (TASK-19).
       const seen = new Set<string>();
-      return [...stubAddressBookSuggestions(accountId, query, limit), ...stubMailContacts(accountId, query, limit)]
+      return [...stubAddressBookSuggestions(accountId, query, limit),
+        ...stubSentRecipientSuggestions(accountId, query), ...stubMailContacts(accountId, query, limit)]
         .filter((hit) => {
           const key = hit.email.toLowerCase();
           if (seen.has(key)) return false;
