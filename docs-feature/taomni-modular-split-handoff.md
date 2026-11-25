@@ -6,6 +6,13 @@
 
 实装工作流默认选择当时公开的稳定单体版本，记录 Release ID 和四个目标各自的资产 ID、字节数、SHA-256。四个平台在同一次验收中复用这份记录。放行时再查询 GitHub 公开版并与实装回执匹配。单体发布有更新时使用新基线复验，涉及主线产品改动时同步更新候选和对应回执。历史版本号用于重现已执行的测试。[滚动基线实现](https://github.com/engcapa/taomni/commit/04e6e0497) · [首次自动选择的实装](https://github.com/engcapa/taomni/actions/runs/45538704639) · [公开稳定版](https://github.com/engcapa/taomni/releases/latest)
 
+生产放行前，取最终四目标实装运行的 `first-upgrade-baseline-<run-id>/first-upgrade-baseline.json`，执行下列复核。四端实装时将 `package_first_release_version` 留空。若公开单体版本或任一安装资产已变动，重新派发四端实装，再以新回执复核。若主线改动需要合入产品，按新产品 SHA 重新打包并收证。[实装工作流](../.github/workflows/qa-modular-upgrade.yml)
+
+```bash
+PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto.legacy_baseline \
+  --verify-current first-upgrade-baseline.json
+```
+
 ### 十个独立模块的首次升级验收范围
 
 | 模块 | 旧数据归属和需要验证的用户结果 |
@@ -197,7 +204,7 @@ python .agents/skills/qa-ui-auto/scripts/ci_live_monitor.py \
 - **派发 `qa-modular-gates.yml` 必须同时传分支名与完整 40 位 SHA**：`modular_gate_runs.py` 通过 `git/ref/heads/{source_ref}` 解析分支，请固定传 `source_ref=refactor/modules-arch` 与 `head=<40-char-sha>`。
 - **并行限额与 macOS runner**：本模块化任务在途 workflow 同时最多保持 3 个；`macos-15` 容量不足时可临时切 `macos_runner=macos-26`，但正式 Intel G1 与 Intel 实装升级仍需对应 Intel runner。
 
-## 达到上生产目标的剩余待办（按执行顺序）
+## 2026-11-24 交接时的待办快照
 
 1. **P0 待办 1 — 完成 Wave 2B 剩余 4 个业务模块双版本无重启生命周期（G7）**：
    - 按 `TC-MODULES-107`–`111` 复用架构，为 `vnc-client`、`rdp-client`、`rdp-server`、`vnc-server` 新增签名前后两版本生命周期用例（`TC-MODULES-112`–`115`），验证同一桌面核心 PID 下启停、升级、握手失败恢复、无重启回滚、卸载保留与重装，以及对应独立窗口/服务端监听端口/输入回放与资源回收；同步更新 `feature-list.md`、`testid-catalog.md`、`policy.yaml`、`dependencies.yaml`（视需要），本地跑通 `qa_ui_auto.audit --gate`、`pnpm check:refactor` 及受影响单测后，经 `qa-ui-auto-platforms.yml`（含完整 `crash-regression`）在 Linux/Windows/macOS ARM64 全绿过关。
