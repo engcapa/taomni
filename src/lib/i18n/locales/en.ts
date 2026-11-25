@@ -3673,7 +3673,7 @@ const dict = {
     pin: "Pin to top",
     unpin: "Unpin",
     more: "More actions for {name}",
-    dragHandle: "Drag to reorder {name}",
+    dragHandle: "Reorder {name} (drag or press Enter for move options)",
     menuEdit: "Edit…",
     menuShowQr: "Show QR code…",
     menuCopySecret: "Copy secret key…",

@@ -122,12 +122,18 @@ export function MfaAccountRow({
     >
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
         {reorderable ? (
-          <span
+          <button
+            type="button"
+            aria-haspopup="menu"
             data-testid="mfa-account-drag"
-            role="button"
             aria-label={t("mfa.dragHandle", { name })}
             title={t("mfa.dragHandle", { name })}
             className="shrink-0 cursor-grab text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] touch-none p-0.5 rounded"
+            onClick={(event) => {
+              // Keyboard and assistive activation open the same Move up/down
+              // actions. Pointer movement remains owned by the drag session.
+              if (event.detail === 0) onMenu(event);
+            }}
             onPointerDown={(event) => {
               if (event.button !== 0) return;
               event.preventDefault();
@@ -139,7 +145,7 @@ export function MfaAccountRow({
             }}
           >
             <GripVertical className="w-3.5 h-3.5" />
-          </span>
+          </button>
         ) : null}
         <button
           type="button"
@@ -153,7 +159,7 @@ export function MfaAccountRow({
           <Star
             className="w-3.5 h-3.5"
             fill={account.pinned ? "currentColor" : "none"}
-            style={{ color: account.pinned ? "#e0a800" : "var(--taomni-text-muted)" }}
+            style={{ color: account.pinned ? "var(--taomni-warning-icon)" : "var(--taomni-text-muted)" }}
           />
         </button>
         <div
@@ -251,6 +257,7 @@ export function MfaAccountRow({
           </button>
           <button
             type="button"
+            aria-haspopup="menu"
             data-testid="mfa-account-menu"
             aria-label={t("mfa.more", { name })}
             title={t("mfa.more", { name })}

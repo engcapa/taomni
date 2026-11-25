@@ -20,7 +20,6 @@
   "src-tauri/plugins/mail/renderer/client/MailSourceDialog.tsx": {"L05":1},
   "src-tauri/plugins/mail/renderer/client/MailSubscriptionsDialog.tsx": {"L05":1},
   "src-tauri/plugins/mail/renderer/client/createInvitationControls.tsx": {"L04":3},
-  "src-tauri/plugins/mfa/renderer/MfaAccountRow.tsx": {"L06":1},
   "src-tauri/plugins/mfa/renderer/MfaAddDialog.tsx": {"L05":1,"L02":1},
   "src-tauri/plugins/mfa/renderer/MfaEditDialog.tsx": {"L05":1,"L02":1},
   "src-tauri/plugins/mfa/renderer/MfaQrDialog.tsx": {"L05":1,"L02":1,"L04":2},

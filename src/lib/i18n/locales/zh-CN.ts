@@ -3650,7 +3650,7 @@ export const zhCN: DeepPartial<typeof en> = {
     pin: "置顶",
     unpin: "取消置顶",
     more: "{name} 的更多操作",
-    dragHandle: "拖拽调整 {name} 的顺序",
+    dragHandle: "调整 {name} 的顺序（拖拽，或按 Enter 选择移动操作）",
     menuEdit: "编辑…",
     menuShowQr: "显示二维码…",
     menuCopySecret: "复制密钥…",

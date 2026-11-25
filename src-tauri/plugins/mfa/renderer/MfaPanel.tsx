@@ -143,7 +143,12 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
       { label: "", separator: true, onClick: () => {} },
       { label: t("mfa.menuDelete"), testId: "mfa-menu-delete", danger: true, onClick: () => void remove(account) },
     ];
-    ctx.show(event, items);
+    if (event.detail === 0 && event.type === "click") {
+      const anchor = event.currentTarget.getBoundingClientRect();
+      ctx.showAt(anchor.left, anchor.bottom, items);
+    } else {
+      ctx.show(event, items);
+    }
   };
 
   const resetStore = async () => {
