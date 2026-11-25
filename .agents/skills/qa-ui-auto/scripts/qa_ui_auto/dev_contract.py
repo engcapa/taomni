@@ -17,7 +17,7 @@ import yaml
 
 CASE_ROOT = Path("qa-ui-auto-tests/cases")
 POLICY_PATH = Path("qa-ui-auto-tests/ci/policy.yaml")
-PRODUCT_PREFIXES = ("src/", "src-tauri/src/", "vite-plugins/")
+PRODUCT_PREFIXES = ("src/", "src-tauri/src/", "vite-plugins/", "src-tauri/plugins/")
 UNIT_TEST_PREFIXES = ("src/", "src-tauri/tests/", ".agents/skills/qa-ui-auto/scripts/")
 
 
@@ -82,6 +82,12 @@ def evaluate(paths: list[str], *, case_ids: set[str], policy_ids: set[str]) -> d
             "Add or update a focused case in qa-ui-auto-tests/cases/ and register its ID "
             "in qa-ui-auto-tests/ci/policy.yaml, or record a concrete reason in the design/PR."
         )
+    ui_paths = [Path(path) for path in product_paths if path.endswith((".tsx", ".jsx", ".css"))]
+    if ui_paths and case_paths and not any(
+        Path(path).is_file() and (yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}).get("ui_standard")
+        for path in case_paths
+    ):
+        warnings.append("Desktop UI changed. Map applicable UI-STANDARD rules to observed results in a changed case.")
     return {
         "product_paths": product_paths,
         "case_paths": case_paths,

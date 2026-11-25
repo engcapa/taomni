@@ -8,7 +8,8 @@ description: >-
   not claim OS-level pointer delivery or a packaged-WebView repaint.
 modes: [browser, native]
 covers: [F-EXPLORER-1]
-tags: [p1, explorer, regression]
+ui_standard: [UI-PNL-03]
+tags: [ui-contract, p1, explorer, regression]
 fixtures: [reset_db]
 timeout_sec: 120
 steps:
@@ -34,6 +35,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
+    ui_standard: [UI-PNL-03]
     requirement: >-
       The Explorer surface renders without a sidebar Panel or draggable resize divider while the rail and Explorer
       tab strip remain visible.

@@ -37,6 +37,8 @@ class TestCase:
     source_path: Path | None = None
     verification: dict[str, Any] = field(default_factory=dict)
 
+    ui_standard: list[str] = field(default_factory=list)
+
     def supports_mode(self, mode: str) -> bool:
         return mode in self.modes
 
@@ -135,6 +137,7 @@ def load_case(path: Path) -> TestCase:
         skip=raw.get("skip"),
         steps=list(raw["steps"]),
         source_path=path,
+        ui_standard=list(raw.get("ui_standard", [])),
         verification=raw.get("verification", {}),
     )
 

@@ -8,6 +8,8 @@ from __future__ import annotations
 from typing import Any
 
 import argparse
+from functools import lru_cache
+import re
 import json
 from pathlib import Path
 
@@ -95,11 +97,28 @@ def is_check(step: dict) -> bool:
     return False
 
 
+@lru_cache(maxsize=1)
+def standard_ids() -> set[str]:
+    standard = Path(__file__).resolve().parents[5] / "docs-feature/ui-standard/UI-STANDARD.md"
+    ids = re.findall(r"^\| (UI-[A-Z0-9]+-[0-9]{2}[a-z]?) \|", standard.read_text(encoding="utf-8"), re.M)
+    if not ids or len(set(ids)) != len(ids):
+        raise ValueError("UI-STANDARD must define unique rule IDs in the first table column")
+    return set(ids)
+
+
 def validate_contract(doc: dict, *, require_review: bool = False) -> list[str]:
     contract = doc.get("verification")
     if not contract:
-        return ["missing verification contract"] if require_review else []
+        return ["missing verification contract"] if require_review or doc.get("ui_standard") else []
     errors = []
+    declared = set(doc.get("ui_standard", []))
+    mapped = {rule for req in contract["requirements"] for rule in req.get("ui_standard", [])}
+    if declared != mapped:
+        errors.append("ui_standard must equal the union of requirement rule IDs")
+    if declared or mapped:
+        unknown = (declared | mapped) - standard_ids()
+        if unknown:
+            errors.append(f"unknown UI-STANDARD rules: {sorted(unknown)}")
     steps = doc["steps"]
     if require_review and contract["review"] != "reviewed":
         errors.append("verification contract still needs semantic review")
@@ -133,6 +152,7 @@ def execution_contract(contract: dict, result: dict, *, dry_run: bool) -> dict:
         statuses = {e["status"] for e in evidence}
         status = "passed" if statuses == {"passed"} else "failed" if "failed" in statuses else "unrun"
         requirements.append({"id": req["id"], "requirement": req["requirement"],
+                             "ui_standard": req.get("ui_standard", []), "results": req["results"],
                              "status": status, "evidence": evidence})
     return {"review": contract.get("review", "missing"), "requirements": requirements,
             "visual": contract.get("visual", []), "native": contract.get("native", []),

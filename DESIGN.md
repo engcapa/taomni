@@ -1,5 +1,7 @@
 # Taomni Architecture
 
+Desktop UI, interaction rules and exceptions are maintained in [UI-STANDARD](docs-feature/ui-standard/UI-STANDARD.md).
+
 > Status: current architecture overview. Update this document when a subsystem boundary or persistent data contract changes. Detailed implemented UI coverage lives in `qa-ui-auto-tests/feature-list.md`; dependency versions live in `package.json` and `src-tauri/Cargo.toml`.
 
 ## Product boundary

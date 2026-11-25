@@ -35,6 +35,20 @@ class BehaviorContractTest(TestCase):
         self.assertEqual(execution_contract(self.contract(), result, dry_run=True)["requirements"][0]["status"], "unrun")
         self.assertEqual(execution_contract(self.contract(), result, dry_run=False)["requirements"][0]["status"], "passed")
 
+    def test_ui_rules_require_an_observed_result_and_survive_execution(self):
+        contract = self.contract()
+        doc = {"verification": contract, "steps": [{"click": "#cancel"}, {"assert_visible": "#original"}],
+               "ui_standard": ["UI-DLG-06"]}
+        self.assertTrue(validate_contract(doc))
+        requirement = contract["requirements"][0]
+        requirement["ui_standard"] = ["UI-DLG-06"]
+        self.assertEqual(validate_contract(doc), [])
+        receipt = execution_contract(contract, {"step_timings": []}, dry_run=False)["requirements"][0]
+        self.assertEqual((receipt["ui_standard"], receipt["results"], receipt["status"]),
+                         (["UI-DLG-06"], [2], "unrun"))
+        doc["ui_standard"] = requirement["ui_standard"] = ["UI-UNKNOWN-99"]
+        self.assertTrue(any("unknown UI-STANDARD" in error for error in validate_contract(doc)))
+
     def reject(self, observed, expected, *, items):
         with patch("qa_ui_auto.exact_assertions.time.monotonic", side_effect=[0, 0, 11]), patch("qa_ui_auto.exact_assertions.time.sleep"):
             with self.assertRaises(StepError):

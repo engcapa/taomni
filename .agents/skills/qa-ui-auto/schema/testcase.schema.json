@@ -32,6 +32,7 @@
       },
       "uniqueItems": true
     },
+    "ui_standard": {"$ref": "#/$defs/ui_standard"},
     "tags": {
       "type": "array",
       "items": {
@@ -272,6 +273,7 @@
                 "type": "string",
                 "minLength": 1
               },
+              "ui_standard": {"$ref": "#/$defs/ui_standard"},
               "requirement": {
                 "type": "string",
                 "minLength": 1
@@ -385,6 +387,12 @@
     }
   },
   "$defs": {
+    "ui_standard": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^UI-[A-Z0-9]+-[0-9]{2}[a-z]?$"}
+    },
     "language_startup_counts": {
       "type": "object",
       "minProperties": 1,

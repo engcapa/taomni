@@ -17,7 +17,7 @@ class DevelopmentContractTests(unittest.TestCase):
         result = evaluate(
             [
                 "src/components/editor/CodeWorkspaceTab.tsx",
-                "qa-ui-auto-tests/cases/TC-NEW.testcase.yaml",
+                "qa-ui-auto-tests/cases/TC-EXPLORER-012-explorer-rail-only-layout.testcase.yaml",
             ],
             case_ids={"TC-001", "TC-NEW"},
             policy_ids={"TC-001", "TC-NEW"},
