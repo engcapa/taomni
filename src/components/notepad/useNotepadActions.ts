@@ -152,8 +152,7 @@ export function useNotepadActions(deps: NotepadActionDeps) {
     insertText(txt) {
       const v = deps.getActiveView();
       if (!v || deps.effectiveReadOnly) return;
-      const sel = v.state.selection.main;
-      v.dispatch({ changes: { from: sel.from, to: sel.to, insert: txt }, selection: { anchor: sel.from + txt.length } });
+      v.dispatch(v.state.replaceSelection(txt));
     },
     getCursorAndLength() {
       const v = deps.getActiveView();

@@ -1,0 +1,46 @@
+id: TC-NP-106
+title: Multiline Windows clipboard text replaces the selection and leaves the caret after the inserted text
+covers: [F-NOTEPAD-1]
+tags: [p1, notepad, clipboard, regression]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 150
+steps:
+  - open: ${cfg.app.base_url}
+  - click: '[data-testid="side-tab-explorer"]'
+  - click: '[data-testid="explorer-tab-new-notepad"]'
+  - click: '[data-testid="viewer-editor"] .cm-content'
+  - type: replace me
+  - press: Mod+a
+  - seed_clipboard: "第一行\r\nsecond line"
+  - press: Mod+v
+  - assert_items: {selector: '[data-testid="viewer-editor"] .cm-line', equals: [第一行, second line]}
+  - type: '!'
+  - assert_items: {selector: '[data-testid="viewer-editor"] .cm-line', equals: [第一行, 'second line!']}
+  - press: Mod+a
+  - click: '[data-testid="notepad-menu-edit"]'
+  - click: '[data-testid="notepad-menu-item-edit.pasteSpecial"]'
+  - click: '[data-testid="notepad-paste-plain"]'
+  - assert_items: {selector: '[data-testid="viewer-editor"] .cm-line', equals: [第一行, second line]}
+  - assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+    - id: R1
+      requirement: The paste replaces the previous selection once and subsequent input follows the last pasted line.
+      actions: [5, 6, 7, 8, 10]
+      checkpoints:
+        - {step: 9, expectation: Both pasted lines replace the entire old buffer.}
+        - {step: 11, expectation: Typing adds the exclamation mark immediately after the second line.}
+      results: [9, 11]
+    - id: R2
+      requirement: Paste Special uses the same document coordinates when replacing a selection at EOF.
+      actions: [12, 13, 14, 15]
+      checkpoints:
+        - {step: 16, expectation: The plain text replaces both selected lines and removes the exclamation mark.}
+        - {step: 17, expectation: Neither entry point raised an uncaught editor error.}
+      results: [16, 17]
+  visual:
+    - {check: Editor lines and caret placement, method: automated, reason: Assert each line before and after typing at the resulting caret.}
+  native:
+    - {check: System clipboard, method: external, reason: TC-NP-105 and TC-NP-107 plant text using the host OS.}

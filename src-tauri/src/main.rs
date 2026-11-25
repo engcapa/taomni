@@ -1,6 +1,9 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(windows)]
+mod windows_update_relaunch;
+
 fn main() {
     if std::env::args().nth(1).as_deref() == Some("--headless") {
         std::process::exit(taomni_lib::mobile::headless::run());
@@ -19,6 +22,10 @@ fn main() {
     #[cfg(windows)]
     if std::env::args().nth(1).as_deref() == Some(taomni_lib::VNC_SPECIAL_KEY_HOOK_ARG) {
         std::process::exit(taomni_lib::run_vnc_special_key_hook());
+    }
+    #[cfg(windows)]
+    if windows_update_relaunch::handoff_to_desktop() {
+        return;
     }
     taomni_lib::run();
 }
