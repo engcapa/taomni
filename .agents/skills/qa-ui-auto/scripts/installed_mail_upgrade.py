@@ -188,10 +188,14 @@ def close_tab(steps, tab_type):
 def read_original(steps):
     row = element("mail-message-row") + f'[data-subject="{LEGACY_SUBJECT}"]'
     desktop_action(steps, "wait_for", {"selector": row, "timeout_sec": 45})
-    desktop_action(steps, "press", {"selector": row, "key": "Enter"})
-    desktop_action(steps, "assert_text", {
-        "selector": element("mail-reader-text"), "contains": LEGACY_BODY, "timeout_sec": 45,
-    })
+    try:
+        desktop_action(steps, "dblclick", row)
+        desktop_action(steps, "assert_text", {
+            "selector": element("mail-reader-text"), "contains": LEGACY_BODY, "timeout_sec": 45,
+        })
+    except RuntimeError:
+        steps.session.screenshot(steps.case_dir / "installed-mail-reader-failure.png")
+        raise
 
 
 def open_account(steps, *, signed=False):
