@@ -23,6 +23,12 @@ class DialogRegistryTests(unittest.TestCase):
             self.assertEqual(len(sync(REGISTRY, cases, check=True)), 2)
             self.assertEqual(case.read_text(encoding="utf-8"), "stale")
 
+    def test_initial_field_needs_a_keyboard_path_to_the_first_control(self):
+        entry = yaml.safe_load(REGISTRY.read_text(encoding="utf-8"))["dialogs"][0]
+        for path in ([], ["Escape"]):
+            with self.subTest(path=path), self.assertRaisesRegex(ValueError, "keyboard path"):
+                dialog_case({**entry, "initial": "editor", "to_first": path})
+
     def test_rejects_ids_outside_the_case_directory(self):
         entry = yaml.safe_load(REGISTRY.read_text(encoding="utf-8"))["dialogs"][0]
         with self.assertRaisesRegex(ValueError, "Invalid dialog slug"):

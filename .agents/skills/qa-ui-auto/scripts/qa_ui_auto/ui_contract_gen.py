@@ -47,15 +47,32 @@ def dialog_case(entry: dict) -> dict:
     geometry = step("assert_element_geometry", {
         "selector": panel, "min_width": 1, "min_height": 1, "viewport_margin": 0,
     })
-    focused = step("assert_focus_on", first)
-    requirement("open", "The entry opens a labelled modal within the viewport and focuses its first control.",
+    initial = selector("initial") if "initial" in entry else first
+    focused = step("assert_focus_on", initial)
+    requirement("open", "The entry opens a labelled modal within the viewport and focuses its first control." if initial == first
+                else "The entry opens a labelled modal within the viewport and focuses its editing field.",
                 ["UI-DLG-03", "UI-DLG-06"], [opening],
                 [(title, "The modal references the expected title."), (geometry, "All edges fit the viewport."),
-                 (focused, "The first control has focus.")])
+                 (focused, "The initial control has focus." if initial != first else "The first control has focus.")])
+    if initial != first:
+        navigation = entry.get("to_first")
+        if not navigation or any(key not in ("Tab", "Shift+Tab") for key in navigation):
+            raise ValueError(f"{slug} must give the keyboard path from initial focus to its first control")
+        actions = [step("press", key) for key in navigation]
+        edge = step("assert_focus_on", first)
+        requirement("first-control", "The first control is reachable from the initial editing field.",
+                    ["UI-DLG-04"], actions, [(edge, "Focus reaches the leading control.")])
+
     back = step("press", "Shift+Tab")
     end = step("assert_focus_on", last)
     forward = step("press", "Tab")
     start = step("assert_focus_on", first)
+    # Return to the editing field before cancelling. A keyboard-focused icon
+    # at the edge of the cycle may have its own dismissible tooltip.
+    if initial != first:
+        for key in reversed(navigation):
+            step("press", "Tab" if key == "Shift+Tab" else "Shift+Tab")
+        step("assert_focus_on", initial)
     close = step("press", "Escape")
     gone = step("assert_not_visible", panel)
     returned = step("assert_focus_on", selector("return_to"))

@@ -40,3 +40,22 @@ dialogs:
       - press: Enter
       - fill: {selector: '[data-testid="mail-compose-subject"]', value: Report attached}
       - press: {selector: '[data-testid="mail-compose-send"]', key: Enter}
+  - slug: workspace-build-tools
+    title: Build and Run Tools opens at Cargo and returns to the Run panel
+    covers: [F25.1]
+    fixtures: [reset_db]
+    panel: workspace-build-run-tools-dialog
+    heading: Build and Run Tools
+    initial: workspace-tool-cargo
+    to_first: [Shift+Tab]
+    first: workspace-build-run-tools-close
+    last: workspace-build-run-tools-save
+    return_to: run-panel-configure-tools
+    open:
+      - open: ${cfg.app.base_url}
+      - vault_first_run: qa-build-tools
+      - click: '[data-testid="side-tab-tools"]'
+      - click: '[data-testid="sidebar-tool-code-workspace"]'
+      - wait_for: '[data-testid="code-workspace-tab"]'
+      - click: '[data-testid="code-workspace-bottom-tab-run"]'
+      - press: {selector: '[data-testid="run-panel-configure-tools"]', key: Enter}

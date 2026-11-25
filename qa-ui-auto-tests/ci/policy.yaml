@@ -317,6 +317,7 @@ cases:
 - TC-UIC-019-session-file-validation
 - TC-UIC-DLG-explorer-new-file
 - TC-UIC-DLG-mail-attachment-reminder
+- TC-UIC-DLG-workspace-build-tools
 - TC-MOBILE-001
 - TC-MOBILE-002
 - TC-MOBILE-003

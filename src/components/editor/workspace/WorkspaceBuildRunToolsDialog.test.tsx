@@ -4,6 +4,27 @@ import { WorkspaceBuildRunToolsDialog } from "./WorkspaceBuildRunToolsDialog";
 
 describe("WorkspaceBuildRunToolsDialog", () => {
   afterEach(cleanup);
+  it("protects modified tool paths on Escape and lets editing continue", () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    render(<WorkspaceBuildRunToolsDialog config={{ tools: {}, mavenRun: { jvmArgs: [], inheritProjectJvmArgs: true } }}
+      onSave={onSave} onClose={onClose} />);
+    const cargo = screen.getByRole("textbox", { name: "Cargo executable" });
+    expect(cargo).toHaveFocus();
+    fireEvent.change(cargo, { target: { value: "/qa/cargo" } });
+    fireEvent.keyDown(cargo, { key: "Escape" });
+    const keep = screen.getByRole("button", { name: "Keep editing" });
+    expect(keep).toHaveFocus();
+    fireEvent.click(keep);
+    expect(cargo).toHaveValue("/qa/cargo");
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onSave).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("workspace-build-run-tools-cancel"));
+    fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it("saves Maven JVM options and project argLine inheritance", () => {
     const onSave = vi.fn();
     render(

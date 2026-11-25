@@ -115,7 +115,6 @@
   "src/components/editor/workspace/TabSwitcher.tsx": {"L02":1,"L05":1},
   "src/components/editor/workspace/UndoWorkspaceEditConfirmDialog.tsx": {"L02":1},
   "src/components/editor/workspace/UsagesScopeDialog.tsx": {"L04-inline":1},
-  "src/components/editor/workspace/WorkspaceBuildRunToolsDialog.tsx": {"L02":1,"L08":1},
   "src/components/editor/workspace/WorkspaceEditorAppearanceSettingsDialog.tsx": {"L02":1},
   "src/components/editor/workspace/WorkspaceIntelligenceSettingsDialog.tsx": {"L02":1},
   "src/components/editor/workspace/WorkspaceRecoveryDialog.tsx": {"L02":1,"L04":4},
