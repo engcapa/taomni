@@ -76,7 +76,16 @@ export function installTooltips(doc: Document) {
     if (target?.matches(":focus-visible")) open(target, true);
   };
   const key = (event: KeyboardEvent) => {
-    if (!event.isComposing && event.key === "Escape") close();
+    if (event.isComposing || event.keyCode === 229 || !owner) return;
+    if (event.key === "Escape") {
+      if (tip.isConnected) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+      close();
+    } else if (event.key === "Enter" || event.key === " ") {
+      close();
+    }
   };
   const events = new AbortController();
   const options = { capture: true, signal: events.signal };
@@ -85,7 +94,7 @@ export function installTooltips(doc: Document) {
   doc.addEventListener("focusin", focus, options);
   doc.addEventListener("focusout", close, options);
   doc.addEventListener("pointerdown", close, options);
-  doc.addEventListener("keydown", key, options);
+  win.addEventListener("keydown", key, options);
   doc.addEventListener("scroll", close, options);
   win.addEventListener("resize", close, options);
   win.addEventListener("blur", close, options);

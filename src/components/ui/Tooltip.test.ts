@@ -54,3 +54,21 @@ it("puts keyboard hints inside their modal and clears them with Escape or when t
   await Promise.resolve();
   expect(dialog.querySelector('[role="tooltip"]')).toBeNull();
 });
+
+it("dismisses one visible layer per Escape and leaves composition and pending hints with the control", () => {
+  const target = button("Close");
+  const dialogKey = vi.fn();
+  target.addEventListener("keydown", dialogKey);
+  fireEvent.pointerOver(target);
+  fireEvent.keyDown(target, { key: "Escape" });
+  expect(dialogKey).toHaveBeenCalledTimes(1);
+  fireEvent.pointerOver(target);
+  vi.advanceTimersByTime(500);
+  fireEvent.keyDown(target, { key: "Escape", keyCode: 229 });
+  expect(document.querySelector('[role="tooltip"]')).toBeVisible();
+  expect(dialogKey).toHaveBeenCalledTimes(2);
+  expect(fireEvent.keyDown(target, { key: "Escape" })).toBe(false);
+  expect(dialogKey).toHaveBeenCalledTimes(2);
+  fireEvent.keyDown(target, { key: "Escape" });
+  expect(dialogKey).toHaveBeenCalledTimes(3);
+});
