@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../src/components/ui/IconButton";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, ChevronRight, Search, RefreshCw } from "lucide-react";
@@ -482,16 +483,16 @@ export function UpstreamSourcePicker({
                 onKeyDown={onKeyDown}
               />
             </div>
-            <button
+            <IconButton
               type="button"
               data-testid={`${testId}-rescan`}
               className="px-2 py-1.5 rounded text-ui-small border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] shrink-0 inline-flex items-center gap-1"
               onClick={() => void doRescan()}
               disabled={busy || rescanning}
-              title={t("sockscap.picker.rescan")}
+              label={t("sockscap.picker.rescan")}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${rescanning ? "animate-spin" : ""}`} />
-            </button>
+            </IconButton>
           </div>
           <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto p-0.5">
             {rows.length === 0 ? (

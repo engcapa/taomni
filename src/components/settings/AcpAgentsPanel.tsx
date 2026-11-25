@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -343,15 +344,15 @@ export function AcpAgentsPanel() {
                   {t("aiSettings.acpPreferred")}
                 </label>
                 {!isGrok && (
-                  <button
+                  <IconButton
                     type="button"
                     className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center text-red-400"
                     onClick={() => removeProfile(profile.id)}
-                    title={t("aiSettings.acpRemoveProfile")}
+                    label={t("aiSettings.acpRemoveProfile")}
                     data-testid={`acp-profile-${profile.id}-remove`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  </IconButton>
                 )}
               </div>
 

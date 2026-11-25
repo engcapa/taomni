@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { ChevronDown, ChevronRight, Database, RefreshCw, Search } from "lucide-react";
 import { useT } from "../../../lib/i18n";
 import { useConfirmDialog, useTextInputDialog } from "../../sidebar/ConfirmDialog";
@@ -71,14 +72,14 @@ export function SchemaTreeView(props: SchemaTreeViewProps) {
       >
         <Database className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
         <span className="truncate flex-1">{engine}</span>
-        <button
+        <IconButton
           type="button"
-          title="Refresh"
+          labelKey="refresh"
           className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
           onClick={metadata.refreshAll}
         >
           <RefreshCw className="w-3 h-3" />
-        </button>
+        </IconButton>
       </div>
 
       <div

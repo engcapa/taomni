@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { type CSSProperties } from "react";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle, type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
 import { Plus, X, AlertTriangle, Loader2, Bot, ExternalLink, Maximize2, Minimize2, ChevronRight, Files, Database } from "lucide-react";
@@ -435,14 +436,14 @@ export function DatabaseWorkspaceView(props: DatabaseWorkspaceViewProps) {
                 );
               })}
               {workspace.panels.length < workspace.tabLimit && (
-                <button
+                <IconButton
                   type="button"
-                  title="New query panel"
+                  labelKey="newQueryPanel"
                   className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
                   onClick={panelActions.addPanel}
                 >
                   <Plus className="w-3 h-3" />
-                </button>
+                </IconButton>
               )}
             </div>
 

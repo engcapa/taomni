@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { memo, useEffect, useId, useState } from "react";
 import { Import, RotateCcw, Save, X } from "lucide-react";
 import {
@@ -81,15 +82,15 @@ export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({
               Auto Import Settings
             </h2>
           </div>
-          <button
+          <IconButton
             type="button"
             onClick={onClose}
             className="p-1 rounded hover:bg-neutral-800 text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
-            title="Close (Escape)"
+            labelKey="closeEsc"
             data-testid="auto-import-close-button"
           >
             <X className="w-4 h-4" />
-          </button>
+          </IconButton>
         </div>
 
         {/* Form Controls */}

@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { sessionCapabilities } from "../../../lib/sessionCapabilities";
 import { type ClipboardEvent } from "react";
 import { Terminal as TerminalIcon, Shield, Search } from "lucide-react";
@@ -58,15 +59,15 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
                   aria-label={proto === "Browser" ? t("sessionEditor2.browserUrl") : t("sessionEditor2.remoteHostAria")}
                   placeholder={proto === "Browser" ? t("sessionEditor2.browserUrlPlaceholder") : t("sessionEditor2.remoteHostPlaceholder")}
                 />
-                {proto !== "Browser" && <button
+                {proto !== "Browser" && <IconButton
                   data-testid="session-host-lookup"
-                  title={t("sessionEditor2.lookup")}
+                  label={t("sessionEditor2.lookup")}
                   className="taomni-btn px-2"
                   onClick={handleHostLookup}
                   type="button"
                 >
                   <Search className="w-3 h-3 inline -mt-0.5" />
-                </button>}
+                </IconButton>}
               </div>
               {sessionCapabilities(proto).username && <>
               <label className="col-span-3 text-ui-body flex items-center gap-1.5 justify-end">

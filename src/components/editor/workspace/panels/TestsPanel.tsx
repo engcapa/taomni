@@ -1,3 +1,4 @@
+import { IconButton } from "../../../ui/IconButton";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bug, CheckCircle2, ChevronDown, ChevronRight, CircleAlert, CircleDashed, CircleX, FlaskConical, Loader2, Play, RefreshCw, RotateCcw, Square } from "lucide-react";
 import type { JavaTestItem } from "../../../../lib/editor/lsp";
@@ -81,15 +82,15 @@ function TestRow({
         >
           <Play className="h-3 w-3" />
         </button>
-        <button
+        <IconButton
           type="button"
           data-testid={`tests-debug-${item.fullName}`}
           className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors"
           onClick={() => onDebug(item)}
-          title="Debug test (requires java-debug + java-test bundles)"
+          labelKey="debugTest"
         >
           <Bug className="h-3.5 w-3.5" />
-        </button>
+        </IconButton>
       </div>
       {open && hasChildren && item.children.map((child) => (
         <TestRow
@@ -199,16 +200,16 @@ export function TestsPanel({
               </button>
               <span className="shrink-0 text-ui-caption text-[var(--taomni-text-muted)]">{formatTestDuration(result.durationMs)}</span>
               {onRerun && (
-                <button
+                <IconButton
                   type="button"
                   data-testid={`tests-rerun-${result.id}`}
                   className="shrink-0 opacity-0 group-hover:opacity-100"
-                  title="Rerun test"
+                  labelKey="rerunTest"
                   onClick={() => onRerun(result)}
                   disabled={runDisabled}
                 >
                   <RotateCcw className="h-3 w-3" />
-                </button>
+                </IconButton>
               )}
             </div>
             {(result.message || result.details) && (

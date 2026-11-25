@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useState } from "react";
 import { Save, Trash2, Pencil, Plus, RefreshCw, Braces } from "lucide-react";
 import {
@@ -75,9 +76,9 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
         </span>
         <span className="font-mono truncate flex-1" title={redisKey}>{redisKey}</span>
         <span className="text-[var(--taomni-text-muted)]">TTL: {value ? ttlText(value.ttl) : "—"}</span>
-        <button
+        <IconButton
           type="button"
-          title="Edit TTL"
+          labelKey="editTtl"
           className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
           onClick={async () => {
             const input = await promptAppDialog({
@@ -104,15 +105,15 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
           }}
         >
           <Pencil className="w-3 h-3" />
-        </button>
+        </IconButton>
         {value?.encoding && <span className="text-[var(--taomni-text-muted)]">enc: {value.encoding}</span>}
         {value?.memoryUsage != null && <span className="text-[var(--taomni-text-muted)]">mem: {value.memoryUsage}B</span>}
-        <button type="button" title="Reload" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => void load()}>
+        <IconButton type="button" labelKey="reload" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => void load()}>
           <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           type="button"
-          title="Delete key"
+          labelKey="deleteKey"
           className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
           style={{ color: "#d9534f" }}
           onClick={async () => {
@@ -131,7 +132,7 @@ export function RedisValuePanel({ sessionId, redisKey, onDeleted, onChanged }: R
           }}
         >
           <Trash2 className="w-3 h-3" />
-        </button>
+        </IconButton>
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y p-2">

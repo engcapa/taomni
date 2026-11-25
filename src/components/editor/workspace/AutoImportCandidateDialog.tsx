@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { useEffect, useId, useState } from "react";
 import { HelpCircle, X } from "lucide-react";
 import type { AutoImportCandidate } from "./autoImportModel";
@@ -63,15 +64,15 @@ export function AutoImportCandidateDialog({
               Select Class to Import
             </h2>
           </div>
-          <button
+          <IconButton
             type="button"
             onClick={onClose}
             className="p-1 rounded hover:bg-neutral-800 text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
-            title="Cancel (Escape)"
+            labelKey="cancelEsc"
             data-testid="auto-import-candidate-cancel"
           >
             <X className="w-3.5 h-3.5" />
-          </button>
+          </IconButton>
         </div>
 
         <p className="text-xs text-[var(--taomni-code-muted)]">

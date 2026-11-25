@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
   Users, X, Send, ChevronUp, ChevronDown, Maximize2, Clock, CornerDownLeft,
@@ -160,14 +161,14 @@ function ExpandedEditor({ initialValue, onSend, onClose, onApplyToBar }: Expande
             {t("multiExec.editorHint")}
           </span>
           <div className="flex-1" />
-          <button
+          <IconButton
             className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
             onClick={onClose}
             type="button"
-            title={t("multiExec.closeEsc")}
+            label={t("multiExec.closeEsc")}
           >
             <X className="w-3 h-3" />
-          </button>
+          </IconButton>
         </div>
 
         {/* Body: editor + history sidebar */}
@@ -434,37 +435,37 @@ export function MultiExecBar({
           />
           {/* History navigation arrows */}
           <div className="flex flex-col flex-shrink-0" style={{ marginTop: 1 }}>
-            <button
+            <IconButton
               type="button"
               className="w-4 h-3.5 inline-flex items-center justify-center rounded-t hover:bg-[var(--taomni-hover)] disabled:opacity-30"
               style={{ border: "1px solid var(--taomni-divider)", borderBottom: "none", background: "var(--taomni-button-to)" }}
               onClick={() => navigateHistory("up")}
               disabled={history.length === 0}
-              title={t("multiExec.historyPrev")}
+              label={t("multiExec.historyPrev")}
             >
               <ChevronUp className="w-2.5 h-2.5" />
-            </button>
-            <button
+            </IconButton>
+            <IconButton
               type="button"
               className="w-4 h-3.5 inline-flex items-center justify-center rounded-b hover:bg-[var(--taomni-hover)] disabled:opacity-30"
               style={{ border: "1px solid var(--taomni-divider)", background: "var(--taomni-button-to)" }}
               onClick={() => navigateHistory("down")}
               disabled={historyIdx === null}
-              title={t("multiExec.historyNext")}
+              label={t("multiExec.historyNext")}
             >
               <ChevronDown className="w-2.5 h-2.5" />
-            </button>
+            </IconButton>
           </div>
           {/* Expand button */}
-          <button
+          <IconButton
             type="button"
             className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] flex-shrink-0 mt-0.5"
             style={{ border: "1px solid var(--taomni-divider)" }}
             onClick={() => setExpanded(true)}
-            title={t("multiExec.expand")}
+            label={t("multiExec.expand")}
           >
             <Maximize2 className="w-3 h-3" />
-          </button>
+          </IconButton>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
           <button
@@ -497,14 +498,14 @@ export function MultiExecBar({
           >
             {t("multiExec.clearShort")}
           </button>
-          <button
+          <IconButton
             className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] flex-shrink-0"
             onClick={onClose}
             type="button"
-            title={t("multiExec.closeBar")}
+            label={t("multiExec.closeBar")}
           >
             <X className="w-3 h-3" />
-          </button>
+          </IconButton>
         </div>
       </div>
     </>

@@ -7,6 +7,7 @@
  *  1. SessionEditor (for persisting mappings to options_json)
  *  2. FileBrowser toolbar (for runtime view/edit of the active session's mappings)
  */
+import { IconButton } from "../ui/IconButton";
 import { useState, useCallback } from "react";
 import { Plus, Trash2, FolderOpen, AlertTriangle } from "lucide-react";
 import type { SftpPathMapping } from "../../types";
@@ -125,16 +126,16 @@ export function PathMappingsEditor({
                 data-testid={`path-mapping-local-${index}`}
               />
               {canBrowseLocal && onBrowseLocal && (
-                <button
+                <IconButton
                   type="button"
                   className="px-1 py-0.5 hover:bg-[var(--taomni-hover)] rounded shrink-0"
-                  title={t("pathMappings.browseLocalTitle")}
+                  label={t("pathMappings.browseLocalTitle")}
                   disabled={validating[index]}
                   onClick={() => void handleBrowseLocal(index)}
                   data-testid={`path-mapping-browse-local-${index}`}
                 >
                   <FolderOpen className="w-3 h-3" />
-                </button>
+                </IconButton>
               )}
             </div>
 
@@ -158,15 +159,15 @@ export function PathMappingsEditor({
             </div>
 
             {/* Remove button */}
-            <button
+            <IconButton
               type="button"
               className="px-1 py-0.5 hover:bg-red-100 dark:hover:bg-red-900/20 hover:text-red-600 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0"
-              title={t("pathMappings.removeTitle")}
+              label={t("pathMappings.removeTitle")}
               onClick={() => handleRemove(index)}
               data-testid={`path-mapping-remove-${index}`}
             >
               <Trash2 className="w-3 h-3" />
-            </button>
+            </IconButton>
           </div>
         );
       })}

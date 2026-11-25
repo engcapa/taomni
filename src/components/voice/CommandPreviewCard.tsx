@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle, Copy, Edit2, X } from "lucide-react";
 import { useT, type TranslateFn } from "../../lib/i18n";
@@ -93,14 +94,14 @@ export function CommandPreviewCard({ preview, onExecute, onCancel, onCopy }: Com
         <span className={`text-ui-small font-medium px-2 py-0.5 rounded-full border ${risk.border} ${risk.color}`}>
           {risk.label}
         </span>
-        <button
+        <IconButton
           type="button"
           className="text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] transition-colors"
           onClick={() => onCancel(preview.audit_id)}
-          title={t("voice.cardCancelTitle")}
+          label={t("voice.cardCancelTitle")}
         >
           <X className="w-4 h-4" />
-        </button>
+        </IconButton>
       </div>
 
       {/* Blocked warning */}

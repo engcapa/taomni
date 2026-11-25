@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../../src/components/ui/IconButton";
 import { FileText, Loader2, RefreshCw, Send, Trash2 } from "lucide-react";
 import { type SetStateAction } from "react";
 import { type MailDraft } from "../../../../../src/lib/mail";
@@ -137,14 +138,14 @@ export function MailDraftsDialog(context: MailDraftsDialogContext) {
                   Send now
                 </button>
               )}
-              <button
+              <IconButton
                 type="button"
                 className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center"
-                title="Delete draft"
+                labelKey="deleteDraft"
                 onClick={() => void deleteSavedDraft(saved)}
               >
                 <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              </IconButton>
             </div>
           ))}
         </div>

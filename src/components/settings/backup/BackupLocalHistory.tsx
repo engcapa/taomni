@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { RefreshCw, Lock, Unlock } from "lucide-react";
 import { getLocale } from "../../../lib/i18n";
 import type { BackupSettingsViewProps } from "./BackupSettingsTypes";
@@ -12,15 +13,15 @@ export function BackupLocalHistory(inputs: Pick<BackupSettingsViewProps, "t" | "
               <h4 className="text-sm font-medium text-theme-text">
                 {t("backupSettings.historyTitle")} ({safeHistory.length})
               </h4>
-              <button
+              <IconButton
                 type="button"
                 data-testid="backup-history-refresh"
                 onClick={() => void refreshHistory()}
                 className="p-1 rounded text-theme-muted hover:text-theme-text"
-                title={t("common.refresh")}
+                label={t("common.refresh")}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-              </button>
+              </IconButton>
             </div>
 
             {safeHistory.length === 0 ? (

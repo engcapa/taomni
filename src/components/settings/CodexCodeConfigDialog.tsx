@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { Button } from "../ui/Button";
 import { confirmAppDialog } from "../../lib/appDialogs";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -298,9 +299,9 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
         <div className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0 select-none" style={{ background: "linear-gradient(to bottom, #5895c8, #2b5d8b)", color: "white" }}>
           <Sliders className="w-3.5 h-3.5 mr-1.5" />
           <div className="text-ui-body font-semibold">{t("aiSettings.codexCustomModalTitle")}</div>
-          <button className="ml-auto hover:bg-red-500 rounded p-0.5" onClick={onClose} type="button" title={t("common.close")}>
+          <IconButton className="ml-auto hover:bg-red-500 rounded p-0.5" onClick={onClose} type="button" label={t("common.close")}>
             <X className="w-3.5 h-3.5" />
-          </button>
+          </IconButton>
         </div>
 
         <div className="flex-1 min-h-0 flex border-x border-b overflow-hidden" style={{ borderColor: "var(--taomni-input-border)", background: "var(--taomni-bg)" }}>
@@ -333,9 +334,9 @@ export function CodexCodeConfigDialog({ onClose }: Props) {
                         </span>
                       )}
                     </div>
-                    <button type="button" title={t("common.delete")} className="opacity-0 group-hover:opacity-100 hover:text-red-400 p-0.5 transition-opacity rounded" onClick={(e) => deleteProfile(p.id, e)}>
+                    <IconButton type="button" label={t("common.delete")} className="opacity-0 group-hover:opacity-100 hover:text-red-400 p-0.5 transition-opacity rounded" onClick={(e) => deleteProfile(p.id, e)}>
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </IconButton>
                   </div>
                 );
               })}

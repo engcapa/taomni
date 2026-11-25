@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../ui/IconButton";
 import { Trash2 } from "lucide-react";
 import { breakpointModesFor, parseBreakpointModes, resolveBreakpointMode, sortedBreakpoints } from "../../dapDebugModel";
 import { BreakpointEditor } from "./BreakpointEditor";
@@ -93,15 +94,15 @@ export function BreakpointsView({
               >
                 {open ? "Done" : "Edit"}
               </button>
-              <button
+              <IconButton
                 type="button"
                 data-testid={`debug-breakpoint-remove-${bp.line}`}
                 className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-rose-500"
                 onClick={() => debug.removeBreakpoint(path, bp.line)}
-                title="Remove breakpoint"
+                labelKey="removeBreakpoint"
               >
                 <Trash2 className="h-3 w-3" />
-              </button>
+              </IconButton>
             </div>
             {open && (
               <BreakpointEditor

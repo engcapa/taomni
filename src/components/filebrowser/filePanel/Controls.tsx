@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { ChevronDown, File as FileIcon, Folder, HardDrive, HelpCircle, Link as LinkIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useT } from "../../../lib/i18n";
@@ -107,16 +108,16 @@ export function DrivesPicker({ onSelect }: { onSelect: (path: string) => void; }
 
   return (
     <div ref={wrapRef} className="relative shrink-0">
-      <button
+      <IconButton
         type="button"
-        title={t("fileBrowser.drivesSwitchTitle")}
+        label={t("fileBrowser.drivesSwitchTitle")}
         className="h-5 px-1 inline-flex items-center gap-0.5 rounded hover:bg-[var(--taomni-hover)] text-ui-small"
         onClick={() => setOpen((v) => !v)}
         style={{ color: "var(--taomni-text-muted)" }}
       >
         <HardDrive className="w-3 h-3" />
         <ChevronDown className="w-3 h-3" />
-      </button>
+      </IconButton>
       {open && (
         <div
           className="absolute top-full left-0 mt-0.5 z-50 min-w-[160px] py-1 text-ui-body shadow-lg rounded"

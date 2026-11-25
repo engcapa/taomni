@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { GitBranch, ChevronDown, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "../../lib/i18n";
@@ -103,7 +104,7 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
         <section data-testid="workspace-linked-sessions" className="shrink-0 border-t p-1.5" style={{ borderColor: "var(--taomni-chrome-border)" }}>
           <div className="flex items-center justify-between gap-1 text-ui-caption text-[var(--taomni-text-muted)]">
             <button type="button" data-testid="workspace-linked-sessions-toggle" aria-expanded={linkedOpen} className="inline-flex min-w-0 items-center gap-1 py-1 font-semibold" onClick={() => setLinkedOpenByWorkspace((current) => ({ ...current, [workspace.id]: !linkedOpen }))}><ChevronDown className={`h-3 w-3 ${linkedOpen ? "" : "-rotate-90"}`} />{t("platform.frequentSessions")} ({workspace.pinnedSessionIds.length})</button>
-            <button type="button" data-testid="workspace-link-session" className="inline-flex shrink-0 items-center gap-0.5 rounded p-1 hover:bg-[var(--taomni-hover)]" title={t("platform.openAnySession")} onClick={onOpenSessionPicker}><Plus className="h-3 w-3" /></button>
+            <IconButton type="button" data-testid="workspace-link-session" className="inline-flex shrink-0 items-center gap-0.5 rounded p-1 hover:bg-[var(--taomni-hover)]" label={t("platform.openAnySession")} onClick={onOpenSessionPicker}><Plus className="h-3 w-3" /></IconButton>
           </div>
           {linkedOpen && <div className="max-h-[180px] overflow-auto">
             <p className="px-1 pb-1 text-ui-caption text-[var(--taomni-text-muted)]">{t("platform.isolatedSessionHint")}</p>

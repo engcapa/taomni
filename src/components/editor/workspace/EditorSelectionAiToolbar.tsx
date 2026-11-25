@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { useEffect, useRef, useState } from "react";
 import { BookOpen, Check, ChevronDown, GraduationCap, Languages, Sparkles, WandSparkles, X } from "lucide-react";
 import { useT } from "../../../lib/i18n";
@@ -163,14 +164,14 @@ export function EditorSelectionAiToolbar({
           )}
         </div>
       )}
-      <button
+      <IconButton
         type="button"
         className="h-7 w-7 inline-flex items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
-        title="Dismiss AI toolbar"
+        labelKey="dismissAiToolbar"
         onClick={onDismiss}
       >
         <X className="h-3.5 w-3.5" />
-      </button>
+      </IconButton>
     </div>
   );
 }

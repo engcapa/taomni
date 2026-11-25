@@ -1,3 +1,4 @@
+import { IconButton } from "../../../ui/IconButton";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bug,
@@ -340,37 +341,37 @@ export function DebugPanel({
               </div>
             )}
             <div className="ml-auto flex items-center gap-0.5 rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-0.5 shadow-xs">
-              <button
+              <IconButton
                 type="button"
                 data-testid="debug-start"
                 className={`${controlBtn} hover:bg-emerald-500/15`}
                 onClick={() => onStart?.()}
                 disabled={!onStart}
-                title="Start debugging the active file"
+                labelKey="debugActiveFile"
               >
                 <CirclePlay className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
-              </button>
+              </IconButton>
               {onAttach && (
-                <button
+                <IconButton
                   type="button"
                   data-testid="debug-attach"
                   className={`${controlBtn} hover:bg-sky-500/15`}
                   onClick={onAttach}
-                  title="Attach to a remote JVM process"
+                  labelKey="attachRemoteJvm"
                 >
                   <Plug className="h-4 w-4 text-sky-500 dark:text-sky-400" />
-                </button>
+                </IconButton>
               )}
               {debug.canRestart && !state && (
-                <button
+                <IconButton
                   type="button"
                   data-testid="debug-restart"
                   className={`${controlBtn} hover:bg-emerald-500/15`}
                   onClick={() => debug.restart()}
-                  title="Restart debug session"
+                  labelKey="restartDebug"
                 >
                   <RotateCcw className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
-                </button>
+                </IconButton>
               )}
             </div>
           </div>

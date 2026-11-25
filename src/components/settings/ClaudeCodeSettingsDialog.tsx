@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { confirmAppDialog } from "../../lib/appDialogs";
 import { useEffect, useState, useRef } from "react";
 import { Sliders, Loader2, X, Plus, Trash2, Shield, AlertTriangle } from "lucide-react";
@@ -421,14 +422,14 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
         >
           <Sliders className="w-3.5 h-3.5 mr-1.5" />
           <div className="text-ui-body font-semibold">{t("aiSettings.ccCustomModalTitle")}</div>
-          <button
-            title={t("common.close")}
+          <IconButton
+            label={t("common.close")}
             className="ml-auto hover:bg-red-500 rounded p-0.5"
             onClick={onClose}
             type="button"
           >
             <X className="w-3.5 h-3.5" />
-          </button>
+          </IconButton>
         </div>
 
         {/* Body columns */}
@@ -475,14 +476,14 @@ export function ClaudeCodeSettingsDialog({ onClose }: ClaudeCodeSettingsDialogPr
                         </span>
                       )}
                     </div>
-                    <button
+                    <IconButton
                       type="button"
-                      title={t("common.delete")}
+                      label={t("common.delete")}
                       className="opacity-0 group-hover:opacity-100 hover:text-red-400 p-0.5 transition-opacity rounded"
                       onClick={(e) => handleDeleteProfile(p.id, e)}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </IconButton>
                   </div>
                 );
               })}

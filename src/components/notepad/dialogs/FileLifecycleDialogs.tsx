@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { useEffect, useRef, useState } from "react";
 import { FolderOpen, ShieldAlert, Trash2, X } from "lucide-react";
 import { useViewerLabels } from "../../viewer/viewerLabels";
@@ -80,11 +81,11 @@ function NotepadSaveAsDialog({
             value={pathInput}
             onChange={(e) => { setPathInput(e.target.value); setOverwrite(false); }}
           />
-          <button
+          <IconButton
             type="button"
             className="np-btn"
             data-testid="notepad-save-as-browse"
-            title={modal.defaultDir}
+            label={modal.defaultDir}
             onClick={async () => {
               // U2: the native picker opens in the resolved default directory.
               const picked = await selectSaveFilePath(
@@ -95,7 +96,7 @@ function NotepadSaveAsDialog({
             }}
           >
             <FolderOpen size={13} />
-          </button>
+          </IconButton>
         </div>
         {err && <div className="text-ui-body text-red-500" data-testid="notepad-dialog-error">{err}</div>}
         <div className="flex justify-end gap-2">

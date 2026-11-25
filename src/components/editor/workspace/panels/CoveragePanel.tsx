@@ -1,3 +1,4 @@
+import { IconButton } from "../../../ui/IconButton";
 import { useMemo, useState } from "react";
 import { Eye, EyeOff, FileCode, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import type { FileCoverage, WorkspaceCoverageReport } from "../coverageModel";
@@ -129,15 +130,15 @@ export function CoveragePanel({
           </button>
 
           {onRefreshCoverage && (
-            <button
+            <IconButton
               type="button"
               data-testid="coverage-refresh-btn"
               onClick={onRefreshCoverage}
-              title="Refresh coverage data"
+              labelKey="refreshCoverage"
               className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-fg)]"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-            </button>
+            </IconButton>
           )}
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { FileCode, AlertCircle, X, Settings2 } from "lucide-react";
 import {
@@ -126,15 +127,15 @@ export function NewJavaClassDialog({
           </div>
           <div className="flex items-center gap-1">
             {onOpenSettings && (
-              <button
+              <IconButton
                 type="button"
                 onClick={onOpenSettings}
-                title="Edit file templates"
+                labelKey="editFileTemplates"
                 data-testid="new-java-class-edit-templates"
                 className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-hover)] hover:text-[var(--taomni-code-fg)]"
               >
                 <Settings2 className="h-4 w-4" />
-              </button>
+              </IconButton>
             )}
             <button
               type="button"

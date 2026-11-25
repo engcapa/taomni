@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { Sparkles, BookOpen, Copy, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useT } from "../../lib/i18n";
@@ -87,14 +88,14 @@ export function SelectionToolbar({
         <BookOpen className="w-3 h-3" />
         {t("terminal.selectionExplain")}
       </button>
-      <button
+      <IconButton
         type="button"
         className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
-        title={t("terminal.selectionDismissTitle")}
+        label={t("terminal.selectionDismissTitle")}
         onClick={onDismiss}
       >
         <X className="w-3 h-3" />
-      </button>
+      </IconButton>
     </div>
   );
 }

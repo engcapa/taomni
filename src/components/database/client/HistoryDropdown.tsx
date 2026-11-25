@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { Play, SquareDashedMousePointer, Clock, Plus, Loader2, FileJson, MessageSquare, RefreshCw, Trash2 } from "lucide-react";
 import { type DbSqlHistoryEntry } from "../../../lib/ipc";
 import { formatDurationMs, formatFullDateTime } from "./formatting";
@@ -119,9 +120,9 @@ export function HistoryDropdown({
                       <MessageSquare className="w-3 h-3" /> Ask AI
                     </button>
                     <div className="flex-1" />
-                    <button type="button" data-testid="db-query-history-delete" className={iconButton} onClick={() => onDelete(entry)} title="Delete this history entry">
+                    <IconButton type="button" data-testid="db-query-history-delete" className={iconButton} onClick={() => onDelete(entry)} labelKey="deleteHistory">
                       <Trash2 className="w-3 h-3" />
-                    </button>
+                    </IconButton>
                   </div>
                 </div>
               );

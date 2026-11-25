@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useMemo, useState, useEffect } from "react";
 import { ChevronRight, Home, HardDrive, Pencil } from "lucide-react";
 import { useT } from "../../lib/i18n";
@@ -111,20 +112,20 @@ export function PathBreadcrumb({
         className="taomni-path-breadcrumb-scroll flex-1 self-stretch flex items-center gap-0.5 min-w-0 overflow-x-auto overflow-y-hidden"
       >
         {homePath && homePath !== path && (
-          <button
+          <IconButton
             type="button"
             className="px-1 hover:bg-[var(--taomni-hover)] rounded shrink-0"
             onClick={(e) => {
               e.stopPropagation();
               onNavigate(homePath);
             }}
-            title={t("fileBrowser.pathBreadcrumbHome")}
+            label={t("fileBrowser.pathBreadcrumbHome")}
           >
             <Home className="w-3 h-3" />
-          </button>
+          </IconButton>
         )}
         {isWindows && !isDrivesRoot && (
-          <button
+          <IconButton
             type="button"
             data-testid="breadcrumb-drives-root"
             className="px-1 hover:bg-[var(--taomni-hover)] rounded shrink-0"
@@ -132,10 +133,10 @@ export function PathBreadcrumb({
               e.stopPropagation();
               onNavigate("\\\\");
             }}
-            title={t("fileBrowser.pathBreadcrumbShowDrives")}
+            label={t("fileBrowser.pathBreadcrumbShowDrives")}
           >
             <HardDrive className="w-3 h-3" />
-          </button>
+          </IconButton>
         )}
         {segments.map((seg, i) => (
           <span key={`${seg.path}-${i}`} className="flex items-center shrink-0">

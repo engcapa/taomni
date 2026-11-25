@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { Link2, Map, Maximize2, PanelRightClose } from "lucide-react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { useT } from "../../../lib/i18n";
@@ -137,15 +138,15 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
             </button>
           )}
           {props.onDetach && (
-            <button
+            <IconButton
               data-testid="sftp-detach"
               type="button"
               className="px-1 hover:bg-[var(--taomni-hover)] rounded"
-              title={t("fileBrowser.detachOpenInWindow")}
+              label={t("fileBrowser.detachOpenInWindow")}
               onClick={props.onDetach}
             >
               <Maximize2 className="w-3 h-3" />
-            </button>
+            </IconButton>
           )}
           {props.onClose && (
             <button

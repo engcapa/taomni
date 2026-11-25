@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { Shield, FileText, Info } from "lucide-react";
 import { selectFilePath, hbaseParseSiteXml, hbaseParseKeytabPrincipal } from "../../../lib/ipc";
 import { Field, Checkbox } from "./Fields";
@@ -177,14 +178,14 @@ export function HBaseSettings({
               placeholder="(optional) /etc/hbase/conf/hbase-site.xml"
               onChange={(e) => setHBaseSitePath(e.target.value)}
             />
-            <button
+            <IconButton
               type="button"
               className="taomni-btn px-2 shrink-0 py-1"
-              title="Browse file"
+              labelKey="browseFile"
               onClick={handleBrowseSiteXml}
             >
               <FileText className="w-3.5 h-3.5" />
-            </button>
+            </IconButton>
             <button
               type="button"
               className="taomni-btn px-2 shrink-0 py-1"
@@ -256,14 +257,14 @@ export function HBaseSettings({
                   placeholder="(optional) /etc/security/keytabs/user.keytab"
                   onChange={(e) => setKeytabPath(e.target.value)}
                 />
-                <button
+                <IconButton
                   type="button"
                   className="taomni-btn px-2 shrink-0 py-1"
-                  title="Browse file"
+                  labelKey="browseFile"
                   onClick={handleBrowseKeytab}
                 >
                   <FileText className="w-3.5 h-3.5" />
-                </button>
+                </IconButton>
                 <button
                   type="button"
                   className="taomni-btn px-2 shrink-0 py-1"
@@ -286,14 +287,14 @@ export function HBaseSettings({
                   placeholder="(optional) /etc/krb5.conf"
                   onChange={(e) => setKrb5ConfPath(e.target.value)}
                 />
-                <button
+                <IconButton
                   type="button"
                   className="taomni-btn px-2 shrink-0 py-1"
-                  title="Browse file"
+                  labelKey="browseFile"
                   onClick={handleBrowseKrb5Conf}
                 >
                   <FileText className="w-3.5 h-3.5" />
-                </button>
+                </IconButton>
               </Field>
               {keytabPath.trim() && (
                 <Field label="Principal">

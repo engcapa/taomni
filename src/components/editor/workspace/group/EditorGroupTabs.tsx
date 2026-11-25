@@ -1,3 +1,4 @@
+import { IconButton } from "../../../ui/IconButton";
 import { ChevronDown, ChevronLeft, ChevronRight, File, Pin, X } from "lucide-react";
 import { FileTypeIcon } from "../fileTypeIcon";
 import { useEditorGroupTabs } from "./useEditorGroupTabs";
@@ -57,14 +58,14 @@ export function EditorGroupTabs(props: EditorGroupTabsProps) {
               <span className={`truncate ${preview ? "italic" : ""}`}>{file.title}</span>
               {file.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
             </button>
-            <button
+            <IconButton
               type="button"
               className="h-full w-6 shrink-0 inline-flex items-center justify-center hover:bg-[var(--taomni-code-active-line-bg)]"
-              title="Close"
+              labelKey="close"
               onClick={() => onClose(key)}
             >
               <X className="w-3 h-3" />
-            </button>
+            </IconButton>
           </div>
         );
       })}

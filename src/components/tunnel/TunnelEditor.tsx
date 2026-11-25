@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useMemo, useState } from "react";
 import { useModalDraggable } from "../../hooks/useModalDraggable";
 import { useModalShortcuts, getShortcutSuffixes } from "../../hooks/useModalShortcuts";
@@ -212,14 +213,14 @@ export function TunnelEditor({ initial, sessions, focus, onSave, onCancel }: Pro
         >
           <LinkIcon className="w-3.5 h-3.5 mr-1.5" />
           <div className="text-ui-body font-semibold">{initial ? t("tunnels.editor.titleEdit") : t("tunnels.editor.titleNew")}</div>
-          <button
-            title={t("tunnels.editor.close")}
+          <IconButton
+            label={t("tunnels.editor.close")}
             className="ml-auto hover:bg-red-500 rounded p-0.5"
             onClick={onCancel}
             type="button"
           >
             <X className="w-3.5 h-3.5" />
-          </button>
+          </IconButton>
         </div>
 
         {/* Mode picker */}

@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import "./diff/styles";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { EditorView } from "@codemirror/view";
@@ -470,26 +471,26 @@ export function DiffViewer({
         </span>
 
         <div className="flex items-center gap-1">
-          <button
+          <IconButton
             className="h-7 w-7 rounded-md inline-flex items-center justify-center border border-[var(--taomni-divider)] bg-[var(--taomni-card-bg)] text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)] disabled:opacity-40 disabled:hover:bg-[var(--taomni-card-bg)] transition-all duration-150 cursor-pointer"
             type="button"
             data-testid="git-diff-prev"
-            title="Previous change"
+            labelKey="previousChange"
             disabled={!diffCount}
             onClick={goPrev}
           >
             <ChevronUp className="w-4 h-4" />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
             className="h-7 w-7 rounded-md inline-flex items-center justify-center border border-[var(--taomni-divider)] bg-[var(--taomni-card-bg)] text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)] disabled:opacity-40 disabled:hover:bg-[var(--taomni-card-bg)] transition-all duration-150 cursor-pointer"
             type="button"
             data-testid="git-diff-next"
-            title="Next change"
+            labelKey="nextChange"
             disabled={!diffCount}
             onClick={goNext}
           >
             <ChevronDown className="w-4 h-4" />
-          </button>
+          </IconButton>
         </div>
       </div>
       <div ref={hostRef} className="taomni-diff-host flex-1 min-h-0 min-w-0 w-full overflow-hidden" />

@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { GoCatalogStatus, GoModelPicker } from "../GoModelPicker";
 import {
   Bell,
@@ -381,14 +382,14 @@ export function ChatDrawerView(props: ChatDrawerViewProps) {
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
-              <button
+              <IconButton
                 type="button"
                 className={`taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ${showHistory ? "bg-[var(--taomni-selected)]" : ""}`}
                 onClick={() => setShowHistory((v) => !v)}
-                title={t("chat.historyTitle")}
+                label={t("chat.historyTitle")}
               >
                 <History className="w-3.5 h-3.5" />
-              </button>
+              </IconButton>
             </>
           )}
           <button

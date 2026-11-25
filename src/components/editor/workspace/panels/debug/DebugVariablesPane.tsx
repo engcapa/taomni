@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../ui/IconButton";
 import type React from "react";
 import { useMemo, useRef, useState } from "react";
 import { ArrowUpDown, Search, X } from "lucide-react";
@@ -256,16 +257,16 @@ export function DebugVariablesPane({
           )
         )}
         {onToggleSortMode && (
-          <button
+          <IconButton
             type="button"
             data-testid="debug-variables-sort"
             aria-pressed={sortMode === "alphabetical"}
             onClick={onToggleSortMode}
             className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover-bg)] aria-pressed:bg-[var(--taomni-accent)]/20"
-            title="Sort Variables Alphabetically"
+            labelKey="sortVariables"
           >
             <ArrowUpDown className="h-3 w-3 text-[var(--taomni-text-muted)]" />
-          </button>
+          </IconButton>
         )}
       </div>
       <div

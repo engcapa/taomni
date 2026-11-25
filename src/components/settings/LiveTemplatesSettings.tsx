@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useMemo, useState } from "react";
 import { FileCode2, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useT } from "../../lib/i18n";
@@ -520,15 +521,15 @@ export function LiveTemplatesSettings() {
                     >
                       {t("settings.liveTemplatesEdit")}
                     </button>
-                    <button
+                    <IconButton
                       type="button"
                       className="taomni-btn h-7 px-2 text-ui-small text-red-500"
                       data-testid={`live-template-custom-delete-${item.id}`}
                       onClick={() => removeCustom(item.id)}
-                      title={t("settings.liveTemplatesDelete")}
+                      label={t("settings.liveTemplatesDelete")}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </IconButton>
                   </div>
                 </li>
               ))}

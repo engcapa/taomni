@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import {
   ChevronDown,
   ChevronLeft,
@@ -603,27 +604,27 @@ export function TabBar({
       )}
 
       <div className="flex shrink-0 items-end" data-testid="new-tab-split">
-        <button type="button"
+        <IconButton type="button"
           data-testid="new-local-terminal"
           className="taomni-tab"
           style={{ paddingRight: 4, borderTopRightRadius: 0 }}
           data-active={false}
           onClick={handleQuickLaunch}
-          title={t("tabs.newTab")}
+          label={t("tabs.newTab")}
         >
           <Plus className="w-3 h-3" />
-        </button>
-        <button type="button"
+        </IconButton>
+        <IconButton type="button"
           data-testid="new-tab-launch-menu"
           className="taomni-tab"
           style={{ paddingLeft: 2, paddingRight: 4, borderTopLeftRadius: 0, marginLeft: -1 }}
           data-active={false}
           onClick={handleOpenLaunchMenu}
-          title={t("tabs.newTabMenu")}
+          label={t("tabs.newTabMenu")}
           aria-haspopup="menu"
         >
           <ChevronDown className="w-3 h-3" />
-        </button>
+        </IconButton>
       </div>
 
       {/* Trailing draggable filler. The open-tabs `⋯` overflow now lives in the

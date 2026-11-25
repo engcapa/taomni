@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import {
   AlertTriangle,
   Ban,
@@ -289,9 +290,9 @@ export function HBaseWorkspaceView(props: HBaseWorkspaceViewProps) {
                 );
               })}
               {workspace.panels.length < workspace.tabLimit && (
-                <button type="button" title="New query panel" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => workspace.addPanel("")}>
+                <IconButton type="button" labelKey="newQueryPanel" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => workspace.addPanel("")}>
                   <Plus className="w-3 h-3" />
-                </button>
+                </IconButton>
               )}
             </div>
 

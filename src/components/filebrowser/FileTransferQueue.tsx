@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Trash2, X, Eraser, Pause, Play, RotateCw, ChevronDown, ChevronUp, ArrowLeftRight } from "lucide-react";
 import { useTransferStore } from "../../stores/transferStore";
@@ -274,15 +275,15 @@ export function FileTransferQueue({
         >
           <Eraser className="w-3 h-3" /> {t("fileBrowser.transferClear")}
         </button>
-        <button
+        <IconButton
           type="button"
           data-testid="sftp-transfer-queue-close"
           className="px-1 py-0.5 hover:bg-[var(--taomni-hover)] rounded inline-flex items-center text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
-          title={t("fileBrowser.transferClose")}
+          label={t("fileBrowser.transferClose")}
           onClick={toggleOpen}
         >
           <ChevronDown className="w-3.5 h-3.5" />
-        </button>
+        </IconButton>
       </div>
 
       <div className="overflow-auto text-ui-small flex-1 min-h-0">
@@ -339,53 +340,53 @@ export function FileTransferQueue({
                   </span>
                 )}
                 {canPause && (
-                  <button
+                  <IconButton
                     type="button"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
-                    title={t("fileBrowser.transferPause")}
+                    label={t("fileBrowser.transferPause")}
                     onClick={() => onPause!(it.id)}
                   >
                     <Pause className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 )}
                 {canResume && (
-                  <button
+                  <IconButton
                     type="button"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
-                    title={t("fileBrowser.transferResume")}
+                    label={t("fileBrowser.transferResume")}
                     onClick={() => onResume!(it.id)}
                   >
                     <Play className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 )}
                 {canRetry && (
-                  <button
+                  <IconButton
                     type="button"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
-                    title={t("fileBrowser.transferRetryTitle")}
+                    label={t("fileBrowser.transferRetryTitle")}
                     onClick={() => onRetry!(it.id)}
                   >
                     <RotateCw className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 )}
                 {isInFlight || it.state === "paused" ? (
-                  <button
+                  <IconButton
                     type="button"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
-                    title={t("fileBrowser.transferCancelTitle")}
+                    label={t("fileBrowser.transferCancelTitle")}
                     onClick={() => onCancel(it.id)}
                   >
                     <X className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 ) : (
-                  <button
+                  <IconButton
                     type="button"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
-                    title={t("fileBrowser.transferRemoveTitle")}
+                    label={t("fileBrowser.transferRemoveTitle")}
                     onClick={() => remove(it.id)}
                   >
                     <Trash2 className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 )}
               </div>
               <div

@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useState } from "react";
 import { useVaultStore } from "../../stores/vaultStore";
 import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
@@ -86,14 +87,14 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
             {t("vaultSettings.manageEntries")}
           </div>
           <div className="ml-auto flex items-center">
-            <button
-              title={t("vaultSettings.close")}
+            <IconButton
+              label={t("vaultSettings.close")}
               className="hover:bg-red-500 rounded p-0.5 animate-all duration-150"
               onClick={onClose}
               type="button"
             >
               <X className="w-3.5 h-3.5" />
-            </button>
+            </IconButton>
           </div>
         </div>
 
@@ -153,15 +154,15 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
                       <Lock className="w-3.5 h-3.5" style={{ color: "var(--taomni-text-muted)" }} />
                     </span>
                   ) : (
-                    <button
+                    <IconButton
                       type="button"
                       className="p-1 rounded text-red-600 hover:bg-red-500/10 shrink-0"
                       onClick={() => handleDelete(e.id, e.label)}
-                      title={t("vaultSettings.deleteEntry")}
+                      label={t("vaultSettings.deleteEntry")}
                       data-testid={`vault-entry-delete-${e.id}`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </IconButton>
                   )}
                 </div>
               ))}

@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CheckCircle, Copy, Loader2, Terminal, XCircle, AlertTriangle } from "lucide-react";
@@ -28,7 +29,7 @@ function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const t = useT();
   return (
-    <button
+    <IconButton
       type="button"
       className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center shrink-0"
       onClick={async () => {
@@ -36,10 +37,10 @@ function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      title={t("aiSettings.ccCopy")}
+      label={t("aiSettings.ccCopy")}
     >
       <Copy className={`w-3 h-3 ${copied ? "text-green-400" : ""}`} />
-    </button>
+    </IconButton>
   );
 }
 

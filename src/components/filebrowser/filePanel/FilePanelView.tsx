@@ -1,3 +1,4 @@
+import { IconButton } from "../../ui/IconButton";
 import { AlertTriangle, Eye, X } from "lucide-react";
 import { useT } from "../../../lib/i18n";
 import { formatBytes, type FileEntry } from "../../../lib/sftp";
@@ -311,15 +312,15 @@ export function FilePanelView(inputs: FilePanelViewProps) {
                   query: normalizedFilter,
                 })}
               </span>
-              <button
+              <IconButton
                 type="button"
                 data-testid={`sftp-${side}-clear-filter`}
                 className="inline-flex h-5 w-5 shrink-0 items-center justify-center hover:text-[var(--taomni-text)]"
-                title={t("fileBrowser.clearFilter")}
+                label={t("fileBrowser.clearFilter")}
                 onClick={() => onFilterTextChange?.("")}
               >
                 <X className="h-3.5 w-3.5" />
-              </button>
+              </IconButton>
             </span>
           )}
         </div>

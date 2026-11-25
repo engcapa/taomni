@@ -1,0 +1,41 @@
+id: TC-UIC-010-icon-action-names
+title: Quick launch controls retain distinct names and keyboard actions after a language change
+covers: [F1.5]
+fixtures: [reset_db]
+modes: [browser, native]
+tags: [ui-contract, accessibility, keyboard]
+ui_standard: [UI-A11Y-02]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-icon-names
+- click: '[data-testid="side-tab-sessions"]'
+- assert_attribute: {selector: '[data-testid="new-local-terminal"]', name: aria-label, equals: New tab}
+- assert_attribute: {selector: '[data-testid="new-tab-launch-menu"]', name: aria-label, equals: Open new tab options}
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-zh-CN"]'
+- assert_attribute: {selector: '[data-testid="new-local-terminal"]', name: aria-label, equals: 新建标签页}
+- assert_attribute: {selector: '[data-testid="new-tab-launch-menu"]', name: aria-label, equals: 新建标签选项}
+- press: {selector: '[data-testid="new-tab-launch-menu"]', key: Enter}
+- wait_for: '[data-testid="launch-menu-new-session"]'
+- press: Escape
+- assert_not_visible: '[data-testid="launch-menu-new-session"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: quick-launch
+    requirement: The main action and options button have distinct accessible names in both languages. Enter opens the options menu and Escape closes it.
+    ui_standard: [UI-A11Y-02]
+    actions: [3, 6, 7, 10, 12]
+    checkpoints:
+    - {step: 4, expectation: The default action has its English name.}
+    - {step: 5, expectation: The options button has its English name.}
+    - {step: 8, expectation: The main action changes to Chinese.}
+    - {step: 9, expectation: The menu action changes to Chinese.}
+    - {step: 11, expectation: The launch menu is visible.}
+    - {step: 13, expectation: Escape dismisses that menu.}
+    results: [4, 5, 8, 9, 11, 13]
+  visual:
+  - {check: Action names, method: automated, reason: Reads the accessible labels from the two adjacent controls.}
+  native:
+  - {check: WebView focus and keyboard activation, method: automated, reason: Uses the rendered quick-launch menu in the QA application.}

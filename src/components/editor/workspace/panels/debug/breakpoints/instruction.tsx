@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../../ui/IconButton";
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -199,15 +200,15 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
               >
                 {open ? "Done" : "Edit"}
               </button>
-              <button
+              <IconButton
                 type="button"
                 data-testid={`debug-instruction-breakpoint-remove-${index}`}
                 className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-rose-500"
-                title="Remove instruction breakpoint"
+                labelKey="removeInstructionBreakpoint"
                 onClick={() => debug.removeInstructionBreakpoint(key)}
               >
                 <Trash2 className="h-3 w-3" />
-              </button>
+              </IconButton>
             </div>
             {open && (
               <InstructionBreakpointEditor

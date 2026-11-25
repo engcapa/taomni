@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../../ui/IconButton";
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { type DebugFunctionBreakpoint } from "../../../dapDebugModel";
@@ -106,15 +107,15 @@ export function FunctionBreakpointsView({ debug }: { debug: CodeDebugSession; })
               >
                 {open ? "Done" : "Edit"}
               </button>
-              <button
+              <IconButton
                 type="button"
                 data-testid={`debug-function-breakpoint-remove-${index}`}
                 className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-rose-500"
-                title="Remove function breakpoint"
+                labelKey="removeFunctionBreakpoint"
                 onClick={() => debug.removeFunctionBreakpoint(breakpoint.name)}
               >
                 <Trash2 className="h-3 w-3" />
-              </button>
+              </IconButton>
             </div>
             {open && (
               <FunctionBreakpointEditor

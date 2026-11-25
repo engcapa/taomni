@@ -1,3 +1,4 @@
+import { IconButton } from "../ui/IconButton";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   RefreshCw,
@@ -221,14 +222,14 @@ export function RedisKeyBrowser({
               }}
             />
           </div>
-          <button
+          <IconButton
             type="button"
-            title="Scan"
+            labelKey="scan"
             className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
             onClick={() => void scan(true)}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          </button>
+          </IconButton>
         </div>
         <div className="flex items-center gap-1 mt-1">
           <button type="button" className="taomni-btn px-1.5 py-0.5 text-ui-small flex items-center gap-1" onClick={onAddKey}>

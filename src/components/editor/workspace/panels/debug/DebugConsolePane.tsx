@@ -1,3 +1,4 @@
+import { IconButton } from "../../../../ui/IconButton";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowDown, CornerDownLeft, Eraser, Pin } from "lucide-react";
 import type { CodeDebugSession } from "../../useCodeDebugSession";
@@ -258,16 +259,16 @@ export function DebugConsolePane({ debug, stopped, visible = true, onOpenLocatio
           }}
           onKeyDown={handleKeyDown}
         />
-        <button
+        <IconButton
           type="button"
           data-testid="debug-console-submit"
           onClick={submitConsole}
           disabled={!stopped || !consoleInput.trim()}
           className="rounded p-1 text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)] hover:text-[var(--taomni-text)] disabled:opacity-30 disabled:pointer-events-none transition-colors"
-          title="Send (Enter)"
+          labelKey="sendEnter"
         >
           <CornerDownLeft className="h-3.5 w-3.5" />
-        </button>
+        </IconButton>
       </div>
     </div>
   );
