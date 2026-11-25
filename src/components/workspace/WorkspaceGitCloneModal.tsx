@@ -1,3 +1,4 @@
+import { Button } from "../ui/Button";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useT } from "../../lib/i18n";
@@ -294,16 +295,16 @@ export function WorkspaceGitCloneModal() {
           >
             {t("gitClone.close")}
           </button>
-          <button
+          <Button
             type="button"
             data-testid={primaryAction.testId}
-            className={`taomni-btn h-8 px-3 ${primaryAction.kind === "primary" ? "taomni-btn-primary" : ""}`}
-            style={primaryAction.kind === "danger" ? { background: "var(--taomni-danger, #ef4444)", color: "white" } : undefined}
+            className="h-8 px-3"
+            variant={primaryAction.kind === "secondary" ? "default" : primaryAction.kind}
             disabled={picking || (showForm && defaultsStatus === "loading")}
             onClick={primaryAction.onClick}
           >
             {primaryAction.label}
-          </button>
+          </Button>
         </footer>
       </div>
     </div>

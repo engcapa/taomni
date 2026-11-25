@@ -1,3 +1,4 @@
+import { Button } from "../ui/Button";
 import { Terminal as TerminalIcon, Shield, FolderOpen, Mail as MailIcon } from "lucide-react";
 import { type LocalShellOption, type SessionConfig, type WslDistro } from "../../lib/ipc";
 import { type TranslateFn } from "../../lib/i18n";
@@ -82,9 +83,9 @@ export function LocalTerminalCard({
           </div>
         )}
         <div className="taomni-home-shell-buttons flex items-center gap-2 flex-wrap">
-          <button data-testid="welcome-open-local-terminal" className="taomni-btn taomni-btn-primary h-8 px-3" onClick={onStart} type="button">
+          <Button variant="primary" data-testid="welcome-open-local-terminal" className="h-8 px-3" onClick={onStart} type="button">
             {t("welcome.open")}
-          </button>
+          </Button>
           {canElevate && (
             <button
               className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"

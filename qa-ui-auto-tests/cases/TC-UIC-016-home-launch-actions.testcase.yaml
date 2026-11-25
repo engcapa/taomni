@@ -1,0 +1,43 @@
+id: TC-UIC-016-home-launch-actions
+title: Tao Home provider setup stays readable in both themes and the launcher opens the session editor
+covers: [F1.11, F-WS-1]
+tags: [ui-contract, home, theme]
+fixtures: [reset_db]
+modes: [browser, native]
+ui_standard: [UI-FND-03a, UI-FND-03c, UI-FND-08b]
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-home-contrast
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: light}
+- assert_solid_text_contrast: {selector: '[data-testid="tao-home-open-settings"]', minimum: 4.5}
+- assert_element_geometry: {selector: '[data-testid="tao-home-open-settings"]', min_width: 24, min_height: 24}
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: dark}
+- assert_solid_text_contrast: {selector: '[data-testid="tao-home-open-settings"]', minimum: 4.5}
+- hover: {selector: '[data-testid="tao-home-open-settings"]', macos_system_pointer: true}
+- assert_solid_text_contrast: {selector: '[data-testid="tao-home-open-settings"]:hover', minimum: 4.5}
+- click: '[data-testid="tao-home-new-session"]'
+- wait_for: '[data-testid="session-editor"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: launch-colors
+    ui_standard: [UI-FND-03a, UI-FND-03c, UI-FND-08b]
+    requirement: The launch card uses a readable action foreground in both themes and provides a reachable target and a working session action.
+    actions: [3, 4, 8, 11, 13]
+    checkpoints:
+    - {step: 5, expectation: Light is active.}
+    - {step: 6, expectation: The rendered primary text in Light clears 4.5 to 1.}
+    - {step: 7, expectation: The action target is at least 24 by 24 pixels.}
+    - {step: 9, expectation: Dark is active.}
+    - {step: 10, expectation: The rendered primary text in Dark clears 4.5 to 1.}
+    - {step: 12, expectation: The primary text stays legible on hover.}
+    - {step: 14, expectation: New session opens the session editor.}
+    results: [5, 6, 7, 9, 10, 12, 14]
+  visual:
+  - {check: Card action colors and hit area, method: automated, reason: Measures the WebView's computed foreground and background and the control bounds.}
+  native:
+  - {check: Desktop launch action and hover, method: automated, reason: Opens the session editor from the packaged Tao Home page.}

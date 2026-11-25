@@ -35,6 +35,7 @@ describe("Tao Home module navigation", () => {
       destinations.push(consumePendingSettingsSection()?.id ?? "none");
     });
     render(<TaoHomeHost onStartLocalTerminal={vi.fn()} onNewSession={vi.fn()} onOpenSettings={onOpenSettings} />);
+    expect(screen.getByTestId("tao-home-open-settings")).toHaveAttribute("data-primary", "true");
     fireEvent.click(screen.getByTestId("welcome-browse-modules"));
     expect(destinations).toEqual(["module-store"]);
     fireEvent.click(screen.getByTestId("tao-home-dock-more"));

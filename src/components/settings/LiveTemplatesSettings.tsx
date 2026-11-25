@@ -1,3 +1,4 @@
+import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 import { useEffect, useMemo, useState } from "react";
 import { FileCode2, Plus, RotateCcw, Trash2 } from "lucide-react";
@@ -450,14 +451,14 @@ export function LiveTemplatesSettings() {
               </div>
             )}
             <div className="flex gap-2">
-              <button
+              <Button variant="primary"
                 type="button"
                 data-testid="live-template-custom-save"
-                className="taomni-btn-primary h-7 px-3 text-ui-small"
+                className="h-7 px-3 text-ui-small"
                 onClick={saveDraft}
               >
                 {t("settings.liveTemplatesSave")}
-              </button>
+              </Button>
               <button
                 type="button"
                 data-testid="live-template-custom-cancel"

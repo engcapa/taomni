@@ -1,3 +1,4 @@
+import { Button } from "../ui/Button";
 import { useEffect, useRef, useState } from "react";
 import { FolderOpen } from "lucide-react";
 import { useT } from "../../lib/i18n";
@@ -184,15 +185,15 @@ export function WorkspaceFsModals({ request, initialPath, onCancel, onSubmit }: 
           <button type="button" data-testid="workspace-fs-modal-cancel" className="taomni-btn h-7 px-2" onClick={onCancel}>
             {t("platform.cancel")}
           </button>
-          <button
+          <Button variant="primary"
             type="button"
             data-testid="workspace-fs-modal-confirm"
-            className="taomni-btn taomni-btn-primary h-7 px-2"
+            className="h-7 px-2"
             disabled={!value.trim() || busy || picking || (createNew && !name.trim())}
             onClick={() => void submit()}
           >
             {request.kind === "root" && !createNew ? t("platform.add") : t("platform.create")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
