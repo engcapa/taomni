@@ -1,0 +1,21 @@
+{
+  "id": "taomni-plugin-servers",
+  "slug": "servers",
+  "name": "Local servers",
+  "description": "Start local SSH/SFTP, FTP, TFTP, HTTP, Telnet, NFS, Cron, and iperf services.",
+  "version": "0.1.3",
+  "coreApiVersion": "1",
+  "kind": "local-server",
+  "status": "stable",
+  "platforms": ["linux-x86_64", "windows-x86_64", "darwin-aarch64", "darwin-x86_64"],
+  "entry": { "host": "taomni-plugin-servers", "frontend": "frontend/index.js", "protocol": 1 },
+  "tabs": [],
+  "commands": ["servers/start", "servers/status", "servers/stop", "servers/save-settings", "backup/prepare", "backup/snapshot", "backup/release"],
+  "permissions": ["fs.dataDir"],
+  "dataDir": "plugins/servers",
+  "dataSchemaVersion": 1,
+  "backupPaths": ["plugins/servers/data/config.json", "plugins/servers/data/host_ed25519"],
+  "legacyTables": ["server_configs"],
+  "vaultFixedKeys": [],
+  "snapshot": "rpc"
+}

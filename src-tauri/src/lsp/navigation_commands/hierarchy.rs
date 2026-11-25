@@ -97,6 +97,7 @@ pub(in crate::lsp) async fn lsp_hierarchy_prepare_request(
         _ => CancellationToken::new(),
     };
     let Some(session) = state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -107,6 +108,7 @@ pub(in crate::lsp) async fn lsp_hierarchy_prepare_request(
         .await
     else {
         let status = state
+            .core
             .workspace
             .lsp
             .document_status(
@@ -134,6 +136,7 @@ pub(in crate::lsp) async fn lsp_hierarchy_prepare_request(
         .unwrap_or(Value::Null);
     finish_reference_request(cancel_key.as_deref(), request_seq);
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -299,6 +302,7 @@ pub(in crate::lsp) async fn lsp_hierarchy_item_request(
         _ => CancellationToken::new(),
     };
     let result = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -319,6 +323,7 @@ pub(in crate::lsp) async fn lsp_hierarchy_item_request(
     };
     finish_reference_request(cancel_key.as_deref(), request_seq);
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(

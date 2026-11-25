@@ -1,0 +1,65 @@
+[package]
+name = "taomni-rdp-server-engine"
+version = "0.1.0"
+description = "Desktop RDP server and local input approval"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[features]
+rdp-server-audio = ["dep:cpal"]
+
+[dependencies]
+anyhow = "1"
+arboard = "3"
+async-trait = "0.1"
+bytes = "1"
+cpal = { version = "0.17", optional = true }
+enigo = { version = "0.6", default-features = false, features = ["x11rb", "wayland"] }
+ironrdp = { version = "0.17.0", features = ["core", "graphics", "input", "cliprdr", "rdpsnd", "svc", "dvc", "server", "acceptor", "qoi", "qoiz"] }
+libc = "0.2"
+rcgen = "0.14"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+serde = { version = "1", features = ["derive"] }
+taomni-capture = { path = "../taomni-capture" }
+taomni-rdp-common = { path = "../taomni-rdp-common", features = ["bitmap"] }
+taomni-server-process = { path = "../taomni-server-process" }
+tokio = { version = "1", features = ["macros", "net", "rt", "sync", "time", "io-util"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tracing = "0.1"
+uuid = { version = "1", features = ["v4"] }
+which = "8"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+pipewire = { version = "0.9", features = ["v0_3_49"] }
+x11rb = { version = "0.13", features = ["xfixes"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_System_DataExchange", "Win32_UI_Input_KeyboardAndMouse"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.4"
+block2 = "0.6.2"
+dispatch2 = "0.3.1"
+objc2-foundation = { version = "0.3.2", features = ["NSArray", "NSError", "NSData", "NSDictionary", "NSProcessInfo", "NSString"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSPasteboard"] }
+objc2-core-media = { version = "0.3.2", features = ["CMSampleBuffer", "objc2-core-video"] }
+objc2-core-audio-types = { version = "0.3.2", default-features = false, features = ["std", "CoreAudioBaseTypes"] }
+objc2-core-video = { version = "0.3.2", features = ["CVBase", "CVBuffer", "CVImageBuffer", "CVPixelBuffer", "CVReturn"] }
+objc2-core-foundation = "0.3.2"
+objc2-screen-capture-kit = { version = "0.3.2", default-features = false, features = ["std", "SCShareableContent", "SCStream", "block2", "dispatch2", "objc2-core-graphics", "objc2-core-media"] }
+objc2-video-toolbox = { version = "0.3.2", default-features = false, features = ["std", "block2", "objc2-core-media", "objc2-core-video", "VTBase", "VTCompressionProperties", "VTCompressionSession", "VTErrors", "VTSession"] }
+ironrdp-server = { version = "0.13", features = ["egfx"] }
+ironrdp-egfx = "0.3"
+objc2-core-graphics = { version = "0.3.2", features = ["CGDirectDisplay", "CGEvent", "CGEventSource", "CGEventTypes", "CGWindow"] }
+
+[dev-dependencies]
+ironrdp = { version = "0.17.0", features = ["connector", "session", "rdpdr", "displaycontrol"] }
+ironrdp-tokio = { version = "0.10.0", features = ["reqwest-rustls-ring"] }
+serde_json = "1"
+taomni-plugin-api = { path = "../taomni-plugin-api" }
+taomni-plugin-stream = { path = "../taomni-plugin-stream" }
+tempfile = "3"
+tokio = { version = "1", features = ["process", "rt-multi-thread"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
+tracing-subscriber = "0.3"

@@ -21,10 +21,6 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 bundle_root="$repo_root/src-tauri/target/$target_triple/release/bundle"
 app="$bundle_root/macos/Taomni.app"
 main_executable="$app/Contents/MacOS/taomni"
-resource_root="$app/Contents/Resources"
-pinned_redirector="$repo_root/src-tauri/resources/sockscap/macos/redirector/0.12.11/Mitmproxy Redirector.app.tar"
-pinned_manifest="$repo_root/src-tauri/resources/sockscap/macos/redirector/0.12.11/manifest.json"
-pinned_license="$repo_root/src-tauri/resources/sockscap/macos/redirector/0.12.11/LICENSE"
 
 test -d "$app" || {
   echo "Taomni app bundle is missing: $app" >&2
@@ -68,7 +64,7 @@ verify_certificate_signature() {
     echo "Expected a certificate signature, found ad-hoc: $signed_app" >&2
     return 1
   fi
-  if [ "$signing_mode" = developer-id ]; then
+  if [ "$signing_mode" = developer-id ] || [ "${MACOS_STATIC_KRB5:-false}" = true ]; then
     grep -Eq 'flags=.*\(runtime\)' <<<"$signature"
   elif grep -Eq 'flags=.*\(runtime\)' <<<"$signature"; then
     echo "Self-signed bundles must disable hardened runtime to load krb5 libraries without an Apple Team ID." >&2
@@ -125,41 +121,35 @@ test "$main_architectures" = "$expected_arch" || {
   exit 1
 }
 
-xray_count="$(find "$resource_root" -type f -path '*/sockscap/macos/xray' | wc -l | tr -d ' ')"
-test "$xray_count" = "1" || {
-  echo "Expected one bundled macOS xray executable, found $xray_count" >&2
-  exit 1
+verify_separate_installer() {
+  local misplaced
+  misplaced="$(find "$1" \( -path '*/sockscap/*' -o -name 'sockscap-redirector-bridge' -o -name 'Mitmproxy Redirector.app.tar' -o -path '*/macos/redirector' -o -iname xray \) -print -quit)"
+  if [ -n "$misplaced" ]; then
+    echo "The SocksCap module installer or runtime was included in the core bundle: $misplaced" >&2
+    return 1
+  fi
 }
-xray="$(find "$resource_root" -type f -path '*/sockscap/macos/xray' -print -quit)"
-test -x "$xray" || {
-  echo "Bundled xray is not executable: $xray" >&2
-  exit 1
+verify_test_fixture_absent() {
+  local fixture
+  fixture="$(find "$1" -iname 'acp-fake-agent' -print -quit)"
+  if [ -n "$fixture" ]; then
+    echo "The macOS app contains the ACP integration test fixture: $fixture" >&2
+    return 1
+  fi
 }
-xray_architectures="$(lipo -archs "$xray")"
-test "$xray_architectures" = "$expected_arch" || {
-  echo "Expected bundled xray architecture $expected_arch, found: $xray_architectures" >&2
-  exit 1
-}
-
-redirector_count="$(find "$resource_root" -type f -path '*/sockscap/macos/redirector/0.12.11/Mitmproxy Redirector.app.tar' | wc -l | tr -d ' ')"
-test "$redirector_count" = "1" || {
-  echo "Expected one bundled Redirector v0.12.11 archive, found $redirector_count" >&2
-  exit 1
-}
-bundled_redirector="$(find "$resource_root" -type f -path '*/sockscap/macos/redirector/0.12.11/Mitmproxy Redirector.app.tar' -print -quit)"
-cmp "$pinned_redirector" "$bundled_redirector"
-
-bundled_manifest="$(find "$resource_root" -type f -path '*/sockscap/macos/redirector/0.12.11/manifest.json' -print -quit)"
-bundled_license="$(find "$resource_root" -type f -path '*/sockscap/macos/redirector/0.12.11/LICENSE' -print -quit)"
-test -n "$bundled_manifest" && cmp "$pinned_manifest" "$bundled_manifest"
-test -n "$bundled_license" && cmp "$pinned_license" "$bundled_license"
+verify_test_fixture_absent "$app"
+verify_separate_installer "$app"
+if [ -n "${updater_app:-}" ]; then
+  verify_test_fixture_absent "$updater_app"
+  verify_separate_installer "$updater_app"
+fi
 
 if [ "$notarize" = true ]; then
   test "$signing_mode" = developer-id && test -n "$expected_team_id"
   gatekeeper="$(spctl --assess --type execute --verbose=4 "$app" 2>&1)"
   grep -Fq 'source=Notarized Developer ID' <<<"$gatekeeper"
   xcrun stapler validate "$app"
-  echo "Taomni macOS $expected_arch verified: fixed Developer ID certificate, updater app, notarization, architecture, Xray and Redirector v0.12.11."
+  echo "Taomni macOS $expected_arch verified with fixed Developer ID, updater identity, notarization and separate SocksCap installer."
 else
-  echo "Taomni macOS $expected_arch verified: $signing_mode, architecture, Xray and Redirector v0.12.11 (unnotarized build)."
+  echo "Taomni macOS $expected_arch verified with $signing_mode signing and separate SocksCap installer (unnotarized build)."
 fi

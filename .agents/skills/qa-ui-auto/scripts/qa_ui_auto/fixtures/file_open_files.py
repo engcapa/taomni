@@ -22,6 +22,7 @@ DRAFT_LARGE = "".join(
     for index in range(10_000)
 )
 MARKDOWN = "# File open Markdown\n\n**Rendered bold** and `inline code`.\n\nMath: $x^2$ and $$\\frac{1}{2}$$.\n\n## Details\n\n![Original](assets/pixel.png)\n\n- [ ] First task\n\n```mermaid\nflowchart LR\n  Explorer --> OpenFile --> Viewer\n```\n"
+MARKDOWN_TABLE = "# Live table\n\n| **Heading** | Link | Safety |\n| :--- | :---: | ---: |\n| **bold** *italic* ~~removed~~ `code` $x^2$ | [safe](https://example.test) | [bad](javascript:alert(1)) <img src=\"assets/pixel.png\" onerror=\"window.TABLE_UNSAFE=true\"> |\n| Keep \\| pipe | <u>underline</u><br>next | untouched |\n"
 HTML = '''<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="assets/local.css"></head><body><h1>File open HTML</h1><div id="resource">Local resource</div><img id="pixel" src="assets/pixel.png"><a href="next.html">Next local page</a><a href="https://example.invalid/external">External browser</a><script>
 window.addEventListener("load", function () {
   console.log("FILE_OPEN_SCRIPT_OK");
@@ -50,6 +51,7 @@ def setup(ctx: Any) -> None:
         "notes.txt": TEXT.encode(), "recovery.txt": b"Recovery disk original\n", "retry.txt": b"Retry original\n",
         "draft-large.txt": DRAFT_LARGE.encode(),
         "binary.txt": b"\x00\xff\x00binary", "unsafe.svg": SVG.encode(), "live.md": MARKDOWN.encode(),
+        "table.md": MARKDOWN_TABLE.encode(),
         "report.html": HTML.encode(), "next.html": b"<!doctype html><h1>Next local page</h1>",
         "assets/local.css": b"#resource { color: rgb(12, 34, 56); }", "assets/pixel.png": PNG,
         "src/sample.ts": b"export const fileOpenSource = true;\n", "unsupported.bin": b"\x00\xff\x10",
@@ -76,6 +78,7 @@ def setup(ctx: Any) -> None:
         "file_open_svg_original_sha": hashlib.sha256(SVG.encode()).hexdigest(),
         "file_open_svg_saved_sha": hashlib.sha256(SVG_SAVED.encode()).hexdigest(),
         "file_open_markdown_sha": hashlib.sha256(MARKDOWN.encode()).hexdigest(),
+        "file_open_table_sha": hashlib.sha256(MARKDOWN_TABLE.encode()).hexdigest(),
         "file_open_png_sha": hashlib.sha256(PNG).hexdigest(),
         "file_open_html_sha": hashlib.sha256(HTML.encode()).hexdigest(),
     })
@@ -92,21 +95,28 @@ def setup_mail(ctx: Any) -> None:
     native = (ctx.cfg.get("app") or {}).get("mode") == "native"
     ctx.values["file_open_mail_subject"] = "Account-level AI policy"
     ctx.values["file_open_mail_text"] = MAIL_TEXT
+    pop3_attachment = ctx.case_id in {"TC-MAIL-POP3-01", "TC-MODULES-076"}
+    if pop3_attachment and native and ctx.case_id == "TC-MODULES-076":
+        # Keep the original mailbox fixture while adding a stable MIME part.
+        ctx.values["file_open_mail_target"] = (Path(ctx.case_dir).resolve() / "pop3-policy.txt").as_posix()
+        ctx.values["file_open_mail_sha256"] = hashlib.sha256(MAIL_TEXT.encode()).hexdigest()
     if not native:
         return
     from .. import mail_fake_server
     server = mail_fake_server.ACTIVE
     if server is None:
         raise RuntimeError("file_open_mail requires the local fake mail server")
+    signed_mail = ctx.case_id == "TC-MODULES-059"
     with server.state.lock:
-        for folder in server.state.folders.values():
-            folder.messages.clear()
+        if not signed_mail and not pop3_attachment:
+            for folder in server.state.folders.values():
+                folder.messages.clear()
         raw = ("From: QA <qa@example.com>\r\nTo: reader@example.com\r\nSubject: Account-level AI policy\r\n"
                "MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=file-open\r\n\r\n"
                "--file-open\r\nContent-Type: text/plain\r\n\r\nRead-only attachment fixture\r\n"
                "--file-open\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Disposition: attachment; filename=policy.txt\r\n"
                "Content-Transfer-Encoding: base64\r\n\r\n").encode() + base64.b64encode(MAIL_TEXT.encode()) + b"\r\n--file-open--\r\n"
-        server.state.append_raw("INBOX", raw, [])
+        server.state.append_raw("Archive" if signed_mail else "INBOX", raw, [])
 
 
 def teardown(ctx: Any) -> None:

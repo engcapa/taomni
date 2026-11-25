@@ -32,7 +32,7 @@ steps:
     selector: '[data-testid="backup-global-include-mail"]'
     checked: true
 - set_check:
-    selector: '[data-testid="backup-global-includeLanchat"]'
+    selector: '[data-testid="backup-global-includeMfa"]'
     checked: true
 - assert_text:
     selector: '[data-testid="backup-settings-save-status"]'
@@ -91,7 +91,7 @@ steps:
     name: aria-checked
     equals: 'false'
 - assert_attribute:
-    selector: '[data-testid="backup-global-includeLanchat"]'
+    selector: '[data-testid="backup-global-includeMfa"]'
     name: aria-checked
     equals: 'true'
 - screenshot: backup-native-category-range.png

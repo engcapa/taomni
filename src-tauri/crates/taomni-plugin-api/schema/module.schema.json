@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://taomni.app/schemas/module.json",
+  "title": "Taomni plugin module manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "slug",
+    "name",
+    "version",
+    "coreApiVersion",
+    "kind",
+    "status",
+    "platforms",
+    "entry",
+    "tabs",
+    "commands",
+    "permissions",
+    "dataDir",
+    "backupPaths",
+    "legacyTables",
+    "vaultFixedKeys",
+    "snapshot"
+  ],
+  "properties": {
+    "id": { "type": "string", "pattern": "^taomni-plugin-[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$" },
+    "coreApiVersion": { "type": "string", "minLength": 1 },
+    "kind": { "enum": ["remote-client", "local-server", "collaboration", "media", "auth", "ai-local", "mobile"] },
+    "status": { "enum": ["stable", "provisional"] },
+    "removalCandidate": { "type": "boolean" },
+    "platforms": {
+      "type": "array",
+      "items": { "enum": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"] },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol"],
+      "properties": {
+        "host": { "type": "string", "minLength": 1 },
+        "frontend": { "type": "string", "minLength": 1 },
+        "protocol": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "tabs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "title"],
+        "properties": {
+          "kind": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "commands": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "permissions": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "dataDir": { "type": "string", "pattern": "^plugins/[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "dataSchemaVersion": { "type": "integer", "minimum": 1, "default": 1 },
+    "backupPaths": { "type": "array", "items": { "type": "string", "pattern": "^plugins/[a-z0-9]+(?:-[a-z0-9]+)*/data(?:/[^/]+)*$" }, "uniqueItems": true, "description": "Each path belongs to this manifest's slug and stays below its data subtree; the core also validates portable segments and case collisions." },
+    "legacyTables": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "vaultFixedKeys": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "snapshot": { "enum": ["rpc", "file"] }
+  }
+}

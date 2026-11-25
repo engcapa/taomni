@@ -64,5 +64,3 @@ verification:
   - check: Packaged WebView layout and OS pointer delivery for the removed divider.
     method: external
     reason: This case asserts renderer DOM/layout; physical pointer delivery is not established by WebView actions.
-
-

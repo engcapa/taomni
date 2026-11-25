@@ -39,7 +39,13 @@ steps:
 - click: '[data-testid="screenshot-copy"]'
 - wait_for: '[data-testid="system-screenshot"]'
 - eval_readonly:
-    expression: window.__taomniStubScreenshotCalls.at(-3).cmd === "screenshot_save_data_url" && window.__taomniStubScreenshotCalls.at(-3).args.width === 160 && window.__taomniStubScreenshotCalls.at(-3).args.height === 120
+    expression: >-
+      window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_copy_image" &&
+      window.__taomniStubScreenshotCalls.at(-3).cmd === "screenshot_save_data_url" &&
+      window.__taomniStubScreenshotCalls.at(-2).args.path === window.__taomniStubScreenshotCalls.at(-3).args.path &&
+      window.__taomniStubScreenshotCalls.at(-3).args.width === 160 &&
+      window.__taomniStubScreenshotCalls.at(-3).args.height === 120
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:

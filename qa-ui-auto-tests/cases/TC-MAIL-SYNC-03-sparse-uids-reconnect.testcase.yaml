@@ -58,6 +58,7 @@ steps:
     unread: true
     timeout_sec: 120
 - mail_server_assert_sync_transport: null
+- assert_no_runtime_errors: null
 - screenshot: mail-sync-sparse-reconnect.png
 verification:
   review: reviewed
@@ -96,10 +97,13 @@ verification:
       expectation: '{"mail_server_assert_list_matches": {"unread": true, "timeout_sec": 120}}'
     - step: 19
       expectation: '{"mail_server_assert_sync_transport": null}'
+    - step: 20
+      expectation: '{"assert_no_runtime_errors": null}'
     results:
     - 13
     - 18
     - 19
+    - 20
   visual:
   - check: Sync button and reconciled list remain readable.
     method: manual

@@ -1,0 +1,51 @@
+id: TC-MODULES-047
+title: A staged legacy restore applies before the first signed module roster installs
+description: A synthetic 0.5.10 profile starts with a changed SSH session name and a staged v1 restore.
+  The candidate restores the session and automatically installs both compatible modules in the first signed roster.
+covers: [F-Modules-1]
+tags: [p1, modules, upgrade, marketplace]
+modes: [native]
+fixtures: [reset_db, module_upgrade, module_signed_archive, module_legacy_roster]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- module_upgrade_probe: {phase: legacy-restore-applied}
+- module_marketplace_probe: {phase: source}
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- module_marketplace_probe: {phase: legacy-installed}
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
+- assert_count:
+    selector: '[data-testid="module-marketplace-current"]'
+    equal: 2
+- assert_no_runtime_errors: null
+- screenshot: module-first-upgrade-with-restore.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Starting the candidate applies the staged legacy restore and enrolls the existing installation.
+    actions: [1, 4, 5]
+    checkpoints:
+    - step: 3
+      expectation: The staged restore is absent and SQLite returns the original name from the backup.
+    - step: 7
+      expectation: Each roster archive transferred exactly once and its verified version is installed.
+    - step: 11
+      expectation: Settings lists both modules as installed.
+    - step: 12
+      expectation: Startup and module installation report no renderer runtime errors.
+    results: [3, 7, 11, 12]
+  native:
+  - check: The startup restore applies to a legacy SQLite file before the signed roster can be fetched.
+    method: external
+    reason: The observations compare actual stored data and signed package requests on the GitHub runner.
+  visual:
+  - check: The module store shows both signed roster entries as installed.
+    method: manual
+    reason: Review the screenshot captured after the independent installation checks.

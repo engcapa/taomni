@@ -1,0 +1,171 @@
+id: TC-MODULES-007
+title: Official signed offline module survives lifecycle and rejects installed tampering on restart
+description: >-
+  Install the current-source official hello package through Settings, using the
+  unmodified production pinned public key. Verify the native registry version,
+  inactive invoke rejection before enabling, real host ping after enabling,
+  an independent OS writer-lock check after each lifecycle observation,
+  disable/enable, Settings reopening and graceful app restart. When Settings
+  remains open, approve only the exact one-tab Exit confirmation; verify the
+  normal process shutdown before creating another native session.
+  Change only the isolated signed frontend externally and restart: the real
+  startup verifier must disable it. Restore the original signed bytes, restart,
+  then uninstall through Settings and prove another restart cannot resurrect it.
+  The GitHub artifact is not OS signing, Gatekeeper, TCC or noexec evidence.
+covers: [F-Modules-1]
+tags: [p1, modules, install, lifecycle, security]
+modes: [native]
+fixtures: [reset_db, module_signed_archive]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-offline-install"]'
+- fill:
+    selector: '[data-testid="module-offline-archive"]'
+    value: ${fixture.module_signed_archive}
+- fill:
+    selector: '[data-testid="module-offline-signature"]'
+    value: ${fixture.module_signed_signature}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- assert_text:
+    selector: '[data-testid="module-version-hello-plugin"]'
+    contains: 0.1.0
+- module_signed_probe: {phase: installed}
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-disable-hello-plugin"]'
+- module_signed_probe: {phase: enabled}
+- click: '[data-testid="module-action-disable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-enable-hello-plugin"]'
+- module_signed_probe: {phase: disabled}
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-disable-hello-plugin"]'
+- module_signed_probe: {phase: enabled}
+- click: '[data-testid="tab-item"][data-tab-type="settings"][data-active="true"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="settings-panel"]'
+    state: detached
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-action-disable-hello-plugin"]'
+- module_signed_probe: {phase: enabled}
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- module_signed_probe: {phase: enabled}
+- module_signed_probe: {phase: tamper-frontend}
+- native_restart_app: null
+- wait_for: '[data-testid="status-bar"]'
+- module_signed_probe: {phase: invalid}
+- module_signed_probe: {phase: restore-frontend}
+- native_restart_app: null
+- wait_for: '[data-testid="status-bar"]'
+- module_signed_probe: {phase: enabled}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-action-uninstall-hello-plugin"]'
+- click: '[data-testid="module-delete-data-hello-plugin"]'
+- click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-hello-plugin"]'
+- module_signed_probe: {phase: uninstalled}
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- module_signed_probe: {phase: uninstalled}
+- assert_no_runtime_errors: null
+- screenshot: official-module-uninstalled-after-restart.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A current-source official package reaches the real pinned signature gate and activates the correct native host.
+    actions: [7, 8, 9, 13]
+    checkpoints:
+    - step: 10
+      expectation: The real installation finishes successfully with the production trust anchor.
+    - step: 11
+      expectation: The module card displays the signed 0.1.0 version.
+    - step: 12
+      expectation: Native registry, active pointer and retained signed original match the official artifact; the installed but not enabled module rejects invoke with InvalidState.
+    - step: 15
+      expectation: hello/ping is served by the real isolated host with the correct plugin ID, version and enabled state.
+    results: [10, 11, 12, 15]
+  - id: R2
+    requirement: Disable/enable, Settings reopening and graceful restart preserve native lifecycle state and trust.
+    actions: [16, 19, 22, 24, 29]
+    checkpoints:
+    - step: 18
+      expectation: Disabled native invoke rejects with InvalidState.
+    - step: 21
+      expectation: Enabling restores a successful native host invocation.
+    - step: 28
+      expectation: Reopened Settings retains the actual enabled module.
+    - step: 31
+      expectation: The exact one-tab Exit confirmation is accepted once, normal shutdown completes, and a new native process revalidates retained signed bytes and invokes the expected host.
+    results: [18, 21, 28, 31]
+  - id: R3
+    requirement: Installed frontend tampering fails startup trust, and restoring exact signed bytes permits safe recovery.
+    actions: [32, 33, 36, 37]
+    checkpoints:
+    - step: 35
+      expectation: After external frontend tampering, the startup scan disables the real record with an integrity error and rejects host invocation.
+    - step: 39
+      expectation: Restoring only the original signed file and restarting recovers the correct host without changing the public key or active pointer.
+    results: [35, 39]
+  - id: R4
+    requirement: Uninstall deactivates the module and a subsequent app restart cannot resurrect it.
+    actions: [44, 45, 47, 50]
+    checkpoints:
+    - step: 49
+      expectation: Native registry is uninstalled, activeVersion is null, all installed code is absent, and invocation rejects with InvalidState.
+    - step: 52
+      expectation: After the exact one-tab Exit confirmation and normal shutdown, the same uninstalled state persists in a newly started native process.
+    - step: 53
+      expectation: Installation, lifecycle, recovery and uninstall produce no unhandled renderer error.
+    results: [49, 52, 53]
+  - id: R5
+    requirement: The actual native host owns the writer lease while enabled and releases it when inactive, including after normal restart and integrity rejection.
+    actions: [13, 16, 19, 29, 33, 37, 45, 50]
+    checkpoints:
+    - step: 15
+      expectation: An independent nonblocking OS lock attempt cannot take hello-plugin's writer lease after a successful host ping.
+    - step: 18
+      expectation: After UI disable, the same OS lock can be acquired and immediately released; no file is created or changed by the probe.
+    - step: 31
+      expectation: The newly started native host owns the writer lock after normal application restart.
+    - step: 35
+      expectation: Integrity rejection leaves no host writer lease held.
+    - step: 52
+      expectation: Uninstalled state after restart has no host writer lease held.
+    results: [15, 18, 31, 35, 52]
+  native:
+  - check: Official pinned-key installation, host process invocation, independent OS writer-lock ownership/release, native disk persistence and graceful restart re-verification.
+    method: automated
+    reason: Browser stubs cannot validate real files, signatures, process execution or startup scanning.
+  - check: OS signature trust, Gatekeeper/TCC, Linux noexec and production install-location execution.
+    method: manual
+    reason: The QA artifact proves Minisign trust and isolated lifecycle only; separate G1/G2/G3 experiments remain required.
+  visual:
+  - check: Settings installation and lifecycle controls remain readable across desktop WebViews.
+    method: manual
+    reason: Retained native screenshots support review; the automated assertions verify actual state and content.

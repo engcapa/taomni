@@ -31,10 +31,12 @@ from pathlib import Path
 from typing import Any
 
 from .deadline import budget_time as time
+from .fixtures.rdp_server_required import probe_binary
 from .native_steps import NativeStepContext, _verb
 from .steps import StepError
 from . import host_clipboard
 from .rdp_helpers.mstsc import launch as launch_mstsc
+from .rdp_helpers.report_assertions import check_expectations as _check_expectations, report_expectations
 from .rdp_helpers.mstsc import diagnose as diagnose_mstsc
 from .rdp_helpers.mstsc import file_launch_consent
 
@@ -42,15 +44,7 @@ HELPERS = Path(__file__).resolve().parent / "rdp_helpers"
 
 
 def _probe_path(ctx: NativeStepContext) -> Path:
-    configured = (ctx.cfg.get("app") or {}).get("native_binary")
-    if configured:
-        base = Path(str(configured)).expanduser().resolve().parent
-    else:
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-        from native_build import qa_binary  # type: ignore[import-not-found]
-
-        base = qa_binary().parent
-    probe = base / ("rdp-probe.exe" if platform.system() == "Windows" else "rdp-probe")
+    probe = probe_binary(ctx.cfg)
     if not probe.is_file():
         raise StepError(f"rdp-probe binary not found next to the QA app: {probe}")
     return probe
@@ -496,50 +490,6 @@ def host_screenshot(path: Path) -> str:
     return f"host screenshot {path.name}"
 
 
-def _lookup(report: Any, dotted: str) -> Any:
-    current = report
-    for part in dotted.split("."):
-        if isinstance(current, list) and part.isdigit():
-            current = current[int(part)] if int(part) < len(current) else None
-        elif isinstance(current, dict):
-            current = current.get(part)
-        else:
-            return None
-    return current
-
-
-def _check_expectations(report: Any, expect: dict, label: str) -> list[str]:
-    problems = []
-    for dotted, rule in expect.items():
-        value = _lookup(report, str(dotted))
-        rules = rule if isinstance(rule, dict) else {"equals": rule}
-        for op, wanted in rules.items():
-            ok = True
-            if op == "equals":
-                ok = value == wanted
-            elif op == "min":
-                ok = isinstance(value, (int, float)) and value >= wanted
-            elif op == "max":
-                ok = isinstance(value, (int, float)) and value <= wanted
-            elif op == "exists":
-                ok = (value is not None) == bool(wanted)
-            elif op == "contains":
-                ok = value is not None and str(wanted) in (json.dumps(value) if not isinstance(value, str) else value)
-            elif op == "excludes":
-                # Absent counts as excluded: a format that was never listed.
-                text = "" if value is None else (value if isinstance(value, str)
-                                                 else json.dumps(value, ensure_ascii=False))
-                ok = str(wanted) not in text
-            elif op == "length_min":
-                ok = isinstance(value, (list, dict, str)) and len(value) >= wanted
-            else:
-                problems.append(f"{label}: unknown expectation operator {op!r} for {dotted}")
-                continue
-            if not ok:
-                problems.append(f"{label}: {dotted} {op} {wanted!r} failed (actual {value!r})")
-    return problems
-
-
 def _finish_probe(ctx: NativeStepContext, process: subprocess.Popen, artifact: Path,
                   args: dict, label: str, timeout: float) -> str:
     try:
@@ -816,15 +766,19 @@ def _do_assert_json_file(ctx: NativeStepContext, args: Any) -> str:
     if not isinstance(args, dict) or "path" not in args or "expect" not in args:
         raise StepError("assert_json_file: expected {path, expect, timeout_sec?}")
     path = _within_report(ctx, str(args["path"]))
+    modular_rdp_p95 = getattr(ctx, "cfg", {}).get("rdp", {}).get("modular_p95") is True
+    expectations = report_expectations(args, modular_rdp_p95=modular_rdp_p95)
     timeout = float(args.get("timeout_sec") or 10)
     deadline = time.time() + timeout
     problems: list[str] = ["file missing"]
     while time.time() < deadline:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            problems = _check_expectations(data, args["expect"], "assert_json_file")
+            problems = _check_expectations(data, expectations, "assert_json_file")
             if not problems:
-                return f"{path.name} satisfies {sorted(args['expect'])}"
+                if expectations is not args["expect"]:
+                    return f"{path.name} satisfies the modular p95 limit of {expectations['latency_ms.p95']['max']} ms"
+                return f"{path.name} satisfies {sorted(expectations)}"
         except (OSError, ValueError) as exc:
             problems = [f"unreadable: {exc}"]
         time.sleep(0.25)
@@ -838,23 +792,9 @@ def _do_rdp_canvas_click(ctx: NativeStepContext, args: Any) -> str:
     """Click remote desktop coordinate (x, y) inside the RDP client canvas."""
     if not isinstance(args, dict) or "x" not in args or "y" not in args:
         raise StepError("rdp_canvas_click: expected {x, y, selector?}")
-    selector = str(args.get("selector") or '[data-testid="rdp-canvas"]')
-    geometry = ctx.session.execute(
-        "const c = document.querySelector(" + json.dumps(selector) + ");"
-        "if (!c) return null; const r = c.getBoundingClientRect();"
-        "return {left: r.left, top: r.top, width: r.width, height: r.height,"
-        " desktopWidth: c.width, desktopHeight: c.height};"
-    )
-    if not isinstance(geometry, dict) or not geometry.get("width"):
-        raise StepError(f"rdp_canvas_click: canvas {selector} not found or not laid out")
-    sx = float(geometry["width"]) / float(geometry["desktopWidth"] or geometry["width"])
-    sy = float(geometry["height"]) / float(geometry["desktopHeight"] or geometry["height"])
-    vx = int(geometry["left"] + float(args["x"]) * sx)
-    vy = int(geometry["top"] + float(args["y"]) * sy)
-    from native_pointer import click_viewport_point
+    from .rdp_helpers.canvas import CANVAS, click_canvas
 
-    click_viewport_point(ctx.session, vx, vy, move_ms=50, hold_ms=60)
-    return f"clicked desktop ({args['x']},{args['y']}) at viewport ({vx},{vy}) scale {sx:.3f}x{sy:.3f}"
+    return click_canvas(ctx.session, args["x"], args["y"], str(args.get("selector") or CANVAS))
 
 
 # ------------------------------------------------------------------- save_text

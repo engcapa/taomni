@@ -1,0 +1,161 @@
+id: TC-MODULES-009
+title: Core notes and registry recover after normal native shutdown and restart
+covers:
+- F-Modules-1
+- F-TAO-1
+tags:
+- modules
+- core-only
+- native-boundary
+- lifecycle
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- core_profile_state
+timeout_sec: 180
+description: Save a note through the production Notes UI, close the run-owned QA app through its normal window path and restart the same isolated profile.
+  The native restart receipt must show normal shutdown and a new owned application process. Reopen Notes and Module Store to prove core store/profile ownership
+  and registry setup recover. No kill or fixture reset is a successful shutdown. Read the actual core-owned profile generation before and after restart;
+  it must remain identical without a restore. The fixture registers the owned path; asserting probes read the file after application readiness and never
+  write it. Hide the saved Notes overlay before using window chrome; an open drawer may cover the Windows close button. The closed drawer remains
+  mounted to retain its content, so verify that it is hidden rather than requiring DOM removal. After normal desktop shutdown, an actual headless owner
+  rejects a competing desktop on the same profile. After the headless owner releases it, the restored desktop rejects a headless contender.
+  Verify both conflicts again with a pending MFA recovery record in the isolated profile and confirm that the contender preserves the record.
+  The MFA upgrade helper also rejects a different executable while the desktop stays responsive.
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="rail-chat-button"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- wait_for: '[data-testid="notes-panel"]'
+- click: '[data-testid="notes-new"]'
+- wait_for: '[data-testid="note-editor"]'
+- fill:
+    selector: '[data-testid="note-editor-title"]'
+    value: QA CoreState normal restart
+- click: '[data-testid="note-editor-back"]'
+- assert_text:
+    selector: '[data-testid="notes-list"]'
+    contains: QA CoreState normal restart
+- assert_no_runtime_errors: null
+- assert_core_profile_generation:
+    phase: capture
+    path: ${fixture.core_profile_state_path}
+- &id001
+  click: '[data-testid="ai-chat-drawer-hide"]'
+- &id002
+  wait_for:
+    selector: '[data-testid="ai-chat-drawer"]'
+    state: hidden
+- native_restart_app:
+    verify_mode_lease: true
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="notes-panel"]'
+- assert_text:
+    selector: '[data-testid="notes-list"]'
+    contains: QA CoreState normal restart
+- *id001
+- *id002
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-store-panel"]'
+- assert_visible: '[data-testid="module-store-core-api"]'
+- assert_visible: '[data-testid="module-upgrade-status"]'
+- assert_no_runtime_errors: null
+- assert_core_profile_generation:
+    phase: unchanged
+    path: ${fixture.core_profile_state_path}
+- assert_headless_profile_blocked: null
+- assert_json_file:
+    path: headless-mode-lease.json
+    expect:
+      passed: true
+      headlessOwner.ready: true
+      headlessOwner.exited: true
+      desktopContender.exitCode: 1
+      desktopContender.modeLeaseError: true
+      desktopContender.ownerStillRunning: true
+      desktopContender.openedEndpoint: false
+      pendingMfaRecoveryContender.exitCode: 1
+      pendingMfaRecoveryContender.modeLeaseError: true
+      pendingMfaRecoveryContender.ownerStillRunning: true
+      pendingMfaRecoveryContender.openedEndpoint: false
+      pendingMfaRecoveryContender.recoveryRecordPreserved: true
+- assert_json_file:
+    path: desktop-mode-lease.json
+    expect:
+      passed: true
+      mfaRelaunchExecutableGuard.exitCode: 1
+      mfaRelaunchExecutableGuard.rejected: true
+      mfaRelaunchExecutableGuard.ownerStillRunning: true
+verification:
+  review: reviewed
+  requirements:
+  - id: R-CORE-NORMAL-RESTART
+    requirement: Normal native shutdown releases profile ownership and the same saved core data and registry remain available after restarting.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 8
+    - 9
+    - 13
+    - 15
+    - 17
+    - 20
+    - 22
+    - 23
+    checkpoints:
+    - step: 11
+      expectation: No runtime errors occur before the lifecycle transition.
+    - step: 10
+      expectation: A note is saved before normal app shutdown.
+    - step: 12
+      expectation: The real core persisted a canonical profile generation before restart.
+    - step: 19
+      expectation: The note survives the real application restart without reseeding.
+    - step: 25
+      expectation: Registry setup succeeded in the restarted process.
+    - step: 26
+      expectation: The same profile supports upgrade preflight after restart.
+    - step: 27
+      expectation: No runtime error occurs in the restarted application.
+    - step: 28
+      expectation: Normal startup retains the same generation instead of invalidating contexts on every restart.
+    - step: 29
+      expectation: Headless startup reports the profile in use and opens no endpoint while the reopened desktop remains responsive, including with a pending MFA recovery record.
+    - step: 14
+      expectation: Closing the saved Notes overlay exposes the native window close button before normal restart.
+    - step: 30
+      expectation: Headless stays alive while the desktop exits with status 1 in both attempts. The pending MFA recovery record is preserved and the desktop reopens the same data after headless exits.
+    - step: 31
+      expectation: The helper rejects the different executable with status 1 while the desktop remains responsive.
+    - step: 21
+      expectation: After proving persisted notes, closing the overlay exposes Settings without discarding data.
+    results:
+    - 10
+    - 11
+    - 12
+    - 14
+    - 19
+    - 21
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+  native:
+  - check: Normal exit, process ownership change, profile lock release and SQLite persistence.
+    method: automated
+    reason: These effects require the matching native QA application; browser reload cannot establish them.
+  visual:
+  - check: This case verifies native lifecycle and persisted content.
+    method: not-applicable
+    reason: No layout or visual fidelity requirement changes.

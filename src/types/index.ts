@@ -6,137 +6,13 @@ import type { ObjectStorageConfig } from "./objectStorage";
 import type { LaunchPreparation } from "../lib/sockscap";
 import type { VncViewerOptions } from "../lib/vncOptions";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "sockscap" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git" | "mail" | "mail-unified" | "code-workspace" | "mfa" | "file-viewer" | "servers";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "sockscap" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "git" | "mail" | "mail-unified" | "code-workspace" | "mfa" | "file-viewer" | "servers" | "plugin";
 
-/** Presence state of a LAN peer (mirrors the Rust `PresenceStatus`). */
-export type LanPresence = "online" | "away" | "busy" | "offline";
-
-/** A peer discovered on the LAN via mDNS (mirrors Rust `PeerRecord`). */
-export interface LanPeer {
-  id: string;
-  name: string;
-  avatarHash?: string | null;
-  signature: string;
-  status: LanPresence;
-  lastSeen: number;
-  addr?: string | null;
-  port?: number | null;
+/** A persisted view locator, never native activation or permission evidence. */
+export interface PluginTabInfo {
+  slug: string;
+  kind: string;
 }
-
-/** This node's own profile (mirrors Rust `Profile`). */
-export interface LanProfile {
-  id: string;
-  name: string;
-  avatarBase64?: string | null;
-  avatarHash?: string | null;
-  signature: string;
-  status: LanPresence;
-  updatedAt: number;
-}
-
-/** A conversation thread — direct (`direct:<peer>`) or group (`group:<id>`). */
-export interface LanConversation {
-  id: string;
-  kind: "direct" | "group";
-  peerOrGroupId: string;
-  lastMsgAt: number;
-  unread: number;
-}
-
-/** Delivery state of an outgoing/incoming message. */
-export type LanMessageState = "sending" | "sent" | "delivered" | "failed";
-
-/** A chat message (mirrors Rust `LanMessage`). */
-export interface LanMessage {
-  id: string;
-  convId: string;
-  senderId: string;
-  body: string;
-  mentions: string[];
-  createdAt: number;
-  state: LanMessageState;
-}
-
-/** A named group / channel (mirrors Rust `Group`). */
-export interface LanGroup {
-  id: string;
-  name: string;
-  createdAt: number;
-  members: string[];
-}
-
-/** LanChat service status (mirrors Rust `LanChatStatus`). */
-export interface LanChatStatus {
-  running: boolean;
-  nodeId: string;
-  peerCount: number;
-}
-
-/** A file transfer progress / state update (mirrors Rust `TransferProgress`). */
-export interface LanTransferProgress {
-  transferId: string;
-  direction: "send" | "recv";
-  name: string;
-  size: number;
-  transferred: number;
-  rate: number;
-  eta: number;
-  state: "offering" | "active" | "paused" | "done" | "failed" | "cancelled" | "rejected";
-  convId: string;
-}
-
-/** An inbound file offer awaiting accept/reject. */
-export interface LanFileOffer {
-  transferId: string;
-  from: string;
-  name: string;
-  size: number;
-  mime: string;
-  kind: "file" | "dir";
-  convId: string;
-  /** Set when the offer targets a group (vs a 1:1 chat). */
-  groupId?: string | null;
-}
-
-/** A WebRTC signaling frame relayed from a peer. */
-export interface LanSignal {
-  from: string;
-  type: string;
-  payload: Record<string, unknown>;
-}
-
-/** Message-retention policy (mirrors Rust `RetentionSettings`). */
-export interface LanRetention {
-  retentionDays: number;
-  maxPerConv: number;
-  cleanupEnabled: boolean;
-}
-
-/** Service enablement state (mirrors Rust `LanChatServiceState`). */
-export interface LanServiceState {
-  /** Whether the background service (discovery + transport + beacon) is live. */
-  running: boolean;
-  /** Whether the service is configured to start on app launch. */
-  startOnLaunch: boolean;
-}
-
-/** A pinned peer identity record (mirrors Rust `PinnedPeer`). */
-export interface LanPinnedPeer {
-  nodeId: string;
-  firstSeen: number;
-  lastSeen: number;
-}
-
-/** A security event: a peer's presented identity was rejected. */
-export interface LanSecurityEvent {
-  peerId: string;
-  addr: string;
-  /** "spoof" = claimed id != cert fingerprint; "keyChanged" = pinned cert changed. */
-  kind: "spoof" | "keyChanged";
-}
-
-/** Call kind. */
-export type LanCallKind = "audio" | "video";
 
 /**
  * Connection parameters for a database client tab (MySQL / PostgreSQL /
@@ -469,6 +345,7 @@ export interface Tab {
   mail?: MailTabInfo;
   git?: GitTabInfo;
   codeWorkspace?: CodeWorkspaceTabInfo;
+  plugin?: PluginTabInfo;
   hasNewOutput?: boolean;
   /**
    * Ownership of a terminal tab title. Fresh terminals keep their launch label

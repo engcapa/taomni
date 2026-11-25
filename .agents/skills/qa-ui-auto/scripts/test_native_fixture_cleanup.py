@@ -1,5 +1,7 @@
 """Fixture ownership, including an isolated Windows process-tree lock probe."""
 from pathlib import Path
+import json
+import sqlite3
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -15,7 +17,7 @@ from qa_ui_auto.steps import StepError
 
 class NativeFixtureCleanupTest(unittest.TestCase):
     def run_case(self, failure=None, setup_failure=False, cleanup_failure=False, close_failure=False,
-                 second_name="second"):
+                 second_name="second", second_fixture=None, step_action=None):
         events = []
         first = Fixture("first", lambda ctx: events.append("first-setup"),
                         lambda ctx: events.append("first-cleanup"))
@@ -30,7 +32,7 @@ class NativeFixtureCleanupTest(unittest.TestCase):
             if cleanup_failure:
                 raise RuntimeError("cleanup failed")
 
-        second = Fixture(second_name, second_setup, second_cleanup)
+        second = second_fixture or Fixture(second_name, second_setup, second_cleanup)
         fixtures = {first.name: first, second.name: second}
         case = SimpleNamespace(id="TC-FIXTURE-OWNER", title="fixture ownership", tags=[], covers=[],
                                modes=["native"], native_platforms=[], fixtures=list(fixtures),
@@ -51,7 +53,7 @@ class NativeFixtureCleanupTest(unittest.TestCase):
              patch("tauri_webdriver.NativeHarness", return_value=harness), \
              patch.object(runner.platform, "system", return_value="Linux"), \
              patch.object(runner, "get_fixture", side_effect=fixtures.__getitem__), \
-             patch("qa_ui_auto.native_steps.run_native_step", side_effect=failure), \
+             patch("qa_ui_auto.native_steps.run_native_step", side_effect=step_action or failure), \
              patch.object(runner, "_capture_native_failure", return_value={}), \
              patch("qa_ui_auto.native_diagnostics.collect"), \
              patch.object(runner, "_jdtls_pids", return_value=set()), \
@@ -60,6 +62,48 @@ class NativeFixtureCleanupTest(unittest.TestCase):
              patch.object(runner, "_reap_lingering_qa_apps", return_value={}):
             results = runner._native_run([case], {"app": {"mode": "native"}}, {}, Path(directory), False)
         return events, results[0]
+
+    def test_module_wal_connection_is_owned_until_fixture_cleanup_on_success_or_failure(self):
+        from qa_ui_auto.fixtures import module_backup_data
+        from qa_ui_auto.module_backup_observation import DATABASE, MARKER, run
+
+        for failure in [None, StepError("after seed")]:
+            connections = []
+            real_connect = sqlite3.connect
+
+            def tracked_connect(*args, **kwargs):
+                connection = real_connect(*args, **kwargs)
+                connections.append(connection)
+                return connection
+
+            def seed(ctx, verb, args):
+                root = ctx.case_dir.parent.resolve() / "native-appdata" / "plugins"
+                (root / "hello-plugin").mkdir(parents=True)
+                (ctx.case_dir / "official-module-fixture.json").write_text(
+                    json.dumps({"pluginRoot": str(root)}), encoding="utf-8")
+                with patch("qa_ui_auto.module_backup_observation.invoke", return_value={
+                    "value": [{"manifest": {"slug": "hello-plugin"}, "state": "installed"}],
+                }), patch("qa_ui_auto.module_backup_observation.sqlite3.connect", side_effect=tracked_connect):
+                    self.assertIn("verified", run(ctx, {"phase": "seed"}))
+                    self.assertEqual(connections[-1].execute(
+                        "SELECT value FROM qa_snapshot_marker").fetchall(), [(MARKER,)])
+                    self.assertGreater((root / "hello-plugin/data" / (DATABASE + "-wal")).stat().st_size, 0)
+                if failure:
+                    raise failure
+
+            fixture = Fixture("module_backup_data", module_backup_data.setup, module_backup_data.teardown)
+            with self.subTest(failure=failure):
+                try:
+                    events, result = self.run_case(second_fixture=fixture, step_action=seed)
+                    self.assertEqual(result["status"], "failed" if failure else "passed")
+                    if failure:
+                        self.assertEqual(result["failure"]["message"], "after seed")
+                    self.assertEqual(len(connections), 1)
+                    with self.assertRaises(sqlite3.ProgrammingError):
+                        connections[0].execute("SELECT value FROM qa_snapshot_marker")
+                finally:
+                    for connection in connections:
+                        connection.close()
 
     def test_success_and_step_failure_restore_every_fixture_after_session_close(self):
         for failure in [None, StepError("original step failure")]:

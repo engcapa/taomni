@@ -1,150 +1,79 @@
 id: TC-MAIL-SEARCH-01
-title: Mail search finds cached mail across folders and via the server
-description: 'TASK-08 (AC-25/AC-26/AC-27): 12 messages are delivered and synced; a
-
-  full-text search for one subject returns exactly that message from the
-
-  local index, the unread quick filter keeps it, and a server search of the
-
-  current folder returns it too. Selecting and deleting the result moves it to
-  Trash and removes it from the search list. Browser mode drives the stub index/server;
-
-  native mode exercises SQLite FTS5 and IMAP UID SEARCH on the fake server.
-
-  '
-covers:
-- F-MAIL-7
-- F-MAIL-12
-tags:
-- mail
-- p1
-modes:
-- browser
-- native
-fixtures:
-- reset_db
-- mail_server
+title: Mail searches all cached folders, the current folder and the server
+description: Sync an Archive message and 12 inbox messages. Find the Archive message with the all-folders scope and check that the current-folder scope hides it. Find and delete one unread inbox message through the search results.
+covers: [F-MAIL-7, F-MAIL-12]
+tags: [mail, p1]
+modes: [browser, native]
+fixtures: [reset_db, mail_server]
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
-- seed_storage:
-    key: taomni.quickConnectVisible
-    value: 'true'
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
 - reload_window: null
 - wait_for: '[data-testid="qc-input"]'
-- fill:
-    selector: '[data-testid="qc-input"]'
-    value: ${fixture.mail_quick_connect}
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
 - click: '[data-testid="qc-submit"]'
 - wait_for: '[data-testid="mail-client-tab"]'
-- mail_server_assert_list_matches:
-    timeout_sec: 60
-- mail_server_deliver:
-    count: 12
-    prefix: Needle
-- click: '[data-testid="mail-sync-button"]'
-- mail_server_assert_list_matches:
-    timeout_sec: 60
-- select_option:
-    selector: '[data-testid="mail-search-scope"]'
-    value: all
-- fill:
-    selector: '[data-testid="mail-search-input"]'
-    value: Needle 0007
-- assert_count:
-    selector: '[data-testid="mail-message-row"]'
-    equal: 1
-- assert_text:
-    selector: '[data-testid="mail-message-row"]'
-    contains: Needle 0007
+- mail_server_assert_list_matches: {timeout_sec: 60}
+- mail_server_deliver: {count: 12, prefix: Needle}
+- mail_server_deliver: {folder: Archive, count: 1, prefix: Cached elsewhere}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: new headers across, timeout_sec: 30}
+- mail_server_assert_list_matches: {timeout_sec: 30}
+- select_option: {selector: '[data-testid="mail-search-scope"]', value: all}
+- select_option: {selector: '[data-testid="mail-search-field"]', value: subject}
+- fill: {selector: '[data-testid="mail-search-input"]', value: Cached elsewhere 0001}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Cached elsewhere 0001"]'
+- assert_text: {selector: '[data-testid="mail-message-folder"]', contains: Archive}
+- select_option: {selector: '[data-testid="mail-search-scope"]', value: folder}
+- wait_for: {selector: '[data-testid="mail-message-row"][data-subject="Cached elsewhere 0001"]', state: detached}
+- fill: {selector: '[data-testid="mail-search-input"]', value: Needle 0007}
+- assert_count: {selector: '[data-testid="mail-message-row"]', equal: 1}
+- assert_text: {selector: '[data-testid="mail-message-row"]', contains: Needle 0007}
 - click: '[data-testid="mail-quick-filter-unread"]'
-- assert_count:
-    selector: '[data-testid="mail-message-row"][data-unread="true"]'
-    equal: 1
+- assert_count: {selector: '[data-testid="mail-message-row"][data-unread="true"]', equal: 1}
 - click: '[data-testid="mail-search-server"]'
-- assert_text:
-    selector: '[data-testid="mail-client-tab"]'
-    contains: Server search found 1 message
-    timeout_sec: 30
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Server search found 1 message in INBOX, timeout_sec: 30}
 - screenshot: mail-search-01.png
 - click: '[aria-label="Select all visible messages"]'
-- assert_text:
-    selector: '[data-testid="mail-selection-count"]'
-    contains: 1 selected
+- assert_text: {selector: '[data-testid="mail-selection-count"]', contains: 1 selected}
 - click: '[data-testid="mail-delete-selected"]'
-- wait_for:
-    selector: '[data-testid="mail-message-row"]'
-    state: detached
-- mail_server_assert_folder_count:
-    folder: Trash
-    equals: 1
-- assert_text:
-    selector: '[data-testid="mail-selection-count"]'
-    contains: 0 selected
+- wait_for: {selector: '[data-testid="mail-message-row"]', state: detached}
+- mail_server_assert_folder_count: {folder: Trash, equals: 1, has_subject: Needle 0007}
+- assert_text: {selector: '[data-testid="mail-selection-count"]', contains: 0 selected}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 本地全文索引跨文件夹检索到唯一匹配邮件，未读快捷过滤保留该邮件（AC-25/AC-27）。
-    actions:
-    - 1
-    - 2
-    - 3
-    - 5
-    - 6
-    - 9
-    - 10
-    - 12
-    - 13
-    - 16
+    requirement: 本地全文索引支持跨文件夹、当前文件夹和未读过滤（AC-25/AC-27）。
+    actions: [5, 6, 9, 10, 11, 14, 15, 16, 19, 21, 24]
     checkpoints:
-    - step: 8
-      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
-    - step: 11
-      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
-    - step: 14
-      expectation: '{"assert_count": {"equal": 1}}'
-    - step: 15
-      expectation: '{"assert_text": {"contains": "Needle 0007"}}'
-    - step: 17
-      expectation: '{"assert_count": {"selector": "unread rows", "equal": 1}}'
-    results:
-    - 14
-    - 15
-    - 17
+    - {step: 13, expectation: 同步后的邮件列表与收件箱一致。}
+    - {step: 17, expectation: 所有文件夹范围找到已同步的归档邮件。}
+    - {step: 18, expectation: 搜索结果显示归档文件夹名称。}
+    - {step: 20, expectation: 切换至当前文件夹后移除归档邮件。}
+    - {step: 22, expectation: 精确查询返回一封邮件。}
+    - {step: 23, expectation: 唯一结果为目标收件箱邮件。}
+    - {step: 25, expectation: 未读过滤保留同一封邮件。}
+    results: [13, 17, 18, 20, 22, 23, 25]
   - id: R2
     requirement: 服务器搜索在当前文件夹返回匹配邮件（AC-26）。
-    actions:
-    - 18
+    actions: [26]
     checkpoints:
-    - step: 19
-      expectation: '{"assert_text": {"contains": "Server search found 1 message"}}'
-    results:
-    - 19
+    - {step: 27, expectation: 服务器搜索在 INBOX 返回一封邮件。}
+    results: [27]
   - id: R3
     requirement: 搜索结果可以选中并删除到 Trash，成功后从结果列表和选择中移除。
-    actions:
-    - 21
-    - 23
+    actions: [29, 31]
     checkpoints:
-    - step: 22
-      expectation: 搜索行计入选择数量。
-    - step: 24
-      expectation: 删除的搜索行消失。
-    - step: 25
-      expectation: 服务器 Trash 收到一封邮件。
-    - step: 26
-      expectation: 操作完成后清空选择。
-    results:
-    - 22
-    - 24
-    - 25
-    - 26
+    - {step: 30, expectation: 搜索行计入选择数量。}
+    - {step: 32, expectation: 删除的搜索行消失。}
+    - {step: 33, expectation: 服务器 Trash 收到同一封邮件。}
+    - {step: 34, expectation: 操作完成后清空选择。}
+    - {step: 35, expectation: 渲染期间没有运行时错误。}
+    results: [30, 32, 33, 34, 35]
   visual:
-  - check: 截图中搜索框、范围、快捷过滤与结果行布局完整。
-    method: manual
-    reason: 像素与布局需人工评审。
+  - {check: 截图中搜索框、范围、快捷过滤与结果行布局完整。, method: manual, reason: 像素与布局需人工评审。}
   native:
-  - check: native 模式验证 SQLite FTS5 trigram 索引与 IMAP UID SEARCH；browser 仅验证渲染层与桩模型；平台结果分别记录。
-    method: automated
-    reason: 按实际执行模式与平台解释证据。
+  - {check: 原生运行检查 SQLite FTS5 索引及真实 IMAP UID SEARCH。, method: automated, reason: Browser 检查搜索范围和操作接线，Native 检查 SQLite 和回环服务器。}

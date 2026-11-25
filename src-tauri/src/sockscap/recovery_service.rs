@@ -1,3 +1,4 @@
+mod module_cleanup;
 mod stop;
 
 mod update;
@@ -10,6 +11,12 @@ mod teardown;
 
 mod repair;
 
+pub(crate) fn publish_recovery_status(app: &tauri::AppHandle) {
+    use tauri::Emitter;
+    let _ = app.emit("sockscap-recovery-status", ());
+}
+
+pub(crate) use module_cleanup::ModuleCleanup;
 pub use stop::{prepare_for_exit, sockscap_stop};
 
 pub(crate) use stop::{__cmd__sockscap_stop, __tauri_command_name_sockscap_stop};

@@ -28,6 +28,7 @@ type StubMailHeader = {
   snippet: string;
   rawSize: number;
   bodyCached: boolean;
+  composedBody?: { text: string | null; html: string | null };
   inReplyTo?: string | null;
   references?: string[];
   listUnsubscribe?: { uris: string[]; oneClick: boolean } | null;
@@ -78,6 +79,8 @@ interface StubAccountState {
 
 const accounts = new Map<string, StubAccountState>();
 let nextFolderReadDelayMs = 0;
+let prefetchGate: Promise<void> | undefined;
+let releasePrefetch: (() => void) | undefined;
 type MutationFault = { supports_move?: boolean; uidplus?: boolean; max_count?: number | null; fail_after?: number | null; reject_store_once?: boolean; drop_copy_response_once?: boolean };
 let mutationFault: MutationFault = {};
 let mutationTransferred = 0;
@@ -158,15 +161,66 @@ export function stubMailListFolders(accountId: string, seed: Seed) {
 
 export function stubMailListCached(accountId: string, seed: Seed, folder: string, limit: number, offset: number) {
   const state = account(accountId, seed);
-  const rows = [...folderState(state, folder).cache.values()]
+  const rows = [...(state.folders.get(folder)?.cache.values() ?? [])]
     .sort((a, b) => (b.dateTs - a.dateTs) || (b.uid - a.uid));
   return rows.slice(offset, offset + limit);
+}
+
+export function stubMailSyncHeaders(accountId: string, seed: Seed, folder: string, limit: number, offset: number) {
+  const state = account(accountId, seed);
+  const { server } = folderState(state, folder);
+  const messages = [...server.values()]
+    .sort((left, right) => right.uid - left.uid)
+    .slice(offset, offset + limit);
+  return {
+    accountId,
+    folder,
+    folders: state.meta.map((meta) => folderPayload(accountId, state, meta)),
+    messages,
+    fetchedMessages: messages.length,
+    cachedBodies: messages.filter((message) => message.bodyCached).length,
+    syncedAt: nowTs(),
+    offset,
+    limit,
+    hasMore: offset + messages.length < server.size,
+  };
 }
 
 export function stubMailFindHeader(accountId: string, seed: Seed, folder: string, uid: number) {
   const state = account(accountId, seed);
   const entry = folderState(state, folder);
   return entry.cache.get(uid) ?? entry.server.get(uid) ?? null;
+}
+
+export async function stubMailPrefetchBodies(
+  accountId: string,
+  seed: Seed,
+  folderName: string,
+  uids: number[],
+): Promise<boolean> {
+  await prefetchGate;
+  const { cache } = folderState(account(accountId, seed), folderName);
+  for (const uid of uids) {
+    const entry = cache.get(uid);
+    if (entry) cache.set(uid, { ...entry, bodyCached: true });
+  }
+  return true;
+}
+
+export function stubMailMarkBodyCached(
+  accountId: string,
+  seed: Seed,
+  folderName: string,
+  uid: number,
+): "cache" | "remote" {
+  const entry = folderState(account(accountId, seed), folderName);
+  const cached = entry.cache.get(uid);
+  if (cached) {
+    if (cached.bodyCached) return "cache";
+    entry.cache.set(uid, { ...cached, bodyCached: true });
+    return "remote";
+  }
+  return entry.server.has(uid) ? "remote" : "cache";
 }
 
 export function stubMailSyncFolder(
@@ -238,6 +292,42 @@ export function stubMailSetSubscription(accountId: string, seed: Seed, folder: s
   const state = account(accountId, seed);
   if (subscribed) state.unsubscribed.delete(folder);
   else state.unsubscribed.add(folder);
+  return stubMailListFolders(accountId, seed);
+}
+
+type StubFolderChange =
+  | { kind: "create"; name: string }
+  | { kind: "rename"; from: string; to: string }
+  | { kind: "delete"; name: string };
+
+export function stubMailChangeFolder(accountId: string, seed: Seed, change: StubFolderChange) {
+  const state = account(accountId, seed);
+  if (change.kind === "create") {
+    if (!change.name || state.folders.has(change.name)) throw new Error("Folder name is unavailable");
+    folderState(state, change.name);
+  } else {
+    const source = change.kind === "rename" ? change.from : change.name;
+    if (!state.folders.has(source)) throw new Error("Folder does not exist");
+    if (change.kind === "rename" && (!change.to || state.folders.has(change.to))) {
+      throw new Error("Folder name is unavailable");
+    }
+    const affected = state.meta.filter(({ name }) => name === source || name.startsWith(`${source}/`));
+    state.meta = state.meta.filter((folder) => !affected.includes(folder));
+    for (const { name } of affected) {
+      const folder = state.folders.get(name)!;
+      const unsubscribed = state.unsubscribed.delete(name);
+      state.folders.delete(name);
+      if (change.kind === "rename") {
+        const destination = change.to + name.slice(source.length);
+        for (const messages of [folder.server, folder.cache]) {
+          for (const message of messages.values()) message.folder = destination;
+        }
+        state.meta.push({ name: destination, displayName: destination });
+        state.folders.set(destination, folder);
+        if (unsubscribed) state.unsubscribed.add(destination);
+      }
+    }
+  }
   return stubMailListFolders(accountId, seed);
 }
 
@@ -512,10 +602,21 @@ function idleChanged(accountId: string, folder: string) {
 export interface StubMailQaControl {
   mutationFault: (fault: MutationFault) => void;
   delayNextFolderRead: (milliseconds: number) => void;
-  deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean, listUnsubscribe?: string | null, invite?: string | null, readReceipt?: boolean) => number[];
+  setPrefetchPaused: (paused: boolean) => void;
+  deliver: (
+    accountId: string,
+    folder: string,
+    count: number,
+    prefix?: string,
+    thread?: boolean,
+    listUnsubscribe?: string | null,
+    invite?: string | null,
+    readReceipt?: boolean,
+    body?: string | null,
+  ) => number[];
   expunge: (accountId: string, folder: string, uids: number[]) => void;
   setFlags: (accountId: string, folder: string, uid: number, flags: string[]) => void;
-  observe: (accountId: string, folder: string) => { server: number[]; cache: number[] };
+  observe: (accountId: string, folder: string) => { server: number[]; cache: number[]; flagged: number[] };
   unseen: (accountId: string, folder: string) => number;
   accounts: () => string[];
   idleClients: () => number;
@@ -551,7 +652,12 @@ export function installStubMailQaControl(seed: Seed): void {
   const control: StubMailQaControl = {
     mutationFault(fault) { mutationFault = { ...mutationFault, ...fault }; },
     delayNextFolderRead(milliseconds) { nextFolderReadDelayMs = milliseconds; },
-    deliver(accountId, folderName, count, prefix = "QA", thread = false, listUnsubscribe = null, invite = null, readReceipt = false) {
+    setPrefetchPaused(paused) {
+      releasePrefetch?.();
+      prefetchGate = paused ? new Promise<void>((resolve) => { releasePrefetch = resolve; }) : undefined;
+      if (!paused) releasePrefetch = undefined;
+    },
+    deliver(accountId, folderName, count, prefix = "QA", thread = false, listUnsubscribe = null, invite = null, readReceipt = false, body = null) {
       const state = account(accountId, seed);
       const folder = folderState(state, folderName);
       const uids: number[] = [];
@@ -560,6 +666,10 @@ export function installStubMailQaControl(seed: Seed): void {
         const uid = folder.uidNext;
         folder.uidNext += 1;
         const message = templateMessage(accountId, folderName, uid, `${prefix} ${String(index + 1).padStart(4, "0")}`);
+        if (body !== null) {
+          message.snippet = body;
+          message.composedBody = { text: body, html: null };
+        }
         if (thread && ancestry.length > 0) {
           message.inReplyTo = ancestry[ancestry.length - 1];
           message.references = [...ancestry];
@@ -593,6 +703,10 @@ export function installStubMailQaControl(seed: Seed): void {
       return {
         server: [...folder.server.keys()].sort((a, b) => a - b),
         cache: [...folder.cache.keys()].sort((a, b) => a - b),
+        flagged: [...folder.server.entries()]
+          .filter(([, message]) => message.flags.includes("\\Flagged"))
+          .map(([uid]) => uid)
+          .sort((a, b) => a - b),
       };
     },
     idleClients() {

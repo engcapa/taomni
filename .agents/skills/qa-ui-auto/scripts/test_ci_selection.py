@@ -1,4 +1,5 @@
 import argparse
+from contextlib import ExitStack
 import os
 from pathlib import Path
 import subprocess
@@ -7,14 +8,105 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from ci_plan_test_support import repository_plan_snapshot
 from qa_ui_auto.ci import capabilities, dependency_order, diff_paths, make_plan, selection_entry, write_json
 from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE, LINUX_PROFILES
+
+
+def setUpModule():
+    inputs = ExitStack()
+    unittest.addModuleCleanup(inputs.close)
+    inputs.enter_context(repository_plan_snapshot(Path.cwd()))
 
 
 def args(**overrides):
     return argparse.Namespace(**({'scope': 'smoke', 'head': '', 'base': '',
         'platforms': 'linux,windows,macos', 'modes': 'browser,native',
         'case_ids': '', 'features': '', 'tags': '', 'shards': '1'} | overrides))
+
+
+class ModuleProfileSelectionTests(unittest.TestCase):
+    def test_both_installation_states_preserve_applicable_crash_cases(self):
+        options = dict(scope="selected", tags="crash-regression", native_release=True, shards="3")
+        core = make_plan(args(**options, module_profile="core-only"))
+        full = make_plan(args(**options, module_profile="full", first_release_run="123"))
+        self.assertEqual(core["module_profile"]["modules"], {})
+        self.assertEqual(len(full["module_profile"]["modules"]), 10)
+        self.assertEqual(core["gaps"], [])
+        self.assertEqual(full["gaps"], [])
+        self.assertEqual([b["id"] for b in core["builds"]], [b["id"] for b in full["builds"]])
+        self.assertTrue(all(b["id"].endswith("-release-modular") for b in full["builds"]))
+        self.assertTrue(all("modular-release" in b["capabilities"] for b in full["builds"]))
+        plugin_cases = {"TC-FILE-OPEN-049": "mail", "TC-MODULES-102": "mfa"}
+        excludes = [entry for entry in core["not_applicable"] if "requires_plugin" in entry]
+        self.assertEqual(len(excludes), 12)
+        self.assertEqual({e["case"]: e["requires_plugin"] for e in excludes}, plugin_cases)
+        core_modes = {(e["mode"], e["platform_key"], case) for e in core["entries"] for case in e["selected_ids"]}
+        full_modes = {(e["mode"], e["platform_key"], case) for e in full["entries"] for case in e["selected_ids"]}
+        self.assertEqual(full_modes - core_modes, {
+            (mode, platform, case) for mode in ("browser", "native")
+            for platform in ("linux", "windows", "macos") for case in plugin_cases
+        })
+        self.assertTrue(all((mode, platform, "TC-WS-039") in core_modes
+                            for mode in ("browser", "native") for platform in ("linux", "windows", "macos")))
+        for entry in full["entries"]:
+            self.assertEqual("full-module-profile" in entry["capabilities"], entry["mode"] == "native")
+            self.assertNotIn("legacy-mail-imap", entry["capabilities"])
+
+    def test_full_native_profile_requires_a_release_producer(self):
+        with self.assertRaisesRegex(ValueError, "matching Release Bundle run ID"):
+            make_plan(args(scope="selected", tags="crash-regression", module_profile="full"))
+
+    def test_full_roster_covers_the_native_rdp_performance_case(self):
+        performance = "TC-RDPS-PERF-01-performance-budget"
+        plan = make_plan(args(scope="selected", tags="crash-regression", module_profile="full",
+                              modes="native", first_release_run="123",
+                              modular_rdp_p95=True, case_ids=performance))
+        entries = [e for e in plan["entries"] if performance in e["selected_ids"]]
+        self.assertEqual({e["platform_key"] for e in entries}, {"linux", "windows", "macos"})
+        self.assertTrue(all("full-module-profile" in e["capabilities"] for e in entries))
+        self.assertTrue(plan["modular_rdp_p95"])
+
+
+class MacosRunnerSelectionTests(unittest.TestCase):
+    def test_macos_26_arm64_recovery_keeps_cases_crash_selection_and_release_architecture(self):
+        selected = dict(scope="selected", platforms="macos", modes="native",
+                        case_ids="TC-EXPLORER-006,TC-EXPLORER-010,TC-EXPLORER-013,TC-EXPLORER-012,"
+                                 "TC-FILE-OPEN-041,TC-MODULES-033,TC-MODULES-034,TC-MODULES-035",
+                        tags="crash-regression", native_release=True, shards="4")
+        original = make_plan(args(**selected))
+        recovery = make_plan(args(**selected, macos_runner="macos-26"))
+        self.assertEqual(recovery["groups"], original["groups"])
+        self.assertEqual(recovery["gaps"], [])
+        self.assertEqual(recovery["unreviewed"], [])
+        self.assertEqual(recovery["macos_runner"], "macos-26")
+        self.assertEqual({entry["runner"] for entry in recovery["entries"]}, {"macos-26"})
+        self.assertEqual({entry["arch"] for entry in recovery["entries"]}, {"ARM64"})
+        self.assertEqual(recovery["builds"][0]["id"], "native-build-macos-arm64-release")
+        self.assertEqual(recovery["builds"][0]["runner"], "macos-26")
+        for before, after in zip(original["entries"], recovery["entries"], strict=True):
+            for key in ("selected_ids", "case_digests", "capabilities"):
+                self.assertEqual(before[key], after[key])
+
+    def test_macos_intel_keeps_cases_and_separates_native_build_architecture(self):
+        selected = dict(scope="selected", platforms="macos", modes="browser,native",
+                        case_ids="TC-MODULES-022,TC-MODULES-023", native_release=True)
+        arm = make_plan(args(**selected))
+        intel = make_plan(args(**selected, macos_runner="macos-15-intel"))
+        self.assertEqual(arm["groups"], intel["groups"])
+        self.assertEqual(intel["gaps"], [])
+        self.assertEqual(intel["macos_runner"], "macos-15-intel")
+        self.assertEqual({entry["runner"] for entry in intel["entries"]}, {"macos-15-intel"})
+        self.assertEqual({entry["arch"] for entry in intel["entries"]}, {"X64"})
+        self.assertEqual(arm["builds"][0]["id"], "native-build-macos-arm64-release")
+        self.assertEqual(intel["builds"][0]["id"], "native-build-macos-x64-release")
+        for before, after in zip(arm["entries"], intel["entries"]):
+            self.assertEqual(before["case_digests"], after["case_digests"])
+            self.assertEqual(before["capabilities"], after["capabilities"])
+
+    def test_macos_runner_rejects_unapproved_host_and_architecture_labels(self):
+        with self.assertRaisesRegex(ValueError, "macos_runner"):
+            make_plan(args(macos_runner="self-hosted"))
 
 
 class SelectionTests(unittest.TestCase):
@@ -70,7 +162,8 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(set(after["capabilities"]), expected)
 
     def test_only_mstsc_cases_require_windows_debugger_tools(self):
-        client = SimpleNamespace(fixtures=["rdp_server_required"], steps=[{"open": "/"}], tags=[])
+        client = SimpleNamespace(id="TC-RDPJ-02-joint-clipboard-no-echo", fixtures=["rdp_server_required"],
+                                 steps=[{"open": "/"}], tags=[])
         self.assertNotIn("mstsc", capabilities([client], "native"))
         client.steps.append({"host_mstsc": {"action": "start"}})
         self.assertIn("mstsc", capabilities([client], "native"))
@@ -108,7 +201,8 @@ class SelectionTests(unittest.TestCase):
                     'TC-WS-052', 'TC-WS-053', 'TC-WS-054', 'TC-WS-056', 'TC-WS-057', 'TC-MOBILE-013',
                     'TC-FILE-OPEN-002', 'TC-FILE-OPEN-003', 'TC-FILE-OPEN-005', 'TC-FILE-OPEN-006',
                     'TC-FILE-OPEN-007', 'TC-FILE-OPEN-008', 'TC-FILE-OPEN-009', 'TC-FILE-OPEN-010', 'TC-FILE-OPEN-011', 'TC-FILE-OPEN-012',
-                    'TC-FILE-OPEN-013', 'TC-TAO-HOME-002'}
+                    'TC-FILE-OPEN-013', 'TC-TAO-HOME-002', 'TC-EXPLORER-013', 'TC-FILE-OPEN-041',
+                    'TC-FILE-OPEN-049', 'TC-MODULES-102'}
         for entry in native:
             with self.subTest(profile=entry['linux_profile']):
                 self.assertEqual(set(entry['selected_ids']), expected)

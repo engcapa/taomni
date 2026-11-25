@@ -1,9 +1,7 @@
-//! QA-only WebDriver bridge for macOS WKWebView runs.
+//! WebDriver bridge for the isolated QA application.
 //!
-//! `tauri-driver` has no macOS adapter.  The QA runner therefore starts the
-//! packaged QA binary with `TAOMNI_QA_WEBDRIVER_PORT` and talks to this small
-//! W3C-compatible server.  The bridge is deliberately opt-in and is never
-//! started for normal application launches.
+//! macOS runs use this bridge for WKWebView. Restore tests also use it to
+//! attach to a Linux or Windows WebView after the application restarts itself.
 
 mod model;
 
@@ -27,4 +25,34 @@ mod application_menu;
 
 mod server;
 
-pub use server::start;
+use tauri::{AppHandle, WebviewWindowBuilder, Wry};
+
+pub(crate) fn configure<'a>(
+    app: &AppHandle,
+    builder: WebviewWindowBuilder<'a, Wry, AppHandle>,
+) -> WebviewWindowBuilder<'a, Wry, AppHandle> {
+    let port = std::env::var("TAOMNI_QA_WEBDRIVER_PORT")
+        .ok()
+        .and_then(|value| value.trim().parse::<u16>().ok())
+        .filter(|port| *port != 0);
+    let isolated = ["NEWMOB_DATA_DIR", "NEWMOB_CONFIG_DIR", "NEWMOB_CACHE_DIR"]
+        .into_iter()
+        .all(|name| {
+            std::env::var(name)
+                .ok()
+                .and_then(|path| crate::qa_override_path(&path))
+                .is_some()
+        });
+    let Some(port) = port.filter(|_| app.config().identifier == crate::QA_APP_ID && isolated)
+    else {
+        return builder;
+    };
+    let owner = app.clone();
+    builder.on_page_load(move |window, payload| {
+        // The in-process bridge must be able to evaluate the initial document
+        // before the runner attaches. Subsequent page loads reuse its listener.
+        if payload.event() == tauri::webview::PageLoadEvent::Finished {
+            server::start(owner.clone(), window, port);
+        }
+    })
+}

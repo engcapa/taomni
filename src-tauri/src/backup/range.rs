@@ -11,8 +11,6 @@ pub struct BackupCustomOptions {
     #[serde(default)]
     pub include_vault: bool,
     #[serde(default)]
-    pub include_lanchat: bool,
-    #[serde(default)]
     pub include_configs: bool,
     #[serde(default)]
     pub include_mail: bool,
@@ -27,6 +25,9 @@ pub struct BackupCustomOptions {
     pub include_local_history: bool,
     #[serde(default)]
     pub include_mfa: bool,
+    /// Includes installed, disabled and uninstalled retained module data.
+    #[serde(default)]
+    pub include_plugins: bool,
 }
 
 /// What a backup scope stages. MFA secrets are sealed with a data key held in
@@ -36,7 +37,6 @@ pub struct BackupScopeFlags {
     pub sessions: bool,
     pub notes: bool,
     pub vault: bool,
-    pub lanchat: bool,
     pub configs: bool,
     pub mail: bool,
     pub mail_originals: bool,
@@ -44,6 +44,7 @@ pub struct BackupScopeFlags {
     pub server_certificates: bool,
     pub local_history: bool,
     pub mfa: bool,
+    pub plugins: bool,
 }
 
 pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> BackupScopeFlags {
@@ -64,7 +65,6 @@ pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> 
         sessions: true,
         notes: true,
         vault: true,
-        lanchat: false,
         configs: true,
         mail: false,
         mail_originals: false,
@@ -72,19 +72,15 @@ pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> 
         server_certificates: certificates,
         local_history: false,
         mfa: true,
+        plugins: true,
     };
     let mut flags = match scope {
-        "full" => BackupScopeFlags {
-            lanchat: true,
-            mail: true,
-            ..core
-        },
+        "full" => BackupScopeFlags { mail: true, ..core },
         "custom" => match custom {
             Some(opts) => BackupScopeFlags {
                 sessions: opts.include_sessions,
                 notes: opts.include_notes,
                 vault: opts.include_vault,
-                lanchat: opts.include_lanchat,
                 configs: opts.include_configs,
                 mail: opts.include_mail,
                 mail_originals: false,
@@ -92,6 +88,7 @@ pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> 
                 server_certificates: certificates,
                 local_history: opts.include_local_history,
                 mfa: opts.include_mfa,
+                plugins: opts.include_plugins,
             },
             None => core,
         },
@@ -102,7 +99,7 @@ pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> 
             flags.mail = mail;
         }
     }
-    if flags.mfa {
+    if flags.mfa || flags.plugins {
         flags.vault = true;
     }
     flags.mail_originals = flags.mail && originals;
@@ -171,7 +168,7 @@ mod tests {
         };
         let full = global(&policy);
         let flags = resolve_scope_flags(&full.scope, full.custom_options);
-        assert!(flags.mail && flags.lanchat && flags.vault && flags.mfa);
+        assert!(flags.mail && flags.vault && flags.mfa);
         assert!(!flags.local_history);
         policy.include_mail = Some(false);
         let range = global(&policy);

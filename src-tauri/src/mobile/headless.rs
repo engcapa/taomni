@@ -3,41 +3,8 @@ use super::Core;
 use crate::state::AppState;
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, OnceLock},
+    sync::Arc,
 };
-
-static CONFIG_ROOT: OnceLock<PathBuf> = OnceLock::new();
-pub(crate) fn config_root() -> Option<PathBuf> {
-    CONFIG_ROOT.get().cloned()
-}
-
-/// Desktop instances share this lock; a headless process owns it exclusively.
-/// ProfileLease independently protects backup/restore operations.
-pub struct ModeLease(std::fs::File);
-impl ModeLease {
-    pub fn acquire(data: &Path, headless: bool) -> Result<Self, String> {
-        std::fs::create_dir_all(data).map_err(|e| e.to_string())?;
-        let file = std::fs::OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .read(true)
-            .write(true)
-            .open(data.join(".mobile-mode.lock"))
-            .map_err(|e| e.to_string())?;
-        let result = if headless {
-            file.try_lock()
-        } else {
-            file.try_lock_shared()
-        };
-        result.map_err(|_| "Close the other Taomni mode using this profile first")?;
-        Ok(Self(file))
-    }
-}
-impl Drop for ModeLease {
-    fn drop(&mut self) {
-        let _ = self.0.unlock();
-    }
-}
 
 pub fn initialize(data: &Path) -> Result<AppState, String> {
     let config = crate::ai::config::AiConfig::load(&crate::ai::config::default_ai_config_path());
@@ -48,28 +15,7 @@ pub(super) fn initialize_with_config(
     data: &Path,
     config: crate::ai::config::AiConfig,
 ) -> Result<AppState, String> {
-    std::fs::create_dir_all(data).map_err(|e| e.to_string())?;
-    let db = rusqlite::Connection::open(data.join("taomni.db")).map_err(|e| e.to_string())?;
-    crate::session::db::init_db(&db).map_err(|e| e.to_string())?;
-    crate::terminal::local_directories::init_tables(&db).map_err(|e| e.to_string())?;
-    crate::servers::db::init_server_tables(&db).map_err(|e| e.to_string())?;
-    crate::rdp::tls::init_trust_table(&db).map_err(|e| e.to_string())?;
-    let notes = rusqlite::Connection::open(data.join("notes.db")).map_err(|e| e.to_string())?;
-    crate::notes::init_db(&notes).map_err(|e| e.to_string())?;
-    let vault =
-        Arc::new(crate::vault::Vault::open(&data.join("vault.db")).map_err(|e| e.to_string())?);
-    let ai = crate::ai::AppAiCtx::from_config_with_proxy_db(config, vault.clone(), Some(&db));
-    let mail = data.join("mail-cache");
-    std::fs::create_dir_all(&mail).map_err(|e| e.to_string())?;
-    Ok(AppState::new(
-        db,
-        notes,
-        Arc::new(crate::mfa::store::MfaStore::new(data.join("mfa.db"))),
-        mail,
-        vault,
-        ai,
-        Arc::new(crate::lanchat::LanChatState::new(data)),
-    ))
+    crate::runtime::bootstrap::isolated_state(data, config)
 }
 fn argument(name: &str) -> Option<String> {
     let args: Vec<String> = std::env::args().collect();
@@ -107,16 +53,34 @@ async fn serve() -> Result<(), String> {
         .parse::<u16>()
         .map_err(|_| "Invalid port")?;
     let lan = std::env::args().any(|a| a == "--mobile-lan");
-    if custom_data.is_some() {
-        let _ = CONFIG_ROOT.set(data.join("config"));
-        crate::migrate::run_profile(&data);
-    } else {
-        crate::migrate::run(&data);
+    let paths = crate::runtime::paths::ProfilePaths::headless(&data, custom_data.is_some())?;
+    let boot = crate::runtime::bootstrap::bootstrap(
+        paths,
+        crate::runtime::profile::StartupMode::Headless,
+        None,
+        custom_data.is_none(),
+    )
+    .map_err(|error| error.to_string())?;
+    let state = Arc::new(boot.state);
+    let runtime = boot.runtime;
+    runtime.start();
+    let result = serve_state(&state, &runtime, &data, lan, port).await;
+    let shutdown = runtime.shutdown(&state).await;
+    if let Err(error) = &shutdown {
+        tracing::warn!(%error, "Headless plugin termination was not confirmed");
     }
-    let _mode = ModeLease::acquire(&data, true)?;
-    let _profile = crate::backup::coordination::ProfileLease::prepare(&data)?;
-    let state = Arc::new(initialize(&data)?);
+    result.and(shutdown)
+}
+
+async fn serve_state(
+    state: &Arc<AppState>,
+    runtime: &crate::runtime::ApplicationRuntime,
+    data: &PathBuf,
+    lan: bool,
+    port: u16,
+) -> Result<(), String> {
     let address = state
+        .legacy
         .mobile
         .start(Core::Headless(state.clone()), data.clone(), lan, port)
         .await?;
@@ -126,6 +90,7 @@ async fn serve() -> Result<(), String> {
     println!(
         "Pairing code (5 minutes): {}",
         state
+            .legacy
             .mobile
             .auth
             .lock()
@@ -136,24 +101,30 @@ async fn serve() -> Result<(), String> {
         let config = super::im_adapter::Config::load(&data)?;
         let secret = super::headless_ops::secret(std::env::var("TAOMNI_FEISHU_APP_SECRET").ok())?;
         state
+            .legacy
             .mobile
             .im
             .start(Core::Headless(state.clone()), config, secret)
             .await?;
     }
-    let observer = super::headless_ops::observe(state.mobile.clone());
-    let runtime = state.mobile.clone();
-    let rotate = tokio::spawn(async move {
+    let mut observer = super::headless_ops::observe(state.legacy.mobile.clone());
+    let observer_cancel = runtime.tasks.cancellation();
+    runtime.tasks.spawn("headless-observer", async move {
+        tokio::select! {
+            _ = observer_cancel.cancelled() => { observer.abort(); let _ = observer.await; },
+            _ = &mut observer => {}
+        }
+    });
+    let mobile = state.legacy.mobile.clone();
+    let cancel = runtime.tasks.cancellation();
+    runtime.tasks.spawn("headless-pairing-rotation", async move {
         loop {
-            tokio::time::sleep(std::time::Duration::from_secs(300)).await;
-            println!(
-                "Pairing code (5 minutes): {}",
-                runtime
-                    .auth
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .pairing_code()
-            );
+            tokio::select! {
+                _ = cancel.cancelled() => break,
+                _ = tokio::time::sleep(std::time::Duration::from_secs(300)) => {
+                    println!("Pairing code (5 minutes): {}", mobile.auth.lock().unwrap_or_else(|e| e.into_inner()).pairing_code());
+                }
+            }
         }
     });
     #[cfg(unix)]
@@ -166,18 +137,11 @@ async fn serve() -> Result<(), String> {
             tokio::select! {
                 _ = tokio::signal::ctrl_c() => break,
                 _ = term.recv() => break,
-                _ = hup.recv() => println!("Pairing code (5 minutes): {}", state.mobile.auth.lock().unwrap_or_else(|e| e.into_inner()).pairing_code()),
+                _ = hup.recv() => println!("Pairing code (5 minutes): {}", state.legacy.mobile.auth.lock().unwrap_or_else(|e| e.into_inner()).pairing_code()),
             }
         }
     }
     #[cfg(not(unix))]
     tokio::signal::ctrl_c().await.map_err(|e| e.to_string())?;
-    observer.abort();
-    rotate.abort();
-    state.mobile.stop().await;
-    let runs = std::mem::take(&mut *state.agent.chat_runs.lock().await);
-    for (_, run) in runs {
-        run.stop().await;
-    }
     Ok(())
 }

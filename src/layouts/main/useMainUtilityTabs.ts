@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { t as tr } from "../../lib/i18n";
-import { totalUnread, useLanChatStore } from "../../stores/lanChatStore";
+import { useCallback, useEffect, useMemo } from "react";
 import { useSessionStore } from "../../stores/sessionStore";
 import type { MailTabInfo } from "../../types";
 import { passwordRefFromOptions } from "./authentication";
@@ -82,26 +80,6 @@ export function useMainUtilityTabs(context: UseMainUtilityTabsContext) {
     seenControlToolCallsRef: layout.seenControlToolCallsRef,
   });
 
-  const openLanChatTab = useCallback(() => {
-    // If LanChat is currently docked as an edge drawer, undock it; the
-    // edgeDock effect below restores and focuses the tab.
-    if (useLanChatStore.getState().edgeDock) {
-      useLanChatStore.getState().closeEdgeDock();
-      return;
-    }
-    const existing = layout.tabsRef.current.find((tab) => tab.type === "lan-chat");
-    if (existing) {
-      layout.setActiveTab(existing.id);
-      return;
-    }
-    layout.addTab({
-      id: "lan-chat",
-      type: "lan-chat",
-      title: layout.t("tabs.lanChat"),
-      closable: true,
-    });
-  }, [layout.addTab, layout.setActiveTab]);
-
   /** MFA authenticator: one tab per window (docs-feature/mfa-authenticator-design.md). */
   const openMfaTab = useCallback(() => {
     const existing = layout.tabsRef.current.find((tab) => tab.type === "mfa");
@@ -155,47 +133,9 @@ export function useMainUtilityTabs(context: UseMainUtilityTabsContext) {
     if (session) workspaceOpening.openQueuedSession(session);
   }, [workspaceOpening.openQueuedSession]);
 
-  // Initialize LanChat at app startup (not only when the tab opens) so roster,
-  // unread, and desktop notifications work even while the tab is closed.
-  useEffect(() => {
-    void useLanChatStore.getState().init();
-  }, []);
-
-  // Keep the lan-chat tab and the in-app edge drawer mutually exclusive.
-  // Docking (null → side) hides the main-window tab; undocking (side → null,
-  // via the drawer close button or Esc) restores and focuses it. Chat state
-  // survives because the store stays alive regardless of the tab's presence.
-  const edgeDock = useLanChatStore((s) => s.edgeDock);
-  const prevEdgeDock = useRef(edgeDock);
-  useEffect(() => {
-    const prev = prevEdgeDock.current;
-    prevEdgeDock.current = edgeDock;
-    if (prev === null && edgeDock !== null) {
-      layout.removeTab("lan-chat");
-    } else if (prev !== null && edgeDock === null) {
-      if (!layout.tabsRef.current.some((tab) => tab.id === "lan-chat")) {
-        layout.addTab({
-          id: "lan-chat",
-          type: "lan-chat",
-          title: tr("tabs.lanChat"),
-          closable: true,
-        });
-      }
-      layout.setActiveTab("lan-chat");
-    }
-  }, [edgeDock, layout.addTab, layout.removeTab, layout.setActiveTab]);
-
-  // Mirror total LanChat unread onto the lan-chat tab's new-output indicator
-  // (cleared while that tab is active).
-  const lanUnread = useLanChatStore((s) => totalUnread(s.conversations));
-  useEffect(() => {
-    const hasUnread = lanUnread > 0 && layout.activeTabId !== "lan-chat";
-    layout.setTabHasNewOutput("lan-chat", hasUnread);
-  }, [lanUnread, layout.activeTabId, layout.setTabHasNewOutput]);
   return {
     openPlaceholderTab,
     openSettingsTab,
-    openLanChatTab,
     openUnifiedMailTab,
     openMfaTab,
     unifiedMailAccounts,

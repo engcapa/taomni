@@ -54,16 +54,17 @@ pub async fn save_ai_config(
 
     let llm = {
         let db = state
+            .core
             .db
             .lock()
             .map_err(|_| "session database is unavailable".to_string())?;
         crate::llm::router::build_router_from_ai_with_proxy_db(
             &config,
-            Some(state.vault.as_ref()),
+            Some(state.core.vault.as_ref()),
             Some(&db),
         )
     };
-    let mut ai_ctx = state.ai_ctx.write().await;
+    let mut ai_ctx = state.legacy.ai_ctx.write().await;
     ai_ctx.update_inspector_policy(&config);
     if config.fully_disabled || ai_ctx.config.asr != config.asr {
         crate::voice::commands::cancel_all();
@@ -84,7 +85,7 @@ pub async fn save_ai_api_key(
     plaintext: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let result = state.vault.put(&kind, &label, &plaintext)?;
+    let result = state.core.vault.put(&kind, &label, &plaintext)?;
     Ok(result.reference)
 }
 
@@ -105,14 +106,14 @@ async fn test_provider_connection(
     provider.normalize();
     provider.validate_custom()?;
     if provider.custom.is_some() {
-        let config = &state.ai_ctx.read().await.config;
+        let config = &state.legacy.ai_ctx.read().await.config;
         if config.fully_disabled {
             return Err("AI is disabled in Settings".into());
         }
         crate::ai::network_policy::reject_if_remote(config.full_local_mode, &provider.base_url)?;
     }
     if provider.runtime == "opencode-go" {
-        let ctx = state.ai_ctx.read().await;
+        let ctx = state.legacy.ai_ctx.read().await;
         if ctx.config.full_local_mode || ctx.config.fully_disabled {
             return Err("OpenCode Go is disabled by the AI network policy".into());
         }
@@ -128,7 +129,7 @@ async fn test_provider_connection(
     // prompt for unlock instead of sending the literal `vault:<uuid>` as the
     // bearer token (which would always 401).
     let api_key = if test_api_key.starts_with(crate::vault::VAULT_REF_PREFIX) {
-        match state.vault.resolve(&test_api_key) {
+        match state.core.vault.resolve(&test_api_key) {
             Ok(Some(plaintext)) => plaintext.to_string(),
             Ok(None) if deadline.is_some() || provider.custom.is_some() => {
                 return Err("Credential reference was not found".into());
@@ -147,20 +148,25 @@ async fn test_provider_connection(
 
     let proxy_url = {
         let db = state
+            .core
             .db
             .lock()
             .map_err(|_| "session database is unavailable".to_string())?;
         if provider.runtime == "opencode-go" || deadline.is_some() {
-            crate::ai::config::resolve_go_proxy_url(&provider, Some(&db), Some(&state.vault))
+            crate::ai::config::resolve_go_proxy_url(&provider, Some(&db), Some(&state.core.vault))
                 .map_err(|error| {
-                    if deadline.is_some() {
-                        error.replace("OpenCode Go", "Model check")
-                    } else {
-                        error
-                    }
-                })?
+                if deadline.is_some() {
+                    error.replace("OpenCode Go", "Model check")
+                } else {
+                    error
+                }
+            })?
         } else {
-            crate::ai::config::resolve_provider_proxy_url(&provider, Some(&db), Some(&state.vault))?
+            crate::ai::config::resolve_provider_proxy_url(
+                &provider,
+                Some(&db),
+                Some(&state.core.vault),
+            )?
         }
     };
 
@@ -176,7 +182,7 @@ async fn test_provider_connection(
             api_key.clone(),
             provider.model.clone(),
             proxy_url,
-            state.opencode_go_catalog.clone(),
+            state.core.opencode_go_catalog.clone(),
             provider.protocol_overrides.clone(),
         )),
         "anthropic" => {
@@ -203,7 +209,7 @@ async fn test_provider_connection(
     };
 
     let blocked = if deadline.is_some() {
-        let ctx = state.ai_ctx.read().await;
+        let ctx = state.legacy.ai_ctx.read().await;
         crate::ai::model_inspector::checks_disabled(
             &provider.runtime,
             ctx.config.full_local_mode,
@@ -237,7 +243,7 @@ pub async fn test_llm_model(
         return Err("Model ID is required".into());
     }
     let (mut provider, cancel) = {
-        let ctx = state.ai_ctx.read().await;
+        let ctx = state.legacy.ai_ctx.read().await;
         let provider = crate::ai::model_inspector::inspector_provider(
             ctx.config
                 .llm
@@ -288,7 +294,7 @@ pub async fn get_provider_models(
 ) -> Result<crate::ai::model_inspector::ProviderModelsDto, String> {
     use crate::ai::model_inspector::*;
     let (provider, full_local, disabled, cancel) = {
-        let ctx = state.ai_ctx.read().await;
+        let ctx = state.legacy.ai_ctx.read().await;
         (
             inspector_provider(
                 ctx.config
@@ -308,14 +314,15 @@ pub async fn get_provider_models(
     let request = async {
         let dto = if provider.runtime == "opencode-go" {
             let proxy = {
-                let db = state.db.lock().map_err(|e| e.to_string())?;
+                let db = state.core.db.lock().map_err(|e| e.to_string())?;
                 crate::ai::config::resolve_go_proxy_url(
                     &provider,
                     Some(&db),
-                    Some(state.vault.as_ref()),
+                    Some(state.core.vault.as_ref()),
                 )
             };
             let go = state
+                .core
                 .opencode_go_catalog
                 .inspect(
                     provider.base_url.clone(),
@@ -334,15 +341,16 @@ pub async fn get_provider_models(
             }
         } else {
             let proxy = {
-                let db = state.db.lock().map_err(|e| e.to_string())?;
+                let db = state.core.db.lock().map_err(|e| e.to_string())?;
                 crate::ai::config::resolve_go_proxy_url(
                     &provider,
                     Some(&db),
-                    Some(state.vault.as_ref()),
+                    Some(state.core.vault.as_ref()),
                 )
                 .map_err(|error| error.replace("OpenCode Go", "Model catalog"))
             };
             let catalog = state
+                .core
                 .opencode_go_catalog
                 .metadata
                 .refresh(
@@ -362,6 +370,7 @@ pub async fn get_provider_models(
                     .unwrap_or(&provider.api_key);
                 let key = if key.starts_with(crate::vault::VAULT_REF_PREFIX) {
                     state
+                        .core
                         .vault
                         .resolve(key)
                         .map(|v| v.map(|k| k.to_string()).unwrap_or_default())
@@ -409,15 +418,15 @@ pub async fn get_provider_models(
     let mut dto = match under_policy(&cancel, request).await {
         Ok(dto) => dto,
         Err(error) if cancel.is_cancelled() => {
-            let ctx = state.ai_ctx.read().await;
-            let catalog = state.opencode_go_catalog.metadata.get();
+            let ctx = state.legacy.ai_ctx.read().await;
+            let catalog = state.core.opencode_go_catalog.metadata.get();
             let snapshot: serde_json::Value =
                 serde_json::from_str(crate::llm::model_catalog::SNAPSHOT).unwrap();
             let key = provider_key(&provider_id, &provider.base_url);
             ProviderModelsDto {
                 rows: if provider.runtime == "opencode-go" {
                     go_rows(
-                        &state.opencode_go_catalog.get(),
+                        &state.core.opencode_go_catalog.get(),
                         &provider.model,
                         &provider.protocol_overrides,
                     )
@@ -458,21 +467,25 @@ pub async fn get_opencode_go_catalog(
 ) -> Result<crate::llm::opencode_go::catalog::GoCatalogDto, String> {
     // Re-resolve policies and session proxies, not a stale UI snapshot.
     {
-        let ctx = state.ai_ctx.read().await;
+        let ctx = state.legacy.ai_ctx.read().await;
         if let Some(go) = ctx.config.llm.providers.get("opencode-go") {
-            let db = state.db.lock().map_err(|e| e.to_string())?;
-            state.opencode_go_catalog.configure(
+            let db = state.core.db.lock().map_err(|e| e.to_string())?;
+            state.core.opencode_go_catalog.configure(
                 go.base_url.clone(),
-                crate::ai::config::resolve_go_proxy_url(go, Some(&db), Some(state.vault.as_ref())),
+                crate::ai::config::resolve_go_proxy_url(
+                    go,
+                    Some(&db),
+                    Some(state.core.vault.as_ref()),
+                ),
                 ctx.config.full_local_mode || ctx.config.fully_disabled,
             );
         }
     }
     if force_refresh {
-        Ok(state.opencode_go_catalog.refresh(true).await)
+        Ok(state.core.opencode_go_catalog.refresh(true).await)
     } else {
-        state.opencode_go_catalog.trigger(false);
-        Ok(state.opencode_go_catalog.get())
+        state.core.opencode_go_catalog.trigger(false);
+        Ok(state.core.opencode_go_catalog.get())
     }
 }
 
@@ -513,7 +526,7 @@ pub async fn generate_shell_command(
 
     // Route through LlmRouter using VoiceToShell task — gets fallback for free.
     let resp = {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         ai_ctx
             .llm
             .complete(req, crate::llm::TaskKind::VoiceToShell)
@@ -556,7 +569,7 @@ pub async fn generate_shell_command(
 
     // Write audit log entry.
     let audit_id = {
-        let db = state.db.lock().unwrap();
+        let db = state.core.db.lock().unwrap();
         let now = chrono::Utc::now().timestamp();
         db.execute(
             "INSERT INTO voice_audit (created_at, session_id, transcript, intent_json, outcome, command, risk)
@@ -592,7 +605,7 @@ pub async fn update_shell_audit_outcome(
     outcome: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let db = state.db.lock().unwrap();
+    let db = state.core.db.lock().unwrap();
     db.execute(
         "UPDATE voice_audit SET outcome = ?1 WHERE id = ?2",
         params![outcome, audit_id],

@@ -46,6 +46,7 @@ use tokio::sync::Mutex as AsyncMutex;
 
 use tokio::task::JoinHandle;
 
+pub(crate) mod observation;
 mod output;
 
 mod active;

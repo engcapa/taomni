@@ -127,4 +127,4 @@ class SchemaAndPlatformTest(TestCase):
         self.assertIsNone(verification.native_support(clipboard, "Linux"))
         self.assertIn("Linux/X11", verification.native_support(clipboard, "Windows"))
         self.assertIsNone(verification.native_support(window, "Windows"))
-        self.assertIn("Linux/Windows", verification.native_support(window, "macOS"))
+        self.assertIsNone(verification.native_support(window, "macOS"))

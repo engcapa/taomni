@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { checkModularBoundaries } from "./modular-boundaries.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // These are implementation modules, not alternate application entry points.
@@ -15,7 +16,6 @@ const boundaries = [
   ["src/components/editor/workspace/panels/run", "src/components/editor/workspace/panels/RunPanel.tsx"],
   ["src/components/editor/workspace/panels/debug/breakpoints", "src/components/editor/workspace/panels/debug/BreakpointsView.tsx"],
   ["src/components/git/changes", "src/components/git/WorkspaceChangesView.tsx"],
-  ["src/components/lanchat/panel", "src/components/lanchat/LanChatPanel.tsx"],
   ["src/components/settings/backup", "src/components/settings/BackupSettingsPanel.tsx"],
   ["src/components/settings/languageServers", "src/components/settings/LanguageServersSettings.tsx"],
   ["src/components/settings/panel", "src/components/settings/SettingsPanel.tsx"],
@@ -34,7 +34,7 @@ const boundaries = [
   ["src/components/editor/workspace/virtualSpace", "src/components/editor/workspace/workspaceVirtualSpace.ts"],
   ["src/components/editor/workspace/searchPanel", "src/components/editor/workspace/editorSearchPanel.ts"],
   ["src/components/editor/workspace/lspSession", "src/components/editor/workspace/useWorkspaceLspSession.ts"],
-  ["src/components/rdp/panel", "src/components/rdp/RdpPanel.tsx"],
+  ["src-tauri/plugins/rdp-client/renderer/panel", "src-tauri/plugins/rdp-client/renderer/RdpPanel.tsx"],
   ["src/components/filebrowser/filePanel", "src/components/filebrowser/FilePanel.tsx"],
   ["src/components/filebrowser/browser", "src/components/filebrowser/FileBrowser.tsx"],
   ["src/components/database/schema", "src/components/database/SchemaTree.tsx"],
@@ -63,7 +63,7 @@ const boundaries = [
   ["src/components/sidebar/sessionTree", "src/components/sidebar/SessionTree.tsx"],
   ["src/components/database/grid", "src/components/database/QueryResultGrid.tsx"],
   ["src/components/welcome", "src/components/WelcomePanel.tsx"],
-  ["src/components/vnc/panel", "src/components/vnc/VncPanel.tsx"],
+  ["src-tauri/plugins/vnc-client/renderer/panel", "src-tauri/plugins/vnc-client/renderer/VncPanel.tsx"],
   ["src/components/editor/workspace/host", "src/components/editor/workspace/CodeMirrorHost.tsx"],
   ["src/lib/ipc", "src/lib/ipc.ts"],
   ["src/lib/sessionImportExport", "src/lib/sessionImportExport.ts"],
@@ -76,12 +76,12 @@ const boundaries = [
   ["src/components/editor/workspace/hooks", "src/components/editor/CodeWorkspaceTab.tsx"],
   ["src/components/editor/workspace/views", "src/components/editor/CodeWorkspaceTab.tsx"],
   ["src/components/database/client", "src/components/database/DbClientTab.tsx"],
-  ["src/components/mail/client", "src/components/mail/MailClientTab.tsx"],
+  ["src-tauri/plugins/mail/renderer/client", "src-tauri/plugins/mail/renderer/MailClientTab.tsx"],
   ["src/components/git/workspace", "src/components/git/WorkspaceGitManager.tsx"],
   ["src/components/git/panel", "src/components/git/GitPanel.tsx"],
   ["src/components/terminal/panel", "src/components/terminal/TerminalPanel.tsx"],
   ["src/components/session/editor", "src/components/session/SessionEditor.tsx"],
-  ["src/components/sockscap/panel", "src/components/sockscap/SocksCapPanel.tsx"],
+  ["src-tauri/plugins/sockscap/renderer/panel", "src-tauri/plugins/sockscap/renderer/SocksCapPanel.tsx"],
   ["src/layouts/main", "src/layouts/MainLayout.tsx"],
 ];
 function sources(directory) {
@@ -97,6 +97,7 @@ function resolve(from, specifier) {
     .find((file) => fs.existsSync(file) && fs.statSync(file).isFile()) ?? null;
 }
 const errors = [];
+checkModularBoundaries(root);
 const graph = new Map();
 for (const [directory, facade] of boundaries) {
   for (const file of sources(path.join(root, directory))) {

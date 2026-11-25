@@ -1,6 +1,6 @@
 //! Explicit, local-only benchmark probe. Never part of application startup.
 //! Invoked by scripts/asr-bench/bench.py through the ignored test executable.
-use super::{catalog, manager::AsrManager};
+use super::catalog;
 use std::{
     sync::{Arc, atomic::AtomicBool},
     time::Instant,
@@ -22,7 +22,7 @@ async fn decode_fixture() {
         .map(|v| f32::from_le_bytes(v.try_into().unwrap()))
         .collect();
     assert!(pcm.iter().all(|s| s.is_finite() && s.abs() <= 1.0));
-    let engine = AsrManager::configured(&model_id, &language);
+    let engine = crate::asr::manager::configured(&model_id, &language).legacy;
     let start = Instant::now();
     engine.prepare().await.expect("load pinned model");
     let cold_load_ms = start.elapsed().as_secs_f64() * 1000.0;

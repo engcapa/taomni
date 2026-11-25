@@ -175,7 +175,7 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
     stable_since = None
     last = None
     samples = []
-    centered = False
+    centered_geometry = None
     while True:
         if session.deadline:
             session.deadline.remaining()
@@ -202,12 +202,14 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
         else:
             stable_since = now if current is not None else None
         previous = current
-        if not last["ready"] and (last.get("outside") is True or not centered):
+        geometry = tuple(round(last[k]) for k in ("x", "y", "width", "height"))
+        if not last["ready"] and (last.get("outside") is True or geometry != centered_geometry):
             # Nearest alignment can leave a control behind a sticky header or
             # a clipping ancestor despite being inside the viewport. Center
-            # once, then require the same hit test. Layout growth can also
-            # move it outside again; no input has been sent at this stage.
-            centered = True
+            # each newly clipped geometry, then require the same hit test.
+            # A delayed search scroll may undo the first preparation without
+            # moving outside the WebView. A stationary overlay still fails.
+            centered_geometry = geometry
             session.request("POST", session.endpoint("/execute/sync"), {
                 "script": "arguments[0].scrollIntoView({block:'center', inline:'center', behavior:'instant'});",
                 "args": [origin],

@@ -6,7 +6,7 @@ import { rangeOptions, type BackupRange } from "../../../lib/backupSettings";
 export const backupInput = "w-full rounded border border-theme-border bg-theme-bg p-2 text-xs text-theme-text";
 export const backupButton = "rounded border border-theme-border px-3 py-1.5 text-xs text-theme-text hover:border-accent disabled:opacity-50";
 type Key = keyof BackupCustomOptions;
-const fields: Key[] = ["includeSessions", "includeNotes", "includeVault", "includeMfa", "includeConfigs", "includeServerCertificates", "includeLanchat", "includeLocalHistory"];
+const fields: Key[] = ["includeSessions", "includeNotes", "includeVault", "includeMfa", "includePlugins", "includeConfigs", "includeServerCertificates", "includeLocalHistory"];
 const mailFields: Key[] = ["includeMail", "includeMailOriginals", "includeMailAttachments"];
 
 function CategoryCheckbox({ mixed = false, ...props }: InputHTMLAttributes<HTMLInputElement> & { mixed?: boolean }) {
@@ -30,13 +30,13 @@ export function BackupRangeEditor({ value, onChange, id = "backup-global", disab
   const change = (keys: Key[], checked: boolean) => {
     const next = { ...options };
     keys.forEach((key) => { next[key] = checked; });
-    if (next.includeMfa) next.includeVault = true;
+    if (next.includeMfa || next.includePlugins) next.includeVault = true;
     if (next.includeMailOriginals || next.includeMailAttachments) next.includeMail = true;
     onChange({ scope: "custom", customOptions: next });
   };
   const row = (key: Key, mail = false) => <label key={key} className="flex items-start gap-2 text-xs text-theme-text">
     <CategoryCheckbox id={`${id}-${key}`} data-testid={`${id}-${key}`} checked={options[key]}
-      disabled={disabled || key === "includeVault" && options.includeMfa || key === "includeMail" && (options.includeMailOriginals || options.includeMailAttachments)}
+      disabled={disabled || key === "includeVault" && (options.includeMfa || options.includePlugins) || key === "includeMail" && (options.includeMailOriginals || options.includeMailAttachments)}
       onChange={(e) => change([key], e.target.checked)} />
     <span>{t(`backupUnified.${mail && key === "includeMail" ? "mailCache" : key}`)}</span>
   </label>;

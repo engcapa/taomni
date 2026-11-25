@@ -151,7 +151,7 @@ pub async fn git_push_tag(
     delete: bool,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let vault = state.vault.clone();
+    let vault = state.core.vault.clone();
     blocking(move || {
         require_non_empty("tag name", &name)?;
         let root = PathBuf::from(repo_root);

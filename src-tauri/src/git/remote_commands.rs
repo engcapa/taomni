@@ -6,7 +6,7 @@ pub async fn git_fetch(
     remote: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let vault = state.vault.clone();
+    let vault = state.core.vault.clone();
     blocking(move || {
         let root = PathBuf::from(repo_root);
         let remote = remote.filter(|s| !s.trim().is_empty());
@@ -27,7 +27,7 @@ pub async fn git_pull(
     rebase: bool,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let vault = state.vault.clone();
+    let vault = state.core.vault.clone();
     blocking(move || {
         let root = PathBuf::from(repo_root);
         let remote = remote.filter(|s| !s.trim().is_empty());
@@ -47,7 +47,7 @@ pub async fn git_push(
     force_with_lease: bool,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let vault = state.vault.clone();
+    let vault = state.core.vault.clone();
     blocking(move || {
         let root = PathBuf::from(repo_root);
         let remote = remote.filter(|s| !s.trim().is_empty());
@@ -149,7 +149,7 @@ pub async fn git_save_remote_auth(
     clear_token: bool,
     state: State<'_, AppState>,
 ) -> Result<GitRemoteAuthResult, String> {
-    let vault = state.vault.clone();
+    let vault = state.core.vault.clone();
     blocking(move || {
         require_non_empty("remote", &remote)?;
         let root = PathBuf::from(repo_root);

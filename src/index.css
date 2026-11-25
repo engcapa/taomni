@@ -27,5 +27,8 @@
 @import "./styles/controls.css";
 @import "./styles/terminal.css";
 @import "./styles/compatibility.css";
-@import "./styles/mail.css";
-@import "./styles/sockscap.css";
+
+@source not "../src-tauri/plugins/vnc-client/renderer";
+@source not "../src-tauri/plugins/mail/renderer";
+@source not "../src-tauri/plugins/mfa/renderer";
+@source not "../src-tauri/plugins/sockscap/renderer";

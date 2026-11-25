@@ -69,7 +69,7 @@ pub fn deepseek_app_create_workflow(
     definition_id: String,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     init(&db)?;
     let def = definitions()
         .into_iter()
@@ -98,7 +98,7 @@ pub fn deepseek_app_workflow_runs(
     thread_id: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<Value>, String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     list_runs(&db, thread_id.as_deref())
 }
 #[tauri::command]
@@ -111,7 +111,7 @@ pub fn deepseek_app_advance_workflow(
     if !confirmed {
         return Err("confirmation: workflow step requires approval".into());
     }
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     init(&db)?;
     let (index, status): (i64, String) = db
         .query_row(
@@ -154,7 +154,7 @@ pub fn deepseek_app_cancel_workflow(
     run_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     init(&db)?;
     db.execute("UPDATE tao_workflow_runs SET status='cancelled',updated_at=?2 WHERE id=?1 AND status NOT IN ('done','cancelled')",params![run_id,crate::deepseek_app::store::now()]).map_err(|e|e.to_string())?;
     Ok(())

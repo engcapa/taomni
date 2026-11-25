@@ -190,7 +190,7 @@ fn ambiguous_missing_and_short_ids_are_refused() {
 async fn short_ids_resolve_before_the_thread_only_rule() {
     let f = Fixture::new().await;
     thread(&f.state);
-    f.state.mobile.broker.register("pty-short-id-1");
+    f.state.legacy.mobile.broker.register("pty-short-id-1");
     let core = Core::Headless(f.state.clone());
     let cfg = config();
     for command in [

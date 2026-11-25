@@ -1,9 +1,5 @@
 use super::capture::output_dims;
-use super::encoding::encode_loop;
 use super::frames::FrameQueue;
-use super::frames::TimedFrame;
-use super::inspection::inspect_clip;
-use super::inspection::inspect_clip_frames;
 use super::lifetime::Recording;
 use super::lifetime::RecordingLease;
 use super::lifetime::Session;
@@ -13,17 +9,16 @@ use super::lifetime::nano_id;
 use super::lifetime::sessions;
 use super::lifetime::stop_recording;
 use super::lifetime::take_for_recovery;
-use super::model::RecordFormat;
-use super::model::RecordingInfo;
-use super::mp4::annex_b_nals;
 use crate::screenshot::capture::temp_artifact_path;
 use image::RgbaImage;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::atomic::AtomicBool;
+use std::sync::OnceLock;
 use std::sync::mpsc::sync_channel;
 use std::thread;
+use taomni_screenshot_api::{RecordFormat, RecordingInfo, TimedFrame};
+use taomni_screenshot_recording::{annex_b_nals, encode_loop, inspect_clip, inspect_clip_frames};
 
 static RECORDING_TEST_LOCK: Mutex<()> = Mutex::new(());
 
@@ -36,6 +31,24 @@ fn frame(w: u32, h: u32, shift: u32) -> RgbaImage {
             image::Rgba([30, 60, 220, 255])
         }
     })
+}
+
+#[test]
+fn blocked_capture_retains_the_user_stop_time_and_recording_limit() {
+    use std::time::{Duration, Instant};
+
+    let start = Instant::now();
+    let stop = start + Duration::from_millis(2300);
+    let deadline = start + Duration::from_secs(4);
+    let read_completed = start + Duration::from_millis(4330);
+    assert_eq!(
+        super::capture::clip_end_ms(start, deadline, Some(stop), read_completed),
+        2300
+    );
+    assert_eq!(
+        super::capture::clip_end_ms(start, deadline, None, read_completed),
+        4000
+    );
 }
 
 fn encode(format: RecordFormat, frames: &[(RgbaImage, u64)], end_ms: u64) -> PathBuf {
@@ -115,7 +128,7 @@ fn capture_failure_is_not_a_successful_partial_recording_and_releases_lease() {
     sessions().lock().unwrap().insert(
         id.clone(),
         Arc::new(Recording::from(Session {
-            stop: Arc::new(AtomicBool::new(false)),
+            stop: Arc::new(OnceLock::new()),
             capture: Some(thread::spawn(|| {
                 anyhow::bail!("capture device disconnected")
             })),
@@ -147,7 +160,7 @@ fn recovery_owns_active_inflight_and_preview_files_through_close_and_exit() {
         let encoded_path = path.clone();
         let (finish_tx, finish_rx) = std::sync::mpsc::channel();
         let recording = Arc::new(Recording::from(Session {
-            stop: Arc::new(AtomicBool::new(false)),
+            stop: Arc::new(OnceLock::new()),
             capture: Some(thread::spawn(|| Ok(()))),
             encoder: Some(thread::spawn(move || {
                 finish_rx.recv().unwrap();

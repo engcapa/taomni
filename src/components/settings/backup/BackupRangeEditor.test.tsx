@@ -15,7 +15,6 @@ it("opens legacy full with explicit mail exclusion and keeps certificates when e
   render(<Editor initial={{ scope: "full", customOptions: { includeMail: false } }} />);
   expect(screen.queryByRole("combobox")).toBeNull();
   expect(screen.getByTestId("backup-global-include-mail")).not.toBeChecked();
-  expect(screen.getByTestId("backup-global-includeLanchat")).toBeChecked();
   fireEvent.click(screen.getByTestId("backup-global-includeNotes"));
   expect(JSON.parse(screen.getByTestId("value").textContent!)).toMatchObject({ scope: "custom", customOptions: { includeNotes: false, includeMail: false, includeServerCertificates: true } });
 });
@@ -30,4 +29,20 @@ it("shows mixed mail selection, toggles the whole branch and protects required c
   fireEvent.click(screen.getByTestId("backup-global-include-mail"));
   expect(screen.getByTestId("backup-global-includeMail")).not.toBeChecked();
   expect(screen.getByTestId("backup-global-includeMailOriginals")).not.toBeChecked();
+});
+
+it("includes retained module data by default and keeps its Vault dependency until explicitly excluded", () => {
+  setLocale("en");
+  render(<Editor initial={{ scope: "core", customOptions: null }} />);
+  expect(screen.getByTestId("backup-global-includePlugins")).toBeChecked();
+  fireEvent.click(screen.getByTestId("backup-global-includeMfa"));
+  expect(screen.getByTestId("backup-global-includeVault")).toBeChecked();
+  expect(screen.getByTestId("backup-global-includeVault")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("backup-global-includePlugins"));
+  expect(screen.getByTestId("backup-global-includeVault")).not.toBeDisabled();
+  fireEvent.click(screen.getByTestId("backup-global-includeVault"));
+  fireEvent.click(screen.getByTestId("backup-global-includePlugins"));
+  expect(screen.getByTestId("backup-global-includeVault")).toBeChecked();
+  expect(screen.getByTestId("backup-global-includeVault")).toBeDisabled();
+  expect(screen.getByTestId("backup-range-summary")).toHaveTextContent("retained data");
 });

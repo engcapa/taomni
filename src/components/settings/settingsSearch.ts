@@ -62,6 +62,14 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     terms: ["screenshot", "screen capture", "hotkey", "shortcut", "recording", "截图", "截屏", "快捷键", "热键", "录屏"],
   },
   {
+    id: "module-store",
+    titleKeys: ["settings.moduleStoreTitle", "settings.moduleStoreSubtitle"],
+    terms: [
+      "module", "modules", "plugin", "plugins", "module store", "marketplace", "extension",
+      "模块", "模块商店", "插件", "扩展", "插件商店",
+    ],
+  },
+  {
     id: "code-view-appearance",
     titleKeys: ["settings.codeViewAppearanceTitle"],
     terms: [
@@ -174,11 +182,6 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     terms: ["mobile", "remote", "pairing", "headless", "host", "domain", "reverse proxy", "allowlist", "screen", "window", "browser", "移动服务", "手机", "配对", "远程控制", "域名", "白名单", "反向代理", "屏幕", "窗口", "浏览器", "feishu", "飞书", "机器人", "bot"],
   },
   {
-    id: "lanchat",
-    titleKeys: ["settings.lanChatSection"],
-    terms: ["lanchat", "lan", "messenger", "chat", "broadcast", "局域网", "内网", "通讯", "聊天", "广播", "消息"],
-  },
-  {
     id: "ai-master",
     titleKeys: ["settings.aiSection", "settings.aiMaster"],
     terms: ["ai", "artificial intelligence", "master switch", "assistant", "人工智能", "智能", "主开关", "助手"],
@@ -269,7 +272,7 @@ export const SETTINGS_GROUPS: SettingsGroupDef[] = [
   {
     id: "general",
     titleKey: "settings.groupGeneral",
-    entryIds: ["language", "app-theme", "welcome-history", "global-ui", "file-open", "notepad", "screenshot"],
+    entryIds: ["language", "app-theme", "welcome-history", "global-ui", "file-open", "notepad", "screenshot", "module-store"],
   },
   {
     id: "code",
@@ -299,7 +302,7 @@ export const SETTINGS_GROUPS: SettingsGroupDef[] = [
   {
     id: "network",
     titleKey: "settings.groupNetwork",
-    entryIds: ["app-proxy", "mobile-service", "lanchat"],
+    entryIds: ["app-proxy", "mobile-service"],
   },
   {
     id: "ai",

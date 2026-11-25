@@ -66,7 +66,7 @@ pub fn sources(conn: &Connection) -> Result<BTreeMap<String, bool>, String> {
 pub fn deepseek_app_search_sources(
     state: State<'_, AppState>,
 ) -> Result<BTreeMap<String, bool>, String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     sources(&db)
 }
 
@@ -96,32 +96,33 @@ pub fn deepseek_app_set_search_sources(
     sources: BTreeMap<String, bool>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     set_sources(&db, sources)
 }
 
 #[tauri::command]
-pub fn deepseek_app_search(
+pub async fn deepseek_app_search(
     query: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<Value>, String> {
-    retrieve(state.inner(), &query)
+    retrieve(state.inner(), &query).await
 }
 
-pub fn retrieve(state: &AppState, query: &str) -> Result<Vec<Value>, String> {
+pub async fn retrieve(state: &AppState, query: &str) -> Result<Vec<Value>, String> {
     if matches!(
-        state.vault.status()?.state,
+        state.core.vault.status()?.state,
         crate::vault::VaultStateKind::Locked
     ) {
         return Err("vault_locked: unlock Vault before searching local records".into());
     }
     let enabled = {
-        let db = state.db.lock().map_err(|_| "database unavailable")?;
+        let db = state.core.db.lock().map_err(|_| "database unavailable")?;
         sources(&db)?
     };
     let mut extras = Vec::new();
     if enabled.get("notes") == Some(&true) {
         let notes = state
+            .core
             .notes_db
             .lock()
             .map_err(|_| "notes database unavailable")?;
@@ -132,8 +133,8 @@ pub fn retrieve(state: &AppState, query: &str) -> Result<Vec<Value>, String> {
         )?);
         extras.extend(connectors::collect(&notes, "notes", "SELECT s.id,n.title,s.title||' completed:'||CASE WHEN s.completed_at IS NULL THEN 'no' ELSE 'yes' END,'',s.updated_at,1 FROM note_steps s JOIN notes n ON n.id=s.note_id WHERE n.archived_at IS NULL")?);
     }
-    extras.extend(stored_sources::collect(state, &enabled)?);
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    extras.extend(stored_sources::collect(state, &enabled).await?);
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     synchronize(&db, extras)?;
     query::search(&db, query)
 }

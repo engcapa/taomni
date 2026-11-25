@@ -1,0 +1,128 @@
+id: TC-MODULES-076
+title: The signed Mail host synchronizes a POP3 inbox and saves its attachments
+description: Install the signed module and sync from the fixture POP3 server. After reopening, save a MIME attachment whose server copy has been removed, then disable the module and verify its retained mailbox.
+covers: [F-MAIL-3, F-MAIL-17, F-MAIL-23, F-Modules-1]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, file_open_mail, module_signed_mail_archive]
+timeout_sec: 230
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: {selector: '[data-testid="module-action-disable-mail"]', timeout_sec: 45}
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_pop3_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
+- mail_server_assert_list_matches: {timeout_sec: 60}
+- assert_signed_mail_host: pop3-sync
+- mail_server_deliver: {count: 1, prefix: Signed-POP3}
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- mail_server_assert_list_matches: {timeout_sec: 60}
+- press: {selector: '[data-testid="mail-message-row"][data-subject="Signed-POP3 0001"]', key: Enter}
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent
+      ?? document.querySelector('.taomni-mail-reader-text')?.textContent
+      ?? '').includes('Signed-POP3 0001')
+    expect_truthy: true
+    timeout_sec: 30
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- wait_for: {selector: '[data-testid="mail-sync-button"]:not([disabled])', timeout_sec: 45}
+- mail_server_assert_list_matches: {timeout_sec: 45}
+- assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Signed-POP3 0001"]', equal: 1}
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'Synced 0 new headers across', timeout_sec: 30}
+- assert_signed_mail_host: pop3-saved
+- right_click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- click: '[data-testid="context-menu-item-close"]'
+- wait_for: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', state: detached}
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_pop3_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
+- mail_server_assert_list_matches: {timeout_sec: 45}
+- assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Signed-POP3 0001"]', equal: 1}
+- press: {selector: '[data-testid="mail-message-row"][data-subject="Signed-POP3 0001"]', key: Enter}
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent
+      ?? document.querySelector('.taomni-mail-reader-text')?.textContent
+      ?? '').includes('Signed-POP3 0001')
+    expect_truthy: true
+    timeout_sec: 30
+- click: '[data-testid="mail-message-row"][data-subject="${fixture.file_open_mail_subject}"]'
+- wait_for: '[data-testid="mail-attachment-open"][data-name="policy.txt"]:enabled'
+- mail_server_expunge_newest: {folder: INBOX, count: 2}
+- right_click: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- native_file_dialog:
+    kind: save
+    action: cancel
+    title: Save attachment
+    trigger: '[data-testid="context-menu-item-save-attachment-as"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Attachment save cancelled}
+- right_click: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    title: Save attachment
+    trigger: '[data-testid="context-menu-item-save-attachment-as"]'
+    path: ${fixture.file_open_mail_target}
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Saved attachment to}
+- assert_file_sha256: {path: '${fixture.file_open_mail_target}', equals: '${fixture.file_open_mail_sha256}'}
+- assert_signed_mail_host: pop3-reopened
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-mail"]'
+- wait_for: {selector: '[data-testid="module-action-enable-mail"]', timeout_sec: 45}
+- assert_signed_mail_host: disabled
+- assert_signed_mail_host: pop3-retained
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: pop3-sync
+    requirement: An installed Mail host reads a real POP3 inbox. Repeated sync keeps one local copy of the new message, which opens in the reader. Disabling Mail releases the host.
+    actions: [8, 10, 15, 19, 20, 22, 24, 30, 31, 34, 38, 53]
+    checkpoints:
+    - {step: 12, expectation: The verified host is installed and idle before the session opens.}
+    - {step: 17, expectation: The initial local mailbox matches the fixture server.}
+    - {step: 18, expectation: 'The signed host holds the writer lease. The fixture sees UIDL, RETR and QUIT, and the module database contains the matching UIDLs and MIME originals.'}
+    - {step: 21, expectation: The local mailbox includes the newly delivered message.}
+    - {step: 23, expectation: The reader renders the original message body.}
+    - {step: 27, expectation: A repeat sync leaves exactly one copy of the new message.}
+    - {step: 28, expectation: The completed repeat sync reports zero newly downloaded headers.}
+    - {step: 29, expectation: The signed host saves the original bytes and UIDLs in the module database.}
+    - {step: 32, expectation: The original Mail tab has closed.}
+    - {step: 37, expectation: The reopened mailbox contains exactly one copy of the newly downloaded message.}
+    - {step: 39, expectation: The reopened mailbox renders the saved message body.}
+    - {step: 50, expectation: The reopened account matches the saved UIDL and original message digests.}
+    - {step: 55, expectation: Disabling Mail releases the host lease.}
+    - {step: 56, expectation: The disabled module retains the same original message bytes and UIDL ledger.}
+    - {step: 57, expectation: The workflow produces no runtime errors.}
+    results: [12, 17, 18, 21, 23, 27, 28, 29, 32, 37, 39, 50, 55, 56, 57]
+  - id: offline-attachment
+    requirement: A POP3 attachment remains available from the leased module mailbox after its server copy is removed. Cancelling the save keeps the same attachment available for retry.
+    actions: [40, 42, 43, 44, 46, 47]
+    checkpoints:
+    - {step: 41, expectation: The reader exposes the saved MIME attachment after reopening the account.}
+    - {step: 45, expectation: Cancelling the native save reports cancellation in the account.}
+    - {step: 48, expectation: The retry reports a completed attachment save.}
+    - {step: 49, expectation: The downloaded bytes match the fixture MIME payload.}
+    - {step: 50, expectation: The receipt binds the file digest to the signed host and its retained POP3 mailbox.}
+    results: [41, 45, 48, 49, 50]
+  visual:
+  - check: The opened message shows the body fetched from the server.
+    method: automated
+    reason: The case reads the active Mail reader after selecting the new message.
+  native:
+  - check: Signed package installation, real POP3 synchronization and host cleanup.
+    method: automated
+    reason: The case checks the installed host, mailbox contents and writer lease.

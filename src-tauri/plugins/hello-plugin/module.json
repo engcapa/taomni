@@ -1,0 +1,42 @@
+{
+  "id": "taomni-plugin-hello-plugin",
+  "slug": "hello-plugin",
+  "name": "Hello Plugin",
+  "description": "Verify that a signed module can open its own tab and save text in a separate data directory.",
+  "version": "0.1.0",
+  "coreApiVersion": "1",
+  "kind": "collaboration",
+  "status": "provisional",
+  "platforms": [
+    "windows-x86_64",
+    "darwin-aarch64",
+    "darwin-x86_64",
+    "linux-x86_64"
+  ],
+  "entry": {
+    "host": "taomni-hello-plugin",
+    "frontend": "frontend/index.js",
+    "protocol": 1
+  },
+  "tabs": [
+    { "kind": "hello-plugin", "title": "Hello Plugin" }
+  ],
+  "commands": [
+    "hello/ping",
+    "hello/crash",
+    "hello/hang",
+    "plugin/enable",
+    "plugin/disable",
+    "hello/write",
+    "hello/read",
+    "backup/prepare",
+    "backup/snapshot",
+    "backup/release"
+  ],
+  "permissions": [],
+  "dataDir": "plugins/hello-plugin",
+  "backupPaths": ["plugins/hello-plugin/data"],
+  "legacyTables": [],
+  "vaultFixedKeys": [],
+  "snapshot": "rpc"
+}

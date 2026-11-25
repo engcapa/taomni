@@ -306,6 +306,26 @@ export function registerSessionEditorLifecycle3Cases() {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("retries a new mail account save with the same account ID", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "Mail" });
+    ipcMocks.saveSession.mockRejectedValueOnce(new Error("Mail initialization interrupted"));
+
+    await user.type(screen.getByLabelText("IMAP server"), "imap.example.test");
+    await user.type(screen.getByLabelText("Mail email or username"), "me@example.test");
+    await user.type(screen.getByLabelText("Mail password or app password token"), "fixture-password");
+    await user.type(screen.getByLabelText("SMTP server"), "smtp.example.test");
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+    expect(await screen.findByText("Mail initialization interrupted")).toBeVisible();
+    expect(onClose).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(2);
+    expect(ipcMocks.saveSession.mock.calls[1][0].id).toBe(ipcMocks.saveSession.mock.calls[0][0].id);
+  });
+
   it("saves mail sessions with username identity and appearance settings", async () => {
     const user = userEvent.setup();
     const { onClose } = renderEditor(undefined, { initialProto: "Mail" });
@@ -317,6 +337,7 @@ export function registerSessionEditorLifecycle3Cases() {
     await user.type(screen.getByLabelText("Mail password or app password token"), "imap-secret");
     await user.type(screen.getByLabelText("SMTP server"), "smtp.example.com");
     await user.type(screen.getByLabelText("Mail save directory"), "D:\\mail-cache");
+    await user.click(screen.getByTestId("mail-cache-attachments"));
     await user.type(screen.getByTestId("mail-storage-directory"), "D:\\complete-mail");
     await user.selectOptions(screen.getByTestId("mail-storage-mode"), "include");
     fireEvent.change(screen.getByTestId("mail-storage-folder-names"), { target: { value: "INBOX\nProjects/Work\nINBOX\n" } });
@@ -347,6 +368,7 @@ export function registerSessionEditorLifecycle3Cases() {
     });
     expect(savedOptions.mailEmailAddress).toBeUndefined();
     expect(savedOptions.mailSmtpHost).toBe("smtp.example.com");
+    expect(savedOptions.mailAttachmentCache).toBe(true);
     expect(savedOptions.mailSaveDirectory).toBe("D:\\mail-cache");
     expect(savedOptions.mailStorageDirectory).toBe("D:\\complete-mail");
     expect(savedOptions.mailFullMessageMode).toBe("include");

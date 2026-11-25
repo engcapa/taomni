@@ -34,7 +34,7 @@ pub fn summary(conn: &Connection) -> rusqlite::Result<HistoryPrivacySummary> {
 pub async fn history_privacy_summary(
     state: tauri::State<'_, crate::state::AppState>,
 ) -> Result<HistoryPrivacySummary, String> {
-    let conn = state.db.lock().map_err(|error| error.to_string())?;
+    let conn = state.core.db.lock().map_err(|error| error.to_string())?;
     summary(&conn).map_err(|error| error.to_string())
 }
 

@@ -220,7 +220,7 @@ fn opening_a_mail_snapshot_does_not_run_schema_or_original_index_migrations() {
             "CREATE TABLE retained (value TEXT); INSERT INTO retained VALUES ('legacy');",
         )
         .unwrap();
-    let handle = crate::mail::coordination::MailDatabase::new(path);
+    let handle = crate::mail::coordination::mailbox_database(path);
     {
         let guard = handle
             .lock_for_snapshot(&tokio_util::sync::CancellationToken::new())

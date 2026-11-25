@@ -1,0 +1,26 @@
+[package]
+name = "taomni-plugin-vnc-client"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "Official VNC client host"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+taomni-plugin-api = { path = "../../crates/taomni-plugin-api" }
+taomni-plugin-sdk = { path = "../../crates/taomni-plugin-sdk" }
+taomni-vnc-api = { path = "../../crates/taomni-vnc-api" }
+taomni-vnc-engine = { path = "../../crates/taomni-vnc-engine" }
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
+tokio-util = "0.7"
+uuid = { version = "1", features = ["v4"] }
+
+[target.'cfg(windows)'.dependencies]
+taomni-vnc-key-protocol = { path = "../../crates/taomni-vnc-key-protocol" }
+
+[dev-dependencies]
+futures = "0.3"
+tempfile = "3"
+tokio-tungstenite = "0.29"

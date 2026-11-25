@@ -1,0 +1,26 @@
+{
+  "id": "taomni-plugin-mfa",
+  "slug": "mfa",
+  "name": "MFA Authenticator",
+  "description": "Manage two-factor authentication accounts and generate time-based and counter-based one-time codes.",
+  "version": "0.1.2",
+  "coreApiVersion": "1",
+  "kind": "auth",
+  "status": "stable",
+  "platforms": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"],
+  "entry": { "host": "taomni-plugin-mfa", "frontend": "frontend/index.js", "protocol": 1 },
+  "tabs": [],
+  "commands": [
+    "mfa_list", "mfa_codes", "mfa_inspect", "mfa_add", "mfa_update",
+    "mfa_delete", "mfa_reorder", "mfa_hotp_next", "mfa_mark_used",
+    "mfa_set_prefs", "mfa_export_uri", "mfa_reset_store", "mfa_initialize_empty", "mfa_scan_screen_codes",
+    "backup/prepare", "backup/snapshot", "backup/release"
+  ],
+  "permissions": ["vault.fixed-key", "capture.screen"],
+  "dataDir": "plugins/mfa",
+  "dataSchemaVersion": 1,
+  "backupPaths": ["plugins/mfa/data/mfa.db"],
+  "legacyTables": [],
+  "vaultFixedKeys": ["mfa.data-key-v1"],
+  "snapshot": "rpc"
+}

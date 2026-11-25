@@ -1,0 +1,6 @@
+fn main() {
+    if let Err(error) = taomni_plugin_rdp_server::serve() {
+        eprintln!("RDP Server host: {error}");
+        std::process::exit(1);
+    }
+}

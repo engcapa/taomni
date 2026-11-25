@@ -414,6 +414,9 @@ steps:
 - mail_server_assert_folder_count:
     folder: INBOX
     min: 210
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: paused
 - click: '[data-testid="mail-storage-resume"]'
 - wait_for:
     selector: '[data-testid="mail-storage-resume"]:enabled'
@@ -432,6 +435,9 @@ steps:
     selector: '[data-testid="mail-archive-results"]'
     contains: of 1 messages
     timeout_sec: 60
+- click: '[data-testid="mail-archive-read"]'
+- assert_text: {selector: '[data-testid="mail-archive-preview"]', contains: 'Subject: Manager 0'}
+- assert_visible: '[data-testid="mail-archive-export"]'
 - click: '[data-testid="mail-archive-close"]'
 - assert_not_visible: '[data-testid="mail-archive-dialog"]'
 verification:
@@ -516,11 +522,12 @@ verification:
     - 138
     - 139
     - 141
-    - 144
-    - 146
-    - 148
+    - 145
+    - 147
     - 149
-    - 151
+    - 150
+    - 152
+    - 155
     checkpoints:
     - step: 23
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains": "completed", "timeout_sec": 60}}'
@@ -620,9 +627,15 @@ verification:
       expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
     - step: 143
       expectation: '{"mail_server_assert_folder_count": {"folder": "INBOX", "min": 210}}'
-    - step: 150
+    - step: 144
+      expectation: Storage remains paused after closing the archive manager following cleanup.
+    - step: 151
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 1 messages", "timeout_sec": 60}}'
-    - step: 152
+    - step: 153
+      expectation: The surviving archived Manager message shows its saved body after the scan resumes.
+    - step: 154
+      expectation: Its original EML is available to export.
+    - step: 156
       expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
     results:
     - 23
@@ -674,8 +687,11 @@ verification:
     - 140
     - 142
     - 143
-    - 150
-    - 152
+    - 144
+    - 151
+    - 153
+    - 154
+    - 156
   visual:
   - check: Archive manager layout, readable results, selection and cleanup estimate
     method: manual

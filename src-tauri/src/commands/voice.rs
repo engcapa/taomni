@@ -1,6 +1,7 @@
 pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
     let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
         crate::voice::commands::voice_capture_supported,
+        crate::voice::commands::voice_check_local_module,
         crate::voice::commands::voice_start_capture,
         crate::voice::commands::voice_start_stream,
         crate::voice::cleanup::voice_cleanup_text,

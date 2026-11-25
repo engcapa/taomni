@@ -111,6 +111,7 @@ steps:
 - wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]'
 - screenshot: explorer-prototype-narrow-overlay.png
 - set_viewport: {width: 1600, height: 960}
+- assert_not_visible: '[data-testid="explorer-tab"][data-active="true"] .ex-preview-overlay'
 - press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Alt+p}
 - assert_not_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]'
 - press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Alt+p}
@@ -263,9 +264,9 @@ verification:
     - 82
     - 85
     - 88
-    - 89
-    - 91
-    - 93
+    - 90
+    - 92
+    - 94
     checkpoints:
     - step: 55
       expectation: Last selected text wins after delayed reads.
@@ -289,13 +290,15 @@ verification:
       expectation: Narrow collapse retains enabled preference.
     - step: 86
       expectation: Preview manually opens at narrow width.
-    - step: 90
+    - step: 89
+      expectation: Expanded layout has released the narrow preview overlay before shortcut input.
+    - step: 91
       expectation: AltP disables preview.
-    - step: 92
+    - step: 93
       expectation: AltP enables preview again.
-    - step: 94
-      expectation: New tab receives shared right position.
     - step: 95
+      expectation: New tab receives shared right position.
+    - step: 96
       expectation: New tab retains global wrap.
     results:
     - 55
@@ -309,10 +312,11 @@ verification:
     - 83
     - 84
     - 86
-    - 90
-    - 92
-    - 94
+    - 89
+    - 91
+    - 93
     - 95
+    - 96
   - id: R3
     requirement: Product Explorer preserves prototype light/dark surface tokens, 210px navigation, 300px preview and right/bottom placement.
     actions:
@@ -343,69 +347,29 @@ verification:
     - 79
     - 80
   - id: R4
-    requirement: New file and folder use inline rename; same-volume drag moves into a folder; same-directory copy gets a suffix; Delete opens a
-      Trash/persistent choice, unavailable trash requires explicit confirm and cancellation preserves the original.
-    actions:
-    - 98
-    - 99
-    - 100
-    - 102
-    - 103
-    - 105
-    - 106
-    - 107
-    - 108
-    - 110
-    - 112
-    - 114
-    - 115
-    - 116
-    - 118
-    - 119
-    - 120
-    - 121
-    - 123
-    - 125
-    - 126
-    - 129
+    requirement: New files and folders use inline rename. Drag and copy preserve the expected files. Delete offers Trash and permanent deletion and permits cancellation when Trash is unavailable.
+    actions: [99, 100, 101, 103, 104, 106, 107, 108, 109, 111, 113, 115, 116, 117, 120, 121, 122, 125, 127, 128, 132]
     checkpoints:
-    - step: 104
-      expectation: Created folder uses the entered inline name.
-    - step: 109
-      expectation: Created text document uses the entered inline name.
-    - step: 111
-      expectation: Drag moves file out of the source listing.
-    - step: 113
-      expectation: The moved file is visible inside the target folder.
-    - step: 117
-      expectation: Same-directory Paste copies with documented suffix.
-    - step: 123
-      expectation: Trash-unavailable reason explicitly states confirmation is required.
-    - step: 125
-      expectation: Cancelling fallback preserves the original.
-    - step: 128
-      expectation: Confirmed permanent fallback removes only the original.
-    - step: 136
-      expectation: No runtime error after fallback and partial-batch recovery.
-    results:
-    - 104
-    - 109
-    - 111
-    - 113
-    - 117
-    - 123
-    - 125
-    - 128
-    - 136
+    - {step: 105, expectation: The folder uses the entered name.}
+    - {step: 110, expectation: The text document uses the entered name.}
+    - {step: 112, expectation: Drag moves the file out of the source listing.}
+    - {step: 114, expectation: The moved file appears inside the target folder.}
+    - {step: 118, expectation: Same-directory paste gives the copy a distinct name.}
+    - {step: 124, expectation: Unavailable Trash reports the reason and requires confirmation.}
+    - {step: 126, expectation: Cancellation preserves the original.}
+    - {step: 129, expectation: Confirmed permanent deletion removes the original.}
+    - {step: 135, expectation: The earlier copy remains present.}
+    - {step: 137, expectation: Deletion and partial-batch recovery produce no runtime errors.}
+    results: [105, 110, 112, 114, 118, 124, 126, 129, 135, 137]
   - id: R5
     requirement: A manually expanded narrow bottom preview stays at the bottom with the prototype 190px height, leaving the file list above it usable.
-    actions: [137, 138, 139, 141, 143, 144, 145, 147]
+    actions: [138, 139, 140, 142, 144, 145, 146, 148]
     checkpoints:
-    - {step: 146, expectation: Narrow layout first auto-collapses while the bottom preference is retained.}
-    - {step: 148, expectation: Manual opening renders the selected real text.}
-    - {step: 149, expectation: 'Overlay is no taller than 190px; starts below the body top and spans file-list width rather than covering the entire list.'}
-    - {step: 151, expectation: Preview transitions leave no runtime error.}
-    results: [146, 148, 149, 151]
+    - {step: 147, expectation: Narrow layout first auto-collapses while the bottom preference is retained.}
+    - {step: 149, expectation: Manual opening renders the selected real text.}
+    - {step: 150, expectation: 'Overlay is no taller than 190px; starts below the body top and spans file-list width rather than covering the entire list.'}
+    - {step: 152, expectation: Preview transitions leave no runtime error.}
+    results: [147, 149, 150, 152]
   visual:
   - check: High-fidelity light/dark/narrow surface and density.
     method: automated

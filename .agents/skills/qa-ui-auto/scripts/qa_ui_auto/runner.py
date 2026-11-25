@@ -42,6 +42,7 @@ from .deadline import BudgetedPage, Deadline, using_deadline
 from .provenance import input_digest, execution_identity, conditions_identity
 from .browser_evidence import BrowserEvidence, traces_ssh_terminal
 from . import browser_tracing
+from . import module_profile
 
 _browser = None
 _playwright = None
@@ -100,10 +101,6 @@ def _run_browser_case(payload: dict) -> dict:
     return run_browser_case(payload, _run_browser_case_inner)
 
 # ─── per-case worker (browser) ──────────────────────────────────────────────
-
-
-def _slugify_path_part(s: str) -> str:
-    return "".join(c if c.isalnum() or c in "-_." else "_" for c in s)
 
 
 def _run_browser_case_inner(payload: dict) -> dict:
@@ -217,6 +214,8 @@ def _run_browser_case_inner(payload: dict) -> dict:
                     result["status"] = "skipped"
                     result["fixtures_skipped"] = f"{fname}: {fs}"
                     raise
+            if profile := module_profile.configured(cfg):
+                result["module_profile"] = module_profile.prepare_browser(profile, ctx, deadline)
             result["timings"]["fixtures_sec"] = time.monotonic() - fixture_started
 
             # Auto-open base_url at step 0 if the first step isn't `open`.
@@ -382,7 +381,9 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
             })
         return results
 
+    profile = module_profile.configured(cfg)
     with NativeHarness(cfg, report_root) as harness:
+        prepared = module_profile.prepare_native(profile, harness)
         for c in cases:
             case_dir = report_root / c.id
             case_dir.mkdir(parents=True, exist_ok=True)
@@ -456,13 +457,15 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                         r["fixtures_skipped"] = f"{fname}: {fs}"
                         break
                 else:
+                    module_profile.restore_native(prepared, report_root)
                     r["timings"]["fixtures_sec"] = time.monotonic() - fixture_started
                     session_started = time.monotonic()
                     harness.deadline = deadline
                     java25_home = (cfg.get("app", {}).get("tooling_java25_home")
                                    if "java25_projects" in c.fixtures else None)
-                    session = (harness.create_session(tooling_java_home=java25_home)
-                               if java25_home else harness.create_session())
+                    bridge = any("native_confirm_restore_relaunch" in step for step in c.steps)
+                    session = harness.create_session(tooling_java_home=java25_home) if java25_home else (
+                        harness.create_session(restore_bridge=True) if bridge and current_target != "macOS" else harness.create_session())
                     r["timings"]["session_setup_sec"] = time.monotonic() - session_started
                     nctx: NativeStepContext | None = None
                     try:
@@ -470,7 +473,9 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                         renderer_reset_sec = reset_case_renderer(ctx_ns, session, c.fixtures, java25_home or cfg.get("app", {}).get("tooling_java_home"))
                         if renderer_reset_sec is not None:
                             r["timings"]["renderer_reset_sec"] = renderer_reset_sec
-                        nctx = NativeStepContext(session, case_dir, cfg)
+                        if profile:
+                            r["module_profile"] = module_profile.observe_native(profile, prepared, session)
+                        nctx = NativeStepContext(session, case_dir, cfg, fixture_context=ctx_ns)
                         last_step, last_verb, last_args = 0, "<setup>", None
                         for i, step in enumerate(c.steps, start=1):
                             ctx_ns.step_index = i
@@ -1038,6 +1043,11 @@ def main(argv: list[str] | None = None) -> int:
         },
         "cases": results,
     }
+    if ci_entry:
+        summary["runner_image"] = {
+            "label": ci_entry["runner"], "image": env.get("ImageOS"),
+            "version": env.get("ImageVersion"), "architecture": env.get("RUNNER_ARCH"),
+        }
     if mode == "native":
         if ci_entry and ci_entry.get("desktop"):
             summary["desktop_identity"] = cfg.get("desktop", {})

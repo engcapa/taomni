@@ -1,5 +1,5 @@
 import { mailArchiveStub } from "../mailArchiveStub";
-import { stubMailAppend, stubMailClearCache, stubMailExpunge, stubMailFindHeader, stubMailListCached, stubMailListFolders, stubMailSearch, stubMailSyncAll, stubMailSyncFolder, stubMailIdleStart, stubMailSetSubscription, stubMailIdleStop, stubMailRecordSent, stubMailMutation, stubMailUpdateCachedFlags, stubMailMarkRead, type Seed as MailStubSeed, type StubMailSearchQuery } from "../mailServerStub";
+import { stubMailAppend, stubMailChangeFolder, stubMailClearCache, stubMailExpunge, stubMailFindHeader, stubMailListCached, stubMailListFolders, stubMailMarkBodyCached, stubMailSearch, stubMailSyncAll, stubMailSyncFolder, stubMailSyncHeaders, stubMailIdleStart, stubMailSetSubscription, stubMailIdleStop, stubMailRecordSent, stubMailMutation, stubMailUpdateCachedFlags, stubMailMarkRead, stubMailPrefetchBodies, type Seed as MailStubSeed, type StubMailSearchQuery } from "../mailServerStub";
 import { stubApplyFilters, stubListFilters, stubSaveFilters } from "../mailFiltersStub";
 import { stubAddressBookSuggestions, stubDeleteAddressBookEntry, stubListAddressBook, stubSaveAddressBookEntry } from "../mailContactsStub";
 import type { MailAddressBookEntry } from "../../lib/mailContacts";
@@ -102,8 +102,9 @@ export const mailStubSeed: MailStubSeed = (accountId) => ({
   messages: (folder) => stubMailMessages(accountId, folder),
 });
 
-export function stubMailBody(accountId: string, folder: string, uid: number) {
-  const header = stubMailFindHeader(accountId, mailStubSeed, folder, uid)
+export function stubMailBody(accountId: string, folder: string, uid: number, source: "cache" | "remote" = "cache") {
+  const stored = stubMailFindHeader(accountId, mailStubSeed, folder, uid);
+  const header = stored
     ?? stubMailMessages(accountId, folder).find((message) => message.uid === uid)
     ?? stubMailMessages(accountId, folder)[0];
   const html = uid === 89
@@ -118,13 +119,13 @@ export function stubMailBody(accountId: string, folder: string, uid: number) {
     uid: header.uid,
     messageId: header.messageId,
     subject: header.subject,
-    text,
-    html,
+    text: stored?.composedBody ? stored.composedBody.text : text,
+    html: stored?.composedBody ? stored.composedBody.html : html,
     snippet: header.snippet,
     attachments: header.attachments,
     rawSize: header.rawSize,
     cachedAt: Math.floor(Date.now() / 1000),
-    source: "cache",
+    source,
   };
 }
 
@@ -205,6 +206,9 @@ export function stubSaveMailDraft(accountId: string, draft: Record<string, unkno
     ? draft.id.trim()
     : `stub-draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const existing = drafts.find((item) => item.accountId === accountId && item.id === id);
+  const remoteDraftFolder = typeof draft.remoteDraftFolder === "string" ? draft.remoteDraftFolder : null;
+  const remoteDraftUid = typeof draft.remoteDraftUid === "number" ? draft.remoteDraftUid : null;
+  const preserveRemoteDraft = remoteDraftFolder === null && remoteDraftUid === null;
   const now = Math.floor(Date.now() / 1000);
   const attachments = Array.isArray(draft.attachments)
     ? draft.attachments
@@ -233,8 +237,8 @@ export function stubSaveMailDraft(accountId: string, draft: Record<string, unkno
     replyContext: draft.replyContext && typeof draft.replyContext === "object"
       ? draft.replyContext as Record<string, unknown>
       : null,
-    remoteDraftFolder: typeof draft.remoteDraftFolder === "string" ? draft.remoteDraftFolder : null,
-    remoteDraftUid: typeof draft.remoteDraftUid === "number" ? draft.remoteDraftUid : null,
+    remoteDraftFolder: preserveRemoteDraft ? existing?.remoteDraftFolder ?? null : remoteDraftFolder,
+    remoteDraftUid: preserveRemoteDraft ? existing?.remoteDraftUid ?? null : remoteDraftUid,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -288,23 +292,12 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
     case "mail_sync_headers": {
       const invokeArgs = args as InvokeArgs | undefined;
       const accountId = stubMailAccountId(invokeArgs);
-      const folder = ((invokeArgs?.folder as string | null | undefined) ?? "INBOX") || "INBOX";
-      const messages = stubMailMessages(accountId, folder);
-      const limit = Math.max(1, Number((invokeArgs?.limit as number | undefined) ?? messages.length));
+      const requestedFolder = invokeArgs?.folder as string | null | undefined;
+      const folder = requestedFolder?.trim() ? requestedFolder : "INBOX";
+      const config = invokeArgs?.config as { sync?: { maxFetchPerSync?: number } } | undefined;
+      const limit = Math.min(2000, Math.max(1, Number(invokeArgs?.limit ?? config?.sync?.maxFetchPerSync ?? 200)));
       const offset = Math.max(0, Number((invokeArgs?.offset as number | undefined) ?? 0));
-      const page = messages.slice(offset, offset + limit);
-      return {
-        accountId,
-        folder,
-        folders: stubMailListFolders(accountId, mailStubSeed),
-        messages: page,
-        fetchedMessages: page.length,
-        cachedBodies: page.filter((message) => message.bodyCached).length,
-        syncedAt: Math.floor(Date.now() / 1000),
-        offset,
-        limit,
-        hasMore: offset + page.length < messages.length,
-      } as T;
+      return stubMailSyncHeaders(accountId, mailStubSeed, folder, limit, offset) as T;
     }
 
     case "mail_idle_start": {
@@ -359,6 +352,21 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
       return stubMailListFolders(stubMailAccountId(invokeArgs), mailStubSeed) as T;
     }
 
+    case "mail_create_folder":
+    case "mail_rename_folder":
+    case "mail_delete_folder": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      if (cmd === "mail_rename_folder") {
+        const from = String(invokeArgs?.from ?? "").trim();
+        const to = String(invokeArgs?.to ?? "").trim();
+        return stubMailChangeFolder(accountId, mailStubSeed, { kind: "rename", from, to }) as T;
+      }
+      const name = String(invokeArgs?.name ?? "").trim();
+      const kind = cmd === "mail_create_folder" ? "create" : "delete";
+      return stubMailChangeFolder(accountId, mailStubSeed, { kind, name }) as T;
+    }
+
     case "mail_set_folder_subscription": {
       const invokeArgs = args as InvokeArgs | undefined;
       return stubMailSetSubscription(
@@ -369,15 +377,44 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
       ) as T;
     }
 
-    case "mail_prefetch_message_body":
-      return undefined as T;
+    case "mail_prefetch_message_body": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = String(invokeArgs?.folder ?? "INBOX");
+      const uids = Array.isArray(invokeArgs?.uids) ? invokeArgs.uids.map(Number) : [Number(invokeArgs?.uid)];
+      return await stubMailPrefetchBodies(stubMailAccountId(invokeArgs), mailStubSeed, folder, uids) as T;
+    }
 
     case "mail_get_message_body": {
       const invokeArgs = args as InvokeArgs | undefined;
       const accountId = stubMailAccountId(invokeArgs);
       const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
       const uid = Number((invokeArgs?.uid as number | undefined) ?? 91);
-      return stubMailBody(accountId, folder, uid) as T;
+      const source = stubMailMarkBodyCached(accountId, mailStubSeed, folder, uid);
+      return stubMailBody(accountId, folder, uid, source) as T;
+    }
+
+    case "mail_fetch_raw":
+    case "mail_save_raw": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const folder = String(invokeArgs?.folder ?? "INBOX");
+      const uid = Number(invokeArgs?.uid);
+      const header = stubMailFindHeader(accountId, mailStubSeed, folder, uid);
+      if (!header) throw new Error("Message is unavailable");
+      const body = stubMailBody(accountId, folder, uid);
+      const text = [
+        `From: ${header.from?.address ?? "sender@example.com"}`,
+        `Subject: ${header.subject}`,
+        "MIME-Version: 1.0",
+        `Content-Type: ${body.html ? "text/html" : "text/plain"}; charset=UTF-8`,
+        "",
+        (body.html ?? body.text ?? "").replace(/\r?\n/g, "\r\n"),
+      ].join("\r\n");
+      if (cmd === "mail_fetch_raw") return text as T;
+      const targetPath = String(invokeArgs?.targetPath ?? "");
+      if (!targetPath.trim()) throw new Error("target path is required");
+      await vfsWriteText(targetPath, text);
+      return { path: targetPath, contentType: "message/rfc822", size: new TextEncoder().encode(text).length } as T;
     }
 
     case "mail_download_attachment": {
@@ -403,6 +440,7 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
         to?: string[];
         subject?: string;
         textBody?: string | null;
+        htmlBody?: string | null;
         inReplyTo?: string | null;
         references?: string[];
         draftId?: string | null;
@@ -416,6 +454,7 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
         to: (request.to ?? []).map((address) => ({ name: address, address })),
         from: { name: "Preview User", address: "user@example.com" },
         snippet: (request.textBody ?? "").slice(0, 200),
+        composedBody: { text: request.textBody ?? null, html: request.htmlBody ?? null },
         inReplyTo: request.inReplyTo?.replace(/^<|>$/g, "") ?? null,
         references: (request.references ?? []).map((id) => id.replace(/^<|>$/g, "")),
       });
@@ -544,6 +583,7 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
         subject: draft.subject,
         flags: ["\\Draft", "\\Seen"],
         snippet: draft.textBody.slice(0, 200),
+        composedBody: { text: draft.textBody || null, html: draft.htmlBody || null },
       });
       const stored = { ...draft, remoteDraftFolder: "Drafts", remoteDraftUid: uid };
       saveMailDrafts(drafts.map((item) => (item === draft ? stored : item)));

@@ -223,8 +223,31 @@ fn create_backup_locked(
     // Determine what to include based on scope
     let flags = resolve_scope_flags(scope, custom_options);
 
+    // The global Vault lease precedes mail/store mutexes. Release this short
+    // barrier before ordinary snapshots, packing, encryption and upload.
+    let protected = super::protected_snapshot::stage_with_plugins(
+        &state.plugins,
+        &state.core.vault,
+        if flags.mfa {
+            state.legacy.mfa.legacy_store()?
+        } else {
+            None
+        },
+        &temp_staging_dir,
+        flags,
+        context,
+    )?;
+    let module_owned_rows =
+        super::server_configs::module_owned_rows(&protected.files, flags.sessions)?;
+    let owned_mailboxes = protected
+        .datasets
+        .iter()
+        .flat_map(super::plugins::contracts::PluginDataSet::owned_mailbox_names)
+        .collect::<std::collections::HashSet<_>>();
+    staged_files.extend(protected.files);
+
     let mail_paths = if flags.mail {
-        Some(context.lock(&state.mail.mail_archive.changes)?)
+        Some(context.lock(&state.legacy.mail.mail_archive.changes)?)
     } else {
         None
     };
@@ -233,10 +256,19 @@ fn create_backup_locked(
     context.check()?;
     if flags.sessions {
         let snap_dest = temp_staging_dir.join("taomni.db");
-        let conn = context.lock(&state.db)?;
+        let conn = context.lock(&state.core.db)?;
         super::snapshot_context::hot_backup_conn(&conn, &snap_dest, context)?;
         drop(conn);
-        portable_mail_paths(&rusqlite::Connection::open(&snap_dest).map_err(|e| e.to_string())?)?;
+        let snapshot = rusqlite::Connection::open(&snap_dest).map_err(|e| e.to_string())?;
+        portable_mail_paths(&snapshot)?;
+        super::server_configs::omit_rollback_rows(&snapshot, module_owned_rows)?;
+        let profile = state
+            .plugins
+            .data_profile()
+            .map_err(|error| error.to_string())?;
+        if crate::plugin::migration_rdp_pins::owns_profile_pins(profile.path())? {
+            crate::plugin::migration_rdp_pins::omit_rollback_pins(&snapshot)?;
+        }
         staged_files.push(StagedFile {
             archive_path: "databases/taomni.db".into(),
             disk_path: snap_dest,
@@ -247,7 +279,7 @@ fn create_backup_locked(
     context.check()?;
     if flags.notes {
         let snap_dest = temp_staging_dir.join("notes.db");
-        let conn = context.lock(&state.notes_db)?;
+        let conn = context.lock(&state.core.notes_db)?;
         super::snapshot_context::hot_backup_conn(&conn, &snap_dest, context)?;
         staged_files.push(StagedFile {
             archive_path: "databases/notes.db".into(),
@@ -255,41 +287,7 @@ fn create_backup_locked(
         });
     }
 
-    // 3. vault.db
-    context.check()?;
-    if flags.vault {
-        let snap_dest = temp_staging_dir.join("vault.db");
-        state.vault.backup_to_with_context(&snap_dest, context)?;
-        staged_files.push(StagedFile {
-            archive_path: "databases/vault.db".into(),
-            disk_path: snap_dest,
-        });
-    }
-
-    // 3b. mfa.db (skipped when MFA was never used on this profile)
-    context.check()?;
-    if flags.mfa {
-        let snap_dest = temp_staging_dir.join("mfa.db");
-        if state.mfa.backup_to_with_context(&snap_dest, context)? {
-            staged_files.push(StagedFile {
-                archive_path: "databases/mfa.db".into(),
-                disk_path: snap_dest,
-            });
-        }
-    }
-
-    // 4. lanchat.sqlite
-    context.check()?;
-    if flags.lanchat {
-        let snap_dest = temp_staging_dir.join("lanchat.sqlite");
-        state.lanchat.backup_to_with_context(&snap_dest, context)?;
-        staged_files.push(StagedFile {
-            archive_path: "databases/lanchat.sqlite".into(),
-            disk_path: snap_dest,
-        });
-    }
-
-    // 5. Config files
+    // 4. Config files
     context.check()?;
     if flags.configs {
         if let Some(cfg_base) = dirs::config_dir() {
@@ -318,15 +316,18 @@ fn create_backup_locked(
     context.check()?;
     if flags.mail {
         let sessions = {
-            let db = context.lock(&state.db)?;
+            let db = context.lock(&state.core.db)?;
             crate::session::db::list_sessions(&db, None).map_err(|e| e.to_string())?
         };
-        let mut covered = std::collections::HashSet::new();
+        let mut covered = owned_mailboxes;
         for session in sessions
             .into_iter()
             .filter(|s| s.session_type == crate::session::models::SessionType::Mail)
         {
             let stem = crate::state::mail_db_file_stem(&session.id);
+            if covered.contains(&format!("{stem}.db")) {
+                continue;
+            }
             let directory = crate::mail::storage::configured_directory(
                 &session.options_json,
                 state.mail_cache_root(),
@@ -360,7 +361,7 @@ fn create_backup_locked(
                 {
                     continue;
                 }
-                let handle = crate::mail::coordination::MailDatabase::new(path);
+                let handle = crate::mail::coordination::mailbox_database(path);
                 let db = handle.lock_for_snapshot(&context.cancel)?;
                 let account = super::mail_snapshot::snapshot_account(&db)?;
                 staged_files.extend(snapshot_mail_with_options(
@@ -423,13 +424,14 @@ fn create_backup_locked(
         source_kind: "taomni".into(),
         source_schema_version: 1,
     };
-    let (manifest, file_size) = super::archive_writer::pack_staged_archive_with_provenance(
+    let (manifest, file_size) = super::archive_writer::pack_staged_archive_with_plugins(
         &staged_files,
         &app_version,
         scope,
         password.as_deref(),
         &out_file_path,
         Some(provenance),
+        protected.datasets,
         context,
     )?;
 

@@ -14,12 +14,30 @@ wheel_sha256="63349d9b46514ca679547651f7c0548f9222892edfbcba087b82b3244fbae859"
 app_tar_sha256="b8ea49940489560bb76b231a064aa823cf3d3e8a0787eac4a456611f26c96a7f"
 app_executable_sha256="fb154632717ac7780c2706757573f2352a769e07fef7db1e4ae22027d2e4bc7a"
 extension_executable_sha256="0785d00082db59543c093fe63581d31060f5fdc9677dbf2796bf6ac473f6087a"
-resource_dir="$repo_root/src-tauri/resources/sockscap/macos/redirector/$version"
+resource_dir="$repo_root/src-tauri/plugins/sockscap/resources/macos/redirector/$version"
 app_tar="$resource_dir/Mitmproxy Redirector.app.tar"
 manifest="$resource_dir/manifest.json"
 
 sha256() {
   shasum -a 256 "$1" | awk '{print $1}'
+}
+
+validate_stapled_ticket() {
+  local app_path="$1" attempt output status
+  for attempt in 1 2 3; do
+    if output="$(xcrun stapler validate "$app_path" 2>&1)"; then
+      printf '%s\n' "$output"
+      return 0
+    else
+      status=$?
+    fi
+    printf '%s\n' "$output" >&2
+    if [[ "$attempt" == 3 ]] || ! grep -Eq 'NSURLErrorDomain Code=-1005([^0-9]|$)' <<<"$output"; then
+      return "$status"
+    fi
+    echo "Stapler lost its network connection. Retrying validation." >&2
+    sleep "$((attempt * 2))"
+  done
 }
 
 verify_staged() {
@@ -75,7 +93,7 @@ verify_staged() {
   gatekeeper="$(spctl --assess --type execute --verbose=4 "$app" 2>&1)"
   grep -Fq 'source=Notarized Developer ID' <<<"$gatekeeper"
   if xcrun --find stapler >/dev/null 2>&1; then
-    xcrun stapler validate "$app"
+    validate_stapled_ticket "$app"
   elif [[ "${CI:-}" == "true" ]]; then
     echo "Xcode stapler is required for the macOS release gate" >&2
     exit 1

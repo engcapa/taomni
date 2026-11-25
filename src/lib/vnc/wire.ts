@@ -24,6 +24,11 @@ export function parseWsMessage(data: string): WsIncoming | null {
           && (msg.generation as number) > 0
           ? value as WsIncoming
           : null;
+      case "special_key":
+        return typeof msg.down === "boolean" && typeof msg.code === "string"
+          && ["MetaLeft", "MetaRight", "PrintScreen", "Tab", "Escape"].includes(msg.code)
+          ? value as WsIncoming
+          : null;
       case "pointer_pos":
         return Number.isInteger(msg.x)
           && Number.isInteger(msg.y)

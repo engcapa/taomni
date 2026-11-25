@@ -19,6 +19,7 @@ pub async fn list(state: &AppState) -> Result<Value, String> {
     let mut sessions = vec![];
     {
         let terminals = state
+            .legacy
             .mobile
             .broker
             .terminals
@@ -30,20 +31,22 @@ pub async fn list(state: &AppState) -> Result<Value, String> {
         }
     }
     let (threads, saved) = {
-        let db = state.db.lock().map_err(|_| "database_unavailable")?;
+        let db = state.core.db.lock().map_err(|_| "database_unavailable")?;
         let threads =
             crate::chat::store::list_threads(&db, 200).map_err(|_| "database_unavailable")?;
         let saved =
             crate::session::db::list_sessions(&db, None).map_err(|_| "database_unavailable")?;
         (threads, saved)
     };
-    let runs = state.agent.chat_runs.lock().await;
+    let runs = state.core.agent.chat_runs.lock().await;
     let pending = state
+        .legacy
         .mobile
         .pending_turns
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     let summaries = state
+        .legacy
         .mobile
         .task_summaries
         .lock()
@@ -62,14 +65,15 @@ pub async fn list(state: &AppState) -> Result<Value, String> {
         "saved_sessions": saved,
         "capabilities": {
             "open_sessions": super::session_open::available(state),
-            "screen_capture": state.mobile.desktop.screen_allowed(),
-            "desktop_control": state.mobile.desktop_available.load(std::sync::atomic::Ordering::Relaxed)
+            "screen_capture": state.legacy.mobile.desktop.screen_allowed(),
+            "desktop_control": state.legacy.mobile.desktop_available.load(std::sync::atomic::Ordering::Relaxed)
         }
     }))
 }
 pub async fn detail(state: &AppState, id: &str) -> Result<Value, String> {
     if let Some(id) = id.strip_prefix("term:") {
         let ts = state
+            .legacy
             .mobile
             .broker
             .terminals
@@ -83,19 +87,21 @@ pub async fn detail(state: &AppState, id: &str) -> Result<Value, String> {
     }
     let tid = id.strip_prefix("thread:").ok_or("session_not_found")?;
     let thread = {
-        let db = state.db.lock().map_err(|_| "database_unavailable")?;
+        let db = state.core.db.lock().map_err(|_| "database_unavailable")?;
         crate::chat::store::get_thread(&db, tid)
             .map_err(|_| "database_unavailable")?
             .ok_or("session_not_found")?
     };
-    let running = state.agent.chat_runs.lock().await.contains_key(tid)
+    let running = state.core.agent.chat_runs.lock().await.contains_key(tid)
         || state
+            .legacy
             .mobile
             .pending_turns
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .contains_key(tid);
     let summary = state
+        .legacy
         .mobile
         .task_summaries
         .lock()
@@ -106,8 +112,8 @@ pub async fn detail(state: &AppState, id: &str) -> Result<Value, String> {
     let confirmations = super::agent_view::confirmations(state, tid);
     Ok(json!({"id":id,"kind":"agent","title":thread.title,
         "status":if !confirmations.is_empty() {"awaiting_confirmation"} else if running {"running"} else {"idle"},
-        "summary":summary, "tools":state.mobile.tools.lock().unwrap_or_else(|e| e.into_inner()).get(tid).cloned().unwrap_or_default(), "confirmations":confirmations,
-        "capabilities":{"message":state.mobile.desktop_available.load(std::sync::atomic::Ordering::Relaxed) || (!matches!(thread.provider_id.as_str(),"claude-code" | "codex") && crate::agent::acp_bridge::profile_id_from_provider_id(&thread.provider_id).is_none()),
-            "desktop_tools":state.mobile.desktop_available.load(std::sync::atomic::Ordering::Relaxed)},
-        "context_notice":if state.mobile.desktop_available.load(std::sync::atomic::Ordering::Relaxed) { "由手机发起，未带桌面上下文；消息中的 ActionCard / WebSearch 确认请在桌面处理" } else { "Headless：本轮仅提供文本回复，未提供桌面工具；依赖桌面的 provider 返回 desktop_required" }}))
+        "summary":summary, "tools":state.legacy.mobile.tools.lock().unwrap_or_else(|e| e.into_inner()).get(tid).cloned().unwrap_or_default(), "confirmations":confirmations,
+        "capabilities":{"message":state.legacy.mobile.desktop_available.load(std::sync::atomic::Ordering::Relaxed) || (!matches!(thread.provider_id.as_str(),"claude-code" | "codex") && crate::agent::acp_bridge::profile_id_from_provider_id(&thread.provider_id).is_none()),
+            "desktop_tools":state.legacy.mobile.desktop_available.load(std::sync::atomic::Ordering::Relaxed)},
+        "context_notice":if state.legacy.mobile.desktop_available.load(std::sync::atomic::Ordering::Relaxed) { "由手机发起，未带桌面上下文；消息中的 ActionCard / WebSearch 确认请在桌面处理" } else { "Headless：本轮仅提供文本回复，未提供桌面工具；依赖桌面的 provider 返回 desktop_required" }}))
 }

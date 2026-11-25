@@ -3,53 +3,8 @@
 
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
-
-/// Parsed `List-Unsubscribe` of a message.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct MailListUnsubscribe {
-    /// `https:`/`http:`/`mailto:` URIs in header order.
-    pub uris: Vec<String>,
-    /// `List-Unsubscribe-Post: List-Unsubscribe=One-Click` with an https URI.
-    #[serde(default)]
-    pub one_click: bool,
-}
-
-/// Parse the `<uri>, <uri>` list; `None` when no usable URI is present.
-pub(super) fn parse_list_unsubscribe(
-    value: Option<&str>,
-    post: Option<&str>,
-) -> Option<MailListUnsubscribe> {
-    let raw = value?;
-    let mut uris = Vec::new();
-    let mut rest = raw;
-    while let Some(open) = rest.find('<') {
-        let Some(close) = rest[open + 1..].find('>') else {
-            break;
-        };
-        let uri: String = rest[open + 1..open + 1 + close]
-            .chars()
-            .filter(|c| !c.is_whitespace())
-            .collect();
-        let lower = uri.to_ascii_lowercase();
-        if lower.starts_with("https:") || lower.starts_with("http:") || lower.starts_with("mailto:")
-        {
-            uris.push(uri);
-        }
-        rest = &rest[open + 1 + close + 1..];
-    }
-    if uris.is_empty() {
-        return None;
-    }
-    let one_click = post.is_some_and(|post| {
-        post.split(|c: char| c.is_whitespace() || c == ';')
-            .any(|token| token.eq_ignore_ascii_case("List-Unsubscribe=One-Click"))
-    }) && uris
-        .iter()
-        .any(|uri| uri.to_ascii_lowercase().starts_with("https:"));
-    Some(MailListUnsubscribe { uris, one_click })
-}
+#[cfg(test)]
+use taomni_mail_storage::parse_list_unsubscribe;
 
 async fn post_one_click(url: &str, allow_plain_http: bool) -> Result<u16, String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| format!("invalid unsubscribe URL: {e}"))?;

@@ -17,7 +17,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 use taomni_lib::sockscap::config::{UpstreamKind, UpstreamParams};
-use taomni_lib::sockscap::core::{ResolvedCoreUpstream, XrayManager, spec_config_hash};
+use taomni_sockscap_xray::{ResolvedCoreUpstream, XrayManager, spec_config_hash};
 
 /* ------------------------- tier 1: pure, always run ------------------------ */
 

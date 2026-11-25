@@ -1,0 +1,187 @@
+id: TC-MODULES-108
+title: Signed SocksCap switches versions and preserves Vault-backed upstream configuration in one session
+description: >-
+  Install an independently compiled SocksCap prerelease, import a fixture share link with Vault setup,
+  and run target evaluation inside the host. Download the current signed build from the loopback catalog,
+  update and roll back both while disabled and while running without restarting Taomni, recover from a
+  handshake-failure candidate, uninstall with data retained, and reinstall with upstream settings intact.
+covers: [F-Modules-1, F-Sockscap-1, F-WS-3]
+tags: [modules, sockscap, marketplace, lifecycle, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, module_signed_sockscap_archive, module_marketplace, release_build_required]
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- module_marketplace_probe: {phase: source}
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.sockscap_previous_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.sockscap_previous_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-sockscap"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-sockscap"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"][data-plugin-version="${fixture.sockscap_previous_version}"] [data-testid="sockscap-panel"]', timeout_sec: 25}
+- show_sockscap_section: upstream
+- wait_for: '[data-testid="sockscap-upstream-kind"]'
+- select_option: {selector: '[data-testid="sockscap-upstream-kind"]', value: trojan}
+- wait_for: '[data-testid="sockscap-sharelink-input"]'
+- fill: {selector: '[data-testid="sockscap-sharelink-input"]', value: 'trojan://qa-sockscap-fixture@127.0.0.2:19392#Hosted%20fixture'}
+- click: '[data-testid="sockscap-sharelink-import"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-sockscap-lifecycle-vault
+- wait_for: '[data-testid="sockscap-upstream-host"][value="127.0.0.2"]'
+- assert_attribute: {selector: '[data-testid="sockscap-upstream-port"]', name: value, equals: '19392'}
+- show_sockscap_section: test
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: example.com}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Decision: direct'}
+- click: '[data-testid="sockscap-test-detail-close"]'
+- assert_signed_module_lifecycle: {slug: sockscap, phase: old-enabled}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-disable-sockscap"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-enable-sockscap"]:enabled'
+- assert_signed_module_lifecycle: {slug: sockscap, phase: old-disabled}
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-update"]'
+- click: '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-download"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: {selector: '[data-testid="module-download-task"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-review"]'
+- assert_text: {selector: '[data-testid="confirm-dialog-message"]', contains: '${fixture.sockscap_current_version}'}
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-current"]'
+- assert_signed_module_lifecycle: {slug: sockscap, phase: updated-disabled}
+- click: '[data-testid="module-action-rollback-sockscap"]'
+- assert_text: {selector: '[data-testid="module-action-rollback-sockscap"]:enabled', contains: '${fixture.sockscap_current_version}'}
+- assert_signed_module_lifecycle: {slug: sockscap, phase: rolled-back-disabled}
+- press: {selector: '[data-testid="module-action-enable-sockscap"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-sockscap"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"][data-plugin-version="${fixture.sockscap_previous_version}"] [data-testid="sockscap-panel"]', timeout_sec: 25}
+- show_sockscap_section: upstream
+- wait_for: '[data-testid="sockscap-upstream-host"][value="127.0.0.2"]'
+- assert_attribute: {selector: '[data-testid="sockscap-upstream-port"]', name: value, equals: '19392'}
+- show_sockscap_section: test
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: example.com}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Decision: direct'}
+- click: '[data-testid="sockscap-test-detail-close"]'
+- assert_signed_module_lifecycle: {slug: sockscap, phase: old-reenabled}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-update"]'
+- click: '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-review"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-current"]'
+- assert_signed_module_lifecycle: {slug: sockscap, phase: updated-enabled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"][data-plugin-version="${fixture.sockscap_current_version}"] [data-testid="sockscap-panel"]', timeout_sec: 25}
+- show_sockscap_section: test
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: example.com}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Decision: direct'}
+- click: '[data-testid="sockscap-test-detail-close"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.sockscap_failed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.sockscap_failed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="failed"]', timeout_sec: 45}
+- assert_text: {selector: '[data-testid="module-offline-error"]', contains: 'Plugin permission denied'}
+- assert_signed_module_lifecycle: {slug: sockscap, phase: failed-update}
+- click: '[data-testid="module-action-rollback-sockscap"]'
+- assert_text: {selector: '[data-testid="module-action-rollback-sockscap"]:enabled', contains: '${fixture.sockscap_current_version}'}
+- assert_signed_module_lifecycle: {slug: sockscap, phase: rolled-back-enabled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"][data-plugin-version="${fixture.sockscap_previous_version}"] [data-testid="sockscap-panel"]', timeout_sec: 25}
+- show_sockscap_section: test
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: example.com}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Decision: direct'}
+- click: '[data-testid="sockscap-test-detail-close"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-uninstall-sockscap"]:enabled', key: Enter}
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-sockscap"]'
+- assert_visible: '[data-testid="module-data-retained-sockscap"]'
+- assert_signed_module_lifecycle: {slug: sockscap, phase: uninstalled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+- assert_count: {selector: '[data-testid="sockscap-panel"]', equal: 0}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.sockscap_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.sockscap_signed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-sockscap"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-sockscap"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"][data-plugin-version="${fixture.sockscap_current_version}"] [data-testid="sockscap-panel"]', timeout_sec: 25}
+- show_sockscap_section: upstream
+- wait_for: '[data-testid="sockscap-upstream-host"][value="127.0.0.2"]'
+- assert_attribute: {selector: '[data-testid="sockscap-upstream-port"]', name: value, equals: '19392'}
+- assert_signed_module_lifecycle: {slug: sockscap, phase: reinstalled}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: disabled-update-and-rollback
+    requirement: Update and roll back a disabled SocksCap package without restarting the desktop process and preserve the imported upstream configuration.
+    actions: [10, 12, 23, 25, 30, 36, 41, 44, 46, 49]
+    checkpoints:
+    - {step: 33, expectation: The earlier signed host owns the writer lease and evaluates target rules.}
+    - {step: 38, expectation: Disabling releases the writer lease.}
+    - {step: 48, expectation: Updating while disabled activates the new version without starting the host.}
+    - {step: 51, expectation: Rolling back while disabled restores the earlier version with no running host.}
+    results: [33, 38, 48, 51]
+  - id: enabled-update-and-failed-handshake
+    requirement: Replace and roll back a running SocksCap host and recover the previous working host when a replacement fails handshake.
+    actions: [52, 63, 71, 72, 81, 88, 92, 101]
+    checkpoints:
+    - {step: 66, expectation: Re-enabled earlier host preserves the Vault-backed trojan upstream and runs target evaluation.}
+    - {step: 74, expectation: Live update switches to the new running host cleanly.}
+    - {step: 82, expectation: Updated host panel renders the active version and evaluates targets.}
+    - {step: 90, expectation: Handshake-failure version reports permission denied error.}
+    - {step: 91, expectation: Failed update restores the active host cleanly.}
+    - {step: 94, expectation: Manual rollback switches the running host back to the earlier version.}
+    - {step: 102, expectation: Rolled-back earlier host evaluates targets cleanly without runtime errors.}
+    results: [66, 74, 82, 90, 91, 94, 102]
+  - id: retained-uninstall-and-reinstall
+    requirement: Uninstall removes SocksCap versions while retaining config.json and Vault reference, then restores them on reinstall.
+    actions: [106, 107, 113, 120, 122, 128]
+    checkpoints:
+    - {step: 109, expectation: Uninstall displays the retained-data notice.}
+    - {step: 110, expectation: Executable versions and runtime are removed while config.json locator and writer lease state match.}
+    - {step: 114, expectation: Reopening the retained tool displays the missing-module notice without mounting the panel.}
+    - {step: 131, expectation: Reinstalled current host reads the persisted upstream host/port and Vault reference in the original desktop process.}
+    results: [109, 110, 114, 131]
+  native:
+  - check: Record desktop and host process identities, signed digests, writer lease, retained locator and config continuity on Linux, Windows and macOS.
+    method: external
+    reason: Native observation verifies each phase outside the renderer.
+  visual:
+  - check: Confirm mounted plugin version, persisted upstream values, and missing placeholder in Settings and Tools tabs.
+    method: automated
+    reason: Explicit DOM assertions check the mounted version and upstream fields across transitions.

@@ -4,7 +4,7 @@ import subprocess
 import unittest
 from unittest.mock import call, patch
 
-from modular_gate_runs import PLATFORMS, UPGRADE, api, plan
+from modular_gate_runs import PLATFORMS, UPGRADE, api, dispatch, plan
 
 
 class GitHubRunLookupTests(unittest.TestCase):
@@ -55,6 +55,7 @@ class DesktopGateSelectionTests(unittest.TestCase):
         self.assertEqual(inputs["linux_profiles"], "ubuntu-24.04-xvfb")
         self.assertEqual(inputs["macos_runner"], "macos-26")
         self.assertEqual(inputs["native_release"], "true")
+        self.assertEqual(inputs["modular_rdp_p95"], "true")
         self.assertEqual(set(inputs["case_ids"].split(",")), {
             "TC-MFA-106", "TC-MOBILE-003", "TC-MOBILE-021",
             "TC-SHOT-003", "TC-SHOT-N2", "TC-SHOT-N10", "TC-SHOT-N15", "TC-SHOT-N19",
@@ -68,6 +69,7 @@ class DesktopGateSelectionTests(unittest.TestCase):
         self.assertEqual(wayland_inputs["modes"], "native")
         self.assertEqual(wayland_inputs["linux_profiles"], "ubuntu-26.04-wayland")
         self.assertEqual(wayland_inputs["native_release"], "true")
+        self.assertEqual(wayland_inputs["modular_rdp_p95"], "true")
         self.assertEqual(set(wayland_inputs["case_ids"].split(",")), {
             "TC-MFA-106", "TC-SHOT-N2", "TC-SHOT-N10",
             "TC-RDPS-NAT-01-start-connect-display", "TC-RDPS-PERF-01-performance-budget",
@@ -98,3 +100,45 @@ class ReleasePackageSelectionTests(unittest.TestCase):
         for targets in ("all,linux-x86_64", "windows-x86_64,windows-x86_64", "darwin-aarch64,"):
             with self.subTest(targets=targets), self.assertRaisesRegex(ValueError, "supported release package targets"):
                 plan("release", "macos-15", "123", "0.5.11", targets)
+
+    def test_first_release_runs_all_installers_and_payloads_in_parallel(self):
+        checks = plan("release", "macos-26", "123", "0.6.0", first_release=True)
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0][1], UPGRADE)
+        self.assertEqual(checks[0][2], {
+            "package_run": "123", "package_version": "0.6.0",
+            "package_targets": "linux-x86_64,windows-x86_64,darwin-aarch64,darwin-x86_64",
+            "package_first_release_linux": "true", "package_first_release_desktop": "true",
+            "package_relocation_linux": "true", "package_macos_arm_runner": "macos-26",
+            "package_rdp_perf": "true",
+        })
+
+    def test_first_release_keeps_linux_only_inventory_and_recovery(self):
+        checks = plan("release", "macos-26", "123", "0.6.0", "linux-x86_64", first_release=True)
+        self.assertEqual(len(checks), 2)
+        inventory, installed = (check[2] for check in checks)
+        self.assertEqual(inventory["package_targets"], "linux-x86_64")
+        self.assertEqual(installed, {
+            **inventory, "package_first_release_linux": "true", "package_relocation_linux": "true",
+            "package_rdp_perf": "true",
+        })
+
+    def test_first_release_requires_a_package_suite_and_matching_bundle(self):
+        for suite, package in (("signed", "123"), ("all", "123"), ("release", "")):
+            with self.subTest(suite=suite, package=package):
+                with self.assertRaisesRegex(ValueError, "matching first-release bundle run"):
+                    plan(suite, "macos-15", package, "0.6.0", first_release=True)
+
+    def test_unavailable_roster_fails_before_dispatching_any_jobs(self):
+        sha = "a" * 40
+        branch = {"ref": "refs/heads/qa", "object": {"sha": sha}}
+        producer = {"head_sha": sha, "path": ".github/workflows/release.yml", "event": "workflow_dispatch"}
+        roster = {"name": "modular-candidate-roster-123", "expired": True}
+        with patch("modular_gate_runs.subprocess.run"), patch(
+            "modular_gate_runs.api", side_effect=[branch, producer, {"artifacts": [roster]}],
+        ) as github:
+            with self.assertRaisesRegex(ValueError, "available signed roster artifact"):
+                dispatch("engcapa/taomni", "qa", sha, "release", "macos-15", "123", "0.6.0",
+                         first_release=True)
+        github.assert_called_with("engcapa/taomni", "actions/runs/123/artifacts?name=modular-candidate-roster-123")
+        self.assertEqual(github.call_count, 3)

@@ -1,63 +1,10 @@
 use super::account_model::MailAccountConfig;
 use crate::terminal::network::NetworkSettings;
-use lettre::transport::smtp::client::Tls;
 use serde::Deserialize;
 use serde::Serialize;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MailConnectionSecurity {
-    #[serde(rename = "tls", alias = "TLS", alias = "Tls")]
-    Tls,
-    #[serde(rename = "starttls", alias = "STARTTLS", alias = "StartTls")]
-    Starttls,
-    #[serde(rename = "none", alias = "None", alias = "NONE")]
-    None,
-}
-
-impl Default for MailConnectionSecurity {
-    fn default() -> Self {
-        Self::Tls
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MailProvider {
-    #[serde(rename = "custom", alias = "Custom")]
-    Custom,
-    #[serde(rename = "gmail", alias = "Gmail")]
-    Gmail,
-    #[serde(rename = "outlook", alias = "Outlook", alias = "outlook.com")]
-    Outlook,
-}
-
-/// Incoming protocol of an account (TASK-21).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum MailIncomingProtocol {
-    #[default]
-    Imap,
-    Pop3,
-}
-
-impl Default for MailProvider {
-    fn default() -> Self {
-        Self::Custom
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MailAuthMode {
-    #[serde(rename = "password", alias = "Password")]
-    Password,
-    #[serde(rename = "oauth2", alias = "OAuth2", alias = "oauth")]
-    OAuth2,
-}
-
-impl Default for MailAuthMode {
-    fn default() -> Self {
-        Self::Password
-    }
-}
+pub use taomni_mail_api::{
+    MailAuthMode, MailConnectionSecurity, MailIncomingProtocol, MailProvider,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

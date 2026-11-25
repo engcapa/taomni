@@ -27,7 +27,7 @@ pub async fn acp_probe_profile(
     state: State<'_, AppState>,
 ) -> Result<AcpProfileProbeResult, String> {
     let (bridge, profile) = {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         if ai_ctx.config.full_local_mode || ai_ctx.config.fully_disabled {
             return Err("ACP is unavailable in full-local / fully-disabled mode.".into());
         }
@@ -55,7 +55,7 @@ pub async fn acp_resolve_permission(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let thread_process = {
-        let registry = state.agent.acp_processes.lock().await;
+        let registry = state.core.agent.acp_processes.lock().await;
         registry.get(&thread_id).cloned()
     };
     if let Some(process) = thread_process {
@@ -70,7 +70,7 @@ pub async fn acp_resolve_permission(
         }
     }
     let media_process = {
-        let registry = state.agent.acp_media_processes.lock().await;
+        let registry = state.core.agent.acp_media_processes.lock().await;
         registry.get(&thread_id).cloned()
     };
     if let Some(process) = media_process {
@@ -92,7 +92,7 @@ pub async fn acp_cancel_permission(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let thread_process = {
-        let registry = state.agent.acp_processes.lock().await;
+        let registry = state.core.agent.acp_processes.lock().await;
         registry.get(&thread_id).cloned()
     };
     if let Some(process) = thread_process {
@@ -103,7 +103,7 @@ pub async fn acp_cancel_permission(
         }
     }
     let media_process = {
-        let registry = state.agent.acp_media_processes.lock().await;
+        let registry = state.core.agent.acp_media_processes.lock().await;
         registry.get(&thread_id).cloned()
     };
     if let Some(process) = media_process {

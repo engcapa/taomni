@@ -2,32 +2,37 @@
 //!
 //! Secrets are stored AES-256-GCM encrypted. The data key lives in the
 //! credential vault as the fixed entry [`crate::vault::MFA_DATA_KEY_ENTRY_ID`]
-//! (same pattern as the LanChat message key), so every command needs the vault
+//! (same protected-entry pattern as other plugin data keys), so every command needs the vault
 //! unlocked and the renderer only ever receives codes, never stored secrets.
 //! See `docs-feature/mfa-authenticator-design.md`.
 
+#[cfg(any(test, feature = "legacy-mfa"))]
+mod access;
+pub(crate) mod backend;
 pub mod capture;
 pub mod commands;
+#[cfg(any(test, feature = "legacy-mfa"))]
 pub mod crypto;
-pub mod otp;
+#[cfg(any(test, feature = "legacy-mfa"))]
+mod key_provider;
+pub(crate) mod ownership;
+#[cfg(any(test, feature = "legacy-mfa"))]
+pub use taomni_mfa_engine::otp;
 pub mod store;
 
 #[cfg(test)]
+mod access_tests;
+#[cfg(test)]
+mod test_keys;
+#[cfg(test)]
 mod tests;
 
-/// Error codes surfaced to the frontend verbatim (prefix match on the string).
-pub const ERR_KEY_MISSING: &str = "MFA_KEY_MISSING";
-pub const ERR_KEY_MISMATCH: &str = "MFA_KEY_MISMATCH";
-pub const ERR_INVALID_INPUT: &str = "MFA_INVALID_INPUT";
-pub const ERR_NOT_FOUND: &str = "MFA_NOT_FOUND";
+pub use taomni_mfa_api::{ERR_INVALID_INPUT, ERR_KEY_MISMATCH, ERR_KEY_MISSING, ERR_NOT_FOUND};
+#[cfg(any(test, feature = "legacy-mfa"))]
+pub use taomni_mfa_engine::now_ms;
 pub const ERR_CLIPBOARD_NO_IMAGE: &str = "MFA_CLIPBOARD_NO_IMAGE";
 /// Only macOS gates screen capture behind a preflightable permission.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub const ERR_SCREEN_PERMISSION: &str = "MFA_SCREEN_PERMISSION";
 pub const ERR_NO_DISPLAY: &str = "MFA_NO_DISPLAY";
 pub const ERR_CAPTURE_FAILED: &str = "MFA_CAPTURE_FAILED";
-
-/// Current Unix time in milliseconds; all MFA timestamps use this unit.
-pub fn now_ms() -> i64 {
-    chrono::Utc::now().timestamp_millis()
-}

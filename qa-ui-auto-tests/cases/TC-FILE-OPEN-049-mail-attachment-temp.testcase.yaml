@@ -1,0 +1,111 @@
+id: TC-FILE-OPEN-049
+title: Mail attachments dedupe their read-only copy and clean up on final close
+description: Native mode downloads an attachment from local IMAP and verifies the observed temporary
+  file bytes and removal. Browser mode verifies the same flow using its virtual file system.
+modes: [browser, native]
+covers: [F-FILEOPEN-1, F-MAIL-5]
+tags: [p0, file-open, mail, temporary-file, crash-regression]
+fixtures: [reset_db, file_open_files, file_open_mail]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-file-open-mail
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- wait_for:
+    selector: '[data-testid="mail-message-row"][data-subject="Account-level AI policy"]'
+    timeout_sec: 60
+- click: '[data-testid="mail-message-row"][data-subject="Account-level AI policy"]'
+- wait_for: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
+- wait_for: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-editor"] .cm-line'
+- assert_text:
+    selector: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-editor"] .cm-content'
+    contains: Mail attachment read-only fixture.
+- assert_visible: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-readonly"]'
+- assert_disabled: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-save"]'
+- assert_attribute:
+    selector: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-editor"] .cm-content'
+    name: contenteditable
+    equals: 'false'
+- assert_items:
+    selector: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-editor"] .cm-line'
+    equals:
+    - Mail attachment read-only fixture.
+    - Save locally before editing.
+    - ''
+- assert_file_open_bytes:
+    selector: '[data-testid="file-viewer"][data-readonly="true"]'
+    remember: mail-copy
+    equals: 'Mail attachment read-only fixture.
+
+      Save locally before editing.
+
+      '
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+    equal: 1
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="file-viewer"][data-readonly="true"]'
+    state: detached
+- assert_file_open_bytes:
+    remember: mail-copy
+    absent: true
+- assert_no_runtime_errors: null
+- screenshot: mail-temp-closed.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Mail opens one controlled read-only copy and final-host close deletes only that observed temporary artifact.
+    actions:
+    - 5
+    - 6
+    - 9
+    - 11
+    - 19
+    - 20
+    - 23
+    checkpoints:
+    - step: 15
+      expectation: Remote copy cannot Save in place.
+    - step: 16
+      expectation: CodeMirror is genuinely non-editable.
+    - step: 17
+      expectation: Downloaded text is exact.
+    - step: 18
+      expectation: Independent VFS/native bytes match downloaded attachment and controlled path is retained.
+    - step: 22
+      expectation: Reopening the same attachment reuses one main viewer.
+    - step: 25
+      expectation: Closing the final host removes its observed controlled temp file.
+    - step: 26
+      expectation: Mail and viewer cleanup have no uncaught runtime errors.
+    results:
+    - 15
+    - 16
+    - 17
+    - 18
+    - 22
+    - 25
+    - 26
+  visual:
+  - check: Read-only file viewer and removal after closing the final tab
+    method: automated
+    reason: The case checks the Open and Save controls, verifies one viewer, and captures the result after closing.
+  native:
+  - check: IMAP attachment download, read-only host and temp cleanup
+    method: automated
+    reason: Native mode uses local real IMAP and independent host reads/removal observation.

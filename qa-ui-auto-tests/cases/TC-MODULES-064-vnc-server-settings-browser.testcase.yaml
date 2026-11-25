@@ -1,0 +1,97 @@
+id: TC-MODULES-064
+title: Local servers retains VNC configuration and singleton behavior
+description: Edit the existing VNC settings, verify persistence through reload, and confirm the browser preview reports its desktop-only Start boundary.
+covers: [F-Servers-1, F-Modules-1]
+tags: [modules, servers, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.preview.modules.vnc-server.v1, value: '{"lifecycle":"enabled","values":[]}'}
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-vnc-settings"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="vnc-server"] [data-testid="server-field-vnc-password"]'
+- fill: {selector: '[data-testid="server-field-bind-address"]', value: '127.0.0.1'}
+- fill: {selector: '[data-testid="server-field-port"]', value: '15900'}
+- fill: {selector: '[data-testid="server-field-vnc-password"]', value: 'qaVNC7pw'}
+- click: '[data-testid="server-field-vnc-view-only"]'
+- click: '[data-testid="server-field-vnc-shared"]'
+- click: '[data-testid="servers-dialog-apply"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-browser-vnc-vault
+- wait_for: '[data-testid="server-field-vnc-remove-password"]'
+- reload_window: null
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-vnc"]'
+- wait_for: '[data-testid="server-field-vnc-remove-password"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="servers"]', equal: 1}
+- assert_attribute: {selector: '[data-testid="server-field-bind-address"]', name: value, equals: '127.0.0.1'}
+- assert_attribute: {selector: '[data-testid="server-field-port"]', name: value, equals: '15900'}
+- assert_attribute: {selector: '[data-testid="server-field-vnc-password"]', name: value, equals: ''}
+- assert_visible: '[data-testid="server-field-vnc-view-only"]:checked'
+- assert_visible: '[data-testid="server-field-vnc-shared"]:not(:checked)'
+- click: '[data-testid="server-row-vnc-start"]'
+- wait_for: '[data-testid="server-row-vnc"][data-status="error"]'
+- assert_text: {selector: '[data-testid="server-log"]', contains: 'Local servers run only in the desktop build'}
+- assert_disabled: '[data-testid="server-row-vnc-stop"]'
+- click: '[data-testid="server-field-vnc-remove-password"]'
+- click: '[data-testid="servers-dialog-apply"]'
+- wait_for: {selector: '[data-testid="server-field-vnc-remove-password"]', state: detached}
+- wait_for: '[data-testid="servers-dialog-apply"]:enabled'
+- assert_not_visible: '[data-testid="vault-unlock-dialog"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-vnc-server"]'
+- wait_for: '[data-testid="module-action-enable-vnc-server"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-vnc"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="vnc-server"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_not_visible: '[data-testid="server-field-vnc-password"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: retained-settings
+    requirement: Local servers keeps the VNC settings in a single tab through reload, reports the browser Start limitation and supports removing the saved credential.
+    actions: [7, 8, 10, 11, 12, 13, 14, 15, 17, 19, 22, 23, 31, 35, 36]
+    checkpoints:
+    - {step: 16, expectation: Saving a VNC password opens its Vault setup.}
+    - {step: 25, expectation: Reopening Local servers reuses a single tab.}
+    - {step: 26, expectation: The persisted bind address is displayed after reload.}
+    - {step: 27, expectation: The persisted port is displayed after reload.}
+    - {step: 28, expectation: The form hides the saved password.}
+    - {step: 29, expectation: View-only remains selected.}
+    - {step: 30, expectation: Shared desktop remains unchecked.}
+    - {step: 32, expectation: The row indicates that Start failed in the preview.}
+    - {step: 33, expectation: The log explains that desktop mode is required.}
+    - {step: 34, expectation: Stop is disabled.}
+    - {step: 37, expectation: The form drops its saved credential state after Apply.}
+    - {step: 39, expectation: Removing the password completes without a new Vault unlock.}
+    results: [16, 25, 26, 27, 28, 29, 30, 32, 33, 34, 37, 39]
+  - id: disabled-module-form
+    requirement: Disabling VNC Server in the module store makes the optional settings unavailable in the same app session.
+    actions: [40, 42, 47, 48]
+    checkpoints:
+    - {step: 43, expectation: The store offers to re-enable VNC Server.}
+    - {step: 49, expectation: The VNC row explains the disabled module and offers its Settings entry.}
+    - {step: 50, expectation: The optional VNC settings form is absent.}
+    - {step: 51, expectation: The shell and module transitions produce no runtime errors.}
+    results: [43, 49, 50, 51]
+  visual:
+  - check: The restored form and preview error are visible in the existing Local servers tab.
+    method: automated
+    reason: The case reads the displayed fields, log and control state.
+  native:
+  - check: Native startup and cleanup are covered by TC-MODULES-063.
+    method: not-applicable
+    reason: This case verifies browser preview and its own persisted settings.

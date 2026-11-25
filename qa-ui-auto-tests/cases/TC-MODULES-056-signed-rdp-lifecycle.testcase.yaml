@@ -1,0 +1,222 @@
+id: TC-MODULES-056
+title: The signed RDP client keeps its saved session through disable and reconnect
+description: >-
+  Install the matching signed package and open a saved session against the
+  runner's local Taomni RDP server. Confirm its certificate and deliver a click
+  to the host. Disable the client module, verify the server accepts another
+  connection, and re-enable the module. The same tab must reconnect without
+  another certificate confirmation and deliver a second click. A separate
+  session without a configured RD Gateway username shows the gateway validation error.
+  The migration imports legacy pins and records the new pin in the module database.
+  The reconnected signed viewer also measures the input-to-decoded-frame delay.
+  The saved session then reconnects in a detached WebView and back in the original window.
+covers: [F-Modules-1, F9.7, F-RdpServer-1, F-Detach-1]
+tags: [modules, rdp-client, rdp-server, lifecycle, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, module_upgrade, module_signed_rdp_archive, rdp_server_required, system_rdp_running, release_build_required]
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.rdp_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.rdp_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- click: '[data-testid="module-action-enable-rdp-client"]'
+- wait_for: '[data-testid="module-action-disable-rdp-client"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- click: '[data-testid="session-proto-rdp"]'
+- fill: {selector: '[data-testid="session-host"]', value: 127.0.0.1}
+- fill: {selector: '[data-testid="session-port"]', value: '${env.QA_RDP_PORT}'}
+- click: '[data-testid="session-specify-username"]'
+- fill: {selector: '[data-testid="session-user"]', value: '${env.QA_RDP_USER}'}
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: qa-signed-rdp}
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-signed-rdp"]'
+- open_route: ?servers=main
+- wait_for: '[data-testid="servers-dialog"]'
+- click: '[data-testid="server-row-rdp"]'
+- fill: {selector: '[data-testid="server-field-port"]', value: '${env.QA_RDP_PORT}'}
+- fill: {selector: '[data-testid="server-field-bind-address"]', value: 127.0.0.1}
+- set_check: {selector: '[data-testid="server-field-auto-stop"]', checked: false}
+- fill: {selector: '[data-testid="rdp-field-username"]', value: '${env.QA_RDP_USER}'}
+- fill: {selector: '[data-testid="rdp-field-password"]', value: '${env.QA_RDP_PASSWORD}'}
+- set_check: {selector: '[data-testid="rdp-field-control-approval"]', checked: false}
+- click: '[data-testid="server-row-rdp-start"]'
+- platform_choice:
+    platforms: [Windows]
+    dialog: '[data-testid="choice-dialog"]'
+    click: '[data-testid="choice-dialog-secondary"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: '${env.QA_VAULT_PASSWORD}'}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: '${env.QA_VAULT_PASSWORD}'}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: {selector: '[data-testid="server-row-rdp"][data-status="running"]', timeout_sec: 90}
+- host_helper: {action: start, name: target, mode: flip, geometry: '480x320+40+80'}
+- open_route: /
+- click: '[data-testid="side-tab-sessions"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-signed-rdp"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill: {selector: '[data-testid="auth-password"]', value: '${env.QA_RDP_PASSWORD}'}
+- click: '[data-testid="auth-submit"]'
+- wait_for: {selector: '[data-testid="confirm-dialog"]', timeout_sec: 60}
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="rdp-panel"][data-frontend-source*="/__taomni_plugins__/rdp-client/${fixture.rdp_signed_version}/frontend/index.js"]'
+- click: '[data-testid="titlebar-actions-more"]'
+- assert_text: {selector: '[data-testid="rdp-status"]', contains: 'CredSSP/NLA', timeout_sec: 60}
+- rdp_canvas_click: {x: 280, y: 240}
+- assert_json_file: {path: target-state.json, timeout_sec: 20, expect: {flips: {min: 1}}}
+- assert_no_runtime_errors: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-disable-rdp-client"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-enable-rdp-client"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="rdp"]'
+- wait_for: '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="rdp-canvas"]', equal: 0}
+- rdp_probe:
+    scenario: connect
+    artifact: after-disabling-module
+    args: {seconds: 2}
+    expect: {first_graphics_ms: {exists: true}}
+- click: '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-settings"]'
+- click: '[data-testid="module-action-enable-rdp-client"]'
+- wait_for: '[data-testid="module-action-disable-rdp-client"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="rdp"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="rdp"]', equal: 1}
+- wait_for: '[data-testid="rdp-panel"][data-frontend-source*="/__taomni_plugins__/rdp-client/${fixture.rdp_signed_version}/frontend/index.js"]'
+- click: '[data-testid="titlebar-actions-more"]'
+- assert_text: {selector: '[data-testid="rdp-status"]', contains: 'CredSSP/NLA', timeout_sec: 60}
+- assert_count: {selector: '[data-testid="confirm-dialog"]', equal: 0}
+- rdp_canvas_click: {x: 280, y: 240}
+- assert_json_file: {path: target-state.json, timeout_sec: 20, expect: {flips: {min: 2}}}
+- assert_signed_rdp_latency: null
+- assert_no_runtime_errors: null
+- click: '[data-testid="titlebar-actions-more"][aria-expanded="false"]'
+- click: '[data-testid="rdp-detach"]'
+- switch_window: {selector: '[data-testid="detached-session-window"][data-detached-kind="rdp"]'}
+- wait_for: '[data-testid="rdp-panel"][data-frontend-source*="/__taomni_plugins__/rdp-client/${fixture.rdp_signed_version}/frontend/index.js"]'
+- assert_text: {selector: '[data-testid="rdp-status"]', contains: 'CredSSP/NLA', timeout_sec: 60}
+- eval_readonly:
+    expression: "document.querySelector('.rdp-panel canvas')?.getContext('2d')?.getImageData(280, 240, 1, 1).data[3] === 255"
+    timeout_sec: 30
+- assert_count: {selector: '[data-testid="confirm-dialog"]', equal: 0}
+- assert_no_runtime_errors: null
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    close_with: '[data-testid="detached-reattach"]'
+- wait_for: '[data-testid="rdp-panel"][data-frontend-source*="/__taomni_plugins__/rdp-client/${fixture.rdp_signed_version}/frontend/index.js"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="rdp"]', equal: 1}
+- click: '[data-testid="titlebar-actions-more"]'
+- assert_text: {selector: '[data-testid="rdp-status"]', contains: 'CredSSP/NLA', timeout_sec: 60}
+- eval_readonly:
+    expression: "document.querySelector('.rdp-panel canvas')?.getContext('2d')?.getImageData(280, 240, 1, 1).data[3] === 255"
+    timeout_sec: 30
+- assert_count: {selector: '[data-testid="confirm-dialog"]', equal: 0}
+- assert_no_runtime_errors: null
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- click: '[data-testid="session-proto-rdp"]'
+- fill: {selector: '[data-testid="session-host"]', value: 127.0.0.1}
+- click: '[data-testid="session-section-rdp"]'
+- set_check: {selector: '[data-testid="rdp-gateway-enabled"]', checked: true}
+- fill: {selector: '[data-testid="rdp-gateway-host"]', value: gateway.example.test}
+- set_check: {selector: '[data-testid="rdp-gateway-use-session"]', checked: false}
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: qa-signed-rdp-gateway}
+- click: '[data-testid="session-save"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-signed-rdp-gateway"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill: {selector: '[data-testid="auth-password"]', value: '${env.QA_RDP_PASSWORD}'}
+- click: '[data-testid="auth-submit"]'
+- assert_text:
+    selector: '[data-testid="rdp-panel"][data-frontend-source*="/__taomni_plugins__/rdp-client/"] .rdp-overlay'
+    contains: 'rdg: gateway username is empty'
+    timeout_sec: 45
+- assert_no_runtime_errors: null
+- module_upgrade_probe: {phase: rdp-pins-retained}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-upgrade-migrate"]:not([disabled])'
+- click: '[data-testid="module-upgrade-migrate"]'
+- wait_for: '[data-testid="module-upgrade-pending"]'
+- assert_text_equals: {selector: '[data-testid="module-upgrade-candidates"] li:first-child', equals: vnc-client}
+- module_upgrade_probe: {phase: rdp-sessions-retained}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The native app loads the matching signed RDP client, authenticates and sends input to the real server.
+    actions: [4, 5, 6, 8, 20, 31, 36, 41, 44, 46, 48, 50]
+    checkpoints:
+    - {step: 7, expectation: The normal offline control accepts the signed package.}
+    - {step: 47, expectation: The loaded renderer URL identifies the installed module version.}
+    - {step: 49, expectation: The signed client reaches CredSSP/NLA connected state.}
+    - {step: 51, expectation: The native host target observes the first click.}
+    results: [7, 47, 49, 51]
+  - id: R2
+    requirement: Disabling releases the connection and enabling restores the existing tab and already accepted certificate.
+    actions: [55, 57, 58, 59, 63, 64, 66, 67, 68, 71, 74]
+    checkpoints:
+    - {step: 60, expectation: The original tab identifies the disabled module.}
+    - {step: 61, expectation: No module framebuffer remains after disable.}
+    - {step: 62, expectation: The single-client server accepts a new independent connection.}
+    - {step: 69, expectation: The same saved session occupies one tab after enabling.}
+    - {step: 73, expectation: The second connection did not require renewed certificate approval.}
+    - {step: 75, expectation: A second click reaches the same host target after enabling.}
+    - {step: 76, expectation: Forty target clicks yield at least 36 measured signed viewer frames and a p95 at or below 130 ms.}
+    - {step: 77, expectation: The native renderer has no uncaught runtime errors.}
+    results: [60, 61, 62, 69, 73, 75, 76, 77]
+  - id: detached-signed-viewer
+    requirement: The separate WebView and the reattached tab reconnect through the same signed RDP renderer and retained certificate.
+    actions: [78, 79, 80, 86, 89]
+    checkpoints:
+    - {step: 81, expectation: The detached WebView loads the exact installed signed frontend path.}
+    - {step: 83, expectation: The detached WebView paints a frame from the real RDP server.}
+    - {step: 84, expectation: The existing pin avoids a new certificate prompt in the separate window.}
+    - {step: 85, expectation: The separate viewer has no uncaught renderer errors.}
+    - {step: 87, expectation: The reattached tab loads the same signed frontend.}
+    - {step: 88, expectation: Reattachment restores exactly one RDP tab in the original window.}
+    - {step: 91, expectation: The reattached tab paints frames from the same saved session.}
+    - {step: 92, expectation: The returning tab still accepts the original pin.}
+    - {step: 93, expectation: The detachment lifecycle leaves the original renderer healthy.}
+    results: [81, 83, 84, 85, 87, 88, 91, 92, 93]
+  - id: R3
+    requirement: The signed viewer reports an invalid gateway using its normal connection workflow.
+    actions: [94, 95, 96, 97, 99, 100, 101, 102, 105, 106, 108, 109]
+    checkpoints:
+    - {step: 110, expectation: The signed renderer shows the missing gateway username error.}
+    - {step: 111, expectation: The gateway validation produces no uncaught renderer errors.}
+    results: [110, 111]
+  - id: R4
+    requirement: A signed installation imports old certificate decisions and records newly accepted certificates in the module store.
+    actions: [6, 8, 46]
+    checkpoints:
+    - {step: 112, expectation: "The native profile preserves the legacy rows and contains the import receipt and the new module-owned pin."}
+    results: [112]
+  - id: retained-rdp-sessions
+    requirement: Upgrading with a verified RDP viewer records the existing core sessions and keeps VNC pending.
+    actions: [113, 114, 116]
+    checkpoints:
+    - {step: 118, expectation: The refreshed recommendations include the missing VNC viewer and omit the verified RDP viewer.}
+    - {step: 119, expectation: The original RDP session and committed pin import are preserved in their respective stores.}
+    - {step: 120, expectation: The refreshed upgrade view has no runtime errors.}
+    results: [118, 119, 120]
+  visual:
+  - check: The signed viewer and the disabled state appear in the saved tab.
+    method: automated
+    reason: The case checks the loaded renderer URL and the visible lifecycle state.
+  native:
+  - check: Exercise a signed package and live RDP input against the desktop application's own server.
+    method: automated
+    reason: The browser preview cannot exercise the native module process, verified artifact or RDP negotiation.

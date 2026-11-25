@@ -3,7 +3,7 @@ import { type CodeWorkspaceGitManagerPayload } from "../../../components/editor/
 import type { WorkspaceCommandRegistration } from "../../../components/editor/workspace/workspaceCommands";
 import { type SftpPendingUploadRequest } from "../../../components/filebrowser/FileBrowser";
 import { type TerminalLocalPathUploadRequest } from "../../../components/terminal/TerminalPanel";
-import type { VncSessionProperties } from "../../../components/vnc/VncPropertiesDialog";
+import type { VncSessionProperties } from "../../../lib/vnc/viewerContract";
 import { type SessionConfig } from "../../../lib/ipc";
 import { type TerminalProfile } from "../../../lib/terminalProfile";
 import type { LocalLaunchOutcome, LocalShellSelection, MailTabInfo, RecentWorkspace, Tab } from "../../../types";
@@ -16,7 +16,6 @@ export interface TabContentRouterProps {
   openLocalTab: (title?: string, sessionId?: string, terminalProfile?: TerminalProfile, localShell?: LocalShellSelection, initialCwd?: string, chatTabId?: string) => Promise<LocalLaunchOutcome>;
   handleNewSession: (groupPath?: string | null) => void;
   handleOpenLocalPath: (target: string, opts?: { embedFolder?: boolean; title?: string; sessionId?: string; }) => Promise<void>;
-  openLanChatTab: () => void;
   welcomeRecentSessions: SessionConfig[];
   recentWorkspaces?: RecentWorkspace[];
   welcomeMailSessions: SessionConfig[];

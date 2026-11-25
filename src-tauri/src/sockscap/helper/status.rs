@@ -1,5 +1,5 @@
 use super::model::HelperStatus;
-use super::registry::HelperSession;
+use super::registry::{HelperRegistry, HelperSession};
 use super::requests::send_cmd;
 use crate::state::AppState;
 use serde_json::json;
@@ -7,25 +7,70 @@ use tauri::State;
 
 #[tauri::command]
 pub async fn sockscap_helper_stop(state: State<'_, AppState>) -> Result<(), String> {
-    let sess = {
-        let mut guard = state
-            .sockscap
-            .helper
-            .inner
-            .lock()
-            .map_err(|e| e.to_string())?;
-        guard.take()
-    };
-    if let Some(sess) = sess {
-        let _ = send_cmd(&sess, "shutdown", None);
-        sess.remove_ready_file();
+    let _operation = state.legacy.sockscap.operation.lock().await;
+    stop_registered(&state.legacy.sockscap.helper).await
+}
+
+pub(in crate::sockscap) async fn stop_registered(
+    registry: &std::sync::Arc<HelperRegistry>,
+) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let registry = registry.clone();
+        tokio::task::spawn_blocking(move || registry.confirm_shutdown())
+            .await
+            .map_err(|error| error.to_string())?
     }
-    Ok(())
+    #[cfg(not(windows))]
+    {
+        let _ = registry;
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+impl HelperRegistry {
+    pub(in crate::sockscap) fn confirm_shutdown(&self) -> Result<(), String> {
+        use std::time::{Duration, Instant};
+
+        let session = self.inner.lock().map_err(|e| e.to_string())?.clone();
+        let Some(session) = session else {
+            return Ok(());
+        };
+        let ready_exists = || {
+            session
+                .ready_file
+                .try_exists()
+                .map_err(|error| error.to_string())
+        };
+        if ready_exists()? {
+            super::requests::send_json_timeout(
+                &session,
+                json!({ "cmd": "shutdown" }),
+                Duration::from_secs(10),
+            )
+            .and_then(super::requests::expect_ok)?;
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while ready_exists()? {
+                if Instant::now() >= deadline {
+                    return Err(
+                        "SocksCap helper still reports itself as ready after shutdown".into(),
+                    );
+                }
+                std::thread::sleep(Duration::from_millis(40));
+            }
+        }
+        // The helper removes this file itself after releasing capture. Leave
+        // the session registered if shutdown is unconfirmed, for a retry.
+        *self.inner.lock().map_err(|e| e.to_string())? = None;
+        Ok(())
+    }
 }
 
 #[tauri::command]
 pub async fn sockscap_helper_status(state: State<'_, AppState>) -> Result<HelperStatus, String> {
     let guard = state
+        .legacy
         .sockscap
         .helper
         .inner
@@ -50,6 +95,7 @@ pub async fn sockscap_helper_probe_windivert(
     filter: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let guard = state
+        .legacy
         .sockscap
         .helper
         .inner

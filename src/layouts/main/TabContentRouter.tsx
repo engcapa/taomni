@@ -4,14 +4,8 @@ import { CodeWorkspaceTab } from "../../components/editor/CodeWorkspaceTab";
 import { FileBrowser } from "../../components/filebrowser/FileBrowser";
 import { GitPanel } from "../../components/git/GitPanel";
 import { WorkspaceGitManager } from "../../components/git/WorkspaceGitManager";
-import { LanChatGate } from "../../components/lanchat/LanChatGate";
-import { MailClientTab } from "../../components/mail/MailClientTab";
-import { MailUnifiedTab } from "../../components/mail/MailUnifiedTab";
-import { MfaTab } from "../../components/mfa/MfaTab";
 import { ObjectStorageBrowser } from "../../components/objectstorage/ObjectStorageBrowser";
 import { SettingsPanel } from "../../components/settings/SettingsPanel";
-import { ServersPanel } from "../../components/servers/ServersPanel";
-import { SocksCapPanel } from "../../components/sockscap/SocksCapPanel";
 import { TunnelManager } from "../../components/tunnel/TunnelManager";
 import { TaoHomeHost } from "../../components/tao/home/TaoHomeHost";
 import { t as tr } from "../../lib/i18n";
@@ -20,16 +14,12 @@ import {
   DbClientTab,
   DbLoadingPanel,
   HBaseShellTab,
-  ProxyTestTab,
-  RdpLoadingPanel,
-  RdpPanel,
   RedisClientTab,
   UnavailablePanel,
-  VncLoadingPanel,
-  VncPanel,
 } from "./panels";
 import { type TabContentRouterProps } from "./tabs/TabContentRouterProps";
 import { TerminalTabContents } from "./tabs/TerminalTabContents";
+import { PluginTabPanels } from "../../components/plugins/PluginTabPanels";
 
 export function TabContentRouter(viewProps: TabContentRouterProps) {
   const storeRecentWorkspaces = useAppStore((state) => state.recentWorkspaces);
@@ -59,7 +49,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     handleTerminalProfileChange,
     handleWorkspaceCommandsChange,
     hbaseTabs,
-    mailTabs,
     multiExecActive,
     multiExecSelectedTabIds,
     objectStorageTabs,
@@ -78,7 +67,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     pendingSftpUploadRequests,
     persistVncProperties,
     queryTerminalCwd,
-    rdpTabs,
     recentWorkspaces,
     redisTabs,
     rememberVncCredentials,
@@ -94,7 +82,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     setStatusMessage,
     setTerminalSplitLayout,
     settingsTabs,
-    serversTabs,
     sftpTabs,
     splitGridColumnTemplate,
     splitGridColumnWeightsForLayout,
@@ -128,12 +115,25 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     toggleTerminalSplit,
     toggleTerminalSplitInputLock,
     unifiedMailAccounts,
-    vncTabs,
     welcomeMailSessions,
     welcomeRecentSessions,
     welcomeRestore,
   } = viewProps;
   return (<div className="flex-1 min-h-0 overflow-hidden relative">
+    <PluginTabPanels
+      tabs={tabs}
+      activeTabId={activeTabId}
+      onOpenSettings={openSettingsTab}
+      onClose={removeTab}
+      onStatusMessage={setStatusMessage}
+      onPersistVncProperties={async (tabId, sessionId, properties) => persistVncProperties(tabId, sessionId, properties)}
+      onRememberVncCredentials={async (tabId, sessionId, password) => rememberVncCredentials(tabId, sessionId, password)}
+      onDetachVnc={openDetachedVnc}
+      onDetachRdp={openDetachedRdp}
+      unifiedMailAccounts={unifiedMailAccounts}
+      onOpenMailAccount={openMailAccountById}
+      onEditMailSession={handleEditSessionById}
+    />
     {tabs.filter((tab) => tab.type === "file-viewer" && tab.fileViewer).map((tab) => <div key={tab.id} className="absolute inset-0" style={{ display: activeTabId === tab.id ? "block" : "none" }}><ViewerShell viewer={tab.fileViewer!} active={activeTabId === tab.id} /></div>)}
     {/* Welcome stays mounted so filters, scroll, and shell
                     selections survive switching to another tab. */}
@@ -281,20 +281,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       );
     })}
 
-    {serversTabs.map((tab) => {
-      const isActive = activeTabId === tab.id;
-      return (
-        <div
-          key={tab.id}
-          data-testid="servers-tab-panel"
-          className="absolute inset-0 flex flex-col min-h-0"
-          style={{ display: isActive ? "flex" : "none" }}
-        >
-          <ServersPanel onClose={() => removeTab(tab.id)} />
-        </div>
-      );
-    })}
-
     {/* Git tabs stay mounted so repository views, loaded logs, and
                     scroll position survive switching to another app tab. */}
     {gitTabs.map((tab) => {
@@ -347,83 +333,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       );
     })}
 
-    {activeTab?.type === "lan-chat" && <LanChatGate />}
-
-    {tabs.some((tab) => tab.type === "mail-unified") && (
-      <div className="absolute inset-0" style={{ display: activeTab?.type === "mail-unified" ? "block" : "none" }}>
-        <MailUnifiedTab
-          accounts={unifiedMailAccounts}
-          visible={activeTab?.type === "mail-unified"}
-          onOpenAccount={openMailAccountById}
-        />
-      </div>
-    )}
-
-    {/* VNC tabs — always mounted so connection survives tab switches */}
-    {vncTabs.map((tab) => {
-      const vnc = tab.vnc;
-      if (!vnc) return null;
-      const isActive = activeTabId === tab.id;
-      return (
-        <div
-          key={tab.id}
-          className="absolute inset-0"
-          style={{ display: isActive ? "block" : "none" }}
-        >
-          <Suspense fallback={<VncLoadingPanel />}>
-            <VncPanel
-              tabId={tab.id}
-              host={vnc.host}
-              port={vnc.port}
-              username={vnc.username}
-              password={vnc.password}
-              networkSettingsJson={vnc.networkSettingsJson}
-              securityPolicy={vnc.securityPolicy}
-              viewOnly={vnc.viewOnly}
-              clipboardPolicy={vnc.clipboardPolicy}
-              viewerOptions={vnc.viewerOptions}
-              onSessionPropertiesChange={(properties) => {
-                void persistVncProperties(tab.id, vnc.sessionId, properties);
-              }}
-              onCredentialsChange={({ password: typed }) => {
-                void rememberVncCredentials(tab.id, vnc.sessionId, typed);
-              }}
-              visible={isActive}
-              onDetach={() => openDetachedVnc(tab.id, vnc, tab.title)}
-            />
-          </Suspense>
-        </div>
-      );
-    })}
-
-    {/* RDP tabs */}
-    {rdpTabs.map((tab) => {
-      const rdp = tab.rdp;
-      if (!rdp) return null;
-      const isActive = activeTabId === tab.id;
-      return (
-        <div
-          key={tab.id}
-          className="absolute inset-0"
-          style={{ display: isActive ? "block" : "none" }}
-        >
-          <Suspense fallback={<RdpLoadingPanel />}>
-            <RdpPanel
-              tabId={tab.id}
-              host={rdp.host}
-              port={rdp.port}
-              username={rdp.username}
-              password={rdp.password}
-              options={rdp.options}
-              networkSettingsJson={rdp.networkSettingsJson}
-              visible={isActive}
-              onDetach={() => openDetachedRdp(tab.id, rdp, tab.title)}
-            />
-          </Suspense>
-        </div>
-      );
-    })}
-
     {/* Object-storage (S3 / Azure Blob) browser tabs — always
                     mounted so in-flight transfers survive tab switches. */}
     {objectStorageTabs.map((tab) => {
@@ -439,25 +348,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
             sessionId={tab.objectStorage.sessionId}
             config={tab.objectStorage.config}
             title={tab.title}
-          />
-        </div>
-      );
-    })}
-
-    {mailTabs.map((tab) => {
-      if (!tab.mail) return null;
-      const isActive = activeTabId === tab.id;
-      return (
-        <div
-          key={tab.id}
-          className="absolute inset-0"
-          style={{ display: isActive ? "block" : "none" }}
-        >
-          <MailClientTab
-            tabId={tab.id}
-            info={tab.mail}
-            visible={isActive}
-            onEditSession={handleEditSessionById}
           />
         </div>
       );
@@ -531,21 +421,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       />
     )}
 
-    {activeTab?.type === "sockscap" && (
-      <SocksCapPanel
-        onStatusMessage={setStatusMessage}
-        onClose={() => removeTab(activeTab.id)}
-      />
-    )}
-
-    {activeTab?.type === "mfa" && <MfaTab onStatusMessage={setStatusMessage} />}
-
-    {activeTab?.type === "proxy-test" && activeTab.proxyTest && (
-      <Suspense fallback={null}>
-        <ProxyTestTab info={activeTab.proxyTest} />
-      </Suspense>
-    )}
-
     {/* Non-terminal, non-sftp, non-vnc, non-rdp, non-welcome, non-settings, non-nettools tabs */}
     {activeTab &&
       activeTab.type !== "welcome" &&
@@ -563,9 +438,9 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       activeTab.type !== "git" &&
       activeTab.type !== "nettools" &&
       activeTab.type !== "sockscap" &&
-      activeTab.type !== "lan-chat" &&
       activeTab.type !== "mfa" &&
       activeTab.type !== "servers" &&
+      activeTab.type !== "plugin" &&
       activeTab.type !== "proxy-test" && (
         <UnavailablePanel title={activeTab.title} message={activeTab.message} />
       )}

@@ -150,7 +150,7 @@ class FakeMailState:
 
     def deliver(self, folder: str, count: int, prefix: str = "QA", thread: bool = False,
                 list_unsubscribe: str | None = None, invite: str | None = None,
-                read_receipt: bool = False) -> list[int]:
+                read_receipt: bool = False, body: str | None = None) -> list[int]:
         extra = f"List-Unsubscribe: <{list_unsubscribe}>\r\n" if list_unsubscribe else ""
         if read_receipt:
             extra += "Disposition-Notification-To: QA Sender <qa-sender@example.com>\r\n"
@@ -165,7 +165,7 @@ class FakeMailState:
                 subject = f"{prefix} {index + 1:04d}"
                 message_id = f"{prefix}-{index + 1}.{_unique_token()}@qa.taomni".replace(" ", "-")
                 raw = build_message(subject, message_id=message_id, ancestry=list(ancestry) if thread else None,
-                                    extra_headers=extra, invite=invite)
+                                    extra_headers=extra, invite=invite, body=body)
                 ancestry.append(message_id)
                 entry.messages[uid] = FakeMessage(raw=raw, internal_ts=int(time.time()) + index, modseq=modseq)
                 uids.append(uid)

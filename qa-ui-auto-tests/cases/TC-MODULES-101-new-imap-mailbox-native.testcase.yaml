@@ -1,0 +1,74 @@
+id: TC-MODULES-101
+title: The signed Mail module owns the cache of a newly saved IMAP account
+description: Enable the signed Mail package, create a default-storage IMAP account and inspect the owner receipt before connecting. Synchronize and reopen the same account, then check that only the module database has the message.
+covers: [F-Modules-1, F-MAIL-1, F-MAIL-5, F-MAIL-23]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, mail_server, module_signed_mail_archive]
+timeout_sec: 175
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-mail"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill: {selector: 'input[aria-label="IMAP server"]', value: '${fixture.mail_host}'}
+- select_option: {selector: '[data-testid="mail-imap-security"]', value: None}
+- fill: {selector: 'input[aria-label="IMAP port"]', value: '${fixture.mail_imap_port}'}
+- fill: {selector: 'input[aria-label="Mail email or username"]', value: qa@example.com}
+- fill: {selector: 'input[aria-label="Mail password or app password token"]', value: qa-pass}
+- fill: {selector: 'input[aria-label="SMTP server"]', value: '${fixture.mail_host}'}
+- select_option: {selector: '[data-testid="mail-smtp-security"]', value: None}
+- fill: {selector: 'input[aria-label="SMTP port"]', value: '${fixture.mail_smtp_port}'}
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: QA owned IMAP}
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-fresh-imap-password
+- wait_for: {selector: '[data-testid="session-editor"]', state: detached, timeout_sec: 45}
+- assert_count: {selector: '[data-testid="session-tree-item"][data-session-name="QA owned IMAP"]', equal: 1}
+- assert_signed_mail_host: imap-account-created
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA owned IMAP"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"] [data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 40}
+- mail_server_deliver: {folder: INBOX, count: 1, prefix: Fresh ownership}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 40}
+- assert_signed_mail_host: imap-account-synced
+- right_click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- click: '[data-testid="context-menu-item-close"]'
+- wait_for: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', state: detached}
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA owned IMAP"]'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 40}
+- assert_signed_mail_host: imap-account-synced
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: save-then-sync
+    requirement: The first save commits one account receipt and an empty module database. Synchronizing and reopening writes and reads the same account store.
+    actions: [6, 8, 13, 15, 26, 28, 32, 35, 36, 40, 42]
+    checkpoints:
+    - {step: 30, expectation: The first save displays one account.}
+    - {step: 31, expectation: The signed host owns the empty account store before connecting.}
+    - {step: 37, expectation: The new message appears and the mailbox matches the server.}
+    - {step: 38, expectation: The exact new message was committed once to the module database.}
+    - {step: 43, expectation: Reopening the same session reloads the synchronized list.}
+    - {step: 44, expectation: The module database and receipt still match the same account and package.}
+    - {step: 45, expectation: No renderer runtime errors were observed.}
+    results: [30, 31, 37, 38, 43, 44, 45]
+  visual:
+  - {check: The account is visible in the session tree and the synchronized Mail tab opens., method: automated, reason: The case reads the session and mailbox results.}
+  native:
+  - {check: The installed signed host owns the SQLite store and writer lease., method: automated, reason: The case reads the session ID and module data before and after sync.}

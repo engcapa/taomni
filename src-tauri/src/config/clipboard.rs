@@ -54,7 +54,7 @@ pub fn clipboard_write_image_png(
         }
         InvokeBody::Json(_) => Err("clipboard_write_image_png expects raw bytes".to_string()),
     };
-    let clipboard = Arc::clone(&state.clipboard);
+    let clipboard = Arc::clone(&state.core.clipboard);
     async move {
         let bytes = payload?;
         tauri::async_runtime::spawn_blocking(move || write_image_png_bytes(&clipboard, &bytes))
@@ -71,6 +71,7 @@ pub fn clipboard_read_text(state: State<'_, AppState>) -> Result<String, String>
     }
 
     let mut guard = state
+        .core
         .clipboard
         .lock()
         .map_err(|e| format!("clipboard lock: {}", e))?;
@@ -99,6 +100,7 @@ pub fn clipboard_read_text(state: State<'_, AppState>) -> Result<String, String>
 #[tauri::command]
 pub fn clipboard_write_text(text: String, state: State<'_, AppState>) -> Result<(), String> {
     let mut guard = state
+        .core
         .clipboard
         .lock()
         .map_err(|e| format!("clipboard lock: {}", e))?;

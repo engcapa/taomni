@@ -16,12 +16,15 @@ mod mail_snapshot;
 pub mod manifest;
 pub mod model;
 pub mod network;
+pub mod plugins;
 pub mod policy;
+mod protected_snapshot;
 pub mod provider;
 pub mod qa;
 pub mod range;
 pub mod restore;
 pub mod scheduler;
+mod server_configs;
 pub mod settings;
 pub mod settings_model;
 pub(crate) mod snapshot_context;
@@ -32,6 +35,10 @@ pub mod worker;
 #[cfg(test)]
 mod compat_tests;
 #[cfg(test)]
+mod generation_tests;
+#[cfg(test)]
+mod protected_snapshot_tests;
+#[cfg(test)]
 mod snapshot_tests;
 #[cfg(test)]
 mod tests;
@@ -41,6 +48,11 @@ pub use engine::{BackupCustomOptions, BackupEntryInfo, BackupResult};
 pub use manifest::BackupManifest;
 pub use policy::BackupPolicy;
 pub use restore::StageRestoreResult;
+
+#[cfg(all(test, feature = "qa-release-trust-gates"))]
+pub(crate) use archive_writer::pack_staged_archive_with_plugins;
+#[cfg(all(test, feature = "qa-release-trust-gates"))]
+pub(crate) use protected_snapshot::stage_with_plugins as stage_protected_backup;
 
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
@@ -88,14 +100,16 @@ pub async fn backup_stage_restore(
     password: Option<String>,
     vault_password: Option<String>,
 ) -> Result<StageRestoreResult, String> {
+    let vault_password = vault_password.map(zeroize::Zeroizing::new);
     tauri::async_runtime::spawn_blocking(move || {
         let coordinator = app.state::<scheduler::BackupCoordinator>();
         let _operation = coordinator.operation.lock().map_err(|e| e.to_string())?;
         let _process_operation = coordination::BackupProcessLock::acquire(&app)?;
         let state = app.state::<AppState>();
-        state
-            .vault
-            .verify_master_password(vault_password.as_deref())?;
+        state.plugins.verify_restore_password(
+            &state.core.vault,
+            vault_password.as_deref().map(String::as_str),
+        )?;
         let p = PathBuf::from(path);
         restore::stage_restore(&app, &p, password.as_deref())
     })

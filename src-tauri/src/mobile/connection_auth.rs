@@ -291,7 +291,7 @@ pub async fn mobile_connection_auth(
     if window.label() != "main" {
         return Err("desktop_required".into());
     }
-    let runtime = state.mobile.clone();
+    let runtime = state.legacy.mobile.clone();
     runtime
         .open_requests
         .ask(&request_id, name, instructions, prompts)
@@ -308,6 +308,7 @@ pub fn mobile_cancel_open_session(
         return Err("desktop_required".into());
     }
     Ok(state
+        .legacy
         .mobile
         .open_requests
         .resolve(&request_id, Err("open_cancelled".into())))
@@ -326,7 +327,7 @@ pub fn context(
     if window.label() != "main" {
         return Err("desktop_required".into());
     }
-    let runtime = app.state::<AppState>().mobile.clone();
+    let runtime = app.state::<AppState>().legacy.mobile.clone();
     runtime.open_requests.bind_terminal(&request_id, terminal)?;
     Ok(Some(MobileAuthContext {
         runtime,

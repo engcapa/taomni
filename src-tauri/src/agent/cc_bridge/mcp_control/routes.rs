@@ -68,6 +68,7 @@ impl ControlHandler {
         self.scope(&ctx)?;
         let state = self.app_state();
         let db = state
+            .core
             .db
             .lock()
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -111,6 +112,7 @@ impl ControlHandler {
         self.scope(&ctx)?;
         let state = self.app_state();
         let db = state
+            .core
             .db
             .lock()
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -157,6 +159,7 @@ impl ControlHandler {
         {
             let state = self.app_state();
             let db = state
+                .core
                 .db
                 .lock()
                 .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -183,6 +186,7 @@ impl ControlHandler {
         self.require_write(&scope, "session_update", &args).await?;
         let state = self.app_state();
         let db = state
+            .core
             .db
             .lock()
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -242,6 +246,7 @@ impl ControlHandler {
             .await?;
         let state = self.app_state();
         let db = state
+            .core
             .db
             .lock()
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -277,6 +282,7 @@ impl ControlHandler {
         self.require_write(&scope, "session_delete", &args).await?;
         let state = self.app_state();
         let db = state
+            .core
             .db
             .lock()
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -303,6 +309,7 @@ impl ControlHandler {
         let group_path = normalize_group_path(p.group_path.as_deref());
         let state = self.app_state();
         let db = state
+            .core
             .db
             .lock()
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -328,6 +335,7 @@ impl ControlHandler {
         self.scope(&ctx)?;
         let state = self.app_state();
         let db = state
+            .core
             .db
             .lock()
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -352,6 +360,7 @@ impl ControlHandler {
             .ok_or_else(|| ErrorData::invalid_params("path is required", None))?;
         let state = self.app_state();
         let db = state
+            .core
             .db
             .lock()
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -379,6 +388,7 @@ impl ControlHandler {
             .ok_or_else(|| ErrorData::invalid_params("new_path is required", None))?;
         let state = self.app_state();
         let db = state
+            .core
             .db
             .lock()
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -435,6 +445,7 @@ impl ControlHandler {
             .ok_or_else(|| ErrorData::invalid_params("path is required", None))?;
         let state = self.app_state();
         let db = state
+            .core
             .db
             .lock()
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -487,6 +498,7 @@ impl ControlHandler {
         let (id, session_type) = {
             let state = self.app_state();
             let db = state
+                .core
                 .db
                 .lock()
                 .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;

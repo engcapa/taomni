@@ -10,6 +10,11 @@
 mod lifecycle;
 pub use lifecycle::*;
 mod configuration_commands;
+#[cfg(any(target_os = "macos", test))]
+mod macos_start_gate;
+mod module_host;
+mod module_rules;
+mod module_settings;
 pub use configuration_commands::*;
 mod upstream;
 pub use upstream::*;
@@ -52,7 +57,7 @@ pub mod tun_detect;
 
 pub use config::{Decision, RuleMode, SocksCapConfig};
 pub use orchestrator::{Orchestrator, SocksCapStatus};
-pub use policy::{PolicyEngine, PolicyInput};
+pub use policy::{PolicyEngine, PolicyInput, TargetTestResult};
 pub use rules::GfwListMeta;
 pub use stats::DomainRecord;
 
@@ -69,6 +74,8 @@ use zeroize::Zeroizing;
 use crate::module_lock::ModuleLock;
 use crate::state::AppState;
 
+pub(crate) use recovery_service::{ModuleCleanup, publish_recovery_status};
+
 /* ---------------------------- runtime handle ---------------------------- */
 
 /// Shared SocksCap runtime living on [`AppState`].
@@ -82,6 +89,9 @@ pub struct SocksCapRuntime {
     /// Cross-process ownership of the OS capture stack. SocksCap changes
     /// machine-wide capture state, so only one Taomni process may own it.
     activation_lock: std::sync::Mutex<Option<ModuleLock>>,
+    operation: tokio::sync::Mutex<()>,
+    #[cfg(target_os = "macos")]
+    macos_start: macos_start_gate::StartGate,
     /// macOS starts boot recovery asynchronously. Start remains blocked until
     /// that audit has finished so a user click cannot race a dirty-journal
     /// recovery and replace its inert-only scope with a business scope.
@@ -100,6 +110,9 @@ impl SocksCapRuntime {
             helper: Arc::new(helper::HelperRegistry::new()),
             pending_reap: std::sync::Mutex::new(Vec::new()),
             activation_lock: std::sync::Mutex::new(None),
+            operation: tokio::sync::Mutex::new(()),
+            #[cfg(target_os = "macos")]
+            macos_start: Default::default(),
             #[cfg(target_os = "macos")]
             recovery_ready: AtomicBool::new(false),
             xray: std::sync::OnceLock::new(),
@@ -109,6 +122,38 @@ impl SocksCapRuntime {
     /// The xray manager, if it has been initialized.
     pub fn xray(&self) -> Option<&Arc<core::XrayManager>> {
         self.xray.get()
+    }
+
+    async fn begin_activation(
+        &self,
+        registry: &Arc<crate::plugin::PluginRegistry>,
+    ) -> Result<tokio::sync::MutexGuard<'_, ()>, String> {
+        let operation = self.operation.lock().await;
+        #[cfg(target_os = "macos")]
+        self.macos_start.check()?;
+        let registry = registry.clone();
+        tokio::task::spawn_blocking(move || registry.check_resource_admission())
+            .await
+            .map_err(|error| error.to_string())?
+            .map_err(|error| error.to_string())?;
+        Ok(operation)
+    }
+
+    #[cfg(target_os = "macos")]
+    pub(crate) async fn prepare_module_disable(
+        &self,
+    ) -> Result<macos_start_gate::ModuleChangePermit, String> {
+        let permit = self.macos_start.cancel_for_change()?;
+        // The capture start can still be making a host call. Wait before
+        // taking the registry lifecycle lock so its cleanup can finish.
+        let operation =
+            tokio::time::timeout(std::time::Duration::from_secs(20), self.operation.lock())
+                .await
+                .map_err(|_| {
+                    "SocksCap is still stopping its pending capture. Retry disabling".to_owned()
+                })?;
+        drop(operation);
+        Ok(permit)
     }
 
     fn has_activation_lock(&self) -> bool {
@@ -170,9 +215,7 @@ fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn rules_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = data_dir(app)?.join("rules");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("create rules dir: {e}"))?;
-    Ok(dir)
+    Ok(crate::resolved_app_data_dir(app)?.join("sockscap/rules"))
 }
 
 /* ---------------------------- capabilities ------------------------------ */
@@ -211,16 +254,6 @@ pub struct GfwListStatus {
     pub last_refresh: Option<String>,
     pub source: String,
     pub error: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TargetTestResult {
-    pub host: String,
-    pub port: u16,
-    pub decision: Decision,
-    pub reason: String,
-    pub matched_rule: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

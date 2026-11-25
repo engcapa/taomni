@@ -9,5 +9,3 @@ taomni_status=$?
 [ "$taomni_status" -eq 0 ] || exit "$taomni_status"
 shift
 exec "$@""#;
-pub(super) static LAUNCHER_BYTES: &[u8] =
-    include_bytes!(concat!(env!("OUT_DIR"), "/taomni-sockscap-trace-launcher"));

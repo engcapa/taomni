@@ -405,6 +405,7 @@ pub async fn screenshot_qa_overlay_copy(app: AppHandle) -> Result<String, String
 pub(super) fn read_clipboard_image(app: &AppHandle) -> anyhow::Result<RgbaImage> {
     let state = app.state::<crate::state::AppState>();
     let mut guard = state
+        .core
         .clipboard
         .lock()
         .map_err(|_| anyhow::anyhow!("clipboard lock poisoned"))?;

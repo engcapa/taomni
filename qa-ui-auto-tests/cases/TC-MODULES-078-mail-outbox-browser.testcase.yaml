@@ -1,0 +1,83 @@
+id: TC-MODULES-078
+title: A queued message survives disabling and reopening the Mail account
+description: Schedule an email and re-enable Mail. Reopen the account and send the same draft from its Outbox.
+covers: [F-Modules-1, F-MAIL-13]
+tags: [modules, mail, outbox, p1]
+modes: [browser]
+fixtures: [reset_db, module_mail_preview, mail_server]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- click: '[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]'
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-toolbar-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
+- mail_server_assert_list_matches: {timeout_sec: 60}
+- click: '[data-testid="mail-compose-open"]'
+- wait_for: '[data-testid="mail-compose-dialog"]'
+- fill: {selector: '[data-testid="mail-recipient-to"] input', value: receiver@example.com}
+- press: Enter
+- fill: {selector: '[data-testid="mail-compose-subject"]', value: Signed Outbox ownership}
+- type: {selector: '[data-testid="mail-compose-editor"]', text: Keep this scheduled draft}
+- click: '[data-testid="mail-compose-send-later"]'
+- click: '[data-testid="mail-send-later-confirm"]'
+- wait_for: {selector: '[data-testid="mail-outbox-count"][data-count="1"]', timeout_sec: 25}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-mail"]'
+- wait_for: '[data-testid="module-action-enable-mail"]'
+- wait_for: {selector: '[data-testid="mail-compose-open"]', state: detached}
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-toolbar-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
+- wait_for: {selector: '[data-testid="mail-outbox-count"][data-count="1"]', timeout_sec: 30}
+- click: '[data-testid="mail-drafts-open"]'
+- click: '[data-testid="mail-drafts-tab-outbox"]'
+- assert_count: {selector: '[data-testid="mail-outbox-row"]', equal: 1}
+- assert_text: {selector: '[data-testid="mail-outbox-row"]', contains: Signed Outbox ownership}
+- assert_text: {selector: '[data-testid="mail-outbox-row"]', contains: receiver@example.com}
+- assert_text: {selector: '[data-testid="mail-outbox-state"]', contains: Sends}
+- click: '[data-testid="mail-outbox-send-all"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Sent 1 queued message, timeout_sec: 40}
+- mail_server_assert_folder_count: {folder: Sent, min: 1, timeout_sec: 30}
+- wait_for: {selector: '[data-testid="mail-outbox-count"]', state: detached, timeout_sec: 30}
+- assert_text: {selector: '[data-testid="mail-drafts-dialog"]', contains: The Outbox is empty}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: module-outbox
+    requirement: A scheduled draft retains its recipient and schedule across module lifecycle changes and leaves the Outbox after delivery.
+    actions: [5, 6, 8, 9, 11, 12, 13, 16, 18, 19, 20, 21, 22, 23, 25, 26, 27, 30, 32, 33, 34, 37, 38, 43]
+    checkpoints:
+    - {step: 24, expectation: Scheduling the message sets the account Outbox count to one.}
+    - {step: 29, expectation: Disabling Mail removes the compose entry.}
+    - {step: 39, expectation: The remounted account shows one queued row.}
+    - {step: 40, expectation: The queued subject survives disabling and enabling the module.}
+    - {step: 41, expectation: The reopened queue preserves the recipient.}
+    - {step: 42, expectation: The message still displays its scheduled send time.}
+    - {step: 44, expectation: Exactly one queued message completes the send action.}
+    - {step: 45, expectation: The mail server receives its Sent copy.}
+    - {step: 47, expectation: The queue is empty after acknowledged delivery.}
+    - {step: 48, expectation: The reload and send complete without renderer errors.}
+    results: [24, 29, 39, 40, 41, 42, 44, 45, 47, 48]
+  visual:
+  - check: The Outbox shows the retained message and clears after sending.
+    method: automated
+    reason: The case checks the visible message, recipient, send state and final empty view.
+  native:
+  - check: Draft persistence and SMTP delivery cross the signed Mail module boundary.
+    method: not-applicable
+    reason: TC-MODULES-077 checks native storage and the signed host.

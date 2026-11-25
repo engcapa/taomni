@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
+from urllib.error import HTTPError
 
 import setup_screenshot_ocr as setup
 
@@ -29,3 +30,18 @@ class ScreenshotOcrSetupTest(unittest.TestCase):
         with patch("setup_screenshot_ocr.shutil.which", return_value=None):
             with self.assertRaisesRegex(RuntimeError, "executable missing"):
                 setup.provision(Path("unused"))
+
+    def test_transient_github_failure_retries_the_same_pinned_url(self):
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b"language-data"
+        checksum = hashlib.sha256(b"language-data").hexdigest()
+        unavailable = HTTPError("https://raw.githubusercontent.com", 503, "Backend.max_conn reached", {}, None)
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(setup.urllib.request, "urlopen", side_effect=[unavailable, response]) as request, \
+             patch.object(setup.time, "sleep") as sleep:
+            root = Path(tmp)
+            setup.download_language("eng", root, checksum)
+            self.assertEqual(request.call_count, 2)
+            self.assertEqual(request.call_args_list[0], request.call_args_list[1])
+            self.assertEqual((root / "eng.traineddata").read_bytes(), b"language-data")
+            sleep.assert_called_once_with(2)

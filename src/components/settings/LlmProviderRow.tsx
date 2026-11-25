@@ -256,4 +256,3 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
     </div>
   );
 }
-

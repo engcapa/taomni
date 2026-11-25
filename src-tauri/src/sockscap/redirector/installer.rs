@@ -9,8 +9,8 @@ use sha2::{Digest, Sha256};
 use tauri::Manager;
 
 use super::{
-    REDIRECTOR_APP_PATH, REDIRECTOR_APP_TAR_SHA256, REDIRECTOR_EXTENSION_BUNDLE_ID,
-    REDIRECTOR_VERSION, installed_app_path, verify_bundle, verify_publisher_identity,
+    REDIRECTOR_APP_PATH, REDIRECTOR_EXTENSION_BUNDLE_ID, REDIRECTOR_VERSION, installed_app_path,
+    installer_source::InstallerSource, verify_bundle, verify_publisher_identity,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,6 +30,7 @@ pub struct RedirectorInstallStatus {
     pub state: RedirectorInstallState,
     pub package_version: String,
     pub resource_available: bool,
+    pub resource_source: Option<String>,
     pub system_extension_state: RedirectorSystemExtensionState,
     pub message: String,
 }
@@ -44,8 +45,13 @@ pub enum RedirectorSystemExtensionState {
     Unavailable,
 }
 
-pub fn status(app: &tauri::AppHandle) -> RedirectorInstallStatus {
-    let resource_available = resolve_archive(app).is_some();
+pub fn status(app: &tauri::AppHandle) -> Result<RedirectorInstallStatus, String> {
+    let source = InstallerSource::locate(app)?;
+    Ok(install_status(source.as_ref()))
+}
+
+fn install_status(source: Option<&InstallerSource>) -> RedirectorInstallStatus {
+    let resource_available = source.is_some();
     let installed = installed_app_path();
     let system_extension_state = system_extension_state();
     let (state, message) = if !installed.exists() {
@@ -57,7 +63,7 @@ pub fn status(app: &tauri::AppHandle) -> RedirectorInstallStatus {
         } else {
             (
                 RedirectorInstallState::ResourceMissing,
-                "Mitmproxy Redirector is not installed and the pinned installer resource is unavailable in this build.".into(),
+                "Install or update SocksCap in the Module Store to get its macOS Redirector installer.".into(),
             )
         }
     } else {
@@ -105,13 +111,15 @@ pub fn status(app: &tauri::AppHandle) -> RedirectorInstallStatus {
         state,
         package_version: REDIRECTOR_VERSION.into(),
         resource_available,
+        resource_source: source.map(|resource| resource.name().to_owned()),
         system_extension_state,
         message,
     }
 }
 
 pub fn install(app: &tauri::AppHandle) -> Result<RedirectorInstallStatus, String> {
-    let current = status(app);
+    let source = InstallerSource::locate(app)?;
+    let current = install_status(source.as_ref());
     match current.state {
         RedirectorInstallState::Ready => return Ok(current),
         RedirectorInstallState::PendingSystemApproval => return Ok(current),
@@ -120,16 +128,16 @@ pub fn install(app: &tauri::AppHandle) -> Result<RedirectorInstallStatus, String
         RedirectorInstallState::Missing | RedirectorInstallState::UpgradeAvailable => {}
     }
 
-    let archive = resolve_archive(app).ok_or_else(|| {
+    let source = source.ok_or_else(|| {
         format!("pinned Mitmproxy Redirector {REDIRECTOR_VERSION} resource is missing")
     })?;
-    verify_sha256(&archive, REDIRECTOR_APP_TAR_SHA256)?;
-
     let extraction = tempfile::Builder::new()
         .prefix("taomni-redirector-install-")
         .tempdir()
         .map_err(|error| format!("create Redirector install directory: {error}"))?;
     let extracted = extraction.path().join("Mitmproxy Redirector.app");
+    let archive = extraction.path().join("redirector.tar");
+    source.stage(&app.state::<crate::state::AppState>().plugins, &archive)?;
     let output = Command::new("/usr/bin/tar")
         .args(["-xf"])
         .arg(&archive)
@@ -157,7 +165,7 @@ pub fn install(app: &tauri::AppHandle) -> Result<RedirectorInstallStatus, String
     }
     install_with_authorization(&extracted, &installed_app_path(), &stage, &backup)?;
     verify_supply_chain(&installed_app_path())?;
-    Ok(status(app))
+    status(app)
 }
 
 pub(crate) fn system_extension_state() -> RedirectorSystemExtensionState {
@@ -194,21 +202,6 @@ fn parse_system_extension_state(output: &str) -> RedirectorSystemExtensionState 
     } else {
         RedirectorSystemExtensionState::Other
     }
-}
-
-fn resolve_archive(app: &tauri::AppHandle) -> Option<PathBuf> {
-    let relative = Path::new("sockscap")
-        .join("macos/redirector")
-        .join(REDIRECTOR_VERSION)
-        .join("Mitmproxy Redirector.app.tar");
-    let mut candidates = Vec::new();
-    if let Ok(resource_dir) = app.path().resource_dir() {
-        candidates.push(resource_dir.join(&relative));
-        candidates.push(resource_dir.join("resources").join(&relative));
-    }
-    candidates.push(PathBuf::from("src-tauri/resources").join(&relative));
-    candidates.push(PathBuf::from("resources").join(&relative));
-    candidates.into_iter().find(|candidate| candidate.is_file())
 }
 
 fn verify_supply_chain(app: &Path) -> Result<(), String> {
@@ -323,7 +316,7 @@ end run"#;
     Ok(())
 }
 
-fn verify_sha256(path: &Path, expected: &str) -> Result<(), String> {
+pub(super) fn verify_sha256(path: &Path, expected: &str) -> Result<(), String> {
     let mut file = std::fs::File::open(path)
         .map_err(|error| format!("open Redirector archive {}: {error}", path.display()))?;
     let mut hasher = Sha256::new();

@@ -24,9 +24,10 @@ import { invokeSockscap } from "./commands/sockscap";
 import { invokeTunnel } from "./commands/tunnel";
 import { invokeChat } from "./commands/chat";
 import { invokeDatabase } from "./commands/database";
-import { invokeLanchat } from "./commands/lanchat";
 import { invokeNotes } from "./commands/notes";
 import { invokeScreenshot } from "./commands/screenshot";
+import { invokePlugin } from "./commands/plugin";
+import { backupRestoreStub } from "./backupRestoreStub";
 
 const stubCommandRegistry = new CommandRegistry();
 
@@ -71,6 +72,8 @@ const NOTEPAD_VIEWER_COMMANDS = new Set([
 ]);
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  if (cmd === "backup_inspect" || cmd === "backup_stage_restore") return backupRestoreStub(cmd, args ?? {}) as T;
+  if (cmd.startsWith("plugin_")) return await invokePlugin<T>(cmd, args);
   // Issue #869: the bridge re-reads its pending approvals on mount. Browser
   // preview has no backend registry, so nothing is pending there.
   if (cmd === "cc_pending_permission_prompts") return [] as T;
@@ -158,7 +161,7 @@ for (const command of ["load_server_configs","save_server_config","list_server_s
   stubCommandRegistry.register({ domain: "servers", command, handler: (args) => invokeServers(command, args) });
 }
 
-for (const command of ["sockscap_capabilities","sockscap_redirector_install_status","sockscap_install_redirector","sockscap_get_config","sockscap_validate_macos_app","sockscap_set_config","sockscap_gfwlist_status","sockscap_refresh_gfwlist","sockscap_import_rules","sockscap_test_target","sockscap_status","sockscap_diagnostics","sockscap_start","sockscap_launch_app","sockscap_launch_terminal_app","sockscap_launched_apps","sockscap_stop_launched_app","sockscap_stop","sockscap_recover","sockscap_stats_snapshot","sockscap_get_domain_records","sockscap_clear_domain_records","sockscap_list_processes","sockscap_detect_local_proxies","sockscap_detect_tun_conflicts","sockscap_test_upstream","sockscap_helper_status","sockscap_helper_start","sockscap_helper_stop","sockscap_helper_probe_windivert"]) {
+for (const command of ["sockscap_capabilities","sockscap_redirector_install_status","sockscap_install_redirector","sockscap_get_config","sockscap_validate_macos_app","sockscap_set_config","sockscap_gfwlist_status","sockscap_refresh_gfwlist","sockscap_import_rules","sockscap_test_target","sockscap_status","sockscap_diagnostics","sockscap_start","sockscap_launch_app","sockscap_launch_terminal_app","sockscap_launched_apps","sockscap_stop_launched_app","sockscap_stop","sockscap_recover","sockscap_stats_snapshot","sockscap_get_domain_records","sockscap_clear_domain_records","sockscap_list_processes","sockscap_detect_local_proxies","sockscap_detect_tun_conflicts","sockscap_test_upstream","sockscap_test_core_upstream","sockscap_helper_status","sockscap_helper_start","sockscap_helper_stop","sockscap_helper_probe_windivert"]) {
   stubCommandRegistry.register({ domain: "sockscap", command, handler: (args) => invokeSockscap(command, args) });
 }
 
@@ -170,7 +173,7 @@ for (const command of ["chat_list_threads","chat_new_thread","chat_list_messages
   stubCommandRegistry.register({ domain: "chat", command, handler: (args) => invokeChat(command, args) });
 }
 
-for (const command of ["mail_archive_start","mail_archive_pause","mail_archive_status","mail_archive_query","mail_archive_preview_cleanup","mail_archive_cleanup","mail_archive_list","mail_archive_read","mail_archive_export","mail_archive_attachment","mail_archive_remove","mail_list_cached_folders","mail_list_cached_messages","mail_sync_headers","mail_idle_start","mail_idle_stop","mail_sync_folder","mail_sync_all_folders","mail_autoconfig","mail_list_folders","mail_set_folder_subscription","mail_prefetch_message_body","mail_get_message_body","mail_download_attachment","mail_mark_read","mail_send_message","mail_list_filters","mail_save_filters","mail_apply_filters","mail_export_filters","mail_import_filters","mail_get_invite","mail_respond_invite","mail_set_flags","mail_move_messages","mail_copy_messages","mail_delete_messages","mail_search_messages","mail_search_server","mail_store_remote_draft","mail_discard_remote_draft","mail_list_drafts","mail_save_draft","mail_delete_draft","mail_index_cached_contacts","mail_search_contacts","mail_list_address_book","mail_save_address_book_entry","mail_delete_address_book_entry","mail_import_vcards","mail_export_vcards","mail_carddav_sync","mail_send_receipt","mail_list_agenda","mail_caldav_sync","mail_add_invite_to_calendar","mail_test_connection","mail_oauth_authorize","mail_oauth_device_start","mail_oauth_device_complete","mail_clear_cache"]) {
+for (const command of ["mail_archive_start","mail_archive_pause","mail_archive_status","mail_archive_query","mail_archive_preview_cleanup","mail_archive_cleanup","mail_archive_list","mail_archive_read","mail_archive_export","mail_archive_attachment","mail_archive_remove","mail_list_cached_folders","mail_list_cached_messages","mail_sync_headers","mail_idle_start","mail_idle_stop","mail_sync_folder","mail_sync_all_folders","mail_autoconfig","mail_list_folders","mail_set_folder_subscription","mail_create_folder","mail_rename_folder","mail_delete_folder","mail_prefetch_message_body","mail_get_message_body","mail_fetch_raw","mail_save_raw","mail_download_attachment","mail_mark_read","mail_send_message","mail_list_filters","mail_save_filters","mail_apply_filters","mail_export_filters","mail_import_filters","mail_get_invite","mail_respond_invite","mail_set_flags","mail_move_messages","mail_copy_messages","mail_delete_messages","mail_search_messages","mail_search_server","mail_store_remote_draft","mail_discard_remote_draft","mail_list_drafts","mail_save_draft","mail_delete_draft","mail_index_cached_contacts","mail_search_contacts","mail_list_address_book","mail_save_address_book_entry","mail_delete_address_book_entry","mail_import_vcards","mail_export_vcards","mail_carddav_sync","mail_send_receipt","mail_list_agenda","mail_caldav_sync","mail_add_invite_to_calendar","mail_test_connection","mail_oauth_authorize","mail_oauth_device_start","mail_oauth_device_complete","mail_clear_cache"]) {
   stubCommandRegistry.register({ domain: "mail", command, handler: (args) => invokeMail(command, args) });
 }
 
@@ -178,9 +181,6 @@ for (const command of ["db_append_history","db_list_history","db_delete_history"
   stubCommandRegistry.register({ domain: "database", command, handler: (args) => invokeDatabase(command, args) });
 }
 
-for (const command of ["lanchat_status","lanchat_list_peers","lanchat_get_profile","lanchat_list_conversations","lanchat_list_groups","lanchat_list_messages","lanchat_mark_read","lanchat_open_path","lanchat_send_text","lanchat_send_group_text","lanchat_resend_message","lanchat_update_profile","lanchat_create_group","lanchat_leave_group","lanchat_send_file","lanchat_send_group_file","lanchat_send_dir","lanchat_accept_file","lanchat_reject_file","lanchat_transfer_control","lanchat_send_screenshot","lanchat_send_clipboard_image","lanchat_send_signal","lanchat_signal_group"]) {
-  stubCommandRegistry.register({ domain: "lanchat", command, handler: (args) => invokeLanchat(command, args) });
-}
 
 for (const command of ["notes_list","notes_get","notes_create","notes_update","notes_update_metadata","notes_save_content","notes_delete","notes_toggle_complete","notes_archive","notes_list_tags","notes_upsert_tags","notes_set_steps","notes_get_prefs","notes_set_prefs","notes_list_alerts","notes_ack_alert"]) {
   stubCommandRegistry.register({ domain: "notes", command, handler: (args) => invokeNotes(command, args) });

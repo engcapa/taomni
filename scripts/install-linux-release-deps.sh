@@ -30,18 +30,18 @@ apt_options=(
 # Any missing index must stop the release before package installation.
 sudo apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update
 
-# Base bundle deps + LanChat native A/V: nasm for openh264, ALSA for cpal,
-# V4L for nokhwa. Meson/ninja/clang build newer PipeWire headers in the next
+# Base bundle deps: nasm for openh264 and ALSA for cpal. Meson/ninja/clang
+# build newer PipeWire headers in the next
 # workflow step; stock jammy PipeWire alone is too old for libspa 0.9.
 sudo apt-get "${apt_options[@]}" install -y \
   libwebkit2gtk-4.1-dev \
   libappindicator3-dev \
   librsvg2-dev \
   patchelf \
+  rpm \
   libkrb5-dev \
   nasm \
   libasound2-dev \
-  libv4l-dev \
   libpipewire-0.3-dev \
   libclang-dev \
   libdbus-1-dev \

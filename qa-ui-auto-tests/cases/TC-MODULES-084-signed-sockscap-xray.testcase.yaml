@@ -1,0 +1,62 @@
+id: TC-MODULES-084
+title: The signed SocksCap host runs its Xray resource and rejects altered bytes
+description: Use the upstream test with a deliberately invalid cipher to observe the actual Xray startup error and verified executable, then alter the installed resource and repeat.
+covers: [F-Modules-1, F-Sockscap-1]
+tags: [modules, sockscap, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, sockscap_legacy_config, module_signed_sockscap_archive]
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.sockscap_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.sockscap_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-sockscap"]'
+- wait_for: '[data-testid="module-action-disable-sockscap"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-testid="sockscap-panel"]'
+- show_sockscap_section: upstream
+- wait_for: '[data-testid="sockscap-upstream-host"][value="127.0.0.1"]'
+- wait_for: {selector: '[data-testid="sockscap-upstream-kind"] option[value="shadowsocks"]:checked', state: attached}
+- click: '[data-testid="sockscap-test-upstream"]'
+- wait_for: '[data-testid="sockscap-test-detail"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'xray log:'}
+- assert_file_sha256: {path: '${fixture.sockscap_xray_staged}', equals: '${fixture.sockscap_xray_sha256}'}
+- assert_signed_sockscap_host: running
+- click: '[data-testid="sockscap-test-detail-close"]'
+- sockscap_resource_fixture: alter
+- click: '[data-testid="sockscap-test-upstream"]'
+- wait_for: '[data-testid="sockscap-test-detail"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: Xray bytes differ from the signed SocksCap release}
+- assert_file_sha256: {path: '${fixture.sockscap_xray_staged}', equals: '${fixture.sockscap_xray_sha256}'}
+- sockscap_resource_fixture: restore
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-xray-execution
+    requirement: The ordinary upstream probe spawns the packaged Xray executable and refuses the next spawn when that package resource changes.
+    actions: [6, 8, 12, 14, 17, 22, 23, 24, 28]
+    checkpoints:
+    - {step: 7, expectation: The signed archive installs through Module Store.}
+    - {step: 16, expectation: The panel reads Shadowsocks from the upgraded legacy profile.}
+    - {step: 19, expectation: The probe displays the real Xray diagnostic for an invalid cipher.}
+    - {step: 20, expectation: The staged executable has the exact upstream bytes from the signed archive.}
+    - {step: 21, expectation: The signed module holds the profile writer lease.}
+    - {step: 26, expectation: The altered resource is rejected before spawning a second probe.}
+    - {step: 27, expectation: The last verified staged binary is intact.}
+    - {step: 29, expectation: Handling the integrity error leaves the renderer running.}
+    results: [7, 16, 19, 20, 21, 26, 27, 29]
+  visual:
+  - check: Startup and integrity errors both appear in the ordinary upstream test result.
+    method: automated
+    reason: The case opens the result with the visible Test Upstream button.
+  native:
+  - check: The signed module supplies the actual executable and verifies it before each launch.
+    method: automated
+    reason: Native evidence joins the real subprocess diagnostic with the signed and staged digests.

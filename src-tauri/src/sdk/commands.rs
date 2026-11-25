@@ -15,7 +15,7 @@ use tauri::State;
 
 #[tauri::command]
 pub async fn sdk_get_registry(state: State<'_, AppState>) -> Result<SdkRegistry, String> {
-    Ok(state.workspace.sdk.snapshot().await)
+    Ok(state.core.workspace.sdk.snapshot().await)
 }
 
 #[tauri::command]
@@ -43,12 +43,12 @@ pub async fn sdk_save_installation(
     request: SaveSdkInstallationRequest,
     state: State<'_, AppState>,
 ) -> Result<SdkInstallation, String> {
-    state.workspace.sdk.save_installation(request).await
+    state.core.workspace.sdk.save_installation(request).await
 }
 
 #[tauri::command]
 pub async fn sdk_remove_installation(id: String, state: State<'_, AppState>) -> Result<(), String> {
-    state.workspace.sdk.remove_installation(&id).await
+    state.core.workspace.sdk.remove_installation(&id).await
 }
 
 #[tauri::command]
@@ -57,6 +57,7 @@ pub async fn sdk_refresh_installations(
     state: State<'_, AppState>,
 ) -> Result<Vec<SdkInstallation>, String> {
     state
+        .core
         .workspace
         .sdk
         .refresh_installations(id.as_deref())
@@ -68,7 +69,7 @@ pub async fn sdk_set_default(
     request: SetSdkDefaultRequest,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.workspace.sdk.set_default(request).await
+    state.core.workspace.sdk.set_default(request).await
 }
 
 #[tauri::command]
@@ -76,7 +77,7 @@ pub async fn sdk_save_workspace_binding(
     request: SaveWorkspaceSdkBindingRequest,
     state: State<'_, AppState>,
 ) -> Result<WorkspaceSdkBinding, String> {
-    state.workspace.sdk.save_binding(request).await
+    state.core.workspace.sdk.save_binding(request).await
 }
 
 #[tauri::command]
@@ -87,6 +88,7 @@ pub async fn sdk_remove_workspace_binding(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
+        .core
         .workspace
         .sdk
         .remove_binding(&scope_path, kind, role)
@@ -107,5 +109,10 @@ pub async fn sdk_resolve_workspace(
     workspace_root: String,
     state: State<'_, AppState>,
 ) -> Result<resolve::WorkspaceSdkResolution, String> {
-    state.workspace.sdk.resolve_workspace(&workspace_root).await
+    state
+        .core
+        .workspace
+        .sdk
+        .resolve_workspace(&workspace_root)
+        .await
 }

@@ -27,6 +27,7 @@ pub async fn lsp_document_symbols(
         document_uri,
     );
     let session = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -39,6 +40,7 @@ pub async fn lsp_document_symbols(
         Some(session) => session,
         None => {
             let status = state
+                .core
                 .workspace
                 .lsp
                 .document_status(
@@ -61,6 +63,7 @@ pub async fn lsp_document_symbols(
         .await
         .unwrap_or(Value::Null);
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -90,6 +93,7 @@ pub async fn lsp_workspace_symbols(
     // belonging to this workspace (including other roots/languages).
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -99,6 +103,7 @@ pub async fn lsp_workspace_symbols(
         )
         .await;
     let aggregation = state
+        .core
         .workspace
         .lsp
         .workspace_symbols(&document.workspace_id, &query)
@@ -131,6 +136,7 @@ pub async fn lsp_workspace_symbol_resolve(
         return Err("resolveToken is required".into());
     }
     state
+        .core
         .workspace
         .lsp
         .resolve_workspace_symbol(workspace_id, resolve_token)

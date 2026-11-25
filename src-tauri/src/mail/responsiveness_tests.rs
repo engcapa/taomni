@@ -13,12 +13,13 @@ fn moving_200_messages_adapts_to_provider_copy_count_limit() {
         state.max_transfer_count = Some(20);
     }
     let directory = tempfile::tempdir().unwrap();
-    let db = Arc::new(coordination::MailDatabase::new(
+    let db = Arc::new(coordination::mailbox_database(
         directory.path().join("mutation.db"),
     ));
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let result = mutations::run_cached(
         &MailImapPool::new(),
+        &std::sync::Mutex::new(()),
         &account(fake.port),
         runtime.handle(),
         &db,
@@ -27,6 +28,7 @@ fn moving_200_messages_adapts_to_provider_copy_count_limit() {
         "Trash",
         mutations::Kind::Move,
         false,
+        None,
         None,
     )
     .unwrap();
@@ -126,18 +128,19 @@ fn folder_read_includes_uncached_mail_and_recovers_a_lost_store_response() {
         conn.execute("INSERT INTO mail_messages(account_id, folder, uid, subject, updated_at) VALUES(?1, 'INBOX', ?2, 'cached', 0)", params![account.config.session_id, uid]).unwrap();
     }
     drop(conn);
-    let db = Arc::new(coordination::MailDatabase::new(path));
+    let db = Arc::new(coordination::mailbox_database(path));
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let result = read_actions::mark_read_cached(
-        &MailImapPool::new(),
-        &account,
-        runtime.handle(),
-        &db,
-        "INBOX",
-        vec![],
-        true,
-    )
-    .unwrap();
+    let transport =
+        read_actions::ReadFlagTransport::new(Arc::new(MailImapPool::new()), account.clone(), None);
+    let result = runtime
+        .block_on(read_actions::mark_read_cached(
+            transport,
+            db.clone(),
+            "INBOX",
+            vec![],
+            true,
+        ))
+        .unwrap();
     assert_eq!(result.marked, 699);
     assert_eq!(result.unread, Some(0));
     assert!((1..=700).all(|uid| fake.flags("INBOX", uid).contains(&"\\Seen".into())));
@@ -230,7 +233,7 @@ fn interactive_body_completes_while_background_imap_is_busy() {
 #[tokio::test(flavor = "current_thread")]
 async fn cache_lock_wait_does_not_block_runtime_timers() {
     let directory = tempfile::tempdir().unwrap();
-    let db = Arc::new(coordination::MailDatabase::new(
+    let db = Arc::new(coordination::mailbox_database(
         directory.path().join("timers.db"),
     ));
     let (locked_tx, locked_rx) = mpsc::channel();
@@ -432,10 +435,20 @@ fn smtp_acceptance_does_not_wait_for_or_retry_a_failed_sent_copy() {
         "to": ["qa-recipient@example.test"], "subject": "disposable fixture", "textBody": "test only",
     })).unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let (result, pending) =
-        outgoing::send_with_pending_copy(&account, &request, None, runtime.handle()).unwrap();
-    assert!(result.accepted);
-    assert!(result.sent_copy_folder.is_none());
+    let directory = tempfile::tempdir().unwrap();
+    let registry = Arc::new(crate::plugin::PluginRegistry::new(directory.path()));
+    let (message, pending) = runtime
+        .block_on(outgoing::prepare_send(
+            registry.clone(),
+            &account,
+            request,
+            None,
+        ))
+        .unwrap();
+    let response = runtime
+        .block_on(super::module_host::send_smtp(registry, &account, message))
+        .unwrap();
+    assert!(response.contains("accepted"));
     assert!(
         outgoing::store_pending_copy(
             &MailImapPool::new(),

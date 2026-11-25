@@ -17,9 +17,10 @@ if [[ "${QA_RELEASE:-false}" == true ]]; then
   export CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS=true
 fi
 filters=(lsp::tests::workspace_watch_lifetime commands::workspace_reads::tests
-  workspace::tests::text_and_encoding workspace::tests::encoding_matrix)
+  workspace::tests::text_and_encoding workspace::tests::encoding_matrix
+  plugin::migration:: deepseek_app::)
 if [[ "${QA_RDP_CONTRACTS:-false}" == true ]]; then
-  cargo test --locked "${profile[@]}" -p ironrdp-acceptor -p ironrdp-bulk -p ironrdp-server -p ironrdp-session --lib
+  cargo test --locked "${profile[@]}" -p ironrdp-acceptor -p ironrdp-bulk -p ironrdp-server -p ironrdp-session -p taomni-rdp-client-engine -p taomni-rdp-server-engine --lib
   cargo test --locked "${profile[@]}" -p ironrdp-server --lib profile_photo_encoder_costs -- --ignored --nocapture
   filters+=(rdp::)
 fi
@@ -34,5 +35,5 @@ fi
 # libtest accepts multiple OR filters. Compile/link the root test binary once.
 cargo test --locked "${profile[@]}" --lib -- "${filters[@]}"
 if [[ "${QA_RDP_CONTRACTS:-false}" == true ]]; then
-  cargo test --locked "${profile[@]}" --bin rdp-probe
+  cargo test --locked "${profile[@]}" --package taomni-rdp-probe --bin rdp-probe
 fi

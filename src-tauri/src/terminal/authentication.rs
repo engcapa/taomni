@@ -166,6 +166,7 @@ pub fn submit_ssh_auth_response(
 ) -> Result<(), String> {
     let responder = {
         let mut guard = state
+            .core
             .terminal
             .ssh_auth_responders
             .lock()

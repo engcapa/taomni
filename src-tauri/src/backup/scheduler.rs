@@ -2,7 +2,7 @@ use super::policy::{BackupPolicy, load_policy};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use tauri::{AppHandle, ExitRequestApi, Manager};
+use tauri::{AppHandle, Manager};
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(60);
 const DAY_MS: i64 = 24 * 60 * 60 * 1_000;
@@ -37,16 +37,23 @@ pub fn is_backup_due(policy: &BackupPolicy, now_ms: i64, trigger: BackupTrigger)
 
 /// Check wall-clock time on every pass so a long-running or resumed app does
 /// not depend on opening Settings, restarting, or an active renderer timer.
-pub fn start(app: &AppHandle) {
-    app.manage(BackupCoordinator::default());
+pub fn start(app: &AppHandle, cancel: tokio_util::sync::CancellationToken) {
     let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        loop {
-            run_backup(app.clone(), BackupTrigger::Periodic).await;
-            super::jobs::scheduled(&app, BackupTrigger::Periodic).await;
-            tokio::time::sleep(CHECK_INTERVAL).await;
-        }
-    });
+    let owner = app.clone();
+    app.state::<crate::runtime::ApplicationRuntime>()
+        .tasks
+        .spawn("backup-scheduler", async move {
+            loop {
+                tokio::select! {
+                    _ = cancel.cancelled() => break,
+                    _ = async {
+                        run_backup(owner.clone(), BackupTrigger::Periodic).await;
+                        super::jobs::scheduled(&owner, BackupTrigger::Periodic).await;
+                        tokio::time::sleep(CHECK_INTERVAL).await;
+                    } => {}
+                }
+            }
+        });
 }
 
 async fn run_backup(app: AppHandle, trigger: BackupTrigger) {
@@ -55,37 +62,52 @@ async fn run_backup(app: AppHandle, trigger: BackupTrigger) {
     }
 }
 
-/// Finish an on-exit backup on the blocking pool before allowing normal quit.
-/// Tauri restarts cannot be prevented; they may be applying a staged restore.
-pub fn handle_exit_request(app: &AppHandle, code: Option<i32>, api: &ExitRequestApi) {
-    if code == Some(tauri::RESTART_EXIT_CODE) {
+/// Called once by the shared graceful exit owner while stores still work.
+/// Restart preserves the existing policy of not scheduling an on-exit backup.
+pub(crate) async fn prepare_exit(app: &AppHandle, restarting: bool) {
+    if restarting {
         return;
     }
     let coordinator = app.state::<BackupCoordinator>();
-    if coordinator.exit_finished.load(Ordering::SeqCst) {
+    if coordinator.exit_finished.load(Ordering::SeqCst)
+        || !is_backup_due(&load_policy(app), 0, BackupTrigger::Exit)
+    {
         return;
     }
-    if !is_backup_due(&load_policy(app), 0, BackupTrigger::Exit) {
-        return;
-    }
-    api.prevent_exit();
     if coordinator.exit_started.swap(true, Ordering::SeqCst) {
         return;
     }
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        run_backup(app.clone(), BackupTrigger::Exit).await;
-        super::jobs::scheduled(&app, BackupTrigger::Exit).await;
-        app.state::<BackupCoordinator>()
-            .exit_finished
-            .store(true, Ordering::SeqCst);
-        app.exit(code.unwrap_or(0));
-    });
+    let attempt = ExitBackupAttempt(&coordinator);
+    run_backup(app.clone(), BackupTrigger::Exit).await;
+    super::jobs::scheduled(app, BackupTrigger::Exit).await;
+    coordinator.exit_finished.store(true, Ordering::SeqCst);
+    drop(attempt);
+}
+
+struct ExitBackupAttempt<'a>(&'a BackupCoordinator);
+impl Drop for ExitBackupAttempt<'_> {
+    fn drop(&mut self) {
+        if !self.0.exit_finished.load(Ordering::SeqCst) {
+            self.0.exit_started.store(false, Ordering::SeqCst);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cancelled_exit_backup_can_retry_without_rerunning_a_completed_backup() {
+        let coordinator = BackupCoordinator::default();
+        coordinator.exit_started.store(true, Ordering::SeqCst);
+        drop(ExitBackupAttempt(&coordinator));
+        assert!(!coordinator.exit_started.load(Ordering::SeqCst));
+        coordinator.exit_started.store(true, Ordering::SeqCst);
+        coordinator.exit_finished.store(true, Ordering::SeqCst);
+        drop(ExitBackupAttempt(&coordinator));
+        assert!(coordinator.exit_started.load(Ordering::SeqCst));
+    }
 
     #[test]
     fn daily_and_weekly_backups_become_due_without_restarting() {

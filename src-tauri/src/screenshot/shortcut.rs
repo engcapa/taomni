@@ -209,7 +209,7 @@ fn apply_native(app: &AppHandle, accelerator: String) -> Result<ShortcutStatus, 
 /// Identify the shared portal connection before GTK/Tauri can issue a request.
 #[cfg(target_os = "linux")]
 pub(crate) fn prepare_portal_identity(identifier: &str) {
-    if crate::servers::rdp::capture::wayland::is_wayland_session() {
+    if taomni_capture::engine::wayland::is_wayland_session() {
         // GTK/Tauri initialization can query portal settings before setup.
         // The first request fixes ashpd's connection identity on portal 1.20.
         if let Err(error) = tauri::async_runtime::block_on(portal::ensure_identity(identifier)) {

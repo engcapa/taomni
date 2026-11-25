@@ -1,0 +1,16 @@
+[package]
+name = "taomni-screenshot-recording"
+version = "0.1.0"
+description = "Timed GIF and MP4 encoding for captured screenshot frames"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[dependencies]
+anyhow = "1"
+bytes = "1"
+gif = "0.13"
+image = { version = "0.25", default-features = false }
+mp4 = "0.14"
+openh264 = "0.9"
+taomni-screenshot-api = { path = "../taomni-screenshot-api" }

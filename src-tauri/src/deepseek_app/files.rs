@@ -23,7 +23,7 @@ fn progress(
 ) {
     let value = json!({"id":id,"phase":phase,"downloadedBytes":bytes,"totalBytes":total,
         "percent":if total>0 {bytes as f64/total as f64*100.0} else {0.0},"error":error});
-    if let Ok(db) = state.db.lock() {
+    if let Ok(db) = state.core.db.lock() {
         let _ = db.execute(
             "INSERT OR REPLACE INTO ds_app_file_tasks(id,state) VALUES(?1,?2)",
             rusqlite::params![id, value.to_string()],
@@ -42,7 +42,7 @@ pub async fn deepseek_app_upload_file(
 ) -> Result<Value, String> {
     let path = std::path::PathBuf::from(local_path);
     let provider_id = provider.as_deref().unwrap_or("deepseek-app");
-    let config = state.ai_ctx.read().await.config.clone();
+    let config = state.legacy.ai_ctx.read().await.config.clone();
     let configured = super::client::provider_config(&config, provider_id)?;
     if configured.runtime != "deepseek-messages" {
         return super::inline_files::attach(&state, &thread_id, provider_id, &path).await;
@@ -67,7 +67,7 @@ pub async fn deepseek_app_upload_file(
         .map(|byte| format!("{byte:02x}"))
         .collect::<String>();
     {
-        let db = state.db.lock().map_err(|_| "database unavailable")?;
+        let db = state.core.db.lock().map_err(|_| "database unavailable")?;
         init(&db)?;
         let mut statement = db
             .prepare("SELECT file_id,filename,mime,size FROM ds_app_files WHERE hash=?1")
@@ -106,7 +106,7 @@ pub async fn deepseek_app_upload_file(
             if !response.status().is_success(){return Err(format!("http: file upload returned HTTP {}",response.status().as_u16()));}
             let value:Value=response.json().await.map_err(|_|"protocol: invalid file response")?;
             let file_id=value["id"].as_str().ok_or("protocol: file id missing")?.to_string();
-            let db=state.db.lock().map_err(|_|"database unavailable")?;
+            let db=state.core.db.lock().map_err(|_|"database unavailable")?;
             db.execute("INSERT OR REPLACE INTO ds_app_files(hash,file_id,filename,mime,size) VALUES(?1,?2,?3,?4,?5)",
                 rusqlite::params![hash,file_id,filename,mime,metadata.len() as i64]).map_err(|e|e.to_string())?;
             Ok(json!({"fileId":file_id,"filename":filename,"mime":mime,"sizeBytes":metadata.len(),"threadId":thread_id}))
@@ -171,7 +171,7 @@ pub async fn deepseek_app_delete_file(
             response.status().as_u16()
         ));
     }
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     init(&db)?;
     db.execute("DELETE FROM ds_app_files WHERE file_id=?1", [file_id])
         .map_err(|e| e.to_string())?;
@@ -180,7 +180,7 @@ pub async fn deepseek_app_delete_file(
 
 #[tauri::command]
 pub fn deepseek_app_file_tasks(state: State<'_, AppState>) -> Result<Vec<Value>, String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     init(&db)?;
     let mut stmt = db
         .prepare("SELECT state FROM ds_app_file_tasks ORDER BY rowid DESC")

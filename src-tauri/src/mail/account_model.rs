@@ -3,58 +3,16 @@ use super::connection_model::MailIncomingProtocol;
 use super::connection_model::MailProvider;
 use super::connection_model::MailServerConfig;
 use super::connection_model::MailSmtpConfig;
-use super::limits::DEFAULT_BODY_MAX_BYTES;
 use super::limits::DEFAULT_MESSAGE_LIMIT;
 use super::oauth_model::MailOAuthSettings;
 use crate::mail::caldav;
 use crate::mail::contacts;
-use crate::mail::storage;
 use crate::terminal::network::NetworkSettings;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MailCacheSettings {
-    #[serde(default = "default_true")]
-    pub enabled: bool,
-    #[serde(default = "default_header_retention_days")]
-    pub header_retention_days: u32,
-    #[serde(default = "default_header_limit_per_folder")]
-    pub header_limit_per_folder: u32,
-    #[serde(default = "default_body_recent_limit")]
-    pub body_recent_limit: u32,
-    #[serde(default = "default_body_max_bytes")]
-    pub body_max_bytes: u32,
-    #[serde(default)]
-    pub attachment_cache: bool,
-    #[serde(default)]
-    pub save_directory: Option<String>,
-    #[serde(default)]
-    pub storage_directory: Option<String>,
-    #[serde(default)]
-    pub full_message_mode: storage::FullMessageMode,
-    #[serde(default)]
-    pub full_message_folders: Vec<String>,
-}
-
-impl Default for MailCacheSettings {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            header_retention_days: default_header_retention_days(),
-            header_limit_per_folder: default_header_limit_per_folder(),
-            body_recent_limit: default_body_recent_limit(),
-            body_max_bytes: default_body_max_bytes(),
-            attachment_cache: false,
-            save_directory: None,
-            storage_directory: None,
-            full_message_mode: storage::FullMessageMode::All,
-            full_message_folders: Vec::new(),
-        }
-    }
-}
+pub use taomni_mail_storage::cache::MailCacheSettings;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -151,24 +109,6 @@ pub struct MailAccountConfig {
 
 pub(super) fn default_true() -> bool {
     true
-}
-
-/// 0 = keep every header (full local header index).
-pub(super) fn default_header_retention_days() -> u32 {
-    0
-}
-
-/// 0 = no per-folder header cap.
-pub(super) fn default_header_limit_per_folder() -> u32 {
-    0
-}
-
-pub(super) fn default_body_recent_limit() -> u32 {
-    200
-}
-
-pub(super) fn default_body_max_bytes() -> u32 {
-    DEFAULT_BODY_MAX_BYTES as u32
 }
 
 pub(super) fn default_sync_interval_minutes() -> u32 {

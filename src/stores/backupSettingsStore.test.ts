@@ -69,7 +69,7 @@ describe("persisted backup settings", () => {
   });
   it("preserves the scope contract and makes presets atomic", () => {
     const full = preset("full", globalRange(h.disk.policy));
-    expect(rangeOptions(full)).toMatchObject({ includeMail: true, includeLanchat: true, includeLocalHistory: false });
+    expect(rangeOptions(full)).toMatchObject({ includeMail: true, includeLocalHistory: false });
     expect(rangeOptions({ ...full, customOptions: { includeMail: false } }).includeMail).toBe(false);
     expect(rangeOptions({ scope: "custom", customOptions: { includeMfa: true } })).toMatchObject({ includeMfa: true, includeVault: true, includeSessions: false });
     expect(preset("core", full).customOptions?.includeMail).toBe(false);

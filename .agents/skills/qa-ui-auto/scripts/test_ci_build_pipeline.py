@@ -14,6 +14,43 @@ ROOT = Path(__file__).resolve().parents[4]
 
 
 class BuildPipelineTests(unittest.TestCase):
+    def test_windows_native_cache_restore_never_crosses_runner_images(self):
+        workflow = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
+        steps = workflow['jobs']['entry']['steps']
+        scope = next(s for s in steps if s.get('id') == 'windows-cache-scope')
+        self.assertIn("runner.os == 'Windows'", scope['if'])
+        script = scope['run'].split('\n', 1)[1].rsplit('\nPY', 1)[0]
+        for image, expected_scope in [('20261116.315.1', 'image-20261116.315.1'),
+                                      ('20261109.311.1', 'image-20261109.311.1'), ('', 'run-17-2')]:
+            with self.subTest(image=image), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / 'output'
+                env = dict(os.environ, ImageVersion=image, GITHUB_OUTPUT=str(output),
+                           QA_CACHE_PLATFORM='windows', GITHUB_RUN_ID='17', GITHUB_RUN_ATTEMPT='2')
+                subprocess.run([sys.executable, '-c', script], env=env, check=True)
+                self.assertEqual(output.read_text(), f'platform=windows-{expected_scope}\n')
+        expected_key = '${{ steps.windows-cache-scope.outputs.platform || matrix.cache_key }}'
+        dependencies = next(s for s in steps if s.get('uses') == 'swatinem/rust-cache@v2')
+        self.assertIn(expected_key, dependencies['with']['shared-key'])
+        reusable = next(s for s in steps if s.get('id') == 'reusable-key')
+        self.assertIn('steps.windows-cache-scope.outputs.platform', reusable['env']['QA_PLATFORM_KEY'])
+        self.assertLess(steps.index(scope), steps.index(reusable))
+
+    def test_compiled_workspace_caches_require_the_current_build_inputs(self):
+        entry = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
+        steps = entry['jobs']['entry']['steps']
+        cache = next(step['with'] for step in steps if step.get('id') == 'reusable-runtime-cache')
+        self.assertEqual(cache['key'], '${{ steps.reusable-key.outputs.key }}')
+        self.assertNotIn('restore-keys', cache)
+        performance = yaml.safe_load((ROOT / '.github/workflows/qa-workspace-performance.yml').read_text())
+        perf_steps = next(job['steps'] for job in performance['jobs'].values() if 'steps' in job)
+        self.assertFalse(any(step.get('with', {}).get('path') == 'src-tauri/target/qa-ui-auto'
+                             for step in perf_steps))
+        for consumer in (steps, perf_steps):
+            dependencies = next(step['with'] for step in consumer
+                                if step.get('uses') == 'swatinem/rust-cache@v2')
+            self.assertIs(dependencies['cache-targets'], True)
+            self.assertIs(dependencies['cache-workspace-crates'], False)
+
     def test_frontend_regressions_run_in_parallel_sharded_job_and_keep_original_log(self):
         entry = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
         entry_steps = entry['jobs']['entry']['steps']
@@ -77,15 +114,60 @@ class BuildPipelineTests(unittest.TestCase):
                     self.assertEqual(data['failures'][0]['case'], 'infrastructure')
                     self.assertEqual(data['infrastructure_errors'][0]['entry'], 'native-contracts')
 
-    def test_each_platform_waits_only_for_its_producer_and_final_gate_keeps_contracts(self):
+    def test_each_platform_waits_for_its_producer_and_optional_signed_input_without_other_core_builds(self):
         jobs = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']
         for platform in ('linux', 'windows', 'macos'):
-            self.assertEqual(jobs[f'execute-{platform}-native']['needs'], ['plan', f'build-{platform}'])
+            dependencies = ['plan', f'build-{platform}', 'signed-modular-packages']
+            for module in ('mfa', 'vnc', 'rdp'):
+                signer = f'signed-{module}-{platform}'
+                dependencies.append(signer)
+                self.assertIn(signer, jobs['summarize']['needs'])
+                self.assertIn(f"contains(needs.plan.outputs.{platform}_native_matrix, 'signed-{module}')", jobs[signer]['if'])
+                self.assertEqual(jobs[signer]['with']['module'],
+                                 f'{module}-client' if module in ('rdp', 'vnc') else module)
+                self.assertEqual(jobs[signer]['with']['native_builds'],
+                                 '${{ needs.plan.outputs.' + platform + '_build_matrix }}')
+            rdp_server_signer = f'signed-rdp-server-{platform}'
+            self.assertEqual(jobs[rdp_server_signer]['with']['module'], 'rdp-server')
+            self.assertEqual(jobs[rdp_server_signer]['with']['native_builds'],
+                             '${{ needs.plan.outputs.' + platform + '_build_matrix }}')
+            self.assertIn(f"contains(needs.plan.outputs.{platform}_native_matrix, 'signed-local-rdp')",
+                          jobs[rdp_server_signer]['if'])
+            self.assertIn(rdp_server_signer, jobs['summarize']['needs'])
+            self.assertEqual(
+                jobs[f'execute-{platform}-native']['needs'],
+                dependencies + [
+                    'signed-mail', 'signed-screenshot', 'signed-vnc-server', 'signed-servers',
+                    'signed-voice', 'signed-sockscap', rdp_server_signer,
+                ],
+            )
             self.assertIn(f'execute-{platform}-native', jobs['summarize']['needs'])
             self.assertIn(f'build-{platform}', jobs['summarize']['needs'])
         self.assertEqual(jobs['native-contracts']['needs'], 'plan')
         self.assertIn('native-contracts', jobs['summarize']['needs'])
         self.assertIn('tool-contracts', jobs['summarize']['needs'])
+        self.assertIn('signed-modular-packages', jobs['summarize']['needs'])
+        self.assertIn('signed-mail', jobs['summarize']['needs'])
+        self.assertEqual(jobs['signed-mail']['with']['module'], 'mail')
+        self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-mail')", jobs['signed-mail']['if'])
+        self.assertIn('signed-screenshot', jobs['summarize']['needs'])
+        self.assertEqual(jobs['signed-screenshot']['with']['module'], 'screenshot')
+        self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-screenshot')", jobs['signed-screenshot']['if'])
+        self.assertIn('signed-vnc-server', jobs['summarize']['needs'])
+        self.assertEqual(jobs['signed-vnc-server']['with']['module'], 'vnc-server')
+        self.assertIn('signed-servers', jobs['summarize']['needs'])
+        self.assertEqual(jobs['signed-servers']['with']['module'], 'servers')
+        self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-local-servers')", jobs['signed-servers']['if'])
+        self.assertIn('signed-voice', jobs['summarize']['needs'])
+        self.assertEqual(jobs['signed-voice']['with']['module'], 'ai-voice-local')
+        self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-local-voice')", jobs['signed-voice']['if'])
+        self.assertIn('signed-sockscap', jobs['summarize']['needs'])
+        self.assertEqual(jobs['signed-sockscap']['with']['module'], 'sockscap')
+        self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-sockscap')", jobs['signed-sockscap']['if'])
+        self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-local-vnc')", jobs['signed-vnc-server']['if'])
+        self.assertIs(jobs['signed-rdp-server-macos']['with']['native_macos_signing'], True)
+        self.assertIn('APPLE_CERTIFICATE', jobs['signed-rdp-server-macos']['secrets'])
+        self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-module')", jobs['signed-modular-packages']['if'])
         self.assertNotIn('Validate QA tools', [s.get('name') for s in jobs['plan']['steps']])
 
     def test_rust_cache_prunes_targets_reusable_runtime_cache_replaces_raw_target_and_windows_contracts_decouple(self):
@@ -110,6 +192,11 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertIn('Configure Linux fast linker (lld)', names)
         build_step = next(s for s in steps if s.get('name') == 'Build and export the verified native runtime')
         self.assertIn('--reusable-archive qa-build-output/reusable-runtime/reusable.tar.gz', build_step['run'])
+        runtime_upload = next(s for s in steps if s.get('name') == 'Upload native runtime once per build')
+        self.assertNotIn('continue-on-error', runtime_upload)
+        self.assertEqual(runtime_upload['with']['if-no-files-found'], 'error')
+        diagnostics = next(s for s in steps if s.get('name') == 'Retain native build diagnostics')
+        self.assertIs(diagnostics['continue-on-error'], True)
         for contract_name in (
             'Windows native session cleanup contracts',
             'Windows atomic file replacement contracts',
@@ -128,7 +215,7 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertIn('scripts/refresh-sherpa-onnx-cache.mjs', sherpa_refresh['run'])
         self.assertIn('cargo clean --manifest-path src-tauri/Cargo.toml --package sherpa-onnx-sys', sherpa_refresh['run'])
         helper_contracts = next(s for s in steps if s.get('name') == 'Windows capture helper contracts')
-        self.assertIn("'-p', 'sockscap-helper'", helper_contracts['run'])
+        self.assertIn("'-p', 'taomni-sockscap-tools'", helper_contracts['run'])
         self.assertNotIn('pnpm build:mobile', helper_contracts['run'])
 
     @unittest.skipUnless(os.name == 'posix' and shutil.which('bash'), 'POSIX shell contract')
@@ -155,7 +242,8 @@ class BuildPipelineTests(unittest.TestCase):
                 root_tests = [c for c in commands if '--lib' in c and '-p' not in c]
                 self.assertEqual(len(root_tests), 1)
                 expected = ['lsp::tests::workspace_watch_lifetime', 'commands::workspace_reads::tests',
-                    'workspace::tests::text_and_encoding', 'workspace::tests::encoding_matrix'] + (['rdp::'] if rdp else []) + (['capture::', 'screenshot::', 'mfa::'] if dual else [])
+                    'workspace::tests::text_and_encoding', 'workspace::tests::encoding_matrix',
+                    'plugin::migration::', 'deepseek_app::'] + (['rdp::'] if rdp else []) + (['capture::', 'screenshot::', 'mfa::'] if dual else [])
                 self.assertEqual(root_tests[0], ['test', '--locked', '--release', '--lib', '--', *expected])
                 self.assertEqual(any('rdp-probe' in c for c in commands), rdp)
                 self.assertEqual(any('profile_photo_encoder_costs' in c for c in commands), rdp)

@@ -1,0 +1,111 @@
+id: TC-MODULES-024
+title: Native Linux module execution reports noexec and recovers with the same signed files and user data
+description: >-
+  Install the official current-source signed hello module using the production
+  form. Save data through its actual frontend, disable the host and apply a
+  case-owned noexec bind mount to only its installed version directory. Opening
+  the enabled module must show the stable execution error and actionable data
+  location advice. Independent IPC, kernel flags, signed bytes, active version,
+  data bytes and writer-lock checks must agree. Remove the fixture mount, reopen
+  the module without restarting the core, read the original data and save again.
+  Always unmount during cleanup. Package-format install locations are a separate G4 gate.
+covers: [F-Modules-1]
+tags: [p1, modules, security, lifecycle, noexec]
+modes: [native]
+native_platforms: [Linux]
+fixtures: [reset_db, module_signed_archive, module_execution]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-offline-install"]'
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.module_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.module_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- wait_for: '[data-testid="hello-plugin-empty"]'
+- fill: {selector: '[data-testid="hello-plugin-value"]', value: preserved before noexec}
+- click: '[data-testid="hello-plugin-save"]'
+- assert_text_equals: {selector: '[data-testid="hello-plugin-entry"]', equals: preserved before noexec}
+- click: '[data-testid="tab-item"][data-tab-type="plugin"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="hello-plugin-view"]', state: detached}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="module-action-disable-hello-plugin"]'
+- click: '[data-testid="module-action-disable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-enable-hello-plugin"]'
+- module_signed_probe: {phase: disabled}
+- module_execution_probe: {phase: block}
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- wait_for: '[data-testid="hello-plugin-error"]'
+- assert_text: {selector: '[data-testid="hello-plugin-error"]', contains: MODULE_HOST_NOEXEC}
+- assert_text: {selector: '[data-testid="hello-plugin-error"]', contains: XDG_DATA_HOME}
+- assert_count: {selector: '[data-testid="hello-plugin-entry"]', equal: 0}
+- module_execution_probe: {phase: rejected}
+- assert_no_runtime_errors: null
+- screenshot: module-noexec-actionable-error.png
+- module_execution_probe: {phase: restore}
+- click: '[data-testid="tab-item"][data-tab-type="plugin"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="hello-plugin-view"]', state: detached}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- assert_text_equals: {selector: '[data-testid="hello-plugin-entry"]', equals: preserved before noexec}
+- assert_not_visible: '[data-testid="hello-plugin-error"]'
+- fill: {selector: '[data-testid="hello-plugin-value"]', value: saved after noexec}
+- click: '[data-testid="hello-plugin-save"]'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: saved after noexec}
+- assert_count: {selector: '[data-testid="hello-plugin-entry"]', equal: 2}
+- module_execution_probe: {phase: recovered}
+- assert_no_runtime_errors: null
+- screenshot: module-noexec-recovered-data.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A trusted independent native module first saves actual user data and releases its writer lease on disable.
+    actions: [7, 8, 9, 11, 13, 15, 16, 18, 22]
+    checkpoints:
+    - {step: 10, expectation: The ordinary production pinned verifier installs the current-source official package.}
+    - {step: 17, expectation: The real module frontend displays its first persisted host response.}
+    - {step: 24, expectation: Native disabled state rejects invoke and the independent writer lease is released.}
+    results: [10, 17, 24]
+  - id: R2
+    requirement: A real noexec filesystem rejects execution with actionable advice while preserving signed bytes, version and user data.
+    actions: [25, 26, 28]
+    checkpoints:
+    - {step: 30, expectation: The module displays the stable MODULE_HOST_NOEXEC failure.}
+    - {step: 31, expectation: The error tells the user how to select an executable data location.}
+    - {step: 32, expectation: A failed read does not display an empty or successful data result.}
+    - {step: 33, expectation: "The kernel flag, permission-denied IPC code, exact signed code/data hashes, active version and released writer lease agree."}
+    - {step: 34, expectation: Handled execution rejection causes no unhandled renderer errors.}
+    results: [30, 31, 32, 33, 34]
+  - id: R3
+    requirement: Restoring the fixture mount permits the same signed module to read preserved data and save again without restarting the core.
+    actions: [36, 37, 39, 41, 44, 45]
+    checkpoints:
+    - {step: 42, expectation: Reopening the component reads the exact original persisted message.}
+    - {step: 43, expectation: The new successful component clears the execution failure.}
+    - {step: 46, expectation: The asynchronous save finishes and the second persisted value is visible.}
+    - {step: 47, expectation: Both original and new saved messages are displayed exactly once.}
+    - {step: 48, expectation: "The unchanged signed executable returns its identity and both messages, and owns the native writer lease again."}
+    - {step: 49, expectation: Recovery produces no unhandled runtime errors.}
+    results: [42, 43, 46, 47, 48, 49]
+  native:
+  - check: Real Linux noexec mount, production host permission rejection, exact disk bytes, native writer lease and same-process recovery.
+    method: automated
+    reason: Browser stubs cannot establish kernel execution policy or actual host ownership.
+  - check: deb/rpm/AppImage installed-location behavior and complete-profile relocation to an executable filesystem.
+    method: manual
+    reason: This case runs the isolated QA executable and restores the fixture mount; it does not install three package formats or relocate a user profile.
+  visual:
+  - check: Actionable execution error and recovered module remain readable.
+    method: manual
+    reason: Retained screenshots support visual review separately from behavior assertions.

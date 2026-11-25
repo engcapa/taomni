@@ -2,6 +2,7 @@
 import type { BackupPolicy } from "../lib/backup";
 import type { BackupSettingsSnapshot, ControlPatch, SettingsEdit } from "../lib/backupSettings";
 import { globalRange } from "../lib/backupSettings";
+import { rememberBackupPreview } from "./backupRestoreStub";
 import type { BackupJob, RemoteConfiguration, AuthorizationSession, BackupControlConfig, RemoteBackup } from "../lib/remoteBackup";
 
 const key = "taomni.qa.backup.v1";
@@ -58,6 +59,7 @@ export async function remoteBackupStub(cmd: string, args: Record<string, any> = 
       result = ids.map((targetId) => {
         const jobId = crypto.randomUUID();
         state.jobs.push({ id: jobId, targetId, revision: 1, operation: targetId === "local" ? "local" : "upload", phase: "completed", bytes: 128, total: 128, error: null, artifact: null, remote: null, localPath: targetId === "local" ? request.destination.path ?? "/preview/backups/manual.taobak" : null, createdAt: Date.now() });
+        if (targetId === "local") rememberBackupPreview(state.jobs.at(-1)!.localPath!, globalRange(policy), !!request.destination.password);
         return { targetId, jobId, localPath: null, error: null };
       });
       localStorage.setItem("taomni.qa.backup.lastManual", JSON.stringify({ range: globalRange(policy), destinationIds: ids }));

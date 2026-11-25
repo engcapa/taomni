@@ -97,8 +97,7 @@
 2. detach→另一窗口采用原终端→关闭分离窗口归位→再次detach→关闭标签：
    原ID在交接期间不重复创建；正常关闭最终结束预期资源，不保护错对象。
 3. 手动renderer恢复与上述正常关闭交错（顺序分别测试），用户关闭优先。
-4. 主窗口与独立SFTP、普通分离terminal/database/RDP/VNC/notes/servers/
-   lan-chat分别核对路由和描述；缺已保存配置/过期handoff提示，不恢复凭据。
+4. 主窗口与独立SFTP、普通分离terminal/database/RDP/VNC/notes/servers分别核对路由和描述；缺已保存配置/过期handoff提示，不恢复凭据。
 5. 保留F5/Ctrl+R生产拦截、已有应用退出确认和backup scheduler退出规则。
    正常冷启动Outbox保留旧定时处理；仅恢复启动暂停，不变成永久全局停发。
 
@@ -146,8 +145,6 @@
    不误触Destroyed导致业务资源删除；独立控制窗必须仍能停止并保留文件。
 3. 若共享renderer使控制窗也失去控制，验证沿现有原生停止能力收尾；
    无可控停止的分支记fail，不用“有限恢复”掩盖无限采集/滚动。
-4. LanChat通话/屏幕/音频采集核对控制或停止路径；不自动重建通话或重发
-   文件/消息。固定图、图板、边界覆盖层不适用通用reload替换。
 
 证据：麦克风/屏幕采集状态、输出文件可读性、停止行为和窗口身份。
 共享renderer及native AV设备缺失分别unrun。

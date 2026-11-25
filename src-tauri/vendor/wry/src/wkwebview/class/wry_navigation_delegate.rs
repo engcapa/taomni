@@ -24,6 +24,7 @@ use crate::{
       did_commit_navigation, did_finish_navigation, navigation_policy, navigation_policy_response,
       web_content_process_did_terminate,
     },
+    pending_scripts::PendingScripts,
   },
   PageLoadEvent, WryWebView,
 };
@@ -31,7 +32,7 @@ use crate::{
 use super::wry_download_delegate::WryDownloadDelegate;
 
 pub struct WryNavigationDelegateIvars {
-  pub pending_scripts: Arc<Mutex<Option<Vec<String>>>>,
+  pub pending_scripts: Arc<Mutex<PendingScripts>>,
   pub has_download_handler: bool,
   pub navigation_policy_function: Box<dyn Fn(String) -> bool>,
   pub download_delegate: Option<Retained<WryDownloadDelegate>>,
@@ -109,7 +110,7 @@ impl WryNavigationDelegate {
   #[allow(clippy::too_many_arguments)]
   pub fn new(
     webview: Retained<WryWebView>,
-    pending_scripts: Arc<Mutex<Option<Vec<String>>>>,
+    pending_scripts: Arc<Mutex<PendingScripts>>,
     has_download_handler: bool,
     navigation_handler: Option<Box<dyn Fn(String) -> bool>>,
     download_delegate: Option<Retained<WryDownloadDelegate>>,

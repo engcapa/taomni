@@ -1,0 +1,85 @@
+id: TC-MODULES-018
+title: Native module frontend tampering is contained and a restored signed file can be retried
+description: >-
+  Install and enable the matching official hello package through the production
+  verifier, then alter only its installed frontend in the disposable QA profile.
+  Opening the module must fail closed through the actual native protocol while
+  leaving the core usable. Restore the retained signed bytes, retry through the
+  real UI and save a value through the SDK host. This covers runtime asset
+  integrity and failure recovery; it does not establish OS signing or migration.
+covers: [F-Modules-1]
+tags: [p1, modules, lifecycle, install]
+modes: [native]
+fixtures: [reset_db, module_signed_archive]
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-offline-install"]'
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.module_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.module_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- module_signed_probe: {phase: enabled}
+- module_signed_probe: {phase: tamper-frontend}
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- wait_for: '[data-testid="plugin-tab-error"]'
+- assert_text: {selector: '[data-testid="plugin-tab-error"]', contains: hello-plugin}
+- assert_count: {selector: '[data-testid="hello-plugin-view"]', equal: 0}
+- assert_count: {selector: '[data-testid="status-bar"]', equal: 1}
+- screenshot: native-module-integrity-error.png
+- module_signed_probe: {phase: restore-frontend}
+- click: '[data-testid="plugin-tab-retry"]'
+- wait_for: '[data-testid="hello-plugin-values"][data-state="empty"] [data-testid="hello-plugin-empty"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="plugin"]', equal: 1}
+- fill: {selector: '[data-testid="hello-plugin-value"]', value: integrity retry saved}
+- click: '[data-testid="hello-plugin-save"]'
+- wait_for: '[data-testid="hello-plugin-entry"]'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: integrity retry saved}
+- module_signed_probe: {phase: enabled}
+- assert_no_runtime_errors: null
+- screenshot: native-module-integrity-recovered.png
+- click: '[data-testid="tab-item"][data-tab-type="plugin"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"]', state: detached}
+- assert_count: {selector: '[data-testid="status-bar"]', equal: 1}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Altered signed ESM is rejected at the native asset boundary and no module component executes.
+    actions: [7, 8, 9, 11, 14, 15]
+    checkpoints:
+    - {step: 10, expectation: The pinned-key production installation succeeds before the fault.}
+    - {step: 13, expectation: Independent native observation confirms the actual host and writer lease.}
+    - {step: 16, expectation: The ordinary module pane contains a visible loading error.}
+    - {step: 17, expectation: The error identifies the selected module.}
+    - {step: 18, expectation: No module component mounted from the changed ESM.}
+    - {step: 19, expectation: The core status bar remains mounted.}
+    results: [10, 13, 16, 17, 18, 19]
+  - id: R2
+    requirement: Restoring the exact signed bytes permits an explicit retry and real SDK writes without duplicate tabs or core errors.
+    actions: [21, 22, 25, 26, 32]
+    checkpoints:
+    - {step: 23, expectation: A fresh import after Retry renders the actual signed module component.}
+    - {step: 24, expectation: Retry retains exactly one tab.}
+    - {step: 28, expectation: The SDK-backed value is visible after the actual host write.}
+    - {step: 29, expectation: Native host identity and restored signed bytes remain valid.}
+    - {step: 30, expectation: The handled asset error produces no unhandled application error.}
+    - {step: 33, expectation: Closing the module removes its executable pane.}
+    - {step: 34, expectation: The core remains usable after closing the recovered module.}
+    - {step: 35, expectation: No unhandled application error remains.}
+    results: [23, 24, 28, 29, 30, 33, 34, 35]
+  native:
+  - check: Actual installed frontend mutation, verified protocol rejection, exact byte restoration and SDK store write.
+    method: automated
+    reason: Browser stubs cannot establish native package integrity or process-owned writes.
+  visual:
+  - check: The error and recovered module remain readable without affecting core chrome.
+    method: manual
+    reason: State assertions establish containment; retained error and recovery screenshots support visual review.

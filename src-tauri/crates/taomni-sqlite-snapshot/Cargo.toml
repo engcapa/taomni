@@ -1,0 +1,11 @@
+[package]
+name = "taomni-sqlite-snapshot"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "Cancellable standalone SQLite online snapshots for core and hosts"
+license = "MIT"
+
+[dependencies]
+rusqlite = { version = "0.40", features = ["bundled", "backup", "hooks"] }
+tempfile = "3"

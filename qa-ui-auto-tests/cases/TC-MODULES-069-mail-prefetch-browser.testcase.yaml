@@ -1,0 +1,69 @@
+id: TC-MODULES-069
+title: Mail can open a message while recent bodies are warming
+description: Hold background prefetch after refreshing headers and open a different message while warming is still pending.
+covers: [F-Modules-1, F-MAIL-3]
+tags: [modules, mail, p1]
+modes: [browser]
+fixtures: [reset_db, module_mail_preview, mail_server]
+timeout_sec: 100
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- click: '[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]'
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-toolbar-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
+- mail_server_assert_list_matches: {timeout_sec: 20}
+- wait_for: {selector: '[data-testid="mail-body-warming-progress"]', state: detached}
+- mail_server_prefetch_paused: true
+- mail_server_deliver: {count: 4, prefix: Browser prefetch}
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- wait_for: '[data-testid="mail-message-row"][data-subject="Browser prefetch 0004"]'
+- assert_text: {selector: '[data-testid="mail-body-warming-progress"]', contains: Bodies 0/4}
+- click: '[data-testid="mail-message-row"][data-subject="Browser prefetch 0001"]'
+- assert_text: {selector: '[data-testid="mail-reader-text"]', contains: 'Subject: Browser prefetch 0001'}
+- assert_text: {selector: '[data-testid="mail-body-warming-progress"]', contains: Bodies 0/4}
+- mail_server_prefetch_paused: false
+- wait_for: {selector: '[data-testid="mail-body-warming-progress"]', state: detached}
+- assert_text: {selector: '[data-testid="mail-reader-text"]', contains: 'Subject: Browser prefetch 0001'}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Browser prefetch 0001"][data-unread="false"]'
+- assert_attribute: {selector: '[data-testid="mail-message-row"][data-subject="Browser prefetch 0004"]', name: data-unread, equals: 'true'}
+- click: '[data-testid="mail-message-row"][data-subject="Browser prefetch 0004"]'
+- assert_text: {selector: '[data-testid="mail-reader-text"]', contains: 'Subject: Browser prefetch 0004'}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Browser prefetch 0004"][data-unread="false"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: foreground-reader
+    requirement: Synchronized headers are usable during background prefetch and warming never replaces the open reader.
+    actions: [9, 17, 18, 19, 22, 25, 30]
+    checkpoints:
+    - {step: 20, expectation: The new headers appear in the account list.}
+    - {step: 21, expectation: All four recent bodies are still pending in the background.}
+    - {step: 23, expectation: The explicitly opened message is already readable.}
+    - {step: 24, expectation: The foreground read finished while prefetch was still pending.}
+    - {step: 26, expectation: The warming indicator clears when the request finishes.}
+    - {step: 27, expectation: The reader still shows the same message after warming.}
+    - {step: 28, expectation: The foreground message stays read after the background results arrive.}
+    - {step: 29, expectation: The untouched warmed message stays unread.}
+    - {step: 31, expectation: Opening an unopened warmed message displays its own body.}
+    - {step: 32, expectation: The warmed message becomes read only after opening it.}
+    - {step: 33, expectation: Loading and reading mail produce no runtime errors.}
+    results: [20, 21, 23, 24, 26, 27, 28, 29, 31, 32, 33]
+  visual:
+  - check: The preview displays progress beside the active reader.
+    method: automated
+    reason: The case observes both the warming indicator and the selected message body.
+  native:
+  - check: The signed host fetches the batch and writes to the native cache.
+    method: not-applicable
+    reason: TC-MODULES-068 verifies the real IMAP and SQLite path in the desktop app.

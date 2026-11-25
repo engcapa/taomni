@@ -68,7 +68,8 @@ export type WsOutgoing =
   /** VNC-PERF-005: start (with the canvas box in viewport CSS px) or stop
    *  native cursor sampling; while on, plain moves are not sent from here. */
   | ({ type: "native_pointer"; on: true; } & VncNativePointerTarget)
-  | { type: "native_pointer"; on: false; };
+  | { type: "native_pointer"; on: false; }
+  | { type: "special_key_capture"; enabled: boolean; };
 
 export interface VncNativePointerTarget {
   left: number;
@@ -92,7 +93,9 @@ export type WsIncoming =
     encrypted: boolean;
     /** The relay samples the cursor natively over the canvas (Windows). */
     native_pointer?: boolean;
+    native_special_keys?: boolean;
   }
+  | { type: "special_key"; code: string; down: boolean; }
   | {
     type: "disconnected";
     code: string;

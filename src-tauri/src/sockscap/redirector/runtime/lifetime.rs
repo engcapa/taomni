@@ -10,7 +10,6 @@ use super::telemetry::RedirectorTelemetrySnapshot;
 use super::telemetry::RuntimeTelemetry;
 use super::telemetry::now_unix;
 use crate::sockscap::config::SocksCapConfig;
-use crate::sockscap::paths;
 use crate::sockscap::redirector::REDIRECTOR_APP_PATH;
 use crate::sockscap::redirector::installed_executable_path;
 use crate::sockscap::redirector::scope::ScopeSnapshot;
@@ -20,6 +19,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicU64;
+use tauri::Manager;
 use tokio::sync::RwLock;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
@@ -107,31 +107,39 @@ pub async fn start(
     config: &SocksCapConfig,
     ctx: Arc<RwLock<RelayContext>>,
     session_id: &str,
+    cancel: &tokio_util::sync::CancellationToken,
 ) -> Result<RedirectorCaptureHandle, RedirectorStartError> {
     preflight(config)?;
     let file_descriptor_limit = prepare_file_descriptor_budget()?;
     let flow_capacity = relay_flow_capacity(file_descriptor_limit);
 
     let executable = installed_executable_path();
-    let mut exclusions = vec![
+    let state = app.state::<crate::state::AppState>();
+    let exclusions = vec![
         std::env::current_exe().map_err(|error| format!("resolve Taomni executable: {error}"))?,
         PathBuf::from(REDIRECTOR_APP_PATH),
+        state
+            .core
+            .paths
+            .data
+            .join(taomni_sockscap_api::XRAY_RUN_DIR)
+            .join(taomni_sockscap_api::XRAY_FILE),
     ];
-    if let Some(xray) = paths::resolve_xray_exe(app) {
-        exclusions.push(xray);
-    }
     let scope = Arc::new(ScopeSnapshot::compile(config, exclusions)?);
 
     let flow_socket_path = random_socket_path("flow");
     let provider_socket_path = random_socket_path("provider");
     let listener = bind_private_listener(&flow_socket_path)?;
     let cleanup = SocketCleanup(flow_socket_path.clone());
+    let provider_cleanup = SocketCleanup(provider_socket_path.clone());
     let bridge = launch_bridge(
+        &state.plugins,
         &executable,
         &provider_socket_path,
         &flow_socket_path,
         scope.actions(),
         session_id,
+        cancel,
     )
     .await?;
     let telemetry = Arc::new(RuntimeTelemetry {
@@ -162,6 +170,7 @@ pub async fn start(
     let block_quic = config.block_quic;
     let task_telemetry = Arc::clone(&telemetry);
     let task = tokio::spawn(async move {
+        let _provider_cleanup = provider_cleanup;
         let result = run_capture(
             listener,
             bridge,

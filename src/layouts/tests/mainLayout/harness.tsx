@@ -74,7 +74,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 
 vi.mock("@tauri-apps/api/core", () => ({
   convertFileSrc: (path: string) => path,
-  invoke: vi.fn(async () => undefined),
+  invoke: vi.fn(async (command: string) => command === "plugin_list" ? [] : undefined),
 }));
 
 vi.mock("@tauri-apps/api/event", () => import("../../../stubs/tauri-event"));
@@ -274,7 +274,7 @@ vi.mock("../../../components/terminal/TerminalPanel", () => ({
   },
 }));
 
-vi.mock("../../../components/rdp/RdpPanel", () => ({
+vi.mock("../../../components/plugins/RdpSessionPane", () => ({
   default: ({
     host,
     port,
@@ -296,7 +296,7 @@ vi.mock("../../../components/rdp/RdpPanel", () => ({
   ),
 }));
 
-vi.mock("../../../components/vnc/VncPanel", () => ({
+vi.mock("../../../../src-tauri/plugins/vnc-client/renderer/VncPanel", () => ({
   default: ({
     host,
     port,
@@ -391,26 +391,6 @@ vi.mock("../../../lib/ipc", () => ({
   clearWelcomeRunSnapshot: vi.fn(async () => undefined),
   recordLocalDirectoryUse: vi.fn(async () => ({ changed: true })),
   listenWelcomeDirectoriesChanged: vi.fn(async () => vi.fn()),
-  lanchatGetProfile: vi.fn(async () => ({
-    peerId: "test-peer",
-    displayName: "Test Peer",
-    avatarBase64: null,
-    signature: "",
-    status: "online",
-  })),
-  lanchatListConversations: vi.fn(async () => []),
-  lanchatListGroups: vi.fn(async () => []),
-  lanchatListPeers: vi.fn(async () => []),
-  lanchatGetRetention: vi.fn(async () => null),
-  lanchatGetServiceState: vi.fn(async () => ({ running: false, startOnLaunch: false })),
-  listenLanChatRoster: vi.fn(async () => vi.fn()),
-  listenLanChatMessage: vi.fn(async () => vi.fn()),
-  listenLanChatConversation: vi.fn(async () => vi.fn()),
-  listenLanChatGroup: vi.fn(async () => vi.fn()),
-  listenLanChatTransfer: vi.fn(async () => vi.fn()),
-  listenLanChatFileOffer: vi.fn(async () => vi.fn()),
-  listenLanChatSecurity: vi.fn(async () => vi.fn()),
-  listenLanChatService: vi.fn(async () => vi.fn()),
   listSessionGroups: vi.fn(async () => []),
   listSessions: vi.fn(async () => []),
   listCommonLocalDirectories: vi.fn(async () => []),
@@ -440,7 +420,12 @@ vi.mock("../../../stores/vaultStore", () => ({
         refresh: vaultMock.refresh,
         unlock: vaultMock.unlock,
       }),
-    { getState: () => ({ state: vaultMock.state }) },
+    {
+      getState: () => ({ state: vaultMock.state }),
+      // Shell tests control the gate directly; store subscriptions have their
+      // own behavior tests in vaultStore/mfaStore.
+      subscribe: vi.fn(() => () => undefined),
+    },
   ),
 }));
 

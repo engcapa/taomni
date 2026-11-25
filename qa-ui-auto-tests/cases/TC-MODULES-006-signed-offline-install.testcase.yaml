@@ -1,0 +1,146 @@
+id: TC-MODULES-006
+title: Offline module installation rejects an untrusted signature and restores its result
+description: >-
+  A report-scoped local archive and an invalid detached signature are submitted
+  through Settings. Native mode must execute the actual file/signature gate;
+  browser preview must reject explicitly. Neither mode may invent an installed
+  module. Closing and reopening Settings retains the draft and failure, and a
+  retry remains safe. Click the visible search field after each match appears so
+  user input takes over automatic layout tracking before scrolling to the form,
+  including in a short native viewport. TC-MODULES-007 separately verifies
+  official trusted native installation.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- install
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- module_offline_archive
+timeout_sec: 60
+steps:
+- host_write_file:
+    path: ${fixture.module_untrusted_archive}
+    text: "untrusted module bytes: no signed archive\n"
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-offline-install"]'
+- click: '[data-testid="settings-search-input"]'
+- click: '[data-testid="module-offline-submit"]'
+- assert_visible: '[data-testid="module-offline-error"]'
+- assert_attribute:
+    selector: '[data-testid="module-offline-install"]'
+    name: data-phase
+    equals: failed
+- fill:
+    selector: '[data-testid="module-offline-archive"]'
+    value: ${fixture.module_untrusted_archive}
+- fill:
+    selector: '[data-testid="module-offline-signature"]'
+    value: ${fixture.module_untrusted_signature}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="failed"]'
+- assert_pattern:
+    selector: '[data-testid="module-offline-error"]'
+    regex: '(?i)(signature|public key|verification)'
+- assert_visible: '[data-testid="module-store-empty"]'
+- assert_no_runtime_errors: null
+- click: '[data-testid="tab-item"][data-tab-type="settings"][data-active="true"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="settings-panel"], [data-testid="tab-item"][data-tab-type="settings"]'
+    state: detached
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-offline-install"]'
+- click: '[data-testid="settings-search-input"]'
+- assert_attribute:
+    selector: '[data-testid="module-offline-install"]'
+    name: data-phase
+    equals: failed
+- assert_attribute:
+    selector: '[data-testid="module-offline-archive"]'
+    name: value
+    equals: ${fixture.module_untrusted_archive}
+- assert_text:
+    selector: '[data-testid="module-offline-signature"]'
+    contains: 'untrusted comment: negative module installation fixture'
+- assert_pattern:
+    selector: '[data-testid="module-offline-error"]'
+    regex: '(?i)(signature|public key|verification)'
+- assert_visible: '[data-testid="module-store-empty"]'
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="failed"]'
+- assert_visible: '[data-testid="module-offline-error"]'
+- assert_visible: '[data-testid="module-store-empty"]'
+- assert_file_contains:
+    path: ${fixture.module_untrusted_archive}
+    contains: 'untrusted module bytes: no signed archive'
+- assert_no_runtime_errors: null
+- screenshot: untrusted-module-rejected.png
+- assert_count:
+    selector: '[data-testid="module-action-uninstall-hello-plugin"], [data-testid="module-delete-data-hello-plugin"], [data-testid="module-data-retained-hello-plugin"]'
+    equal: 0
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Required inputs are validated, and an untrusted archive never becomes an installed module.
+    actions: [8, 9, 12, 13, 14, 31]
+    checkpoints:
+    - step: 11
+      expectation: Required inputs produce a failed state without installing a module.
+    - step: 16
+      expectation: The real native signature boundary or explicit browser rejection exposes a signature error.
+    - step: 17
+      expectation: The installed-module projection remains empty.
+    - step: 34
+      expectation: Retrying an untrusted package still leaves the registry empty.
+    - step: 35
+      expectation: The source archive remains intact after both failed attempts.
+    - step: 36
+      expectation: Validation failure, closing Settings and retry produce no unhandled renderer errors.
+    results: [11, 16, 17, 34, 35, 36]
+  - id: R2
+    requirement: Closing Settings preserves the installation draft and error for a safe retry.
+    actions: [19, 21, 23, 25, 31]
+    checkpoints:
+    - step: 20
+      expectation: The close gesture removes both the Settings tab and its panel before reopening.
+    - step: 26
+      expectation: Reopening Settings restores the failed operation state.
+    - step: 27
+      expectation: The local archive path is retained exactly.
+    - step: 28
+      expectation: The detached signature draft is retained.
+    - step: 29
+      expectation: The signature rejection remains visible after reopening.
+    - step: 33
+      expectation: A repeated installation reports its failure after reopening Settings.
+    results: [20, 26, 27, 28, 29, 33]
+  - id: R3
+    requirement: Untrusted input cannot create module data-management controls or a retained-data status.
+    actions: [14, 31]
+    checkpoints:
+    - step: 38
+      expectation: Browser and native Settings expose neither uninstall/delete controls nor a retained-data label for the rejected hello module.
+    results: [38]
+  native:
+  - check: The archive path reaches native disk access and signature verification without changing installed modules.
+    method: automated
+    reason: Browser preview rejects explicitly and cannot validate native file access or signatures.
+  visual:
+  - check: Local archive, signature input, error and retry remain readable across desktop WebViews.
+    method: manual
+    reason: The retained rejection screenshot supports layout review; automated assertions establish state behavior.

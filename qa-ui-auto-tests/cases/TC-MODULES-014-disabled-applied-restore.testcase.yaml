@@ -1,0 +1,317 @@
+id: TC-MODULES-014
+title: A disabled signed module and paired Vault/MFA data restore together after a normal cold restart
+description: Create the RFC HOTP account and install the current-source official hello through the UI. Back up real host data with
+  the module disabled; independently verify the exact manual v2 archive and paired SQLite stores. Then change real host data, increment
+  HOTP, and rekey Vault through Settings. Reject the old current-profile password, stage the original archive through the fixed
+  production backup_stage_restore IPC, and normally close/restart the owned app. Verify original data, unchanged activation/code
+  pointer, a new generation, the original master password and 755224; an additional normal restart keeps the new generation and
+  decrypted account. Staging intentionally bypasses only the dialog automatic relaunch, so this is backend stage/apply evidence
+  and does not claim native automatic-relaunch UI coverage or an independently hosted MFA plugin.
+covers:
+- F-Modules-1
+- F-BACKUP-1
+- F-MFA-3
+- F-MFA-1
+- F12.1
+tags:
+- p0
+- modules
+- backup
+- vault
+- native-boundary
+- persistence
+modes:
+- native
+fixtures:
+- reset_db
+- module_signed_archive
+timeout_sec: 480
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-module-restore-original
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-module-restore-original
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="mfa-empty"]'
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill:
+    selector: '[data-testid="mfa-add-issuer"]'
+    value: QA Module Restore
+- fill:
+    selector: '[data-testid="mfa-add-secret"]'
+    value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ
+- click: '[data-testid="mfa-add-advanced"]'
+- select_option:
+    selector: '[data-testid="mfa-add-kind"]'
+    value: hotp
+- click: '[data-testid="mfa-add-submit"]'
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 755 224
+    timeout_sec: 30
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-offline-install"]'
+- fill:
+    selector: '[data-testid="module-offline-archive"]'
+    value: ${fixture.module_signed_archive}
+- fill:
+    selector: '[data-testid="module-offline-signature"]'
+    value: ${fixture.module_signed_signature}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- module_signed_probe:
+    phase: installed
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-disable-hello-plugin"]'
+- module_signed_probe:
+    phase: enabled
+- module_restore_probe:
+    phase: write-original
+- click: '[data-testid="module-action-disable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-enable-hello-plugin"]'
+- module_signed_probe:
+    phase: disabled
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: backup
+- wait_for: '[data-testid="backup-global-includePlugins"]'
+- assert_attribute:
+    selector: '[data-testid="backup-global-includePlugins"]'
+    name: aria-checked
+    equals: 'true'
+- set_check:
+    selector: '[data-testid="backup-local-select"]'
+    checked: true
+- click: '[data-testid="backup-selected-start"]'
+- wait_for:
+    selector: '[data-testid="backup-action-success"]'
+    timeout_sec: 90
+- wait_for: '[data-testid="backup-manual-result"][data-target-id="local"][data-job-id]'
+- module_restore_probe:
+    phase: disabled-archive
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-offline-install"]'
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-disable-hello-plugin"]'
+- module_signed_probe:
+    phase: enabled
+- module_restore_probe:
+    phase: write-mutated
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mfa"]'
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 755 224
+    timeout_sec: 30
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 287 082
+    timeout_sec: 30
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: vault
+- wait_for: '[data-testid="vault-change-master-button"]'
+- click: '[data-testid="vault-change-master-button"]'
+- wait_for: '[data-testid="vault-change-master-form"]'
+- fill:
+    selector: '[data-testid="vault-change-master-old"]'
+    value: qa-module-restore-original
+- fill:
+    selector: '[data-testid="vault-change-master-new1"]'
+    value: qa-module-restore-changed
+- fill:
+    selector: '[data-testid="vault-change-master-new2"]'
+    value: qa-module-restore-changed
+- click: '[data-testid="vault-change-master-submit"]'
+- assert_text:
+    selector: '[data-testid="vault-change-master-form"]'
+    contains: Master password updated.
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-offline-install"]'
+- click: '[data-testid="module-action-disable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-enable-hello-plugin"]'
+- module_signed_probe:
+    phase: disabled
+- module_restore_probe:
+    phase: reject-password
+- module_restore_probe:
+    phase: stage
+- module_restore_probe:
+    phase: staged
+- assert_no_runtime_errors: null
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There are 2 open tabs. Exit Taomni and close them?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- module_signed_probe:
+    phase: disabled
+- module_restore_probe:
+    phase: restored
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- fill:
+    selector: '[data-testid="vault-unlock-pw"]'
+    value: qa-module-restore-changed
+- click: '[data-testid="vault-unlock-confirm"]'
+- assert_visible: '[data-testid="vault-unlock-error"]'
+- assert_count:
+    selector: '[data-testid="mfa-account-code"]'
+    equal: 0
+- fill:
+    selector: '[data-testid="vault-unlock-pw"]'
+    value: qa-module-restore-original
+- click: '[data-testid="vault-unlock-confirm"]'
+- assert_not_visible: '[data-testid="vault-unlock-dialog"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="mfa-account-row"][data-issuer="QA Module Restore"]'
+- assert_count:
+    selector: '[data-testid="mfa-account-row"]'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 755 224
+    timeout_sec: 30
+- assert_no_runtime_errors: null
+- screenshot: module-disabled-restore-decrypted.png
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- module_signed_probe:
+    phase: disabled
+- module_restore_probe:
+    phase: restart-persisted
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- fill:
+    selector: '[data-testid="vault-unlock-pw"]'
+    value: qa-module-restore-original
+- click: '[data-testid="vault-unlock-confirm"]'
+- assert_not_visible: '[data-testid="vault-unlock-dialog"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 755 224
+    timeout_sec: 30
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The exact manual backup contains the module in its selected lifecycle state plus the original encrypted HOTP and
+      Vault snapshots.
+    actions:
+    - 17
+    - 31
+    - 39
+    checkpoints:
+    - step: 18
+      expectation: The real initial HOTP is 755224.
+    - step: 42
+      expectation: The exact v2 job, all hashes, standalone module rows, original HOTP counter and paired Vault SQLite pass independent
+        inspection; writer ownership matches the lifecycle state.
+    results:
+    - 18
+    - 42
+  - id: R2
+    requirement: Real module data, HOTP and master password change after backup; only the current master password can stage and
+      staging does not apply early.
+    actions:
+    - 48
+    - 53
+    - 64
+    - 72
+    checkpoints:
+    - step: 54
+      expectation: HOTP advances to 287082 through real business logic.
+    - step: 65
+      expectation: The live Vault is rekeyed to a different master password.
+    - step: 71
+      expectation: The original password is rejected by production staging with VAULT_BAD_PASSWORD and no pending files or generation/data
+        change.
+    - step: 73
+      expectation: Independent readback proves the correct-password intent and all staged hashes match the exact original archive,
+        while live business data and generation are still unchanged.
+    results:
+    - 54
+    - 65
+    - 71
+    - 73
+  - id: R3
+    requirement: Normal restart applies the original data with a new generation while preserving activation and trust; real decryption
+      and another restart prove recovery.
+    actions:
+    - 75
+    - 85
+    - 95
+    checkpoints:
+    - step: 77
+      expectation: The real signed module has the same enabled, disabled or uninstalled state.
+    - step: 78
+      expectation: Apply removed pending state, restored only original rows, preserved the executable pointer and advanced generation.
+    - step: 82
+      expectation: The password introduced after backup no longer unlocks the restored Vault.
+    - step: 83
+      expectation: No code is visible after that rejected unlock.
+    - step: 91
+      expectation: Exactly the original account is restored.
+    - step: 92
+      expectation: The original password decrypts the restored real stores and yields 755224.
+    - step: 93
+      expectation: No runtime error occurs during stage/apply/decryption.
+    - step: 98
+      expectation: A second normal cold start keeps restored data, lifecycle and the same new generation.
+    - step: 106
+      expectation: The original password still decrypts the original HOTP after the second cold start.
+    - step: 107
+      expectation: The additional restart produces no runtime errors.
+    results:
+    - 77
+    - 78
+    - 82
+    - 83
+    - 91
+    - 92
+    - 93
+    - 98
+    - 106
+    - 107
+  native:
+  - check: Production stage, normal shutdown/apply, SQLite replacement, activation, profile generation and real Vault/MFA decryption.
+    method: automated
+    reason: Browser stubs cannot establish native filesystem, cryptography or process restart. Restore confirmation automatic relaunch
+      remains a separate UI gap.
+  visual:
+  - check: The restored original account and code remain readable.
+    method: manual
+    reason: Review module-disabled-restore-decrypted.png on each native platform.

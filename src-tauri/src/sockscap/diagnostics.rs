@@ -4,7 +4,7 @@ use super::*;
 pub async fn sockscap_stats_snapshot(
     state: State<'_, AppState>,
 ) -> Result<stats::StatsSnapshot, String> {
-    let orch = state.sockscap.orch.read().await;
+    let orch = state.legacy.sockscap.orch.read().await;
     Ok(orch.stats_snapshot())
 }
 
@@ -236,14 +236,14 @@ pub async fn sockscap_detect_tun_conflicts() -> Result<Vec<String>, String> {
 pub async fn sockscap_get_domain_records(
     state: State<'_, AppState>,
 ) -> Result<Vec<DomainRecord>, String> {
-    let orch = state.sockscap.orch.read().await;
+    let orch = state.legacy.sockscap.orch.read().await;
     let guard = orch.domains.lock().map_err(|e| e.to_string())?;
     Ok(guard.snapshot())
 }
 
 #[tauri::command]
 pub async fn sockscap_clear_domain_records(state: State<'_, AppState>) -> Result<(), String> {
-    let orch = state.sockscap.orch.read().await;
+    let orch = state.legacy.sockscap.orch.read().await;
     let mut guard = orch.domains.lock().map_err(|e| e.to_string())?;
     guard.clear();
     Ok(())

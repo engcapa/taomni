@@ -43,7 +43,7 @@ pub use session::ObjectStorageSession;
 /// string when it isn't a vault reference (inline plaintext).
 fn resolve(state: &State<'_, AppState>, value: &Option<String>) -> Result<Option<String>, String> {
     match value.as_deref().filter(|s| !s.is_empty()) {
-        Some(v) => match state.vault.resolve(v)? {
+        Some(v) => match state.core.vault.resolve(v)? {
             Some(z) => Ok(Some((*z).clone())),
             None => Ok(Some(v.to_string())),
         },
@@ -221,7 +221,7 @@ async fn build_http_client(
             builder = builder.resolve(&host, addr);
             forward_task = Some(fwd.task);
         } else if !matches!(net.proxy_kind.as_str(), "" | "none") {
-            net.resolve_proxy_pass(&state.vault)?;
+            net.resolve_proxy_pass(&state.core.vault)?;
             let proxy = ResolvedProxy {
                 kind: net.proxy_kind.clone(),
                 host: net.proxy_host.clone(),
@@ -246,6 +246,7 @@ async fn get_session(
     session_id: &str,
 ) -> Result<Arc<ObjectStorageSession>, String> {
     state
+        .core
         .files
         .oss_sessions
         .read()
@@ -265,6 +266,7 @@ pub async fn storage_attach(
 ) -> Result<(), String> {
     let session = build_session(&state, session_id.clone(), config).await?;
     if let Some(old) = state
+        .core
         .files
         .oss_sessions
         .write()
@@ -279,7 +281,14 @@ pub async fn storage_attach(
 /// Tear down a live object-storage session. Idempotent.
 #[tauri::command]
 pub async fn storage_detach(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
-    if let Some(sess) = state.files.oss_sessions.write().await.remove(&session_id) {
+    if let Some(sess) = state
+        .core
+        .files
+        .oss_sessions
+        .write()
+        .await
+        .remove(&session_id)
+    {
         sess.close();
     }
     Ok(())

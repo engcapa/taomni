@@ -1,0 +1,165 @@
+id: TC-MODULES-020
+title: Download projection shows progress and errors and survives Settings closure
+description: A seeded browser-only download model exercises production progress UI, known and unknown totals, cancellation,
+  retry, completed state, removal and view reopening. The explicit model never opens a socket or verifies a package; TC-MODULES-021
+  and GitHub downloader gates establish native disk/network effects.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- network
+- lifecycle
+modes:
+- browser
+fixtures:
+- reset_db
+- module_download_preview
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-network-retry"]'
+- assert_text:
+    selector: '[data-testid="module-network-save-status"]'
+    contains: connection settings could not be read
+- click: '[data-testid="module-network-retry"]'
+- wait_for: '[data-testid="module-network-mode"]'
+- wait_for: '[data-testid="module-download-task"][data-download-id="preview-known"]'
+- assert_text:
+    selector: '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-bytes"]'
+    contains: 4.0 KiB / 8.0 KiB · 50.0%
+- assert_attribute:
+    selector: '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-progress"]'
+    name: value
+    equals: '50'
+- assert_count:
+    selector: '[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-progress"][value]'
+    equal: 0
+- assert_text:
+    selector: '[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-error"]'
+    contains: proxy connection refused
+- assert_text:
+    selector: '[data-testid="module-download-recovery-error"]'
+    contains: damaged saved task
+- click: '[data-testid="tab-item"][data-tab-type="settings"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="settings-panel"]'
+    state: detached
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-download-task"][data-download-id="preview-known"][data-phase="downloading"] [data-testid="module-download-phase"]'
+- click: '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-cancel"]'
+- wait_for: '[data-testid="module-download-task"][data-download-id="preview-known"][data-phase="cancelled"][data-downloaded="4096"]'
+- click: '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-resume"]'
+- wait_for: '[data-testid="module-download-task"][data-download-id="preview-known"][data-phase="completed"][data-downloaded="8192"]'
+- assert_text:
+    selector: '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-bytes"]'
+    contains: 100.0%
+- assert_count:
+    selector: '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-cancel"]'
+    equal: 0
+- click: '[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-resume"]'
+- wait_for: '[data-testid="module-download-task"][data-download-id="preview-unknown"][data-phase="completed"]'
+- assert_count:
+    selector: '[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-error"]'
+    equal: 0
+- click: '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-forget"]'
+- click: '[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-forget"]'
+- wait_for: '[data-testid="module-downloads-empty"]'
+- assert_count:
+    selector: '[data-testid="module-download-task"]'
+    equal: 0
+- assert_no_runtime_errors: null
+- screenshot: module-download-progress-preview.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Progress distinguishes known and unknown totals and exposes actionable errors.
+    actions:
+    - 3
+    - 4
+    - 7
+    checkpoints:
+    - step: 6
+      expectation: The load failure is actionable and the Retry control is visible.
+    - step: 8
+      expectation: Retry loads the real connection editor without changing application proxy settings.
+    - step: 10
+      expectation: Known bytes and percentage are visible.
+    - step: 11
+      expectation: Determinate progress is fifty percent.
+    - step: 12
+      expectation: Unknown size uses an indeterminate indicator.
+    - step: 13
+      expectation: The failed task retains its error.
+    - step: 14
+      expectation: Damaged recovered jobs do not hide the other tasks.
+    results:
+    - 6
+    - 8
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+  - id: R2
+    requirement: Closing Settings preserves the task; cancel and resume project actual model responses.
+    actions:
+    - 15
+    - 17
+    - 18
+    - 20
+    - 22
+    checkpoints:
+    - step: 19
+      expectation: Reopening shows the same active task.
+    - step: 21
+      expectation: Cancel retains its downloaded prefix.
+    - step: 23
+      expectation: Resume reaches completed with all bytes.
+    - step: 24
+      expectation: Completed percentage is one hundred.
+    - step: 25
+      expectation: Completed tasks have no cancel action.
+    results:
+    - 19
+    - 21
+    - 23
+    - 24
+    - 25
+  - id: R3
+    requirement: Retry clears the error and removing terminal tasks updates the list.
+    actions:
+    - 26
+    - 29
+    - 30
+    checkpoints:
+    - step: 28
+      expectation: Successful retry clears the prior task error.
+    - step: 31
+      expectation: The empty task state is visible.
+    - step: 32
+      expectation: No removed task remains in the projection.
+    - step: 33
+      expectation: No unhandled runtime errors occurred.
+    results:
+    - 28
+    - 31
+    - 32
+    - 33
+  native:
+  - check: Native network and filesystem effects.
+    method: external
+    reason: Explicit browser model only; TC-MODULES-021 and native downloader contracts own these effects.
+  visual:
+  - check: Download progress, actions and errors remain readable.
+    method: manual
+    reason: The retained screenshot supports visual review.

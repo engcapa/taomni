@@ -360,7 +360,7 @@ class NativeBuildIntegrationTests(unittest.TestCase):
             events: list[str] = []
 
             def fake_run(command, cwd, env, check):
-                events.append("compile")
+                events.append(command[0])
                 binary.parent.mkdir(parents=True, exist_ok=True)
                 binary.write_bytes(b"binary")
 
@@ -368,6 +368,7 @@ class NativeBuildIntegrationTests(unittest.TestCase):
                                  if not key.startswith("QA_VENDOR")}
             with patch.dict(os.environ, clean_environment, clear=True), \
                  patch.object(native_build, "ROOT", root), \
+                 patch.object(native_build, "PLATFORM_HELPERS", {}), \
                  patch.object(native_build.shutil, "which", return_value="pnpm"), \
                  patch.object(native_build, "ensure_linux_link_deps"), \
                  patch.object(native_build, "source_identity", return_value="source"), \
@@ -377,7 +378,7 @@ class NativeBuildIntegrationTests(unittest.TestCase):
                  patch.object(native_build.subprocess, "check_output", return_value="version\n"), \
                  patch.object(native_build.subprocess, "run", side_effect=fake_run):
                 self.assertEqual(native_build.build_qa(release=True, force=True), binary)
-            self.assertEqual(events, ["normalize", "compile"])
+            self.assertEqual(events, ["normalize", "pnpm", "cargo"])
 
 
 if __name__ == "__main__":

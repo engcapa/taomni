@@ -5,20 +5,30 @@ from contextlib import closing
 import gzip
 import hashlib
 import json
+import os
 import sqlite3
 import time
 import zipfile
 from pathlib import Path
 from typing import Any
 
+from .module_profile_observation import _exclusive
 
-def observe(root: Path, expected: dict, full: dict, headers: dict) -> dict:
+
+def observe(root: Path, expected: dict, full: dict, headers: dict, paused: bool | None = None,
+            empty_live: bool = False) -> dict:
     dbs = list(root.glob("*.db"))
     if len(dbs) != 1:
         raise AssertionError(f"Expected one mailbox DB in {root}, got {len(dbs)}")
     with closing(sqlite3.connect(dbs[0].as_uri() + "?mode=ro", uri=True)) as db:
         rows = db.execute("SELECT folder,uid,sha256,raw_size FROM mail_full_messages").fetchall()
         summary = dict(db.execute("SELECT folder,count(*) FROM mail_messages GROUP BY folder"))
+        if empty_live:
+            folders = db.execute("SELECT name FROM mail_folders").fetchall()
+            assert not folders and not summary, f"Live cache still contains folders or headers: {folders}, {summary}"
+        if paused is not None:
+            preferences = db.execute("SELECT paused FROM mail_archive_preferences").fetchall()
+            assert preferences == [(int(paused),)], f"Archive pause state in SQLite: {preferences}"
     actual = {}
     for folder, uid, digest, size in rows:
         actual[folder] = actual.get(folder, 0) + 1
@@ -38,7 +48,10 @@ def observe(root: Path, expected: dict, full: dict, headers: dict) -> dict:
         assert summary.get(folder, 0) == count, f"Summary count {folder}: {summary}"
     objects = list(root.glob("*.mail/objects/*/*.eml.gz"))
     assert len(objects) == len({row[2] for row in rows}), "Unreferenced objects remain after explicit cleanup"
-    return {"full": actual, "headers": summary, "objects": len(objects)}
+    result = {"full": actual, "headers": summary, "objects": len(objects)}
+    if paused is not None:
+        result["paused"] = paused
+    return result
 
 
 def observe_incremental(root: Path, expected: dict) -> dict:
@@ -61,6 +74,20 @@ def observe_incremental(root: Path, expected: dict) -> dict:
     return {"headers": synced, "server_total": total, "sync_complete": complete, "full": len(rows), "verified_originals": len(rows)}
 
 
+def observe_worker(root: Path, active: bool) -> dict:
+    locks = list(root.glob("*.archive.lock"))
+    assert len(locks) == 1, f"Expected one archive worker lock, found {len(locks)}"
+    path = locks[0]
+    assert path.is_file() and not path.is_symlink(), "Archive worker lock is not an ordinary file"
+    descriptor = os.open(path, os.O_RDWR)
+    try:
+        held = not _exclusive(descriptor)
+    finally:
+        os.close(descriptor)
+    assert held == active, f"Archive worker lock held={held}, expected {active}"
+    return {"archive_worker_active": held, "archive_lock": path.name}
+
+
 def check(ctx: Any, args: dict) -> str:
     root = Path(args["root"]).resolve()
     report = ctx.case_dir.parent.resolve()
@@ -72,7 +99,9 @@ def check(ctx: Any, args: dict) -> str:
     last = None
     while time.monotonic() < deadline:
         try:
-            if args.get("kind") == "incremental":
+            if args.get("kind") == "worker":
+                result = observe_worker(root, args["active"])
+            elif args.get("kind") == "incremental":
                 result = observe_incremental(root, expected)
             elif args.get("kind", "storage") == "backup":
                 archives = sorted(root.glob("*.taobak"), key=lambda p: p.stat().st_mtime_ns)
@@ -90,7 +119,14 @@ def check(ctx: Any, args: dict) -> str:
                         assert archive.getinfo(name).compress_type == zipfile.ZIP_STORED, "Compressed MIME was recompressed"
                 result = {"archive": str(archives[-1]), "mail": mail}
             else:
-                result = observe(root, expected, args.get("full", {}), args.get("headers", {}))
+                result = observe(root, expected, args.get("full", {}), args.get("headers", {}),
+                                 args.get("paused"), args.get("empty_live", False))
+                if args.get("empty_live"):
+                    result["empty_live"] = True
+                if "partial_files" in args:
+                    partials = sorted(path.name for path in root.glob("*.mail/partial/*"))
+                    assert len(partials) == args["partial_files"], f"Transfer files remaining: {partials}"
+                    result["partial_files"] = partials
             out = ctx.case_dir / f"mail-storage-observation-{time.time_ns()}.json"
             out.write_text(json.dumps(result, indent=2), encoding="utf-8")
             return str(out)

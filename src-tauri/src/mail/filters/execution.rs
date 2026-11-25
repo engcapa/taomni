@@ -1,27 +1,26 @@
 use super::actions::execute_plans;
-use super::cache::CandidateSelection;
-use super::cache::ensure_filter_mark;
-use super::cache::filter_mark;
-use super::cache::load_candidates;
-use super::cache::load_filters;
-use super::cache::set_filter_mark;
 use super::imap_search::body_needles;
-use super::model::FilterMessage;
-use super::model::MailFilter;
-use super::model::MailFilterRunResult;
-use super::planning::MessagePlan;
-use super::planning::plan_message;
-use super::planning::validate_filter;
+use super::store;
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 use crate::mail::ImapSessionOpts;
 use crate::mail::MailAccountConfig;
 use crate::mail::MailMessageHeader;
+use crate::mail::module_host;
 use crate::mail::now_ts;
+use crate::mail::pop3_store;
 use crate::mail::resolve_config;
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 use crate::mail::with_imap_session;
-use crate::mail::with_mail_db;
 use crate::state::AppState;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use taomni_mail_api::pop3_store::LocalMailboxAction;
+use taomni_mail_api::{filter_cache::FilterCacheAction, imap_exchange::FilterBodyQuery};
+use taomni_mail_storage::filters::rules::FilterRulesAction;
+use taomni_mail_storage::filters::{
+    CandidateSelection, FilterMessage, MailFilter, MailFilterRunResult, MessagePlan,
+    ensure_filter_mark, filter_mark, load_candidates, plan_message, set_filter_mark,
+};
 use tauri::State;
 
 /// Run filters on a folder. `trigger = "incoming"` filters only mail newer
@@ -48,42 +47,61 @@ pub async fn mail_apply_filters(
         folder: folder.clone(),
         ..MailFilterRunResult::default()
     };
-    let (filters, candidates, new_high) = with_mail_db(&state, &account_id, |db| {
-        let wanted: Option<HashSet<&String>> = filter_ids.as_ref().map(|ids| ids.iter().collect());
-        let filters: Vec<MailFilter> = load_filters(db, &account_id)?
-            .into_iter()
-            .filter(|f| f.enabled && (!incoming || f.on_incoming))
-            .filter(|f| wanted.as_ref().is_none_or(|ids| ids.contains(&f.id)))
-            .collect();
-        let selection = if incoming {
-            match filter_mark(db, &account_id, &folder)? {
-                Some(mark) => CandidateSelection::Above(mark),
-                None => {
-                    ensure_filter_mark(db, &account_id, &folder)?;
-                    return Ok((Vec::new(), Vec::new(), None));
-                }
-            }
-        } else {
-            match &uids {
-                Some(uids) => CandidateSelection::Uids(uids.clone()),
-                None => CandidateSelection::All,
-            }
+    let wanted: Option<HashSet<&String>> = filter_ids.as_ref().map(|ids| ids.iter().collect());
+    let filters: Vec<MailFilter> = store::run(&state, &account_id, FilterRulesAction::List)
+        .await?
+        .into_iter()
+        .filter(|f| f.enabled && (!incoming || f.on_incoming))
+        .filter(|f| wanted.as_ref().is_none_or(|ids| ids.contains(&f.id)))
+        .collect();
+    let (candidates, watermark) = if !super::super::pop3::is_pop3(&config)
+        && module_host::owns_imap_filter_cache(&state.plugins)
+    {
+        let snapshot = module_host::imap_filter_cache(
+            &state,
+            &account_id,
+            FilterCacheAction::Candidates {
+                folder: folder.clone(),
+                incoming,
+                uids,
+            },
+        )
+        .await?
+        .ok_or("Missing Mail filter candidates")?;
+        (snapshot.messages, Some(snapshot.uid_validity))
+    } else {
+        let action = LocalMailboxAction::FilterCandidates {
+            folder: folder.clone(),
+            incoming,
+            uids: uids.clone(),
         };
-        let candidates = load_candidates(db, &account_id, &folder, &selection)?;
-        let new_high = candidates.iter().map(|(h, _)| h.uid).max();
-        Ok((filters, candidates, new_high))
-    })?;
-    result.examined = candidates.len();
-    let finish_mark = |state: &State<'_, AppState>| -> Result<(), String> {
-        if let (true, Some(high)) = (incoming, new_high) {
-            with_mail_db(state, &account_id, |db| {
-                set_filter_mark(db, &account_id, &folder, high)
-            })?;
-        }
-        Ok(())
+        let candidate_folder = folder.clone();
+        let candidates = pop3_store::run(&state, &account_id, action, move |db, account| {
+            let selection = if incoming {
+                match filter_mark(db, account, &candidate_folder)? {
+                    Some(mark) => CandidateSelection::Above(mark),
+                    None => {
+                        ensure_filter_mark(db, account, &candidate_folder)?;
+                        return Ok(Vec::new());
+                    }
+                }
+            } else {
+                match &uids {
+                    Some(uids) => CandidateSelection::Uids(uids.clone()),
+                    None => CandidateSelection::All,
+                }
+            };
+            load_candidates(db, account, &candidate_folder, &selection)
+        })
+        .await?;
+        (candidates, None)
     };
+    let new_high = incoming
+        .then(|| candidates.iter().map(|(header, _)| header.uid).max())
+        .flatten();
+    result.examined = candidates.len();
     if filters.is_empty() || candidates.is_empty() {
-        finish_mark(&state)?;
+        finish_mark(&state, &account_id, &folder, new_high, watermark).await?;
         return Ok(result);
     }
     let refs: Vec<&MailFilter> = filters.iter().collect();
@@ -102,27 +120,42 @@ pub async fn mail_apply_filters(
         if super::super::pop3::is_pop3(&config) {
             for uid in &uncached {
                 if let Ok(body) =
-                    super::super::local_cmds::get_body(&state, &account_id, &folder, *uid)
+                    super::super::local_cmds::get_body(&state, &account_id, &folder, *uid).await
                 {
                     local_bodies.insert(*uid, body.text.or(body.html).unwrap_or_default());
                 }
             }
         } else {
             let account = resolve_config(&state, config.clone())?;
-            let pool = std::sync::Arc::clone(&state.mail.mail_imap_pool);
-            let handle = tokio::runtime::Handle::current();
-            let folder_for_task = folder.clone();
-            let lookup = tokio::task::spawn_blocking(move || {
-                with_imap_session(
-                    &pool,
+            let lookup = if module_host::filters_imap_bodies(&state.plugins) {
+                module_host::filter_imap_bodies(
+                    state.plugins.clone(),
                     &account,
-                    &handle,
-                    ImapSessionOpts::default(),
-                    |imap| imap.filter_body_hits(&folder_for_task, &uncached, &needles),
+                    &FilterBodyQuery {
+                        folder: folder.clone(),
+                        uids: uncached,
+                        needles,
+                    },
                 )
-            })
-            .await
-            .map_err(|e| format!("filter body search failed: {e}"))?;
+                .await
+            } else {
+                legacy_imap!({
+                    let pool = std::sync::Arc::clone(&state.legacy.mail.mail_imap_pool);
+                    let handle = tokio::runtime::Handle::current();
+                    let folder_for_task = folder.clone();
+                    tokio::task::spawn_blocking(move || {
+                        with_imap_session(
+                            &pool,
+                            &account,
+                            &handle,
+                            ImapSessionOpts::default(),
+                            |imap| imap.filter_body_hits(&folder_for_task, &uncached, &needles),
+                        )
+                    })
+                    .await
+                    .map_err(|e| format!("filter body search failed: {e}"))?
+                })
+            };
             match lookup {
                 Ok(hits) => server_hits = hits,
                 Err(e) => result.errors.push(format!("body search: {e}")),
@@ -158,20 +191,40 @@ pub async fn mail_apply_filters(
         &mut result,
     )
     .await;
-    finish_mark(&state)?;
+    finish_mark(&state, &account_id, &folder, new_high, watermark).await?;
     Ok(result)
 }
 
-pub(super) fn prepare_filters(mut filters: Vec<MailFilter>) -> Result<Vec<MailFilter>, String> {
-    let mut seen = HashSet::new();
-    let stamp = now_ts();
-    for (index, filter) in filters.iter_mut().enumerate() {
-        filter.name = filter.name.trim().to_string();
-        validate_filter(filter)?;
-        if filter.id.trim().is_empty() || !seen.insert(filter.id.clone()) {
-            filter.id = format!("filter-{stamp}-{index}");
-            seen.insert(filter.id.clone());
-        }
+async fn finish_mark(
+    state: &AppState,
+    account: &str,
+    folder: &str,
+    high: Option<u32>,
+    hosted_validity: Option<Option<u32>>,
+) -> Result<(), String> {
+    let Some(uid) = high else {
+        return Ok(());
+    };
+    let folder = folder.to_owned();
+    if let Some(uid_validity) = hosted_validity {
+        module_host::imap_filter_cache(
+            state,
+            account,
+            FilterCacheAction::Advance {
+                folder,
+                uid,
+                uid_validity,
+            },
+        )
+        .await?;
+        return Ok(());
     }
-    Ok(filters)
+    let action = LocalMailboxAction::AdvanceFilterMark {
+        folder: folder.clone(),
+        uid,
+    };
+    pop3_store::run(state, account, action, move |db, account| {
+        set_filter_mark(db, account, &folder, uid)
+    })
+    .await
 }

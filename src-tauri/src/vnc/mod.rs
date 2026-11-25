@@ -1,20 +1,15 @@
-pub mod clipboard;
-pub mod encodings;
-pub mod error;
-pub mod framebuffer;
+pub use taomni_vnc_api::{error, policy, quality};
+#[cfg(all(test, feature = "legacy-vnc-client"))]
+use taomni_vnc_engine::{encodings, framebuffer, limits, pixel, rfb};
+
 pub mod keyboard_hook;
-pub mod limits;
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-vnc-client"))]
 mod live_bench;
-pub mod native_pointer;
-pub mod pixel;
-pub mod policy;
-pub mod quality;
-pub mod queue;
-pub mod rfb;
-pub mod tight;
-pub mod tls;
+mod module_host;
+#[cfg(feature = "legacy-vnc-client")]
 pub mod ws;
+
+pub(crate) use module_host::SLUG as MODULE_SLUG;
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -23,7 +18,31 @@ use uuid::Uuid;
 use crate::state::AppState;
 use crate::vnc::policy::VncClipboardPolicy;
 use crate::vnc::quality::VncPictureQuality;
-use crate::vnc::ws::{VncControl, VncRelayOptions, dial_vnc_transport, spawn_vnc_relay};
+use taomni_vnc_api::ConnectionRequest;
+
+pub enum DesktopVncSession {
+    #[cfg(feature = "legacy-vnc-client")]
+    Local(ws::VncSession),
+    Module(module_host::HostedSession),
+}
+
+impl DesktopVncSession {
+    fn endpoint(&self) -> (u16, &str) {
+        match self {
+            #[cfg(feature = "legacy-vnc-client")]
+            Self::Local(session) => (session.ws_port, &session.ws_token),
+            Self::Module(session) => session.endpoint(),
+        }
+    }
+
+    fn closed(&self) -> tokio_util::sync::CancellationToken {
+        match self {
+            #[cfg(feature = "legacy-vnc-client")]
+            Self::Local(session) => session.cancel.clone(),
+            Self::Module(session) => session.closed().clone(),
+        }
+    }
+}
 
 /// In-flight `vnc_connect` calls that the viewer can stop (VNC-SESS-003).
 static CONNECT_ATTEMPTS: std::sync::LazyLock<
@@ -213,13 +232,18 @@ pub async fn vnc_connect(
         None => AttemptGuard(None),
     };
 
-    let resolved_password = match password.as_deref() {
-        Some(p) => state
-            .vault
-            .resolve(p)
-            .map_err(structured_error)?
-            .map(|z| (*z).clone())
-            .or(Some(p.to_string())),
+    let resolved_password = match password {
+        Some(password) => {
+            let password = zeroize::Zeroizing::new(password);
+            Some(
+                state
+                    .core
+                    .vault
+                    .resolve(&password)
+                    .map_err(structured_error)?
+                    .unwrap_or(password),
+            )
+        }
         None => None,
     };
 
@@ -227,52 +251,49 @@ pub async fn vnc_connect(
         parse_network_settings(network_settings_json.as_deref()).map_err(structured_error)?;
     if let Some(n) = network.as_mut() {
         crate::terminal::resolve_proxy_session(&state, n).map_err(structured_error)?;
-        n.resolve_proxy_pass(&state.vault)
+        n.resolve_proxy_pass(&state.core.vault)
             .map_err(structured_error)?;
-        n.resolve_jump_secret(&state.vault)
+        n.resolve_jump_secret(&state.core.vault)
             .map_err(structured_error)?;
         crate::terminal::resolve_jump_credentials(&state, n).map_err(structured_error)?;
     }
-    let policy = security_policy.unwrap_or_default();
-    let options = VncRelayOptions {
-        picture_quality: picture_quality.unwrap_or_default(),
-        shared: shared.unwrap_or(true),
-        // Older callers never asked, so keep their behaviour.
-        allow_unencrypted: allow_unencrypted.unwrap_or(true),
-        ..VncRelayOptions::default()
-    };
-    let session = spawn_vnc_relay(
+    let request = ConnectionRequest {
         host,
         port,
         username,
-        resolved_password,
-        network,
-        policy,
-        view_only.unwrap_or(false),
-        clipboard_policy.unwrap_or_default(),
-        options,
-        attempt,
-    )
-    .await
-    .map_err(structured_error)?;
+        password: resolved_password,
+        forward: None,
+        security_policy: security_policy.unwrap_or_default(),
+        view_only: view_only.unwrap_or(false),
+        clipboard_policy: clipboard_policy.unwrap_or_default(),
+        picture_quality: picture_quality.unwrap_or_default(),
+        shared,
+        // Older callers did not set this field.
+        allow_unencrypted: allow_unencrypted.unwrap_or(true),
+    };
+    let session = module_host::start_session(&state.plugins, request, network, attempt)
+        .await
+        .map_err(structured_error)?;
 
+    let (ws_port, ws_token) = session.endpoint();
     let result = VncConnectResult {
         session_id: session_id.clone(),
-        ws_port: session.ws_port,
-        ws_token: session.ws_token.clone(),
+        ws_port,
+        ws_token: ws_token.into(),
         width: 0, // updated by connected message from frontend
         height: 0,
         name: String::new(),
     };
 
-    let reaper_cancel = session.cancel.clone();
+    let reaper_cancel = session.closed();
     state
+        .legacy
         .remote_desktop
         .vnc_sessions
         .write()
         .await
         .insert(session_id.clone(), session);
-    let reaper_sessions = state.remote_desktop.vnc_sessions.clone();
+    let reaper_sessions = state.legacy.remote_desktop.vnc_sessions.clone();
     let reaper_id = session_id.clone();
     tokio::spawn(async move {
         reaper_cancel.cancelled().await;
@@ -306,7 +327,7 @@ pub async fn vnc_create_detach_claim(
     claim: VncDetachClaim,
 ) -> Result<VncDetachClaimResult, String> {
     let claim_id = store_detach_claim(
-        &state.remote_desktop.vnc_detach_claims,
+        &state.legacy.remote_desktop.vnc_detach_claims,
         claim,
         DETACH_CLAIM_TTL,
         MAX_DETACH_CLAIMS,
@@ -320,21 +341,27 @@ pub async fn vnc_consume_detach_claim(
     state: State<'_, AppState>,
     claim_id: String,
 ) -> Result<VncDetachClaim, String> {
-    consume_detach_claim(&state.remote_desktop.vnc_detach_claims, &claim_id).await
+    consume_detach_claim(&state.legacy.remote_desktop.vnc_detach_claims, &claim_id).await
 }
 
 /// Disconnect a VNC session.
 #[tauri::command]
 pub async fn vnc_disconnect(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
     let session = state
+        .legacy
         .remote_desktop
         .vnc_sessions
         .write()
         .await
         .remove(&session_id);
-    if let Some(session) = session {
-        let _ = session.control_tx.send(VncControl::Disconnect).await;
-        session.cancel.cancel();
+    match session {
+        #[cfg(feature = "legacy-vnc-client")]
+        Some(DesktopVncSession::Local(session)) => {
+            let _ = session.control_tx.send(ws::VncControl::Disconnect).await;
+            session.cancel.cancel();
+        }
+        Some(DesktopVncSession::Module(session)) => session.close().await,
+        None => {}
     }
     Ok(())
 }
@@ -358,70 +385,38 @@ pub async fn vnc_test_connection(
             password.as_deref(),
             network_settings_json.as_deref(),
         )?;
-        let resolved = match password.as_deref() {
-            Some(p) => state
-                .vault
-                .resolve(p)?
-                .map(|z| (*z).clone())
-                .or(Some(p.to_string())),
+        let resolved = match password {
+            Some(password) => {
+                let password = zeroize::Zeroizing::new(password);
+                Some(state.core.vault.resolve(&password)?.unwrap_or(password))
+            }
             None => None,
         };
         let mut network = parse_network_settings(network_settings_json.as_deref())?;
         if let Some(settings) = network.as_mut() {
             crate::terminal::resolve_proxy_session(&state, settings)?;
-            settings.resolve_proxy_pass(&state.vault)?;
-            settings.resolve_jump_secret(&state.vault)?;
+            settings.resolve_proxy_pass(&state.core.vault)?;
+            settings.resolve_jump_secret(&state.core.vault)?;
             crate::terminal::resolve_jump_credentials(&state, settings)?;
         }
-        let policy = security_policy.unwrap_or_default();
-        let transport = dial_vnc_transport(host.clone(), port, network).await?;
-        let forward_task = transport.network_forward_task;
-        let prepared = match crate::vnc::tls::prepare_rfb_transport(
-            transport.stream,
-            &host,
-            policy,
-            crate::vnc::ws::VNC_AUTH_TIMEOUT,
-            true,
-            username
-                .as_deref()
-                .is_some_and(|name| !name.trim().is_empty()),
+        module_host::test_connection(
+            &state.plugins,
+            ConnectionRequest {
+                host,
+                port,
+                username,
+                password: resolved,
+                security_policy: security_policy.unwrap_or_default(),
+                allow_unencrypted: true,
+                forward: None,
+                clipboard_policy: VncClipboardPolicy::default(),
+                picture_quality: VncPictureQuality::default(),
+                view_only: true,
+                shared: None,
+            },
+            network,
         )
         .await
-        {
-            Ok(prepared) => prepared,
-            Err(error) => {
-                if let Some(task) = forward_task {
-                    task.abort();
-                }
-                return Err(error);
-            }
-        };
-        let tls_task = prepared.tls_task;
-        let handshake = tokio::task::spawn_blocking(move || {
-            let mut rfb = crate::vnc::rfb::RfbConnection::from_negotiated_stream(
-                prepared.stream,
-                crate::vnc::ws::VNC_AUTH_TIMEOUT,
-                policy,
-                crate::vnc::limits::DecodeLimits::default(),
-                prepared.proto_minor,
-                prepared.pending_security,
-                prepared.outer_security_type,
-            )?;
-            let init =
-                rfb.authenticate_with_policy(username.as_deref(), resolved.as_deref(), policy)?;
-            Ok::<_, String>(format!(
-                "Connection successful: {}x{} - {}",
-                init.width, init.height, init.name
-            ))
-        })
-        .await;
-        if let Some(task) = forward_task {
-            task.abort();
-        }
-        if let Some(task) = tls_task {
-            task.abort();
-        }
-        handshake.map_err(|e| format!("VNC handshake worker failed: {e}"))?
     }
     .await;
     result.map_err(|error| crate::vnc::error::VncError::classify(error).json())

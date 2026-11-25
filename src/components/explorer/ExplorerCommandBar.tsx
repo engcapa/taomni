@@ -26,6 +26,7 @@ export function ExplorerCommandBar({ path, workspaceId, selected, operations, on
       label: label(fileType.zh, fileType.en), icon: <Plus />, testId: fileType.extension === "txt" ? "explorer-new-file" : `explorer-new-file-${fileType.extension}`,
       onClick: () => void operations.create(false, fileType.extension),
     })),
+    { label: label("其他文件类型…", "Other file types…"), icon: <Plus />, testId: "explorer-new-typed-file", onClick: operations.startNewFile },
     { label: "", separator: true },
     { label: label("从剪贴板粘贴文件", "Paste files from clipboard"), icon: <ClipboardPaste />, onClick: () => void operations.paste() },
   ];

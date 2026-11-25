@@ -17,6 +17,7 @@ export interface MailOutboxState {
 
 /** Retry delays after failed attempts (seconds). */
 export const OUTBOX_RETRY_SECONDS = [60, 120, 300, 600, 1800];
+const SMTP_DELIVERY_UNKNOWN = "SMTP delivery status unknown";
 
 export function outboxState(draft: MailDraft): MailOutboxState | null {
   return (draft.replyContext?.outbox as MailOutboxState | null | undefined) ?? null;
@@ -28,6 +29,7 @@ export function isOutbox(draft: MailDraft): boolean {
 
 /** Epoch seconds when the queued message may go out next; null = manual. */
 export function outboxNextAttemptAt(state: MailOutboxState): number | null {
+  if (state.lastError?.startsWith(SMTP_DELIVERY_UNKNOWN)) return null;
   if (state.attempts > 0) {
     const base = Math.max(state.sendAt ?? 0, state.queuedAt);
     let wait = 0;
@@ -52,6 +54,7 @@ export function outboxDue(draft: MailDraft, now: number): boolean {
  * invalid address) stays in the composer so the user can fix it.
  */
 export function isTransientSendError(message: string): boolean {
+  if (message.startsWith(SMTP_DELIVERY_UNKNOWN)) return false;
   return /(connect|connection|network|offline|timed? ?out|dns|resolve|lookup|unreachable|refused|reset|broken pipe|temporar|try again|\b(?:421|450|451|452)\b)/i
     .test(message);
 }

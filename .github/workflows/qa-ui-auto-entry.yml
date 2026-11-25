@@ -5,6 +5,7 @@ on:
       matrix: {type: string, required: true}
       head: {type: string, required: true}
       artifact_key: {type: string, required: true}
+      first_release_run: {type: string, default: ''}
       operation: {type: string, default: run}
       max_parallel: {type: number, default: 8}
       run_rdp_unit_contracts: {type: boolean, default: true}
@@ -72,23 +73,39 @@ jobs:
         with:
           mode: ${{ matrix.mode }}
           install_node_deps: ${{ (inputs.operation != 'run' && !(runner.os == 'Windows' && inputs.operation == 'contracts')) || matrix.mode != 'native' || contains(matrix.capabilities, 'updater') || contains(matrix.capabilities, 'mobile') }}
+      - name: Scope Windows native caches to the runner image
+        id: windows-cache-scope
+        if: runner.os == 'Windows' && matrix.mode == 'native' && inputs.operation != 'run'
+        env:
+          QA_CACHE_PLATFORM: ${{ matrix.cache_key }}
+        run: |
+          python - <<'PY'
+          import os
+          image = os.environ.get("ImageVersion")
+          scope = f"image-{image}" if image else f"run-{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}"
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"platform={os.environ['QA_CACHE_PLATFORM']}-{scope}\n")
+          PY
       - name: Native QA reusable runtime key
         id: reusable-key
         if: matrix.mode == 'native' && inputs.operation == 'build'
         env:
-          QA_PLATFORM_KEY: ${{ matrix.platform_key }}
+          QA_PLATFORM_KEY: ${{ steps.windows-cache-scope.outputs.platform || matrix.platform_key }}
           QA_ARCH: ${{ matrix.arch }}
           QA_RUNNER: ${{ matrix.runner }}
           QA_PROFILE: ${{ matrix.profile }}
+          QA_BUILD_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
         run: |
           python - <<'PYTHON'
+          import json
           import os
-          from native_build import reusable_cache_key
+          from native_build import module_build_options, reusable_cache_key
           key = reusable_cache_key(
               platform_key=os.environ["QA_PLATFORM_KEY"],
               arch=os.environ["QA_ARCH"],
               runner=os.environ["QA_RUNNER"],
               profile=os.environ["QA_PROFILE"],
+              **module_build_options(json.loads(os.environ["QA_BUILD_CAPABILITIES"])),
           )
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"key={key}\n")
@@ -152,6 +169,7 @@ jobs:
           if [[ "$RUNNER_OS" == Linux ]]; then
             source .agents/skills/qa-ui-auto/scripts/ci_linux_apt.sh
             prepare_apt_mirrors "${QA_LINUX_PROFILE:-ubuntu-24.04-xvfb}"
+            configure_playwright_platform "${QA_LINUX_PROFILE:-ubuntu-24.04-xvfb}"
           fi
           if [[ "${MOBILE_CHROMIUM_CACHE_HIT:-}" == "true" ]]; then
             if [[ "$RUNNER_OS" == Linux ]]; then
@@ -170,10 +188,26 @@ jobs:
         run: pnpm test src/lib/updateService.test.ts src/stores/updateStore.test.ts src/components/UpdateDialog.test.tsx
       - name: Rust source formatting contract
         if: runner.os == 'Linux' && inputs.operation == 'build'
-        # Keep the gate on the application packages: the patched vendored
-        # protocol crates are workspace members with their own upstream
-        # formatting, so a rustfmt update must not fail them here.
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml -p taomni -p sockscap-helper -- --check
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import subprocess
+
+          manifest = Path("src-tauri/Cargo.toml").resolve()
+          manifest_args = ["--manifest-path", str(manifest)]
+          metadata = json.loads(subprocess.check_output(
+              ["cargo", "metadata", *manifest_args, "--no-deps", "--format-version", "1"]
+          ))
+          # The vendored workspace crates keep their upstream formatting.
+          packages = [
+              f"--package={package['name']}"
+              for package in metadata["packages"]
+              if package["id"] in metadata["workspace_members"]
+              and Path(package["manifest_path"]).relative_to(manifest.parent).parts[0] != "vendor"
+          ]
+          subprocess.run(["cargo", "fmt", *manifest_args, *packages, "--", "--check"], check=True)
+          PY
       - name: Ubuntu 22.04 PipeWire build cache
         if: runner.os == 'Linux' && matrix.mode == 'native' && startsWith(matrix.linux_profile, 'ubuntu-22.04') && (inputs.operation != 'build' || steps.reusable-runtime.outputs.available != 'true')
         uses: actions/cache@v4
@@ -194,6 +228,13 @@ jobs:
         run: bash .agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh
       - uses: dtolnay/rust-toolchain@stable
         if: matrix.mode == 'native' && inputs.operation != 'run' && (inputs.operation != 'build' || steps.reusable-runtime.outputs.available != 'true')
+      - name: Queued WebView evaluation unit regressions
+        if: runner.os == 'macOS' && inputs.operation == 'build'
+        run: |
+          mkdir -p qa-build-output
+          set -o pipefail
+          rustc --edition 2021 --test src-tauri/vendor/wry/src/wkwebview/pending_scripts.rs --deny warnings -o "$RUNNER_TEMP/wry-pending-scripts-tests"
+          "$RUNNER_TEMP/wry-pending-scripts-tests" 2>&1 | tee qa-build-output/wry-pending-scripts-tests.log
       - name: Install verified fixed protoc
         if: (matrix.mode == 'native') && inputs.operation != 'run' && !(runner.os == 'Windows' && inputs.operation == 'contracts') && (inputs.operation != 'build' || steps.reusable-runtime.outputs.available != 'true')
         run: python .agents/skills/qa-ui-auto/scripts/ci_setup_protoc.py
@@ -264,10 +305,11 @@ jobs:
           steps.branch-cargo-restore.outcome != 'success'
         with:
           workspaces: src-tauri -> target/qa-ui-auto
-          shared-key: qa-platforms-${{ matrix.cache_key }}-${{ matrix.profile }}${{ runner.os == 'Windows' && inputs.operation == 'contracts' && '-sockscap' || '' }}
+          shared-key: qa-platforms-${{ steps.windows-cache-scope.outputs.platform || matrix.cache_key }}-${{ matrix.profile }}${{ runner.os == 'Windows' && inputs.operation == 'contracts' && '-sockscap' || '' }}
           # Branch dispatches retain a separate dependency archive. Keep
           # restoring shared Actions caches on a miss without duplicating writes.
           cache-targets: true
+          cache-workspace-crates: false
           # An interrupted build must not reserve the immutable dependency key.
           cache-on-failure: false
           save-if: ${{ !(runner.os == 'Linux' && inputs.operation == 'contracts') && steps.branch-cargo-restore.outcome != 'success' }}
@@ -310,6 +352,9 @@ jobs:
       - name: Linux backup credential service
         if: (runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'secret-service')) && inputs.operation == 'run'
         run: sudo apt-get update && sudo apt-get install -y gnome-keyring libsecret-tools libglib2.0-bin
+      - name: Install the VNC Server case's X11 daemon
+        if: runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-local-vnc') && inputs.operation == 'run'
+        run: sudo apt-get update && sudo apt-get install -y x11vnc
       - name: Normalize vendored Cargo source mtimes
         if: env.QA_VENDOR_CACHE == '1' && (inputs.operation == 'build' || inputs.operation == 'contracts')
         run: python .agents/skills/qa-ui-auto/scripts/ci_cargo_artifact.py normalize
@@ -358,18 +403,26 @@ jobs:
             if (-not (Test-Path -LiteralPath $gflags)) { throw 'mstsc heap verifier unavailable' }
             "QA_MSTSC_GFLAGS=$gflags" >> $env:GITHUB_ENV
           }
-          $tesseract = Join-Path $env:ProgramFiles 'Tesseract-OCR\tesseract.exe'
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
-            choco install tesseract --yes --no-progress
-            $installExit = $LASTEXITCODE
-            if ($installExit -eq 0 -and (Test-Path -LiteralPath $tesseract)) { break }
-            if ($attempt -eq 3) {
-              throw "Tesseract installation failed after $attempt attempts (exit $installExit; executable: $tesseract)"
-            }
-            Write-Warning "Tesseract is unavailable after install attempt $attempt (exit $installExit); retrying in 15 seconds"
-            Start-Sleep -Seconds 15
+          # Pin the same upstream installer distributed by Chocolatey. The
+          # community feed can return 503 while the release asset is available.
+          $tesseractDir = Join-Path $env:ProgramFiles 'Tesseract-OCR'
+          $tesseract = Join-Path $tesseractDir 'tesseract.exe'
+          $installer = Join-Path $env:RUNNER_TEMP 'qa-tesseract-setup.exe'
+          $download = @{
+            Uri = 'https://github.com/tesseract-ocr/tesseract/releases/download/5.5.3/tesseract-ocr-w64-setup-5.5.3.20260724.exe'
+            OutFile = $installer
+            MaximumRetryCount = 3
+            RetryIntervalSec = 15
           }
-          'C:\Program Files\Tesseract-OCR' >> $env:GITHUB_PATH
+          Invoke-WebRequest @download
+          if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash -ne 'BEE9E3434BD94FD65387D9BE28CD467A41F61B1275383B55B0F59A1331270AE4') {
+            throw 'Unexpected Tesseract installer checksum'
+          }
+          $install = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
+          if ($install.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $tesseract -PathType Leaf)) {
+            throw "Tesseract installation failed (exit $($install.ExitCode); executable: $tesseract)"
+          }
+          $tesseractDir >> $env:GITHUB_PATH
       # Hosted audio cases need a loopback device. BlackHole has no controller
       # app or microphone consent sheet to cover capture fixtures on macOS.
       - name: Windows virtual audio output
@@ -535,7 +588,8 @@ jobs:
           from native_build import ROOT, configured_environment
           env = configured_environment()
           env['CARGO_TARGET_DIR'] = str(ROOT / 'src-tauri' / 'target' / 'qa-ui-auto')
-          command = ['cargo', 'test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml', '-p', 'sockscap-helper', '--bin', 'sockscap-helper']
+          command = ['cargo', 'test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml',
+                     '-p', 'taomni-sockscap-tools', '--bin', 'sockscap-helper']
           if os.environ['QA_RELEASE'] == 'true':
               env['CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS'] = 'true'
               command.append('--release')
@@ -560,6 +614,51 @@ jobs:
             --selection qa-ui-auto-report/selection.json --build "$QA_BUILD_ID" \
             --archive qa-build-output/runtime.tar.gz \
             --reusable-archive qa-build-output/reusable-runtime/reusable.tar.gz 2>&1 | tee qa-build-output/build.log
+      - name: Verify the exported Windows SocksCap helper
+        if: runner.os == 'Windows' && inputs.operation == 'build'
+        env:
+          QA_RELEASE: ${{ matrix.profile == 'release' }}
+        run: |
+          python - <<'PYTHON' 2>&1 | tee qa-build-output/sockscap-helper-launch.log
+          import os, subprocess
+          from native_build import qa_binary, verify_identity
+          app = qa_binary(release=os.environ['QA_RELEASE'] == 'true')
+          verify_identity(app)
+          helper = app.with_name('sockscap-helper.exe')
+          denied = subprocess.run([str(helper)], capture_output=True, text=True, timeout=15)
+          if denied.returncode != 2 or '--token and --port are required' not in denied.stderr:
+              raise SystemExit(f'Unexpected unconfigured SocksCap helper result: {denied.returncode}, {denied.stderr}')
+          print('Verified packaged SocksCap helper rejects an unconfigured launch.')
+          PYTHON
+      - name: Windows VNC helper process ownership
+        if: runner.os == 'Windows' && inputs.operation == 'build'
+        env:
+          QA_RELEASE: ${{ matrix.profile == 'release' }}
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-vnc-key-protocol --lib --locked
+          args=()
+          if [[ "$QA_RELEASE" == "true" ]]; then
+            args+=(--release)
+          fi
+          python .agents/skills/qa-ui-auto/scripts/ci_vnc_key_helper.py \
+            --receipt qa-build-output/vnc-key-helper-receipt.json "${args[@]}" \
+            2>&1 | tee qa-build-output/vnc-key-helper.log
+      - name: macOS Redirector bridge entrypoint and ownership contract
+        if: runner.os == 'macOS' && inputs.operation == 'build'
+        env:
+          QA_RELEASE: ${{ matrix.profile == 'release' }}
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-redirector --lib --locked
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-sockscap-tools --lib --locked
+          args=()
+          if [[ "$QA_RELEASE" == "true" ]]; then
+            args+=(--release)
+          fi
+          python .agents/skills/qa-ui-auto/scripts/ci_redirector_bridge.py \
+            --receipt qa-build-output/redirector-bridge-receipt.json "${args[@]}" \
+            2>&1 | tee qa-build-output/redirector-bridge.log
       - name: Upload native runtime once per build
         if: inputs.operation == 'build'
         uses: actions/upload-artifact@v4
@@ -609,13 +708,164 @@ jobs:
           compression-level: 0
       - name: Retain native build diagnostics
         if: always() && inputs.operation == 'build'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: build-log-${{ matrix.id }}-${{ inputs.artifact_key }}
           path: |
             qa-build-output/build.log
+            qa-build-output/vnc-key-helper-receipt.json
+            qa-build-output/vnc-key-helper.log
+            qa-build-output/redirector-bridge-receipt.json
+            qa-build-output/redirector-bridge.log
+            qa-build-output/wry-pending-scripts-tests.log
+            qa-build-output/sockscap-helper-launch.log
             qa-ui-auto-report/${{ matrix.id }}/
           retention-days: 14
+      - name: Identify the native platform for the official module input
+        if: inputs.operation == 'run' && matrix.mode == 'native' && (contains(matrix.capabilities, 'full-module-profile') || contains(matrix.capabilities, 'signed-module') || contains(matrix.capabilities, 'signed-mfa') || contains(matrix.capabilities, 'signed-vnc') || contains(matrix.capabilities, 'signed-rdp') || contains(matrix.capabilities, 'signed-mail') || contains(matrix.capabilities, 'signed-screenshot') || contains(matrix.capabilities, 'signed-local-vnc') || contains(matrix.capabilities, 'signed-local-rdp') || contains(matrix.capabilities, 'signed-local-servers') || contains(matrix.capabilities, 'signed-local-voice') || contains(matrix.capabilities, 'signed-sockscap'))
+        id: module_platform
+        run: |
+          python - <<'PY'
+          import os
+          from qa_ui_auto.fixtures.module_signed_archive import platform_key
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
+              stream.write('platform=' + platform_key() + '\n')
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as stream:
+              stream.write('QA_SIGNED_MODULE_ROOT=' + os.path.abspath('qa-ui-auto-report/official-module-input') + '\n')
+              stream.write('QA_SIGNED_MFA_ROOT=' + os.path.abspath('qa-ui-auto-report/official-mfa-input') + '\n')
+              stream.write('QA_SIGNED_VNC_ROOT=' + os.path.abspath('qa-ui-auto-report/official-vnc-input') + '\n')
+              stream.write('QA_SIGNED_RDP_ROOT=' + os.path.abspath('qa-ui-auto-report/official-rdp-input') + '\n')
+              stream.write('QA_SIGNED_MAIL_ROOT=' + os.path.abspath('qa-ui-auto-report/official-mail-input') + '\n')
+              stream.write('QA_SIGNED_SCREENSHOT_ROOT=' + os.path.abspath('qa-ui-auto-report/official-screenshot-input') + '\n')
+              stream.write('QA_SIGNED_VNC_SERVER_ROOT=' + os.path.abspath('qa-ui-auto-report/official-vnc-server-input') + '\n')
+              stream.write('QA_SIGNED_RDP_SERVER_ROOT=' + os.path.abspath('qa-ui-auto-report/official-rdp-server-input') + '\n')
+              stream.write('QA_SIGNED_SERVERS_ROOT=' + os.path.abspath('qa-ui-auto-report/official-servers-input') + '\n')
+              stream.write('QA_SIGNED_LOCAL_VOICE_ROOT=' + os.path.abspath('qa-ui-auto-report/official-voice-input') + '\n')
+              stream.write('QA_SIGNED_SOCKSCAP_ROOT=' + os.path.abspath('qa-ui-auto-report/official-sockscap-input') + '\n')
+              stream.write('QA_LOCAL_VOICE_AUDIO_ROOT=' + os.path.abspath('qa-ui-auto-report/official-voice-fixture') + '\n')
+          PY
+      - name: Bind the first-upgrade roster to the selected release build
+        if: inputs.first_release_run != '' && inputs.operation == 'run' && (contains(matrix.capabilities, 'first-upgrade-installer') || contains(matrix.capabilities, 'full-module-profile'))
+        id: first_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_RUN: ${{ inputs.first_release_run }}
+        run: |
+          [[ "$RELEASE_RUN" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RELEASE_RUN" > release-producer.json
+          python - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          run = json.loads(Path('release-producer.json').read_bytes())
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          if (str(run['id']) != os.environ['RELEASE_RUN'] or run['head_sha'] != source
+                  or run['path'] != '.github/workflows/release.yml' or run['event'] != 'workflow_dispatch'
+                  or any(run[key]['full_name'] != os.environ['GITHUB_REPOSITORY'] for key in ('repository', 'head_repository'))):
+              raise SystemExit('Release producer does not match the current native QA source')
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as stream:
+              print('QA_FIRST_RELEASE_RUN=' + os.environ['RELEASE_RUN'], file=stream)
+              print('QA_FIRST_RELEASE_ROOT=' + str(Path('first-release-input').resolve()), file=stream)
+          PY
+      - name: Download the verified first-release catalog
+        if: steps.first_release.outcome == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: modular-candidate-roster-${{ inputs.first_release_run }}
+          run-id: ${{ inputs.first_release_run }}
+          github-token: ${{ github.token }}
+          path: first-release-input/catalog
+      - name: Download the target's signed packages across all artifact pages
+        if: steps.first_release.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODULE_RUN: ${{ inputs.first_release_run }}
+          MODULE_TARGET: ${{ steps.module_platform.outputs.platform }}
+        run: gh run download "$MODULE_RUN" --repo "$GITHUB_REPOSITORY" --pattern "module-signed-*-$MODULE_TARGET-$MODULE_RUN" --dir first-release-input/packages
+      - name: Download this invocation's production-signed module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-module')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}
+          path: qa-ui-auto-report/official-module-input
+      - name: Download this invocation's production-signed MFA module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-mfa')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-mfa
+          path: qa-ui-auto-report/official-mfa-input
+      - name: Download this invocation's production-signed VNC module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-vnc')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-vnc
+          path: qa-ui-auto-report/official-vnc-input
+      - name: Download this invocation's production-signed RDP module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-rdp')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-rdp
+          path: qa-ui-auto-report/official-rdp-input
+      - name: Download this invocation's production-signed Mail module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-mail')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-mail
+          path: qa-ui-auto-report/official-mail-input
+      - name: Download this invocation's production-signed Screenshot module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-screenshot')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-screenshot
+          path: qa-ui-auto-report/official-screenshot-input
+      - name: Download this invocation's production-signed VNC Server module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-local-vnc')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-vnc-server
+          path: qa-ui-auto-report/official-vnc-server-input
+      - name: Download this invocation's production-signed RDP Server module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-local-rdp')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-rdp-server
+          path: qa-ui-auto-report/official-rdp-server-input
+      - name: Download this invocation's signed Local servers module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-local-servers')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-servers
+          path: qa-ui-auto-report/official-servers-input
+      - name: Download this invocation's signed Local Voice module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-local-voice')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-voice
+          path: qa-ui-auto-report/official-voice-input
+      - name: Download this invocation's signed SocksCap module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-sockscap')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-sockscap
+          path: qa-ui-auto-report/official-sockscap-input
+      - name: Prepare pinned model and public speech fixture
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-local-voice')
+        run: python scripts/voice-fixture.py --root "$QA_LOCAL_VOICE_AUDIO_ROOT"
+      - name: Stage the pinned public legacy installers for this shard
+        if: inputs.operation == 'run' && matrix.mode == 'native' && (contains(matrix.capabilities, 'legacy-installer') || contains(matrix.capabilities, 'first-upgrade-installer'))
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EARLIER_MONOLITH: ${{ contains(matrix.capabilities, 'legacy-installer') }}
+          FIRST_UPGRADE_MONOLITH: ${{ contains(matrix.capabilities, 'first-upgrade-installer') }}
+        run: |
+          if [[ "$EARLIER_MONOLITH" == true ]]; then
+            python -m qa_ui_auto.legacy_release qa-ui-auto-report/legacy-installer-input
+          fi
+          if [[ "$FIRST_UPGRADE_MONOLITH" == true ]]; then
+            python -m qa_ui_auto.legacy_release qa-ui-auto-report/legacy-installer-input --first-upgrade
+          fi
+          python -c 'import os; from pathlib import Path; Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8").write("QA_LEGACY_INSTALLER_DIR=" + str(Path("qa-ui-auto-report/legacy-installer-input").resolve()) + "\n")'
       - name: Download this invocation's verified native runtime
         if: inputs.operation == 'run' && matrix.mode == 'native'
         uses: ./.github/actions/qa-download-artifact

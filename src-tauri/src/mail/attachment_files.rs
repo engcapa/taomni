@@ -28,16 +28,16 @@ pub(super) fn save_raw_message(
     if path.exists() {
         return Ok(());
     }
-    write_new_file(&path, body).map_err(|e| format!("failed to save fetched email: {e}"))
-}
-
-pub(super) fn write_new_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    use std::io::Write as _;
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)?;
-    file.write_all(bytes)
+    let save = || -> std::io::Result<()> {
+        let mut staged = tempfile::NamedTempFile::new_in(&dir)?;
+        staged.write_all(body)?;
+        match staged.persist_noclobber(&path) {
+            Ok(_) => Ok(()),
+            Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+            Err(error) => Err(error.error),
+        }
+    };
+    save().map_err(|error| format!("failed to save fetched email: {error}"))
 }
 
 pub(super) fn sanitize_path_component(value: &str) -> String {
@@ -67,4 +67,25 @@ pub(super) fn write_attachment_file(target_path: &str, bytes: &[u8]) -> Result<S
     }
     std::fs::write(&path, bytes).map_err(|e| format!("failed to write attachment: {e}"))?;
     Ok(path.to_string_lossy().to_string())
+}
+
+pub(super) fn publish_mail_bytes(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    std::fs::create_dir_all(parent).map_err(|error| format!("failed to create folder: {error}"))?;
+    let mut staging = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|error| format!("failed to stage mail file: {error}"))?;
+    staging
+        .write_all(bytes)
+        .map_err(|error| format!("failed to write mail file: {error}"))?;
+    staging
+        .as_file()
+        .sync_all()
+        .map_err(|error| format!("failed to flush mail file: {error}"))?;
+    staging
+        .persist(path)
+        .map_err(|error| format!("failed to save mail file: {}", error.error))?;
+    Ok(())
 }

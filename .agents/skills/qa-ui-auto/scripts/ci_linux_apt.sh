@@ -19,11 +19,36 @@ prepare_apt_mirrors() {
   fi
 }
 
+configure_playwright_platform() {
+  local profile="$1"
+  if [[ "$profile" == ubuntu-26.04-wayland ]]; then
+    # Playwright 1.55 has no Resolute dependency manifest. Use its Noble
+    # Chromium build and dependency list on this newer x64 Ubuntu runner.
+    # The QA desktop/profile identity remains Ubuntu 26.04 Wayland.
+    export PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64
+    if [[ -n "${GITHUB_ENV:-}" ]]; then
+      echo "PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=$PLAYWRIGHT_HOST_PLATFORM_OVERRIDE" >> "$GITHUB_ENV"
+    fi
+  fi
+}
+
 update_package_index() {
   sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 update
 }
 
 install_packages() {
+  local install_status
+  if _install_packages_once "$@"; then return 0; else install_status=$?; fi
+  if [[ "$install_status" != 100 ]]; then return "$install_status"; fi
+  # A hosted image or a mirror publication race can leave an index pointing
+  # at removed .deb versions. Refresh once and retain the exact package set;
+  # a second failure still blocks the job.
+  echo 'Package installation failed; refreshing indexes once before retry.' >&2
+  update_package_index || return
+  _install_packages_once "$@"
+}
+
+_install_packages_once() {
   # The fixtures explicitly declare their desktop/IME/audio packages. Suggested
   # applications (Qt WebEngine, modem services, display managers) are unrelated.
   sudo env DEBIAN_FRONTEND=noninteractive apt-get \

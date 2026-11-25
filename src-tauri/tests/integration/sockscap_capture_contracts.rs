@@ -3,15 +3,15 @@
 //! the Windows helper binary tests separately compile the real OS integration.
 #![allow(dead_code)]
 
-#[path = "../../crates/sockscap-helper/src/capture/address.rs"]
+#[path = "../../plugins/sockscap/tools/src/bin/sockscap-helper/capture/address.rs"]
 mod address;
-#[path = "../../crates/sockscap-helper/src/capture/filter.rs"]
+#[path = "../../plugins/sockscap/tools/src/bin/sockscap-helper/capture/filter.rs"]
 mod filter;
-#[path = "../../crates/sockscap-helper/src/capture/flow_table.rs"]
+#[path = "../../plugins/sockscap/tools/src/bin/sockscap-helper/capture/flow_table.rs"]
 mod flow_table;
-#[path = "../../crates/sockscap-helper/src/capture/packet.rs"]
+#[path = "../../plugins/sockscap/tools/src/bin/sockscap-helper/capture/packet.rs"]
 mod packet;
-#[path = "../../crates/sockscap-helper/src/capture/pid_map.rs"]
+#[path = "../../plugins/sockscap/tools/src/bin/sockscap-helper/capture/pid_map.rs"]
 mod pid_map;
-#[path = "../../crates/sockscap-helper/src/capture/tests.rs"]
+#[path = "../../plugins/sockscap/tools/src/bin/sockscap-helper/capture/tests.rs"]
 mod tests;

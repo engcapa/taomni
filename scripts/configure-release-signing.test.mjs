@@ -50,6 +50,18 @@ test("self-signed releases use the pinned identity without Apple notarization cr
   }
 });
 
+test("the static Kerberos comparison enables hardened runtime on a pinned artifact build", () => {
+  const options = { MACOS_STATIC_KRB5: "true", RELEASE_TAG: "" };
+  const plan = releaseSigningPlan(macos(options));
+  const config = JSON.parse(plan.environment.TAURI_RELEASE_CONFIG);
+  assert.equal(plan.mode, "self-signed");
+  assert.deepEqual(config.bundle.macOS, { hardenedRuntime: true, frameworks: [] });
+  assert.equal(plan.environment.APPLE_SIGNING_IDENTITY, fingerprint);
+  assert.equal(plan.environment.MACOS_STATIC_KRB5, "true");
+  assert.throws(() => releaseSigningPlan(macos({ ...options, RELEASE_TAG: "v0.4.30" })), /artifact-only/);
+  assert.throws(() => releaseSigningPlan({ ...options, RELEASE_PLATFORM: "macOS" }), /fixed certificate/);
+});
+
 test("Developer ID signing works with or without a complete optional notarization account", () => {
   const env = macos({ APPLE_SIGNING_IDENTITY: "Developer ID Application: Example (TEAM123456)" });
   assert.equal(releaseSigningPlan(env).mode, "developer-id");

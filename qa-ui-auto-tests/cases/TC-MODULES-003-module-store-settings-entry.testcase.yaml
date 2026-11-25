@@ -1,0 +1,135 @@
+id: TC-MODULES-003
+title: Settings and Welcome open one Module Store with an explicit registry state
+description: >-
+  The modular runtime exposes the signed module registry through Settings. The
+  browser and packaged app must show the Module Store panel and an explicit
+  loading, empty, or registry-error state without runtime errors. Welcome opens
+  that same section directly after selecting the actual application Home
+  navigation (including Tao Home); closing Settings alone keeps Sessions mode.
+  Repeated Settings navigation keeps a single tab. The Home dock's separate Tao
+  settings entry retains its own destination, then Browse modules returns to the
+  Module Store without duplicating Settings.
+covers:
+- F-Modules-1
+- F1.6
+tags:
+- p1
+- modules
+- settings
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 45
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-store-panel"]'
+- assert_visible: '[data-testid="module-store-panel"]'
+- assert_count:
+    selector: '[data-testid="module-store-empty"], [data-testid="module-store-catalog-error"], [data-testid="module-store-loading"]'
+    min: 1
+- assert_no_runtime_errors: null
+- click: '[data-testid="tab-item"][data-tab-type="settings"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-browse-modules"]'
+- click: '[data-testid="welcome-browse-modules"]'
+- wait_for: '[data-testid="settings-panel"]'
+- wait_for: '[data-testid="module-store-panel"]'
+- assert_visible: '[data-testid="module-store-panel"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="settings"]', equal: 1}
+- assert_count:
+    selector: '[data-testid="module-store-empty"], [data-testid="module-store-catalog-error"], [data-testid="module-store-loading"]'
+    min: 1
+- click: '[data-testid="ribbon-settings"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="settings"]', equal: 1}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- assert_visible: '[data-testid="tao-settings"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="settings"]', equal: 1}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="welcome-browse-modules"]'
+- wait_for: '[data-testid="module-store-panel"]'
+- assert_visible: '[data-testid="module-store-panel"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="settings"]', equal: 1}
+- screenshot: module-store-welcome-entry.png
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Settings exposes the module store and reports a truthful registry state.
+    actions:
+    - 3
+    - 5
+    checkpoints:
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"module-store-panel\"]"}'
+    - step: 8
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-store-empty\"], [data-testid=\"module-store-catalog-error\"], [data-testid=\"module-store-loading\"]", "min": 1}}'
+    - step: 9
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 7
+    - 8
+    - 9
+  - id: R2
+    requirement: Welcome opens the same module section directly, and repeated Settings navigation preserves one tab.
+    actions:
+    - 11
+    - 13
+    - 19
+    checkpoints:
+    - step: 16
+      expectation: Module Store is visible without entering a search query.
+    - step: 17
+      expectation: Exactly one Settings tab exists after Welcome navigation.
+    - step: 18
+      expectation: The real registry reports loading, empty, or an actionable error.
+    - step: 20
+      expectation: Reopening Settings activates the existing tab without duplicating it.
+    - step: 33
+      expectation: No runtime errors are reported across both entry workflows.
+    results:
+    - 16
+    - 17
+    - 18
+    - 20
+    - 33
+  - id: R3
+    requirement: The actual Home host preserves separate Tao and Module Store destinations while reusing Settings.
+    actions:
+    - 21
+    - 23
+    - 27
+    - 28
+    checkpoints:
+    - step: 25
+      expectation: The dock Tao settings entry reveals Tao settings.
+    - step: 26
+      expectation: Exactly one Settings tab exists after Tao navigation.
+    - step: 30
+      expectation: Browse modules reveals the Module Store again through the actual Home host.
+    - step: 31
+      expectation: Exactly one Settings tab exists after the second module navigation.
+    results:
+    - 25
+    - 26
+    - 30
+    - 31
+  native:
+  - check: Native mode confirms the installed registry IPC can render the same panel and state.
+    method: automated
+    reason: Browser stubs do not execute the native plugin registry.
+  visual:
+  - check: Module Store remains readable in the expanded General settings group with a clear state boundary.
+    method: manual
+    reason: Automated checks cover presence and state selectors; spacing and narrow viewport layout require screenshot review.

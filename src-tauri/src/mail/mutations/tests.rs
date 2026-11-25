@@ -28,7 +28,7 @@ impl Harness {
             network_settings: None,
         };
         let directory = tempfile::tempdir().unwrap();
-        let db = Arc::new(coordination::MailDatabase::new(
+        let db = Arc::new(coordination::mailbox_database(
             directory.path().join("mail.db"),
         ));
         {
@@ -54,6 +54,7 @@ impl Harness {
     fn run(&self, kind: Kind, uids: Vec<u32>, id: Option<String>) -> Progress {
         run_cached(
             &MailImapPool::new(),
+            &std::sync::Mutex::new(()),
             &self.account,
             self.runtime.handle(),
             &self.db,
@@ -63,6 +64,7 @@ impl Harness {
             kind,
             false,
             id,
+            None,
         )
         .unwrap()
     }
@@ -263,6 +265,7 @@ fn empty_folder_captures_server_uids_even_with_a_client_request_id() {
     let h = Harness::new(3);
     let result = run_cached(
         &MailImapPool::new(),
+        &std::sync::Mutex::new(()),
         &h.account,
         h.runtime.handle(),
         &h.db,
@@ -272,12 +275,14 @@ fn empty_folder_captures_server_uids_even_with_a_client_request_id() {
         Kind::Delete,
         true,
         Some("empty-request".into()),
+        None,
     )
     .unwrap();
     assert_eq!(result.completed_uids, [1, 2, 3]);
     h.fake.deliver("INBOX", 1, "arrived-later");
     let repeat = run_cached(
         &MailImapPool::new(),
+        &std::sync::Mutex::new(()),
         &h.account,
         h.runtime.handle(),
         &h.db,
@@ -287,6 +292,7 @@ fn empty_folder_captures_server_uids_even_with_a_client_request_id() {
         Kind::Delete,
         true,
         Some(result.operation_id),
+        None,
     )
     .unwrap();
     assert_eq!(repeat.completed_uids, [1, 2, 3]);

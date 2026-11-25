@@ -91,7 +91,7 @@
 | `src-tauri/src/chat/mod.rs`：`ChatSendRequest`；`chat/store.rs`：`ChatThread` | 每轮请求由前端补齐上下文：`bound_session_id`、`cwd`、`local_terminal_env`、`bound_db_connection_id`、`code_workspace` 等。`ChatThread.linked_session_id` 是**桌面 tab id**，不是 `SessionConfig.id`。线程表没有运行状态列。流式输出以 `StreamEventOut` 事件发给前端 | ① 手机发起的后续指令没有这些桌面上下文，行为可能与桌面发起不同，待 TASK-03 确认。② 线程“运行中”只能由 `ChatRunRegistry` 是否有该线程判断。③ 流事件当前经 `AppHandle` 发出，须经 EventSink 转给事件流，见 §4.5 | 源码实查 |
 | `src-tauri/src/state.rs`：`AgentRuntime` 的 `cc_pending_permissions`、`cc_pending_tool_calls`、`agent_thread_cwd`、`agent_code_workspaces`；`CcPermissionDecision`（Allow / AllowSession / Deny）；`CcToolOutcome` | Claude Code 权限提示：MCP 工具登记 oneshot、发送 `agent-cc-permission` 事件，阻塞等待前端 `cc_resolve_permission`。副作用工具（如 `run_in_terminal`、`sftp_upload`、`switch_tab`）由**前端执行**后经 `cc_resolve_tool_call` 回传。线程工作目录、代码工作区按轮次由前端桥接后存入后端 | ① CC 权限提示有明确的后端钩子，是 AC-06 最可能可透传的确认点，但仍待 TASK-03 盘点后确认。ACP 有 `acp_resolve_permission`，实现不在输入包内。② 副作用工具依赖桌面前端执行，headless 下无法完成，须在 TASK-03 盘点中标为“需桌面”。③ `agent_thread_cwd` 与 `agent_code_workspaces` 是后端已知的文件根候选，其值类型不在输入包内，待 TASK-04 盘点 | 源码实查（字段与注释）；`domains` 类型定义待核实 |
 | `src/components/agent/`、`src/components/chat/` 确认卡片 | `ActionCard` 见于 `state.rs` 注释；`WebSearchConfirmCard` 不在输入包内 | TASK-03 须先盘点桌面已有确认点，再决定手机能透传哪几个 | `ActionCard` 有间接证据；其余待核实 |
-| `src-tauri/src/lib.rs`：`run()` 与 `setup()` | 进程已有若干网络监听：LanChat 服务（按 start_on_launch 自启）、本地服务器自启（`servers::autostart_servers`）、隧道自启、macOS 上可选启用的 QA WebDriver 桥（仅当设置 `TAOMNI_QA_WEBDRIVER_PORT` 时启动本地 HTTP），命令表中另有 `nmedia_ws_port`。没有面向手机的鉴权 API。`setup()` 依赖 `AppHandle`：解析 app-data 目录、`ProfileLease::prepare`、`vault::default_vault_path(app.handle())`、`local_history::init_local_history(app.handle())`、`workspace.lsp.attach_app`、备份与调度初始化。退出时执行 `backup::scheduler::handle_exit_request` 与 `sockscap::shutdown_on_exit` | 移动服务是全新服务层，不是把 Tauri IPC 暴露出去，也不复用上述任何现有监听。headless 路径不能直接复用 `setup()`，须逐项盘点哪些初始化在 headless 必需、哪些须改为不依赖 `AppHandle`、哪些在 headless 不做，退出清理也要逐项处理，见 TASK-01。`AppState::new` 本身不依赖 `AppHandle`，可在 Tauri 外构造 | 源码实查 |
+| `src-tauri/src/lib.rs`：`run()` 与 `setup()` | 进程已有若干网络监听：本地服务器自启（`servers::autostart_servers`）、隧道自启、macOS 上可选启用的 QA WebDriver 桥（仅当设置 `TAOMNI_QA_WEBDRIVER_PORT` 时启动本地 HTTP），命令表中另有 `nmedia_ws_port`。没有面向手机的鉴权 API。`setup()` 依赖 `AppHandle`：解析 app-data 目录、`ProfileLease::prepare`、`vault::default_vault_path(app.handle())`、`local_history::init_local_history(app.handle())`、`workspace.lsp.attach_app`、备份与调度初始化。退出时执行 `backup::scheduler::handle_exit_request` 与 `sockscap::shutdown_on_exit` | 移动服务是全新服务层，不是把 Tauri IPC 暴露出去，也不复用上述任何现有监听。headless 路径不能直接复用 `setup()`，须逐项盘点哪些初始化在 headless 必需、哪些须改为不依赖 `AppHandle`、哪些在 headless 不做，退出清理也要逐项处理，见 TASK-01。`AppState::new` 本身不依赖 `AppHandle`，可在 Tauri 外构造 | 源码实查 |
 | `src-tauri/src/main.rs` | 不在输入包内。`lib.rs` 导出了 Windows 专用辅助进程入口：`run_screenshot_scroll_input`，以及 `VNC_SPECIAL_KEY_HOOK_ARG`（注释写明 `taomni --vnc-special-key-hook <pid>`）。这表明 `main.rs` 很可能在调用 `run()` 前有命令行分发 | “在 `main.rs` 进入 `run()` 前拦截 `--headless`”的路径方向可行，但现有先例是 Windows 专用；跨平台入口的具体写法待 TASK-01 核实 | 待核实 |
 | `src-tauri/src/servers/http.rs`、`servers/ssh.rs` | 前者是用户配置的静态文件服务，可配 CORS（固定 `Access-Control-Allow-Origin: *`）、目录浏览、根目录回退到家目录；后者是内置 SSH/SFTP 服务，凭据来自服务配置 | **两者都不复用为移动入口**：前者没有鉴权，CORS 为 `*`；后者面向受信局域网。移动服务独立成模块，自带鉴权，默认绑定回环地址（§4.5） | 源码实查 |
 | `src-tauri/src/workspace/paths.rs`、`file_commands.rs` | `resolve_existing_path`：先做相对路径净化（拒绝 `..` 与绝对路径），再 `canonicalize`（解析符号链接），最后 `ensure_inside`。`workspace_read_file` 有大小上限 `DEFAULT_MAX_TEXT_BYTES`。`workspace_read_loose_file` 可读取任意绝对路径。`ensure_inside` 除比较规范化路径外，还有 `target.starts_with(root)` 兜底分支 | 移动文件 API 可复用“净化 → 规范化 → 根内校验 → 大小上限”的思路，但：① 不得暴露 loose 读取；② 根内校验须以规范化后的根做逐段比较，不得依赖兜底分支放宽。复用 `workspace_read_file` 还是另写，由 TASK-04 决定 | 源码实查 |
@@ -451,7 +451,7 @@ Linux 无 GUI 约束（DEC-06）：
 
 - `--headless` 不得调用 `tauri::Builder`。现有 `run()` 在 Linux 下会做 webkit2gtk 相关配置并构建 GTK 窗口；无 Display 时预期会因 GTK 初始化失败而无法启动，以 V-07 实测为准。
 - 拟在进入 `taomni_lib::run()` 之前拦截 `--headless`（`main.rs` 原文待核实），直接构建 Tokio Runtime。只初始化核心：DB、`AppState::new`、移动服务、EventSink。不初始化 GTK、WebView、窗口与桌面插件。
-- `setup()` 中依赖 `AppHandle` 的初始化项须逐项盘点，决定在 headless 下改为不依赖 `AppHandle`，还是不做。涉及：app-data 目录、vault 路径、`ProfileLease`、本地历史、LSP 绑定、备份与调度、LanChat、隧道与本地服务器自启、SocksCap 修复。
+- `setup()` 中依赖 `AppHandle` 的初始化项须逐项盘点，决定在 headless 下改为不依赖 `AppHandle`，还是不做。涉及：app-data 目录、vault 路径、`ProfileLease`、本地历史、LSP 绑定、备份与调度、隧道与本地服务器自启、SocksCap 修复。
 - 退出清理同样逐项盘点，涉及：SocksCap helper、备份调度退出、截图。
 
 EventSink 解耦：
@@ -575,7 +575,7 @@ EventSink 解耦：
   1. 在进入 `taomni_lib::run()` 前拦截 `--headless`。核实 `main.rs` 现有的参数分发方式：输入包内只看到 Windows 专用辅助进程的线索，跨平台入口写法待核实。该分支不得调用 `tauri::Builder` 及其 build/run，不初始化 GTK、WebView、窗口与桌面插件，直接构建 Tokio Runtime。
   2. 盘点 `setup()` 中的每个初始化项与 `RunEvent::Exit` / `ExitRequested` 中的每个清理项，逐项给出 headless 的处理方式：
      - 必需项：改为不依赖 `AppHandle`，如 app-data 目录、vault 路径、DB 初始化、`AppState::new`；
-     - 不做项：在 headless 中不执行，如 LSP 绑定、LanChat、截图、QA 桥；
+     - 不做项：在 headless 中不执行，如 LSP 绑定、截图、QA 桥；
      - 待定项：须写明理由，如备份调度、隧道与本地服务器自启、SocksCap 修复与退出清理。
   3. 核实 `ProfileLease` 是否阻止桌面与 headless 同时占用同一 app-data；若不能阻止，须补互斥。
   4. 盘点核心模块的 `AppHandle` 事件发送点，至少覆盖：

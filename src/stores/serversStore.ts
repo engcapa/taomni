@@ -9,6 +9,7 @@ import {
   saveServerConfig,
   startLocalServer,
   stopLocalServer,
+  serverSettingsNeedVault,
   type ServerConfig,
   type ServerRunState,
   type ServerStatus,
@@ -32,19 +33,17 @@ interface ServersStore {
   configs: Record<ServerType, ServerConfig>;
   runtimes: Record<ServerType, ServerRuntime>;
   loaded: boolean;
-  /** True when configs have unsaved edits since the last Apply / load. */
-  dirty: boolean;
+  editedServers: ReadonlySet<ServerType>;
   /** Non-null when opening the Local servers tab was blocked because another instance holds it. */
   tabBlockedMessage: string | null;
 
   setTabBlockedMessage: (message: string | null) => void;
   selectServer: (t: ServerType) => void;
-  setConfig: (t: ServerType, cfg: ServerConfig) => void;
   patchConfig: (t: ServerType, patch: Partial<ServerConfig>) => void;
+  commitConfig: (t: ServerType, submitted: ServerConfig, saved: ServerConfig) => void;
   setStatus: (t: ServerType, s: ServerStatus) => void;
   appendLog: (t: ServerType, line: string) => void;
   clearLog: (t: ServerType) => void;
-  markDirty: () => void;
   clearDirty: () => void;
   loadAll: () => Promise<void>;
   start: (t: ServerType) => Promise<void>;
@@ -93,20 +92,25 @@ export const useServersStore = create<ServersStore>((set, get) => ({
   configs: initialConfigs(),
   runtimes: initialRuntimes(),
   loaded: false,
-  dirty: false,
+  editedServers: new Set(),
   tabBlockedMessage: null,
 
   setTabBlockedMessage: (message) => set({ tabBlockedMessage: message }),
   selectServer: (t) => set({ selectedServer: t }),
 
-  setConfig: (t, cfg) =>
-    set((s) => ({ configs: { ...s.configs, [t]: cfg } })),
-
   patchConfig: (t, patch) =>
     set((s) => ({
       configs: { ...s.configs, [t]: { ...s.configs[t], ...patch } },
-      dirty: true,
+      editedServers: new Set(s.editedServers).add(t),
     })),
+
+  commitConfig: (t, submitted, saved) =>
+    set((s) => {
+      if (s.configs[t] !== submitted) return s;
+      const editedServers = new Set(s.editedServers);
+      editedServers.delete(t);
+      return { configs: { ...s.configs, [t]: saved }, editedServers };
+    }),
 
   setStatus: (t, status) =>
     set((s) => ({
@@ -141,8 +145,7 @@ export const useServersStore = create<ServersStore>((set, get) => ({
     }));
   },
 
-  markDirty: () => set({ dirty: true }),
-  clearDirty: () => set({ dirty: false }),
+  clearDirty: () => set({ editedServers: new Set() }),
 
   loadAll: async () => {
     const configs = initialConfigs();
@@ -186,11 +189,12 @@ export const useServersStore = create<ServersStore>((set, get) => ({
       runtimes[t].logLines = mergeLogHistory(history[t] ?? [], live[t]?.logLines ?? []);
     }
 
-    set({ configs, runtimes, loaded: true, dirty: false });
+    set({ configs, runtimes, loaded: true, editedServers: new Set() });
   },
 
   start: async (t) => {
-    let cfg = get().configs[t];
+    const submitted = get().configs[t];
+    let cfg = submitted;
     // Optimistic "starting" so the row reflects intent immediately.
     set((s) => ({
       runtimes: {
@@ -212,14 +216,17 @@ export const useServersStore = create<ServersStore>((set, get) => ({
         }
         if (decision.patch && Object.keys(decision.patch).length > 0) {
           cfg = { ...cfg, ...decision.patch };
-          get().setConfig(t, cfg);
         }
       }
       if (t === "rdp" && !(await ensureVaultReady("Store the RDP server password securely"))) {
         throw new Error("RDP server start cancelled: credential vault is not ready");
       }
+      if (serverSettingsNeedVault(t, cfg) &&
+        !(await ensureVaultReady("Unlock the credential vault to use the local server password"))) {
+        throw new Error("Server start cancelled: credential vault is not ready");
+      }
       cfg = await saveServerConfig(t, cfg);
-      get().setConfig(t, cfg);
+      get().commitConfig(t, submitted, cfg);
       const status = await startLocalServer(t, cfg);
       get().setStatus(t, status);
     } catch (err) {

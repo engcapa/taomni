@@ -1,0 +1,474 @@
+name: QA Modular Protocol Contracts
+
+on:
+  workflow_call:
+    inputs:
+      head:
+        type: string
+        required: true
+      rdp_pipeline:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  selection:
+    name: QA selection and module release contracts (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the planner's schema dependencies
+        run: python -m pip install PyYAML==6.0.2 jsonschema==4.25.1 Pillow==12.1.1
+      - name: Verify every existing selection and tampered-digest assertion
+        shell: bash
+        run: |
+          mkdir -p modular-selection-evidence
+          git rev-parse HEAD > modular-selection-evidence/source-sha.txt
+          python --version > modular-selection-evidence/python-version.txt
+          set -o pipefail
+          python -m unittest -v test_ci_selection 2>&1 | tee modular-selection-evidence/selection-unit.log
+      - name: Verify independent module release staging
+        shell: bash
+        run: |
+          mkdir -p modular-selection-evidence
+          set -o pipefail
+          cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked 2>&1 | tee modular-selection-evidence/module-release-unit.log
+          node --test scripts/compose-modules-manifest.test.mjs scripts/stage-published-module-catalog.test.mjs scripts/fetch-published-module-assets.test.mjs scripts/release-workflow.test.mjs scripts/release-modules-workflow.test.mjs scripts/resolve-release-build.test.mjs 2>&1 | tee modular-selection-evidence/release-workflow-unit.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-selection-Linux
+          path: modular-selection-evidence
+          if-no-files-found: error
+
+  protocol:
+    name: Plugin wire contracts (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-protocol-${{ runner.os }}-${{ runner.arch }}
+      - name: Verify the current-source API and binary descriptor wire contracts
+        run: |
+          mkdir -p modular-protocol-evidence
+          git rev-parse HEAD > modular-protocol-evidence/source-sha.txt
+          rustc --version > modular-protocol-evidence/rustc-version.txt
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-api --locked 2>&1 | tee modular-protocol-evidence/protocol-unit.log
+      - name: Verify bounded binary stream units
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --lib --locked 2>&1 | tee modular-protocol-evidence/stream-unit.log
+      - name: Verify independent Mail storage and message codecs
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-api --lib --locked 2>&1 | tee modular-protocol-evidence/mail-api-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-storage --lib --locked 2>&1 | tee modular-protocol-evidence/mail-storage-core-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-storage --lib --all-features --locked 2>&1 | tee modular-protocol-evidence/mail-storage-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-engine --lib --locked 2>&1 | tee modular-protocol-evidence/mail-engine-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-storage --lib --locked \
+            mutation_journal::tests::account_lease_blocks_an_independent_process -- --exact --ignored \
+            2>&1 | tee modular-protocol-evidence/mail-mutation-process-lock.log
+          grep -Fq 'test result: ok. 1 passed;' modular-protocol-evidence/mail-mutation-process-lock.log
+      - name: Prepare Perl for the Windows VNC TLS build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
+          & $perl -MIPC::Cmd -e 'print "Perl ready"'
+          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+          'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
+      - name: Verify the standalone VNC protocol and loopback fixtures
+        env:
+          VNC_ENGINE_RUNNER: ${{ matrix.os }}
+        run: |
+          set -o pipefail
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-vnc-engine --edges normal,build --prefix none --locked > modular-protocol-evidence/vnc-engine-tree.txt
+          if grep -Eq '^(tauri(-[^[:space:]]+)?|wry|taomni|taomni-plugin-[^[:space:]]+) ' modular-protocol-evidence/vnc-engine-tree.txt; then
+            echo 'The standalone VNC engine links the desktop runtime.' >&2
+            exit 1
+          fi
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-vnc-engine --lib --locked --no-run --message-format=json > modular-protocol-evidence/vnc-engine-build.jsonl
+          python - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+
+          evidence = Path('modular-protocol-evidence')
+          rows = map(json.loads, (evidence / 'vnc-engine-build.jsonl').read_text(encoding='utf-8').splitlines())
+          (binary,) = [Path(row['executable']) for row in rows
+                       if row.get('reason') == 'compiler-artifact' and row.get('executable')
+                       and row['target']['name'] == 'taomni_vnc_engine' and row['profile']['test']]
+          log = evidence / 'vnc-engine.log'
+          with log.open('wb') as stream:
+              result = subprocess.run([str(binary)], stdout=stream, stderr=subprocess.STDOUT, timeout=180)
+          output = log.read_text(encoding='utf-8', errors='replace')
+          print(output, end='')
+          result.check_returncode()
+          for case in ('authenticated_websocket_rejects_bad_requests_and_is_single_use',
+                       'cancelling_during_websocket_handshake_closes_the_connection',
+                       'relay_waits_for_paint_ack_and_repaints_after_desktop_size'):
+              assert f'test ws::tests::{case} ... ok' in output, f'Missing successful VNC relay fixture {case}'
+          with binary.open('rb') as stream:
+              digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+          receipt = {
+              'sourceSha': (evidence / 'source-sha.txt').read_text().strip(),
+              'runner': os.environ['VNC_ENGINE_RUNNER'],
+              'runnerImage': os.environ.get('ImageVersion'),
+              'runnerArchitecture': os.environ['RUNNER_ARCH'],
+              'binarySha256': digest,
+              'artifactLog': log.name,
+          }
+          (evidence / 'vnc-engine-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          PY
+      - name: Verify the VNC module process owns and releases its relays
+        env:
+          VNC_HOST_RUNNER: ${{ matrix.os }}
+        run: |
+          set -o pipefail
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-plugin-vnc-client --edges normal,build --prefix none --locked > modular-protocol-evidence/vnc-host-tree.txt
+          if grep -E '^(tauri(-[^[:space:]]+)?|wry|taomni|taomni-hello-plugin|taomni-plugin-[^[:space:]]+) ' modular-protocol-evidence/vnc-host-tree.txt | grep -Ev '^taomni-plugin-(vnc-client|api|sdk|stream) '; then
+            echo 'The VNC host links the desktop runtime or a peer module.' >&2
+            exit 1
+          fi
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-vnc-api --lib --locked 2>&1 | tee modular-protocol-evidence/vnc-api-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-vnc-client --lib --locked 2>&1 | tee modular-protocol-evidence/vnc-host-unit.log
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            cargo build --manifest-path src-tauri/Cargo.toml -p taomni-vnc-key-helper --locked
+          fi
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-vnc-client --test relay_host --locked -- --ignored --nocapture 2>&1 | tee modular-protocol-evidence/vnc-host-process.log
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+
+          evidence = Path('modular-protocol-evidence')
+          log = evidence / 'vnc-host-process.log'
+          process_log = log.read_text(encoding='utf-8')
+          assert '3 passed; 0 failed; 0 ignored' in process_log
+          binary = Path('src-tauri/target/debug') / ('taomni-plugin-vnc-client.exe' if os.name == 'nt' else 'taomni-plugin-vnc-client')
+          with binary.open('rb') as stream:
+              digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+          receipt = {
+              'sourceSha': (evidence / 'source-sha.txt').read_text().strip(),
+              'runner': os.environ['VNC_HOST_RUNNER'],
+              'runnerImage': os.environ.get('ImageVersion'),
+              'runnerArchitecture': os.environ['RUNNER_ARCH'],
+              'binarySha256': digest,
+              'artifactLog': log.name,
+          }
+          if os.name == 'nt':
+              assert 'released its Windows key helper on WebSocket close' in process_log
+              helper = binary.with_name('taomni-vnc-key-helper.exe')
+              with helper.open('rb') as stream:
+                  receipt['keyHelperSha256'] = hashlib.file_digest(stream, 'sha256').hexdigest()
+          (evidence / 'vnc-host-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          PY
+      - name: Verify the Mail module's cached mailbox and profile ownership
+        env:
+          MAIL_HOST_RUNNER: ${{ matrix.os }}
+        run: |
+          set -o pipefail
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mail --edges normal,build --prefix none --locked > modular-protocol-evidence/mail-host-tree.txt
+          node scripts/modular-boundaries.mjs --mail-host-tree modular-protocol-evidence/mail-host-tree.txt
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mail --lib --locked 2>&1 | tee modular-protocol-evidence/mail-host-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mail --test profile_host --locked -- --ignored 2>&1 | tee modular-protocol-evidence/mail-host-native.log
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          evidence = Path('modular-protocol-evidence')
+          native = evidence / 'mail-host-native.log'
+          assert '1 passed; 0 failed; 0 ignored' in native.read_text(encoding='utf-8')
+          host = Path('src-tauri/target/debug') / ('taomni-plugin-mail.exe' if os.name == 'nt' else 'taomni-plugin-mail')
+          receipt = {
+              'sourceSha': (evidence / 'source-sha.txt').read_text().strip(),
+              'runner': os.environ['MAIL_HOST_RUNNER'],
+              'runnerArchitecture': os.environ['RUNNER_ARCH'],
+              'runnerImage': os.environ.get('ImageVersion'),
+              'binarySha256': hashlib.sha256(host.read_bytes()).hexdigest(),
+              'artifactLog': native.name,
+          }
+          (evidence / 'mail-host-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          PY
+      - name: Verify operation cancellation and retained service contracts
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-services --lib --locked 2>&1 | tee modular-protocol-evidence/services-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-sdk --lib --locked 2>&1 | tee modular-protocol-evidence/sdk-unit.log
+      - name: Verify SDK cancellation and deadline during actual pixel reception
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-sdk --lib capture_native_tests --locked -- --ignored --list > modular-protocol-evidence/sdk-capture-selection.txt
+          python -c 'from pathlib import Path; lines=Path("modular-protocol-evidence/sdk-capture-selection.txt").read_text().splitlines(); assert sum(line.endswith(": test") for line in lines) == 3, "Expected all three SDK receive scenarios"'
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-sdk --lib capture_native_tests --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-protocol-evidence/sdk-capture-native.log
+          python -c 'from pathlib import Path; assert "3 passed; 0 failed; 0 ignored" in Path("modular-protocol-evidence/sdk-capture-native.log").read_text(), "Missing SDK mid-receive cancellation evidence"'
+      - name: Verify real SDK still capture and descriptor ownership
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --test capture_still --locked -- --ignored --list > modular-protocol-evidence/capture-selection.txt
+          python -c 'from pathlib import Path; lines=Path("modular-protocol-evidence/capture-selection.txt").read_text().splitlines(); assert sum(line.endswith(": test") for line in lines) == 4, "Expected all four core/SDK capture scenarios"'
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --test capture_still --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-protocol-evidence/capture-native.log
+          python -c 'from pathlib import Path; assert "4 passed; 0 failed; 0 ignored" in Path("modular-protocol-evidence/capture-native.log").read_text(), "Missing complete still capture ownership evidence"'
+      - name: Verify all real loopback and child-process scenarios
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --test transfer --locked -- --ignored --list > modular-protocol-evidence/stream-selection.txt
+          python -c 'from pathlib import Path; lines=Path("modular-protocol-evidence/stream-selection.txt").read_text().splitlines(); assert sum(line.endswith(": test") for line in lines) == 10, "Expected all ten binary transport scenarios"'
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --test transfer --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-protocol-evidence/stream-native.log
+          python -c 'from pathlib import Path; assert "10 passed; 0 failed; 0 ignored" in Path("modular-protocol-evidence/stream-native.log").read_text(), "Missing full native stream evidence"'
+      - name: Verify actual lease and aggregate transfer ownership
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --test owner_cleanup --locked -- --ignored --list > modular-protocol-evidence/owner-selection.txt
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-services --test binary_ownership --locked -- --ignored --list > modular-protocol-evidence/services-binary-selection.txt
+          python - <<'PY'
+          from pathlib import Path
+          expected = {"owner-selection.txt": 1, "services-binary-selection.txt": 7}
+          for name, count in expected.items():
+              lines = Path("modular-protocol-evidence", name).read_text().splitlines()
+              assert sum(line.endswith(": test") for line in lines) == count, name
+          PY
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --test owner_cleanup --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-protocol-evidence/owner-native.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-services --test binary_ownership --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-protocol-evidence/services-binary-native.log
+          python - <<'PY'
+          from pathlib import Path
+          expected = {"owner-native.log": 1, "services-binary-native.log": 7}
+          for name, count in expected.items():
+              log = Path("modular-protocol-evidence", name).read_text()
+              assert f"{count} passed; 0 failed; 0 ignored" in log, name
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-protocol-${{ runner.os }}-${{ runner.arch }}
+          path: modular-protocol-evidence
+          if-no-files-found: error
+
+  rdp-frame-transport:
+    name: RDP frame transport measurement (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-rdp-frames-${{ runner.os }}-${{ runner.arch }}
+      - name: Measure matched in-process and native host frame delivery
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p rdp-frame-evidence
+          git rev-parse HEAD > rdp-frame-evidence/source-sha.txt
+          rustc --version > rdp-frame-evidence/rustc-version.txt
+          printf '%s\n' "$RUNNER_OS" "$RUNNER_ARCH" > rdp-frame-evidence/runner.txt
+          export QA_MODULE_FRAME_REPORT="$GITHUB_WORKSPACE/rdp-frame-evidence/frames.json"
+          cargo test --release --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --locked --lib \
+            frame_transport::compare_in_process_and_host -- --ignored --exact --nocapture \
+            2>&1 | tee rdp-frame-evidence/frame-transport.log
+          test -s rdp-frame-evidence/frames.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-rdp-frames-${{ runner.os }}-${{ runner.arch }}
+          path: rdp-frame-evidence
+          if-no-files-found: error
+
+  rdp-probe:
+    name: Standalone RDP probe (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Prepare Linux audio development libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends libasound2-dev libpipewire-0.3-dev libclang-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-rdp-probe-${{ runner.os }}-${{ runner.arch }}
+      - name: Build and verify the RDP probe independently
+        run: |
+          set -o pipefail
+          mkdir -p rdp-probe-evidence
+          git rev-parse HEAD > rdp-probe-evidence/source-sha.txt
+          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --package taomni-rdp-probe \
+            2>&1 | tee rdp-probe-evidence/unit.log
+          cargo tree --locked --manifest-path src-tauri/Cargo.toml --package taomni-rdp-probe --edges normal \
+            > rdp-probe-evidence/cargo-tree.txt
+          cargo build --locked --release --manifest-path src-tauri/Cargo.toml --package taomni-rdp-probe \
+            2>&1 | tee rdp-probe-evidence/build.log
+          suffix=''
+          if [[ "$RUNNER_OS" == 'Windows' ]]; then suffix='.exe'; fi
+          cp "src-tauri/target/release/rdp-probe$suffix" rdp-probe-evidence/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-rdp-probe-${{ runner.os }}-${{ runner.arch }}
+          path: rdp-probe-evidence
+          if-no-files-found: error
+
+  rdp-pipeline:
+    if: inputs.rdp_pipeline
+    name: Native RDP encoder host comparison (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head }}
+          persist-credentials: false
+      - uses: ./.github/actions/qa-runtime
+        with:
+          mode: native
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install verified fixed protoc
+        run: python .agents/skills/qa-ui-auto/scripts/ci_setup_protoc.py
+      - name: Install native X11 and build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libappindicator3-dev libgbm-dev librsvg2-dev patchelf \
+            libkrb5-dev libasound2-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev \
+            libudev-dev nasm xvfb xauth python3-tk
+      - name: Prepare macOS native harness dependencies
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install krb5
+          krb5="$(brew --prefix krb5)"
+          echo "LIBGSSAPI_IMPL=mit" >> "$GITHUB_ENV"
+          echo "LIBGSSAPI_PREFIX=$krb5" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$krb5/lib/pkgconfig" >> "$GITHUB_ENV"
+          bash scripts/bundle-krb5-macos.sh stage
+          python -c 'import tkinter; tkinter.Tcl()'
+      - name: Select a complete Windows Perl for vendored OpenSSL
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
+          & $perl -MIPC::Cmd -e 'print "Perl ready"'
+          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+          'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-rdp-pipeline-${{ matrix.os }}-${{ runner.arch }}
+          cache-on-failure: true
+      - name: Build the release test harness and probe
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p rdp-pipeline-evidence
+          git rev-parse HEAD > rdp-pipeline-evidence/source-sha.txt
+          printf '%s\n' "$RUNNER_OS" "$RUNNER_ARCH" > rdp-pipeline-evidence/runner.txt
+          rustc --version > rdp-pipeline-evidence/rustc-version.txt
+          pnpm build 2>&1 | tee rdp-pipeline-evidence/frontend-build.log
+          cargo build --locked --release --manifest-path src-tauri/Cargo.toml --package taomni-rdp-probe \
+            2>&1 | tee rdp-pipeline-evidence/probe-build.log
+          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --package taomni-rdp-server-engine \
+            --lib --no-default-features --no-run --message-format=json > rdp-pipeline-evidence/harness-build.jsonl
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          evidence = Path("rdp-pipeline-evidence")
+          with (evidence / "harness-build.jsonl").open(encoding="utf-8") as build:
+              harnesses = [
+                  item["executable"] for line in build
+                  if (item := json.loads(line)).get("reason") == "compiler-artifact"
+                  and item["target"]["name"] == "taomni_rdp_server_engine" and item["profile"]["test"]
+                  and item["executable"]
+              ]
+          assert len(harnesses) == 1, harnesses
+          (evidence / "harness-path.txt").write_text(harnesses[0] + "\n", encoding="utf-8", newline="\n")
+          PY
+      - name: Measure both paths against the modular release performance budgets
+        shell: bash
+        run: |
+          set -o pipefail
+          read -r harness < rdp-pipeline-evidence/harness-path.txt
+          if [[ "$RUNNER_OS" == Windows ]]; then harness="$(cygpath -u "$harness")"; fi
+          "$harness" --exact host_perf::bitmap::validates_dimensions_stride_and_damage_offsets_before_allocating_pixels
+          runner=()
+          probe=src-tauri/target/release/rdp-probe
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            export XDG_SESSION_TYPE=x11
+            runner=(xvfb-run -a -s '-noreset -screen 0 1920x1080x24 +extension DAMAGE +extension MIT-SHM -nolisten tcp')
+          elif [[ "$RUNNER_OS" == Windows ]]; then
+            probe+=.exe
+          fi
+          "${runner[@]}" python .agents/skills/qa-ui-auto/scripts/modular_rdp_pipeline.py \
+            "$harness" "$probe" rdp-pipeline-evidence/comparison \
+            2>&1 | tee rdp-pipeline-evidence/comparison.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-rdp-pipeline-${{ runner.os }}-${{ runner.arch }}
+          path: rdp-pipeline-evidence
+          if-no-files-found: error

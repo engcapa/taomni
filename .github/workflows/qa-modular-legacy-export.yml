@@ -1,0 +1,149 @@
+name: QA Legacy MFA Export Contracts
+
+on:
+  workflow_call:
+    inputs:
+      head:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    name: Legacy MFA export (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head }}
+          persist-credentials: false
+      - name: Read the verifier's test dependencies for a frozen candidate
+        if: inputs.head != github.sha
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: export-verifier
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /src-tauri/crates/taomni-host-gates/Cargo.toml
+            /src-tauri/Cargo.lock
+          persist-credentials: false
+      - name: Apply only host-gate test dependency changes to the candidate checkout
+        if: inputs.head != github.sha
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          import tomllib
+
+          manifest = Path("src-tauri/crates/taomni-host-gates/Cargo.toml")
+          lock = Path("src-tauri/Cargo.lock")
+          verifier = Path("export-verifier")
+          def production_inputs(path):
+              with path.open("rb") as stream:
+                  parsed = tomllib.load(stream)
+              if path.name == "Cargo.toml":
+                  parsed.pop("dev-dependencies", None)
+              else:
+                  gate, = [entry for entry in parsed["package"] if entry["name"] == "taomni-host-gates"]
+                  gate.pop("dependencies")
+              return parsed
+          if all(production_inputs(path) == production_inputs(verifier / path) for path in (manifest, lock)):
+              for path in (manifest, lock):
+                  shutil.copyfile(verifier / path, path)
+          else:
+              print("Using the selected candidate's dependency resolution for this historical build")
+          PY
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-legacy-export-${{ runner.os }}-${{ runner.arch }}
+      - name: Compile the production exporter and run every native data/ownership scenario
+        env:
+          PYTHONUNBUFFERED: '1'
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import platform
+          import subprocess
+
+          evidence = pathlib.Path("modular-export-evidence").resolve()
+          evidence.mkdir()
+          patch = subprocess.check_output(["git", "diff", "HEAD", "--", "src-tauri/crates/taomni-host-gates/Cargo.toml", "src-tauri/Cargo.lock"])
+          (evidence / "test-dependencies.patch").write_bytes(patch)
+          os.environ["TAOMNI_GATE_EVIDENCE_DIR"] = str(evidence)
+          source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          (evidence / "source-sha.txt").write_text(source + "\n")
+          rustc = subprocess.check_output(["rustc", "--version"], text=True).strip()
+          command = ["cargo", "test", "--manifest-path", "src-tauri/Cargo.toml", "-p", "taomni-host-gates", "--test", "legacy_export", "--locked", "--no-run", "--message-format=json"]
+          build = subprocess.run(command, text=True, capture_output=True)
+          (evidence / "build-messages.jsonl").write_text(build.stdout)
+          (evidence / "build.log").write_text(build.stderr)
+          print(build.stderr, flush=True)
+          build.check_returncode()
+          binaries = [message["executable"] for line in build.stdout.splitlines() if (message := json.loads(line)).get("reason") == "compiler-artifact" and message.get("executable") and message["target"]["name"] == "legacy_export"]
+          assert len(binaries) == 1, "Expected the exact production export harness"
+          binary = pathlib.Path(binaries[0]).resolve(strict=True)
+          identity = {"source_sha": source, "verification_sha": os.environ["GITHUB_SHA"], "test_dependency_patch_sha256": hashlib.sha256(patch).hexdigest(), "platform": platform.platform(), "architecture": platform.machine(), "rustc": rustc, "test_binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(), "production_source": "src-tauri/src/plugin/migration_export/mod.rs"}
+          (evidence / "identity.json").write_text(json.dumps(identity, indent=2) + "\n")
+
+          def run(name, *args):
+              result = subprocess.run([str(binary), *args], text=True, capture_output=True)
+              output = result.stdout + result.stderr
+              (evidence / name).write_text(output)
+              print(output, flush=True)
+              result.check_returncode()
+              return output
+
+          # These also retain the original pending/journal/source regressions.
+          unit_listing = run("unit-selection.txt", "migration::", "--list")
+          units = sorted(line.removesuffix(": test") for line in unit_listing.splitlines() if line.endswith(": test"))
+          assert len(units) >= 8, "Missing production source/evidence unit contracts"
+          unit_output = run("migration-unit.log", "migration::", "--test-threads=1", "--nocapture")
+          assert f"{len(units)} passed; 0 failed; 0 ignored" in unit_output, "Missing retained migration unit execution"
+          listing = run("native-selection.txt", "--ignored", "--list")
+          selected = sorted(line.removesuffix(": test") for line in listing.splitlines() if line.endswith(": test"))
+          expected = 12 if os.name == "nt" else 13
+          assert len(selected) == expected, f"Expected all {expected} real export scenarios, got {selected}"
+          output = run("native-export.log", "--ignored", "--test-threads=1", "--nocapture")
+          assert f"{expected} passed; 0 failed; 0 ignored" in output, "Missing native export execution"
+          (evidence / "result.json").write_text(json.dumps({**identity, "unit_selected": units, "unit_passed": len(units), "selected": selected, "passed": expected, "failed": 0, "skipped": 0}, indent=2) + "\n")
+          PY
+      - name: Verify read-only engine behavior and retained account/key contracts
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine --lib --locked -- --test-threads=1 --nocapture 2>&1 | tee modular-export-evidence/mfa-engine-unit.log
+          python -c 'from pathlib import Path; assert "21 passed; 0 failed; 0 ignored" in Path("modular-export-evidence/mfa-engine-unit.log").read_text(), "Missing actual read-only and retained MFA engine contracts"'
+      - name: Verify legacy exports with the original read-only Vault key
+        env:
+          TAOMNI_GATE_EVIDENCE_DIR: ${{ github.workspace }}/modular-export-evidence
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --test legacy_key_service --locked -- vault:: --test-threads=1 --nocapture 2>&1 | tee modular-export-evidence/vault-key-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --test legacy_key_service --locked -- native:: --ignored --test-threads=1 --nocapture 2>&1 | tee modular-export-evidence/vault-key-native.log
+          python -c 'from pathlib import Path; root = Path("modular-export-evidence"); assert all("4 passed; 0 failed; 0 ignored" in (root / name).read_text() for name in ("vault-key-unit.log", "vault-key-native.log")), "Missing actual Vault key contracts"'
+      - name: Verify old-mode exclusion and crash release across real processes
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-profile-locks --test process_locks --locked -- --ignored --exact legacy_mode_writer_blocks_upgrade_until_a_crash_releases_its_lease --test-threads=1 --nocapture 2>&1 | tee modular-export-evidence/legacy-mode-process.log
+          python -c 'from pathlib import Path; assert "1 passed; 0 failed; 0 ignored" in Path("modular-export-evidence/legacy-mode-process.log").read_text(), "Missing actual cross-process legacy mode exclusion"'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-legacy-export-${{ matrix.os }}
+          path: modular-export-evidence
+          if-no-files-found: error

@@ -71,6 +71,7 @@ steps:
 - assert_count:
     selector: '[data-testid="mail-message-row"][data-flagged="true"]'
     equal: 1
+- mail_server_assert_list_matches: {flagged: true, timeout_sec: 20}
 - screenshot: mail-keys-01-shortcuts.png
 verification:
   review: reviewed
@@ -111,8 +112,11 @@ verification:
     checkpoints:
     - step: 20
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-message-row\"][data-flagged=\"true\"]", "equal": 1}}'
+    - step: 21
+      expectation: 星标行的 UID 与服务器当前星标一致。
     results:
     - 20
+    - 21
   visual:
   - check: 截图中选中行与星标状态正确。
     method: manual

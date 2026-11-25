@@ -164,7 +164,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     let mut net = Network::new(config(), Zeroizing::new("fixture-secret".into()), None).unwrap();
     net.base = p.url.clone();
     let core = Core::Headless(f.state.clone());
-    let runtime = &f.state.mobile.im;
+    let runtime = &f.state.legacy.mobile.im;
     runtime.start_network(core.clone(), net).await.unwrap();
     wait(|| p.pings.load(Ordering::SeqCst) > 0).await;
     p.events.send(event("om_list", "列表")).unwrap();
@@ -217,7 +217,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     denied["event"]["sender"]["sender_id"]["open_id"] = json!("ou_stranger");
     p.events.send(denied).unwrap();
     wait(|| runtime.snapshot().rejected == 2).await;
-    f.state.mobile.broker.register("blocked");
+    f.state.legacy.mobile.broker.register("blocked");
     p.events
         .send(event("om_pty", "/taomni send term:blocked text"))
         .unwrap();
@@ -259,6 +259,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     p.events.send(stop).unwrap();
     wait(|| {
         !f.state
+            .legacy
             .mobile
             .pending_turns
             .lock()
@@ -276,6 +277,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
         requests.load(Ordering::SeqCst) == 2
             && !f
                 .state
+                .legacy
                 .mobile
                 .pending_turns
                 .lock()
@@ -284,7 +286,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     })
     .await;
     let messages =
-        crate::chat::store::list_messages(&f.state.db.lock().unwrap(), "feishu-task").unwrap();
+        crate::chat::store::list_messages(&f.state.core.db.lock().unwrap(), "feishu-task").unwrap();
     assert_eq!(messages.iter().filter(|m| m.role == "user").count(), 2);
     assert!(
         messages
@@ -299,16 +301,17 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     );
     let (tx, rx) = tokio::sync::oneshot::channel();
     f.state
+        .core
         .agent
         .cc_pending_permissions
         .lock()
         .unwrap()
         .insert("confirmation".into(), tx);
-    f.state.mobile.confirmations.lock().unwrap().insert(
+    f.state.legacy.mobile.confirmations.lock().unwrap().insert(
         "confirmation".into(),
         json!({"id":"confirmation","thread_id":"feishu-task","tool":"write_file","supported":true}),
     );
-    f.state.mobile.events.publish(json!({"type":"task_status","task_id":"thread:feishu-task","status":"awaiting_confirmation","summary":"write_file"}));
+    f.state.legacy.mobile.events.publish(json!({"type":"task_status","task_id":"thread:feishu-task","status":"awaiting_confirmation","summary":"write_file"}));
     wait(|| {
         p.sent.lock().unwrap().iter().any(|m| {
             m["msg_type"] == "interactive"
@@ -334,7 +337,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     wait(|| p.connections.load(Ordering::SeqCst) >= 2 && p.pings.load(Ordering::SeqCst) >= 2).await;
     p.events.send(event("om_list", "/taomni list")).unwrap();
     wait(|| runtime.snapshot().duplicates == 3).await;
-    f.state.mobile.events.publish(json!({"type":"task_status","task_id":"thread:feishu-task","status":"idle","summary":"turn_finished"}));
+    f.state.legacy.mobile.events.publish(json!({"type":"task_status","task_id":"thread:feishu-task","status":"idle","summary":"turn_finished"}));
     wait(|| {
         p.sent.lock().unwrap().iter().any(|m| {
             m["content"]
@@ -365,6 +368,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     );
     assert_eq!(
         f.state
+            .core
             .db
             .lock()
             .unwrap()

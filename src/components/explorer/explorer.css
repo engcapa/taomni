@@ -134,3 +134,6 @@ html[data-app-theme="dark"] .ex-toast button { color:#1d4ed8; }
 .ex-preview-overlay[data-position="bottom"] .ex-pv { width:100%; border-left:0; border-top:1px solid var(--ex-divider); }
 @media(max-width:800px) { .ex-search { width:190px; } }
 @media(max-width:600px) { .ex-search { width:140px; } .ex-nav { max-width:160px; } .ex-name { min-width:100px; } .ex-result-path { display:none; } }
+.ex-new-file-field { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.ex-new-file-field input, .ex-new-file-field select { width: 100%; padding: 6px 8px; border: 1px solid var(--ex-input-b); border-radius: 4px; color: inherit; background: var(--ex-input); font: inherit; }
+.ex-dialog [role="alert"] { color: #ef4444; overflow-wrap: anywhere; }

@@ -70,7 +70,7 @@ pub async fn voice_install_sherpa_model(
     let dir = sherpa_storage_dir().join(SHERPA_UPSTREAM_REVISION);
     let result = async {
         tokio::fs::create_dir_all(&dir).await.map_err(|e| e.to_string())?;
-        let settings = state.ai_ctx.read().await.config.asr.download_proxy.clone();
+        let settings = state.legacy.ai_ctx.read().await.config.asr.download_proxy.clone();
         let proxy = resolve_download_proxy(&state, &settings)?;
         let client = download_client(proxy.as_ref())?;
         let mut completed = 0u64;

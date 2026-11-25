@@ -1,0 +1,38 @@
+id: TC-MODULES-058
+title: Legacy backup restores certificate pins to retained RDP module data
+description: >-
+  Stage a v1 RDP session backup and retain a different certificate pin in the
+  uninstalled RDP module. The desktop applies the pending restore on startup
+  and keeps the restored certificate data available to the module store.
+covers: [F-Modules-1, F-BACKUP-1, F9.7]
+tags: [modules, backup, restore, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, module_upgrade]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- module_upgrade_probe: {phase: rdp-legacy-restore-applied}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-offline-install"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Startup restores the legacy pin and session into their respective data owners.
+    actions: [1, 4, 5]
+    checkpoints:
+    - {step: 3, expectation: The session name and certificate pin match the backup and the module stays uninstalled.}
+    - {step: 6, expectation: Module Store shows the offline installation control after restore.}
+    - {step: 7, expectation: The restored application has no uncaught renderer errors.}
+    results: [3, 6, 7]
+  visual:
+  - check: The Module Store is reachable after restoring the legacy profile.
+    method: automated
+    reason: The case waits for the visible offline installation controls.
+  native:
+  - check: The running app applies the legacy SQLite backup before opening the profile.
+    method: automated
+    reason: The runner verifies the actual restored files and the retained module locator.

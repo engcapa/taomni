@@ -1,0 +1,111 @@
+id: TC-MODULES-063
+title: Signed VNC Server starts and stops an X11 daemon from Local servers
+description: Verify offline installation, migration of a legacy VNC config into module data and Vault, an authenticated loopback listener, and cleanup after stopping or disabling the module.
+covers: [F-Modules-1, F-Servers-1, F-BACKUP-1]
+tags: [modules, servers, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux]
+fixtures: [reset_db, linux_x11_required, module_signed_vnc_server_archive]
+timeout_sec: 330
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.vnc_daemon_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.vnc_daemon_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-vnc-server"]'
+- wait_for: '[data-testid="module-action-disable-vnc-server"]'
+- assert_signed_vnc_daemon: idle
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-vnc"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="vnc-server"][data-plugin-version="${fixture.server_settings_module_version}"] [data-testid="server-field-vnc-password"]', timeout_sec: 25}
+- assert_file_sha256: {path: '${fixture.server_settings_frontend}', equals: '${fixture.server_settings_frontend_sha256}'}
+- wait_for: '[data-testid="server-field-vnc-remove-password"]'
+- assert_attribute: {selector: '[data-testid="server-field-port"]', name: value, equals: '${fixture.vnc_daemon_port}'}
+- assert_attribute: {selector: '[data-testid="server-field-bind-address"]', name: value, equals: '127.0.0.1'}
+- assert_attribute: {selector: '[data-testid="server-field-vnc-password"]', name: value, equals: ''}
+- click: '[data-testid="server-field-vnc-view-only"]'
+- click: '[data-testid="server-row-vnc-start"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-servers-vault-123}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-servers-vault-123}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: {selector: '[data-testid="server-row-vnc"][data-status="running"]', timeout_sec: 20}
+- assert_text: {selector: '[data-testid="server-log"]', contains: 'starting x11vnc', timeout_sec: 10}
+- assert_signed_vnc_daemon: running
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: backup}
+- wait_for: '[data-testid="backup-global-includePlugins"]'
+- assert_attribute: {selector: '[data-testid="backup-global-includePlugins"]', name: aria-checked, equals: 'true'}
+- set_check: {selector: '[data-testid="backup-local-select"]', checked: true}
+- click: '[data-testid="backup-selected-start"]'
+- wait_for: {selector: '[data-testid="backup-action-success"]', timeout_sec: 90}
+- assert_signed_vnc_daemon: backup
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-vnc-stop"]'
+- wait_for: '[data-testid="server-row-vnc"][data-status="stopped"]'
+- assert_signed_vnc_daemon: stopped
+- click: '[data-testid="server-row-vnc-start"]'
+- wait_for: '[data-testid="server-row-vnc"][data-status="running"]'
+- assert_signed_vnc_daemon: running
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-vnc-server"]'
+- wait_for: '[data-testid="module-action-enable-vnc-server"]'
+- assert_signed_vnc_daemon: disabled
+- click: '[data-testid="module-action-enable-vnc-server"]'
+- wait_for: '[data-testid="module-action-disable-vnc-server"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-vnc"]'
+- wait_for: '[data-testid="server-row-vnc"][data-status="stopped"]'
+- assert_visible: '[data-testid="server-field-vnc-view-only"]:checked'
+- click: '[data-testid="server-row-vnc-start"]'
+- wait_for: {selector: '[data-testid="server-row-vnc"][data-status="running"]', timeout_sec: 20}
+- assert_signed_vnc_daemon: running
+- click: '[data-testid="server-row-vnc-stop"]'
+- wait_for: '[data-testid="server-row-vnc"][data-status="stopped"]'
+- assert_signed_vnc_daemon: stopped
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-daemon
+    requirement: The signed module adopts the old VNC settings and starts its own X11 daemon after the Vault accepts the old password.
+    actions: [7, 9, 15, 23, 24, 28, 37, 44, 47, 52, 55, 64, 67]
+    checkpoints:
+    - {step: 17, expectation: The loaded VNC settings form is inside the active signed module version.}
+    - {step: 18, expectation: The installed form entry exactly matches the SHA-256 in the verified archive fixture.}
+    - {step: 11, expectation: 'The installed host matches the signed archive, and migration recorded the old row without copying its plaintext password.'}
+    - {step: 20, expectation: Local servers displays the port from the migrated configuration.}
+    - {step: 21, expectation: The form displays the preserved loopback address.}
+    - {step: 22, expectation: The form does not expose the old plaintext password.}
+    - {step: 31, expectation: 'The VNC greeting, writer lease, encrypted Vault entry and unchanged rollback row are independently observed.'}
+    - {step: 39, expectation: 'The running host snapshots its settings together with Vault. The captured core DB retains HTTP and omits the old VNC row.'}
+    - {step: 46, expectation: Stop releases the listener while the enabled host remains loaded.}
+    - {step: 54, expectation: Disabling the running module releases the writer lease and listener.}
+    - {step: 62, expectation: The Servers tab has released the former instance.}
+    - {step: 63, expectation: The view-only change survives re-enabling the module.}
+    - {step: 66, expectation: The module starts again with the saved credential and reacquires its write lease in the same desktop process.}
+    - {step: 69, expectation: The final Stop releases the listener again.}
+    - {step: 70, expectation: The workflow completes without renderer errors.}
+    results: [11, 17, 18, 20, 21, 22, 31, 39, 46, 54, 62, 63, 66, 69, 70]
+  visual:
+  - check: The Servers row shows the current state, retained settings and daemon logs.
+    method: automated
+    reason: The case checks the mounted pane at each transition.
+  native:
+  - check: Signed package bytes, migrated settings, encrypted credential, writer lease and a real RFB greeting.
+    method: automated
+    reason: The case reads the installation and database using the isolated native profile, then checks the listener on loopback.

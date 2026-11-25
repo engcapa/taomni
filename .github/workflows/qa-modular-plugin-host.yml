@@ -1,0 +1,243 @@
+name: QA Modular Plugin Host Gates
+
+on:
+  workflow_dispatch:
+    inputs:
+      head:
+        description: Commit or ref to test (empty = workflow ref)
+        type: string
+        required: false
+        default: ''
+  workflow_call:
+    inputs:
+      head:
+        description: Commit or ref to test
+        type: string
+        required: false
+        default: ''
+      system_execution_only:
+        type: boolean
+        default: false
+    secrets:
+      APPLE_CERTIFICATE: {required: false}
+      APPLE_CERTIFICATE_PASSWORD: {required: false}
+      APPLE_SIGNING_IDENTITY: {required: false}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modular-plugin-host-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-system-execution:
+    name: Windows download-marked hosts with Defender active
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-system-execution-windows
+      - name: System experiment tool unit contracts
+        run: python -m unittest test_module_windows_execution
+      - name: Build the actual hello and MFA hosts without signing credentials
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin -p taomni-plugin-mfa --bins --locked
+      - name: Require active Defender in this disposable runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'Requires a disposable hosted runner' }
+          New-Item -ItemType Directory -Force qa-modular-windows-execution | Out-Null
+          try {
+            Set-MpPreference -DisableRealtimeMonitoring $false
+            $deadline = (Get-Date).AddSeconds(30)
+            do {
+              $state = Get-MpComputerStatus
+              if ($state.RealTimeProtectionEnabled) { break }
+              Start-Sleep -Seconds 1
+            } while ((Get-Date) -lt $deadline)
+            if (-not $state.RealTimeProtectionEnabled) { throw 'The hosted image did not enable real-time protection' }
+          } finally {
+            Get-MpComputerStatus |
+              Select-Object AMServiceEnabled, AntivirusEnabled, RealTimeProtectionEnabled, BehaviorMonitorEnabled, IoavProtectionEnabled |
+              ConvertTo-Json | Set-Content -Encoding utf8 qa-modular-windows-execution/defender-state.json
+          }
+      - name: Observe actual Authenticode and protection state and execute Internet-zone hosts
+        run: python scripts/run-module-windows-execution-gates.py --evidence qa-modular-windows-execution --require-defender
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-system-execution-windows
+          path: qa-modular-windows-execution
+          if-no-files-found: error
+
+  macos-system-execution:
+    name: macOS hardened runtime and quarantined hosts
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-system-execution-intel
+      - name: System experiment tool unit contracts
+        run: python -m unittest test_module_system_execution
+      # This experiment uses an ad-hoc identity only. No signing credential or
+      # private key is available to candidate compilation or native execution.
+      - name: Build the actual hello and MFA hosts without signing credentials
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin -p taomni-plugin-mfa --bins --locked
+      - name: Sign the experiment with hardened runtime and observe quarantined host execution
+        run: python scripts/run-module-system-execution-gates.py --evidence qa-modular-system-execution
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-system-execution-macos-intel
+          path: qa-modular-system-execution
+          if-no-files-found: error
+      - uses: actions/setup-node@v4
+        if: vars.MACOS_SIGNING_CERT_SHA1 != ''
+        with:
+          node-version: '22'
+      - name: Import the fixed certificate after compiling the test binaries
+        if: vars.MACOS_SIGNING_CERT_SHA1 != ''
+        env:
+          RELEASE_PLATFORM: macOS
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
+        run: node scripts/configure-release-signing.mjs
+      - name: Verify fixed-certificate launch with hardened runtime
+        if: vars.MACOS_SIGNING_CERT_SHA1 != ''
+        run: |
+          python scripts/run-module-system-execution-gates.py \
+            --evidence qa-modular-system-execution-fixed \
+            --harness-build-log qa-modular-system-execution/harness-build.log
+      - name: Remove temporary signing credentials after a failed check
+        if: always() && env.MACOS_SIGNING_WORK_DIR != ''
+        run: |
+          if [[ -d "$MACOS_SIGNING_WORK_DIR" ]]; then
+            node scripts/configure-release-signing.mjs --cleanup-macos
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always() && vars.MACOS_SIGNING_CERT_SHA1 != ''
+        with:
+          name: modular-system-execution-macos-fixed
+          path: qa-modular-system-execution-fixed
+          if-no-files-found: warn
+
+  hello-plugin:
+    if: ${{ !inputs.system_execution_only }}
+    name: hello-plugin (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux build prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Run hello-plugin unit and process contracts
+        shell: bash
+        run: |
+          mkdir -p qa-modular-plugin-host
+          cargo test --manifest-path src-tauri/plugins/hello-plugin/Cargo.toml --locked \
+            2>&1 | tee qa-modular-plugin-host/cargo-test.log
+
+      - name: Exercise newline JSON-RPC host contract
+        shell: bash
+        env:
+          TAOMNI_PLUGIN_TOKEN: hosted-gate-token
+        run: |
+          set -euo pipefail
+          cargo build --manifest-path src-tauri/plugins/hello-plugin/Cargo.toml --locked --bin taomni-hello-plugin
+          bin="src-tauri/target/debug/taomni-hello-plugin"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then bin="${bin}.exe"; fi
+          python - "$bin" <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+
+          binary = sys.argv[1]
+          token = os.environ["TAOMNI_PLUGIN_TOKEN"]
+          handshake = {
+              "jsonrpc": "2.0",
+              "id": "hosted-handshake",
+              "method": "plugin/handshake",
+              "params": {
+                  "apiVersion": 1,
+                  "protocolVersion": 1,
+                  "pluginId": "taomni-plugin-hello-plugin",
+                  "pluginVersion": "0.1.0",
+                  "token": token,
+                  "commands": ["hello/ping", "plugin/enable", "plugin/disable"],
+                  "permissions": [],
+              },
+          }
+          ping = {"jsonrpc": "2.0", "id": "hosted-ping", "method": "hello/ping"}
+          proc = subprocess.Popen(
+              [binary],
+              stdin=subprocess.PIPE,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.PIPE,
+              text=True,
+              env=os.environ,
+          )
+          try:
+              for request in (handshake, ping):
+                  proc.stdin.write(json.dumps(request) + "\n")
+                  proc.stdin.flush()
+                  response = json.loads(proc.stdout.readline())
+                  assert response.get("result"), response
+              proc.stdin.close()
+              assert proc.wait(timeout=5) == 0
+          finally:
+              if proc.poll() is None:
+                  proc.kill()
+                  proc.wait()
+          PY
+
+      - name: Upload host gate receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: modular-plugin-host-${{ matrix.os }}
+          path: qa-modular-plugin-host
+          if-no-files-found: ignore

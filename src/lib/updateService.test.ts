@@ -119,16 +119,25 @@ describe("updateService.relaunchApp", () => {
     expect(mocks.invoke).toHaveBeenCalledWith("sockscap_prepare_for_update", {
       sudoPassword: undefined,
     });
-    expect(mocks.relaunch).toHaveBeenCalledTimes(1);
-    expect(mocks.invoke.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.relaunch.mock.invocationCallOrder[0],
-    );
+    expect(mocks.invoke).toHaveBeenNthCalledWith(2, "restart_app");
+    expect(mocks.relaunch).not.toHaveBeenCalled();
   });
 
   it("does not relaunch when SocksCap network cleanup fails", async () => {
     mocks.invoke.mockRejectedValueOnce("Linux capture teardown failed");
 
     await expect(relaunchApp()).rejects.toBe("Linux capture teardown failed");
+    expect(mocks.invoke).not.toHaveBeenCalledWith("restart_app");
+    expect(mocks.relaunch).not.toHaveBeenCalled();
+  });
+
+  it("keeps the app open when shared restart preparation is refused", async () => {
+    mocks.invoke.mockImplementation(async (command: string) => {
+      if (command === "restart_app") throw new Error("Recording has not finished");
+      return undefined;
+    });
+    await expect(relaunchApp()).rejects.toThrow("Recording has not finished");
+    expect(mocks.invoke).toHaveBeenNthCalledWith(2, "restart_app");
     expect(mocks.relaunch).not.toHaveBeenCalled();
   });
 

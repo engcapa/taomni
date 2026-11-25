@@ -1,0 +1,198 @@
+id: TC-MODULES-106
+title: Signed MFA automatic restore preserves uninstalled retained data, paired Vault and HOTP account
+description: >-
+  Install the signed MFA module, create a paired Vault and HOTP account, uninstall MFA while
+  retaining data, and create a manual local v2 backup. Reinstall and enable MFA to advance
+  HOTP, rekey Vault, and uninstall MFA again while retaining data. Reject the old master
+  password in Settings, then confirm with the new password. Observe automatic desktop relaunch
+  and verify the restored uninstalled retained state (missing module notice, retained locator
+  and exact mfa.db bytes, released lease), Vault password rollback, and HOTP continuity after
+  reinstalling and enabling MFA.
+covers: [F-Modules-1, F-BACKUP-1, F-MFA-1, F-MFA-2, F-MFA-3, F12.1]
+tags: [p0, modules, mfa, backup, vault, native-boundary, persistence]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, module_signed_mfa_archive, release_build_required]
+timeout_sec: 480
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-offline-install"]'
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mfa_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mfa_signed_signature_text}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-mfa"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mfa"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-signed-mfa-restore-original}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-signed-mfa-restore-original}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: Signed MFA Restore}
+- fill: {selector: '[data-testid="mfa-add-secret"]', value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ}
+- click: '[data-testid="mfa-add-advanced"]'
+- select_option: {selector: '[data-testid="mfa-add-kind"]', value: hotp}
+- click: '[data-testid="mfa-add-submit"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 755 224, timeout_sec: 30}
+- assert_signed_mfa_backup: initial
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-action-uninstall-mfa"]'
+- press: {selector: '[data-testid="module-action-uninstall-mfa"]:enabled', key: Enter}
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-mfa"]'
+- assert_visible: '[data-testid="module-data-retained-mfa"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: backup}
+- wait_for: '[data-testid="backup-global-includePlugins"]'
+- assert_attribute: {selector: '[data-testid="backup-global-includePlugins"]', name: aria-checked, equals: 'true'}
+- set_check: {selector: '[data-testid="backup-local-select"]', checked: true}
+- click: '[data-testid="backup-selected-start"]'
+- wait_for: {selector: '[data-testid="backup-action-success"]', timeout_sec: 90}
+- wait_for: '[data-testid="backup-manual-result"][data-target-id="local"][data-job-id]'
+- assert_signed_mfa_backup: archive
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-offline-install"]'
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mfa_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mfa_signed_signature_text}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-mfa"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mfa"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 755 224, timeout_sec: 30}
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082, timeout_sec: 30}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: vault}
+- wait_for: '[data-testid="vault-change-master-button"]'
+- click: '[data-testid="vault-change-master-button"]'
+- wait_for: '[data-testid="vault-change-master-form"]'
+- fill: {selector: '[data-testid="vault-change-master-old"]', value: qa-signed-mfa-restore-original}
+- fill: {selector: '[data-testid="vault-change-master-new1"]', value: qa-signed-mfa-restore-changed}
+- fill: {selector: '[data-testid="vault-change-master-new2"]', value: qa-signed-mfa-restore-changed}
+- click: '[data-testid="vault-change-master-submit"]'
+- assert_text: {selector: '[data-testid="vault-change-master-form"]', contains: Master password updated., timeout_sec: 30}
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-action-uninstall-mfa"]'
+- press: {selector: '[data-testid="module-action-uninstall-mfa"]:enabled', key: Enter}
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-mfa"]'
+- assert_visible: '[data-testid="module-data-retained-mfa"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: backup}
+- wait_for: '[data-testid="backup-cloud-job"][data-job-id="${fixture.signed_mfa_restore_job_id}"] [data-testid="backup-local-restore"]'
+- click: '[data-testid="backup-cloud-job"][data-job-id="${fixture.signed_mfa_restore_job_id}"] [data-testid="backup-local-restore"]'
+- wait_for: '[data-testid="backup-restore-files"]'
+- assert_text: {selector: '[data-testid="backup-restore-files"]', contains: plugins/mfa/data/mfa.db}
+- assert_text: {selector: '[data-testid="backup-restore-files"]', contains: databases/vault.db}
+- fill: {selector: '[data-testid="backup-restore-vault-password"]', value: qa-signed-mfa-restore-original}
+- click: '[data-testid="backup-restore-confirm"]'
+- assert_text_equals: {selector: '[data-testid="backup-restore-error"]', equals: Incorrect vault master password. Verification failed.}
+- assert_not_visible: '[data-testid="backup-restore-staged"]'
+- fill: {selector: '[data-testid="backup-restore-vault-password"]', value: qa-signed-mfa-restore-changed}
+- assert_signed_mfa_backup: ready
+- assert_no_runtime_errors: null
+- native_confirm_restore_relaunch: null
+- wait_for: '[data-testid="status-bar"]'
+- assert_signed_mfa_backup: restored
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-signed-mfa-restore-changed}
+- click: '[data-testid="vault-unlock-confirm"]'
+- assert_visible: '[data-testid="vault-unlock-error"]'
+- assert_count: {selector: '[data-testid="mfa-account-code"]', equal: 0}
+- fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-signed-mfa-restore-original}
+- click: '[data-testid="vault-unlock-confirm"]'
+- assert_not_visible: '[data-testid="vault-unlock-dialog"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mfa"][data-plugin-kind="manager"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+- assert_count: {selector: '[data-testid="mfa-account-code"]', equal: 0}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-action-install-mfa"]'
+- assert_visible: '[data-testid="module-data-retained-mfa"]'
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mfa_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mfa_signed_signature_text}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-mfa"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mfa"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="mfa-account-row"][data-issuer="Signed MFA Restore"]'
+- assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 1}
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 755 224, timeout_sec: 30}
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082, timeout_sec: 30}
+- assert_signed_mfa_backup: reopened
+- assert_no_runtime_errors: null
+- screenshot: signed-mfa-uninstalled-restore-relaunch.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Uninstalling signed MFA removes code and creates a paired v2 backup retaining plugins/mfa/data/mfa.db and its locator.
+    actions: [9, 11, 20, 28, 35, 37, 44]
+    checkpoints:
+    - {step: 29, expectation: "Initial RFC HOTP is 755 224."}
+    - {step: 30, expectation: "Signed package, live host, writer lease and module SQLite at counter 0 match."}
+    - {step: 39, expectation: "Settings displays that MFA data is retained after uninstall."}
+    - {step: 47, expectation: "The exact UI-created v2 ZIP pairs Vault and plugins/mfa/data/mfa.db while code and runtime are absent."}
+    results: [29, 30, 39, 47]
+  - id: R2
+    requirement: Reinstalling to advance HOTP, rekeying Vault, and uninstalling again precede restore confirmation, rejecting the old password.
+    actions: [52, 54, 61, 72, 76, 78, 83, 88]
+    checkpoints:
+    - {step: 62, expectation: "HOTP advances to 287 082."}
+    - {step: 73, expectation: "Vault master password updates."}
+    - {step: 80, expectation: "Settings confirms retained data after second uninstall."}
+    - {step: 85, expectation: "Restore dialog lists plugins/mfa/data/mfa.db."}
+    - {step: 86, expectation: "Restore dialog lists databases/vault.db."}
+    - {step: 89, expectation: "Incorrect old master password fails verification."}
+    - {step: 90, expectation: "Failed verification does not stage pending restore state."}
+    - {step: 92, expectation: "Archive, mutated counter 1, retained locator, released lease and unchanged generation are ready before confirmation."}
+    - {step: 93, expectation: "Original renderer emits no runtime errors."}
+    results: [62, 73, 80, 85, 86, 89, 90, 92, 93]
+  - id: R3
+    requirement: Automatic relaunch preserves the uninstalled retained state, rolls back Vault and exact mfa.db bytes, and decrypts HOTP after reinstall.
+    actions: [94, 99, 103, 117, 119, 128]
+    checkpoints:
+    - {step: 94, expectation: "Single confirmation exits original desktop at 0 and reattaches to new QA desktop PID."}
+    - {step: 96, expectation: "Generation advances, active pointer stays intact, code stays absent, retained locator and exact archived mfa.db bytes match."}
+    - {step: 100, expectation: "Changed password is rejected after restore."}
+    - {step: 108, expectation: "Manager tab shows the missing-module unavailable notice."}
+    - {step: 109, expectation: "No MFA account codes render while uninstalled."}
+    - {step: 114, expectation: "Module store shows retained data on the uninstalled MFA card."}
+    - {step: 127, expectation: "Reinstalling and enabling decrypts restored HOTP 755 224."}
+    - {step: 129, expectation: "Reinstalled signed host advances restored account to 287 082."}
+    - {step: 130, expectation: "Reinstalled signed MFA host holds the writer lease on the relaunched desktop."}
+    - {step: 131, expectation: "Complete automatic restore produces no runtime errors."}
+    results: [94, 96, 100, 108, 109, 114, 127, 129, 130, 131]
+  visual:
+  - check: Reinstalled signed MFA pane showing restored HOTP 287 082 after advancing from 755 224.
+    method: manual
+    reason: Review signed-mfa-uninstalled-restore-relaunch.png; screenshot capture alone is not a visual verdict.
+  native:
+  - check: Uninstalled retained signed MFA v2 backup, automatic desktop relaunch, code removal, locator and exact SQLite byte match.
+    method: automated
+    reason: Kernel PIDs, OS locks, ZIP checksums and SQLite bytes/ciphertext are verified independently of renderer claims.

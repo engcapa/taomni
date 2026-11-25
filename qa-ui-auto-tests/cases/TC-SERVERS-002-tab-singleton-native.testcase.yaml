@@ -217,7 +217,7 @@ verification:
     - 71
     checkpoints:
     - step: 57
-      expectation: '{"servers_multi_instance_probe": {}}'
+      expectation: Both processes use the same QA data root and the OS lock blocks each process while the other holds the tab.
     - step: 59
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
     - step: 60

@@ -1,0 +1,58 @@
+id: TC-MAIL-CACHE-01
+title: Clear the current mail cache and reconstruct it from the server
+description: Start with a synchronized IMAP account, clear its visible local folders and message list, then refresh and verify the fixture mailbox and its body remain readable.
+covers: [F-MAIL-3, F-MAIL-5]
+tags: [mail, p1]
+modes: [browser]
+fixtures: [reset_db, mail_server]
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_deliver: {folder: INBOX, count: 1, prefix: Cache reset, body: Original message stays on the server}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 30}
+- assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Cache reset 0001"]', equal: 1}
+- click: 'button[title="Clear this account cache"]:enabled'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Mail cache cleared}
+- assert_count: {selector: '[data-testid="mail-message-row"]', equal: 0}
+- eval_readonly:
+    expression: >-
+      window.__taomniQaMail.observe(window.__taomniQaMail.accounts()[0], 'INBOX').cache.length === 0
+- mail_server_assert_folder_count: {folder: INBOX, has_subject: Cache reset 0001}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 30}
+- assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Cache reset 0001"]', equal: 1}
+- dblclick: '[data-testid="mail-message-row"][data-subject="Cache reset 0001"]'
+- assert_text: {selector: '[data-testid="mail-reader-text"]', contains: Original message stays on the server, timeout_sec: 20}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: clear-and-recover
+    requirement: Clearing the cached account empties its displayed list and the next sync reads the original message from the server.
+    actions: [6, 9, 12, 17, 20]
+    checkpoints:
+    - {step: 11, expectation: The fixture message appears once before clearing.}
+    - {step: 13, expectation: The account confirms that the cache was cleared.}
+    - {step: 14, expectation: The local list is empty immediately after clearing.}
+    - {step: 15, expectation: The fixture's local mailbox index is also empty.}
+    - {step: 16, expectation: The server still contains the fixture message.}
+    - {step: 18, expectation: The next sync rebuilds the list to match the server.}
+    - {step: 19, expectation: The rebuilt list contains precisely one fixture message.}
+    - {step: 21, expectation: The rebuilt message opens with its original body.}
+    - {step: 22, expectation: The flow reports no runtime errors.}
+    results: [11, 13, 14, 15, 16, 18, 19, 21, 22]
+  visual:
+  - check: The mailbox view reports the clear and displays the recovered message.
+    method: automated
+    reason: The case checks the status, message count and recovered reader content.
+  native:
+  - check: Signed host and SQLite persistence.
+    method: not-applicable
+    reason: TC-MODULES-070 checks the signed host and retained archive in a separate native case.

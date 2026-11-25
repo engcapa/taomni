@@ -69,6 +69,12 @@ steps:
     selector: '[data-testid="mail-outbox-row"]'
     contains: Queued in the Outbox
     timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="mail-outbox-row"]'
+    contains: receiver@example.com
+- assert_text:
+    selector: '[data-testid="mail-outbox-state"]'
+    contains: Sends
 - click: '[data-testid="mail-outbox-send-all"]'
 - assert_text:
     selector: '[data-testid="mail-client-tab"]'
@@ -82,12 +88,16 @@ steps:
     selector: '[data-testid="mail-outbox-count"]'
     state: detached
     timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="mail-drafts-dialog"]'
+    contains: The Outbox is empty
+- assert_no_runtime_errors: null
 - screenshot: mail-outbox-01-sent.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Send later 把邮件放入本地 Outbox 而不立即发送；工具栏显示 Outbox 计数 1，Outbox 页签列出该邮件。
+    requirement: Send later 将邮件放入本地 Outbox。工具栏显示计数 1，Outbox 页签显示主题、收件人和定时发送状态。
     actions:
     - 1
     - 2
@@ -112,24 +122,27 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-outbox-count\"][data-count=\"1\"]", "timeout_sec": 15}}'
     - step: 21
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-outbox-row\"]", "contains": "Queued in the Outbox", "timeout_sec": 10}}'
-    results:
-    - 18
-    - 21
-  - id: R2
-    requirement: Outbox 的 Send all 发出邮件：状态提示已发送，服务器 Sent 有副本，Outbox 计数消失（AC-49）。
-    actions:
-    - 22
-    checkpoints:
+    - step: 22
+      expectation: 排队邮件显示保存的收件人。
     - step: 23
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Sent 1 queued message", "timeout_sec": 30}}'
-    - step: 24
-      expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "min": 1, "timeout_sec": 20}}'
-    - step: 25
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-outbox-count\"]", "state": "detached", "timeout_sec": 10}}'
-    results:
-    - 23
+      expectation: 排队邮件显示定时发送状态。
+    results: [18, 21, 22, 23]
+  - id: R2
+    requirement: Send all 发出队列邮件。界面显示发送成功，服务器 Sent 有副本，Outbox 显示空状态（AC-49）。
+    actions:
     - 24
-    - 25
+    checkpoints:
+    - step: 25
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Sent 1 queued message", "timeout_sec": 30}}'
+    - step: 26
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "min": 1, "timeout_sec": 20}}'
+    - step: 27
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-outbox-count\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 28
+      expectation: 已打开的 Outbox 显示空状态。
+    - step: 29
+      expectation: 流程结束时记录无运行时错误。
+    results: [25, 26, 27, 28, 29]
   visual:
   - check: 截图中 Outbox 已空、状态栏提示发送成功。
     method: manual

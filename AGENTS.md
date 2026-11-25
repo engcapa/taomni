@@ -8,6 +8,81 @@ Taomni is a cross-platform desktop workspace built with Tauri 2, React 19, TypeS
 - `src-tauri/src/`: Rust backend; integration tests in `src-tauri/tests/`, bundled assets in `src-tauri/resources/` and `src-tauri/icons/`.
 - `qa-ui-auto-tests/`: browser/native automation and YAML cases. `docs-feature/` and `docs-issue/` hold designs.
 
+## Modular Product Development
+
+Taomni is released as a core application plus independently versioned official
+modules. Keep module implementation in `src-tauri/plugins/<slug>/` and keep
+shared protocol or platform-neutral code in `src-tauri/crates/`. A module must
+provide `module.json`, its native host when required, its frontend entry, data
+and backup ownership declarations, migration declarations, and its registry
+integration. A module may depend on `taomni-plugin-api` and approved shared
+crates. It must not depend on the core crate or another module.
+
+The core owns the registry, lifecycle, permissions, profile leases, Vault
+scoped services, backup coordination, and the renderer host. Installed module
+code lives under `<app-data>/plugins/<slug>/versions/<version>/`, the active
+version is selected by `active.json`, and module data lives under
+`<app-data>/plugins/<slug>/data/`. Disabling or uninstalling a module keeps its
+data until the user explicitly confirms permanent deletion.
+Derived module binaries and caches staged under `<app-data>/plugins/<slug>/runtime/`
+are removed with the version directories during uninstall.
+
+Every module change updates the module manifest, browser and native cases,
+feature-list and testid catalogs, migration and backup fixtures, and the
+platform build and signing matrix. Core changes update the core compatibility
+contract and core-only regression selection. Keep the `coreApiVersion` stable
+for compatible changes and raise it only for a breaking plugin contract.
+
+Release artifacts use two independent manifests. The core uses `latest.json`.
+Modules use `.taomni-plugin` packages, detached `.minisig` signatures,
+`SHA256SUMS`, and the signed `modules.json` catalog. Upload every referenced
+package and signature before uploading the catalog. Publish `latest.json` only
+after all core assets have passed signature verification.
+
+Use the release workflow according to the changed ownership. A core-only
+change builds and publishes new core installers and `latest.json`, then carries
+forward the last verified `modules.json` and its signature without rebuilding
+module packages. A module-only change builds and publishes that module for all
+declared platforms, preserves the other catalog entries and the frozen
+`legacyUpgrade` roster, increments the catalog sequence, and publishes the new
+signed catalog and packages to a module release. It then updates the catalog
+assets on the latest core release. A change that
+touches both produces both asset sets in one draft release and publishes both
+manifests after their respective gates pass. Module assets remain separate
+GitHub Release assets and are never embedded into the core installer.
+
+Local validation is limited to unit, contract, static, formatting, dependency
+boundary, and build checks. Run browser, native, real installation, upgrade,
+cross-process, signing, and system-permission validation through GitHub
+workflows. Each product run includes affected cases and the complete
+`crash-regression` collection. Download completed shards during execution and
+record the source SHA, selection, build identity, case digest, receipt, and
+summary. Existing failures may be isolated only with evidence that they are
+unrelated to the current change.
+
+The modular release gate is closed only when G1 through G11 each have a
+matching-source GitHub receipt. G1 covers macOS host execution and signing,
+G2 system permission ownership, G3 Windows protection, G4 Linux `noexec`, G5
+frame throughput, G6 forced-exit cleanup, G7 no-restart lifecycle, G8 package
+and catalog tamper rejection, G9 core-only dependency closure, G10 RPC
+timeouts/cancellation/repeated requests, and G11 profile/mode leases plus
+re-exec entry ownership. Unit results or a green aggregate job without the
+platform-specific receipt do not close a gate. The final release record must
+bind every gate to the source SHA, runner image, package identity, and raw
+artifact path.
+
+Match the OS signing policy on `main` for G1 and G3. On macOS, verify the
+fixed signing identity of the core and host, retain the Gatekeeper assessment,
+and exercise the installed host and system permissions. On Windows, record
+Authenticode status and exercise downloaded hosts with Defender enabled.
+An unsigned Windows installer and an unnotarized macOS app are accepted under
+this policy. Module, catalog and updater signature verification is required.
+
+For G5, accept input-to-frame p95 up to twice the existing 65 ms reference.
+Record the 130 ms limit and the observed p95 in the modular QA evidence. Apply
+the reviewed RDP case checks for first graphics, frame rate, bandwidth, and
+sample completeness.
+
 ## Build, Test, and Development Commands
 
 Use pnpm 10 and Node.js 22 to match CI. Native builds require Rust 1.94+, `protoc`, a complete Perl distribution, and Tauri system dependencies; see `README.md`.

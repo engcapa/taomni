@@ -8,6 +8,8 @@ describe("fail-closed recovery policy", () => {
       expect(limitation.length).toBeGreaterThan(20);
     }
     expect(recoveryLimitation("servers")).toContain("本地服务器配置");
+    expect(recoveryLimitation("plugin")).toContain("重新校验安装与启用状态");
+    expect(recoveryLimitation("plugin")).toContain("不重放模块命令或未提交操作");
   });
   it("does not mistake HBase REST, proxy tests or placeholders for PTYs", () => {
     expect(recoveryLimitation("hbase-shell")).toContain("不是 PTY");

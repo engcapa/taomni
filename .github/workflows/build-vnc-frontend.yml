@@ -1,0 +1,73 @@
+name: Build an official module frontend
+
+on:
+  workflow_call:
+    inputs:
+      source:
+        type: string
+        required: true
+      artifact:
+        type: string
+        required: true
+      module:
+        type: string
+        default: vnc-client
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Match the selected frontend inputs to the trusted workflow revision
+        env:
+          MODULE_SOURCE: ${{ inputs.source }}
+          MODULE_SLUG: ${{ inputs.module }}
+        run: |
+          case "$MODULE_SLUG" in
+            vnc-client) dependencies=(src/lib/vnc src/lib/vncOptions.ts src/lib/terminal/keyboardGuards.ts) ;;
+            rdp-client) dependencies=(src/lib/rdpViewerHost.ts src/lib/rdpViewerContract.ts) ;;
+            mail) dependencies=(src/lib/mail src/lib/mailHtml ':(glob)src/lib/mail*.ts') ;;
+            mfa) dependencies=(src/lib/mfa) ;;
+            screenshot) dependencies=(vite-plugins/screenshotOcr.ts scripts/stage-vnc-frontend.py) ;;
+            sockscap) dependencies=(src/lib/sockscap src/lib/sockscap.ts src/lib/sessionPaths.ts src/lib/sockscapPreflight.ts) ;;
+            rdp-server|vnc-server|servers) dependencies=(vite-plugins/serverSettings.ts src/lib/servers) ;;
+            *) echo 'Unknown module frontend' >&2; exit 1 ;;
+          esac
+          git diff --quiet HEAD "${MODULE_SOURCE}^{commit}" -- \
+            package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc patches \
+            "src-tauri/plugins/$MODULE_SLUG/renderer" "src-tauri/plugins/$MODULE_SLUG/vite.config.ts" \
+            "${dependencies[@]}" || {
+              echo 'The selected frontend inputs differ from the trusted workflow revision.' >&2
+              exit 1
+            }
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Build the frontend and bind its bytes to the selected source
+        env:
+          MODULE_SOURCE: ${{ inputs.source }}
+          MODULE_SLUG: ${{ inputs.module }}
+          FRONTEND_TOOLING: ${{ github.workflow_sha }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec vite build --config "src-tauri/plugins/$MODULE_SLUG/vite.config.ts"
+          python scripts/stage-vnc-frontend.py "src-tauri/plugins/$MODULE_SLUG/dist/frontend" \
+            --receipt "$MODULE_SOURCE" "$FRONTEND_TOOLING" "$MODULE_SLUG"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: src-tauri/plugins/${{ inputs.module }}/dist/frontend/
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,65 @@
+id: TC-MODULES-061
+title: Signed Screenshot host recognizes and redacts captured pixels
+description: Install the verified Screenshot package, recognize real captured text with the host and the signed offline renderer, redact pixels, and disable the module from Settings.
+covers: [F-Modules-1, F27.1]
+tags: [modules, screenshot, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, module_signed_screenshot_archive]
+timeout_sec: 270
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.screenshot_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.screenshot_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-screenshot"]'
+- wait_for: '[data-testid="module-action-disable-screenshot"]'
+- assert_signed_screenshot_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- native_screenshot_scenario: {scenario: ocr-redact}
+- assert_signed_screenshot_host: running
+- native_screenshot_scenario: {scenario: ocr-offline-module}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-screenshot"]'
+- wait_for: '[data-testid="module-action-enable-screenshot"]'
+- assert_signed_screenshot_host: disabled
+- click: '[data-testid="nav-mode-home"]'
+- native_screenshot_scenario: {scenario: ocr-disabled}
+- assert_signed_screenshot_host: disabled
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-ocr
+    requirement: OCR recognizes the captured fixture through the installed host and automatic redaction affects the actual clipboard image.
+    actions: [7, 9, 12]
+    checkpoints:
+    - {step: 8, expectation: The ordinary installer verifies and selects the signed package.}
+    - {step: 11, expectation: The verified host has not taken a writer lease yet.}
+    - {step: 13, expectation: 'The native OCR, redaction history and actual clipboard PNG match the captured fixture.'}
+    - {step: 14, expectation: The host issued with this package identity holds the writer lease.}
+    - {step: 15, expectation: The signed renderer and local WASM assets recognize the actual fixture text and produce word geometry.}
+    results: [8, 11, 13, 14, 15]
+  - id: disable
+    requirement: Disabling Screenshot releases the host lease. Native capture remains available, and recording directs the user to the module store before acquiring the desktop.
+    actions: [18, 21]
+    checkpoints:
+    - {step: 19, expectation: The module is available to enable again.}
+    - {step: 20, expectation: The installed host released its native writer lease.}
+    - {step: 22, expectation: 'Native capture succeeds. OCR, redaction and recording identify the module store while another capture owns the lease. No recorder window opens.'}
+    - {step: 23, expectation: The rejected requests leave the host stopped.}
+    - {step: 24, expectation: The restored main window has no runtime errors.}
+    results: [19, 20, 22, 23, 24]
+  visual:
+  - check: OCR panel, redaction undo and redo, and the restored main window.
+    method: automated
+    reason: The native scenario inspects the recognized text and action results in the overlay.
+  native:
+  - check: Installed host bytes, writer lease, captured text, and actual clipboard pixels.
+    method: automated
+    reason: The case reads the isolated profile and captures an external native window through the app's normal commands.

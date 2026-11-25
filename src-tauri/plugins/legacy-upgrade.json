@@ -1,0 +1,12 @@
+[
+  "taomni-plugin-ai-voice-local",
+  "taomni-plugin-mail",
+  "taomni-plugin-mfa",
+  "taomni-plugin-rdp-client",
+  "taomni-plugin-rdp-server",
+  "taomni-plugin-screenshot",
+  "taomni-plugin-servers",
+  "taomni-plugin-sockscap",
+  "taomni-plugin-vnc-client",
+  "taomni-plugin-vnc-server"
+]

@@ -19,6 +19,12 @@ pub mod macos;
 
 /// Describe what this build/OS can do today.
 pub fn capabilities() -> SocksCapCapabilities {
+    capabilities_with_registry(None)
+}
+
+pub fn capabilities_with_registry(
+    _registry: Option<&crate::plugin::PluginRegistry>,
+) -> SocksCapCapabilities {
     #[cfg(target_os = "windows")]
     {
         SocksCapCapabilities {
@@ -45,7 +51,7 @@ pub fn capabilities() -> SocksCapCapabilities {
         let launched = if transparent_available {
             Ok(())
         } else {
-            linux::launched::preflight()
+            linux::launched::preflight(_registry)
         };
         let launched_application_available = launched.is_ok();
         SocksCapCapabilities {
@@ -141,15 +147,21 @@ pub fn macos_capabilities(redirector_installed: bool) -> SocksCapCapabilities {
     }
 }
 
-/// Capabilities for the running build. Non-macOS platforms ignore `app` and
-/// match [`capabilities`].
+/// Capabilities for the running build. On Linux, inspects the active signed
+/// SocksCap module for the trace launcher; macOS inspects Redirector.
 pub fn capabilities_for(app: &tauri::AppHandle) -> SocksCapCapabilities {
     #[cfg(target_os = "macos")]
     {
         let _ = app;
         return macos_capabilities(crate::sockscap::redirector::is_installed());
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    {
+        use tauri::Manager;
+        let state = app.state::<crate::state::AppState>();
+        return capabilities_with_registry(Some(state.plugins.as_ref()));
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     {
         let _ = app;
         capabilities()
@@ -165,7 +177,10 @@ pub const HELPER_IMAGE_NAME: &str = "sockscap-helper.exe";
 /// terminate. They are elevated and we are (normally) not, so only another
 /// elevated process can reap them — the caller hands the list to the next
 /// helper launch, which runs under UAC and can finish the job.
-pub async fn recover_system(sudo_password: Option<&str>) -> Result<Vec<u32>, String> {
+pub async fn recover_system(
+    _registry: &std::sync::Arc<crate::plugin::PluginRegistry>,
+    sudo_password: Option<&str>,
+) -> Result<Vec<u32>, String> {
     #[cfg(target_os = "linux")]
     {
         return linux::recover_system(sudo_password).map(|()| Vec::new());

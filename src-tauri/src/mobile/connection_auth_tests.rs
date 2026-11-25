@@ -205,7 +205,7 @@ async fn real_http_challenges_require_authentication_and_the_requesting_device()
     let fixture = crate::mobile::service_tests::Fixture::new().await;
     let (device, token) = fixture.pair().await;
     let (_, other_token) = fixture.pair().await;
-    let requests = &fixture.state.mobile.open_requests;
+    let requests = &fixture.state.legacy.mobile.open_requests;
     requests
         .allowed
         .store(true, std::sync::atomic::Ordering::Relaxed);
@@ -301,9 +301,9 @@ fn final_launch_guard_never_runs_after_cancel_revoke_stop_or_expiry() {
 #[tokio::test]
 async fn whole_connection_preparation_is_dropped_on_mobile_cancellation() {
     let fixture = crate::mobile::service_tests::Fixture::new().await;
-    let id = pending(&fixture.state.mobile.open_requests);
+    let id = pending(&fixture.state.legacy.mobile.open_requests);
     let context = MobileAuthContext {
-        runtime: fixture.state.mobile.clone(),
+        runtime: fixture.state.legacy.mobile.clone(),
         request_id: id.clone(),
     };
     let dropped = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -323,6 +323,7 @@ async fn whole_connection_preparation_is_dropped_on_mobile_cancellation() {
         tokio::task::yield_now().await;
         fixture
             .state
+            .legacy
             .mobile
             .open_requests
             .cancel("phone-a", &id)

@@ -1,22 +1,19 @@
 use super::*;
 
-pub(super) struct Xoauth2Authenticator {
-    pub(super) username: String,
-    pub(super) access_token: String,
-}
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use taomni_mail_engine::imap_transport::{ImapConnection, ImapSession};
+#[cfg(test)]
+pub(super) use taomni_mail_storage::imap_auth::xoauth2_sasl_response;
 
-impl imap::Authenticator for Xoauth2Authenticator {
-    type Response = String;
+pub(super) struct ProxyForward(JoinHandle<()>);
 
-    fn process(&self, _challenge: &[u8]) -> Self::Response {
-        xoauth2_sasl_response(&self.username, &self.access_token)
+impl Drop for ProxyForward {
+    fn drop(&mut self) {
+        self.0.abort();
     }
 }
 
-pub(super) fn xoauth2_sasl_response(username: &str, access_token: &str) -> String {
-    format!("user={username}\x01auth=Bearer {access_token}\x01\x01")
-}
-
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 pub(super) fn connect_imap(
     account: &ResolvedMailAccount,
     runtime: &tokio::runtime::Handle,
@@ -26,6 +23,7 @@ pub(super) fn connect_imap(
 
 /// Connect and also return a clone of the TCP socket, so a watcher can shut
 /// the connection down from another thread (e.g. to end a blocked IDLE).
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 pub(super) fn connect_imap_with_socket(
     account: &ResolvedMailAccount,
     runtime: &tokio::runtime::Handle,
@@ -36,47 +34,24 @@ pub(super) fn connect_imap_with_socket(
         mail_effective_endpoint(account, host, port, runtime)?;
     let stream = tcp_connect(&connect_host, connect_port)?;
     let socket = stream.try_clone().ok();
-    let trusted = account.config.imap.trusted_cert.as_deref();
-    let pinned = trusted.is_some_and(|value| !value.trim().is_empty());
-    let session = match account.config.imap.security {
-        MailConnectionSecurity::Tls => {
-            let connector = certs::tls_connector(trusted)?;
-            let tls_stream = connector.connect(host, stream).map_err(|e| {
-                certs::certificate_error_hint(&format!("IMAP TLS handshake failed: {e}"), pinned)
-            })?;
-            let mut client = imap::Client::new(tls_stream);
-            client
-                .read_greeting()
-                .map_err(|e| format!("IMAP greeting failed: {e}"))?;
-            ActiveImapSession::Tls {
-                session: authenticate_imap_client(client, account)?,
-                forward_task,
-            }
-        }
-        MailConnectionSecurity::Starttls => {
-            let mut client = imap::Client::new(stream);
-            client
-                .read_greeting()
-                .map_err(|e| format!("IMAP greeting failed: {e}"))?;
-            let connector = certs::tls_connector(trusted)?;
-            let client = client.secure(host, &connector).map_err(|e| {
-                certs::certificate_error_hint(&format!("IMAP STARTTLS failed: {e}"), pinned)
-            })?;
-            ActiveImapSession::Tls {
-                session: authenticate_imap_client(client, account)?,
-                forward_task,
-            }
-        }
-        MailConnectionSecurity::None => {
-            let mut client = imap::Client::new(stream);
-            client
-                .read_greeting()
-                .map_err(|e| format!("IMAP greeting failed: {e}"))?;
-            ActiveImapSession::Plain {
-                session: authenticate_imap_client(client, account)?,
-                forward_task,
-            }
-        }
+    let connection = ImapConnection {
+        server_name: host,
+        security: account.config.imap.security,
+        trusted_certificate: account.config.imap.trusted_cert.as_deref(),
+        username: &account.imap_username,
+        secret: &account.imap_password,
+        authentication: account.auth_mode,
+        provider: account.config.provider,
+    };
+    let session = match connection.open(stream)? {
+        ImapSession::Tls(session) => ActiveImapSession::Tls {
+            session,
+            forward_task,
+        },
+        ImapSession::Plain(session) => ActiveImapSession::Plain {
+            session,
+            forward_task,
+        },
     };
     Ok((session, socket))
 }
@@ -86,7 +61,7 @@ pub(super) fn mail_effective_endpoint(
     host: &str,
     port: u16,
     runtime: &tokio::runtime::Handle,
-) -> Result<(String, u16, Option<JoinHandle<()>>), String> {
+) -> Result<(String, u16, Option<ProxyForward>), String> {
     let Some(network) = account.network_settings.clone() else {
         return Ok((host.to_string(), port, None));
     };
@@ -101,100 +76,8 @@ pub(super) fn mail_effective_endpoint(
     Ok((
         "127.0.0.1".to_string(),
         forward.local_port,
-        Some(forward.task),
+        Some(ProxyForward(forward.task)),
     ))
-}
-
-pub(super) fn authenticate_imap_client<T: Read + Write>(
-    client: imap::Client<T>,
-    account: &ResolvedMailAccount,
-) -> Result<imap::Session<T>, String> {
-    match account.auth_mode {
-        MailAuthMode::Password => {
-            login_imap_client(client, &account.imap_username, &account.imap_password)
-        }
-        MailAuthMode::OAuth2 => {
-            let auth = Xoauth2Authenticator {
-                username: account.imap_username.clone(),
-                access_token: account.imap_password.clone(),
-            };
-            if account.config.provider == MailProvider::Outlook {
-                let initial_response = BASE64_STANDARD
-                    .encode(xoauth2_sasl_response(&auth.username, &auth.access_token));
-                client
-                    .authenticate(format!("XOAUTH2 {initial_response}"), &auth)
-                    .map_err(|(e, _)| imap_xoauth2_auth_error(account.config.provider, e))
-            } else {
-                client
-                    .authenticate("XOAUTH2", &auth)
-                    .map_err(|(e, _)| imap_xoauth2_auth_error(account.config.provider, e))
-            }
-        }
-    }
-}
-
-pub(super) fn imap_xoauth2_auth_error(provider: MailProvider, error: imap::Error) -> String {
-    let detail = error.to_string();
-    if provider == MailProvider::Outlook
-        && detail.contains("User is authenticated but not connected")
-    {
-        format!(
-            "IMAP XOAUTH2 authentication failed: {detail}. Outlook accepted the OAuth token, but the mailbox was not connected. Enable IMAP in Outlook.com Settings > Mail > Forwarding and IMAP, then retry. If it still fails, approve the recent IMAP sign-in activity at account.live.com/activity."
-        )
-    } else {
-        format!("IMAP XOAUTH2 authentication failed: {detail}")
-    }
-}
-
-pub(super) fn login_imap_client<T: Read + Write>(
-    mut client: imap::Client<T>,
-    username: &str,
-    password: &str,
-) -> Result<imap::Session<T>, String> {
-    for attempt in 0..=IMAP_LOGIN_RETRY_DELAYS_MS.len() {
-        match client.login(username, password) {
-            Ok(session) => return Ok(session),
-            Err((e, next_client)) => {
-                let message = e.to_string();
-                client = next_client;
-                let retry_limit_reached = attempt >= IMAP_LOGIN_RETRY_DELAYS_MS.len();
-                let retryable = should_retry_imap_login(&message);
-                if retry_limit_reached || !retryable {
-                    return Err(format!("IMAP login failed: {message}"));
-                }
-
-                let delay_ms = IMAP_LOGIN_RETRY_DELAYS_MS[attempt];
-                tracing::debug!(
-                    "transient IMAP login failure; retrying in {delay_ms}ms: {message}"
-                );
-                std::thread::sleep(Duration::from_millis(delay_ms));
-            }
-        }
-    }
-
-    Err("IMAP login failed".into())
-}
-
-pub(super) fn should_retry_imap_login(message: &str) -> bool {
-    let message = message.to_ascii_lowercase();
-    if message.contains("authenticationfailed")
-        || message.contains("authentication failed")
-        || message.contains("invalid credentials")
-        || message.contains("invalid login")
-        || message.contains("bad credentials")
-        || (message.contains("password") && message.contains("incorrect"))
-    {
-        return false;
-    }
-
-    message.contains("login error")
-        || message.contains("no response")
-        || message.contains("temporar")
-        || message.contains("try again")
-        || message.contains("rate")
-        || message.contains("throttl")
-        || message.contains("too many")
-        || message.contains("timeout")
 }
 
 pub(super) fn tcp_connect(host: &str, port: u16) -> Result<TcpStream, String> {
@@ -219,4 +102,32 @@ pub(super) fn tcp_connect(host: &str, port: u16) -> Result<TcpStream, String> {
             .map(|e| e.to_string())
             .unwrap_or_else(|| "no resolved address".into())
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ProxyForward;
+    use std::future::pending;
+    use std::time::Duration;
+    use tokio::sync::oneshot;
+    use tokio::time::timeout;
+
+    #[tokio::test]
+    async fn forwarder_is_cancelled_when_its_connection_owner_leaves() {
+        let (released, stopped) = oneshot::channel::<()>();
+        let task = tokio::spawn(async move {
+            let _released = released;
+            pending::<()>().await;
+        });
+        let forward = ProxyForward(task);
+        assert!(!forward.0.is_finished());
+
+        drop(forward);
+        assert!(
+            timeout(Duration::from_secs(1), stopped)
+                .await
+                .expect("forwarder task did not stop")
+                .is_err()
+        );
+    }
 }

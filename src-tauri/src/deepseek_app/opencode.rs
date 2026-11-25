@@ -135,6 +135,6 @@ pub(super) fn checkpoint(
 ) -> Result<(), String> {
     let mut blocks = previous.to_vec();
     blocks.extend(reply.blocks.iter().filter(|b| !b.is_null()).cloned());
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     super::store::settle(&db, id, &blocks, "streaming", reply.stop_reason.as_deref())
 }

@@ -1,0 +1,385 @@
+id: TC-MODULES-059
+title: Signed Mail manages IMAP folders and sends from IMAP and POP3 accounts
+description: >-
+  Install and enable the matching signed Mail package. Use the regular Mail
+  tab to populate the IMAP folder tree, unsubscribe Archive, search the server,
+  update message flags, view and save the original of an unarchived message, and send
+  messages from IMAP and POP3 accounts. Check the installed renderer,
+  connection tests, persisted IMAP folder state, SMTP delivery, IMAP Sent copies, remote draft cleanup,
+  and the signed host's data lease through disable and re-enable.
+covers: [F-Modules-1, F-MAIL-3, F-MAIL-6, F-MAIL-7, F-MAIL-11, F-MAIL-12, F-MAIL-15, F-MAIL-17, F-MAIL-23, F-FILEOPEN-1]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, file_open_mail, module_signed_mail_archive, file_open_files]
+timeout_sec: 340
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- mail_server_archive_fault: {folder: INBOX, empty_newest: true}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]'
+- mail_server_assert_list_matches: {timeout_sec: 40}
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- assert_signed_mail_host: folder-tree
+- right_click: '[data-testid="mail-message-row"][data-subject="Seed 0030"]'
+- click: '[data-testid="context-menu-item-view-source"]'
+- assert_text: {selector: '[role="dialog"][aria-label="Message source"] pre', contains: 'Subject: Seed 0030', timeout_sec: 30}
+- assert_text: {selector: '[role="dialog"][aria-label="Message source"] pre', contains: 'Body of Seed 0030'}
+- assert_signed_mail_host: imap-source
+- click: '[role="dialog"][aria-label="Message source"] [aria-label="Close dialog"]'
+- wait_for: {selector: '[role="dialog"][aria-label="Message source"]', state: detached}
+- click: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="Archive"][data-active="true"]'
+- wait_for: '[data-testid="mail-message-row"][data-subject="${fixture.file_open_mail_subject}"]'
+- click: '[data-testid="mail-message-row"][data-subject="${fixture.file_open_mail_subject}"]'
+- wait_for: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
+- assert_file_open_bytes:
+    selector: '[data-testid="file-viewer"][data-readonly="true"]'
+    remember: signed-mail-attachment
+    equals: ${fixture.file_open_mail_text}
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-readonly="true"]', state: detached}
+- assert_file_open_bytes: {remember: signed-mail-attachment, absent: true}
+- mail_server_deliver: {count: 3, prefix: Signed header}
+- click: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="INBOX"][data-active="true"]'
+- wait_for: {selector: '[data-testid="mail-message-row"][data-subject="Signed header 0003"]', timeout_sec: 40}
+- click: '[data-testid="mail-message-row"][data-subject="Signed header 0003"]'
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent
+      ?? document.querySelector('.taomni-mail-reader-text')?.textContent
+      ?? '').includes('Body of Signed header 0003')
+    expect_truthy: true
+    timeout_sec: 30
+- mail_server_assert_list_matches: {timeout_sec: 40}
+- click: '[data-testid="mail-subscriptions-open"]'
+- wait_for: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="true"]'
+- click: '[data-testid="mail-subscription-row"][data-folder-name="Archive"] [data-testid="mail-subscription-toggle"]'
+- wait_for: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="false"]'
+- click: '[role="dialog"][aria-label="Folder subscriptions"] [aria-label="Close dialog"]'
+- mail_server_deliver: {count: 1, prefix: Signed full-account header}
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'new headers across', timeout_sec: 40}
+- wait_for: {selector: '[data-testid="mail-message-row"][data-subject="Signed full-account header 0001"]', timeout_sec: 40}
+- select_option: {selector: '[data-testid="mail-search-field"]', value: subject}
+- fill: {selector: '[data-testid="mail-search-input"]', value: 'Signed full-account header 0001'}
+- click: '[data-testid="mail-search-server"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'Server search found 1 message in INBOX', timeout_sec: 30}
+- assert_count: {selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-message-row"]', equal: 1}
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-message-row"]', contains: 'Signed full-account header 0001'}
+- assert_signed_mail_host: imap-search
+- fill: {selector: '[data-testid="mail-search-input"]', value: ''}
+- wait_for: {selector: '[data-testid="mail-search-server"]', state: detached}
+- click: '[data-testid="mail-message-row"][data-subject="Signed full-account header 0001"][data-flagged="false"]'
+- press: {selector: '[data-testid="mail-message-row"][aria-pressed="true"]', key: s}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Signed full-account header 0001"][data-flagged="true"]'
+- mail_server_assert_list_matches: {flagged: true, timeout_sec: 20}
+- press: {selector: '[data-testid="mail-message-row"][aria-pressed="true"]', key: s}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Signed full-account header 0001"][data-flagged="false"]'
+- mail_server_assert_list_matches: {flagged: true, timeout_sec: 20}
+- click: '[data-testid="mail-mark-folder-read"]:not([disabled])'
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'messages as read', timeout_sec: 30}
+- assert_count: {selector: '[data-testid="mail-message-row"][data-unread="true"]', equal: 0}
+- mail_server_assert_list_matches: {unread: true, flagged: true, timeout_sec: 20}
+- assert_signed_mail_host: imap-flags
+- click: '[data-testid="mail-subscriptions-open"]'
+- wait_for: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="false"]'
+- click: '[role="dialog"][aria-label="Folder subscriptions"] [aria-label="Close dialog"]'
+- right_click: '[data-testid="mail-message-row"][data-subject="Seed 0030"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    title: Save message as .eml
+    trigger: '[data-testid="context-menu-item-save-as-eml"]'
+    path: ${fixture.file_open_root}/mail-original.eml
+- assert_file_contains: {path: '${fixture.file_open_root}/mail-original.eml', contains: 'Subject: Seed 0030'}
+- assert_file_contains: {path: '${fixture.file_open_root}/mail-original.eml', contains: 'Body of Seed 0030'}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- click: '[data-testid="context-menu-item-new-subfolder"]'
+- fill: {selector: '[data-testid="text-input-dialog-input"]', value: QA module folder}
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module folder"]'
+- mail_server_assert_folder_count: {folder: INBOX/QA module folder, exists: true, equals: 0}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module folder"]'
+- click: '[data-testid="context-menu-item-rename-folder"]'
+- fill: {selector: '[data-testid="text-input-dialog-input"]', value: QA module renamed}
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- assert_count: {selector: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module folder"]', equal: 0}
+- mail_server_assert_folder_count: {folder: INBOX/QA module folder, exists: false}
+- mail_server_assert_folder_count: {folder: INBOX/QA module renamed, exists: true, equals: 0}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- click: '[data-testid="context-menu-item-delete-folder"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_visible: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- mail_server_assert_folder_count: {folder: INBOX/QA module renamed, exists: true, equals: 0}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- click: '[data-testid="context-menu-item-delete-folder"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: {selector: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]', state: detached}
+- assert_visible: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- mail_server_assert_folder_count: {folder: INBOX/QA module renamed, exists: false}
+- assert_signed_mail_host: folder-changes
+- click: '[data-testid="mail-test-connection"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'IMAP ok, SMTP ok', timeout_sec: 45}
+- assert_signed_mail_host: running
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-compose-open"]'
+- fill: {selector: '[data-testid="mail-recipient-to"] input', value: receiver@example.com}
+- press: Enter
+- fill: {selector: '[data-testid="mail-compose-subject"]', value: Signed host IMAP delivery}
+- type: {selector: '[data-testid="mail-compose-editor"]', text: IMAP message from the signed Mail host}
+- click: '[data-testid="mail-compose-save-draft"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: Draft saved to Drafts, timeout_sec: 25}
+- mail_server_assert_folder_count: {folder: Drafts, has_subject: Signed host IMAP delivery}
+- fill: {selector: '[data-testid="mail-compose-subject"]', value: Revised signed IMAP delivery}
+- click: '[data-testid="mail-compose-save-draft"]'
+- mail_server_assert_folder_count: {folder: Drafts, equals: 1, has_subject: Revised signed IMAP delivery, lacks_subject: Signed host IMAP delivery}
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: Draft saved to Drafts, timeout_sec: 25}
+- click: '[data-testid="mail-compose-send"]'
+- wait_for: {selector: '[data-testid="mail-compose-dialog"]', state: detached}
+- mail_server_assert_smtp_contains: {text: Revised signed IMAP delivery, timeout_sec: 20}
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-sent-copy-status"]', contains: copy saved to Sent, timeout_sec: 30}
+- mail_server_assert_folder_count: {folder: Sent, has_subject: Revised signed IMAP delivery}
+- mail_server_assert_folder_count: {folder: Drafts, lacks_subject: Revised signed IMAP delivery}
+- assert_signed_mail_host: imap-delivery
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-compose-open"]'
+- fill: {selector: '[data-testid="mail-recipient-to"] input', value: receiver@example.com}
+- press: Enter
+- fill: {selector: '[data-testid="mail-compose-subject"]', value: Discardable server draft}
+- click: '[data-testid="mail-compose-save-draft"]'
+- mail_server_assert_folder_count: {folder: Drafts, has_subject: Discardable server draft}
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: Draft saved to Drafts, timeout_sec: 25}
+- click: '[role="dialog"][aria-label="New message"] [aria-label="Close dialog"]'
+- wait_for: {selector: '[data-testid="mail-compose-dialog"]', state: detached}
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-drafts-open"]'
+- assert_text: {selector: '[data-testid="mail-draft-row"][data-subject="Discardable server draft"]', contains: Discardable server draft}
+- click: '[data-testid="mail-draft-row"][data-subject="Discardable server draft"] button[title="Delete draft"]'
+- mail_server_assert_folder_count: {folder: Drafts, lacks_subject: Discardable server draft}
+- wait_for: {selector: '[data-testid="mail-draft-row"][data-subject="Discardable server draft"]', state: detached}
+- click: '[role="dialog"][aria-label="Drafts and templates"] [aria-label="Close dialog"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_pop3_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 2}
+- mail_server_assert_list_matches: {timeout_sec: 40}
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-test-connection"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: 'POP3 ok, SMTP ok', timeout_sec: 45}
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-compose-open"]'
+- fill: {selector: '[data-testid="mail-recipient-to"] input', value: receiver@example.com}
+- press: Enter
+- fill: {selector: '[data-testid="mail-compose-subject"]', value: Signed host POP3 delivery}
+- type: {selector: '[data-testid="mail-compose-editor"]', text: POP3 message from the signed Mail host}
+- click: '[data-testid="mail-compose-send"]'
+- wait_for: {selector: '[data-testid="mail-compose-dialog"]', state: detached}
+- mail_server_assert_smtp_contains: {text: Signed host POP3 delivery, timeout_sec: 20}
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-sent-copy-status"]', contains: copy saved to Sent, timeout_sec: 30}
+- assert_signed_mail_host: pop3-delivery
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-mail"]'
+- wait_for: '[data-testid="module-action-enable-mail"]'
+- assert_signed_mail_host: disabled
+- wait_for: {selector: '[data-plugin-slug="mail"] [data-testid="mail-client-tab"]', state: detached}
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 2}
+- assert_count: {selector: '[data-testid="mail-test-connection"]', equal: 0}
+- assert_count: {selector: '[data-testid="mail-compose-open"]', equal: 0}
+- assert_no_runtime_errors: null
+- mail_server_deliver: {count: 1, prefix: After Mail re-enable}
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="tab-item"]:nth-child(1 of [data-tab-type="mail"])'
+- wait_for: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- wait_for: {selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-message-row"][data-subject="After Mail re-enable 0001"]', timeout_sec: 40}
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 25}
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 2}
+- assert_no_runtime_errors: null
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-compose-open"]'
+- fill: {selector: '[data-testid="mail-recipient-to"] input', value: receiver@}
+- assert_text:
+    selector: '[data-testid="mail-recipient-suggestions"]'
+    contains: receiver@example.com
+    timeout_sec: 20
+- assert_pattern:
+    selector: '[data-testid="mail-recipient-suggestions"]'
+    regex: 'receiver@example\.com>?\s*sent\b'
+- click: '[role="dialog"][aria-label="New message"] [aria-label="Close dialog"]'
+- wait_for: {selector: '[data-testid="mail-compose-dialog"]', state: detached}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Opening the Mail tab starts the signed host, lists the actual IMAP folders and changes the server subscription.
+    actions: [6, 7, 8, 10, 15, 17, 47, 49, 53, 77]
+    checkpoints:
+    - {step: 9, expectation: The module installer accepts the verified artifact.}
+    - {step: 12, expectation: The signed module is installed and the host has no writer lease yet.}
+    - {step: 18, expectation: Opening the account mounts the module's verified frontend.}
+    - {step: 20, expectation: Opening the account shows Archive from the actual IMAP server.}
+    - {step: 21, expectation: The signed host holds its data lease and the on-disk folder cache contains INBOX and subscribed Archive.}
+    - {step: 48, expectation: The subscription dialog shows the initial subscribed state.}
+    - {step: 50, expectation: The updated IMAP folder tree reports Archive as unsubscribed.}
+    - {step: 54, expectation: Full synchronization reports its completed header counts.}
+    - {step: 55, expectation: Synchronization through the signed host added the newly delivered header.}
+    - {step: 78, expectation: The refreshed server tree preserves the changed subscription.}
+    results: [9, 12, 18, 20, 21, 48, 50, 54, 55, 78]
+  - id: R2
+    requirement: The normal connection controls test IMAP, POP3 and SMTP using the installed Mail host.
+    actions: [79, 110, 147, 148, 151]
+    checkpoints:
+    - {step: 111, expectation: The hosted app reports working IMAP and SMTP connections.}
+    - {step: 112, expectation: The signed Mail host still holds its data lease.}
+    - {step: 152, expectation: A separate POP3 account reports working POP3 and SMTP connections.}
+    results: [111, 112, 152]
+  - id: R3
+    requirement: The signature-verified package composes and delivers from both account types, stores an IMAP Sent copy with the same body and Message-ID, and removes the server draft.
+    actions: [113, 114, 115, 116, 117, 118, 125, 153, 154, 155, 156, 157, 158]
+    checkpoints:
+    - {step: 120, expectation: IMAP Drafts contains the composed subject before sending.}
+    - {step: 127, expectation: The SMTP server received the message sent from the IMAP account.}
+    - {step: 128, expectation: The IMAP Sent copy was stored.}
+    - {step: 129, expectation: The actual IMAP Sent folder contains the accepted message.}
+    - {step: 130, expectation: IMAP Drafts no longer contains the original server draft.}
+    - {step: 131, expectation: The verified host declares recipient recording and the account cache contains exactly one sent-contact entry for the delivered address.}
+    - {step: 160, expectation: The SMTP server received the message sent from the POP3 account.}
+    - {step: 161, expectation: The POP3 copy was stored in local Sent.}
+    - {step: 162, expectation: The verified host still holds the Mail writer lease after POP3 delivery.}
+    results: [120, 127, 128, 129, 130, 131, 160, 161, 162]
+  - id: R4
+    requirement: Disabling the module releases its data lease without restarting the desktop.
+    actions: [163, 164, 165]
+    checkpoints:
+    - {step: 166, expectation: The disabled package can be re-enabled.}
+    - {step: 167, expectation: The verified module is still installed and the host released its writer lease.}
+    - {step: 168, expectation: Disabling unmounts both Mail account panes.}
+    - {step: 169, expectation: Both tabs remain open for reactivation.}
+    - {step: 170, expectation: The stopped module exposes no connection-test control.}
+    - {step: 171, expectation: The stopped module exposes no compose control.}
+    - {step: 172, expectation: The remaining application runs without uncaught errors.}
+    results: [166, 167, 168, 169, 170, 171, 172]
+  - id: R5
+    requirement: The signed Mail host catches up the selected inbox after messages arrive while another folder is open.
+    actions: [29, 40, 41]
+    checkpoints:
+    - {step: 30, expectation: Archive becomes the selected folder.}
+    - {step: 42, expectation: Inbox becomes the selected folder again.}
+    - {step: 43, expectation: The newest header appears in the inbox.}
+    - {step: 46, expectation: The complete visible list matches the server.}
+    results: [30, 42, 43, 46]
+  - id: R6
+    requirement: Subject search in the signed Mail renderer returns the matching header from the selected IMAP folder.
+    actions: [56, 57, 58]
+    checkpoints:
+    - {step: 59, expectation: The IMAP server reports exactly one match in INBOX.}
+    - {step: 60, expectation: The result list contains one row.}
+    - {step: 61, expectation: The result row shows the newly received subject.}
+    - {step: 62, expectation: The signed host holds its lease and the new header appears once in SQLite below the persisted UID watermark.}
+    results: [59, 60, 61, 62]
+  - id: R7
+    requirement: Toggling the selected message star updates the IMAP flag and the visible message list.
+    actions: [65, 66, 69]
+    checkpoints:
+    - {step: 67, expectation: The selected message shows a star.}
+    - {step: 68, expectation: Starred UI rows match the IMAP server's flagged UIDs.}
+    - {step: 70, expectation: The selected message no longer shows a star.}
+    - {step: 71, expectation: Starred UI rows still match the server after removing the flag.}
+    - {step: 76, expectation: The signed host keeps its lease and the SQLite index preserves the final star and unread state.}
+    results: [67, 68, 70, 71, 76]
+  - id: R8
+    requirement: Marking the entire inbox as read updates the actual IMAP mailbox and the cached list.
+    actions: [72]
+    checkpoints:
+    - {step: 73, expectation: The whole-folder operation reports its success.}
+    - {step: 74, expectation: No displayed message is still unread.}
+    - {step: 75, expectation: The unread count and flagged UID set agree with the live IMAP server.}
+    results: [73, 74, 75]
+  - id: R9
+    requirement: The signed Mail module opens and saves the original MIME of a message whose partial archive fetch returns no bytes.
+    actions: [16, 22, 23, 27, 80, 81]
+    checkpoints:
+    - {step: 24, expectation: The raw message shows the exact IMAP subject header.}
+    - {step: 25, expectation: The raw message also includes the IMAP body.}
+    - {step: 26, expectation: The installed signed host holds the Mail writer lease while serving the account.}
+    - {step: 28, expectation: Closing the source dialog returns to the folder list.}
+    - {step: 82, expectation: The native file contains the original IMAP subject header.}
+    - {step: 83, expectation: The native file contains the original IMAP body.}
+    results: [24, 25, 26, 28, 82, 83]
+  - id: R10
+    requirement: A newly delivered IMAP message opens with its plain-text body in the installed Mail renderer.
+    actions: [44]
+    checkpoints:
+    - {step: 45, expectation: The reader shows the actual body from the IMAP fixture.}
+    results: [45]
+  - id: R11
+    requirement: The signed Mail renderer opens its Archive attachment as a read-only temporary file and releases it on close.
+    actions: [32, 34, 37]
+    checkpoints:
+    - {step: 33, expectation: The selected message exposes the expected attachment.}
+    - {step: 36, expectation: The new read-only viewer holds the exact attachment bytes.}
+    - {step: 39, expectation: Closing the viewer removes the controlled temporary file.}
+    results: [33, 36, 39]
+  - id: R12
+    requirement: The Mail module supports creating and renaming a folder, cancelling deletion and confirming deletion.
+    actions: [87, 93, 100, 105]
+    checkpoints:
+    - {step: 88, expectation: The new empty subfolder appears.}
+    - {step: 89, expectation: The fixture independently verifies the server result.}
+    - {step: 94, expectation: The renamed folder replaces its original row.}
+    - {step: 96, expectation: The fixture independently verifies the server result.}
+    - {step: 101, expectation: Cancelling deletion leaves the folder visible.}
+    - {step: 102, expectation: The fixture independently verifies the server result.}
+    - {step: 106, expectation: Confirmed deletion removes the folder and keeps its parent.}
+    - {step: 108, expectation: The fixture independently verifies the server result.}
+    results: [88, 89, 94, 96, 101, 102, 106, 108]
+  - id: R13
+    requirement: Editing a saved draft replaces its server copy, and deleting a saved draft removes it from both the local list and the server.
+    actions: [122, 143]
+    checkpoints:
+    - {step: 123, expectation: Drafts contains only the revised version before sending.}
+    - {step: 137, expectation: The second draft is visible on the server before removal.}
+    - {step: 144, expectation: The server no longer lists the discarded draft.}
+    - {step: 145, expectation: The deleted draft leaves the local list.}
+    results: [123, 137, 144, 145]
+  - id: R14
+    requirement: Re-enabling Mail resumes IMAP sync in the retained account tab and receives messages that arrived while the module was disabled.
+    actions: [173, 174, 176, 178]
+    checkpoints:
+    - {step: 175, expectation: The module store reports Mail enabled.}
+    - {step: 179, expectation: The retained IMAP account displays the new header.}
+    - {step: 180, expectation: The active account shows the same messages as the live INBOX.}
+    - {step: 181, expectation: Both existing account tabs remain open.}
+    - {step: 182, expectation: Re-enabling produces no runtime errors.}
+    results: [175, 179, 180, 181, 182]
+  - id: R15
+    requirement: The signed host preserves sent-recipient suggestions across disable and re-enable.
+    actions: [125, 174, 183, 184, 187]
+    checkpoints:
+    - {step: 185, expectation: The IMAP Inbox composer finds the recipient of the accepted message.}
+    - {step: 186, expectation: The matching address is marked as a sent recipient.}
+    - {step: 188, expectation: The composer closes normally.}
+    - {step: 189, expectation: The account remains usable without runtime errors.}
+    results: [185, 186, 188, 189]
+  visual:
+  - check: The Mail pane shows the connection results for both accounts.
+    method: automated
+    reason: The case checks the visible status in each active Mail tab.
+  native:
+  - check: The production verifier, real Mail connection, host and data lease are observable.
+    method: automated
+    reason: Native execution uses the matching signed artifact and real protocol listeners in an isolated profile.

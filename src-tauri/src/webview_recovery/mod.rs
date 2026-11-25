@@ -350,16 +350,6 @@ pub fn terminated(app: &AppHandle, label: &str, reason: &'static str) {
         // native recording/scroll controls remain usable in their own windows.
         if label == "main" {
             crate::voice::commands::stop_orphaned_capture();
-            let media_app = handle.clone();
-            tauri::async_runtime::spawn(async move {
-                let state = media_app.state::<crate::state::AppState>();
-                // Native A/V has no cheap per-renderer ownership query. Fail
-                // safely rather than letting an orphan microphone run forever.
-                let mut sessions = state.lanchat.media_sessions.write().await;
-                for (_, session) in sessions.drain() {
-                    session.stop();
-                }
-            });
         }
         failure_dialog(&handle, &label, reload_supported);
     });

@@ -139,7 +139,7 @@ pub(in crate::mail) fn persist_new_oauth_token(
     let json = serde_json::to_string(&bundle).map_err(|e| e.to_string())?;
     let label_owner =
         non_empty(email_address.to_string()).unwrap_or_else(|| session_id.to_string());
-    let saved = state.vault.put(
+    let saved = state.core.vault.put(
         "mail-oauth-token",
         &format!("{label_owner} OAuth2 token"),
         &json,
@@ -194,7 +194,7 @@ pub(in crate::mail) fn persist_oauth_token_bundle(
         .strip_prefix(crate::vault::VAULT_REF_PREFIX)
         .ok_or_else(|| "OAuth2 token must be stored in the credential vault".to_string())?;
     let json = serde_json::to_string(bundle).map_err(|e| e.to_string())?;
-    state.vault.update(id, &json)
+    state.core.vault.update(id, &json)
 }
 
 pub(in crate::mail) fn oauth_refresh_scope(

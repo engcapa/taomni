@@ -36,7 +36,11 @@ steps:
     name: aria-checked
     equals: 'false'
 - assert_attribute:
-    selector: '[data-testid="backup-global-includeLanchat"]'
+    selector: '[data-testid="backup-global-includeMfa"]'
+    name: aria-checked
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="backup-global-includePlugins"]'
     name: aria-checked
     equals: 'true'
 - assert_attribute:
@@ -53,9 +57,9 @@ steps:
     name: value
     equals: custom
 - assert_attribute:
-    selector: '[data-testid="backup-cloud-includeLanchat"]'
+    selector: '[data-testid="backup-cloud-includeMfa"]'
     name: aria-checked
-    equals: 'false'
+    equals: 'true'
 - set_check:
     selector: '[data-testid="backup-cloud-includeMailOriginals"]'
     checked: true
@@ -77,6 +81,13 @@ steps:
 - set_check:
     selector: '[data-testid="backup-cloud-includeMfa"]'
     checked: false
+- assert_attribute:
+    selector: '[data-testid="backup-cloud-includeVault"]'
+    name: disabled
+    equals: ''
+- set_check:
+    selector: '[data-testid="backup-cloud-includePlugins"]'
+    checked: false
 - set_check:
     selector: '[data-testid="backup-cloud-includeVault"]'
     checked: false
@@ -87,7 +98,7 @@ steps:
     selector: '[data-testid="backup-cloud-includeServerCertificates"]'
     checked: true
 - set_check:
-    selector: '[data-testid="backup-cloud-includeLanchat"]'
+    selector: '[data-testid="backup-cloud-includeMfa"]'
     checked: true
 - set_check:
     selector: '[data-testid="backup-cloud-includeLocalHistory"]'
@@ -113,7 +124,7 @@ steps:
     value: inherit
 - assert_text:
     selector: '[data-testid="backup-cloud-destination"] [data-testid="backup-range-summary"]'
-    contains: LAN chat
+    contains: MFA
 - set_check:
     selector: '[data-testid="backup-global-include-mail"]'
     checked: true
@@ -169,13 +180,20 @@ steps:
     selector: '[data-testid="backup-global-includeServerCertificates"]'
     checked: true
 - set_check:
-    selector: '[data-testid="backup-global-includeLanchat"]'
+    selector: '[data-testid="backup-global-includeMfa"]'
     checked: false
 - set_check:
-    selector: '[data-testid="backup-global-includeLanchat"]'
+    selector: '[data-testid="backup-global-includeMfa"]'
     checked: true
 - set_check:
     selector: '[data-testid="backup-global-includeMfa"]'
+    checked: false
+- assert_attribute:
+    selector: '[data-testid="backup-global-includeVault"]'
+    name: disabled
+    equals: ''
+- set_check:
+    selector: '[data-testid="backup-global-includePlugins"]'
     checked: false
 - set_check:
     selector: '[data-testid="backup-global-includeVault"]'
@@ -187,6 +205,9 @@ steps:
     selector: '[data-testid="backup-global-includeVault"]'
     name: disabled
     equals: ''
+- set_check:
+    selector: '[data-testid="backup-global-includePlugins"]'
+    checked: true
 - click: '[data-testid="backup-local-destination"] > summary'
 - select_option:
     selector: '[data-testid="backup-local-range-mode"]'
@@ -199,6 +220,9 @@ steps:
     selector: '[data-testid="backup-local-includeMfa"]'
     checked: false
 - set_check:
+    selector: '[data-testid="backup-local-includePlugins"]'
+    checked: false
+- set_check:
     selector: '[data-testid="backup-local-includeVault"]'
     checked: false
 - set_check:
@@ -208,7 +232,7 @@ steps:
     selector: '[data-testid="backup-local-includeServerCertificates"]'
     checked: false
 - set_check:
-    selector: '[data-testid="backup-local-includeLanchat"]'
+    selector: '[data-testid="backup-local-includeMfa"]'
     checked: false
 - set_check:
     selector: '[data-testid="backup-local-include-mail"]'
@@ -272,6 +296,10 @@ steps:
     selector: '[data-testid="backup-global-categories"]'
     contains: 完整邮件原件
 - screenshot: backup-categories-zh.png
+- assert_attribute:
+    selector: '[data-testid="backup-global-includePlugins"]'
+    name: aria-checked
+    equals: 'true'
 verification:
   review: reviewed
   native:
@@ -282,96 +310,120 @@ verification:
   - id: R1
     requirement: Legacy full/core configurations expand without rewriting or enabling excluded mail
     actions:
-    - 12
+    - 13
     checkpoints:
     - step: 7
       expectation: No core/full selector
     - step: 8
       expectation: Mail remains excluded
     - step: 9
-      expectation: LAN chat retained
-    - step: 10
-      expectation: Certificates retained
+      expectation: MFA retained
     - step: 11
+      expectation: Certificates retained
+    - step: 12
       expectation: Opening leaves legacy persisted policy intact
-    - step: 13
-      expectation: Old target stays custom
     - step: 14
-      expectation: Old target core excludes LAN chat
+      expectation: Old target stays custom
+    - step: 15
+      expectation: The legacy target retains core's MFA inclusion; explicit custom exclusion is exercised below.
     results:
     - 7
     - 8
     - 9
-    - 10
     - 11
-    - 13
+    - 12
     - 14
+    - 15
   - id: R2
     requirement: Mail children support mixed state and enforce cache/vault dependencies
     actions:
-    - 15
-    - 34
-    - 35
+    - 16
+    - 37
+    - 38
     checkpoints:
-    - step: 16
-      expectation: Target mixed state
     - step: 17
+      expectation: Target mixed state
+    - step: 18
       expectation: Originals include cache
-    - step: 36
+    - step: 39
       expectation: Global mixed state
-    - step: 38
-      expectation: Cache alone stays selected
     - step: 41
+      expectation: Cache alone stays selected
+    - step: 44
       expectation: Cache cannot be removed while originals need it
-    - step: 56
+    - step: 61
       expectation: MFA retains vault
     results:
-    - 16
     - 17
-    - 36
-    - 38
+    - 18
+    - 39
     - 41
-    - 56
+    - 44
+    - 61
   - id: R3
     requirement: Destination overrides remain independent and category edits persist through remount and translations
     actions:
-    - 32
-    - 58
-    - 75
-    - 78
-    - 86
+    - 35
+    - 64
+    - 82
+    - 85
+    - 93
     checkpoints:
-    - step: 33
+    - step: 36
       expectation: Inherited category summary
-    - step: 73
-      expectation: Local excludes mail
-    - step: 74
-      expectation: Global retains all mail
-    - step: 76
-      expectation: Save acknowledged
-    - step: 79
-      expectation: Originals restored
     - step: 80
-      expectation: Attachments restored
-    - step: 83
-      expectation: Local notes exclusion restored
-    - step: 84
-      expectation: Global notes retained
+      expectation: Local excludes mail
     - step: 81
-      expectation: Manual action uses global categories
+      expectation: Global retains all mail
+    - step: 83
+      expectation: Save acknowledged
+    - step: 86
+      expectation: Originals restored
     - step: 87
+      expectation: Attachments restored
+    - step: 90
+      expectation: Local notes exclusion restored
+    - step: 91
+      expectation: Global notes retained
+    - step: 88
+      expectation: Manual action uses global categories
+    - step: 94
       expectation: Translated child label
     results:
-    - 33
-    - 73
-    - 74
-    - 76
-    - 79
+    - 36
     - 80
-    - 83
-    - 84
     - 81
+    - 83
+    - 86
     - 87
+    - 90
+    - 91
+    - 88
+    - 94
+  - id: R-MODULES
+    requirement: Default ranges include retained module data; its Vault dependency persists independently of the
+      legacy MFA category, and category selection survives reopening Settings.
+    actions:
+    - 24
+    - 54
+    - 56
+    - 58
+    - 62
+    checkpoints:
+    - step: 10
+      expectation: Legacy default full range includes module data.
+    - step: 23
+      expectation: Cloud module data still requires Vault after MFA is unchecked; removing module data permits the
+        explicit Vault exclusion below.
+    - step: 57
+      expectation: Vault remains required after MFA is unchecked while module data is selected.
+    - step: 96
+      expectation: Reopened Settings retains the explicitly selected module category.
+    results:
+    - 10
+    - 23
+    - 57
+    - 96
   visual:
   - check: Category and task controls remain readable in retained screenshots
     method: manual

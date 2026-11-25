@@ -93,7 +93,7 @@ pub(crate) fn release_servers_tab_in(slot: &Mutex<Option<HeldServersTabLock>>, w
 
 /// Release any Local servers tab lock owned by `window_label` on `state`.
 pub(crate) fn release_tab_lock_for_window(state: &AppState, window_label: &str) {
-    release_servers_tab_in(&state.servers_tab_lock, window_label);
+    release_servers_tab_in(&state.legacy.servers_tab_lock, window_label);
 }
 
 #[tauri::command]
@@ -104,7 +104,11 @@ pub async fn claim_servers_tab(
 ) -> Result<ServersTabClaim, String> {
     let app_data_dir = crate::resolved_app_data_dir(&app)
         .map_err(|error| format!("resolve app data directory for Local servers tab: {error}"))?;
-    claim_servers_tab_in(&state.servers_tab_lock, &app_data_dir, window.label())
+    claim_servers_tab_in(
+        &state.legacy.servers_tab_lock,
+        &app_data_dir,
+        window.label(),
+    )
 }
 
 #[tauri::command]

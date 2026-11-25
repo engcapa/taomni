@@ -29,6 +29,7 @@ pub fn client(state: &AppState, settings: &NetworkConfig) -> Result<reqwest::Cli
         }
         if !config.password_ref.is_empty() {
             state
+                .core
                 .vault
                 .resolve(&config.password_ref)
                 .map_err(|_| "Unlock the vault to use the configured proxy")?;

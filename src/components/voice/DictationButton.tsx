@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Mic, Square, Loader2, X } from "lucide-react";
 import { useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
+import { openSettingsSection } from "../../lib/settingsNavigation";
 import { useVoiceSettingsStore } from "./VoiceSettingsDialog";
 
 type Phase = "idle" | "preparing" | "recording" | "transcribing";
@@ -38,7 +39,9 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
   const session = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const mounted = useRef(true);
-  const streamingMode = ["local-auto", "sensevoice-small", "sherpa-zipformer-zh-en"].includes(active) || ["aliyun", "volcengine", "soniox", "deepgram", "gemini"].includes(active);
+  const online = ["aliyun", "volcengine", "soniox", "deepgram", "gemini"].includes(active);
+  const streamingMode = ["local-auto", "sensevoice-small", "sherpa-zipformer-zh-en"].includes(active) || online;
+  const moduleError = error.match(/^(?:Error: )?ASR_MODULE_(?:REQUIRED|DISABLED):\s*(.+)$/)?.[1];
   const [interim, setInterim] = useState("");
   const deliverFinal = useCallback(async (raw: string, id: string) => {
     if (session.current !== id || !mounted.current) return;
@@ -177,6 +180,10 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
     setPhase("preparing");
     try {
       if (!await invoke<boolean>("voice_capture_supported")) throw new Error(t("voice.unsupported"));
+      if (!online) {
+        await invoke("voice_check_local_module");
+        if (session.current !== id) return;
+      }
       if (!streamingMode || ["local-auto", "sensevoice-small"].includes(active)) {
         const models = await invoke<{ id: string; installed: boolean }[]>("voice_models");
         if (session.current !== id) return;
@@ -225,8 +232,12 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
         else setError("The draft has changed. Original transcript remains available above.");
       }}>Undo cleanup</button>}
     </details>}
-    {error && createPortal(<div role="alert" className="fixed top-14 right-4 z-[10001] w-80 rounded border bg-[var(--taomni-panel-bg)] p-3 text-xs text-red-400">
-      {error}<button type="button" className="ml-2 underline" onClick={() => { setError(""); setSetup(true); }}>{t("voice.settings")}</button>
+    {error && createPortal(<div role="alert" data-testid="voice-dictation-error" className="fixed top-14 right-4 z-[10001] w-80 rounded border bg-[var(--taomni-panel-bg)] p-3 text-xs text-red-400">
+      {moduleError ?? error}
+      <button type="button" className="ml-2 underline" data-testid={moduleError ? "voice-open-module-store" : undefined}
+        onClick={() => { setError(""); if (moduleError) openSettingsSection("module-store"); else setSetup(true); }}>
+        {t(moduleError ? "plugins.browse" : "voice.settings")}
+      </button>
       <button type="button" aria-label={t("voice.close")} onClick={() => setError("")}><X className="h-4 w-4" /></button>
     </div>, document.body)}
   </div>;

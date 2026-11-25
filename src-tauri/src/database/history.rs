@@ -217,7 +217,7 @@ pub async fn db_append_history(
     entry: DbHistoryEntry,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     append_history(&db, &entry).map_err(|e| e.to_string())
 }
 
@@ -228,7 +228,7 @@ pub async fn db_list_history(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<DbHistoryEntry>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     list_history(
         &db,
         saved_session_id.as_deref(),
@@ -240,7 +240,7 @@ pub async fn db_list_history(
 
 #[tauri::command]
 pub async fn db_delete_history(id: String, state: State<'_, AppState>) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     delete_history(&db, &id).map_err(|e| e.to_string())
 }
 
@@ -249,7 +249,7 @@ pub async fn db_clear_history(
     saved_session_id: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     clear_history(&db, saved_session_id.as_deref()).map_err(|e| e.to_string())
 }
 
@@ -260,7 +260,7 @@ pub async fn db_update_history_tab_name(
     tab_name: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<i64, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     update_history_tab_name(&db, &saved_session_id, &panel_id, tab_name.as_deref())
         .map(|changed| changed as i64)
         .map_err(|e| e.to_string())

@@ -1,0 +1,124 @@
+id: TC-MODULES-041
+title: New module notice displays the feature description and leaves installation to the user
+description: An explicit browser catalog model introduces Hello after a baseline check. Later dismisses the notice,
+  and the module remains available for the user to download, review and install later.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- marketplace
+- upgrade
+modes:
+- browser
+fixtures:
+- reset_db
+- module_marketplace_preview
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-marketplace-empty"]'
+- assert_count:
+    selector: '[data-testid="module-release-new"]'
+    equal: 0
+- click: '[data-testid="module-marketplace-source-toggle"]'
+- fill:
+    selector: '[data-testid="module-marketplace-source"]'
+    value: https://preview.invalid/modules.json
+- click: '[data-testid="module-marketplace-refresh"]'
+- wait_for: '[data-testid="module-release-new-item"]'
+- assert_text:
+    selector: '[data-testid="module-release-new-item"]'
+    contains: Hello Plugin
+- assert_text:
+    selector: '[data-testid="module-release-new-item"]'
+    contains: Open a separate module tab and save text there.
+- assert_visible: '[data-testid="module-marketplace-new"]'
+- assert_count:
+    selector: '[data-testid="module-download-task"]'
+    equal: 0
+- click: '[data-testid="module-release-open-store"]'
+- wait_for: '[data-testid="module-marketplace"]'
+- click: '[data-testid="module-release-later"]'
+- wait_for:
+    selector: '[data-testid="module-release-notice"]'
+    state: detached
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-marketplace-download"]'
+- assert_count:
+    selector: '[data-testid="module-release-new"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="module-marketplace-installed"]'
+    equal: 0
+- click: '[data-testid="module-marketplace-download"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-marketplace-review"]'
+- click: '[data-testid="module-marketplace-review"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Hello Plugin 0.1.0
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-marketplace-current"]'
+- assert_no_runtime_errors: null
+- assert_count:
+    selector: '[data-testid="module-release-new-item"], [data-testid="module-marketplace-new"]'
+    equal: 0
+- screenshot: module-new-opt-in-browser.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A newer catalog prompts with the exact module name and feature description, with no automatic transfer.
+    actions: [7, 8, 9, 15]
+    checkpoints:
+    - step: 6
+      expectation: The baseline has no prompt.
+    - step: 11
+      expectation: The prompt shows the module name.
+    - step: 12
+      expectation: The prompt shows the signed catalog description supplied by the browser model.
+    - step: 13
+      expectation: The matching store entry is marked new.
+    - step: 14
+      expectation: No download starts without the user choosing the module.
+    - step: 16
+      expectation: The prompt opens the module store.
+    results: [6, 11, 12, 13, 14, 16]
+  - id: R2
+    requirement: Later dismisses the prompt through reload, and a separate choice installs the previously offered module.
+    actions: [17, 19, 21, 26, 27, 29, 31]
+    checkpoints:
+    - step: 18
+      expectation: Later dismisses the open notice.
+    - step: 24
+      expectation: The dismissed prompt stays hidden after reopening.
+    - step: 25
+      expectation: The module is still uninstalled before confirmation.
+    - step: 30
+      expectation: The installation dialog shows the name and version from the package review.
+    - step: 32
+      expectation: The user-selected module appears as installed after confirmed review.
+    - step: 33
+      expectation: The renderer records no unhandled errors.
+    - step: 34
+      expectation: The store and main window clear the new-module offer once the user installs it.
+    results: [18, 24, 25, 30, 32, 33, 34]
+  native:
+  - check: Catalog authentication, transfer and install on disk.
+    method: external
+    reason: Native TC-MODULES-045 exercises the signed catalog, persistent dismissal and filesystem.
+  visual:
+  - check: New module name, description and action labels fit the main window.
+    method: manual
+    reason: Inspect the retained screenshot.

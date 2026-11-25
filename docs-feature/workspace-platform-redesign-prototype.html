@@ -1154,7 +1154,6 @@
         { id: 'tunnels', name: 'SSH 隧道与端口转发管理器', badge: '3 活跃', desc: '集中监控 Local / Remote / Dynamic SOCKS5 隧道状态与流量统计' },
         { id: 'sockscap', name: 'SocksCap 应用级代理沙箱', badge: 'Proxy', desc: '强制指定本地进程通过 SSH 动态隧道或指定 SOCKS5/HTTP 代理访问内网' },
         { id: 'localservers', name: '本地服务启停面板 (HTTP / TFTP / Syslog)', badge: 'Servers', desc: '一键启动本地静态文件 HTTP 共享、固件升级 TFTP 或 Syslog 接收器' },
-        { id: 'lanchat', name: '局域网闪电传书 (LAN Chat)', badge: 'P2P', desc: '零配置局域网加密消息与大文件点对点直传' }
       ],
       selectedToolId: 'nettools'
     };
@@ -1991,12 +1990,11 @@
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                   <span style="font-weight:700;font-size:13px;">💬 协作与全局工具</span>
-                  <span class="kbd-badge">LAN / Mail</span>
+                  <span class="kbd-badge">Mail / Tools</span>
                 </div>
-                <div class="muted" style="font-size:11.5px;margin-top:3px;">局域网加密传书、邮件客户端、网络诊断箱与 MFA</div>
+                <div class="muted" style="font-size:11.5px;margin-top:3px;">邮件客户端、网络诊断箱与 MFA</div>
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
-                <button class="pill-btn" style="flex:1;justify-content:center;" onclick="openGlobalTool('lanchat')">💬 局域网传书</button>
                 <button class="pill-btn" style="flex:1;justify-content:center;" onclick="switchMode('sessions');openSessionInSessionsWorkbench('sess-mail-ops');">✉️ 邮件客户端</button>
               </div>
               <div style="display:flex;align-items:center;gap:6px;padding-top:4px;border-top:1px solid var(--taomni-chrome-border);">

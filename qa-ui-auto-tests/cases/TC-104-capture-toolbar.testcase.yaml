@@ -41,6 +41,16 @@ steps:
 - wait_for: '[data-testid="screenshot-toolbar"]'
 - click: '[data-testid="screenshot-cancel"]'
 - wait_for: '[data-testid="terminal-pane"]'
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- click: '[data-testid="system-screenshot-delay-toggle"]'
+- click: '[data-testid="system-screenshot-current-window"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- assert_not_visible: '[data-testid="screenshot-toolbar"]'
+- press: Escape
+- wait_for: '[data-testid="terminal-pane"]'
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- assert_count: {selector: '[data-testid="terminal-pane"]', equal: 1}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -93,6 +103,18 @@ verification:
     - 15
     - 17
     - 19
+  - id: repeat-cancel
+    requirement: The core screenshot entry can reopen after cancellation and Escape restores the same terminal without a stale selection or overlay.
+    actions: [21, 22, 25]
+    checkpoints:
+    - {step: 20, expectation: First cancelled overlay is gone.}
+    - {step: 23, expectation: A fresh unselected overlay opens.}
+    - {step: 24, expectation: Previous region toolbar is absent.}
+    - {step: 26, expectation: Terminal is usable after the second exit.}
+    - {step: 27, expectation: Second overlay is gone.}
+    - {step: 28, expectation: The original terminal remains the only pane.}
+    - {step: 29, expectation: No runtime errors occurred during repeated opens.}
+    results: [23, 24, 26, 27, 28, 29]
   visual:
   - check: Observable capture UI and operation results
     method: automated

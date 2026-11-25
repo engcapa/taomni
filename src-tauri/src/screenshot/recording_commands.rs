@@ -21,6 +21,7 @@ use crate::screenshot::window_lifecycle::focus_capture_window;
 use crate::screenshot::window_lifecycle::hide_app_windows;
 use crate::screenshot::window_lifecycle::restore_app_windows;
 use crate::screenshot::window_lifecycle::restore_app_windows_for_preview;
+use crate::state::AppState;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tauri::AppHandle;
@@ -44,6 +45,9 @@ pub async fn screenshot_start_recording(
 ) -> Result<RecordingStarted, String> {
     let format = record::RecordFormat::parse(&format).map_err(internal_error)?;
     let region = recording_region(x, y, width, height)?;
+    // Fail before acquiring the desktop capture lease or opening its windows.
+    // The worker selects the encoder again when it begins the recording.
+    record::select_recording_encoder(&app.state::<AppState>().plugins).map_err(internal_error)?;
     if STARTING_RECORDING.swap(true, Ordering::SeqCst) {
         return Err("screen recording is already starting".into());
     }

@@ -1,0 +1,94 @@
+id: TC-MODULES-019
+title: Module proxy modes persist independently across Settings reopening and renderer reload
+description: >-
+  Exercise the production module connection selector and reused manual proxy
+  editor. Preserve host, port and username while switching application/custom/
+  direct modes, closing Settings and reloading. Browser uses an explicit local
+  preview model; native reads and writes its isolated on-disk module settings.
+  Real application/session/Vault resolution, authenticated HTTP proxy routing,
+  poisoned environment bypass and fail-closed behavior are separate native
+  GitHub core harness contracts, not established by the preview model.
+covers: [F-Modules-1]
+tags: [p1, modules, network, lifecycle]
+modes: [browser, native]
+fixtures: [reset_db]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-network-settings"] [data-testid="module-network-mode"]'
+- select_option: {selector: '[data-testid="module-network-mode"]', value: custom}
+- wait_for: '[data-testid="module-network-custom"]'
+- fill: {selector: '[data-testid="module-network-custom"] input[aria-label="Proxy host"]', value: '127.0.0.1'}
+- fill: {selector: '[data-testid="module-network-custom"] input[aria-label="Port"]', value: '9'}
+- fill: {selector: '[data-testid="module-network-custom"] input[aria-label="Username (optional)"]', value: module-user}
+- wait_for: '[data-testid="module-network-save-status"][data-state="saved"]'
+- select_option: {selector: '[data-testid="module-network-mode"]', value: none}
+- wait_for: '[data-testid="module-network-save-status"][data-state="saved"]'
+- assert_count: {selector: '[data-testid="module-network-custom"]', equal: 0}
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-network-mode"]:has(option[value="none"]:checked)'
+- select_option: {selector: '[data-testid="module-network-mode"]', value: app}
+- wait_for: '[data-testid="module-network-save-status"][data-state="saved"]'
+- select_option: {selector: '[data-testid="module-network-mode"]', value: custom}
+- wait_for: '[data-testid="module-network-custom"]'
+- assert_attribute: {selector: '[data-testid="module-network-custom"] input[aria-label="Proxy host"]', name: value, equals: '127.0.0.1'}
+- assert_attribute: {selector: '[data-testid="module-network-custom"] input[aria-label="Port"]', name: value, equals: '9'}
+- assert_attribute: {selector: '[data-testid="module-network-custom"] input[aria-label="Username (optional)"]', name: value, equals: module-user}
+- click: '[data-testid="tab-item"][data-tab-type="settings"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="settings-panel"]', state: detached}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-network-custom"]'
+- assert_attribute: {selector: '[data-testid="module-network-custom"] input[aria-label="Proxy host"]', name: value, equals: '127.0.0.1'}
+- assert_count: {selector: '[data-testid="module-network-mode"]', equal: 1}
+- assert_count: {selector: '[data-testid="module-downloads"]', equal: 1}
+- select_option: {selector: '[data-testid="module-network-mode"]', value: app}
+- wait_for: '[data-testid="module-network-save-status"][data-state="saved"]'
+- assert_count: {selector: '[data-testid="module-network-custom"]', equal: 0}
+- assert_no_runtime_errors: null
+- screenshot: module-independent-proxy-settings.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Direct mode persists after renderer reload and hides the independent editor.
+    actions: [7, 9, 10, 11, 13, 16, 18, 19]
+    checkpoints:
+    - {step: 12, expectation: All independent fields were saved.}
+    - {step: 15, expectation: Direct mode hides the independent editor.}
+    - {step: 20, expectation: Reload selects the persisted direct mode.}
+    results: [12, 15, 20]
+  - id: R2
+    requirement: Independent fields survive mode switches and Settings closure.
+    actions: [21, 23, 28, 30, 31]
+    checkpoints:
+    - {step: 25, expectation: The independently saved host remains intact.}
+    - {step: 26, expectation: The independent port remains intact.}
+    - {step: 27, expectation: The independent username remains intact.}
+    - {step: 33, expectation: Reopening Settings restores the independent host.}
+    results: [25, 26, 27, 33]
+  - id: R3
+    requirement: Settings has a single connection editor and download projection and returns to the default application route.
+    actions: [36]
+    checkpoints:
+    - {step: 34, expectation: Only one connection editor exists.}
+    - {step: 35, expectation: Only one download projection exists.}
+    - {step: 37, expectation: The default application route is durably saved.}
+    - {step: 38, expectation: The independent editor is hidden.}
+    - {step: 39, expectation: No unhandled runtime errors occurred.}
+    results: [34, 35, 37, 38, 39]
+  native:
+  - check: Native Settings persistence and real network proxy resolution.
+    method: external
+    reason: Native mode proves on-disk renderer reload; GitHub module-network core contracts separately check Vault authentication, fail-closed resolution and environment bypass.
+  visual:
+  - check: Connection selector, independent fields and download task section are readable.
+    method: manual
+    reason: The retained screenshot supports visual review.

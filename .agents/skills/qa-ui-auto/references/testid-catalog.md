@@ -159,6 +159,8 @@
 
 - `[data-testid="chat-voice-button"]` — interactive — F-AI-2.3.chat-voice-button
 - `[data-testid="chat-voice-button-cancel"]` — interactive — F-AI-2.3.chat-voice-cancel
+- `[data-testid="voice-open-module-store"]` — interactive — F-AI-2.3.local-voice-module-store
+- `[data-testid="voice-dictation-error"]` — display — F-AI-2.3.voice-dictation-error
 - `[data-testid="voice-settings-close"]` — interactive — F-AI-2.3.voice-settings-close
 - `[data-testid="voice-settings-dialog"]` — display — F-AI-2.3.voice-settings-dialog
 - `[data-testid="asr-installation-progress"]` — display — F-AI-2.3.asr-installation-progress
@@ -1349,6 +1351,7 @@
 - `[data-testid="explorer-context-copy-path"]` — interactive — F-EXPLORER-1.explorer-context-copy-path
 - `[data-testid="explorer-context-cut"]` — interactive — F-EXPLORER-1.explorer-context-cut
 - `[data-testid="explorer-context-delete"]` — interactive — F-EXPLORER-1.explorer-context-delete
+- `[data-testid="explorer-context-open-with"]` — interactive — F-EXPLORER-1.explorer-context-open-with
 - `[data-testid="explorer-context-new-file"]` — interactive — F-EXPLORER-1.explorer-context-new-file
 - `[data-testid="explorer-context-new-folder"]` — interactive — F-EXPLORER-1.explorer-context-new-folder
 - `[data-testid="explorer-context-newtab"]` — interactive — F-EXPLORER-1.explorer-context-newtab
@@ -1383,6 +1386,14 @@
   ↳ `[data-testid="explorer-nav-node"]${fixture.explorer_source_match} button` — alias
 - `[data-testid="explorer-nav-shortcut"]` — interactive — F-EXPLORER-1.explorer-nav-shortcut
 - `[data-testid="explorer-nav-tree"]` — display — F-EXPLORER-1.explorer-nav-tree
+- `[data-testid="explorer-new-typed-file"]` — interactive — F-EXPLORER-1.explorer-new-typed-file
+- `[data-testid="explorer-context-new-typed-file"]` — interactive — F-EXPLORER-1.explorer-context-new-typed-file
+- `[data-testid="explorer-new-file-dialog"]` — display — F-EXPLORER-1.explorer-new-file-dialog
+- `[data-testid="explorer-new-file-type"]` — interactive — F-EXPLORER-1.explorer-new-file-type
+- `[data-testid="explorer-new-file-name"]` — interactive — F-EXPLORER-1.explorer-new-file-name
+- `[data-testid="explorer-new-file-error"]` — display — F-EXPLORER-1.explorer-new-file-error
+- `[data-testid="explorer-new-file-cancel"]` — interactive — F-EXPLORER-1.explorer-new-file-cancel
+- `[data-testid="explorer-new-file-create"]` — interactive — F-EXPLORER-1.explorer-new-file-create
 - `[data-testid="explorer-new-file"]` — interactive — F-EXPLORER-1.explorer-new-file
 - `[data-testid="explorer-new-file-md"]` — interactive — F-EXPLORER-1.explorer-new-file-md
 - `[data-testid="explorer-new-file-html"]` — interactive — F-EXPLORER-1.explorer-new-file-html
@@ -1797,6 +1808,8 @@
 ## mail/compose (F-MAIL-1)
 
 - `[data-testid="mail-client-tab"]` — display — F-MAIL-1.mail-client-tab
+  ↳ `[data-plugin-slug="mail"] [data-testid="mail-client-tab"]` — alias
+  ↳ `[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]` — alias
 - `[data-testid="mail-compose-open"]` — interactive — F-MAIL-1.compose-open
 - `[data-testid="mail-compose-dialog"]` — display — F-MAIL-1.compose-dialog
 - `[data-testid="mail-recipient-to"]` — interactive — F-MAIL-1.recipient-to
@@ -1936,6 +1949,9 @@
 
 ## mail/folders (F-MAIL-11)
 
+- `[data-testid="context-menu-item-new-subfolder"]` — interactive — F-MAIL-11.mail-new-subfolder
+- `[data-testid="context-menu-item-rename-folder"]` — interactive — F-MAIL-11.mail-rename-folder
+- `[data-testid="context-menu-item-delete-folder"]` — interactive — F-MAIL-11.mail-delete-folder
 - `[data-testid="mail-subscriptions-open"]` — interactive — F-MAIL-11.subscriptions-open
 - `[data-testid="mail-subscriptions-dialog"]` — display — F-MAIL-11.subscriptions-dialog
 - `[role="dialog"][aria-label="Folder subscriptions"] [aria-label="Close dialog"]` — interactive — F-MAIL-11.subscriptions-close
@@ -1959,6 +1975,8 @@
 ## mail/lists (F-MAIL-14)
 
 - `[data-testid="mail-unsubscribe"]` — interactive — F-MAIL-14.unsubscribe
+- `[data-testid="context-menu-item-import-messages-mbox-eml"]` — interactive — F-MAIL-14.import-messages
+- `[data-testid="context-menu-item-export-as-mbox"]` — interactive — F-MAIL-14.export-mbox
 
 ## mail/organize (F-MAIL-8)
 
@@ -1972,6 +1990,7 @@
 
 - `[data-testid="mail-incoming-protocol"]` — interactive [optional] — F-MAIL-17.incoming-protocol
 - `[data-testid="mail-pop3-leave-days"]` — interactive [optional] — F-MAIL-17.pop3-leave-days
+- `[data-testid="mail-reader-text"]` — display — F-MAIL-17.received-text
 
 ## mail/search (F-MAIL-7)
 
@@ -1995,10 +2014,19 @@
 
 ## mail/storage (F-MAIL-23)
 
+- `[data-testid="context-menu-item-view-source"]` — interactive — F-MAIL-23.mail-view-source
+- `[data-testid="context-menu-item-save-as-eml"]` — interactive — F-MAIL-23.mail-save-eml
+- `[data-testid="context-menu-item-save-attachment-as"]` — interactive — F-MAIL-23.mail-save-attachment-as
+- `[role="dialog"][aria-label="Message source"]` — display — F-MAIL-23.mail-source-dialog
 - `[data-testid="mail-storage-settings"]` — display — F-MAIL-23.mail-storage-settings
 - `[data-testid="mail-storage-directory"]` — interactive — F-MAIL-23.mail-storage-directory
 - `[data-testid="mail-storage-browse"]` — interactive — F-MAIL-23.mail-storage-browse
 - `[data-testid="mail-storage-mode"]` — interactive — F-MAIL-23.mail-storage-mode
+- `[data-testid="mail-cache-attachments"]` — interactive — F-MAIL-23.mail-cache-attachments
+- `[data-testid="mail-cache-enabled"]` — interactive — F-MAIL-23.mail-cache-enabled
+- `input[aria-label="Mail recent body limit"]` — interactive — F-MAIL-23.mail-recent-body-limit
+- `input[aria-label="Mail sync interval minutes"]` — interactive — F-MAIL-23.mail-sync-interval
+- `input[aria-label="Mail max fetch per sync"]` — interactive — F-MAIL-23.mail-sync-fetch-limit
 - `[data-testid="mail-storage-folders"]` — interactive — F-MAIL-23.mail-storage-folders
 - `[data-testid="mail-storage-folder-names"]` — interactive — F-MAIL-23.mail-storage-folder-names
 - `[data-testid="mail-storage-edit-folders"]` — interactive — F-MAIL-23.mail-storage-edit-folders
@@ -2058,6 +2086,8 @@
 ## mail/sync (F-MAIL-3)
 
 - `[data-testid="mail-sync-button"]` — interactive — F-MAIL-3.sync-button
+- `button[title="Clear this account cache"]` — interactive — F-MAIL-3.clear-account-cache
+- `[data-testid="mail-test-connection"]` — interactive — F-MAIL-3.test-connection
 - `[data-testid="mail-body-warming-progress"]` — display [optional] — F-MAIL-3.body-warming-progress
 - `[data-testid="mail-mark-folder-read"]` — interactive — F-MAIL-3.mark-folder-read
 
@@ -2076,6 +2106,7 @@
 - `[data-testid="sidebar-tool-mail-unified"]` — interactive — F-MAIL-20.open-unified
 - `[data-testid="context-menu-item-mail-unified"]` — interactive [optional] — F-MAIL-20.open-unified-menu
 - `[data-testid="mail-unified-tab"]` — display — F-MAIL-20.unified-tab
+  ↳ `[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="mail-unified-tab"]` — alias
 - `[data-testid="mail-unified-refresh"]` — interactive — F-MAIL-20.unified-refresh
 - `[data-testid="mail-unified-status"]` — display — F-MAIL-20.unified-status
 - `[data-testid="mail-unified-row"]` — interactive — F-MAIL-20.unified-row
@@ -2125,6 +2156,10 @@
 - `[data-testid="detached-session-window"]` — display [optional] — F-Detach-1.detached-window
 - `[data-testid="detached-reattach"]` — interactive [optional] — F-Detach-1.detached-reattach
 - `[data-testid="detached-os-fullscreen"]` — interactive [optional] — F-Detach-1.detached-os-fullscreen
+- `[data-testid="plugin-tab-detach"]` — interactive — F-Detach-1.plugin-tab-detach
+- `[data-testid="plugin-detached-window"]` — display — F-Detach-1.plugin-detached-window
+- `[data-testid="plugin-tab-reattach"]` — interactive — F-Detach-1.plugin-tab-reattach
+- `[data-testid="plugin-tab-returned"]` — display [optional] — F-Detach-1.plugin-tab-returned
 
 ## main/menubar (F1.8)
 
@@ -2239,6 +2274,7 @@
 ## main/welcome (F1.6)
 
 - `[data-testid="welcome-panel"]` — display — F1.6.panel-root
+- `[data-testid="welcome-browse-modules"]` — interactive — F1.6.browse-modules
 - `[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]` — interactive — F1.6.open-local-terminal
 - `select[aria-label="Terminal shell"]` — interactive [optional] — F1.6.shell-select
 - `[data-testid="tao-home-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
@@ -2304,8 +2340,6 @@
 - `[data-testid="home-open-mail"]` — interactive — F-WS-1.home-open-mail
 - `[data-testid="home-open-network-tools"]` — interactive — F-WS-1.home-open-network-tools
 - `[data-testid="home-open-mfa"]` — interactive — F-WS-1.home-open-mfa
-- `[data-testid="welcome-open-lanchat"]` — interactive — F-WS-1.welcome-open-lanchat
-- `[data-testid="lanchat-roster-panel"]` — display — F-WS-1.lanchat-roster-panel
 - `[data-testid="platform-toolbar-actions"]` — display — F-WS-1.platform-toolbar-actions
 - `[data-testid="home-toolbar-workspaces"]` — interactive — F-WS-1.home-toolbar-workspaces
 - `[data-testid="home-toolbar-sessions"]` — interactive — F-WS-1.home-toolbar-sessions
@@ -2529,9 +2563,11 @@
 - `[data-testid="mfa-floating-account"]` — interactive — F-WS-3.mfa-floating-account
 - `[data-testid="mfa-floating-close"]` — interactive — F-WS-3.mfa-floating-close
 - `[data-testid="mfa-floating-drag-handle"]` — interactive — F-WS-3.mfa-floating-drag-handle
+- `[data-testid="mfa-floating-entry"]` — display — F-WS-3.mfa-floating-entry
 - `[data-testid="mfa-floating-expand-tab"]` — interactive — F-WS-3.mfa-floating-expand-tab
 - `[data-testid="mfa-floating-locked"]` — display — F-WS-3.mfa-floating-locked
 - `[data-testid="mfa-floating-pin"]` — interactive — F-WS-3.mfa-floating-pin
+- `[data-testid="mfa-floating-code"]` — display — F-WS-3.mfa-floating-code
 - `[data-testid="mfa-floating-search"]` — interactive — F-WS-3.mfa-floating-search
 - `[data-testid="mfa-floating-window"]` — display — F-WS-3.mfa-floating-window
 - `[data-testid="rail-bottom-tools"]` — display — F-WS-3.rail-bottom-tools
@@ -2800,13 +2836,275 @@
 - `[data-testid="feishu-status"]` — display — F-MOBILE-2.feishu-status
 - `[data-testid="feishu-error"]` — display — F-MOBILE-2.feishu-error
 
+## modules/core-startup (F-Modules-1)
+
+- `[data-testid="module-marketplace"]` — display — F-Modules-1.module-marketplace
+- `[data-testid="module-marketplace-search"]` — interactive — F-Modules-1.module-marketplace-search
+- `[data-testid="module-marketplace-refresh"]` — interactive — F-Modules-1.module-marketplace-refresh
+- `[data-testid="module-marketplace-source-toggle"]` — interactive — F-Modules-1.module-marketplace-source-toggle
+- `[data-testid="module-marketplace-source"]` — interactive — F-Modules-1.module-marketplace-source
+- `[data-testid="module-marketplace-loading"]` — display [optional] — F-Modules-1.module-marketplace-loading
+- `[data-testid="module-marketplace-error"]` — display — F-Modules-1.module-marketplace-error
+  ↳ `xpath=//*[@data-testid="module-marketplace-error"][contains(., "older than the highest seen")]` — alias
+- `[data-testid="module-marketplace-checked"]` — display — F-Modules-1.module-marketplace-checked
+- `[data-testid="module-marketplace-empty"]` — display — F-Modules-1.module-marketplace-empty
+- `[data-testid="module-marketplace-card"]` — display — F-Modules-1.module-marketplace-card
+- `[data-testid="module-marketplace-installed"]` — display — F-Modules-1.module-marketplace-installed
+- `[data-testid="module-marketplace-unavailable"]` — display [optional] — F-Modules-1.module-marketplace-unavailable
+- `[data-testid="module-marketplace-task"]` — display — F-Modules-1.module-marketplace-task
+- `[data-testid="module-marketplace-action-error"]` — display [optional] — F-Modules-1.module-marketplace-action-error
+- `[data-testid="module-marketplace-current"]` — display — F-Modules-1.module-marketplace-current
+  ↳ `[data-module-id="taomni-plugin-rdp-client"] [data-testid="module-marketplace-current"]` — alias
+  ↳ `[data-module-id="taomni-plugin-rdp-server"] [data-testid="module-marketplace-current"]` — alias
+  ↳ `[data-module-id="taomni-plugin-vnc-client"] [data-testid="module-marketplace-current"]` — alias
+  ↳ `[data-module-id="taomni-plugin-vnc-server"] [data-testid="module-marketplace-current"]` — alias
+  ↳ `[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-current"]` — alias
+  ↳ `[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-current"]` — alias
+  ↳ `[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-current"]` — alias
+  ↳ `[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-current"]` — alias
+  ↳ `[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-current"]` — alias
+- `[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]` — display — F-Modules-1.module-marketplace-mfa-current
+- `[data-testid="module-marketplace-update"]` — display — F-Modules-1.module-marketplace-update
+  ↳ `[data-module-id="taomni-plugin-rdp-client"] [data-testid="module-marketplace-update"]` — alias
+  ↳ `[data-module-id="taomni-plugin-rdp-server"] [data-testid="module-marketplace-update"]` — alias
+  ↳ `[data-module-id="taomni-plugin-vnc-client"] [data-testid="module-marketplace-update"]` — alias
+  ↳ `[data-module-id="taomni-plugin-vnc-server"] [data-testid="module-marketplace-update"]` — alias
+  ↳ `[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-update"]` — alias
+  ↳ `[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-update"]` — alias
+  ↳ `[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-update"]` — alias
+  ↳ `[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-update"]` — alias
+  ↳ `[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-update"]` — alias
+  ↳ `[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-update"]` — alias
+- `[data-testid="module-marketplace-new"]` — display — F-Modules-1.module-marketplace-new
+- `[data-testid="module-release-notice"]` — display — F-Modules-1.module-release-notice
+- `[data-testid="module-release-new"]` — display — F-Modules-1.module-release-new
+- `[data-testid="module-release-new-item"]` — display — F-Modules-1.module-release-new-item
+- `[data-testid="module-release-mfa"]` — display — F-Modules-1.module-release-mfa
+- `[data-testid="module-release-open-store"]` — interactive — F-Modules-1.module-release-open-store
+- `[data-testid="module-release-later"]` — interactive — F-Modules-1.module-release-later
+- `[data-testid="module-release-legacy"]` — display [optional] — F-Modules-1.module-release-legacy
+- `[data-testid="module-marketplace-provision"]` — interactive [optional] — F-Modules-1.module-marketplace-provision
+- `[data-testid="module-marketplace-mail-import-failed"]` — display — F-Modules-1.module-marketplace-mail-import-failed
+- `[data-testid="module-marketplace-review"]` — interactive — F-Modules-1.module-marketplace-review
+  ↳ `[data-module-id="taomni-plugin-rdp-client"] [data-testid="module-marketplace-review"]` — alias
+  ↳ `[data-module-id="taomni-plugin-rdp-server"] [data-testid="module-marketplace-review"]` — alias
+  ↳ `[data-module-id="taomni-plugin-vnc-client"] [data-testid="module-marketplace-review"]` — alias
+  ↳ `[data-module-id="taomni-plugin-vnc-server"] [data-testid="module-marketplace-review"]` — alias
+  ↳ `[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-review"]` — alias
+  ↳ `[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-review"]` — alias
+  ↳ `[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-review"]` — alias
+  ↳ `[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-review"]` — alias
+  ↳ `[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-review"]` — alias
+  ↳ `[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-review"]` — alias
+- `[data-testid="module-marketplace-download"]` — interactive — F-Modules-1.module-marketplace-download
+  ↳ `[data-module-id="taomni-plugin-rdp-client"] [data-testid="module-marketplace-download"]` — alias
+  ↳ `[data-module-id="taomni-plugin-rdp-server"] [data-testid="module-marketplace-download"]` — alias
+  ↳ `[data-module-id="taomni-plugin-vnc-client"] [data-testid="module-marketplace-download"]` — alias
+  ↳ `[data-module-id="taomni-plugin-vnc-server"] [data-testid="module-marketplace-download"]` — alias
+  ↳ `[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-download"]` — alias
+  ↳ `[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-download"]` — alias
+  ↳ `[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-download"]` — alias
+  ↳ `[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-download"]` — alias
+  ↳ `[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-download"]` — alias
+  ↳ `[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-download"]` — alias
+- `[data-testid="module-network-settings"]` — display — F-Modules-1.module-network-settings
+- `[data-testid="module-network-mode"]` — interactive — F-Modules-1.module-network-mode
+- `[data-testid="module-network-custom"]` — display — F-Modules-1.module-network-custom
+- `[data-testid="module-network-save-status"]` — display — F-Modules-1.module-network-save-status
+- `[data-testid="module-network-retry"]` — interactive — F-Modules-1.module-network-retry
+- `[data-testid="module-downloads"]` — display — F-Modules-1.module-downloads
+- `[data-testid="module-downloads-empty"]` — display — F-Modules-1.module-downloads-empty
+- `[data-testid="module-downloads-error"]` — display [optional] — F-Modules-1.module-downloads-error
+- `[data-testid="module-download-recovery-error"]` — display — F-Modules-1.module-download-recovery-error
+- `[data-testid="module-download-task"]` — display — F-Modules-1.module-download-task
+- `[data-testid="module-download-phase"]` — display — F-Modules-1.module-download-phase
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-known"][data-phase="downloading"] [data-testid="module-download-phase"]` — alias
+- `[data-testid="module-download-progress"]` — display — F-Modules-1.module-download-progress
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-progress"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-progress"]` — alias
+- `[data-testid="module-download-bytes"]` — display — F-Modules-1.module-download-bytes
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-bytes"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-bytes"]` — alias
+- `[data-testid="module-download-error"]` — display — F-Modules-1.module-download-error
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-error"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-error"]` — alias
+- `[data-testid="module-download-cancel"]` — interactive — F-Modules-1.module-download-cancel
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-cancel"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-cancel"]` — alias
+- `[data-testid="module-download-resume"]` — interactive — F-Modules-1.module-download-resume
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-resume"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-resume"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-resume"]` — alias
+- `[data-testid="module-download-forget"]` — interactive — F-Modules-1.module-download-forget
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-forget"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-forget"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-forget"]` — alias
+- `[data-testid="context-menu-item-lan-chat"]` — display — F-Modules-1.removed-lanchat-context-entry
+- `[data-testid="welcome-open-lanchat"]` — display — F-Modules-1.removed-lanchat-welcome-entry
+- `[data-testid="tao-home-lan-chat"]` — display — F-Modules-1.removed-lanchat-home-card
+- `[data-testid="module-store-panel"]` — display — F-Modules-1.module-store-panel
+- `[data-testid="status-sockscap-recovery"]` — interactive [optional] — F-Modules-1.status-sockscap-recovery
+- `[data-testid="module-sockscap-recovery"]` — display [optional] — F-Modules-1.module-sockscap-recovery
+- `[data-testid="module-sockscap-recover"]` — interactive [optional] — F-Modules-1.module-sockscap-recover
+- `[data-testid="module-store-core-api"]` — display — F-Modules-1.module-store-core-api
+- `[data-testid="module-store-empty"]` — display — F-Modules-1.module-store-empty
+- `[data-testid="module-store-catalog-error"]` — display — F-Modules-1.module-store-catalog-error
+- `[data-testid="module-store-loading"]` — display — F-Modules-1.module-store-loading
+- `[data-testid="module-upgrade-status"]` — display — F-Modules-1.module-upgrade-status
+- `[data-testid="module-upgrade-candidates"]` — display — F-Modules-1.module-upgrade-candidates
+  ↳ `[data-testid="module-upgrade-candidates"] li` — alias
+- `[data-testid="module-upgrade-empty"]` — display — F-Modules-1.module-upgrade-empty
+- `[data-testid="module-upgrade-error"]` — display — F-Modules-1.module-upgrade-error
+- `[data-testid="module-upgrade-migrate"]` — interactive — F-Modules-1.module-upgrade-migrate
+  ↳ `[data-testid="module-upgrade-migrate"]:not([disabled])` — alias
+- `[data-testid="module-upgrade-pending"]` — display — F-Modules-1.module-upgrade-pending
+- `[data-testid="module-upgrade-retained"]` — display — F-Modules-1.module-upgrade-retained
+- `[data-testid="module-upgrade-mfa-open"]` — interactive — F-Modules-1.module-upgrade-mfa-open
+- `[data-testid="module-upgrade-mfa-form"]` — display — F-Modules-1.module-upgrade-mfa-form
+- `[data-testid="module-upgrade-mfa-archive"]` — interactive — F-Modules-1.module-upgrade-mfa-archive
+- `[data-testid="module-upgrade-mfa-signature"]` — interactive — F-Modules-1.module-upgrade-mfa-signature
+- `[data-testid="module-upgrade-mfa-choose-archive"]` — interactive — F-Modules-1.module-upgrade-mfa-choose-archive
+- `[data-testid="module-upgrade-mfa-choose-signature"]` — interactive — F-Modules-1.module-upgrade-mfa-choose-signature
+- `[data-testid="module-upgrade-mfa-password"]` — interactive — F-Modules-1.module-upgrade-mfa-password
+- `[data-testid="module-upgrade-mfa-submit"]` — interactive — F-Modules-1.module-upgrade-mfa-submit
+  ↳ `[data-testid="module-upgrade-mfa-submit"][disabled]` — alias
+  ↳ `[data-testid="module-upgrade-mfa-submit"]:not([disabled])` — alias
+- `[data-testid="module-upgrade-mfa-cancel"]` — interactive — F-Modules-1.module-upgrade-mfa-cancel
+- `[data-testid="module-upgrade-mfa-error"]` — display — F-Modules-1.module-upgrade-mfa-error
+- `[data-testid="module-upgrade-mfa-result"]` — display — F-Modules-1.module-upgrade-mfa-result
+  ↳ `[data-testid="module-upgrade-mfa-result"][data-state="complete"]` — alias
+- `[data-testid="module-offline-install"]` — display — F-Modules-1.module-offline-install
+- `[data-testid="module-offline-archive"]` — interactive — F-Modules-1.module-offline-archive
+- `[data-testid="module-offline-choose"]` — interactive — F-Modules-1.module-offline-choose
+- `[data-testid="module-offline-signature"]` — interactive — F-Modules-1.module-offline-signature
+- `[data-testid="module-offline-submit"]` — interactive — F-Modules-1.module-offline-submit
+- `[data-testid="module-offline-error"]` — display — F-Modules-1.module-offline-error
+- `[data-testid="module-offline-status"]` — display — F-Modules-1.module-offline-status
+- `[data-testid="module-offline-refresh-error"]` — display — F-Modules-1.module-offline-refresh-error
+- `[data-testid="module-version-hello-plugin"]` — display — F-Modules-1.module-version-hello-plugin
+- `[data-testid="module-status-hello-plugin"]` — display — F-Modules-1.module-status-hello-plugin
+- `[data-testid="module-action-rollback-hello-plugin"]` — interactive — F-Modules-1.module-action-rollback-hello-plugin
+  ↳ `[data-testid="module-action-rollback-rdp-client"]` — alias
+  ↳ `[data-testid="module-action-rollback-rdp-client"]:enabled` — alias
+  ↳ `[data-testid="module-action-rollback-rdp-server"]` — alias
+  ↳ `[data-testid="module-action-rollback-rdp-server"]:enabled` — alias
+  ↳ `[data-testid="module-action-rollback-vnc-client"]` — alias
+  ↳ `[data-testid="module-action-rollback-vnc-client"]:enabled` — alias
+  ↳ `[data-testid="module-action-rollback-vnc-server"]` — alias
+  ↳ `[data-testid="module-action-rollback-vnc-server"]:enabled` — alias
+  ↳ `[data-testid="module-action-rollback-mfa"]` — alias
+  ↳ `[data-testid="module-action-rollback-servers"]` — alias
+  ↳ `[data-testid="module-action-rollback-sockscap"]` — alias
+  ↳ `[data-testid="module-action-rollback-screenshot"]` — alias
+  ↳ `[data-testid="module-action-rollback-ai-voice-local"]` — alias
+  ↳ `[data-testid="module-action-rollback-mail"]` — alias
+- `[data-testid="module-action-enable-hello-plugin"]` — interactive — F-Modules-1.module-action-enable-hello-plugin
+  ↳ `[data-testid="module-action-enable-mfa"]` — alias
+  ↳ `[data-testid="module-action-enable-vnc-client"]` — alias
+  ↳ `[data-testid="module-action-enable-vnc-server"]` — alias
+  ↳ `[data-testid="module-action-enable-rdp-client"]` — alias
+  ↳ `[data-testid="module-action-enable-rdp-server"]` — alias
+  ↳ `[data-testid="module-action-enable-servers"]` — alias
+  ↳ `[data-testid="module-action-enable-mail"]` — alias
+  ↳ `[data-testid="module-action-enable-screenshot"]` — alias
+  ↳ `[data-testid="module-action-enable-ai-voice-local"]` — alias
+  ↳ `[data-testid="module-action-enable-sockscap"]` — alias
+- `[data-testid="module-status-mfa"]` — display — F-Modules-1.module-status-mfa
+- `[data-testid="module-action-disable-hello-plugin"]` — interactive — F-Modules-1.module-action-disable-hello-plugin
+  ↳ `[data-testid="module-action-disable-mfa"]` — alias
+  ↳ `[data-testid="module-action-disable-vnc-client"]` — alias
+  ↳ `[data-testid="module-action-disable-vnc-server"]` — alias
+  ↳ `[data-testid="module-action-disable-rdp-client"]` — alias
+  ↳ `[data-testid="module-action-disable-rdp-server"]` — alias
+  ↳ `[data-testid="module-action-disable-servers"]` — alias
+  ↳ `[data-testid="module-action-disable-mail"]` — alias
+  ↳ `[data-testid="module-action-disable-screenshot"]` — alias
+  ↳ `[data-testid="module-action-disable-ai-voice-local"]` — alias
+  ↳ `[data-testid="module-action-disable-sockscap"]` — alias
+- `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
+  ↳ `[data-testid="module-action-uninstall-rdp-client"]:enabled` — alias
+  ↳ `[data-testid="module-action-uninstall-rdp-server"]:enabled` — alias
+  ↳ `[data-testid="module-action-uninstall-vnc-client"]:enabled` — alias
+  ↳ `[data-testid="module-action-uninstall-vnc-server"]:enabled` — alias
+  ↳ `[data-testid="module-action-uninstall-mfa"]` — alias
+  ↳ `[data-testid="module-action-uninstall-mail"]` — alias
+  ↳ `[data-testid="module-action-uninstall-servers"]` — alias
+  ↳ `[data-testid="module-action-uninstall-sockscap"]` — alias
+  ↳ `[data-testid="module-action-uninstall-screenshot"]` — alias
+  ↳ `[data-testid="module-action-uninstall-ai-voice-local"]` — alias
+  ↳ `[data-testid="module-action-uninstall-${fixture.module_roster_remove}"]` — alias
+- `[data-testid="module-action-install-hello-plugin"]` — interactive — F-Modules-1.module-action-install-hello-plugin
+  ↳ `[data-testid="module-action-install-rdp-client"]` — alias
+  ↳ `[data-testid="module-action-install-rdp-server"]` — alias
+  ↳ `[data-testid="module-action-install-vnc-client"]` — alias
+  ↳ `[data-testid="module-action-install-vnc-server"]` — alias
+  ↳ `[data-testid="module-action-install-mfa"]` — alias
+  ↳ `[data-testid="module-action-install-mail"]` — alias
+  ↳ `[data-testid="module-action-install-servers"]` — alias
+  ↳ `[data-testid="module-action-install-sockscap"]` — alias
+  ↳ `[data-testid="module-action-install-screenshot"]` — alias
+  ↳ `[data-testid="module-action-install-ai-voice-local"]` — alias
+  ↳ `[data-testid="module-action-install-${fixture.module_roster_remove}"]` — alias
+- `[data-testid="module-delete-data-hello-plugin"]` — interactive — F-Modules-1.module-delete-data-hello-plugin
+- `[data-testid="module-data-retained-hello-plugin"]` — display — F-Modules-1.module-data-retained-hello-plugin
+  ↳ `[data-testid="module-data-retained-rdp-client"]` — alias
+  ↳ `[data-testid="module-data-retained-rdp-server"]` — alias
+  ↳ `[data-testid="module-data-retained-vnc-client"]` — alias
+  ↳ `[data-testid="module-data-retained-vnc-server"]` — alias
+  ↳ `[data-testid="module-data-retained-mfa"]` — alias
+  ↳ `[data-testid="module-data-retained-servers"]` — alias
+  ↳ `[data-testid="module-data-retained-sockscap"]` — alias
+  ↳ `[data-testid="module-data-retained-mail"]` — alias
+- `[data-testid="module-action-open-hello-plugin-hello-plugin"]` — interactive — F-Modules-1.module-action-open-hello-plugin
+- `[data-testid="plugin-tab-panel"]` — display — F-Modules-1.plugin-tab-panel
+- `[data-testid="plugin-tab-unavailable"]` — display — F-Modules-1.plugin-tab-unavailable
+  ↳ `[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]` — alias
+  ↳ `[data-plugin-slug="rdp-server"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
+  ↳ `[data-plugin-slug="rdp-server"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]` — alias
+  ↳ `[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]` — alias
+  ↳ `[data-plugin-slug="vnc-server"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
+  ↳ `[data-plugin-slug="vnc-server"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]` — alias
+  ↳ `[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
+  ↳ `[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
+  ↳ `[data-plugin-slug="mfa"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]` — alias
+  ↳ `[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
+  ↳ `[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]` — alias
+  ↳ `[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
+  ↳ `[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]` — alias
+  ↳ `[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
+- `[data-testid="plugin-tab-error"]` — display — F-Modules-1.plugin-tab-error
+- `[data-testid="plugin-tab-retry"]` — interactive — F-Modules-1.plugin-tab-retry
+- `[data-testid="plugin-tab-settings"]` — interactive — F-Modules-1.plugin-tab-settings
+  ↳ `[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-settings"]` — alias
+  ↳ `[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-settings"]` — alias
+  ↳ `[data-plugin-slug="sockscap"] [data-testid="plugin-tab-settings"]` — alias
+  ↳ `[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]` — alias
+- `[data-testid="plugin-tab-loading"]` — display [optional] — F-Modules-1.plugin-tab-loading
+- `[data-testid="hello-plugin-view"]` — display — F-Modules-1.hello-plugin-view
+- `[data-testid="hello-plugin-value"]` — interactive — F-Modules-1.hello-plugin-value
+- `[data-testid="hello-plugin-save"]` — interactive — F-Modules-1.hello-plugin-save
+- `[data-testid="hello-plugin-values"]` — display — F-Modules-1.hello-plugin-values
+- `[data-testid="hello-plugin-empty"]` — display — F-Modules-1.hello-plugin-empty
+- `[data-testid="hello-plugin-error"]` — display [optional] — F-Modules-1.hello-plugin-error
+- `[data-testid="hello-plugin-entry"]` — display — F-Modules-1.hello-plugin-entry
+
 ## network/sockscap (F-Sockscap-1)
 
 - `[data-testid="side-tab-tools"]` — interactive — F-Sockscap-1.tools-side-tab
 - `[data-testid="sidebar-tools-panel"]` — display — F-Sockscap-1.tools-panel
 - `[data-testid="sidebar-tool-sockscap"]` — interactive — F-Sockscap-1.sidebar-entry
+- `[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"]` — display [optional] — F-Sockscap-1.module-panel
 - `[data-testid="sockscap-panel"]` — display — F-Sockscap-1.panel
+  ↳ `[data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]` — alias
+  ↳ `[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]` — alias
+  ↳ `[data-testid="sockscap-panel"][aria-busy="false"]` — alias
 - `[data-testid="sockscap-locked-banner"]` — display [optional] — F-Sockscap-1.locked-banner
+- `[data-testid="sockscap-macos-setup-help"]` — interactive [optional] — F-Sockscap-1.macos-setup-help
+- `[data-testid="sockscap-macos-setup-status"]` — display [optional] — F-Sockscap-1.macos-setup-status
+  ↳ `[data-testid="sockscap-macos-setup-status"][data-installer-source="module"]` — alias
+- `[data-testid="sockscap-macos-setup-close"]` — interactive [optional] — F-Sockscap-1.macos-setup-close
+- `[data-testid="sockscap-macos-setup-install"]` — interactive [optional] — F-Sockscap-1.macos-setup-install
+- `[data-testid="sockscap-macos-setup-error"]` — display [optional] — F-Sockscap-1.macos-setup-error
 - `[data-testid="sockscap-add-profile"]` — interactive — F-Sockscap-1.add-profile
 - `[data-testid="sockscap-start"]` — interactive — F-Sockscap-1.start
 - `[data-testid="sockscap-stop"]` — interactive [optional] — F-Sockscap-1.stop
@@ -2815,6 +3113,14 @@
 - `[data-testid="sockscap-section-profile-toggle"]` — interactive — F-Sockscap-1.profile-section-toggle
 - `[data-testid="sockscap-section-scope-toggle"]` — interactive — F-Sockscap-1.scope-section-toggle
 - `[data-testid="sockscap-section-upstream-toggle"]` — interactive — F-Sockscap-1.upstream-section-toggle
+- `[data-testid="sockscap-upstream-kind"]` — interactive — F-Sockscap-1.upstream-kind
+- `[data-testid="sockscap-upstream-uuid"]` — interactive — F-Sockscap-1.upstream-uuid
+- `[data-testid="sockscap-upstream-uuid-store"]` — interactive — F-Sockscap-1.upstream-uuid-store
+- `[data-testid="sockscap-upstream-host"]` — interactive — F-Sockscap-1.upstream-host
+- `[data-testid="sockscap-upstream-port"]` — interactive — F-Sockscap-1.upstream-port
+- `[data-testid="sockscap-test-upstream"]` — interactive — F-Sockscap-1.test-upstream
+- `[data-testid="sockscap-sharelink-input"]` — interactive [optional] — F-Sockscap-1.share-link
+- `[data-testid="sockscap-sharelink-import"]` — interactive [optional] — F-Sockscap-1.import-share-link
 - `[data-testid="sockscap-section-rules-toggle"]` — interactive — F-Sockscap-1.rules-section-toggle
 - `[data-testid="sockscap-section-test-toggle"]` — interactive — F-Sockscap-1.test-section-toggle
 - `[data-testid="sockscap-section-gfwlist-toggle"]` — interactive — F-Sockscap-1.gfwlist-section-toggle
@@ -2989,6 +3295,10 @@
 
 - `[data-testid="rdp-panel"]` — display — F9.7.panel-root
 - `[data-testid="rdp-status"]` — display — F9.7.status
+- `[data-testid="rdp-panel"] .rdp-overlay` — display — F9.7.status-overlay
+- `[data-testid="rdp-gateway-enabled"]` — interactive — F9.7.gateway-enabled
+- `[data-testid="rdp-gateway-host"]` — interactive — F9.7.gateway-host
+- `[data-testid="rdp-gateway-use-session"]` — interactive — F9.7.gateway-use-session
 - `[data-testid="rdp-canvas"]` — display — F9.7.canvas
 - `.rdp-options-form input[type="number"][min="320"]` — interactive [optional] — F9.7.screen-width
 - `[data-testid="session-section-rdp"]` — interactive [optional] — F9.7.options-section
@@ -3232,6 +3542,12 @@
 
 ## servers (F-Servers-1)
 
+- `[data-testid="server-field-http-root-dir"]` — interactive [optional] — F-Servers-1.server-field-http-root-dir
+- `[data-testid="server-field-ssh-password"]` — interactive [optional] — F-Servers-1.server-field-ssh-password
+- `[data-testid="server-field-ssh-remove-password"]` — interactive [optional] — F-Servers-1.server-field-ssh-remove-password
+- `[data-testid="server-field-ftp-password"]` — interactive [optional] — F-Servers-1.server-field-ftp-password
+- `[data-testid="server-field-ftp-remove-password"]` — interactive [optional] — F-Servers-1.server-field-ftp-remove-password
+- `[data-testid="server-field-ssh-root-dir"]` — interactive [optional] — F-Servers-1.server-field-ssh-root-dir
 - `[data-testid="sidebar-tool-servers"]` — interactive [optional] — F-Servers-1.sidebar-tool-servers
 - `[data-testid="servers-tab-panel"]` — display [optional] — F-Servers-1.servers-tab-panel
 - `[data-testid="tab-item"][data-tab-type="servers"]` — display [optional] — F-Servers-1.tab-servers
@@ -3248,6 +3564,14 @@
 - `[data-testid="server-row-ftp"]` — interactive [optional] — F-Servers-1.server-row-ftp
 - `[data-testid="server-row-http"]` — interactive [optional] — F-Servers-1.server-row-http
 - `[data-testid="server-row-rdp"]` — interactive [optional] — F-Servers-1.server-row-rdp
+- `[data-testid="server-row-vnc"]` — interactive [optional] — F-Servers-1.server-row-vnc
+- `[data-testid="server-row-vnc-start"]` — interactive [optional] — F-Servers-1.server-row-vnc-start
+- `[data-testid="server-row-vnc-stop"]` — interactive [optional] — F-Servers-1.server-row-vnc-stop
+- `[data-testid="server-row-vnc-settings"]` — interactive [optional] — F-Servers-1.server-row-vnc-settings
+- `[data-testid="server-field-vnc-password"]` — interactive [optional] — F-Servers-1.server-field-vnc-password
+- `[data-testid="server-field-vnc-remove-password"]` — interactive [optional] — F-Servers-1.server-field-vnc-remove-password
+- `[data-testid="server-field-vnc-view-only"]` — interactive [optional] — F-Servers-1.server-field-vnc-view-only
+- `[data-testid="server-field-vnc-shared"]` — interactive [optional] — F-Servers-1.server-field-vnc-shared
 - `[data-testid="server-row-ssh-start"]` — interactive [optional] — F-Servers-1.server-row-ssh-start
 - `[data-testid="server-row-ssh-stop"]` — interactive [optional] — F-Servers-1.server-row-ssh-stop
 - `[data-testid="server-row-ssh-settings"]` — interactive [optional] — F-Servers-1.server-row-ssh-settings
@@ -3581,6 +3905,10 @@
 - `[data-testid="backup-restore-password"]` — interactive — F-BACKUP-1.restore-password
 - `[data-testid="backup-restore-unlock"]` — interactive — F-BACKUP-1.restore-unlock
 - `[data-testid="backup-restore-dialog"]` — display — F-BACKUP-1.restore-dialog
+- `[data-testid="backup-restore-vault-password"]` — interactive — F-BACKUP-1.restore-vault-password
+- `[data-testid="backup-restore-confirm"]` — interactive — F-BACKUP-1.restore-confirm
+- `[data-testid="backup-restore-error"]` — display — F-BACKUP-1.restore-error
+- `[data-testid="backup-restore-staged"]` — display — F-BACKUP-1.restore-staged
 - `[data-testid="backup-range-summary"]` — display — F-BACKUP-1.range-summary
   ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-range-summary"]` — alias
   ↳ `[data-testid="backup-manual"] [data-testid="backup-range-summary"]` — alias
@@ -3589,9 +3917,9 @@
 - `[data-testid="backup-global-includeSessions"]` — interactive — F-BACKUP-1.backup-global-includeSessions
 - `[data-testid="backup-global-includeNotes"]` — interactive — F-BACKUP-1.backup-global-includeNotes
 - `[data-testid="backup-global-includeMfa"]` — interactive — F-BACKUP-1.backup-global-includeMfa
+- `[data-testid="backup-global-includePlugins"]` — interactive — F-BACKUP-1.backup-global-includePlugins
 - `[data-testid="backup-global-includeConfigs"]` — interactive — F-BACKUP-1.backup-global-includeConfigs
 - `[data-testid="backup-global-includeServerCertificates"]` — interactive — F-BACKUP-1.backup-global-includeServerCertificates
-- `[data-testid="backup-global-includeLanchat"]` — interactive — F-BACKUP-1.backup-global-includeLanchat
 - `[data-testid="backup-global-includeMail"]` — interactive — F-BACKUP-1.backup-global-includeMail
 - `[data-testid="backup-global-includeMailOriginals"]` — interactive — F-BACKUP-1.backup-global-includeMailOriginals
 - `[data-testid="backup-global-includeMailAttachments"]` — interactive — F-BACKUP-1.backup-global-includeMailAttachments
@@ -3601,9 +3929,9 @@
 - `[data-testid="backup-local-includeNotes"]` — interactive — F-BACKUP-1.backup-local-includeNotes
 - `[data-testid="backup-local-includeVault"]` — interactive — F-BACKUP-1.backup-local-includeVault
 - `[data-testid="backup-local-includeMfa"]` — interactive — F-BACKUP-1.backup-local-includeMfa
+- `[data-testid="backup-local-includePlugins"]` — interactive — F-BACKUP-1.backup-local-includePlugins
 - `[data-testid="backup-local-includeConfigs"]` — interactive — F-BACKUP-1.backup-local-includeConfigs
 - `[data-testid="backup-local-includeServerCertificates"]` — interactive — F-BACKUP-1.backup-local-includeServerCertificates
-- `[data-testid="backup-local-includeLanchat"]` — interactive — F-BACKUP-1.backup-local-includeLanchat
 - `[data-testid="backup-local-includeLocalHistory"]` — interactive — F-BACKUP-1.backup-local-includeLocalHistory
 - `[data-testid="backup-local-includeMail"]` — interactive — F-BACKUP-1.backup-local-includeMail
 - `[data-testid="backup-local-includeMailOriginals"]` — interactive — F-BACKUP-1.backup-local-includeMailOriginals
@@ -3673,9 +4001,9 @@
 - `[data-testid="backup-cloud-includeNotes"]` — interactive — F-BACKUP-2.backup-cloud-includeNotes
 - `[data-testid="backup-cloud-includeVault"]` — interactive — F-BACKUP-2.backup-cloud-includeVault
 - `[data-testid="backup-cloud-includeMfa"]` — interactive — F-BACKUP-2.backup-cloud-includeMfa
+- `[data-testid="backup-cloud-includePlugins"]` — interactive — F-BACKUP-2.backup-cloud-includePlugins
 - `[data-testid="backup-cloud-includeConfigs"]` — interactive — F-BACKUP-2.backup-cloud-includeConfigs
 - `[data-testid="backup-cloud-includeServerCertificates"]` — interactive — F-BACKUP-2.backup-cloud-includeServerCertificates
-- `[data-testid="backup-cloud-includeLanchat"]` — interactive — F-BACKUP-2.backup-cloud-includeLanchat
 - `[data-testid="backup-cloud-includeLocalHistory"]` — interactive — F-BACKUP-2.backup-cloud-includeLocalHistory
 - `[data-testid="backup-cloud-includeMail"]` — interactive — F-BACKUP-2.backup-cloud-includeMail
 - `[data-testid="backup-cloud-includeMailOriginals"]` — interactive — F-BACKUP-2.backup-cloud-includeMailOriginals
@@ -3885,7 +4213,6 @@
 - `[data-testid="tao-home-new-session"]` — interactive — F1.11.tao-home-new-session
 - `[data-testid="tao-home-new-workspace"]` — interactive — F1.11.tao-home-new-workspace
 - `[data-testid="tao-home-dock-more"]` — interactive — F1.11.tao-home-dock-more
-- `[data-testid="tao-home-lan-chat"]` — display [optional] — F1.11.tao-home-lan-chat
 - `[data-testid="tao-home-search"]` — interactive — F1.11.tao-home-search
 - `[data-testid="tao-home-search-panel"]` — display — F1.11.tao-home-search-panel
 - `[data-testid="tao-home-search-input"]` — interactive — F1.11.tao-home-search-input
@@ -4310,6 +4637,7 @@
 
 ## tunnel (F8.2)
 
+- `[data-testid="sidebar-tool-tunneling"]` — interactive — F8.2.sidebar-entry
 - `[data-testid="tunnel-manager"]` — display — F8.2.panel-root
 - `[data-testid="tunnel-list"]` — display — F8.2.tunnel-list
 - `[data-testid="tunnel-new"]` — interactive — F8.2.new-tunnel
@@ -4387,6 +4715,7 @@
 - `[data-testid="vault-init-button"]` — interactive [optional] — F12.1.init-button
 - `[data-testid="vault-unlock-button"]` — interactive [optional] — F12.1.unlock-button
 - `[data-testid="vault-lock-button"]` — interactive [optional] — F12.1.lock-button
+- `[data-testid="vault-operation-error"]` — display [optional] — F12.1.operation-error
 - `[data-testid="vault-change-master-button"]` — interactive [optional] — F12.1.change-master-button
 - `[data-testid="vault-change-master-form"]` — display [optional] — F12.1.change-master-form
 - `[data-testid="vault-change-master-old"]` — interactive [optional] — F12.1.change-master-old
@@ -4413,6 +4742,7 @@
 ## vnc (F9.6)
 
 - `[data-testid="vnc-panel"]` — display — F9.6.panel-root
+  ↳ `[data-testid="vnc-panel"][data-frontend-source]` — alias
 - `[data-testid="vnc-canvas"]` — display — F9.6.canvas
 - `[data-testid="vnc-scale-toggle"]` — interactive [optional] — F9.6.scale-toggle
 - `[data-testid="vnc-send-cad"]` — interactive [optional] — F9.6.send-ctrl-alt-del

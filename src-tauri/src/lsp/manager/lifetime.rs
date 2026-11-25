@@ -8,7 +8,6 @@ use crate::lsp::LspSessionEntry;
 use crate::lsp::LspSessionStart;
 use crate::lsp::ResolvedDocument;
 use crate::lsp::java_runtime::command_is_jdtls;
-use crate::lsp::java_runtime::prune_stale_jdtls_data_dirs;
 use crate::lsp::java_runtime::resolve_java_for_jdtls_with_sdk;
 use crate::lsp::paths::lsp_session_root;
 use crate::lsp::paths::session_key;
@@ -34,9 +33,6 @@ impl LspManager {
     }
 
     pub fn with_sdk(sdk: Arc<SdkManager>) -> Self {
-        // Drop indexes for projects that no longer exist so the cache dir does not
-        // grow without bound. Off the async path — never blocks startup.
-        std::thread::spawn(prune_stale_jdtls_data_dirs);
         Self {
             sessions: Arc::new(Mutex::new(HashMap::new())),
             last_errors: Arc::new(Mutex::new(HashMap::new())),

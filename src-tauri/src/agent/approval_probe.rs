@@ -139,6 +139,7 @@ pub async fn qa_agent_approval_probe(
         // `tool` claims the thread for the caller on purpose: the effect must
         // still be routed to the window that owns the terminal.
         "own" | "acp" | "tool" => state
+            .core
             .agent
             .thread_windows
             .record(&thread_id, window.label()),
@@ -147,6 +148,7 @@ pub async fn qa_agent_approval_probe(
         // The prompt must therefore fall back to a broadcast that every live
         // window shows.
         "stale" => state
+            .core
             .agent
             .thread_windows
             .record(&thread_id, "qa-destroyed-owner-window"),
@@ -188,11 +190,13 @@ pub async fn qa_agent_approval_probe(
 
     if mode == "tool" {
         state
+            .core
             .agent
             .thread_windows
             .record(&thread_id, window.label());
         let candidate = {
             let tab_windows = state
+                .core
                 .agent
                 .cc_tab_windows
                 .lock()

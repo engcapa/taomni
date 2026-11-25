@@ -3,14 +3,14 @@
 //! An idle pre-barrier stream is retired before a fresh serial source opens.
 
 use super::displays::DisplayInfo;
-use super::permissions::ensure_capture_permission;
-use super::snapshot::ObservedSource;
-use super::snapshot::capture_display;
+use crate::capture::permissions::ensure_capture_permission;
+use crate::capture::snapshot::ObservedSource;
+use crate::capture::snapshot::capture_display;
 use crate::screenshot::startup_timing;
-use crate::servers::rdp::capture::stage_trace;
 use image::RgbaImage;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
+use taomni_capture::engine::stage_trace;
 use tauri::AppHandle;
 use tokio_util::sync::CancellationToken;
 

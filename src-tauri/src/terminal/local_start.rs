@@ -100,12 +100,16 @@ pub(crate) async fn register_routed_terminal(
     };
 
     {
-        let mut terminals = state.terminal.terminals.write().await;
+        let mut terminals = state.core.terminal.terminals.write().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
-        state.mobile.broker.register(&session_id);
-        state.mobile.broker.desktop(&session_id, initial_size);
+        state.legacy.mobile.broker.register(&session_id);
+        state
+            .legacy
+            .mobile
+            .broker
+            .desktop(&session_id, initial_size);
         terminals.insert(session_id.clone(), terminal);
     }
     if let Err(error) = crate::webview_recovery::register_output(
@@ -114,20 +118,26 @@ pub(crate) async fn register_routed_terminal(
         output_generation,
         || {
             add_terminal_output_channel(
-                &state.terminal.terminal_outputs,
+                &state.core.terminal.terminal_outputs,
                 &session_id,
                 on_output,
                 window_label,
             )
         },
     ) {
-        state.terminal.terminals.write().await.remove(&session_id);
+        state
+            .core
+            .terminal
+            .terminals
+            .write()
+            .await
+            .remove(&session_id);
         return Err(error);
     }
 
     let sid = session_id;
-    let terminals = state.terminal.terminals.clone();
-    let outputs = state.terminal.terminal_outputs.clone();
+    let terminals = state.core.terminal.terminals.clone();
+    let outputs = state.core.terminal.terminal_outputs.clone();
     std::thread::spawn(move || {
         read_loop_local(reader, sid.clone(), app_handle, outputs);
         // Drop the route and child after EOF, including a remote network loss.
@@ -163,6 +173,7 @@ pub async fn create_local_terminal(
             .map(std::path::Path::new)
             .unwrap_or(root_path);
         match state
+            .core
             .workspace
             .sdk
             .resolve_environment(root_path, scope_path)
@@ -205,12 +216,16 @@ pub async fn create_local_terminal(
     };
 
     {
-        let mut terminals = state.terminal.terminals.write().await;
+        let mut terminals = state.core.terminal.terminals.write().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
-        state.mobile.broker.register(&session_id);
-        state.mobile.broker.desktop(&session_id, initial_size);
+        state.legacy.mobile.broker.register(&session_id);
+        state
+            .legacy
+            .mobile
+            .broker
+            .desktop(&session_id, initial_size);
         terminals.insert(session_id.clone(), terminal);
     }
     crate::webview_recovery::register_output(
@@ -219,7 +234,7 @@ pub async fn create_local_terminal(
         output_generation,
         || {
             add_terminal_output_channel(
-                &state.terminal.terminal_outputs,
+                &state.core.terminal.terminal_outputs,
                 &session_id,
                 on_output,
                 window.label(),
@@ -229,7 +244,7 @@ pub async fn create_local_terminal(
 
     let sid = session_id.clone();
     let app = app_handle.clone();
-    let outputs = state.terminal.terminal_outputs.clone();
+    let outputs = state.core.terminal.terminal_outputs.clone();
     std::thread::spawn(move || {
         read_loop_local(reader, sid, app, outputs);
     });
@@ -263,7 +278,7 @@ pub async fn create_command_terminal(
     let output_generation = crate::webview_recovery::output_generation(&app_handle, window.label());
     validate_session_id(&session_id)?;
     {
-        let terminals = state.terminal.terminals.read().await;
+        let terminals = state.core.terminal.terminals.read().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
@@ -291,12 +306,16 @@ pub async fn create_command_terminal(
     };
 
     {
-        let mut terminals = state.terminal.terminals.write().await;
+        let mut terminals = state.core.terminal.terminals.write().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
-        state.mobile.broker.register(&session_id);
-        state.mobile.broker.desktop(&session_id, initial_size);
+        state.legacy.mobile.broker.register(&session_id);
+        state
+            .legacy
+            .mobile
+            .broker
+            .desktop(&session_id, initial_size);
         terminals.insert(session_id.clone(), terminal);
     }
     crate::webview_recovery::register_output(
@@ -305,7 +324,7 @@ pub async fn create_command_terminal(
         output_generation,
         || {
             add_terminal_output_channel(
-                &state.terminal.terminal_outputs,
+                &state.core.terminal.terminal_outputs,
                 &session_id,
                 on_output,
                 window.label(),
@@ -315,7 +334,7 @@ pub async fn create_command_terminal(
 
     let sid = session_id.clone();
     let app = app_handle.clone();
-    let outputs = state.terminal.terminal_outputs.clone();
+    let outputs = state.core.terminal.terminal_outputs.clone();
     std::thread::spawn(move || {
         read_loop_local(reader, sid, app, outputs);
     });

@@ -34,7 +34,7 @@ pnpm build:mobile                # 生成内嵌 PWA，主 build 会自动执行
 | AC-15 diff | 独立只读 Git porcelain status + worktree/cached diff，禁用 external diff/textconv；不调用 loose-file API。非 Git 工作目录 / 无可用根返回 diff_unavailable。文件路径拒绝绝对路径、上跳、反斜杠和符号链接越界；删除文件校验规范化父目录。|
 | AC-15 推送 | notify 原生递归监听可信根，推送 file_changed；不依赖终端打开。采用每任务 500ms 合并的粗粒度失效事件，忽略 .git、node_modules、target；异常也合并为失效事件，不逐个文件洪泛。列表、文件与 diff 限 256 KiB，二进制拒绝、超限标 truncated。|
 | AC-16 初始化 | headless 初始化 profile lease、session/terminal/server/trust/chat 数据表、notes、vault、MFA、mail 目录、AI context、AppState 及移动 listener。`ModeLease` 解决原 ProfileLease 只取共享锁、不能区分模式的问题。|
-| AC-16 不启动项 | 不启动 LSP AppHandle 绑定、GUI local-history、LanChat、本地 servers/tunnels 自启、备份调度、截图/屏幕捕获、桌面 QA bridge 或 SocksCap。退出先停止移动 listener/WS/文件监听，再取消聊天运行句柄。|
+| AC-16 不启动项 | 不启动 LSP AppHandle 绑定、GUI local-history、本地 servers/tunnels 自启、备份调度、截图/屏幕捕获、桌面 QA bridge 或 SocksCap。退出先停止移动 listener/WS/文件监听，再取消聊天运行句柄。|
 
 ## 契约与安全参数
 

@@ -1,0 +1,212 @@
+id: TC-MODULES-032
+title: Native upgrade fingerprints include committed WAL data through normal restart
+description: Seeds an SSH/VNC profile and commits a VNC options change only to its actual SQLite WAL, retaining
+  the writer across candidate restarts. Real Settings/IPC must preserve the main database bytes, read committed
+  options, and bind both main and WAL bytes in the one pending VNC journal. No package, exporter or module activation
+  is involved.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- upgrade
+- lifecycle
+modes:
+- native
+fixtures:
+- reset_db
+- module_upgrade
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-upgrade-status"][data-state="candidates"]'
+- assert_count:
+    selector: '[data-testid="module-upgrade-candidates"] li'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li'
+    equals: vnc-client
+- assert_visible: '[data-testid="module-upgrade-retained"]'
+- assert_text:
+    selector: '[data-testid="module-upgrade-retained"]'
+    contains: '2'
+- assert_count:
+    selector: '[data-testid="module-upgrade-error"]'
+    equal: 0
+- module_upgrade_probe:
+    phase: preflight
+- press: {selector: '[data-testid="module-upgrade-migrate"]:not([disabled])', key: Enter}
+- wait_for: '[data-testid="module-upgrade-pending"]'
+- assert_attribute:
+    selector: '[data-testid="module-upgrade-status"]'
+    name: data-state
+    equals: candidates
+- assert_text:
+    selector: '[data-testid="module-upgrade-pending"]'
+    contains: verified
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li'
+    equals: vnc-client
+- module_upgrade_probe:
+    phase: pending
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-upgrade-status"][data-state="candidates"]'
+- assert_count:
+    selector: '[data-testid="module-upgrade-candidates"] li'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li'
+    equals: vnc-client
+- assert_visible: '[data-testid="module-upgrade-retained"]'
+- assert_text:
+    selector: '[data-testid="module-upgrade-retained"]'
+    contains: '2'
+- assert_count:
+    selector: '[data-testid="module-upgrade-error"]'
+    equal: 0
+- module_upgrade_probe:
+    phase: repeat
+- press: {selector: '[data-testid="module-upgrade-migrate"]:not([disabled])', key: Enter}
+- wait_for: '[data-testid="module-upgrade-pending"]'
+- wait_for: '[data-testid="module-upgrade-migrate"]:not([disabled])'
+- module_upgrade_probe:
+    phase: repeat
+- assert_no_runtime_errors: null
+- screenshot: module-upgrade-wal-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: WAL-SOURCE-032
+    requirement: Seeds an SSH/VNC profile and commits a VNC options change only to its actual SQLite WAL, retaining
+      the writer across candidate restarts. Real Settings/IPC must preserve the main database bytes, read committed
+      options, and bind both main and WAL bytes in the one pending VNC journal. No package, exporter or module activation
+      is involved.
+    actions:
+    - 3
+    - 5
+    - 13
+    - 19
+    - 21
+    - 23
+    - 31
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-status\"][data-state=\"candidates\"]"}'
+    - step: 7
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equal": 1}}'
+    - step: 8
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equals":
+        "vnc-client"}}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"module-upgrade-retained\"]"}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"module-upgrade-retained\"]", "contains": "2"}}'
+    - step: 11
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-error\"]", "equal": 0}}'
+    - step: 12
+      expectation: The independent oracle verifies unchanged main bytes, committed WAL-only options, retained chat
+        bytes and no module directory; pending/repeat also match the exact main-plus-WAL fingerprint and unchanged
+        journal.
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-pending\"]"}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"module-upgrade-status\"]", "name": "data-state",
+        "equals": "candidates"}}'
+    - step: 16
+      expectation: '{"assert_text": {"selector": "[data-testid=\"module-upgrade-pending\"]", "contains": "verified"}}'
+    - step: 17
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equals":
+        "vnc-client"}}'
+    - step: 18
+      expectation: The independent oracle verifies unchanged main bytes, committed WAL-only options, retained chat
+        bytes and no module directory; pending/repeat also match the exact main-plus-WAL fingerprint and unchanged
+        journal.
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-status\"][data-state=\"candidates\"]"}'
+    - step: 25
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equal": 1}}'
+    - step: 26
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equals":
+        "vnc-client"}}'
+    - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"module-upgrade-retained\"]"}'
+    - step: 28
+      expectation: '{"assert_text": {"selector": "[data-testid=\"module-upgrade-retained\"]", "contains": "2"}}'
+    - step: 29
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-error\"]", "equal": 0}}'
+    - step: 30
+      expectation: The independent oracle verifies unchanged main bytes, committed WAL-only options, retained chat
+        bytes and no module directory; pending/repeat also match the exact main-plus-WAL fingerprint and unchanged
+        journal.
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-pending\"]"}'
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-migrate\"]:not([disabled])"}'
+    - step: 34
+      expectation: The independent oracle verifies unchanged main bytes, committed WAL-only options, retained chat
+        bytes and no module directory; pending/repeat also match the exact main-plus-WAL fingerprint and unchanged
+        journal.
+    - step: 35
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 2
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 22
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 32
+    - 33
+    - 34
+    - 35
+  native:
+  - check: A committed real SQLite WAL contributes to the pending source fingerprint, remains uncheckpointed and
+      retains its exact rows through normal candidate restart.
+    method: automated
+    reason: Native disk/SQLite/IPC and normal process lifecycle are required. Browser TC-MODULES-026 retains renderer
+      preflight/pending behavior and cannot validate SQLite WAL.
+  visual:
+  - check: Upgrade state, owner and pending notice remain readable in Module Store.
+    method: manual
+    reason: The screenshot retains the one VNC recommendation and pending notice; no layout change is introduced.

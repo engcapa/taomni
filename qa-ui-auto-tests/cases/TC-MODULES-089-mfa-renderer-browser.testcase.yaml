@@ -1,0 +1,87 @@
+id: TC-MODULES-089
+title: The enabled MFA preview shares accounts between the floating panel and the manager
+description: Enable the fixture module, create a counter-based account and expand its floating panel into the manager. Disable the module with the tab open, then enable it again and read the same account.
+covers: [F-Modules-1, F-MFA-1, F-MFA-2, F-WS-3]
+tags: [modules, mfa, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 160
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.preview.modules.mfa.v1
+    value: '{"lifecycle":"installed","values":[]}'
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-enable-mfa"]'
+- wait_for: '[data-testid="module-action-disable-mfa"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mfa"][data-plugin-kind="manager"] [data-testid="mfa-tab"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mfa-renderer-browser
+- wait_for: '[data-testid="mfa-empty"]'
+- click: '[data-testid="mfa-add"]'
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: Module HOTP}
+- fill: {selector: '[data-testid="mfa-add-secret"]', value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ}
+- click: '[data-testid="mfa-add-advanced"]'
+- select_option: {selector: '[data-testid="mfa-add-kind"]', value: hotp}
+- click: '[data-testid="mfa-add-submit"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 755 224}
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mfa"][data-plugin-kind="floating"] [data-testid="mfa-floating-window"]'
+- assert_text_equals: {selector: '[data-testid="mfa-floating-code"]', equals: 755 224}
+- click: '[data-testid="mfa-floating-expand-tab"]'
+- wait_for: {selector: '[data-testid="mfa-floating-window"]', state: detached}
+- assert_visible: '[data-testid="mfa-account-row"][data-issuer="Module HOTP"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-mfa"]'
+- wait_for: '[data-testid="module-action-enable-mfa"]'
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-entry"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="mfa-floating-code"]', equal: 0}
+- click: '[data-testid="rail-mfa-button"]'
+- click: '[data-testid="module-action-enable-mfa"]'
+- wait_for: '[data-testid="module-action-disable-mfa"]'
+- click: '[data-testid="rail-mfa-button"]'
+- assert_text_equals: {selector: '[data-testid="mfa-floating-code"]', equals: 755 224}
+- click: '[data-testid="mfa-floating-expand-tab"]'
+- assert_visible: '[data-testid="mfa-account-row"][data-issuer="Module HOTP"]'
+- assert_no_runtime_errors: null
+- assert_count: {selector: '[data-testid="mfa-load-error"][data-code="MFA_LEGACY_MIGRATION_REQUIRED"]', equal: 0}
+verification:
+  review: reviewed
+  requirements:
+  - id: dynamic-mfa-views
+    requirement: The enabled module renders both entry points and displays the same counter-based code.
+    actions: [6, 10, 13, 20, 22, 25]
+    checkpoints:
+    - {step: 11, expectation: The module router renders the manager.}
+    - {step: 21, expectation: The account displays its initial HOTP.}
+    - {step: 23, expectation: The module router renders the floating panel.}
+    - {step: 24, expectation: The floating panel displays the same HOTP.}
+    - {step: 26, expectation: Expanding closes the floating panel.}
+    - {step: 27, expectation: The manager continues to show the account.}
+    results: [11, 21, 23, 24, 26, 27]
+  - id: mfa-activation
+    requirement: Disabling the module hides codes and enabling it restores access to the account.
+    actions: [30, 32, 36, 38, 40]
+    checkpoints:
+    - {step: 33, expectation: The floating entry prompts the user to enable the module.}
+    - {step: 34, expectation: No code from the previous activation stays in the DOM.}
+    - {step: 39, expectation: The floating panel reloads the saved counter.}
+    - {step: 41, expectation: The manager displays the saved account.}
+    - {step: 42, expectation: Opening and revoking the module produced no renderer runtime errors.}
+    - {step: 43, expectation: A newly created account opens without a legacy migration prompt.}
+    results: [33, 34, 39, 41, 42, 43]
+  visual:
+  - check: Both entry points show the HOTP and the disabled floating panel shows the module state.
+    method: automated
+    reason: The mounted views, lifecycle message and code text are asserted in the browser.
+  native:
+  - check: Verify the package and read codes from the real signed host.
+    method: not-applicable
+    reason: TC-MODULES-090 covers the signed asset and native Vault.

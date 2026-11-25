@@ -1,0 +1,80 @@
+id: TC-MODULES-054
+title: A saved VNC tab follows the module's enabled state
+description: >-
+  Seed the browser-only VNC registry record. Open a saved VNC session before the
+  module is enabled, enable it from the tab, display the real RFB fixture through
+  the preview bridge, then disable the module and return to the preserved tab.
+covers: [F-Modules-1, F9.6]
+tags: [modules, vnc, lifecycle, p1]
+modes: [browser]
+fixtures: [reset_db, module_vnc_preview, vnc_required]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- click: '[data-testid="session-proto-vnc"]'
+- fill: {selector: '[data-testid="session-host"]', value: '${fixture.vnc_host}'}
+- fill: {selector: '[data-testid="session-port"]', value: '${fixture.vnc_port}'}
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: qa-preview-vnc}
+- click: '[data-testid="session-save"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-preview-vnc"]'
+- wait_for: '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="vnc-panel"]', equal: 0}
+- click: '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-settings"]'
+- wait_for: '[data-testid="module-action-enable-vnc-client"]'
+- click: '[data-testid="module-action-enable-vnc-client"]'
+- wait_for: '[data-testid="module-action-disable-vnc-client"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="vnc"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="vnc"]', equal: 1}
+- click: '[data-testid="vnc-unencrypted-continue"]'
+- fill: {selector: '[data-testid="vnc-auth-password"]', value: '${env.QA_VNC_PASSWORD}'}
+- click: '[data-testid="vnc-auth-ok"]'
+- wait_for: {selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]', timeout_sec: 30}
+- eval_readonly:
+    expression: "document.querySelector('.vnc-container')?.getAttribute('data-frontend-source')?.includes('/src-tauri/plugins/vnc-client/renderer/VncPanel.tsx') === true && document.querySelector('.vnc-container canvas')?.getContext('2d')?.getImageData(16, 16, 1, 1).data[3] === 255"
+    timeout_sec: 15
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-vnc-client"]'
+- wait_for: '[data-testid="module-action-enable-vnc-client"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="vnc"]'
+- wait_for: '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="vnc-panel"]', equal: 0}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A saved VNC session can enable its module and show live frames in the existing tab.
+    actions: [5, 6, 7, 8, 9, 10, 11, 12, 15, 17, 19, 20, 21, 23, 24, 25]
+    checkpoints:
+    - {step: 13, expectation: The tab identifies the disabled module.}
+    - {step: 14, expectation: No VNC renderer mounts before enable.}
+    - {step: 16, expectation: The tab opens the Module Store at the enable action.}
+    - {step: 22, expectation: A single VNC tab represents the saved session.}
+    - {step: 27, expectation: The preview loads the module renderer source and paints a fixture frame after enable.}
+    results: [13, 14, 16, 22, 27]
+  - id: R2
+    requirement: Disabling the module replaces the viewer with its disabled state in the saved session.
+    actions: [28, 29, 30, 32, 33, 34]
+    checkpoints:
+    - {step: 35, expectation: The original saved session displays the disabled module state.}
+    - {step: 36, expectation: The disabled module has no mounted VNC renderer.}
+    - {step: 37, expectation: Lifecycle changes leave the renderer without uncaught errors.}
+    results: [35, 36, 37]
+  visual:
+  - check: The same tab displays the module message or the connected framebuffer according to its lifecycle.
+    method: automated
+    reason: The case reads the visible placeholder and pixel contents of the canvas.
+  native:
+  - check: Verify installation and socket cleanup with the signed native host.
+    method: not-applicable
+    reason: TC-MODULES-053 checks the signed archive and the socket's lifetime on all supported desktop platforms.

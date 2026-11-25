@@ -85,6 +85,23 @@ class ScreenshotScenariosTest(TestCase):
         self.assertIn('"screenshot_qa_macos_capture_source"', script)
         self.assertIn('{"format": "gif"}', script)
 
+    def test_signed_recorder_assertion_is_passed_to_the_native_recorder(self):
+        self.ctx.session.execute.side_effect = [True, {"done": True, "value": 'OK {"frames":30}'}, True]
+        run_scenario(self.ctx, {"scenario": "recorder", "format": "mp4", "signed_renderer": True})
+        script = self.ctx.session.execute.call_args_list[0].args[0]
+        self.assertIn('"screenshot_qa_recorder"', script)
+        self.assertIn('"expectSignedRenderer": true', script)
+
+    def test_recorder_cancel_uses_the_running_recorder_command(self):
+        self.ctx.session.execute.side_effect = [
+            True, {"done": True, "value": 'OK {"tempRemoved":true}'}, True]
+        run_scenario(self.ctx, {
+            "scenario": "recorder-cancel", "format": "gif", "signed_renderer": True})
+        script = self.ctx.session.execute.call_args_list[0].args[0]
+        self.assertIn('"screenshot_qa_recorder"', script)
+        self.assertIn('"expectCancel": true', script)
+        self.assertIn('"expectSignedRenderer": true', script)
+
     def test_rejects_arbitrary_commands_and_invalid_arguments(self):
         for args in ({"scenario": "macos-capture-source"}, {"scenario": "macos-capture-source", "format": "gif", "secs": 2}, {"scenario": "shell_exec"}, {"scenario": "record"},
                      {"scenario": "pin", "format": "gif"},

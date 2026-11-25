@@ -1,0 +1,89 @@
+id: TC-MODULES-057
+title: A saved RDP tab displays its module lifecycle in browser preview
+description: >-
+  A saved RDP tab with RD Gateway options opens the Module Store when the preview module is disabled.
+  Enabling mounts the module viewer in the same tab. Disabling it again
+  unmounts the canvas while keeping the saved session.
+covers: [F-Modules-1, F9.7]
+tags: [modules, rdp, p1]
+modes: [browser]
+fixtures: [reset_db, module_rdp_preview]
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- click: '[data-testid="session-proto-rdp"]'
+- fill: {selector: '[data-testid="session-host"]', value: rdp.example.test}
+- click: '[data-testid="session-section-rdp"]'
+- set_check: {selector: '[data-testid="rdp-gateway-enabled"]', checked: true}
+- fill: {selector: '[data-testid="rdp-gateway-host"]', value: gateway.example.test}
+- set_check: {selector: '[data-testid="rdp-gateway-enabled"]', checked: false}
+- assert_count: {selector: '[data-testid="rdp-gateway-host"]', equal: 0}
+- set_check: {selector: '[data-testid="rdp-gateway-enabled"]', checked: true}
+- fill: {selector: '[data-testid="rdp-gateway-host"]', value: gateway.example.test}
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: qa-preview-rdp}
+- click: '[data-testid="session-save"]'
+- open_session: {name: qa-preview-rdp, double_click: true}
+- wait_for: '[data-testid="auth-prompt"]'
+- fill: {selector: '[data-testid="auth-password"]', value: preview-only}
+- click: '[data-testid="auth-submit"]'
+- wait_for: '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="rdp-canvas"]', equal: 0}
+- click: '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-settings"]'
+- click: '[data-testid="module-action-enable-rdp-client"]'
+- wait_for: '[data-testid="module-action-disable-rdp-client"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="rdp"]'
+- wait_for: '[data-testid="rdp-panel"] [data-testid="rdp-canvas"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="rdp"]', equal: 1}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-rdp-client"]'
+- wait_for: '[data-testid="module-action-enable-rdp-client"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="rdp"]'
+- wait_for: '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="rdp-canvas"]', equal: 0}
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="rdp"]', equal: 1}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Enabling the RDP module from the saved tab swaps the disabled pane for one viewer.
+    actions: [17, 19, 20, 23, 24, 26, 27, 28]
+    checkpoints:
+    - {step: 21, expectation: The saved tab identifies the disabled RDP module.}
+    - {step: 22, expectation: The disabled tab has no RDP canvas.}
+    - {step: 29, expectation: The existing tab mounts the RDP canvas after enabling.}
+    - {step: 30, expectation: Enabling leaves exactly one RDP tab.}
+    results: [21, 22, 29, 30]
+  - id: R2
+    requirement: Disabling the preview module retains the same saved tab and removes the viewer.
+    actions: [31, 32, 33, 35, 36, 37]
+    checkpoints:
+    - {step: 38, expectation: The existing tab shows that the RDP module is disabled.}
+    - {step: 39, expectation: Disabling removes the RDP canvas.}
+    - {step: 40, expectation: The original RDP tab remains open.}
+    - {step: 41, expectation: The interaction produces no uncaught renderer errors.}
+    results: [38, 39, 40, 41]
+  - id: R3
+    requirement: A saved RDP session can opt in to RD Gateway and expose its conditional controls.
+    actions: [7, 8, 9, 10, 12, 13, 16]
+    checkpoints:
+    - {step: 11, expectation: The gateway host field disappears while RD Gateway is off.}
+    - {step: 21, expectation: A session saved with RD Gateway options reaches its module tab.}
+    results: [11, 21]
+  visual:
+  - check: The RDP tab switches between the canvas and the module status.
+    method: automated
+    reason: The case observes the visible elements on either side of the transition.
+  native:
+  - check: The installed host connects to the runner-owned RDP server.
+    method: not-applicable
+    reason: TC-MODULES-056 verifies the signed package and transport in the desktop application.

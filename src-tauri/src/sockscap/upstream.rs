@@ -114,8 +114,8 @@ pub(super) async fn ensure_core_port(
     if !kind.requires_core() {
         return None;
     }
-    let mgr = state.sockscap.xray()?;
-    let spec = build_core_spec(&state.vault, kind, host.to_string(), port, up);
+    let mgr = state.legacy.sockscap.xray()?;
+    let spec = build_core_spec(&state.core.vault, kind, host.to_string(), port, up);
     match mgr.ensure(profile_key, &spec).await {
         Ok(local_port) => Some(local_port),
         Err(e) => {
@@ -138,14 +138,14 @@ pub(super) async fn build_unix_relay_context(
     let (mut upstream_host, mut upstream_port, mut upstream_user, mut upstream_pass) =
         relay::upstream_from_config(cfg);
     if !cfg.upstream.password_ref.is_empty() {
-        if let Ok(Some(password)) = state.vault.resolve(&cfg.upstream.password_ref) {
+        if let Ok(Some(password)) = state.core.vault.resolve(&cfg.upstream.password_ref) {
             upstream_pass = (*password).clone();
         }
     }
     let mut upstream_session: Option<crate::session::models::SessionConfig> = None;
     if !cfg.upstream.session_id.is_empty() {
         let session = {
-            let db = state.db.lock().ok();
+            let db = state.core.db.lock().ok();
             db.and_then(|db| crate::session::db::get_session(&db, &cfg.upstream.session_id).ok())
         };
         if let Some(session) = session {
@@ -157,7 +157,7 @@ pub(super) async fn build_unix_relay_context(
             // Session credentials live in the vault, not the upstream's own
             // `password_ref`; without this a session-backed SOCKS5/HTTP proxy
             // that needs auth would dial with an empty password.
-            if let Some(pass) = session_proxy_password(&state.vault, &session) {
+            if let Some(pass) = session_proxy_password(&state.core.vault, &session) {
                 upstream_pass = pass;
             }
             upstream_session = Some(session);
@@ -171,7 +171,7 @@ pub(super) async fn build_unix_relay_context(
         // A bound SSH session carries its own auth (key path in `auth_method`,
         // or a vault password); manual upstreams fall back to the old rules.
         let auth = if let Some(sess) = &upstream_session {
-            session_ssh_auth(&state.vault, sess)
+            session_ssh_auth(&state.core.vault, sess)
         } else if !upstream_pass.is_empty() {
             SshAuth::Password(upstream_pass.clone())
         } else if cfg.upstream.password_ref.starts_with("key:") {
@@ -202,13 +202,14 @@ pub(super) async fn build_unix_relay_context(
             profile_session = upstream_session.clone();
         } else {
             if !profile.upstream.password_ref.is_empty() {
-                if let Ok(Some(resolved)) = state.vault.resolve(&profile.upstream.password_ref) {
+                if let Ok(Some(resolved)) = state.core.vault.resolve(&profile.upstream.password_ref)
+                {
                     password = (*resolved).clone();
                 }
             }
             if !profile.upstream.session_id.is_empty() {
                 let session = {
-                    let db = state.db.lock().ok();
+                    let db = state.core.db.lock().ok();
                     db.and_then(|db| {
                         crate::session::db::get_session(&db, &profile.upstream.session_id).ok()
                     })
@@ -219,7 +220,7 @@ pub(super) async fn build_unix_relay_context(
                     if let Some(username) = session.username.clone().filter(|u| !u.is_empty()) {
                         user = username;
                     }
-                    if let Some(pass) = session_proxy_password(&state.vault, &session) {
+                    if let Some(pass) = session_proxy_password(&state.core.vault, &session) {
                         password = pass;
                     }
                     profile_session = Some(session);
@@ -231,7 +232,7 @@ pub(super) async fn build_unix_relay_context(
             use crate::terminal::ssh::SshAuth;
 
             let auth = if let Some(sess) = &profile_session {
-                session_ssh_auth(&state.vault, sess)
+                session_ssh_auth(&state.core.vault, sess)
             } else if !password.is_empty() {
                 SshAuth::Password(password.clone())
             } else if profile.upstream.password_ref.starts_with("key:") {
@@ -281,7 +282,7 @@ pub(super) async fn build_unix_relay_context(
     }
 
     let (stats, domains, rules) = {
-        let orch = state.sockscap.orch.read().await;
+        let orch = state.legacy.sockscap.orch.read().await;
         (
             Arc::clone(&orch.stats),
             Arc::clone(&orch.domains),
@@ -309,7 +310,7 @@ pub(super) async fn build_unix_relay_context(
         config: cfg.clone(),
         rules,
         engine,
-        helper: Arc::clone(&state.sockscap.helper),
+        helper: Arc::clone(&state.legacy.sockscap.helper),
         // Linux recovers the original destination from the redirected socket
         // itself (`SO_ORIGINAL_DST`); there is no privileged helper to ask.
         helper_client: None,
@@ -347,7 +348,7 @@ pub async fn sockscap_test_upstream(
     let mut pass = password.unwrap_or_default();
     // Resolve vault:<id> if the UI passed a password_ref.
     if pass.starts_with("vault:") {
-        if let Ok(Some(p)) = state.vault.resolve(&pass) {
+        if let Ok(Some(p)) = state.core.vault.resolve(&pass) {
             pass = (*p).clone();
         }
     }
@@ -357,7 +358,7 @@ pub async fn sockscap_test_upstream(
     let mut test_session: Option<crate::session::models::SessionConfig> = None;
     if let Some(sid) = session_id.filter(|s| !s.trim().is_empty()) {
         let session = {
-            let db = state.db.lock().ok();
+            let db = state.core.db.lock().ok();
             db.and_then(|db| crate::session::db::get_session(&db, &sid).ok())
         };
         if let Some(session) = session {
@@ -366,7 +367,7 @@ pub async fn sockscap_test_upstream(
             if let Some(u) = session.username.clone().filter(|u| !u.is_empty()) {
                 user = u;
             }
-            if let Some(p) = session_proxy_password(&state.vault, &session) {
+            if let Some(p) = session_proxy_password(&state.core.vault, &session) {
                 pass = p;
             }
             test_session = Some(session);
@@ -397,7 +398,7 @@ pub async fn sockscap_test_upstream(
             // A bound SSH session carries its own auth (key path or vault
             // password); manual entry only has the typed password.
             let auth = if let Some(sess) = &test_session {
-                session_ssh_auth(&state.vault, sess)
+                session_ssh_auth(&state.core.vault, sess)
             } else if pass.is_empty() {
                 SshAuth::Agent
             } else {
@@ -421,8 +422,9 @@ pub async fn sockscap_test_upstream(
 #[tauri::command]
 pub async fn sockscap_parse_share_link(
     link: String,
+    state: State<'_, AppState>,
 ) -> Result<core::share_link::ParsedShareLink, String> {
-    core::share_link::parse(&link)
+    module_host::parse_share_link(&state.plugins, link).await
 }
 
 /// Parse a subscription blob (base64 or plain newline-separated links) into a
@@ -496,15 +498,13 @@ pub async fn sockscap_test_core_upstream(
     }
 
     let mgr = state
+        .legacy
         .sockscap
         .xray()
         .ok_or_else(|| "xray manager not initialized".to_string())?;
-    if !mgr.has_exe() {
-        return Err("xray-core binary not provisioned; run scripts/fetch-xray.ps1".into());
-    }
 
     let spec = build_core_spec(
-        &state.vault,
+        &state.core.vault,
         upstream.kind,
         upstream.host.clone(),
         upstream.port,

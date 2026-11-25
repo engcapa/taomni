@@ -37,7 +37,7 @@ TASK-01 至 TASK-06 已实现并通过本轮自动化；TASK-07 的 Linux 原生
 
 方案 B 的定义与已确认边界：
 
-- 恢复对象是**上次主窗口运行中、退出（或最后提交）时仍打开的、可恢复的 session 标签集合**：每个条目为已保存 `SessionConfig`（按 4.2.2 能力表判定可恢复性），或满足白名单的临时本地终端（非 WSL、有经 OSC 确认的 native cwd）。不包含 Code Workspace、Git、设置、聊天、LanChat、Browser、placeholder、分离窗口集合，也不恢复整个工作区布局（侧栏、分屏、焦点光标位置等仅按既有全局 UI 偏好加载）。
+- 恢复对象是**上次主窗口运行中、退出（或最后提交）时仍打开的、可恢复的 session 标签集合**：每个条目为已保存 `SessionConfig`（按 4.2.2 能力表判定可恢复性），或满足白名单的临时本地终端（非 WSL、有经 OSC 确认的 native cwd）。不包含 Code Workspace、Git、设置、聊天、Browser、placeholder、分离窗口集合，也不恢复整个工作区布局（侧栏、分屏、焦点光标位置等仅按既有全局 UI 偏好加载）。
 - 快照包含：运行批次标识（`batch_id`）、非空有序标签条目（身份 + 顺序）、活动项标识、每条目最小恢复载荷；**不得**把最近 N 个 `SessionConfig` 冒充上次运行集合，`last_connected_at` 语义保持不变。
 - 临时本地终端白名单：`localShell` 启动参数 + 已确认的 native cwd；WSL 终端不进入快照（无法证明目标目录就绪）。该白名单就是临时终端恢复的全部持久化内容；不保存 PTY 输出缓冲、进程、环境变量。
 - 恢复按记录顺序重放既有 opener，恢复完成后将活动项设为记录中的活动条目；逐条目报告成功等级（ready / client-started / view-opened / failed），失败条目不阻断后续条目，且失败重试集允许只重试失败项。
@@ -232,7 +232,7 @@ type SnapshotEntry =
 ```
 
 - `saved-session` 条目仅存配置引用与展示摘要（id、类型、名称），不复制 `options_json`、密码、vault 明文、运行句柄或终端内容。`local-terminal` 条目是白名单条目：仅当本地终端拥有经 OSC 7 确认并归一化的 native `cwd`（`normalizeLocalStartCwd` 非 null）且非 WSL（`localShell.id` 不以 `wsl:` 开头、非 `wsl.exe`）时才进入快照；未确认 cwd 的临时终端、SSH 命令终端（`commandTerminal`）、SocksCap PTY 不进入。`identity` 为条目去重键（`saved:<sessionId>` / `local:<tabId>`）。
-- **可恢复类型判定**复用 4.2.2 能力表：`saved-session` 覆盖该表支持恢复的全部已保存类型；Browser、外部 File/URL、未知/placeholder 类型不进入快照。Code Workspace、Git、设置、聊天、LanChat、proxy-test、nettools、sockscap 标签不进入。
+- **可恢复类型判定**复用 4.2.2 能力表：`saved-session` 覆盖该表支持恢复的全部已保存类型；Browser、外部 File/URL、未知/placeholder 类型不进入快照。Code Workspace、Git、设置、聊天、proxy-test、nettools、sockscap 标签不进入。
 - 收集器在主窗口运行：`addTab`（合格条目）、`removeTab`、`setActiveTab`（合格条目成为活动项）、以及临时终端首次确认 cwd，均触发快照重建。重建后与上次已提交快照做**深比较**（条目集合、顺序、活动项、cwd/名称均一致则跳过），仅在实际变化时提交。关闭所有合格条目不提交空快照；已有非空记录保留为“上次”。
 - 活动项：提交时刻的活动 tab 若是合格条目则记为 `activeIdentity`；活动项不合格（Welcome/设置等）时记 `null`，恢复后保持最后一个恢复条目为活动。
 - 恢复期间的收集抑制：恢复 operation 拥有的新建/定位条目标记 `resumeIncomplete`（内存标志，不持久化为 Tab 快照），这些条目不进入普通快照收集；恢复完全成功后清除标志并纳入正常收集。恢复期间用户成功正常使用的新条目按正常规则进入快照。

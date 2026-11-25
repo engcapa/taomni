@@ -1,6 +1,7 @@
 import { Bot, ChevronDown, ChevronUp, History, RotateCcw, Search, Terminal, Type, Undo } from "lucide-react";
 import { DEFAULT_CODE_VIEW_PROFILE, type CodeViewProfile } from "../../../lib/codeViewProfile";
 import { useT } from "../../../lib/i18n";
+import type { LegacyInstallSnapshot, MigrationExecutionResult } from "../../../lib/ipc";
 import { useAppThemeI18nLabel } from "../../../lib/i18n/labels";
 import { useSystemFonts } from "../../../lib/systemFonts";
 import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../../../lib/terminalProfile";
@@ -24,7 +25,11 @@ import { EditorAiLanguagePanel } from "../EditorAiLanguagePanel";
 import { FileOpenSettings } from "../FileOpenSettings";
 import { NotepadSettingsPanel } from "../NotepadSettingsPanel";
 import { MobileServiceSettings } from "../MobileServiceSettings";
-import { LanChatSettings } from "../LanChatSettings";
+import { ModuleStorePanel, type ModuleStoreCatalogEntry, type ModuleStorePanelProps } from "../ModuleStorePanel";
+import { ModuleOfflineInstall } from "../ModuleOfflineInstall";
+import { ModuleNetworkSettings } from "../ModuleNetworkSettings";
+import { ModuleDownloads } from "../ModuleDownloads";
+import { ModuleMarketplace } from "../ModuleMarketplace";
 import { LanguageSection } from "../LanguageSection";
 import { LanguageServersSettings } from "../LanguageServersSettings";
 import { LiveTemplatesSettings } from "../LiveTemplatesSettings";
@@ -77,6 +82,21 @@ export interface SettingsPanelViewProps {
   handleTerminalDefaultProfileChange: (profile: TerminalProfile) => void;
   voiceShellEnabled: boolean;
   toggleVoiceShell: () => void;
+  moduleCatalog: readonly ModuleStoreCatalogEntry[];
+  moduleCoreApiVersion: string;
+  moduleCatalogLoading: boolean;
+  moduleCatalogError: string | null;
+  onModuleRegistryChanged: () => void;
+  moduleOnInstall: (entry: ModuleStoreCatalogEntry) => Promise<void>;
+  moduleOnEnable: (entry: ModuleStoreCatalogEntry) => Promise<void>;
+  moduleOnDisable: (entry: ModuleStoreCatalogEntry) => Promise<void>;
+  moduleOnUninstall: (entry: ModuleStoreCatalogEntry, deleteData: boolean) => Promise<void>;
+  moduleOnRollback: NonNullable<ModuleStorePanelProps["onRollback"]>;
+  migrationSnapshot: LegacyInstallSnapshot | null;
+  migrationLoading: boolean;
+  migrationError: string | null;
+  migrationResult: MigrationExecutionResult | null;
+  onMigrationExecute: () => Promise<void>;
 }
 
 export function SettingsPanelView(inputs: SettingsPanelViewProps) {
@@ -118,6 +138,21 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
     handleTerminalDefaultProfileChange,
     voiceShellEnabled,
     toggleVoiceShell,
+    moduleCatalog,
+    moduleCoreApiVersion,
+    moduleCatalogLoading,
+    moduleCatalogError,
+    onModuleRegistryChanged,
+    moduleOnInstall,
+    moduleOnEnable,
+    moduleOnDisable,
+    moduleOnUninstall,
+    moduleOnRollback,
+    migrationSnapshot,
+    migrationLoading,
+    migrationError,
+    migrationResult,
+    onMigrationExecute,
   } = inputs;
   return ((
     <SettingsSearchContext.Provider value={ctxValue}>
@@ -355,6 +390,28 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
             <SettingsAnchor id="screenshot">
               <ScreenshotSettings />
             </SettingsAnchor>
+            <SettingsAnchor id="module-store">
+              <ModuleNetworkSettings />
+              <ModuleDownloads />
+              <ModuleMarketplace />
+              <ModuleOfflineInstall onRegistryChanged={onModuleRegistryChanged} />
+              <ModuleStorePanel
+                catalog={moduleCatalog}
+                coreApiVersion={moduleCoreApiVersion}
+                catalogLoading={moduleCatalogLoading}
+                catalogError={moduleCatalogError}
+                onInstall={moduleOnInstall}
+                onEnable={moduleOnEnable}
+                onDisable={moduleOnDisable}
+                onUninstall={moduleOnUninstall}
+                onRollback={moduleOnRollback}
+                migrationSnapshot={migrationSnapshot}
+                migrationLoading={migrationLoading}
+                migrationError={migrationError}
+                migrationResult={migrationResult}
+                onMigrationExecute={onMigrationExecute}
+              />
+            </SettingsAnchor>
           </SettingsGroup>
 
           {/* —— Code —— */}
@@ -514,11 +571,6 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
 
             <SettingsAnchor id="mobile-service"><MobileServiceSettings /></SettingsAnchor>
 
-            <SettingsAnchor id="lanchat">
-              <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
-                <LanChatSettings />
-              </section>
-            </SettingsAnchor>
           </SettingsGroup>
 
           {/* —— AI —— */}

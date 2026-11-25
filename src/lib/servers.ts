@@ -25,6 +25,12 @@ export interface ServerConfig {
   [key: string]: unknown;
 }
 
+export function serverSettingsNeedVault(type: ServerType, config: ServerConfig): boolean {
+  return (type === "vnc" || type === "ssh" || type === "ftp") &&
+    config.removePassword !== true &&
+    (Boolean(config.password) || Boolean(config.passwordRef) || config.credentialMigrationRequired === true);
+}
+
 export interface ServerStatus {
   serverType: ServerType;
   status: ServerRunState;

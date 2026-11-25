@@ -74,7 +74,7 @@ pub(super) fn resolve_secret(
     value: Option<&str>,
 ) -> Result<Option<String>, String> {
     match value.map(str::trim).filter(|v| !v.is_empty()) {
-        Some(v) => match state.vault.resolve(v)? {
+        Some(v) => match state.core.vault.resolve(v)? {
             Some(plain) => Ok(Some((*plain).clone())),
             None => Ok(Some(v.to_string())),
         },
@@ -98,7 +98,7 @@ pub(super) fn prepare_mail_network(
         return Ok(None);
     }
     crate::terminal::resolve_proxy_session(state, &mut net)?;
-    net.resolve_proxy_pass(&state.vault)?;
+    net.resolve_proxy_pass(&state.core.vault)?;
     crate::terminal::resolve_jump_credentials(state, &mut net)?;
     Ok(Some(net))
 }

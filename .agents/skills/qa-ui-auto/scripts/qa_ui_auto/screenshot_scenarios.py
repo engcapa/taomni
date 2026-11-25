@@ -15,10 +15,13 @@ SCENARIOS = {
     "capture": "screenshot_qa_capture",
     "capture-fidelity": "screenshot_qa_capture_fidelity",
     "ocr-redact": "screenshot_qa_ocr_redact",
+    "ocr-disabled": "screenshot_qa_ocr_redact",
+    "ocr-offline-module": "screenshot_qa_ocr_redact",
     "scroll": "screenshot_qa_scroll",
     "overlay-copy": "screenshot_qa_overlay_copy",
     "record": "screenshot_qa_record",
     "recorder": "screenshot_qa_recorder",
+    "recorder-cancel": "screenshot_qa_recorder",
     "pin": "screenshot_qa_pin",
     "pin-tools": "screenshot_qa_pin_tools",
     "pin-arrangement": "screenshot_qa_pin_arrangement",
@@ -47,22 +50,33 @@ SCENARIOS = {
 # the overlay in three groups of 20 real captures. The case's own deadline
 # remains authoritative through budget_time; this cap must not undercut it.
 DEFAULT_DEADLINE = 90
-DEADLINES = {"startup-timing": 600, "startup-isolation": 150}
+DEADLINES = {"startup-timing": 600, "startup-isolation": 150, "ocr-offline-module": 120}
 
 
 def run_scenario(ctx, args):
-    if not isinstance(args, dict) or set(args) - {"scenario", "format", "secs"}:
-        raise StepError("native_screenshot_scenario: expected scenario, optional format/secs")
+    if not isinstance(args, dict) or set(args) - {"scenario", "format", "secs", "signed_renderer"}:
+        raise StepError("native_screenshot_scenario: unexpected arguments")
     scenario = args.get("scenario")
     if scenario not in SCENARIOS:
         raise StepError(f"native_screenshot_scenario: unknown scenario {scenario!r}")
     params = {}
-    if scenario in {"record", "recorder", "macos-capture-source"}:
+    if scenario == "ocr-disabled":
+        params["expectDisabled"] = True
+    if scenario == "ocr-offline-module":
+        params["expectOffline"] = True
+    recorder = scenario in {"recorder", "recorder-cancel"}
+    if scenario == "recorder-cancel":
+        params["expectCancel"] = True
+    if "signed_renderer" in args:
+        if args["signed_renderer"] is not True or not recorder:
+            raise StepError("native_screenshot_scenario: signed_renderer requires a recorder scenario")
+        params["expectSignedRenderer"] = True
+    if recorder or scenario in {"record", "macos-capture-source"}:
         if args.get("format") not in {"gif", "mp4"}:
-            raise StepError("native_screenshot_scenario: record/recorder/macos-capture-source requires gif or mp4")
+            raise StepError(f"native_screenshot_scenario: {scenario} requires format gif or mp4")
         params["format"] = args["format"]
     elif "format" in args:
-        raise StepError("native_screenshot_scenario: format only applies to record/recorder/macos-capture-source")
+        raise StepError(f"native_screenshot_scenario: {scenario} does not accept format")
     if scenario == "record":
         secs = args.get("secs", 3)
         if isinstance(secs, bool) or not isinstance(secs, int) or not 1 <= secs <= 8:

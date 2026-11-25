@@ -29,8 +29,8 @@ pub(super) fn emit_acp_permission(
 ) {
     let state = app.state::<crate::state::AppState>();
     let key = format!("acp:{permission_owner_id}:{}", permission.call_id);
-    state.mobile.confirmations.lock().unwrap().insert(key.clone(), json!({"id":key,"thread_id":thread_id,"tool":"ACP permission","supported":false,"owner":permission_owner_id,"call":permission.call_id}));
-    state.mobile.task_status(
+    state.legacy.mobile.confirmations.lock().unwrap().insert(key.clone(), json!({"id":key,"thread_id":thread_id,"tool":"ACP permission","supported":false,"owner":permission_owner_id,"call":permission.call_id}));
+    state.legacy.mobile.task_status(
         thread_id,
         "awaiting_confirmation",
         "desktop_confirmation_required",
@@ -72,12 +72,19 @@ pub(super) fn dismiss_acp_permission(
     call_id: Option<&str>,
 ) {
     let state = app.state::<crate::state::AppState>();
-    state.mobile.confirmations.lock().unwrap().retain(|_, v| {
-        !(v["thread_id"] == thread_id
-            && permission_owner_id.is_none_or(|owner| v["owner"] == owner)
-            && call_id.is_none_or(|call| v["call"] == call))
-    });
     state
+        .legacy
+        .mobile
+        .confirmations
+        .lock()
+        .unwrap()
+        .retain(|_, v| {
+            !(v["thread_id"] == thread_id
+                && permission_owner_id.is_none_or(|owner| v["owner"] == owner)
+                && call_id.is_none_or(|call| v["call"] == call))
+        });
+    state
+        .legacy
         .mobile
         .task_status(thread_id, "running", "confirmation_resolved");
     let _ = app.emit(

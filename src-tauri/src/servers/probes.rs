@@ -9,12 +9,12 @@ pub async fn probe_rdp_capture(
     app: AppHandle,
     request_permission: bool,
     request_control_permission: bool,
-) -> Result<rdp::capture::CaptureProbe, String> {
+) -> Result<taomni_capture::engine::CaptureProbe, String> {
     #[cfg(target_os = "macos")]
-    if request_permission && !rdp::capture::mac::permission_granted() {
+    if request_permission && !taomni_capture::engine::mac::permission_granted() {
         let (tx, rx) = tokio::sync::oneshot::channel();
         app.run_on_main_thread(move || {
-            let _ = tx.send(rdp::capture::mac::request_permission());
+            let _ = tx.send(taomni_capture::engine::mac::request_permission());
         })
         .map_err(|e| format!("failed to request Screen Recording permission: {e}"))?;
         let _ = rx
@@ -23,10 +23,10 @@ pub async fn probe_rdp_capture(
     }
 
     #[cfg(target_os = "macos")]
-    if request_control_permission && !rdp::control_permission_granted() {
+    if request_control_permission && !taomni_capture::permissions::control_permission_granted() {
         let (tx, rx) = tokio::sync::oneshot::channel();
         app.run_on_main_thread(move || {
-            let _ = tx.send(rdp::request_control_permission());
+            let _ = tx.send(taomni_capture::permissions::request_control_permission());
         })
         .map_err(|e| format!("failed to request Accessibility permission: {e}"))?;
         let _ = rx
@@ -37,7 +37,7 @@ pub async fn probe_rdp_capture(
     #[cfg(not(target_os = "macos"))]
     let _ = (app, request_permission, request_control_permission);
 
-    rdp::capture::probe().map_err(|e| e.to_string())
+    taomni_capture::engine::probe().map_err(|e| e.to_string())
 }
 
 /// Windows built-in Remote Desktop state for the RDP settings card and the

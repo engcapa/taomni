@@ -276,6 +276,10 @@ steps:
 - assert_count:
     selector: '[data-testid="file-viewer"][data-dirty="true"]'
     equal: 0
+- click: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="1"]'
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="1"]'
+    equals: '1'
 - fill:
     selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="1"]'
     value: '2'
@@ -458,10 +462,10 @@ verification:
     - 82
     - 85
     - 86
-    - 113
-    - 164
-    - 167
+    - 115
+    - 166
     - 169
+    - 171
     checkpoints:
     - step: 74
       expectation: '{''assert_text'': {''selector'': ''[data-testid="viewer-editor"]'', ''contains'': ''| Name |
@@ -478,15 +482,15 @@ verification:
       expectation: '{''assert_pattern'': {''selector'': ''[data-testid="viewer-editor"]'', ''regex'': ''assets/image-[^\\s)]+\\.png''}}'
     - step: 89
       expectation: '{''assert_count'': {''selector'': ''[data-testid="markdown-image-widget"]'', ''min'': 2}}'
-    - step: 115
+    - step: 117
       expectation: '{''eval_readonly'': {''expression'': ''document.querySelectorAll(".fv-md-preview-pane img").length
         === 2 && document.querySelectorAll(".fv-md-preview-pane img")[0].complete && document.querySelectorAll(".fv-md-preview-pane
         img")[0].naturalWidth > 0 && document.querySelectorAll(".fv-md-preview-pane img")[1].complete && document.querySelectorAll(".fv-md-preview-pane
         img")[1].naturalWidth > 0'', ''expect_truthy'': True, ''timeout_sec'': 10}}'
-    - step: 170
+    - step: 172
       expectation: '{''assert_text'': {''selector'': ''[data-testid="viewer-editor"]'', ''contains'': ''| Alpha
         | 2 |''}}'
-    - step: 171
+    - step: 173
       expectation: '{''assert_pattern'': {''selector'': ''[data-testid="viewer-editor"]'', ''regex'': ''assets/image-[^\\s)]+\\.png''}}'
     results:
     - 74
@@ -495,33 +499,37 @@ verification:
     - 83
     - 84
     - 89
-    - 115
-    - 170
-    - 171
+    - 117
+    - 172
+    - 173
   - id: R3
     requirement: Export exposes all designed formats; HTML download is self-contained and export does not dirty
       the source.
     actions:
-    - 118
-    - 144
+    - 120
+    - 146
+    - 109
     checkpoints:
-    - step: 144
+    - step: 146
       expectation: '{''assert_download'': {''trigger'': ''[data-testid="markdown-export-html"]'', ''filename'':
         ''live.html'', ''contains'': [''File open Markdown'', ''<table'', ''data:image/png;base64,'', ''Alpha'',
         ''<svg'', ''fv-md-mermaid'', ''Explorer'', ''OpenFile'', ''Viewer'']}}'
-    - step: 145
+    - step: 147
       expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-export-status"]'', ''contains'': ''Export
         completed''}}'
-    - step: 163
+    - step: 165
       expectation: '{''assert_count'': {''selector'': ''[data-testid="file-viewer"][data-dirty="true"]'', ''equal'':
         0}}'
-    - step: 172
+    - step: 174
       expectation: '{''assert_no_runtime_errors'': None}'
+    - step: 110
+      expectation: The clicked table cell exposes its original Markdown source before editing.
     results:
-    - 144
-    - 145
-    - 163
-    - 172
+    - 110
+    - 146
+    - 147
+    - 165
+    - 174
   - id: R4
     requirement: Live outline/image/table actions are real; zoom stays view-only, cell edits serialize standard
       Markdown, and export settings can cancel without a download.
@@ -531,20 +539,20 @@ verification:
     - 85
     - 91
     - 92
-    - 109
-    - 110
+    - 111
     - 112
-    - 118
-    - 126
-    - 129
+    - 114
+    - 120
+    - 128
     - 131
-    - 132
-    - 135
+    - 133
+    - 134
     - 137
-    - 138
-    - 141
+    - 139
+    - 140
     - 143
-    - 169
+    - 145
+    - 171
     checkpoints:
     - step: 29
       expectation: '{''assert_text'': {''selector'': ''[data-testid="viewer-editor"] .cm-line'', ''contains'': ''#
@@ -555,87 +563,87 @@ verification:
     - step: 94
       expectation: '{''assert_count'': {''selector'': ''[data-testid="file-viewer"][data-dirty="true"]'', ''equal'':
         0}}'
-    - step: 111
+    - step: 113
       expectation: '{''assert_text'': {''selector'': ''[data-testid="viewer-editor"]'', ''contains'': ''| Alpha
         | 2 |''}}'
-    - step: 128
-      expectation: '{''assert_visible'': ''[data-testid="markdown-export-confirm"]''}'
     - step: 130
-      expectation: '{''assert_not_visible'': ''[data-testid="markdown-export-settings"]''}'
-    - step: 134
       expectation: '{''assert_visible'': ''[data-testid="markdown-export-confirm"]''}'
+    - step: 132
+      expectation: '{''assert_not_visible'': ''[data-testid="markdown-export-settings"]''}'
     - step: 136
-      expectation: '{''assert_not_visible'': ''[data-testid="markdown-export-settings"]''}'
-    - step: 140
       expectation: '{''assert_visible'': ''[data-testid="markdown-export-confirm"]''}'
-    - step: 142
+    - step: 138
       expectation: '{''assert_not_visible'': ''[data-testid="markdown-export-settings"]''}'
-    - step: 163
+    - step: 142
+      expectation: '{''assert_visible'': ''[data-testid="markdown-export-confirm"]''}'
+    - step: 144
+      expectation: '{''assert_not_visible'': ''[data-testid="markdown-export-settings"]''}'
+    - step: 165
       expectation: '{''assert_count'': {''selector'': ''[data-testid="file-viewer"][data-dirty="true"]'', ''equal'':
         0}}'
-    - step: 172
+    - step: 174
       expectation: '{''assert_no_runtime_errors'': None}'
     results:
     - 29
     - 93
     - 94
-    - 111
-    - 128
+    - 113
     - 130
-    - 134
+    - 132
     - 136
-    - 140
+    - 138
     - 142
-    - 163
-    - 172
+    - 144
+    - 165
+    - 174
   - id: R5
     requirement: PNG exports real image bytes; clipboard entries complete; desktop-only folder export fails explicitly
       without dirtying the source.
     actions:
-    - 146
-    - 147
+    - 148
     - 149
-    - 150
-    - 153
-    - 154
-    - 157
-    - 158
+    - 151
+    - 152
+    - 155
+    - 156
+    - 159
+    - 160
     checkpoints:
-    - step: 147
+    - step: 149
       expectation: '{''assert_download'': {''trigger'': ''[data-testid="markdown-export-png"]'', ''filename'': ''live.png''}}'
-    - step: 148
+    - step: 150
       expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-export-status"]'', ''contains'': ''Export
         completed''}}'
-    - step: 152
+    - step: 154
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="markdown-export-status"]'', ''name'':
         ''data-export-state'', ''equals'': ''copied''}}'
-    - step: 156
+    - step: 158
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="markdown-export-status"]'', ''name'':
         ''data-export-state'', ''equals'': ''copied''}}'
-    - step: 160
+    - step: 162
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="markdown-export-status"]'', ''name'':
         ''data-export-state'', ''equals'': ''failed''}}'
-    - step: 161
+    - step: 163
       expectation: '{''assert_text'': {''selector'': ''[data-testid="viewer-operation-error"]'', ''contains'': ''Markdown
         + image folder export requires the desktop app''}}'
-    - step: 162
+    - step: 164
       expectation: '{''assert_count'': {''selector'': ''[data-testid="file-viewer"][data-dirty="true"]'', ''equal'':
         0}}'
     results:
-    - 147
-    - 148
-    - 152
-    - 156
-    - 160
-    - 161
+    - 149
+    - 150
+    - 154
+    - 158
     - 162
+    - 163
+    - 164
   - id: R6
     requirement: Actual Mermaid renderer produces three labeled SVG nodes and edges in live/split; HTML export preserves
       embedded diagram SVG without HTML foreignObject labels.
     actions:
     - 11
     - 32
-    - 144
+    - 146
     checkpoints:
     - step: 17
       expectation: '{''wait_for'': ''[data-testid="markdown-live"] .fv-md-mermaid svg''}'
@@ -669,11 +677,11 @@ verification:
         svg\'')?.querySelectorAll(".node").length === 3 && document.querySelector(\''.fv-md-preview-pane .fv-md-mermaid
         svg\'')?.querySelectorAll("path").length >= 2 && !document.querySelector(\''.fv-md-preview-pane .fv-md-mermaid
         svg\'')?.querySelector("foreignObject")'', ''expect_truthy'': True}}'
-    - step: 144
+    - step: 146
       expectation: '{''assert_download'': {''trigger'': ''[data-testid="markdown-export-html"]'', ''filename'':
         ''live.html'', ''contains'': [''File open Markdown'', ''<table'', ''data:image/png;base64,'', ''Alpha'',
         ''<svg'', ''fv-md-mermaid'', ''Explorer'', ''OpenFile'', ''Viewer'']}}'
-    - step: 145
+    - step: 147
       expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-export-status"]'', ''contains'': ''Export
         completed''}}'
     results:
@@ -687,8 +695,8 @@ verification:
     - 38
     - 39
     - 40
-    - 144
-    - 145
+    - 146
+    - 147
   - id: R7
     requirement: Prototype regressions have real computed live-widget white-space, compact paragraph/Details spacing
       and a muted smaller source heading prefix; actual Settings dark-theme live/split Mermaid screenshots restore
@@ -713,7 +721,7 @@ verification:
     - 102
     - 104
     - 106
-    - 165
+    - 167
     checkpoints:
     - step: 22
       expectation: '{''eval_readonly'': {''expression'': "document.querySelectorAll(''.fv-md-live-surface .fv-md-math
@@ -786,13 +794,13 @@ verification:
     - step: 108
       expectation: '{''assert_count'': {''selector'': ''[data-testid="file-viewer"][data-dirty="true"]'', ''equal'':
         0}}'
-    - step: 116
+    - step: 118
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="markdown-preview"] .fv-md-task-state'',
         ''name'': ''data-task-checked'', ''equals'': ''false''}}'
-    - step: 117
+    - step: 119
       expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="markdown-preview"] .fv-md-task-state'',
         ''equals'': ''☐''}}'
-    - step: 166
+    - step: 168
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'',
         ''name'': ''data-active'', ''equals'': ''true''}}'
     results:
@@ -818,27 +826,27 @@ verification:
     - 103
     - 107
     - 108
-    - 116
-    - 117
-    - 166
+    - 118
+    - 119
+    - 168
   - id: R8
     requirement: The actual Word export completes through the shared Markdown UI, downloads a DOCX package and leaves runtime clean. Native FILE007 independently verifies editable equations and Mermaid media; browser download alone does not prove Word typography.
     actions:
-    - 174
     - 176
-    - 177
+    - 178
     - 179
+    - 181
     checkpoints:
-    - step: 179
-      expectation: Actual browser download is live.docx and contains a Word document ZIP entry.
-    - step: 180
-      expectation: Production export reports saved only after the download completes.
     - step: 181
+      expectation: Actual browser download is live.docx and contains a Word document ZIP entry.
+    - step: 182
+      expectation: Production export reports saved only after the download completes.
+    - step: 183
       expectation: Word conversion has no unhandled runtime errors.
     results:
-    - 179
-    - 180
     - 181
+    - 182
+    - 183
   visual:
   - check: Live/source/split widgets and export menu
     method: manual

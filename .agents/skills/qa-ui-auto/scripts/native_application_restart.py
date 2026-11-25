@@ -1,6 +1,7 @@
 """Restart only this run's owned QA application, retaining its isolated profile."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import partial
 import json
 import os
@@ -11,8 +12,11 @@ import time
 from typing import TypedDict
 
 from native_process_group import wait_for_driver_ports
-from native_application_shutdown import linux_storage_processes, wait_for_application_shutdown
+from native_application_shutdown import (
+    ApplicationShutdownTimeout, linux_storage_processes, wait_for_application_shutdown,
+)
 from native_webdriver_transport import WebDriverError
+from native_restart_failure import capture as capture_restart_failure
 from native_window_close_x11 import close_x11_application_window, x11_window_closed
 
 
@@ -81,6 +85,10 @@ def validate_exit_confirmation(value: object) -> ExitConfirmation:
 
 def bind_application_restarter(driver, session) -> None:
     session.application_restarter = partial(restart_owned_application, driver, session)
+    from native_restore_relaunch import confirm_restore_relaunch
+    from native_mfa_upgrade_relaunch import confirm_mfa_upgrade_relaunch
+    session.restore_relauncher = partial(confirm_restore_relaunch, driver, session)
+    session.mfa_upgrade_relauncher = partial(confirm_mfa_upgrade_relaunch, driver, session)
 
 
 def close_macos_application_window(application: Path) -> dict:
@@ -268,7 +276,8 @@ def close_application_window(session, timeout: float = 15,
 
 def restart_owned_application(driver, session, *,
                               expect_exit_confirmation: ExitConfirmation | None = None,
-                              preserve_dirty_drafts: bool = False) -> dict:
+                              preserve_dirty_drafts: bool = False,
+                              before_relaunch: Callable[[], None] | None = None) -> dict:
     deadline = session.deadline
     before = session.session_id
     macos_bridge = session.transport == "macOS WKWebView bridge"
@@ -293,7 +302,12 @@ def restart_owned_application(driver, session, *,
         primary_error = error
         observation["error_stage"] = observation["stage"]
         observation["close_error"] = str(error)
+        if isinstance(error, ApplicationShutdownTimeout):
+            observation["shutdown_remaining_processes"] = error.processes
         observation["close_request"] = dict(getattr(session, "last_request", {}))
+        # Session deletion/driver.stop removes the failed window. Capture it
+        # now so the runner can diagnose a blocked close without losing DOM.
+        capture_restart_failure(session, observation)
         raise
     finally:
         observation["stage"] = "release-owner"
@@ -314,6 +328,9 @@ def restart_owned_application(driver, session, *,
     ports = (driver.port,) if session.transport == "macOS WKWebView bridge" else (driver.port, driver.native_port)
     observation["stage"] = "wait-for-old-ports"
     observation["driver_port_release"] = wait_for_driver_ports(driver.host, ports)
+    if before_relaunch is not None:
+        observation["stage"] = "before-relaunch"
+        before_relaunch()
     driver._restart_required = False
     observation["stage"] = "start-owner"
     driver.start()

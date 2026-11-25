@@ -82,12 +82,6 @@ pub mod favorites;
 
 pub mod ocr;
 
-#[cfg(target_os = "macos")]
-mod ocr_macos;
-
-#[cfg(target_os = "windows")]
-mod ocr_windows;
-
 pub mod pins;
 
 pub mod qa;

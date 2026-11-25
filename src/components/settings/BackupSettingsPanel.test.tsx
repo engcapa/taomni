@@ -6,12 +6,12 @@ import { useBackupSettingsStore as settings } from "../../stores/backupSettingsS
 import { useVaultStore } from "../../stores/vaultStore";
 import { backupHarness, deferred } from "../../test/backupHarness";
 import { setLocale } from "../../lib/i18n";
-const mocks = vi.hoisted(() => ({ invoke: vi.fn(), listen: vi.fn(), saveFile: vi.fn(), directory: vi.fn(), open: vi.fn() }));
+const mocks = vi.hoisted(() => ({ invoke: vi.fn(), listen: vi.fn(), saveFile: vi.fn(), directory: vi.fn(), open: vi.fn(), relaunch: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: mocks.listen }));
 vi.mock("@tauri-apps/plugin-shell", () => ({ open: mocks.open }));
 vi.mock("../../lib/ipc", () => ({ selectFilePath: vi.fn(), selectSaveDirectory: mocks.directory, selectSaveFilePath: mocks.saveFile }));
-vi.mock("../../lib/updateService", () => ({ relaunchApp: vi.fn() }));
+vi.mock("../../lib/updateService", () => ({ relaunchApp: mocks.relaunch }));
 let h: ReturnType<typeof backupHarness>;
 beforeEach(() => {
   vi.clearAllMocks(); setLocale("en"); h = backupHarness();
@@ -90,6 +90,36 @@ it("keeps the opaque restore dialog and requires current vault verification", as
   fireEvent.click(screen.getByText("Confirm Restore & Restart Now"));
   expect(screen.getByText("Vault master password is required.")).toBeDefined();
   expect(mocks.invoke.mock.calls.some(([cmd]) => cmd === "backup_stage_restore")).toBe(false);
+});
+it("shows expected password rejection, then stages once and waits before relaunch", async () => {
+  const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    mocks.invoke.mockImplementation((cmd, args) => {
+      if (cmd === "backup_stage_restore" && args?.vaultPassword !== "current-master") return Promise.reject(new Error("VAULT_BAD_PASSWORD"));
+      return h.invoke(cmd, args);
+    });
+    render(<BackupSettingsPanel />);
+    fireEvent.click(screen.getByTestId("backup-history-restore"));
+    await screen.findByTestId("backup-restore-vault-password");
+    fireEvent.change(screen.getByTestId("backup-restore-vault-password"), { target: { value: "wrong" } });
+    fireEvent.click(screen.getByTestId("backup-restore-confirm"));
+    expect(await screen.findByTestId("backup-restore-error")).toHaveTextContent("Incorrect vault master password");
+    expect(screen.queryByTestId("backup-restore-staged")).toBeNull();
+    expect(mocks.relaunch).not.toHaveBeenCalled();
+    expect(consoleError).not.toHaveBeenCalled();
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByTestId("backup-restore-vault-password"), { target: { value: "current-master" } });
+    await act(async () => { fireEvent.click(screen.getByTestId("backup-restore-confirm")); });
+    expect(screen.getByTestId("backup-restore-staged")).toHaveTextContent("Staging complete");
+    expect(screen.getByTestId("backup-restore-confirm")).toBeDisabled();
+    expect(screen.queryByTestId("backup-restore-error")).toBeNull();
+    expect(mocks.relaunch).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+    expect(mocks.relaunch).toHaveBeenCalledTimes(1);
+    expect(mocks.invoke.mock.calls.filter(([cmd]) => cmd === "backup_stage_restore")).toHaveLength(2);
+  } finally {
+    consoleError.mockRestore();
+  }
 });
 it("refreshes history and background timestamp on completion", async () => {
   render(<BackupSettingsPanel />);

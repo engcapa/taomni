@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   SERVER_ORDER,
   saveServerConfig,
   listenServerOutput,
   listenServerStatus,
+  serverSettingsNeedVault,
   type ServerType,
 } from "../../lib/servers";
 import { useServersStore } from "../../stores/serversStore";
@@ -31,8 +32,8 @@ function timestampLine(line: string): string {
 export function ServersPanel({ onClose }: { onClose?: () => void }) {
   const t = useT();
   const appendLog = useServersStore((s) => s.appendLog);
-  const clearDirty = useServersStore((s) => s.clearDirty);
   const loadAll = useServersStore((s) => s.loadAll);
+  const [applying, setApplying] = useState(false);
 
   // Snapshot of the port each server was last saved with, so Apply can warn
   // when a running server's port changed (it won't take effect until restart).
@@ -76,49 +77,51 @@ export function ServersPanel({ onClose }: { onClose?: () => void }) {
   }, []);
 
   const attemptClose = useCallback(async () => {
-    if (useServersStore.getState().dirty) {
+    if (applying) return;
+    if (useServersStore.getState().editedServers.size > 0) {
       const confirmed = await confirmAppDialog({
         message: t("servers.confirmDiscard"),
       });
       if (!confirmed) return;
-      clearDirty();
       await loadAll();
     }
     onClose?.();
-  }, [clearDirty, loadAll, onClose, t]);
+  }, [applying, loadAll, onClose, t]);
 
   const handleApply = async () => {
-    const { configs, runtimes } = useServersStore.getState();
-    for (const type of SERVER_ORDER) {
-      let cfg = configs[type];
-      try {
-        if (
-          type === "rdp" &&
-          !(await ensureVaultReady(t("servers.notes.rdpVaultReason")))
-        ) {
-          appendLog(type, timestampLine(t("servers.notes.rdpVaultCancelled")));
-          continue;
+    const { configs, editedServers, commitConfig } = useServersStore.getState();
+    if (applying || editedServers.size === 0) return;
+    setApplying(true);
+    try {
+      for (const type of SERVER_ORDER) {
+        if (!editedServers.has(type)) continue;
+        const submitted = configs[type];
+        try {
+          if (type === "rdp" && !(await ensureVaultReady(t("servers.notes.rdpVaultReason")))) {
+            appendLog(type, timestampLine(t("servers.notes.rdpVaultCancelled")));
+            continue;
+          }
+          if (serverSettingsNeedVault(type, submitted) &&
+            !(await ensureVaultReady(t(type === "vnc" ? "servers.notes.vncVaultReason" : "servers.notes.localVaultReason")))) {
+            continue;
+          }
+          const { configs: current, runtimes } = useServersStore.getState();
+          if (current[type] !== submitted) continue;
+          const saved = await saveServerConfig(type, submitted);
+          commitConfig(type, submitted, saved);
+          const prevPort = appliedPorts.current[type];
+          if (runtimes[type]?.status === "running" && prevPort !== undefined && prevPort !== saved.port) {
+            appendLog(type, timestampLine(t("servers.restartForPort")));
+          }
+          appliedPorts.current[type] = saved.port;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          appendLog(type, timestampLine(message));
         }
-        cfg = await saveServerConfig(type, cfg);
-        useServersStore.getState().setConfig(type, cfg);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        appendLog(type, timestampLine(message));
-        continue;
       }
-      // Warn when a running server's port changed: the live process keeps the
-      // old port until it is restarted.
-      const prevPort = appliedPorts.current[type];
-      if (
-        runtimes[type]?.status === "running" &&
-        prevPort !== undefined &&
-        prevPort !== cfg.port
-      ) {
-        appendLog(type, timestampLine(t("servers.restartForPort")));
-      }
-      appliedPorts.current[type] = cfg.port;
+    } finally {
+      setApplying(false);
     }
-    clearDirty();
   };
 
   return (
@@ -157,6 +160,7 @@ export function ServersPanel({ onClose }: { onClose?: () => void }) {
         <button
           type="button"
           data-testid="servers-dialog-cancel"
+          disabled={applying}
           className="taomni-btn"
           onClick={() => void attemptClose()}
         >
@@ -165,6 +169,7 @@ export function ServersPanel({ onClose }: { onClose?: () => void }) {
         <button
           type="button"
           data-testid="servers-dialog-apply"
+          disabled={applying}
           className="taomni-btn"
           data-primary="true"
           onClick={() => void handleApply()}

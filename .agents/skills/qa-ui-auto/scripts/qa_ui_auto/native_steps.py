@@ -60,10 +60,11 @@ from .terminal_burst_probe import run as terminal_burst
 class NativeStepContext:
     """Per-case context handed to native verbs (fixture values resolved)."""
 
-    def __init__(self, session: Any, case_dir: Path, cfg: dict):
+    def __init__(self, session: Any, case_dir: Path, cfg: dict, *, fixture_context: Any = None):
         self.session = session
         self.case_dir = case_dir
         self.cfg = cfg
+        self.fixture_context = fixture_context
         self._parity005_trace_positions: dict[tuple[str, str, str], int] = {}
         self._permission_restores: dict[Path, int] = {}
         # External X11 CLIPBOARD owner started by native_clipboard_owner, plus
@@ -1492,6 +1493,9 @@ def _do_right_click(ctx: NativeStepContext, args: Any) -> str:
 def _do_fill(ctx: NativeStepContext, args: Any) -> str:
     if not isinstance(args, dict) or "selector" not in args or "value" not in args:
         raise StepError("fill: expected {selector, value}")
+    from . import fill_paste
+    if fill_paste.requested(args):
+        return fill_paste.native(ctx, args["selector"], args["value"])
     return ctx.session.fill(str(args["selector"]), str(args["value"]))
 
 
@@ -3003,7 +3007,7 @@ def _do_mail_server_deliver(ctx: NativeStepContext, args: Any) -> str:
                                         thread=bool(args.get("thread")),
                                         list_unsubscribe=args.get("list_unsubscribe") or None,
                                         invite=args.get("invite") or None,
-                                        read_receipt=bool(args.get("read_receipt")))
+                                        read_receipt=bool(args.get("read_receipt")), body=args.get("body"))
     return f"delivered {len(uids)} to {folder} (uids {uids[0]}..{uids[-1]})"
 
 
@@ -3036,18 +3040,22 @@ def _do_mail_server_assert_folder_count(ctx: NativeStepContext, args: Any) -> st
     state = _mail_server().state
     deadline = time.time() + float(args.get("timeout_sec", 20))
     count = -1
+    exists = False
     while time.time() < deadline:
-        count = state.count(folder)
-        subjects = state.subjects(folder)
+        with state.lock:
+            exists = folder in state.folders
+            count = state.count(folder)
+            subjects = state.subjects(folder)
         if (
             count >= minimum
+            and ("exists" not in args or exists is args["exists"])
             and ("equals" not in args or count == int(args["equals"]))
             and ("has_subject" not in args or args["has_subject"] in subjects)
             and ("lacks_subject" not in args or args["lacks_subject"] not in subjects)
         ):
-            return f"{folder} has {count} messages on the server"
+            return f"{folder} has {count} messages on the server" if exists else f"{folder} is absent from the server"
         time.sleep(0.25)
-    raise StepError(f"mail_server_assert_folder_count: {folder} has {count}, expected {args!r}")
+    raise StepError(f"mail_server_assert_folder_count: {folder} exists={exists} and has {count}, expected {args!r}")
 
 
 @_verb("mail_server_assert_idle_clients")
@@ -3101,38 +3109,9 @@ def _do_mail_server_assert_smtp_contains(ctx: NativeStepContext, args: Any) -> s
 
 @_verb("mail_server_assert_list_matches")
 def _do_mail_server_assert_list_matches(ctx: NativeStepContext, args: Any) -> str:
-    args = args if isinstance(args, dict) else {}
-    folder = str(args.get("folder") or "INBOX")
-    state = _mail_server().state
-    deadline = time.time() + float(args.get("timeout_sec", 30))
-    observed: Any = None
-    while time.time() < deadline:
-        with state.lock:
-            messages = state.folders[folder].messages
-            server = len(messages)
-            server_unread = sum(1 for m in messages.values() if "\\Seen" not in m.flags)
-        observed = ctx.session.execute(
-            "const el = document.querySelector('[data-testid=\"mail-message-count\"]');"
-            "return {shown: el ? Number(el.getAttribute('data-count')) : -1,"
-            " hasMore: el ? el.getAttribute('data-has-more') : null,"
-            " unreadRows: document.querySelectorAll('[data-testid=\"mail-message-row\"][data-unread=\"true\"]').length};"
-        )
-        if (
-            isinstance(observed, dict)
-            and observed.get("shown") == server
-            and observed.get("hasMore") == "false"
-            and (not args.get("unread") or observed.get("unreadRows") == server_unread)
-        ):
-            return f"list matches server: {server} messages, {server_unread} unread"
-        if isinstance(observed, dict) and observed.get("hasMore") == "true":
-            # Like a user scrolling to the end: load the next cached page.
-            ctx.session.execute(
-                "document.querySelector('[data-testid=\"mail-load-more\"]:not([disabled])')?.click(); return true;"
-            )
-        time.sleep(0.5)
-    raise StepError(
-        f"mail_server_assert_list_matches: server={server} unread={server_unread} ui={observed!r}"
-    )
+    from .mail_list_observation import assert_list_matches
+
+    return assert_list_matches(ctx.session, _mail_server().state, args)
 
 
 # -- MFA authenticator fixtures (docs-feature/mfa-authenticator-design.md) ----
@@ -3155,30 +3134,6 @@ def _mfa_helper_line(proc: subprocess.Popen[str], timeout: float) -> str:
     return lines[0] if lines else ""
 
 
-# Topmost Tk window showing the fixture image, so a real screen capture of the
-# desktop (with Taomni hidden) contains a QR code. Prints its geometry once mapped.
-_MFA_IMAGE_WINDOW_SOURCE = r'''
-import sys
-import tkinter as tk
-
-path, x, y = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
-root = tk.Tk()
-root.title("Taomni QA MFA QR")
-root.configure(background="white")
-image = tk.PhotoImage(file=path)
-tk.Label(root, image=image, background="white", borderwidth=0).pack(padx=24, pady=24)
-root.geometry(f"+{x}+{y}")
-root.attributes("-topmost", True)
-
-def ready():
-    root.update_idletasks()
-    print("WINDOW-READY", root.winfo_rootx(), root.winfo_rooty(), root.winfo_width(), root.winfo_height(), flush=True)
-
-root.after(300, ready)
-root.mainloop()
-'''
-
-
 @_verb("native_show_image_window")
 def _do_native_show_image_window(ctx: NativeStepContext, args: Any) -> str:
     from .mfa_support import png_fixture
@@ -3186,18 +3141,26 @@ def _do_native_show_image_window(ctx: NativeStepContext, args: Any) -> str:
     args = args if isinstance(args, dict) else {"path": args}
     if args.get("action", "show") == "close":
         return "image window closed" if ctx.stop_mfa_helper("image-window") else "no image window was open"
-    if platform.system() not in {"Linux", "Windows"} or (platform.system() == "Linux" and not (os.environ.get("DISPLAY") or wayland.active())):
-        raise StepError("native_show_image_window: requires a Linux X11 display or a Windows desktop")
+    system = platform.system()
+    if system not in {"Linux", "Windows", "Darwin"} or (system == "Linux" and not (os.environ.get("DISPLAY") or wayland.active())):
+        raise StepError("native_show_image_window: requires an interactive Linux, Windows or macOS desktop")
     target, data = png_fixture(args.get("path"), "native_show_image_window")
     ctx.stop_mfa_helper("image-window")
-    command = (["/usr/bin/python3", str(Path(__file__).resolve().parents[1] / "ci_wayland_fixture.py"), "image", "--path", str(target)]
-               if wayland.active() else [sys.executable, "-c", _MFA_IMAGE_WINDOW_SOURCE, str(target), str(int(args.get("x", 40))), str(int(args.get("y", 40)))])
+    scripts = Path(__file__).resolve().parents[1]
+    position = [str(int(args.get(axis, 40))) for axis in ("x", "y")]
+    if system == "Darwin":
+        command = ["swift", str(scripts / "macos_mfa_image_window.swift"), str(target), *position]
+    elif wayland.active():
+        command = ["/usr/bin/python3", str(scripts / "ci_wayland_fixture.py"), "image", "--path", str(target)]
+    else:
+        command = [sys.executable, str(scripts / "mfa_image_window_tk.py"), str(target), *position]
     proc = subprocess.Popen(
         command,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
     )
     ctx._mfa_helpers["image-window"] = proc
-    line = _mfa_helper_line(proc, timeout=20)
+    startup_timeout = 45 if system == "Darwin" else 20
+    line = _mfa_helper_line(proc, timeout=startup_timeout)
     if not line.startswith("WINDOW-READY"):
         exited = proc.poll() is not None
         err = ""
@@ -3205,7 +3168,7 @@ def _do_native_show_image_window(ctx: NativeStepContext, args: Any) -> str:
             with suppress(Exception):
                 err = proc.stderr.read().strip()
         ctx.stop_mfa_helper("image-window")
-        detail = line.strip() or err or (f"exit {proc.returncode}" if exited else "no ready signal within 20s")
+        detail = line.strip() or err or (f"exit {proc.returncode}" if exited else f"no ready signal within {startup_timeout}s")
         raise StepError(f"native_show_image_window: window did not appear: {detail}")
     x, y, width, height = (int(v) for v in line.split()[1:5])
     observation = {"path": str(target), "sha256": hashlib.sha256(data).hexdigest(), "pid": proc.pid,

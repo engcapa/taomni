@@ -1,0 +1,244 @@
+id: TC-MODULES-028
+title: Native legacy server preflight keeps HTTP, RDP and VNC under their distinct module owners
+description: Seeds an SSH session and three synthetic old server_configs rows. Real Settings/IPC must recommend servers, rdp-server
+  and vnc-server exactly once, preserve every configuration byte and retained chat file, and keep three pending entries through
+  explicit repeat and normal candidate restart. It does not export configurations or activate modules.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- upgrade
+- lifecycle
+modes:
+- native
+fixtures:
+- reset_db
+- module_upgrade
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-upgrade-status"][data-state="candidates"]'
+- assert_count:
+    selector: '[data-testid="module-upgrade-candidates"] li'
+    equal: 3
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(1)'
+    equals: servers
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(2)'
+    equals: rdp-server
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(3)'
+    equals: vnc-server
+- assert_visible: '[data-testid="module-upgrade-retained"]'
+- assert_text:
+    selector: '[data-testid="module-upgrade-retained"]'
+    contains: '2'
+- assert_count:
+    selector: '[data-testid="module-upgrade-error"]'
+    equal: 0
+- module_upgrade_probe:
+    phase: preflight
+- click: '[data-testid="module-upgrade-migrate"]'
+- wait_for: '[data-testid="module-upgrade-pending"]'
+- assert_attribute:
+    selector: '[data-testid="module-upgrade-status"]'
+    name: data-state
+    equals: candidates
+- assert_text:
+    selector: '[data-testid="module-upgrade-pending"]'
+    contains: verified
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(1)'
+    equals: servers
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(2)'
+    equals: rdp-server
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(3)'
+    equals: vnc-server
+- module_upgrade_probe:
+    phase: pending
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-upgrade-status"][data-state="candidates"]'
+- assert_count:
+    selector: '[data-testid="module-upgrade-candidates"] li'
+    equal: 3
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(1)'
+    equals: servers
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(2)'
+    equals: rdp-server
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(3)'
+    equals: vnc-server
+- assert_visible: '[data-testid="module-upgrade-retained"]'
+- assert_text:
+    selector: '[data-testid="module-upgrade-retained"]'
+    contains: '2'
+- assert_count:
+    selector: '[data-testid="module-upgrade-error"]'
+    equal: 0
+- module_upgrade_probe:
+    phase: repeat
+- click: '[data-testid="module-upgrade-migrate"]'
+- wait_for: '[data-testid="module-upgrade-pending"]'
+- wait_for: '[data-testid="module-upgrade-migrate"]:not([disabled])'
+- module_upgrade_probe:
+    phase: repeat
+- assert_no_runtime_errors: null
+- screenshot: server-upgrade-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Seeds an SSH session and three synthetic old server_configs rows. Real Settings/IPC must recommend servers,
+      rdp-server and vnc-server exactly once, preserve every configuration byte and retained chat file, and keep three pending
+      entries through explicit repeat and normal candidate restart. It does not export configurations or activate modules.
+    actions:
+    - 3
+    - 5
+    - 15
+    - 23
+    - 25
+    - 27
+    - 37
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-status\"][data-state=\"candidates\"]"}'
+    - step: 7
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equal": 3}}'
+    - step: 8
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(1)", "equals":
+        "servers"}}'
+    - step: 9
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(2)", "equals":
+        "rdp-server"}}'
+    - step: 10
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(3)", "equals":
+        "vnc-server"}}'
+    - step: 11
+      expectation: '{"assert_visible": "[data-testid=\"module-upgrade-retained\"]"}'
+    - step: 12
+      expectation: '{"assert_text": {"selector": "[data-testid=\"module-upgrade-retained\"]", "contains": "2"}}'
+    - step: 13
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-error\"]", "equal": 0}}'
+    - step: 14
+      expectation: '{"module_upgrade_probe": {"phase": "preflight"}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-pending\"]"}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"module-upgrade-status\"]", "name": "data-state", "equals":
+        "candidates"}}'
+    - step: 18
+      expectation: '{"assert_text": {"selector": "[data-testid=\"module-upgrade-pending\"]", "contains": "verified"}}'
+    - step: 19
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(1)", "equals":
+        "servers"}}'
+    - step: 20
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(2)", "equals":
+        "rdp-server"}}'
+    - step: 21
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(3)", "equals":
+        "vnc-server"}}'
+    - step: 22
+      expectation: '{"module_upgrade_probe": {"phase": "pending"}}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-status\"][data-state=\"candidates\"]"}'
+    - step: 29
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equal": 3}}'
+    - step: 30
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(1)", "equals":
+        "servers"}}'
+    - step: 31
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(2)", "equals":
+        "rdp-server"}}'
+    - step: 32
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(3)", "equals":
+        "vnc-server"}}'
+    - step: 33
+      expectation: '{"assert_visible": "[data-testid=\"module-upgrade-retained\"]"}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"module-upgrade-retained\"]", "contains": "2"}}'
+    - step: 35
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-error\"]", "equal": 0}}'
+    - step: 36
+      expectation: '{"module_upgrade_probe": {"phase": "repeat"}}'
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-pending\"]"}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-migrate\"]:not([disabled])"}'
+    - step: 40
+      expectation: '{"module_upgrade_probe": {"phase": "repeat"}}'
+    - step: 41
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 2
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 24
+    - 26
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 38
+    - 39
+    - 40
+    - 41
+  native:
+  - check: Distinct server owners, unchanged actual config rows and retained files, three pending journal items and normal
+      restart.
+    method: automated
+    reason: Native 028 observes actual SQLite rows and journal independently of Settings/IPC; browser 029 covers only the
+      explicit renderer model.
+  visual:
+  - check: Upgrade state, owner and pending notice remain readable in Module Store.
+    method: manual
+    reason: Retained screenshot supports review; runtime assertions establish state semantics, not visual fidelity.

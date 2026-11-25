@@ -146,10 +146,12 @@ async fn headless_runtime_blocks_screen_without_opt_in_then_reports_desktop_requ
         "screen_capture_disabled"
     );
     f.state
+        .legacy
         .mobile
         .desktop
         .set_screen_allowed(
             f.state
+                .legacy
                 .mobile
                 .profile_data
                 .lock()
@@ -270,8 +272,13 @@ async fn http_desktop_endpoints_enforce_screen_opt_in_and_proxy_controls() {
     let origin = "https://mobile.example";
     let f = Fixture::new().await;
     let driver = Arc::new(MockDesktopDriver::new());
-    f.state.mobile.desktop.set_test_driver(Some(driver.clone()));
     f.state
+        .legacy
+        .mobile
+        .desktop
+        .set_test_driver(Some(driver.clone()));
+    f.state
+        .legacy
         .mobile
         .desktop_available
         .store(true, Ordering::Relaxed);
@@ -295,8 +302,17 @@ async fn http_desktop_endpoints_enforce_screen_opt_in_and_proxy_controls() {
         "screen_capture_disabled"
     );
 
-    let data_dir = f.state.mobile.profile_data.lock().unwrap().clone().unwrap();
+    let data_dir = f
+        .state
+        .legacy
+        .mobile
+        .profile_data
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap();
     f.state
+        .legacy
         .mobile
         .desktop
         .set_screen_allowed(&data_dir, true)

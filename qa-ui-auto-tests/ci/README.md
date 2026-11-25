@@ -14,6 +14,118 @@ The audio playback case verifies the real loopback with the same installed devic
 
 ## Trigger and select
 
+For the first modular upgrade, run Release Bundle without a tag, with all
+platforms and the modules in `src-tauri/plugins/legacy-upgrade.json`. It uploads
+the verified packages and `modular-candidate-roster-<run-id>`. Run QA UI Auto
+Platforms at the same commit with `scope=selected`, `case_ids=TC-MODULES-040`,
+`native_release=true` and `first_release_run=<run-id>`. The native shard
+starts the pinned monolith, opens its profile with the candidate, installs all
+compatible business packages and checks the installed versions after removing
+Mail and restarting. The shard saves the catalog digest, package provenance,
+HTTP requests, active pointers and retained sessions. The regular focused run
+uses the signed Hello/MFA fixture.
+
+For the modular release crash regressions, select `scope=selected`,
+`tags=crash-regression`, `modes=browser,native` and `native_release=true`.
+Run the same source with `module_profile=core-only` and
+`module_profile=full`. Supply `first_release_run` for the full native profile.
+Both native profiles use the release QA build without legacy module features.
+The selection lists the cases that require a plugin in the core-only profile.
+The browser cases use the matching preview registry. Each full native shard
+installs the signed release packages with the product verifier, restores that
+fresh registry after the per-case reset, and checks the enabled versions before
+the case starts. Summary and runner receipts bind the observed versions and the
+package digests to the case results. These paths share the signed-Mail QA build
+recipe. Use the installed package workflow for the actual release-binary inventory.
+For the signed RDP Server performance check, add
+`case_ids=TC-RDPS-PERF-01-performance-budget` and `modular_rdp_p95=true` to
+the full profile run. The native receipt records the runner image, candidate
+RDP Server package digest and its active version with the case results.
+
+The modular refactor also uses `qa-modular-upgrade.yml` with an exact `head`.
+It runs the shared capture library checks for the four release targets, real
+X11 capture source tests, and the production host adapter against a real hello
+process on Linux, Windows and macOS. The host tests include cancellation,
+heartbeat/restart and killing the disposable core with live descendants.
+Artifacts named `modular-host-*` and `modular-capture-*` retain these logs.
+These contracts do not establish an actual installed 0.5.x upgrade, operating
+system signing/TCC trust, performance or profile/backup coordination. Those
+remain separate acceptance evidence. Browser/native UI scenarios still run in
+the platforms workflow, including the mandatory crash suite; download each
+completed shard while other shards and builds are running.
+
+The workflow's collector starts after planning and prints each completed
+shard's raw case results. From a local checkout, start the same collector while
+planning or execution is still running. It uses the authenticated `gh` CLI,
+including older versions without `api --slurp`, and inherits proxy variables:
+
+```sh
+python .agents/skills/qa-ui-auto/scripts/background_job.py start \
+  --name qa-live-RUN_ID --log /tmp/qa-live-RUN_ID.log \
+  --env HTTPS_PROXY=http://10.1.0.80:3228 \
+  --env HTTP_PROXY=http://10.1.0.80:3228 \
+  --env ALL_PROXY=http://10.1.0.80:3228 \
+  -- python .agents/skills/qa-ui-auto/scripts/ci_live_monitor.py \
+  --repository engcapa/taomni --run-id RUN_ID
+```
+
+Replace `RUN_ID` with the actual numeric run ID. Selection discovery is automatic;
+if a rerun has multiple selection artifacts, specify the intended `--artifact-key`.
+Artifacts go to `qa-ui-auto-report/github/RUN_ID/live-shards/`, without waiting
+for the summary job. Existing report evidence is never overwritten: when
+starting another monitor for that run, choose a new `--destination` directory.
+The collection index records missing/blocked shards and timeout. Raw failed
+cases stay failed; downloading every artifact is not a passing test result.
+Review the original receipts, source/build identity and exact selected cases
+before claiming coverage.
+
+For a first modular release candidate, dispatch `qa-modular-gates.yml` with
+`suite=release`, `first_release=true`, and the candidate's `package_run` and
+`package_version`. Set `source_ref` and `head` to the producer branch and its SHA.
+The dispatcher checks that the producer has uploaded the signed module roster.
+The installed checks use the signed roster and packages from that run to verify
+the upgrade from 0.5.12, removal of a module, restart with the remaining modules,
+and rollback. The Linux recovery run also checks relocation and RDP performance.
+
+For real release-package samples, dispatch that registered workflow with
+`package_run=<Release Bundle run ID>`, `package_source=<exact 40-character
+producer SHA>`, and `package_version=<artifact-only test version>`. `head` selects
+the inspection tooling; its SHA is recorded separately from the package source.
+For a Windows installed-upgrade retry, run Release Bundle with
+`platforms=windows` and an empty `tag` to build the MSI without publishing. Pass
+`package_targets=windows-x86_64` and `package_upgrade_desktop=true` to the
+upgrade workflow for that artifact. `runner.json` records the hosted image and
+attempt alongside the producer identity and installed-app receipts.
+This exclusive route calls `qa-modular-bundles.yml` on Linux x64, Windows x64,
+macOS ARM64 and macOS Intel. It checks the producer repository/workflow/SHA and
+immutable artifact ID before downloading, then records every actual package's
+size and SHA-256. An uploaded target can be inspected while other builders are
+still running. A missing, expired, duplicate or mismatched artifact fails.
+Set `package_targets=linux-x86_64` (or a comma-separated subset of the four
+release targets) to inspect completed uploads without waiting for other builds;
+the default is `all`. Each target selection has its own concurrency group.
+Set `package_macos_arm_runner=macos-26` to use macOS 26 for an ARM64 DMG
+inspection or installed upgrade. Both runner choices consume the pinned Darwin
+ARM64 artifact and record the actual host OS and architecture.
+For the hardened ARM64 DMG check, set `macos_static_krb5=true` on an artifact-only
+Release Bundle build that includes ARM64. A four-target build uses static Kerberos
+on ARM64 and the bundled Intel libraries on x86_64. Select the
+resulting package with `package_upgrade_desktop=true` and
+`package_macos_hardened_mfa=true`. The run binds the core and module leaf
+certificates, records Gatekeeper, observes the signed host after install and
+scans an external AppKit test window using the installed core and MFA host.
+
+The same jobs read Debian/RPM metadata, administratively extract the actual MSI,
+or mount the actual DMG read-only and inspect its copied app and any updater app.
+macOS preserves the real signature, checks architecture/version and records
+quarantine plus the raw Gatekeeper assessment. Windows records Authenticode
+status. OS rejection is retained as a trust gap, even if inspection succeeds.
+The `modular-bundle-<target>-<producer run>` artifacts contain raw observations
+and `bundle-baseline.json`; collect them as each job finishes. This is a package
+baseline and payload/signature probe, not installed 0.5.x migration, application
+startup/memory, TCC or G1–G11 completion. No new product flow or YAML case is
+introduced; existing modules/MFA and crash-regression cases retain UI coverage.
+
 After the workflow is on the default branch, use **Actions → QA UI Auto Platforms
 → Run workflow**, or:
 
@@ -78,6 +190,33 @@ declared capability gaps at planning time, so no native runner is provisioned
 for a case that can only skip. See "Opt-in credentials" below.
 
 ### Shards and reusable native builds
+
+`macos_runner=macos-15-intel` explicitly selects the macOS 15 Intel hosted
+runner when ARM64 capacity is unavailable. The default remains `macos-15`
+(ARM64). The selection, native build ID, runtime provenance and package platform
+all retain the chosen architecture; an Intel pass does not count as an ARM64
+pass. For example, append `-f macos_runner=macos-15-intel` to a platforms run.
+The allowed labels are fixed; arbitrary or self-hosted runners are rejected.
+
+The platforms workflow forwards this choice to the signed-module package
+builders. `qa-modular-packages.yml` also accepts `macos_runner` directly, with
+`macos-latest` as its standalone default. The source job validates the hosted
+label before scheduling either Darwin package build; each build retains its
+explicit ARM64 or Intel Rust target. This allows the available Intel or macOS 26
+image to build the module packages needed by a focused native run.
+
+The platforms caller also supplies its planned native build matrix. Module
+packages are built and signed only for selected platform/architecture pairs
+that require `signed-module`; duplicate desktop profiles share one package.
+A Linux/Windows run therefore does not wait for a macOS package builder. The
+standalone package workflow and callers that omit `native_builds` still build
+all four release targets. Both paths retain the same candidate restrictions,
+trusted signing checkout and package provenance checks.
+
+Linux package installation refreshes indexes and retries the exact requested
+package set once after apt exit 100 (for example, a removed package version
+referenced by a stale mirror index). A failed refresh or second installation
+failure still blocks execution; tests are not skipped.
 
 `shards=auto` schedules up to four runners per platform/mode/Linux desktop
 profile. Dependencies remain together in their original order. Full suites use

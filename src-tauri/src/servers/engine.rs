@@ -39,6 +39,14 @@ impl ServerCtx {
     }
 }
 
+#[cfg(feature = "legacy-local-servers")]
+impl From<ServerCtx> for taomni_local_servers_engine::ServerCtx {
+    fn from(ctx: ServerCtx) -> Self {
+        let log = ctx.log;
+        Self::new(ctx.cancel, move |line| log.line(line))
+    }
+}
+
 /// Emits human-readable log lines to the frontend on
 /// `server://output/<type>`. Each line is prefixed with a `[HH:MM:SS]`
 /// local-time timestamp.
@@ -56,13 +64,18 @@ impl LogEmitter {
         }
     }
 
+    pub(crate) fn capture_log(&self) -> taomni_capture::CaptureLogger {
+        let server = self.clone();
+        taomni_capture::CaptureLogger::new(move |message| server.line(message))
+    }
+
     /// Emit one timestamped log line to the frontend and keep it in the
     /// registry's history.
     pub fn line(&self, msg: impl Into<String>) {
         let ts = chrono::Local::now().format("%H:%M:%S");
         let line = format!("[{}] {}", ts, msg.into());
         if let Some(state) = self.app.try_state::<crate::state::AppState>() {
-            state.servers.record_log(self.server_type, &line);
+            state.legacy.servers.record_log(self.server_type, &line);
         }
         let channel = format!("server://output/{}", self.server_type.as_str());
         let _ = self.app.emit(&channel, line);
@@ -77,6 +90,16 @@ pub struct ServerStarted {
     /// The running accept-loop / supervisor task. Must exit when the
     /// context's `cancel` token is cancelled.
     pub task: JoinHandle<()>,
+}
+
+#[cfg(feature = "legacy-local-servers")]
+impl From<taomni_local_servers_engine::ServerStarted> for ServerStarted {
+    fn from(started: taomni_local_servers_engine::ServerStarted) -> Self {
+        Self {
+            pid: started.pid,
+            task: started.task,
+        }
+    }
 }
 
 /// Update the registry's status map for `status.server_type` and emit the new
@@ -96,16 +119,43 @@ pub async fn set_status(app: &AppHandle, registry: &ServerRegistry, status: Serv
 /// and returns `Err` synchronously on failure so the caller can map it to an
 /// `Error` status.
 pub async fn start(ctx: ServerCtx, config: super::ServerConfig) -> Result<ServerStarted, String> {
+    let state = ctx.app.state::<crate::state::AppState>();
+    if let Some(kind) = super::local_host::kind(ctx.server_type) {
+        if let Some(record) = state.plugins.get(taomni_server_process::local::SLUG) {
+            if record.state != crate::plugin::LifecycleState::Enabled {
+                return Err(super::local_config::ENABLE.into());
+            }
+            let mut config = config;
+            super::local_config::resolve_password(&state, kind, &mut config)?;
+            return super::local_host::start(state.plugins.clone(), ctx.clone(), kind, config)
+                .await;
+        }
+    }
     match ctx.server_type {
+        ServerType::Vnc => super::vnc::start(ctx, config).await,
+        ServerType::Rdp => super::rdp::start(ctx, config).await,
+        #[cfg(feature = "legacy-local-servers")]
+        server => start_legacy_local(server, ctx, config).await,
+        #[cfg(not(feature = "legacy-local-servers"))]
+        _ => Err(super::local_config::INSTALL.into()),
+    }
+}
+
+#[cfg(feature = "legacy-local-servers")]
+async fn start_legacy_local(
+    server: ServerType,
+    ctx: ServerCtx,
+    config: super::ServerConfig,
+) -> Result<ServerStarted, String> {
+    match server {
         ServerType::Ssh => super::ssh::start(ctx, config).await,
         ServerType::Ftp => super::ftp::start(ctx, config).await,
         ServerType::Tftp => super::tftp::start(ctx, config).await,
         ServerType::Http => super::http::start(ctx, config).await,
         ServerType::Telnet => super::telnet::start(ctx, config).await,
-        ServerType::Vnc => super::vnc::start(ctx, config).await,
         ServerType::Nfs => super::nfs::start(ctx, config).await,
         ServerType::Cron => super::cron::start(ctx, config).await,
         ServerType::Iperf => super::iperf::start(ctx, config).await,
-        ServerType::Rdp => super::rdp::start(ctx, config).await,
+        ServerType::Vnc | ServerType::Rdp => unreachable!("desktop servers have separate owners"),
     }
 }

@@ -4,13 +4,17 @@
 //! the calendar. No calendar grid; reminders are shown by the open mail tab.
 
 use reqwest::Url;
-use rusqlite::{Connection, OptionalExtension, Result as SqlResult, params};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use taomni_mail_storage::agenda::{
+    AgendaAction, AgendaResources, AgendaState, EventDelta, FUTURE_DAYS, MailAgendaEvent,
+};
 use tauri::State;
 
 use super::calendar::{param, parse_time, split_property, unescape, unfold};
 use super::webdav::{CALDAV, DavAuth, DavClient, XML, href_path, parse_multistatus};
-use super::{MailAccountConfig, MailAuthMode, now_ts, resolve_config, with_mail_db};
+use super::{MailAccountConfig, MailAuthMode, now_ts, resolve_config};
+
+mod store;
 use crate::state::AppState;
 
 /// CalDAV calendar of a mail account (same shape as the CardDAV settings).
@@ -18,27 +22,6 @@ pub type MailCalDavSettings = super::contacts::MailCardDavSettings;
 
 /// Agenda window pulled from the server.
 const PAST_DAYS: i64 = 1;
-const FUTURE_DAYS: i64 = 60;
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct MailAgendaEvent {
-    pub uid: String,
-    pub summary: String,
-    pub location: Option<String>,
-    /// Epoch seconds when known (UTC and expanded instances).
-    pub start: Option<i64>,
-    pub end: Option<i64>,
-    /// `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM` as written.
-    pub start_local: String,
-    pub tzid: Option<String>,
-    pub all_day: bool,
-    /// Minutes before the start for the first display/audio alarm.
-    pub alarm_minutes: Option<i64>,
-    /// Instance id of a recurring event (`RECURRENCE-ID`), else empty.
-    #[serde(default)]
-    pub instance: String,
-}
 
 /// `-PT15M`, `-P1D`, `-PT1H30M` → minutes before the start.
 fn trigger_minutes(value: &str) -> Option<i64> {
@@ -129,102 +112,6 @@ pub(super) fn parse_events(ics: &str) -> Vec<MailAgendaEvent> {
     events
 }
 
-pub(super) fn migrate_calendar_tables(conn: &Connection) -> SqlResult<()> {
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS mail_calendar_events (
-            account_id TEXT NOT NULL,
-            href TEXT NOT NULL,
-            instance TEXT NOT NULL DEFAULT '',
-            event_json TEXT NOT NULL,
-            start_ts INTEGER,
-            updated_at INTEGER NOT NULL,
-            PRIMARY KEY (account_id, href, instance)
-        );
-        CREATE TABLE IF NOT EXISTS mail_caldav_state (
-            account_id TEXT PRIMARY KEY,
-            base_url TEXT,
-            collection_url TEXT,
-            last_sync INTEGER,
-            last_error TEXT
-        );",
-    )
-}
-
-/// Replace the cached events of the synced resources.
-pub(super) fn store_events(
-    conn: &Connection,
-    account_id: &str,
-    resources: &[(String, Vec<MailAgendaEvent>)],
-    replace_all: bool,
-) -> SqlResult<usize> {
-    let tx = conn.unchecked_transaction()?;
-    if replace_all {
-        tx.execute(
-            "DELETE FROM mail_calendar_events WHERE account_id = ?1",
-            params![account_id],
-        )?;
-    }
-    let mut count = 0;
-    for (href, events) in resources {
-        tx.execute(
-            "DELETE FROM mail_calendar_events WHERE account_id = ?1 AND href = ?2",
-            params![account_id, href],
-        )?;
-        for event in events {
-            tx.execute(
-                "INSERT OR REPLACE INTO mail_calendar_events
-                 (account_id, href, instance, event_json, start_ts, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![
-                    account_id,
-                    href,
-                    event.instance,
-                    serde_json::to_string(event).unwrap_or_default(),
-                    event.start,
-                    now_ts()
-                ],
-            )?;
-            count += 1;
-        }
-    }
-    tx.commit()?;
-    Ok(count)
-}
-
-/// Upcoming events (still running or starting within `days`), soonest first.
-pub(super) fn agenda(
-    conn: &Connection,
-    account_id: &str,
-    now: i64,
-    days: i64,
-) -> SqlResult<Vec<MailAgendaEvent>> {
-    let mut stmt =
-        conn.prepare("SELECT event_json FROM mail_calendar_events WHERE account_id = ?1")?;
-    let rows = stmt.query_map(params![account_id], |row| row.get::<_, String>(0))?;
-    let horizon = now + days * 86_400;
-    let mut events: Vec<MailAgendaEvent> = Vec::new();
-    for json in rows {
-        let Ok(event) = serde_json::from_str::<MailAgendaEvent>(&json?) else {
-            continue;
-        };
-        let keep = match (event.start, event.end) {
-            (Some(start), end) => start <= horizon && end.unwrap_or(start) >= now,
-            // Zoned times without a tz database: keep by date text.
-            (None, _) => true,
-        };
-        if keep {
-            events.push(event);
-        }
-    }
-    events.sort_by(|a, b| {
-        a.start
-            .unwrap_or(i64::MAX)
-            .cmp(&b.start.unwrap_or(i64::MAX))
-            .then_with(|| a.start_local.cmp(&b.start_local))
-    });
-    Ok(events)
-}
-
 fn stamp(ts: i64) -> String {
     chrono::DateTime::from_timestamp(ts, 0)
         .unwrap_or_default()
@@ -299,11 +186,7 @@ fn collection_url(raw: &str) -> Result<Url, String> {
 }
 
 /// Pull the agenda window: every event resource with its expanded instances.
-async fn pull(
-    client: &DavClient,
-    collection: &Url,
-    now: i64,
-) -> Result<Vec<(String, Vec<MailAgendaEvent>)>, String> {
+async fn pull(client: &DavClient, collection: &Url, now: i64) -> Result<AgendaResources, String> {
     let body = calendar_query(now - PAST_DAYS * 86_400, now + FUTURE_DAYS * 86_400);
     let reply = client
         .send("REPORT", collection, Some("1"), Some((body, XML)), &[])
@@ -349,17 +232,14 @@ async fn open_calendar(
     };
     let client = DavClient::new(CALDAV, auth, false)?;
     let base = settings.url.trim().to_string();
-    let cached: Option<(Option<String>, Option<String>)> =
-        with_mail_db(state, &account_id, |db| {
-            db.query_row(
-                "SELECT collection_url, base_url FROM mail_caldav_state WHERE account_id = ?1",
-                params![account_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .optional()
-        })?;
+    let cached: Option<AgendaState> =
+        store::run(state, &account_id, AgendaAction::ReadState).await?;
     let collection = match cached {
-        Some((Some(url), Some(cached_base))) if cached_base == base => collection_url(&url)?,
+        Some(AgendaState {
+            collection_url: Some(url),
+            base_url: Some(cached_base),
+            ..
+        }) if cached_base == base => collection_url(&url)?,
         _ => {
             let start = Url::parse(&base).map_err(|e| format!("invalid CalDAV URL: {e}"))?;
             collection_url(client.discover(&start).await?.as_str())?
@@ -375,21 +255,15 @@ async fn open_calendar(
     ))
 }
 
-fn save_state(
-    conn: &Connection,
-    account_id: &str,
-    target: &CalDavTarget,
-    error: Option<&str>,
-) -> SqlResult<()> {
-    conn.execute(
-        "INSERT INTO mail_caldav_state (account_id, base_url, collection_url, last_sync, last_error)
-         VALUES (?1, ?2, ?3, ?4, ?5)
-         ON CONFLICT(account_id) DO UPDATE SET base_url = excluded.base_url,
-            collection_url = excluded.collection_url, last_sync = excluded.last_sync,
-            last_error = excluded.last_error",
-        params![account_id, target.base, target.collection.as_str(), now_ts(), error],
-    )?;
-    Ok(())
+impl CalDavTarget {
+    fn state(&self, error: Option<String>) -> AgendaState {
+        AgendaState {
+            base_url: Some(self.base.clone()),
+            collection_url: Some(self.collection.to_string()),
+            last_sync: Some(now_ts()),
+            last_error: error,
+        }
+    }
 }
 
 /// Refresh the agenda cache from the account's CalDAV calendar.
@@ -405,16 +279,29 @@ pub async fn mail_caldav_sync(
     };
     match pull(&target.client, &target.collection, now_ts()).await {
         Ok(resources) => {
-            result.events = with_mail_db(&state, &account_id, |db| {
-                let count = store_events(db, &account_id, &resources, true)?;
-                save_state(db, &account_id, &target, None)?;
-                Ok(count)
-            })?;
+            result.events = store::run(
+                &state,
+                &account_id,
+                AgendaAction::Commit {
+                    state: target.state(None),
+                    events: Some(EventDelta {
+                        resources,
+                        replace_all: true,
+                    }),
+                },
+            )
+            .await?;
         }
         Err(e) => {
-            let _ = with_mail_db(&state, &account_id, |db| {
-                save_state(db, &account_id, &target, Some(&e))
-            });
+            let _ = store::run::<usize>(
+                &state,
+                &account_id,
+                AgendaAction::Commit {
+                    state: target.state(Some(e.clone())),
+                    events: None,
+                },
+            )
+            .await;
             result.errors.push(e);
         }
     }
@@ -427,10 +314,14 @@ pub async fn mail_list_agenda(
     days: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailAgendaEvent>, String> {
-    let days = days.unwrap_or(14).clamp(1, FUTURE_DAYS);
-    with_mail_db(&state, &account_id, |db| {
-        agenda(db, &account_id, now_ts(), days)
-    })
+    store::run(
+        &state,
+        &account_id,
+        AgendaAction::List {
+            days: days.unwrap_or(14),
+        },
+    )
+    .await
 }
 
 #[derive(Debug, Serialize)]
@@ -501,16 +392,26 @@ pub async fn mail_add_invite_to_calendar(
         return Err(format!("CalDAV rejected the event (HTTP {})", reply.status));
     }
     let events = parse_events(&body);
-    with_mail_db(&state, &account_id, |db| {
-        store_events(db, &account_id, &[(href.clone(), events)], false)?;
-        save_state(db, &account_id, &target, None)
-    })?;
+    store::run::<usize>(
+        &state,
+        &account_id,
+        AgendaAction::Commit {
+            state: target.state(None),
+            events: Some(EventDelta {
+                resources: vec![(href.clone(), events)],
+                replace_all: false,
+            }),
+        },
+    )
+    .await?;
     Ok(MailCalendarWriteResult { href, created })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rusqlite::Connection;
+    use taomni_mail_storage::agenda::{agenda, store_events};
 
     const EXPANDED: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:standup\r\nRECURRENCE-ID:20261005T010000Z\r\nDTSTART:20261005T010000Z\r\nDTEND:20261005T011500Z\r\nSUMMARY:Standup\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT10M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:standup\r\nRECURRENCE-ID:20261006T010000Z\r\nDTSTART:20261006T010000Z\r\nDTEND:20261006T011500Z\r\nSUMMARY:Standup\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 

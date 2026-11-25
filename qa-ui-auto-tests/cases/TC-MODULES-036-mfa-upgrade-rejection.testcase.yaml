@@ -1,0 +1,88 @@
+id: TC-MODULES-036
+title: MFA upgrade rejects an untrusted package and preserves the original account
+description: >-
+  Create a Vault and MFA account, request migration with an untrusted local
+  archive, and confirm the rejection keeps Settings open and the candidate
+  available. Return to MFA and read the original HOTP code. Browser exercises
+  the preview's explicit refusal. Native exercises the actual signature check.
+covers: [F-Modules-1, F-MFA-1]
+tags: [modules, mfa, upgrade, p0]
+modes: [browser, native]
+fixtures: [reset_db, module_upgrade, module_offline_archive]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-upgrade-036}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-upgrade-036}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: Upgrade MFA}
+- fill: {selector: '[data-testid="mfa-add-secret"]', value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ}
+- click: '[data-testid="mfa-add-advanced"]'
+- select_option: {selector: '[data-testid="mfa-add-kind"]', value: hotp}
+- click: '[data-testid="mfa-add-submit"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 755 224}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-upgrade-mfa-open"]'
+- press: {selector: '[data-testid="module-upgrade-mfa-open"]', key: Enter}
+- wait_for: '[data-testid="module-upgrade-mfa-form"]'
+- assert_visible: '[data-testid="module-upgrade-mfa-submit"][disabled]'
+- assert_visible: '[data-testid="module-upgrade-mfa-choose-archive"]'
+- assert_visible: '[data-testid="module-upgrade-mfa-choose-signature"]'
+- fill: {selector: '[data-testid="module-upgrade-mfa-archive"]', value: '${fixture.module_untrusted_archive}'}
+- fill: {selector: '[data-testid="module-upgrade-mfa-signature"]', value: '${fixture.module_untrusted_signature_path}'}
+- fill: {selector: '[data-testid="module-upgrade-mfa-password"]', value: qa-mfa-upgrade-036}
+- press: {selector: '[data-testid="module-upgrade-mfa-submit"]:not([disabled])', key: Enter}
+- assert_text: {selector: '[data-testid="module-upgrade-mfa-error"]', contains: signature, timeout_sec: 30}
+- assert_visible: '[data-testid="module-upgrade-mfa-submit"][disabled]'
+- assert_count: {selector: '[data-testid="module-upgrade-mfa-result"]', equal: 0}
+- press: {selector: '[data-testid="module-upgrade-mfa-cancel"]', key: Enter}
+- assert_not_visible: '[data-testid="module-upgrade-mfa-form"]'
+- assert_visible: '[data-testid="module-upgrade-mfa-open"]'
+- assert_text_equals: {selector: '[data-testid="module-upgrade-candidates"] li', equals: mfa}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mfa"]'
+- assert_visible: '[data-testid="mfa-account-row"][data-issuer="Upgrade MFA"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 755 224}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: An untrusted archive is rejected, clears the password, and leaves the upgrade candidate and form recoverable.
+    actions: [19, 21, 23, 28, 29, 30, 31, 35]
+    checkpoints:
+    - {step: 25, expectation: The incomplete request cannot restart the app.}
+    - {step: 32, expectation: The signature check rejects the request.}
+    - {step: 33, expectation: The password field must be filled again after rejection.}
+    - {step: 34, expectation: No migration completion result is shown.}
+    - {step: 36, expectation: The form can be cancelled after failure.}
+    - {step: 38, expectation: MFA remains a candidate.}
+    results: [32, 33, 34, 36, 38]
+  - id: R2
+    requirement: The original account and HOTP value stay accessible after failure.
+    actions: [5, 9, 11, 17, 39, 40, 41]
+    checkpoints:
+    - {step: 18, expectation: The original HOTP value is present before migration.}
+    - {step: 42, expectation: The original account is still present.}
+    - {step: 43, expectation: The original HOTP value is unchanged.}
+    - {step: 44, expectation: No unhandled error occurred.}
+    results: [42, 43, 44]
+  visual:
+  - check: The signature error and remaining candidate are visible on their respective controls.
+    method: automated
+    reason: The case checks both visible states and the form lifecycle.
+  native:
+  - check: The real module verifier refuses the archive while the encrypted original account remains readable.
+    method: automated
+    reason: Release QA executes the native app and its existing Vault.

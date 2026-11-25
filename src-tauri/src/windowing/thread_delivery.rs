@@ -149,7 +149,7 @@ pub(crate) fn plan_delivery<B: EventBus + ?Sized>(
 /// [`plan_delivery`] for an `AppHandle` (diagnostics and the isolated QA probe).
 pub(crate) fn plan_thread_delivery(app: &tauri::AppHandle, thread_id: &str) -> Delivery {
     let state = app.state::<crate::state::AppState>();
-    plan_delivery(app, &state.agent.thread_windows, thread_id)
+    plan_delivery(app, &state.core.agent.thread_windows, thread_id)
 }
 
 /// Emit a thread-scoped event to the window that owns `thread_id`.
@@ -205,8 +205,8 @@ pub(crate) fn emit_to_window_or_broadcast<B: EventBus + ?Sized>(
 /// `has_webview(..)`, so the next approval would be emitted into that dying
 /// window instead of falling back to a broadcast — and nobody would see it.
 pub(crate) fn forget_window_routes(state: &crate::state::AppState, label: &str) {
-    state.agent.thread_windows.forget_label(label);
-    if let Ok(mut owners) = state.agent.cc_tab_windows.lock() {
+    state.core.agent.thread_windows.forget_label(label);
+    if let Ok(mut owners) = state.core.agent.cc_tab_windows.lock() {
         owners.retain(|_, owner| owner != label);
     }
 }
@@ -233,7 +233,13 @@ pub(crate) fn emit_thread_event_for_app(
     payload: Value,
 ) -> Delivery {
     let state = app.state::<crate::state::AppState>();
-    emit_thread_event(app, &state.agent.thread_windows, thread_id, event, payload)
+    emit_thread_event(
+        app,
+        &state.core.agent.thread_windows,
+        thread_id,
+        event,
+        payload,
+    )
 }
 
 /// Event telling every window that a Claude Code approval is no longer

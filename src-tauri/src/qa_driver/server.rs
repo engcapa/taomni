@@ -33,7 +33,7 @@ use tauri::WebviewWindow;
 use tokio::sync::Mutex;
 
 /// Start the opt-in bridge and return immediately so Tauri can finish setup.
-pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: String, port: u16) {
+pub(super) fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, port: u16) {
     if BRIDGE_STARTED.swap(true, Ordering::AcqRel) {
         return;
     }
@@ -44,7 +44,7 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
         next_element: Arc::new(AtomicU64::new(1)),
     };
     tauri::async_runtime::spawn(async move {
-        let address = format!("{host}:{port}");
+        let address = std::net::SocketAddr::from((std::net::Ipv4Addr::LOCALHOST, port));
         let listener = match tokio::net::TcpListener::bind(&address).await {
             Ok(listener) => listener,
             Err(error) => {

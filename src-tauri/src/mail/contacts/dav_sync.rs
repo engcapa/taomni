@@ -1,11 +1,7 @@
 use super::dav_protocol::card_file_name;
 use super::dav_protocol::multiget_body;
-use super::model::CardChange;
 use super::model::MailCardDavSyncResult;
-use super::model::StoredCard;
 use crate::mail::now_ts;
-use crate::mail::vcard::parse_vcards;
-use crate::mail::vcard::serialize_vcard;
 use crate::mail::webdav::DavClient;
 use crate::mail::webdav::PROPFIND_ETAGS;
 use crate::mail::webdav::XML;
@@ -15,6 +11,8 @@ use crate::mail::webdav::href_path;
 use crate::mail::webdav::parse_multistatus;
 use reqwest::Url;
 use std::collections::HashMap;
+use taomni_mail_storage::contacts::{CardChange, StoredCard};
+use taomni_mail_storage::vcard::{parse_vcards, serialize_vcard};
 
 /// Upload local changes, then pull the server state.
 pub(super) async fn sync_collection(

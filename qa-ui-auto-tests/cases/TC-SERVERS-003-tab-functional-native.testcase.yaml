@@ -5,8 +5,8 @@ description: >-
   single `servers` tab across Linux, Windows, and macOS: opens via Global Command
   Palette, configures HTTP on 127.0.0.1:28489, starts the real in-process HTTP
   server and observes listening log output, preserves running status and live logs
-  across Home/tab switches, applies an updated port (28490) through on-demand
-  vault setup and observes the restart warning, stops the server, clears logs,
+  across Home/tab switches, applies the updated HTTP port (28490) and observes the
+  restart warning without requiring another service's Vault, stops the server, clears logs,
   closes without a discard prompt, and reopens to verify persisted settings and
   cleared log state.
 covers:
@@ -22,6 +22,7 @@ native_platforms:
 - macOS
 fixtures:
 - reset_db
+- local_servers_http
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
@@ -52,6 +53,7 @@ steps:
 - fill:
     selector: '[data-testid="server-field-port"]'
     value: '28489'
+- fill: {selector: '[data-testid="server-field-http-root-dir"]', value: '${fixture.local_servers_http_root}'}
 - click: '[data-testid="server-row-http-start"]'
 - wait_for:
     selector: '[data-testid="server-row-http"][data-status="running"]'
@@ -61,6 +63,7 @@ steps:
     selector: '[data-testid="server-log"]'
     contains: 127.0.0.1:28489
     timeout_sec: 10
+- assert_local_servers_http: serving
 - assert_enabled: '[data-testid="server-log-clear"]'
 - click: '[data-testid="nav-mode-home"]'
 - wait_for: '[data-testid="welcome-panel"]'
@@ -81,20 +84,8 @@ steps:
     selector: '[data-testid="server-field-port"]'
     value: '28490'
 - click: '[data-testid="servers-dialog-apply"]'
-- wait_for:
-    selector: '[data-testid="vault-setup-dialog"]'
-    timeout_sec: 15
-- fill:
-    selector: '[data-testid="vault-setup-pw1"]'
-    value: qa-servers-vault-123
-- fill:
-    selector: '[data-testid="vault-setup-pw2"]'
-    value: qa-servers-vault-123
-- click: '[data-testid="vault-setup-confirm"]'
-- wait_for:
-    selector: '[data-testid="vault-setup-dialog"]'
-    state: detached
-    timeout_sec: 15
+- wait_for: '[data-testid="servers-dialog-apply"]:enabled'
+- assert_not_visible: '[data-testid="vault-setup-dialog"]'
 - assert_text:
     selector: '[data-testid="server-log"]'
     contains: Restart server to apply port change
@@ -103,6 +94,7 @@ steps:
 - wait_for:
     selector: '[data-testid="server-row-http"][data-status="stopped"]'
     timeout_sec: 20
+- assert_local_servers_http: stopped
 - assert_disabled: '[data-testid="server-row-http-stop"]'
 - click: '[data-testid="server-log-clear"]'
 - assert_disabled: '[data-testid="server-log-clear"]'
@@ -154,10 +146,10 @@ verification:
     - 10
     - 14
     - 15
-    - 16
-    - 21
-    - 24
+    - 17
+    - 23
     - 26
+    - 28
     checkpoints:
     - step: 7
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 20}}'
@@ -169,58 +161,57 @@ verification:
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-row-http\"]", "name": "data-status", "equals": "stopped"}}'
     - step: 13
       expectation: '{"assert_disabled": "[data-testid=\"server-row-http-stop\"]"}'
-    - step: 17
-      expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-http\"][data-status=\"running\"]", "timeout_sec": 20}}'
     - step: 18
-      expectation: '{"assert_enabled": "[data-testid=\"server-row-http-stop\"]"}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-http\"][data-status=\"running\"]", "timeout_sec": 20}}'
     - step: 19
-      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "127.0.0.1:28489", "timeout_sec": 10}}'
+      expectation: '{"assert_enabled": "[data-testid=\"server-row-http-stop\"]"}'
     - step: 20
-      expectation: '{"assert_enabled": "[data-testid=\"server-log-clear\"]"}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "127.0.0.1:28489", "timeout_sec": 10}}'
     - step: 22
+      expectation: '{"assert_enabled": "[data-testid=\"server-log-clear\"]"}'
+    - step: 24
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 23
+    - step: 25
       expectation: '{"assert_not_visible": "[data-testid=\"servers-dialog\"]"}'
-    - step: 27
-      expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
-    - step: 28
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-row-http\"]", "name": "data-status", "equals": "running"}}'
     - step: 29
+      expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-row-http\"]", "name": "data-status", "equals": "running"}}'
+    - step: 31
       expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "127.0.0.1:28489", "timeout_sec": 5}}'
     results:
     - 8
-    - 17
     - 18
     - 19
-    - 23
-    - 28
-    - 29
-  - id: R2
-    requirement: Applying an edited port on a running HTTP server completes on-demand vault setup, logs the restart hint, stops cleanly, and clears logs.
-    actions:
+    - 20
+    - 25
     - 30
     - 31
+  - id: R2
+    requirement: Applying an edited port on a running HTTP server saves the HTTP configuration, logs the restart hint, stops cleanly, and clears logs.
+    actions:
+    - 32
     - 33
-    - 34
-    - 35
-    - 38
+    - 37
     - 41
     checkpoints:
-    - step: 32
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-dialog\"]", "timeout_sec": 15}}'
+    - step: 34
+      expectation: Apply finishes saving the selected HTTP service.
+    - step: 35
+      expectation: Applying HTTP settings does not open the Vault setup dialog.
     - step: 36
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-dialog\"]", "state": "detached", "timeout_sec": 15}}'
-    - step: 37
       expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "Restart server to apply port change", "timeout_sec": 10}}'
-    - step: 39
+    - step: 38
       expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-http\"][data-status=\"stopped\"]", "timeout_sec": 20}}'
     - step: 40
       expectation: '{"assert_disabled": "[data-testid=\"server-row-http-stop\"]"}'
     - step: 42
       expectation: '{"assert_disabled": "[data-testid=\"server-log-clear\"]"}'
     results:
-    - 37
-    - 39
+    - 34
+    - 35
+    - 36
+    - 38
     - 40
     - 42
   - id: R3
@@ -264,8 +255,15 @@ verification:
     - 57
     - 60
     - 61
+  - id: HTTP
+    requirement: The native HTTP listener returns the configured document and closes on Stop.
+    actions: [14, 15, 16, 17, 37]
+    checkpoints:
+    - {step: 21, expectation: An independent HTTP request returns the fixture file with the exact bytes.}
+    - {step: 39, expectation: A new connection to the configured address is refused after Stop.}
+    results: [21, 39]
   visual:
-  - check: HTTP server configuration, running status indicator, server log output, and vault setup prompt render inside the single servers tab on Linux, Windows, and macOS.
+  - check: HTTP server configuration, running status and server log output render inside the single servers tab on Linux, Windows and macOS.
     method: not-applicable
     reason: Verified natively across desktop WebViews through live control state, port binding, and layout visibility checks rather than static screenshot diffing.
   native:

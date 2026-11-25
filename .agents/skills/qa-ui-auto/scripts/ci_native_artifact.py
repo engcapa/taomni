@@ -31,6 +31,10 @@ def build_entry(selection, build_id):
     return matches[0]
 
 
+def build_recipe(entry):
+    return native_build.recipe_identity(**native_build.module_build_options(entry.get('capabilities', [])))
+
+
 def allowed(name, profile):
     p = PurePosixPath(name)
     if p.is_absolute() or '..' in p.parts or '\\' in name or ':' in name:
@@ -38,11 +42,13 @@ def allowed(name, profile):
     return name.startswith(f'src-tauri/target/qa-ui-auto/{profile}/') or name.startswith('src-tauri/frameworks/')
 
 
-def _collect_runtime_files(profile, selection_source_sha256):
+def _collect_runtime_files(profile, selection_source_sha256, expected_recipe_sha256):
     binary = native_build.qa_binary(release=profile == 'release')
     identity = native_build.verify_identity(binary)
     if identity['source_sha256'] != selection_source_sha256:
         raise ValueError('native build source differs')
+    if identity.get('build_inputs', {}).get('recipe_sha256') != expected_recipe_sha256:
+        raise ValueError('native build recipe differs')
     # Immediate runtime files and resource trees; never Cargo object caches.
     excluded = {'deps', 'build', 'incremental', '.fingerprint', 'examples', 'bundle'}
     paths = []
@@ -61,7 +67,7 @@ def _collect_runtime_files(profile, selection_source_sha256):
         raise ValueError('missing required runtime files')
     files = {n: {'sha256': native_build.binary_digest(p), 'mode': p.stat().st_mode & 0o777}
              for n, p in sorted(names.items())}
-    return names, required[0], identity, files
+    return names, required[0], files
 
 
 def _write_archive(archive, names, profile, manifest_name, record):
@@ -130,7 +136,9 @@ def export(archive, selection, entry):
     if commit('HEAD') != selection['head'] or execution_identity(ROOT) != selection['identity']:
         raise ValueError('build checkout differs from selection')
     profile = entry['profile']
-    names, binary_rel, _, files = _collect_runtime_files(profile, selection['identity']['source_sha256'])
+    names, binary_rel, files = _collect_runtime_files(
+        profile, selection['identity']['source_sha256'], build_recipe(entry)
+    )
     record = {'schema': 1, 'build_id': entry['id'], 'head': selection['head'],
               'selection_sha256': selection_digest(selection), 'platform': platform.system(),
               'arch': entry['arch'], 'runner': entry['runner'], 'profile': profile,
@@ -144,10 +152,10 @@ def export_reusable(archive, selection, entry):
     if commit('HEAD') != selection['head'] or execution_identity(ROOT) != selection['identity']:
         raise ValueError('build checkout differs from selection')
     profile = entry['profile']
-    names, binary_rel, identity, files = _collect_runtime_files(profile, selection['identity']['source_sha256'])
-    recipe_sha256 = native_build.recipe_identity()
-    if identity.get('build_inputs', {}).get('recipe_sha256') != recipe_sha256:
-        raise ValueError('native build recipe differs')
+    recipe_sha256 = build_recipe(entry)
+    names, binary_rel, files = _collect_runtime_files(
+        profile, selection['identity']['source_sha256'], recipe_sha256
+    )
     record = {'schema': 1, 'platform': platform.system(), 'arch': entry['arch'],
               'runner': entry['runner'], 'profile': profile,
               'source_sha256': selection['identity']['source_sha256'],
@@ -182,6 +190,7 @@ def install(archive, selection, entry):
     record = _install_validated_archive(
         archive, build['profile'], MANIFEST, expected,
         expected_source_sha256=selection['identity']['source_sha256'],
+        expected_recipe_sha256=build_recipe(build),
     )
     print(f'Installed verified native build {entry["build_id"]}; no compilation', flush=True)
     return record
@@ -194,7 +203,7 @@ def install_reusable(archive, selection, entry):
         raise ValueError('native build architecture differs from build host')
     if commit('HEAD') != selection['head'] or execution_identity(ROOT) != selection['identity']:
         raise ValueError('build checkout differs from selection')
-    recipe_sha256 = native_build.recipe_identity()
+    recipe_sha256 = build_recipe(entry)
     expected = {'schema': 1, 'platform': platform.system(), 'arch': arch,
                 'runner': entry['runner'], 'profile': entry['profile'],
                 'source_sha256': selection['identity']['source_sha256'],
@@ -222,7 +231,10 @@ def main():
         install_reusable(args.reusable_archive, selection, entry)
         reused = True
     if not reused:
-        native_build.build_qa(release=entry['profile'] == 'release')
+        native_build.build_qa(
+            release=entry['profile'] == 'release',
+            **native_build.module_build_options(entry.get('capabilities', [])),
+        )
         if args.reusable_archive:
             export_reusable(args.reusable_archive, selection, entry)
     export(args.archive, selection, entry)

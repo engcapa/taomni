@@ -32,7 +32,7 @@ pub async fn history_append(
     let cap = clamp_cap(max);
     let ts = now_secs();
 
-    let mut db = state.db.lock().map_err(|e| e.to_string())?;
+    let mut db = state.core.db.lock().map_err(|e| e.to_string())?;
     let tx = db.transaction().map_err(|e| e.to_string())?;
 
     tx.execute(
@@ -71,7 +71,7 @@ pub async fn history_match_prefix(
     state: State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
     let limit = limit.clamp(1, 500);
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     let mut stmt = db
         .prepare(
             "SELECT command FROM command_history
@@ -98,7 +98,7 @@ pub async fn history_list_recent(
     state: State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
     let limit = limit.clamp(1, 2000);
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     let mut stmt = db
         .prepare(
             "SELECT command FROM command_history
@@ -119,7 +119,7 @@ pub async fn history_clear(
     host_key: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     match host_key {
         Some(h) => {
             db.execute(

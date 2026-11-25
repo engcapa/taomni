@@ -154,7 +154,7 @@ Tao Home 渲染在 Taomni 现有外壳里（标题栏 / 主 rail / 标签栏 / �
 - **顶栏与左侧 rail 不再放历史按钮**，历史只有一个入口，避免重复。
 - **快捷行属于宿主，不属于 TaoAiChat**（§6.0）：它是 Home 宿主通过 `belowComposer` 槽位注入的内容；换成别的宿主（如开发 Agent）时可以不提供。
 
-**LAN 聊天移除**：Home 范围内删除所有 LAN 聊天 UI（原“LAN 聊天”启动按钮、`onOpenLanChat` 属性及其测试 id `welcome-open-lanchat`、相关文案）。已核查：`onOpenLanChat` 在 `TabContentRouter.tsx`、`welcome/types.ts`、`PlatformLaunchCards.tsx`、`WelcomePanel.tsx` 中使用；LAN 聊天另有**首页以外的入口**（`ToolsPanel`、`ControlBar`、`useMainMenuActions`、`commandActions`、`useMainUtilityTabs`、若干 store 与 `components/lanchat/`），**本设计只涉及 Home 入口层**，整体下线范围见 §17 待确认项。
+**LAN 聊天已彻底下线**：本次变更移除 Home 入口及应用其余入口、状态、IPC、后台服务、窗口和备份路径。旧安装中的 `lanchat.sqlite` 仅在升级预检中原样保留，不读取、不迁移。
 
 ---
 
@@ -427,7 +427,7 @@ type Phase = "idle"|"sending"|"thinking"|"searching"|"streaming"|"stopped"
 - [ ] H1 快捷行在 Composer 正下方，空态与对话态都显示；“历史”为第一项，顶栏与 rail 无历史按钮
 - [ ] H2 历史浮层三个页签（Tao 对话 / 最近会话 / 最近工作区）可切换且不关闭浮层；搜索框随页签过滤；点最近会话 / 工作区在对应标签打开、不进入聊天
 - [ ] H3 WSL：未就绪、无发行版、加载中、出错、不支持时**均不渲染**；就绪且有发行版才显示（沿用 `wslStatus` 与 `wslDistros`）
-- [ ] H4 Home 范围内搜索不到 LAN 聊天按钮、`onOpenLanChat`、`welcome-open-lanchat`
+- [x] H4 Home 范围内搜索不到 LAN 聊天按钮、`onOpenLanChat`、`welcome-open-lanchat`；应用其余入口与实现也已删除
 - [ ] H5 演示模式下历史浮层不显示真实会话 / 工作区名称
 - [ ] H6 `TaoAiChat` 目录内无对 `WelcomePanel` / `welcome/*` / `layouts/*` / `orchestrationStore` / 旧 `chatStore` 的 import（边界检查通过）
 - [ ] H7 同一窗口挂两个宿主实例（首页 + 空宿主测试页）：各自发送、各自预算与线程状态互不影响
@@ -560,5 +560,5 @@ CREATE INDEX doc_src_ts ON doc(source, ts);
 
 | # | 事项 | 影响 | 建议 |
 |---|---|---|---|
-| Q-1 | LAN 聊天是否**整体下线**：本设计只删 Home 入口；`ToolsPanel`、`ControlBar`、菜单与命令、`components/lanchat/`、三个 store 与后端仍在 | 范围决定：仅清 Home 入口约 0.5 天，整体下线是一次独立的删除任务 | 先做 Home 入口（已含在 P0-H），整体下线另开任务并先确认没有其他依赖 |
+| Q-1 | LAN 聊天是否整体下线 | 已确认整体下线；保留旧安装数据仅作升级预检回归 fixture，不读取、不迁移 | 已在本轮完成代码、入口、备份、QA 和文档清理 |
 | Q-2 | 与 `feat/development-orchestrator` 的对接接口 | §6.0 是 Tao 单方约束；该分支的 `llm/*` 抽取、`MainLayoutView` 与 i18n 改动与本设计的落点相邻 | P0-0 开工前先 rebase 并列冲突面，再与该分支作者核对槽位与端口 |

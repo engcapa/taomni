@@ -1,0 +1,163 @@
+id: TC-MODULES-017
+title: Module tab preview preserves drafts and follows disable, detach and uninstall
+description: >-
+  An explicitly seeded browser-only hello model exercises the production
+  renderer and independently served repository ESM with the host React instance.
+  It does not verify/install an archive or establish native IPC/disk/process
+  behavior. Exercise Open deduplication, inactive draft preservation, persisted
+  locators, disable/retry/enable, a real popup with cross-window invalidation,
+  reattach, and uninstall retaining a missing tab. TC-MODULES-016 covers native
+  signatures, custom-protocol ESM, the real host database and real WebViews.
+covers: [F-Modules-1, F-Detach-1]
+tags: [p1, modules, lifecycle]
+modes: [browser]
+fixtures: [reset_db, module_preview]
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-action-enable-hello-plugin"]'
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- wait_for: '[data-testid="hello-plugin-values"][data-state="empty"] [data-testid="hello-plugin-empty"]'
+- fill: {selector: '[data-testid="hello-plugin-value"]', value: preview saved message}
+- click: '[data-testid="hello-plugin-save"]'
+- wait_for: '[data-testid="hello-plugin-entry"]'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: preview saved message}
+- fill: {selector: '[data-testid="hello-plugin-value"]', value: preview draft}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="plugin"]', equal: 1}
+- assert_attribute: {selector: '[data-testid="hello-plugin-value"]', name: value, equals: preview draft}
+- reload_window: null
+- wait_for: '[data-testid="hello-plugin-values"]'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: preview saved message}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-enable-hello-plugin"]'
+- click: '[data-testid="tab-item"][data-tab-type="plugin"]'
+- wait_for: '[data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="hello-plugin-view"]', equal: 0}
+- click: '[data-testid="plugin-tab-retry"]'
+- wait_for: '[data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- click: '[data-testid="plugin-tab-settings"]'
+- wait_for: '[data-testid="module-action-enable-hello-plugin"]'
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- wait_for: '[data-testid="hello-plugin-values"]'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: preview saved message}
+- click: '[data-testid="plugin-tab-detach"]'
+- switch_window: {selector: '[data-testid="plugin-detached-window"]'}
+- wait_for: '[data-testid="hello-plugin-values"]'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: preview saved message}
+- fill: {selector: '[data-testid="hello-plugin-value"]', value: popup message}
+- click: '[data-testid="hello-plugin-save"]'
+- wait_for: '[data-testid="hello-plugin-entry"]:nth-child(2)'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: popup message}
+- switch_window: {selector: '[data-testid="status-bar"]'}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="module-action-disable-hello-plugin"]'
+- click: '[data-testid="module-action-disable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-enable-hello-plugin"]'
+- switch_window: {selector: '[data-testid="plugin-detached-window"]'}
+- wait_for: '[data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="hello-plugin-view"]', equal: 0}
+- switch_window: {selector: '[data-testid="status-bar"]'}
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- switch_window: {selector: '[data-testid="plugin-detached-window"]'}
+- wait_for: '[data-testid="hello-plugin-values"]'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: popup message}
+- assert_no_runtime_errors: null
+- switch_window: {selector: '[data-testid="status-bar"]', close_with: '[data-testid="plugin-tab-reattach"]'}
+- wait_for: '[data-testid="hello-plugin-values"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="plugin"]', equal: 1}
+- assert_count: {selector: '[data-testid="hello-plugin-entry"]', equal: 2}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="module-action-uninstall-hello-plugin"]'
+- click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-hello-plugin"]'
+- click: '[data-testid="tab-item"][data-tab-type="plugin"]'
+- wait_for: '[data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+- reload_window: null
+- wait_for: '[data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+- assert_count: {selector: '[data-testid="hello-plugin-view"]', equal: 0}
+- assert_no_runtime_errors: null
+- screenshot: preview-module-missing-tab-retained.png
+- click: '[data-testid="plugin-tab-settings"]'
+- wait_for: '[data-testid="module-store-panel"]'
+- assert_count: {selector: '[data-testid="module-action-install-hello-plugin"]', equal: 1}
+- click: '[data-testid="tab-item"][data-tab-type="plugin"]'
+- wait_for: '[data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R5
+    requirement: The retained placeholder navigates to module Settings and back without creating or executing another module.
+    actions: [81, 84]
+    checkpoints:
+    - {step: 82, expectation: Manage modules opens the module store section.}
+    - {step: 83, expectation: The browser preview reflects the uninstalled module state.}
+    - {step: 85, expectation: The original missing-module tab remains available.}
+    - {step: 86, expectation: No unhandled renderer errors occur.}
+    results: [82, 83, 85, 86]
+  - id: R1
+    requirement: Independent preview ESM uses shared hooks, preserves inactive drafts, deduplicates Open and restores saved locators.
+    actions: [7, 9, 11, 12, 15, 16, 18, 21]
+    checkpoints:
+    - {step: 10, expectation: The real renderer mounts the separately served module component.}
+    - {step: 14, expectation: The explicit preview model returns the saved message to the module UI.}
+    - {step: 19, expectation: Repeated Open produces exactly one module tab.}
+    - {step: 20, expectation: Inactive view switching retains the exact draft.}
+    - {step: 23, expectation: Reload restores the locator and reads the saved preview message.}
+    results: [10, 14, 19, 20, 23]
+  - id: R2
+    requirement: Disabled modules unmount and retry cannot bypass lifecycle; enable restores the view.
+    actions: [27, 29, 32, 34, 36, 38]
+    checkpoints:
+    - {step: 30, expectation: The disabled placeholder replaces the module view.}
+    - {step: 31, expectation: No module component remains mounted.}
+    - {step: 33, expectation: Retry preserves the disabled placeholder.}
+    - {step: 40, expectation: Enable restores the component and previously saved message.}
+    results: [30, 31, 33, 40]
+  - id: R3
+    requirement: A real popup follows cross-window invalidations and reattaches with its data and one tab.
+    actions: [41, 42, 45, 46, 49, 52, 54, 57, 58, 60, 64]
+    checkpoints:
+    - {step: 44, expectation: The popup independently loads the module and original preview message.}
+    - {step: 48, expectation: The popup saves its second message.}
+    - {step: 55, expectation: Main-window disable reaches the popup placeholder.}
+    - {step: 56, expectation: Disable actually removes the popup module component.}
+    - {step: 62, expectation: Main-window enable restores the popup with the second saved message.}
+    - {step: 63, expectation: The popup has no unhandled runtime errors.}
+    - {step: 66, expectation: Reattach closes the popup and leaves one main-window module tab.}
+    - {step: 67, expectation: Both saved messages are present after reattach.}
+    results: [44, 48, 55, 56, 62, 63, 66, 67]
+  - id: R4
+    requirement: Uninstall retains a missing tab through reload without evaluating module code.
+    actions: [68, 70, 72, 74, 76]
+    checkpoints:
+    - {step: 75, expectation: Confirmed preview uninstall displays the missing-module placeholder.}
+    - {step: 77, expectation: Reload restores the same unavailable locator.}
+    - {step: 78, expectation: No uninstalled module component is mounted.}
+    - {step: 79, expectation: The main browser page has no unhandled runtime errors.}
+    results: [75, 77, 78, 79]
+  native:
+  - check: Pinned-key installation, native asset integrity, persisted host data and WebView lifecycle.
+    method: external
+    reason: This explicit browser model proves renderer behavior only; TC-MODULES-016/018 own the native boundaries.
+  visual:
+  - check: Module form, tab actions and missing-state controls remain readable.
+    method: manual
+    reason: The retained screenshot supports review; this preview does not prove native trust or disk behavior.

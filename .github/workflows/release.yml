@@ -17,20 +17,46 @@ on:
         required: true
         default: all
         type: choice
-        options: [all, macos]
+        options: [all, macos, windows]
       macos_arch:
         description: "Artifact-only macOS architecture selection. Tagged releases require both."
         required: true
         default: both
         type: choice
         options: [both, x86_64, aarch64]
+      macos_runner:
+        description: "Apple Silicon runner for artifact-only macOS builds."
+        default: macos-15
+        type: choice
+        options: [macos-15, macos-26]
+      macos_static_krb5:
+        description: "Build the ARM64 QA artifact with static Kerberos and hardened runtime."
+        type: boolean
+        default: false
       test_version:
         description: "Optional SemVer override for artifact-only upgrade tests; package.json is unchanged."
+        required: false
+        type: string
+      modules:
+        description: Comma-separated module slugs to build with the core
+        required: false
+        type: string
+      candidate_run:
+        description: Verified Release Bundle run. An empty tag rehearses promotion without publishing.
+        required: false
+        type: string
+      candidate_source:
+        description: Frozen product SHA when running promotion from a newer release workflow
+        required: false
+        type: string
+      module_rehearsal_baseline_run:
+        description: "Artifact-only Release Bundle run ID for read-only single-module catalog rehearsal (never builds core or publishes)."
         required: false
         type: string
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: release-bundle-${{ github.ref }}
@@ -45,23 +71,37 @@ jobs:
       tag: ${{ steps.plan.outputs.tag }}
       test_version: ${{ steps.plan.outputs.test_version }}
       build_desktop: ${{ steps.plan.outputs.build_desktop }}
-      macos_aarch64: ${{ steps.plan.outputs.macos_aarch64 }}
-      macos_x86_64: ${{ steps.plan.outputs.macos_x86_64 }}
+      desktop_platforms: ${{ steps.plan.outputs.desktop_platforms }}
+      macos_architectures: ${{ steps.plan.outputs.macos_architectures }}
+      macos_runner: ${{ steps.plan.outputs.macos_runner }}
+      modules: ${{ steps.plan.outputs.modules }}
+      candidate_run: ${{ steps.plan.outputs.candidate_run }}
+      rehearse_first_upgrade: ${{ steps.plan.outputs.rehearse_first_upgrade }}
+      module_rehearsal_baseline_run: ${{ steps.plan.outputs.module_rehearsal_baseline_run }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Build selection contracts
-        run: node --test scripts/resolve-release-build.test.mjs scripts/release-workflow.test.mjs scripts/install-linux-release-deps.test.mjs scripts/sherpa-onnx-cache.test.mjs
+        run: |
+          node --test scripts/resolve-release-build.test.mjs scripts/release-workflow.test.mjs scripts/verify-release-candidate.test.mjs scripts/install-linux-release-deps.test.mjs scripts/sherpa-onnx-cache.test.mjs
+          python -m unittest discover -s scripts -p test_linux_module_abi.py
       - name: Resolve build selection and version
         id: plan
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
           INPUT_RELEASE_TAG: ${{ inputs.tag }}
           INPUT_PLATFORMS: ${{ inputs.platforms }}
           INPUT_MACOS_ARCH: ${{ inputs.macos_arch }}
+          INPUT_MACOS_STATIC_KRB5: ${{ inputs.macos_static_krb5 }}
+          INPUT_MACOS_RUNNER: ${{ inputs.macos_runner }}
           RELEASE_TEST_VERSION: ${{ inputs.test_version }}
+          INPUT_RELEASE_MODULES: ${{ inputs.modules }}
+          INPUT_CANDIDATE_SOURCE: ${{ inputs.candidate_source }}
+          INPUT_CANDIDATE_RUN: ${{ inputs.candidate_run }}
+          INPUT_MODULE_REHEARSAL_BASELINE_RUN: ${{ inputs.module_rehearsal_baseline_run }}
         run: node scripts/resolve-release-build.mjs
 
   # ---------------------------------------------------------------------------
@@ -69,24 +109,13 @@ jobs:
   # ---------------------------------------------------------------------------
   build:
     needs: plan
-    if: needs.plan.outputs.build_desktop == 'true'
+    if: needs.plan.outputs.build_desktop == 'true' && needs.plan.outputs.candidate_run == ''
     name: Bundle (${{ matrix.platform }})
     runs-on: ${{ matrix.platform }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Stay on 22.04 so the Linux bundle keeps glibc 2.35 and runs on
-          # Ubuntu 22.04 / Debian bookworm-class distros. Stock jammy PipeWire
-          # (~0.3.48) headers are too old for libspa 0.9 (missing
-          # spa_video_info_raw.flags); we install a newer PipeWire from source
-          # for build only (see "Install PipeWire 1.x for libspa" step).
-          - platform: ubuntu-22.04
-            args: "--features native-av"
-            rust-targets: ""
-          - platform: windows-latest
-            args: ""
-            rust-targets: ""
+        platform: ${{ fromJSON(needs.plan.outputs.desktop_platforms) }}
 
     steps:
       - name: Checkout
@@ -111,16 +140,24 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.rust-targets }}
+
+      - name: Scope Windows native dependencies to the runner image
+        if: runner.os == 'Windows'
+        id: windows-cache-scope
+        shell: pwsh
+        run: |
+          $scope = if ($env:ImageVersion) {
+            "windows-image-$env:ImageVersion"
+          } else {
+            "windows-run-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          }
+          "key=$scope" >> $env:GITHUB_OUTPUT
 
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
-
-      - name: Refresh sherpa-onnx native cache
-        run: node scripts/refresh-sherpa-onnx-cache.mjs
+          key: ${{ steps.windows-cache-scope.outputs.key }}
 
       - name: Install Linux bundle dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -133,63 +170,7 @@ jobs:
       # to /usr/local so the release binary stays runnable on 22.04+.
       - name: Install PipeWire 1.x for libspa (Ubuntu 22.04)
         if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          set -euo pipefail
-          PW_VER=1.0.9
-          workdir="${RUNNER_TEMP:-/tmp}/pipewire-src"
-          rm -rf "$workdir"
-          mkdir -p "$workdir"
-          # GitHub mirror of the freedsktop tag (stable for CI downloads).
-          curl -fsSL "https://github.com/PipeWire/pipewire/archive/refs/tags/${PW_VER}.tar.gz" \
-            | tar -xz -C "$workdir" --strip-components=1
-          cd "$workdir"
-          meson setup build \
-            --prefix=/usr/local \
-            --buildtype=release \
-            -Ddocs=disabled \
-            -Dman=disabled \
-            -Dtests=disabled \
-            -Dexamples=disabled \
-            -Dinstalled_tests=disabled \
-            -Dsession-managers=[] \
-            -Dsystemd=disabled \
-            -Dselinux=disabled \
-            -Dpipewire-alsa=disabled \
-            -Dpipewire-jack=disabled \
-            -Dpipewire-v4l2=disabled \
-            -Djack=disabled \
-            -Dbluez5=disabled \
-            -Dffmpeg=disabled \
-            -Dlibcamera=disabled \
-            -Droc=disabled \
-            -Dlv2=disabled \
-            -Dsdl2=disabled \
-            -Dsndfile=disabled \
-            -Dlibpulse=disabled \
-            -Davahi=disabled \
-            -Decho-cancel-webrtc=disabled \
-            -Dgstreamer=disabled \
-            -Dreadline=disabled \
-            -Draop=disabled \
-            -Dgsettings=disabled \
-            -Dlibcanberra=disabled \
-            -Dflatpak=disabled \
-            -Drlimits-install=false
-          meson compile -C build
-          sudo meson install -C build
-          sudo ldconfig
-          # Prefer /usr/local headers and libs over stock jammy packages.
-          {
-            echo "PKG_CONFIG_PATH=/usr/local/lib/x86_64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
-            echo "LIBRARY_PATH=/usr/local/lib/x86_64-linux-gnu:/usr/local/lib:${LIBRARY_PATH:-}"
-            echo "LD_LIBRARY_PATH=/usr/local/lib/x86_64-linux-gnu:/usr/local/lib:${LD_LIBRARY_PATH:-}"
-          } >> "$GITHUB_ENV"
-          export PKG_CONFIG_PATH="/usr/local/lib/x86_64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
-          echo "libpipewire version: $(pkg-config --modversion libpipewire-0.3)"
-          pkg-config --cflags --libs libpipewire-0.3
-          # Sanity-check headers include the fields libspa 0.9 needs.
-          grep -q 'uint32_t flags' /usr/local/include/spa-0.2/spa/param/video/raw.h
-          grep -q 'uint64_t modifier' /usr/local/include/spa-0.2/spa/param/video/raw.h
+        run: bash scripts/install-release-pipewire.sh
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
@@ -199,65 +180,6 @@ jobs:
         run: |
           cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::capture::linux
           bash scripts/stage-sockscap-linux.sh --check
-          # Stage xray-core (MPL-2.0) into resources so the Linux bundle can serve
-          # core-backed upstreams (ss/trojan/vmess/vless/wireguard).
-          pwsh scripts/fetch-xray.ps1 -Platform linux
-          cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::core
-
-      - name: Fetch WinDivert redistributable (Windows)
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $dest = "src-tauri/resources/sockscap/windows"
-          New-Item -ItemType Directory -Force -Path $dest | Out-Null
-          if (Test-Path (Join-Path $dest "WinDivert.dll")) {
-            Write-Host "WinDivert already present in $dest, skipping download."
-            exit 0
-          }
-          # WinDivert redistributable (LGPLv3/GPLv2) — loaded dynamically by the
-          # elevated helper only. reqrypt.org is canonical; GitHub release is a mirror.
-          $version = "2.2.2"
-          $zip = Join-Path $env:RUNNER_TEMP "WinDivert-$version-A.zip"
-          $extract = Join-Path $env:RUNNER_TEMP "WinDivert-extract"
-          $urls = @(
-            "https://reqrypt.org/download/WinDivert-$version-A.zip",
-            "https://github.com/basil00/WinDivert/releases/download/v$version/WinDivert-$version-A.zip"
-          )
-          $ok = $false
-          foreach ($url in $urls) {
-            for ($i = 1; $i -le 3; $i++) {
-              try {
-                Write-Host "Downloading $url (attempt $i)..."
-                Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
-                $ok = $true; break
-              } catch {
-                Write-Warning "Download failed: $($_.Exception.Message)"
-                Start-Sleep -Seconds 5
-              }
-            }
-            if ($ok) { break }
-          }
-          if (-not $ok) { throw "Unable to download WinDivert $version from any mirror." }
-          if (Test-Path $extract) { Remove-Item -Recurse -Force $extract }
-          Expand-Archive -Path $zip -DestinationPath $extract -Force
-          $x64 = Join-Path $extract "WinDivert-$version-A\x64"
-          Copy-Item -Force (Join-Path $x64 "WinDivert.dll") $dest
-          Copy-Item -Force (Join-Path $x64 "WinDivert64.sys") $dest
-          Write-Host "WinDivert $version staged into ${dest}:"
-          Get-ChildItem $dest | Select-Object Name, Length
-
-      - name: Verify Windows SocksCap helper and preflight
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          # Make each native command's non-zero exit fatal so a failing test can't be
-          # masked by a later command's exit code (default pwsh only checks the last).
-          $PSNativeCommandUseErrorActionPreference = $true
-          pwsh scripts/stage-sockscap-windows.ps1
-          cargo test --manifest-path src-tauri/Cargo.toml --lib -- sockscap::policy sockscap::config sockscap::core
-          pwsh scripts/stage-sockscap-windows.ps1 --check
 
       - name: Check updater signing configuration
         shell: bash
@@ -271,27 +193,45 @@ jobs:
 
       # Build only. Release assets are published by the finalizer after every
       # platform and signature gate passes.
+      - name: Remove previous voice build outputs from the core package input
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $runtime = @("sherpa-onnx-c-api.dll", "sherpa-onnx-cxx-api.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll")
+          foreach ($name in $runtime) {
+            $path = Join-Path "src-tauri/target/release" $name
+            if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path }
+          }
+
       - name: Build desktop bundles
         id: tauri_build
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: ${{ matrix.args }} --config '${{ env.TAURI_RELEASE_CONFIG }}'
+          args: --config '${{ env.TAURI_RELEASE_CONFIG }}'
+
+      - name: Verify Linux core installer contents
+        if: matrix.platform == 'ubuntu-22.04'
+        run: bash scripts/verify-linux-release-bundle.sh
 
       - name: Verify Windows installer runtimes
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         env:
           TAOMNI_REQUIRE_NSIS_TESTS: '1'
-          TAOMNI_SHERPA_NATIVE_TEST: '1'
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
-          $env:TAOMNI_SHERPA_TEST_ARCHIVE_DIR = (Resolve-Path src-tauri/target/sherpa-onnx-prebuilt).Path
-          node --test scripts/sherpa-onnx-cache.test.mjs
           node --test scripts/windows-runtime-bundle.test.mjs
           pwsh -File scripts/verify-windows-release-bundle.ps1
+      - name: Exercise the updated GUI in the Windows desktop environment
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          set -eo pipefail
+          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --bin taomni -- --ignored --exact windows_update_relaunch::tests::desktop_environment_after_update --nocapture | tee windows-update-relaunch.log
+          grep -F "1 passed; 0 failed" windows-update-relaunch.log
 
       - name: Collect workflow artifacts
         shell: bash
@@ -308,16 +248,19 @@ jobs:
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
-  # macOS – single arm64 runner, cross-compiles both architectures
+  # macOS – each target gets its own ARM64 runner, keychain and Kerberos build.
   # tauri.conf.json sets minimumSystemVersion to 10.15 for Whisper's C++17
   # std::filesystem. Tauri forwards it as MACOSX_DEPLOYMENT_TARGET to both builds.
   # ---------------------------------------------------------------------------
   build-macos:
     needs: plan
-    name: Bundle (macOS)
-    # Pin the major runner image instead of following the moving `macos-latest`
-    # label. GitHub's macos-15 standard image is arm64 (Apple Silicon).
-    runs-on: macos-15
+    if: needs.plan.outputs.macos_architectures != '[]' && needs.plan.outputs.candidate_run == ''
+    name: Bundle (macOS ${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(needs.plan.outputs.macos_architectures) }}
+    runs-on: ${{ needs.plan.outputs.macos_runner }}
     env:
       # Direct cargo tests run before Tauri exports minimumSystemVersion.
       # Keep native C/C++ dependencies on the same floor as the app bundle.
@@ -347,16 +290,14 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: ${{ matrix.arch }}-apple-darwin
 
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
           cache-on-failure: true
-
-      - name: Refresh sherpa-onnx native cache
-        run: node scripts/refresh-sherpa-onnx-cache.mjs src-tauri/Cargo.toml aarch64-apple-darwin x86_64-apple-darwin
+          key: macos-${{ matrix.arch }}-${{ matrix.arch == 'aarch64' && inputs.macos_static_krb5 && 'static' || 'shared' }}
 
       # -----------------------------------------------------------------------
       # Install MIT Kerberos for both architectures.
@@ -373,16 +314,11 @@ jobs:
         run: brew install krb5
 
       - name: Install MIT Kerberos (x86_64 – Rosetta 2)
-        if: needs.plan.outputs.macos_x86_64 == 'true'
+        if: matrix.arch == 'x86_64'
         run: bash scripts/install-krb5-macos-x86_64.sh
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
-
-      # Keep Redirector v0.12.11 as an opaque, upstream-signed universal app
-      # archive. Taomni never rebuilds or re-signs its nested System Extension.
-      - name: Stage and verify signed Mitmproxy Redirector v0.12.11
-        run: bash scripts/stage-mitmproxy-redirector-macos.sh --stage
 
       - name: Verify macOS Redirector protocol and recovery gates
         env:
@@ -396,7 +332,17 @@ jobs:
           # first so tauri-build can resolve bundle.macOS.frameworks.
           bash scripts/bundle-krb5-macos.sh stage
           cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::redirector -- --test-threads=1
-          cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::recovery -- --test-threads=1
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-sockscap-api --locked --lib recovery::tests -- --test-threads=1
+
+      - name: Build static MIT Kerberos for the ARM64 signing comparison
+        if: matrix.arch == 'aarch64' && inputs.macos_static_krb5
+        id: static-krb5
+        run: |
+          set -euo pipefail
+          brew list --versions openssl@3 >/dev/null || brew install openssl@3
+          bash scripts/build-macos-static-krb5.sh "$RUNNER_TEMP/taomni-static-krb5"
+          echo 'MIT_KRB5_GSSAPI_STATIC=1' >> "$GITHUB_ENV"
+          echo "prefix=$RUNNER_TEMP/taomni-static-krb5" >> "$GITHUB_OUTPUT"
 
       - name: Release signing unit contracts
         run: node --test scripts/configure-release-signing.test.mjs scripts/verify-macos-release-bundle.test.mjs scripts/macos-runtime-paths.test.mjs
@@ -410,6 +356,7 @@ jobs:
         shell: bash
         env:
           RELEASE_PLATFORM: macOS
+          MACOS_STATIC_KRB5: ${{ matrix.arch == 'aarch64' && inputs.macos_static_krb5 }}
           RELEASE_TAG: ${{ needs.plan.outputs.tag }}
           RELEASE_TEST_VERSION: ${{ needs.plan.outputs.test_version }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -423,102 +370,55 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: node scripts/configure-release-signing.mjs
 
-      # ---------- aarch64-apple-darwin (native) ----------
-      - name: Stage and verify xray-core (aarch64)
-        if: needs.plan.outputs.macos_aarch64 == 'true'
-        shell: bash
+      - name: Select target Kerberos libraries
+        env:
+          STATIC_PREFIX: ${{ steps.static-krb5.outputs.prefix }}
+          SHARED_PREFIX: ${{ matrix.arch == 'aarch64' && '/opt/homebrew/opt/krb5' || '/usr/local/opt/krb5' }}
         run: |
-          set -euo pipefail
-          pwsh scripts/fetch-xray.ps1 -Platform macos-arm64 -Force
-          test "$(lipo -archs src-tauri/resources/sockscap/macos/xray)" = "arm64"
+          prefix="${STATIC_PREFIX:-$SHARED_PREFIX}"
+          echo "LIBGSSAPI_PREFIX=$prefix" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$prefix/lib/pkgconfig" >> "$GITHUB_ENV"
 
-      - name: Build macOS bundle (aarch64)
-        if: needs.plan.outputs.macos_aarch64 == 'true'
-        id: tauri_macos_aarch64
+      - name: Build macOS bundle
+        id: tauri_macos
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Point libgssapi-sys at Homebrew MIT Kerberos (arm64)
           LIBGSSAPI_IMPL: mit
-          LIBGSSAPI_PREFIX: /opt/homebrew/opt/krb5
-          PKG_CONFIG_PATH: /opt/homebrew/opt/krb5/lib/pkgconfig
+          PKG_CONFIG_ALLOW_CROSS: ${{ matrix.arch == 'x86_64' && '1' || '0' }}
         with:
-          args: --target aarch64-apple-darwin --config '${{ env.TAURI_RELEASE_CONFIG }}'
+          args: --target ${{ matrix.arch }}-apple-darwin --config '${{ env.TAURI_RELEASE_CONFIG }}'
 
-      - name: Verify fixed signature and updater app (aarch64)
-        if: needs.plan.outputs.macos_aarch64 == 'true'
+      - name: Verify fixed signature and updater app
         env:
           RELEASE_TAG: ${{ needs.plan.outputs.tag }}
-        run: bash scripts/verify-macos-release-bundle.sh aarch64-apple-darwin arm64
+          TARGET: ${{ matrix.arch }}-apple-darwin
+          EXPECTED_ARCH: ${{ matrix.arch == 'aarch64' && 'arm64' || 'x86_64' }}
+        run: bash scripts/verify-macos-release-bundle.sh "$TARGET" "$EXPECTED_ARCH"
 
-      - name: Collect workflow artifacts (aarch64)
-        if: needs.plan.outputs.macos_aarch64 == 'true'
-        shell: bash
+      - name: Collect workflow artifacts
         env:
-          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_aarch64.outputs.artifactPaths }}
-          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-aarch64
-        run: node scripts/collect-tauri-action-artifacts.mjs
-
-      - name: Upload workflow artifacts (aarch64)
-        if: needs.plan.outputs.macos_aarch64 == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: taomni-${{ needs.plan.outputs.version }}-macos-aarch64
-          path: tauri-artifacts/macos-aarch64
-          if-no-files-found: error
-
-      # ---------- x86_64-apple-darwin (cross-compile) ----------
-      - name: Stage and verify xray-core (x86_64)
-        if: needs.plan.outputs.macos_x86_64 == 'true'
-        shell: bash
+          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos.outputs.artifactPaths }}
+          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-${{ matrix.arch }}
+          BUNDLE_ARCH: ${{ matrix.arch }}
         run: |
-          set -euo pipefail
-          pwsh scripts/fetch-xray.ps1 -Platform macos -Force
-          test "$(lipo -archs src-tauri/resources/sockscap/macos/xray)" = "x86_64"
+          node scripts/collect-tauri-action-artifacts.mjs
+          node scripts/verify-release-candidate.mjs record-macos "$TAURI_ACTION_ARTIFACT_OUT_DIR"
 
-      - name: Build macOS bundle (x86_64)
-        if: needs.plan.outputs.macos_x86_64 == 'true'
-        id: tauri_macos_x86_64
-        uses: tauri-apps/tauri-action@action-v0.6.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Point libgssapi-sys at x86_64 MIT Kerberos under /usr/local
-          LIBGSSAPI_IMPL: mit
-          LIBGSSAPI_PREFIX: /usr/local/opt/krb5
-          PKG_CONFIG_PATH: /usr/local/opt/krb5/lib/pkgconfig
-          PKG_CONFIG_ALLOW_CROSS: "1"
-        with:
-          args: --target x86_64-apple-darwin --config '${{ env.TAURI_RELEASE_CONFIG }}'
-
-      - name: Verify fixed signature and updater app (x86_64)
-        if: needs.plan.outputs.macos_x86_64 == 'true'
-        env:
-          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
-        run: bash scripts/verify-macos-release-bundle.sh x86_64-apple-darwin x86_64
-
-      - name: Collect workflow artifacts (x86_64)
-        if: needs.plan.outputs.macos_x86_64 == 'true'
-        shell: bash
-        env:
-          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_x86_64.outputs.artifactPaths }}
-          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-x86_64
-        run: node scripts/collect-tauri-action-artifacts.mjs
-
-      - name: Upload workflow artifacts (x86_64)
-        if: needs.plan.outputs.macos_x86_64 == 'true'
+      - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: taomni-${{ needs.plan.outputs.version }}-macos-x86_64
-          path: tauri-artifacts/macos-x86_64
+          name: taomni-${{ needs.plan.outputs.version }}-macos-${{ matrix.arch }}
+          path: tauri-artifacts/macos-${{ matrix.arch }}
           if-no-files-found: error
 
       # Preserve the signed output for diagnosis when the gate fails. These are
       # Actions artifacts only; a failed builder cannot enter release publishing.
       - name: Preserve macOS bundle verification evidence
-        if: failure() && (steps.tauri_macos_aarch64.outcome == 'success' || steps.tauri_macos_x86_64.outcome == 'success')
+        if: failure() && steps.tauri_macos.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: macos-bundle-diagnostics-${{ github.run_id }}
+          name: macos-bundle-diagnostics-${{ matrix.arch }}-${{ github.run_id }}
           path: |
             src-tauri/target/*-apple-darwin/release/bundle/dmg/*.dmg
             src-tauri/target/*-apple-darwin/release/bundle/macos/*.app.tar.gz*
@@ -530,6 +430,112 @@ jobs:
         timeout-minutes: 3
         run: node scripts/configure-release-signing.mjs --cleanup-macos
 
+  package-modules:
+    needs: plan
+    if: needs.plan.outputs.modules != '[]' && needs.plan.outputs.candidate_run == '' && needs.plan.outputs.module_rehearsal_baseline_run == ''
+    strategy:
+      fail-fast: false
+      # Queue all selected modules so their target jobs can use available runners.
+      matrix:
+        module: ${{ fromJSON(needs.plan.outputs.modules) }}
+    uses: ./.github/workflows/release-modules.yml
+    with:
+      tag: ${{ needs.plan.outputs.tag }}
+      module: ${{ matrix.module }}
+      head: ${{ github.sha }}
+      macos_runner: ${{ needs.plan.outputs.macos_runner }}
+      package_only: true
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
+  verify-candidate-roster:
+    name: Verify first-upgrade catalog and signed business packages
+    needs: [plan, package-modules]
+    if: needs.plan.outputs.rehearse_first_upgrade == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build and test the catalog signer
+        run: |
+          cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
+          cargo build --manifest-path scripts/plugin-package/Cargo.toml --bin taomni-plugin-package --release --locked
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: module-signed-*-${{ github.run_id }}
+          path: signed-module-artifacts
+          merge-multiple: false
+      - name: Verify every package and sign the loopback install feed
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          export MODULE_UPDATED_AT
+          MODULE_UPDATED_AT="$(git show -s --format=%cI HEAD)"
+          scripts/plugin-package/target/release/taomni-plugin-package --qa-first-release-roster signed-module-artifacts candidate-roster
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modular-candidate-roster-${{ github.run_id }}
+          path: candidate-roster
+          if-no-files-found: error
+
+  rehearse-module-release:
+    needs: plan
+    if: needs.plan.outputs.module_rehearsal_baseline_run != ''
+    uses: ./.github/workflows/release-modules.yml
+    with:
+      tag: v${{ needs.plan.outputs.test_version || '0.6.0' }}-${{ fromJSON(needs.plan.outputs.modules)[0] }}.rehearsal
+      module: ${{ fromJSON(needs.plan.outputs.modules)[0] }}
+      head: ${{ github.sha }}
+      macos_runner: ${{ needs.plan.outputs.macos_runner }}
+      package_only: false
+      rehearsal_baseline_run: ${{ needs.plan.outputs.module_rehearsal_baseline_run }}
+      baseline_tag: v${{ needs.plan.outputs.test_version || '0.6.0' }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
+  verify-candidate-updater:
+    name: Verify four-target candidate updater
+    needs: [plan, build, build-macos]
+    if: github.event_name == 'workflow_dispatch' && needs.plan.outputs.tag == '' && inputs.platforms == 'all' && inputs.macos_arch == 'both' && needs.plan.outputs.module_rehearsal_baseline_run == '' && needs.plan.outputs.candidate_run == ''
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: ./.github/actions/stage-core-updater
+        with:
+          version: ${{ needs.plan.outputs.version }}
+      - name: Record candidate inputs and installer digests
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+          MODULE_SELECTION: ${{ needs.plan.outputs.modules }}
+        run: |
+          mkdir candidate-updater
+          cp updater-assets/latest.json candidate-updater/
+          (cd updater-assets && sha256sum -- *) > candidate-updater/SHA256SUMS
+          node scripts/verify-release-candidate.mjs record-updater candidate-updater
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modular-candidate-updater-${{ github.run_id }}
+          path: candidate-updater
+          if-no-files-found: error
+
   # ---------------------------------------------------------------------------
   # Compose a single, complete latest.json for tauri-plugin-updater.
   #
@@ -539,35 +545,178 @@ jobs:
   # bytes. Upload latest.json last so every referenced asset is already present.
   # ---------------------------------------------------------------------------
   finalize-updater-manifest:
-    name: Publish verified bundles and latest.json
-    needs: [plan, build, build-macos]
+    name: Stage verified bundles and publish tagged releases
+    needs: [plan, build, build-macos, package-modules]
     runs-on: ubuntu-22.04
-    if: needs.plan.outputs.tag != ''
+    if: >-
+      ${{ !cancelled() && needs.plan.result == 'success' &&
+          (needs.plan.outputs.candidate_run != '' ||
+           (needs.plan.outputs.tag != '' && needs.build.result == 'success' && needs.build-macos.result == 'success' &&
+            (needs.package-modules.result == 'success' ||
+             (needs.plan.outputs.modules == '[]' && needs.package-modules.result == 'skipped')))) }}
+    permissions:
+      actions: read
+      contents: write
+    concurrency:
+      group: taomni-release-catalog-publication
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Updater manifest unit contracts
-        run: node --test scripts/compose-updater-manifest.test.mjs scripts/verify-updater-signatures.test.mjs scripts/release-workflow.test.mjs
-      - name: Download workflow artifacts
-        if: needs.plan.outputs.tag != ''
+      - name: Updater and plugin manifest unit contracts
+        run: node --test scripts/compose-updater-manifest.test.mjs scripts/compose-modules-manifest.test.mjs scripts/verify-updater-signatures.test.mjs scripts/stage-published-module-catalog.test.mjs scripts/release-workflow.test.mjs
+      - name: Select the verified candidate artifacts
+        if: needs.plan.outputs.candidate_run != ''
+        id: candidate
+        env:
+          CANDIDATE_SOURCE: ${{ inputs.candidate_source || github.sha }}
+          CANDIDATE_RUN: ${{ needs.plan.outputs.candidate_run }}
+          GH_TOKEN: ${{ github.token }}
+          MODULE_SELECTION: ${{ needs.plan.outputs.modules }}
+          TAG: v${{ needs.plan.outputs.version }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          set -euo pipefail
+          # The workflow may have moved since the artifacts were frozen. Check the
+          # release inputs used here against the exact selected product commit.
+          git diff --exit-code "$CANDIDATE_SOURCE" HEAD -- package.json src-tauri/tauri.conf.json src-tauri/plugins
+          mkdir release-candidate
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN" > release-candidate/producer.json
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN/artifacts?per_page=100" > release-candidate/artifacts.json
+          git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}" > release-candidate/tag-refs.txt
+          node scripts/verify-release-candidate.mjs select release-candidate
+      - uses: ./.github/actions/stage-core-updater
+        with:
+          version: ${{ needs.plan.outputs.version }}
+          candidate_run: ${{ needs.plan.outputs.candidate_run }}
+          core_artifacts: ${{ steps.candidate.outputs.core_artifacts }}
+      - name: Download signed module packages
+        if: needs.plan.outputs.modules != '[]' && needs.plan.outputs.candidate_run == ''
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          pattern: module-signed-*-${{ github.run_id }}
+          path: signed-module-artifacts
+          merge-multiple: false
+      - name: Download the candidate updater receipt
+        if: needs.plan.outputs.candidate_run != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.candidate.outputs.updater_artifact }}
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.plan.outputs.candidate_run }}
+          path: release-candidate/updater
+      - name: Download the candidate's signed module packages
+        if: needs.plan.outputs.candidate_run != '' && needs.plan.outputs.modules != '[]'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.candidate.outputs.module_artifacts }}
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.plan.outputs.candidate_run }}
+          path: signed-module-artifacts
+          merge-multiple: false
+      - name: Verify the reused installer and signed module bytes
+        if: needs.plan.outputs.candidate_run != ''
+        env:
+          MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
+        run: node scripts/verify-release-candidate.mjs verify release-candidate
+      - name: Assemble or carry forward the signed module catalog
+        id: module-catalog
+        env:
+          TAG: v${{ needs.plan.outputs.version }}
+          RELEASE_SOURCE: ${{ inputs.candidate_source || github.sha }}
+          MODULE_SELECTION: ${{ needs.plan.outputs.modules }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/stage-published-module-catalog.mjs carried-module-catalog --allow-missing >> "$GITHUB_OUTPUT"
+          if [[ "$MODULE_SELECTION" != '[]' ]]; then
+            export MODULE_UPDATED_AT="$(git show -s --format=%cI "$RELEASE_SOURCE")"
+            if [[ -d carried-module-catalog ]]; then
+              export MODULES_PUBLISHED_CATALOG=carried-module-catalog/modules.json
+              node scripts/compose-modules-manifest.mjs signed-module-artifacts changed-module-catalog --delta
+            else
+              node scripts/compose-modules-manifest.mjs signed-module-artifacts module-assets --first-release
+            fi
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          elif [[ ! -d carried-module-catalog ]]; then
+            echo 'The first modular release requires signed module packages.' >&2
+            exit 1
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.module-catalog.outputs.present == 'true' || steps.module-catalog.outputs.source_tag != ''
+      - name: Build the catalog signer before providing the signing key
+        if: steps.module-catalog.outputs.present == 'true' || steps.module-catalog.outputs.source_tag != ''
+        run: |
+          cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
+          cargo build --manifest-path scripts/plugin-package/Cargo.toml --bin taomni-plugin-package --release --locked
+      - name: Combine changed module packages with the verified catalog
+        if: steps.module-catalog.outputs.present == 'true' && steps.module-catalog.outputs.source_tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog-signature carried-module-catalog
+          node scripts/fetch-published-module-assets.mjs carried-module-catalog carried-module-catalog
+          scripts/plugin-package/target/release/taomni-plugin-package \
+            --prepare-catalog-update carried-module-catalog changed-module-catalog module-assets > module-uploads.json
+          cp changed-module-catalog/SHA256SUMS module-assets/SHA256SUMS
+      - name: Verify the first-upgrade roster before signing
+        if: steps.module-catalog.outputs.present == 'true'
+        shell: bash
+        run: |
+          previous=()
+          if [[ -d carried-module-catalog ]]; then
+            previous+=(carried-module-catalog)
+          fi
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-release-roster module-assets "${previous[@]}"
+      - name: Sign the verified complete module catalog
+        if: steps.module-catalog.outputs.present == 'true'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: scripts/plugin-package/target/release/taomni-plugin-package --sign-catalog module-assets
+
+      - name: Verify signed catalog and package sums
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d module-assets ]; then
+            scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog module-assets
+            (cd module-assets && sha256sum --check --strict SHA256SUMS)
+          elif [ -d carried-module-catalog ]; then
+            scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog-signature carried-module-catalog
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: needs.plan.outputs.candidate_run != ''
+        with:
+          name: verified-release-candidate-${{ github.run_id }}
+          path: |
+            release-candidate/verified-assets.json
+            release-candidate/updater/receipt.json
+            module-assets/modules.json*
+            module-assets/SHA256SUMS
+            carried-module-catalog/modules.json*
+          if-no-files-found: error
 
       - name: Verify and publish release assets
         if: needs.plan.outputs.tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ needs.plan.outputs.tag }}
+          TAG: v${{ needs.plan.outputs.version }}
+          RELEASE_SOURCE: ${{ inputs.candidate_source || github.sha }}
+          MODULE_CATALOG_SOURCE_TAG: ${{ steps.module-catalog.outputs.source_tag }}
+          CANDIDATE_RUN: ${{ needs.plan.outputs.candidate_run }}
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/compose-updater-manifest.mjs artifacts updater-assets
-          node scripts/verify-updater-signatures.mjs updater-assets
-
           # No release mutation until every platform/signature gate has passed.
           # Preserve an existing release's title/body; create one for tag pushes
           # and manual dispatches that do not already have a release. Keep new
@@ -576,8 +725,12 @@ jobs:
             # A draft left by an interrupted earlier run is published only
             # after this run uploads the complete verified asset set.
             test "$publish_draft" = true || test "$publish_draft" = false
+            if [[ -d module-assets && "$publish_draft" != true ]]; then
+              echo 'Joint core and module assets must use a draft release.' >&2
+              exit 1
+            fi
           else
-            release_args=(--draft --title "Taomni $TAG" --generate-notes --target "$GITHUB_SHA")
+            release_args=(--draft --title "Taomni $TAG" --generate-notes --target "${RELEASE_SOURCE:-$GITHUB_SHA}")
             if [[ "$TAG" == *-* ]]; then
               release_args+=(--prerelease)
             fi
@@ -587,10 +740,16 @@ jobs:
           RELEASE_NOTES="$(gh release view "$TAG" --json body --jq '.body // ""')"
           export RELEASE_NOTES
           node --input-type=module <<'NODE'
-          import { readFileSync, writeFileSync } from 'node:fs';
+          import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+          import { appendModuleReleaseNotes } from './scripts/compose-modules-manifest.mjs';
           const path = 'updater-assets/latest.json';
           const manifest = JSON.parse(readFileSync(path, 'utf8'));
-          if (process.env.RELEASE_NOTES) manifest.notes = process.env.RELEASE_NOTES;
+          const catalogPath = ['module-assets/modules.json', 'carried-module-catalog/modules.json'].find(existsSync);
+          const catalog = catalogPath ? JSON.parse(readFileSync(catalogPath, 'utf8')) : null;
+          const original = process.env.RELEASE_NOTES || '';
+          const notes = appendModuleReleaseNotes(original, catalog);
+          if (notes) manifest.notes = notes;
+          if (notes !== original) writeFileSync('module-release-notes.md', notes + '\n');
           writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`);
           NODE
 
@@ -600,8 +759,35 @@ jobs:
             gh release upload "$TAG" "$asset" --clobber
           done < <(find updater-assets -maxdepth 1 -type f ! -name latest.json | sort)
 
+          if [ -d module-assets ]; then
+            # Publish packages and detached signatures first. The signed
+            # catalogue is uploaded last so clients never observe references
+            # to assets that are not present yet.
+            if [[ -f module-uploads.json ]]; then
+              module_uploads="$(node -e 'for (const name of require("./module-uploads.json")) console.log("module-assets/" + name)')"
+            else
+              module_uploads="$(find module-assets -maxdepth 1 -type f \( -name '*.taomni-plugin' -o -name '*.taomni-plugin.minisig' \) | sort)"
+            fi
+            while IFS= read -r asset; do
+              gh release upload "$TAG" "$asset" --clobber
+            done <<< "$module_uploads"
+            gh release upload "$TAG" module-assets/SHA256SUMS --clobber
+            gh release upload "$TAG" module-assets/modules.json.minisig --clobber
+            gh release upload "$TAG" module-assets/modules.json --clobber
+          elif [[ -d carried-module-catalog && "$MODULE_CATALOG_SOURCE_TAG" != "$TAG" ]]; then
+            gh release upload "$TAG" carried-module-catalog/modules.json.minisig --clobber
+            gh release upload "$TAG" carried-module-catalog/modules.json --clobber
+          fi
+
           # Publish the complete manifest only after every referenced asset exists.
           gh release upload "$TAG" updater-assets/latest.json --clobber
+          if [[ -f module-release-notes.md ]]; then
+            gh release edit "$TAG" --notes-file module-release-notes.md
+          fi
           if [ "$publish_draft" = true ]; then
-            gh release edit "$TAG" --draft=false
+            draft_args=(--draft=false)
+            if [[ -n "${CANDIDATE_RUN:-}" ]]; then
+              draft_args+=(--target "${RELEASE_SOURCE:-$GITHUB_SHA}")
+            fi
+            gh release edit "$TAG" "${draft_args[@]}"
           fi

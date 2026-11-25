@@ -1,0 +1,572 @@
+name: QA Official Modular Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      head:
+        description: Repository commit/ref to package (QA artifacts only)
+        type: string
+        default: ''
+      module:
+        description: Official QA module
+        type: choice
+        options: [hello-plugin, mfa, mail, vnc-client, vnc-server, rdp-client, rdp-server, screenshot, servers, ai-voice-local, sockscap]
+        default: hello-plugin
+      macos_runner:
+        description: Hosted macOS package builder (both Darwin targets remain explicit)
+        type: choice
+        options: [macos-latest, macos-15, macos-15-intel, macos-26]
+        default: macos-latest
+      native_macos_signing:
+        description: Sign an official module host with the fixed macOS identity before packaging
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      head: {type: string, default: ''}
+      artifact_key: {type: string, default: ''}
+      module: {type: string, default: hello-plugin}
+      macos_runner: {type: string, default: macos-latest}
+      native_builds: {type: string, default: ''}
+      native_macos_signing: {type: boolean, default: false}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: {required: true}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
+      APPLE_CERTIFICATE: {required: false}
+      APPLE_CERTIFICATE_PASSWORD: {required: false}
+      APPLE_SIGNING_IDENTITY: {required: false}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  QA_MODULE: ${{ inputs.module || 'hello-plugin' }}
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+      host_package: ${{ steps.source.outputs.host_package }}
+      macos_runner: ${{ steps.macos_runner.outputs.runner }}
+      build_matrix: ${{ steps.macos_runner.outputs.build_matrix }}
+      sign_matrix: ${{ steps.macos_runner.outputs.sign_matrix }}
+      frontend_artifact: ${{ steps.macos_runner.outputs.frontend_artifact }}
+      roster_mfa_frontend_artifact: ${{ steps.macos_runner.outputs.roster_mfa_frontend_artifact }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: source
+        name: Require a commit reachable from a repository-owned branch
+        env:
+          NATIVE_MACOS_SIGNING: ${{ inputs.native_macos_signing }}
+        run: |
+          if [[ "$NATIVE_MACOS_SIGNING" == 'true' && "$QA_MODULE" == 'hello-plugin' ]]; then
+            echo 'Select an official business module for the macOS host signature check.' >&2
+            exit 1
+          fi
+          case "$QA_MODULE" in
+            hello-plugin) echo 'host_package=taomni-hello-plugin' >> "$GITHUB_OUTPUT" ;;
+            mfa) echo 'host_package=taomni-plugin-mfa' >> "$GITHUB_OUTPUT" ;;
+            mail) echo 'host_package=taomni-plugin-mail' >> "$GITHUB_OUTPUT" ;;
+            vnc-client|vnc-server|rdp-client|rdp-server|screenshot|servers|ai-voice-local|sockscap) echo "host_package=taomni-plugin-$QA_MODULE" >> "$GITHUB_OUTPUT" ;;
+            *) echo 'Unknown official QA module.' >&2; exit 1 ;;
+          esac
+          test -n "$(git for-each-ref --format='%(refname)' --contains HEAD refs/remotes/origin/)" || {
+            echo 'Refusing to sign a head outside repository-owned branches.' >&2
+            exit 1
+          }
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - id: macos_runner
+        name: Validate hosted package builders and selected targets
+        env:
+          PACKAGE_MACOS_RUNNER: ${{ inputs.macos_runner || 'macos-latest' }}
+          PACKAGE_NATIVE_BUILDS: ${{ inputs.native_builds }}
+          PACKAGE_ARTIFACT_KEY: ${{ inputs.artifact_key || github.run_id }}
+        run: |
+          python - <<'PY'
+          import json, os
+          runner = os.environ['PACKAGE_MACOS_RUNNER']
+          if runner not in {'macos-latest', 'macos-15', 'macos-15-intel', 'macos-26'}:
+              raise SystemExit('Unknown hosted macOS package builder')
+          targets = [
+              {'os': 'ubuntu-22.04', 'target': 'x86_64-unknown-linux-gnu', 'platform': 'linux-x86_64'},
+              {'os': 'windows-latest', 'target': 'x86_64-pc-windows-msvc', 'platform': 'windows-x86_64'},
+              {'os': 'macos-latest', 'target': 'aarch64-apple-darwin', 'platform': 'darwin-aarch64'},
+              {'os': 'macos-latest', 'target': 'x86_64-apple-darwin', 'platform': 'darwin-x86_64'},
+          ]
+          approved = {('linux', 'X64'): 'linux-x86_64', ('windows', 'X64'): 'windows-x86_64',
+                      ('macos', 'ARM64'): 'darwin-aarch64', ('macos', 'X64'): 'darwin-x86_64'}
+          capability = {'hello-plugin': 'signed-module', 'mfa': 'signed-mfa', 'mail': 'signed-mail',
+                        'vnc-client': 'signed-vnc', 'vnc-server': 'signed-local-vnc',
+                        'rdp-client': 'signed-rdp', 'rdp-server': 'signed-local-rdp',
+                        'servers': 'signed-local-servers',
+                        'ai-voice-local': 'signed-local-voice', 'sockscap': 'signed-sockscap',
+                        'screenshot': 'signed-screenshot'}[os.environ['QA_MODULE']]
+          roster = set()
+          lifecycle = set()
+          if raw := os.environ.get('PACKAGE_NATIVE_BUILDS'):
+              document = json.loads(raw)
+              if not isinstance(document, dict) or not isinstance(document.get('include'), list):
+                  raise SystemExit('Invalid native package build selection')
+              requested = set()
+              for build in document['include']:
+                  if not isinstance(build, dict) or (build.get('platform_key'), build.get('arch')) not in approved:
+                      raise SystemExit('Unknown native package target')
+                  if capability in build.get('capabilities', []):
+                      platform = approved[(build['platform_key'], build['arch'])]
+                      requested.add(platform)
+                      if capability == 'signed-module' and 'signed-roster' in build['capabilities']:
+                          roster.add(platform)
+                      if f"{capability}-lifecycle" in build['capabilities']:
+                          lifecycle.add(platform)
+              if not requested:
+                  raise SystemExit('No signed module target selected')
+              targets = [target for target in targets if target['platform'] in requested]
+          for target in targets:
+              target['legacy_roster'] = target['platform'] in roster
+              target['lifecycle'] = capability == 'signed-module' or target['platform'] in lifecycle
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'runner={runner}\n')
+              output.write('build_matrix=' + json.dumps({'include': targets}, separators=(',', ':')) + '\n')
+              output.write('sign_matrix=' + json.dumps({'include': [
+                  {name: target[name] for name in ('platform', 'legacy_roster', 'lifecycle')} for target in targets
+              ]}, separators=(',', ':')) + '\n')
+              suffix = '-'.join(target['platform'] for target in targets)
+              if os.environ['QA_MODULE'] in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
+                                             'rdp-server', 'vnc-server', 'servers'}:
+                  output.write(f"frontend_artifact=qa-{os.environ['QA_MODULE']}-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
+              if roster:
+                  output.write(f"roster_mfa_frontend_artifact=qa-roster-mfa-frontend-{os.environ['PACKAGE_ARTIFACT_KEY']}-{suffix}\n")
+          PY
+
+  desktop-frontend:
+    if: needs.source.outputs.frontend_artifact != ''
+    needs: source
+    uses: ./.github/workflows/build-vnc-frontend.yml
+    with:
+      source: ${{ needs.source.outputs.sha }}
+      artifact: ${{ needs.source.outputs.frontend_artifact }}
+      module: ${{ inputs.module }}
+
+  roster-mfa-frontend:
+    if: needs.source.outputs.roster_mfa_frontend_artifact != ''
+    needs: source
+    uses: ./.github/workflows/build-vnc-frontend.yml
+    with:
+      source: ${{ needs.source.outputs.sha }}
+      artifact: ${{ needs.source.outputs.roster_mfa_frontend_artifact }}
+      module: mfa
+
+  build:
+    name: Build unsigned ${{ inputs.module || 'hello-plugin' }} (${{ matrix.platform }})
+    needs: source
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.source.outputs.build_matrix) }}
+    runs-on: ${{ startsWith(matrix.platform, 'darwin-') && needs.source.outputs.macos_runner || matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-official-${{ inputs.module || 'hello-plugin' }}-${{ matrix.target }}-${{ matrix.os }}
+      - name: Prepare Perl for the Windows desktop client TLS build
+        if: (env.QA_MODULE == 'vnc-client' || env.QA_MODULE == 'rdp-client' || env.QA_MODULE == 'rdp-server') && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
+          & $perl -MIPC::Cmd -e 'print "Perl ready"'
+          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+          'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
+      - name: Install Linux dependencies for the RDP Server host
+        if: env.QA_MODULE == 'rdp-server' && runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y libpipewire-0.3-dev libasound2-dev libxkbcommon-dev libclang-dev libdbus-1-dev libudev-dev meson ninja-build pkg-config
+          bash scripts/install-release-pipewire.sh
+      - name: Refresh cached Local Voice runtime
+        if: env.QA_MODULE == 'ai-voice-local'
+        run: node scripts/refresh-sherpa-onnx-cache.mjs src-tauri/Cargo.toml '${{ matrix.target }}'
+      # Candidate code, Cargo build scripts and host binaries never share a
+      # runner/job with signing secrets. Nothing from this job is executed by
+      # the signing job; it receives only an inert payload directory.
+      - name: Build candidate without signing credentials
+        env:
+          MODULE_PACKAGE: ${{ needs.source.outputs.host_package }}
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p "$MODULE_PACKAGE" --bin "$MODULE_PACKAGE" --release --target '${{ matrix.target }}' --locked
+      - name: Build the Windows VNC key helper
+        if: env.QA_MODULE == 'vnc-client' && runner.os == 'Windows'
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-vnc-key-helper --bin taomni-vnc-key-helper --release --target '${{ matrix.target }}' --locked
+      - name: Build the Windows SocksCap capture helper
+        if: env.QA_MODULE == 'sockscap' && runner.os == 'Windows'
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-sockscap-tools --bin sockscap-helper --release --target '${{ matrix.target }}' --locked
+      - name: Build the second first-upgrade module
+        if: matrix.legacy_roster
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mfa --bin taomni-plugin-mfa --release --target '${{ matrix.target }}' --locked
+      - name: Verify the upstream-signed macOS SocksCap installer
+        if: env.QA_MODULE == 'sockscap' && runner.os == 'macOS'
+        run: bash scripts/stage-mitmproxy-redirector-macos.sh --stage
+      - name: Stage the platform payload
+        env:
+          MODULE_TARGET: ${{ matrix.target }}
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+          MODULE_LEGACY_ROSTER: ${{ matrix.legacy_roster }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, shutil, sys
+          sys.path.insert(0, 'scripts')
+          from local_voice_runtime import stage_runtime
+          import sockscap_redirector_resource as redirector
+          def stage(slug, folder):
+              source = pathlib.Path('src-tauri/plugins') / slug
+              output = pathlib.Path(folder)
+              output.mkdir()
+              manifest = json.loads((source / 'module.json').read_text(encoding='utf-8'))
+              host = manifest['entry']['host'] + ('.exe' if os.environ['MODULE_PLATFORM'].startswith('windows') else '')
+              manifest['entry']['host'] = host
+              (output / 'module.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+              binaries = pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release'
+              shutil.copyfile(binaries / host, output / host)
+              stage_runtime(slug, os.environ['MODULE_PLATFORM'], binaries, output)
+              redirector.stage(slug, os.environ['MODULE_PLATFORM'], source, output)
+              if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
+                  helper = 'taomni-vnc-key-helper.exe'
+                  shutil.copyfile(binaries / helper, output / helper)
+              if slug not in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
+                              'rdp-server', 'vnc-server', 'servers'} and manifest['entry'].get('frontend'):
+                  shutil.copytree(source / 'frontend', output / 'frontend')
+
+          stage(os.environ['QA_MODULE'], 'unsigned-module')
+          if os.environ['MODULE_LEGACY_ROSTER'] == 'true':
+              stage('mfa', 'unsigned-roster-mfa')
+          pathlib.Path('candidate-source.json').write_text(json.dumps({'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': os.environ['QA_MODULE']}), encoding='utf-8')
+          PY
+      - name: Stage pinned SocksCap Xray payload
+        if: env.QA_MODULE == 'sockscap'
+        env:
+          MODULE_PLATFORM: ${{ matrix.platform }}
+        run: python scripts/sockscap_xray_resource.py stage src-tauri/plugins/sockscap "$MODULE_PLATFORM" unsigned-module
+      - name: Stage pinned WinDivert and the module capture helper
+        if: env.QA_MODULE == 'sockscap' && runner.os == 'Windows'
+        env:
+          MODULE_TARGET: ${{ matrix.target }}
+        run: python scripts/sockscap_windows_resource.py src-tauri/plugins/sockscap unsigned-module --helper "src-tauri/target/$MODULE_TARGET/release/sockscap-helper.exe"
+      - name: Build and stage Linux SocksCap trace launcher
+        if: env.QA_MODULE == 'sockscap' && runner.os == 'Linux'
+        run: python scripts/sockscap_linux_resource.py stage src-tauri/plugins/sockscap unsigned-module
+      - name: Compile the previous host version for the native lifecycle test
+        if: matrix.lifecycle
+        env:
+          MODULE_TARGET: ${{ matrix.target }}
+          MODULE_PACKAGE: ${{ needs.source.outputs.host_package }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, shutil, subprocess, sys
+          sys.path.insert(0, '.agents/skills/qa-ui-auto/scripts')
+          from qa_ui_auto.module_qa_versions import lifecycle_versions
+
+          slug, package, target = (os.environ[key] for key in ('QA_MODULE', 'MODULE_PACKAGE', 'MODULE_TARGET'))
+          manifest_path = pathlib.Path('unsigned-module/module.json')
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          current = manifest['version']
+          previous_version, _ = lifecycle_versions(slug, current)
+          old = f'name = "{package}"\nversion = "{current}"'.encode()
+          new = f'name = "{package}"\nversion = "{previous_version}"'.encode()
+          sources = [pathlib.Path('src-tauri/plugins') / slug / 'Cargo.toml', pathlib.Path('src-tauri/Cargo.lock')]
+          originals = {source: source.read_bytes() for source in sources}
+          try:
+              for source, content in originals.items():
+                  # core.autocrlf may change tracked file endings on Windows.
+                  delimiter = b'\r\n' if b'\r\n' in content else b'\n'
+                  old_marker, new_marker = (marker.replace(b'\n', delimiter) for marker in (old, new))
+                  if content.count(old_marker) != 1:
+                      raise RuntimeError(f'Expected one {package} version in {source}')
+                  source.write_bytes(content.replace(old_marker, new_marker))
+              subprocess.run(['cargo', 'build', '--manifest-path', 'src-tauri/Cargo.toml', '-p', package,
+                              '--bin', package, '--release', '--target', target, '--locked'], check=True)
+          finally:
+              for source, content in originals.items():
+                  source.write_bytes(content)
+
+          previous = pathlib.Path('unsigned-previous')
+          shutil.copytree(manifest_path.parent, previous)
+          manifest['version'] = previous_version
+          (previous / 'module.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+          host = manifest['entry']['host']
+          shutil.copyfile(pathlib.Path('src-tauri/target') / target / 'release' / host, previous / host)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-module-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}
+          path: |
+            unsigned-module/
+            unsigned-previous/
+            unsigned-roster-mfa/
+            candidate-source.json
+          if-no-files-found: error
+          retention-days: 7
+
+  sign:
+    name: Sign official ${{ inputs.module || 'hello-plugin' }} (${{ matrix.platform }})
+    needs: [source, build, desktop-frontend, roster-mfa-frontend]
+    # Fork pull requests cannot request a production signature. A manual or
+    # reusable invocation runs the workflow revision trusted by its operator.
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'engcapa/taomni' && needs.build.result == 'success' && (needs.desktop-frontend.result == 'success' || (needs.source.outputs.frontend_artifact == '' && needs.desktop-frontend.result == 'skipped')) && (needs.roster-mfa-frontend.result == 'success' || (needs.source.outputs.roster_mfa_frontend_artifact == '' && needs.roster-mfa-frontend.result == 'skipped')) }}
+    runs-on: ${{ inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-') && needs.source.outputs.macos_runner || 'ubuntu-24.04' }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.source.outputs.sign_matrix) }}
+    steps:
+      - name: Checkout the trusted workflow tooling, not the candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      # Never restore compiled signer/dependency executables from a cache that
+      # an unsigned candidate job could populate. This graph is small enough
+      # to compile from the trusted, locked source on each fresh signing runner.
+      - name: Compile trusted signer without private-key environment
+        run: |
+          cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
+          cargo build --manifest-path scripts/plugin-package/Cargo.toml --release --locked
+      - uses: actions/download-artifact@v4
+        with:
+          name: unsigned-module-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}
+          path: candidate
+      - name: Restrict QA signing to the official manifest and selected source
+        env:
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+          MODULE_LEGACY_ROSTER: ${{ matrix.legacy_roster }}
+          MODULE_LIFECYCLE: ${{ matrix.lifecycle }}
+        run: |
+          python - <<'PY'
+          import filecmp, json, os, pathlib, shutil, sys
+          sys.path.insert(0, 'scripts')
+          sys.path.insert(0, '.agents/skills/qa-ui-auto/scripts')
+          from qa_ui_auto.module_qa_versions import lifecycle_versions
+          from local_voice_runtime import runtime_files, verify_runtime
+          import sockscap_linux_resource as linux_capture
+          import sockscap_redirector_resource as redirector
+          import sockscap_windows_resource as windows_capture
+          import sockscap_xray_resource as xray
+          root = pathlib.Path('candidate')
+          module = os.environ['QA_MODULE']
+          assert module in {'hello-plugin', 'mfa', 'mail', 'vnc-client', 'vnc-server', 'rdp-client', 'rdp-server', 'screenshot', 'servers', 'ai-voice-local', 'sockscap'}, 'Unknown official QA module'
+          observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
+          assert observed == {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': module}
+          assert not any(p.is_symlink() for p in root.rglob('*'))
+
+          def check_payload(slug, folder, version=None):
+              trusted_source = pathlib.Path('src-tauri/plugins') / slug
+              expected = json.loads((trusted_source / 'module.json').read_text(encoding='utf-8'))
+              platform = os.environ['MODULE_PLATFORM']
+              if platform.startswith('windows'):
+                  expected['entry']['host'] += '.exe'
+              assert expected['id'] == 'taomni-plugin-' + slug
+              binaries = {expected['entry']['host'], *runtime_files(slug, platform)}
+              if slug == 'vnc-client' and platform == 'windows-x86_64':
+                  binaries.add('taomni-vnc-key-helper.exe')
+              payload = root / folder
+              resources = set(redirector.files(slug, platform))
+              if slug == 'sockscap':
+                  resources.update(xray.files(platform))
+                  xray.verify(trusted_source, platform, payload)
+                  if platform == 'windows-x86_64':
+                      resources.update(windows_capture.files(trusted_source))
+                      windows_capture.verify(trusted_source, payload)
+                  resources.update(linux_capture.files(slug, platform))
+              allowed = {'module.json', *binaries, *resources}
+              frontend = expected['entry'].get('frontend')
+              if frontend and slug not in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
+                                           'rdp-server', 'vnc-server', 'servers'}:
+                  assert (trusted_source / frontend).is_file()
+                  for source in (trusted_source / 'frontend').rglob('*'):
+                      assert not source.is_symlink()
+                      if source.is_file():
+                          allowed.add(source.relative_to(trusted_source).as_posix())
+              verify_runtime(slug, platform, payload)
+              redirector.verify(slug, platform, trusted_source, payload)
+              linux_capture.verify(slug, platform, payload)
+              manifest = json.loads((payload / 'module.json').read_text(encoding='utf-8'))
+              expected_version = expected['version'] if version is None else version
+              assert manifest == {**expected, 'version': expected_version}, 'Candidate metadata differs from the trusted official contract'
+              files = {p.relative_to(payload).as_posix() for p in payload.rglob('*') if p.is_file()}
+              assert files == allowed, 'Unexpected files in official QA payload'
+              for relative in allowed - {'module.json'} - binaries - resources:
+                  assert (payload / relative).read_bytes() == (trusted_source / relative).read_bytes(), 'Candidate changed official frontend without a trusted revision'
+              return expected
+
+          expected = check_payload(module, 'unsigned-module')
+          if os.environ['MODULE_LEGACY_ROSTER'] == 'true':
+              assert module == 'hello-plugin'
+              check_payload('mfa', 'unsigned-roster-mfa')
+          if module == 'hello-plugin' or os.environ['MODULE_LIFECYCLE'] == 'true':
+              previous_version, failing_version = lifecycle_versions(module, expected['version'])
+              check_payload(module, 'unsigned-previous', previous_version)
+              if module != 'hello-plugin':
+                  binary = expected['entry']['host']
+                  assert not filecmp.cmp(root / 'unsigned-module' / binary, root / 'unsigned-previous' / binary, shallow=False), f'Previous {module} host must be independently compiled'
+              # This signed test input deliberately changes only the declared
+              # version. The binary will reject the host handshake, exercising
+              # recovery through the actual installer and verified registry.
+              failing = root / 'handshake-failure'
+              shutil.copytree(root / 'unsigned-module', failing)
+              (failing / 'module.json').write_text(json.dumps({**expected, 'version': failing_version}), encoding='utf-8')
+          PY
+      - uses: actions/download-artifact@v4
+        if: needs.source.outputs.frontend_artifact != ''
+        with:
+          name: ${{ needs.source.outputs.frontend_artifact }}
+          path: trusted-desktop-frontend
+      - name: Stage the verified module frontend bytes
+        if: needs.source.outputs.frontend_artifact != ''
+        env:
+          MODULE_SOURCE: ${{ needs.source.outputs.sha }}
+          FRONTEND_TOOLING: ${{ github.workflow_sha }}
+          MODULE_LIFECYCLE: ${{ matrix.lifecycle }}
+        run: |
+          python scripts/stage-vnc-frontend.py trusted-desktop-frontend candidate/unsigned-module "$MODULE_SOURCE" "$FRONTEND_TOOLING" "$QA_MODULE"
+          if [[ "$MODULE_LIFECYCLE" == 'true' ]]; then
+            for variant in unsigned-previous handshake-failure; do
+              python scripts/stage-vnc-frontend.py trusted-desktop-frontend "candidate/$variant" "$MODULE_SOURCE" "$FRONTEND_TOOLING" "$QA_MODULE"
+            done
+          fi
+      - uses: actions/download-artifact@v4
+        if: matrix.legacy_roster
+        with:
+          name: ${{ needs.source.outputs.roster_mfa_frontend_artifact }}
+          path: trusted-roster-mfa-frontend
+      - name: Stage the verified first-upgrade MFA frontend
+        if: matrix.legacy_roster
+        env:
+          MODULE_SOURCE: ${{ needs.source.outputs.sha }}
+          FRONTEND_TOOLING: ${{ github.workflow_sha }}
+        run: python scripts/stage-vnc-frontend.py trusted-roster-mfa-frontend candidate/unsigned-roster-mfa "$MODULE_SOURCE" "$FRONTEND_TOOLING" mfa
+      - name: Check Linux module ABI against the core baseline
+        if: matrix.platform == 'linux-x86_64'
+        env:
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: python scripts/check_linux_module_abi.py --source "$MODULE_SOURCE_SHA" --output linux-abi.json candidate/*/module.json
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.platform == 'linux-x86_64' && hashFiles('linux-abi.json') != ''
+        with:
+          name: qa-module-linux-abi-${{ env.QA_MODULE }}-${{ inputs.artifact_key || github.run_id }}
+          path: linux-abi.json
+      - uses: actions/setup-node@v4
+        if: inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-')
+        with:
+          node-version: '22'
+      - name: Import the fixed macOS signing identity
+        if: inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-')
+        env:
+          RELEASE_PLATFORM: macOS
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
+        run: node scripts/configure-release-signing.mjs
+      - name: Sign and verify the macOS host
+        if: inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-')
+        env:
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+          MODULE_LIFECYCLE: ${{ matrix.lifecycle }}
+        run: |
+          export MODULE_SLUG="$QA_MODULE"
+          bash scripts/sign-macos-module-host.sh "candidate/unsigned-module/taomni-plugin-$MODULE_SLUG" macos-signing
+          if [[ "$MODULE_LIFECYCLE" == 'true' ]]; then
+            host="taomni-plugin-$MODULE_SLUG"
+            bash scripts/sign-macos-module-host.sh "candidate/unsigned-previous/$host" macos-signing/previous
+            cp "candidate/unsigned-module/$host" "candidate/handshake-failure/$host"
+          fi
+      - name: Sign and independently verify against the production pinned public key
+        if: env.QA_MODULE == 'hello-plugin' || env.QA_MODULE == 'mfa'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+          MODULE_LEGACY_ROSTER: ${{ matrix.legacy_roster }}
+          MODULE_LIFECYCLE: ${{ matrix.lifecycle }}
+        run: |
+          scripts/plugin-package/target/release/taomni-plugin-package \
+            --payload candidate/unsigned-module --platform "$MODULE_PLATFORM" \
+            --output signed-module --source-sha "$MODULE_SOURCE_SHA" \
+            --qa-catalog true
+          if [[ "$MODULE_LEGACY_ROSTER" == 'true' ]]; then
+            scripts/plugin-package/target/release/taomni-plugin-package \
+              --payload candidate/unsigned-roster-mfa --platform "$MODULE_PLATFORM" \
+              --output signed-module/legacy-roster-mfa --source-sha "$MODULE_SOURCE_SHA" \
+              --qa-catalog true --qa-roster-root signed-module
+          fi
+          if [[ "$MODULE_LIFECYCLE" == 'true' ]]; then
+            for pair in 'unsigned-previous previous' 'handshake-failure handshake-failure'; do
+              read -r payload destination <<< "$pair"
+              scripts/plugin-package/target/release/taomni-plugin-package \
+                --payload "candidate/$payload" --platform "$MODULE_PLATFORM" \
+                --output "signed-module/$destination" --source-sha "$MODULE_SOURCE_SHA"
+            done
+          fi
+      - name: Sign the official business module package
+        if: env.QA_MODULE != 'hello-plugin' && env.QA_MODULE != 'mfa'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+          MODULE_LIFECYCLE: ${{ matrix.lifecycle }}
+        run: |
+          if [[ "$MODULE_LIFECYCLE" == 'true' ]]; then
+            scripts/plugin-package/target/release/taomni-plugin-package \
+              --payload candidate/unsigned-module --platform "$MODULE_PLATFORM" \
+              --output signed-module --source-sha "$MODULE_SOURCE_SHA" \
+              --qa-catalog true
+            for pair in 'unsigned-previous previous' 'handshake-failure handshake-failure'; do
+              read -r payload destination <<< "$pair"
+              scripts/plugin-package/target/release/taomni-plugin-package \
+                --payload "candidate/$payload" --platform "$MODULE_PLATFORM" \
+                --output "signed-module/$destination" --source-sha "$MODULE_SOURCE_SHA"
+            done
+          else
+            scripts/plugin-package/target/release/taomni-plugin-package \
+              --payload candidate/unsigned-module --platform "$MODULE_PLATFORM" \
+              --output signed-module --source-sha "$MODULE_SOURCE_SHA"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qa-modular-package-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}
+          path: signed-module/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-')
+        with:
+          name: qa-module-macos-signature-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}
+          path: macos-signing/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Clean temporary macOS signing keychain
+        if: always() && env.MACOS_SIGNING_WORK_DIR != ''
+        run: node scripts/configure-release-signing.mjs --cleanup-macos

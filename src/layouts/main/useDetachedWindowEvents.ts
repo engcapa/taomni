@@ -4,10 +4,10 @@ import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, Deta
 import { vncConsumeDetachClaim } from "../../lib/vnc";
 import { deserializeVncViewerOptions } from "../../lib/vncOptions";
 import type { Tab } from "../../types";
-import { useLanChatStore } from "../../stores/lanChatStore";
 import { t as tr } from "../../lib/i18n";
 import { reattachSftp } from "./reattachSftp";
 import type { DetachedSftpParams } from "../../lib/sftpWindowState";
+import { readPluginTab } from "../../lib/pluginTabs";
 
 
 export interface UseDetachedWindowEventsContext {
@@ -38,6 +38,11 @@ export function useDetachedWindowEvents(context: UseDetachedWindowEventsContext)
     const recentReattach = new Map<string, number>();
     const BURST_WINDOW_MS = 1500;
     const handle = async (msg: ReattachMessage) => {
+      const pluginTab = msg.kind === "plugin" ? readPluginTab(msg.payload) : null;
+      if (msg.kind === "plugin" && (!pluginTab || pluginTab.id !== msg.id)) {
+        clearReattachHandoff(msg.kind, msg.id);
+        return;
+      }
       const burstKey = `${msg.kind}.${msg.id}`;
       const now = Date.now();
       const last = recentReattach.get(burstKey);
@@ -57,36 +62,13 @@ export function useDetachedWindowEvents(context: UseDetachedWindowEventsContext)
         clearReattachHandoff(msg.kind, msg.id);
         return;
       }
-      if (msg.kind === "lan-chat") {
-        const p = msg.payload as { activeConvId?: string; title?: string } | undefined;
-        const convId = p?.activeConvId || msg.id;
-        const existing = tabsRef.current.find((tab) => tab.type === "lan-chat");
-        if (existing) {
-          setActiveTab(existing.id);
-        } else {
-          addTab({
-            id: "lan-chat",
-            type: "lan-chat",
-            title: tr("tabs.lanChat"),
-            closable: true,
-          });
-        }
-        if (convId) {
-          if (convId.startsWith("direct:") || convId.startsWith("group:")) {
-            void useLanChatStore.getState().openConversation(convId);
-          }
-        }
-        setStatusMessage(tr("status.reattached"));
-        clearReattachHandoff(msg.kind, msg.id);
-        return;
-      }
       // Idempotent tab identity: use the original source tab id when the
       // payload has it so chat threads stay bound across detach/reattach.
       // Older handoffs fall back to the detached id-derived shape.
-      const payloadTabId =
+      const payloadTabId = pluginTab?.id ?? (
         typeof (msg.payload as { tabId?: unknown } | undefined)?.tabId === "string"
           ? ((msg.payload as { tabId: string }).tabId.trim() || null)
-          : null;
+          : null);
       const reattachTabId = payloadTabId ?? `${msg.kind}-reattach-${msg.id}`;
       if (tabsRef.current.some((t) => t.id === reattachTabId)) {
         setActiveTab(reattachTabId);
@@ -94,6 +76,11 @@ export function useDetachedWindowEvents(context: UseDetachedWindowEventsContext)
         return;
       }
       switch (msg.kind) {
+        case "plugin": {
+          addTab(pluginTab!);
+          setStatusMessage(tr("status.reattached"));
+          break;
+        }
         case "rdp": {
           const p = msg.payload as DetachedRdpParams | undefined;
           if (!p?.host) return;

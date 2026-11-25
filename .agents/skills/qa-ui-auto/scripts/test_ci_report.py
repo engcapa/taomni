@@ -30,6 +30,20 @@ class ReportTests(unittest.TestCase):
             root=Path(d); manifest,_=self.example(root)
             self.assertTrue(aggregate(manifest,root)['passed'])
 
+    def test_matching_source_without_a_profile_receipt_cannot_certify_the_profile(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest, run = self.example(root)
+            manifest['module_profile'] = {'name': 'core-only', 'modules': {}}
+            outcome_path = run.parent / 'ci-outcome.json'
+            outcome = json.loads(outcome_path.read_text())
+            outcome['selection_sha256'] = selection_digest(manifest)
+            write_json(outcome_path, outcome)
+            result = aggregate(manifest, root)
+            self.assertFalse(result['passed'])
+            self.assertTrue(any('case lacks the selected installation profile' in error
+                                for error in result['entries'][0]['errors']))
+
     def test_shard_group_failure_key_and_missing_shard_are_preserved(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

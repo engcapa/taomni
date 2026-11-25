@@ -12,15 +12,6 @@
 //! downloaded mail on the server (AC-66). Local mail is never pruned by the
 //! header retention settings — it has no other copy.
 
-macro_rules! each {
-    ($self:ident, $conn:ident => $body:expr) => {
-        match $self {
-            Pop3Client::Plain($conn) => $body,
-            Pop3Client::Tls($conn) => $body,
-        }
-    };
-}
-
 #[cfg(test)]
 pub(super) mod fake {
     //! Minimal POP3 test server (USER/PASS, APOP, STAT, UIDL, RETR, DELE, QUIT).
@@ -110,51 +101,33 @@ pub(super) mod fake {
     }
 }
 
-use std::collections::{HashMap, HashSet};
+use super::MailAccountConfig;
 
-use std::io::{BufRead, BufReader, Read, Write};
-
-use std::net::TcpStream;
-
-use std::time::Duration;
-
-use base64::Engine as _;
-
-use base64::engine::general_purpose::STANDARD as BASE64;
-
-use rusqlite::{Connection, OptionalExtension, Result as SqlResult, params};
-
-use super::{
-    MailAccountConfig, MailAuthMode, MailConnectionSecurity, MailFolder, MailMessageCached,
-    ResolvedMailAccount, certs, list_cached_folders, mail_effective_endpoint, now_ts,
-    parse_body_message, tcp_connect, upsert_folder, upsert_message, xoauth2_sasl_response,
-};
-
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
 mod limits;
 
-mod local_store;
-
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
 mod connection;
-
-mod synchronization;
 
 #[cfg(test)]
 mod tests;
 
-pub(super) use limits::POP3_FETCH_BATCH;
-
-use limits::{LOCAL_FOLDERS, READ_TIMEOUT};
-
-pub(super) use local_store::{
-    create_local_folder, delete_local, delete_local_folder, ensure_local_folders, has_local_store,
-    insert_local, is_pop3, local_raw, migrate_local_tables, move_local, refresh_counts,
-    rename_local_folder,
+pub(super) use taomni_mail_storage::pop3::local_store::{
+    create_local_folder, ensure_local_folders, has_local_store, list_local_folders,
+    list_local_originals, local_raw, mark_local_read, rename_local_folder, set_local_flags,
 };
 
-use local_store::{delete_rows, local_folder, next_uid};
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
+pub(super) use taomni_mail_storage::pop3::local_store::{
+    delete_local, delete_local_folder, import_local_messages, local_body, move_local,
+};
 
-pub(super) use connection::{Pop3Client, Pop3Conn, apop_digest};
+pub(super) fn is_pop3(config: &MailAccountConfig) -> bool {
+    config.incoming == super::MailIncomingProtocol::Pop3
+}
 
-use connection::{authenticate, greeting_timestamp};
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
+pub(super) use connection::Pop3Client;
 
-pub(super) use synchronization::{Pop3SyncOutcome, plan_round, sync_inbox};
+#[cfg(any(test, feature = "legacy-mail-pop3"))]
+pub(super) use taomni_mail_storage::pop3::{sqlite_ledger, sync_inbox};

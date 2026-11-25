@@ -17,7 +17,7 @@ pub(in crate::chat) async fn recycle_if_profile_changed(
 ) {
     let selected_profile = profile_id_from_provider_id(provider_id);
     let process = {
-        let mut registry = state.agent.acp_processes.lock().await;
+        let mut registry = state.core.agent.acp_processes.lock().await;
         let should_remove = registry
             .get(thread_id)
             .is_some_and(|process| Some(process.profile_id()) != selected_profile);
@@ -38,6 +38,7 @@ pub(in crate::chat) async fn recycle_media_process(
 ) {
     let process = {
         state
+            .core
             .agent
             .acp_media_processes
             .lock()
@@ -128,6 +129,7 @@ pub(super) async fn existing_process(
     profile_id: &str,
 ) -> Option<Arc<AcpThreadProcess>> {
     state
+        .core
         .agent
         .acp_processes
         .lock()
@@ -138,7 +140,13 @@ pub(super) async fn existing_process(
 }
 
 pub(super) async fn recycle_thread_process(state: &AppState, thread_id: &str) {
-    let process = state.agent.acp_processes.lock().await.remove(thread_id);
+    let process = state
+        .core
+        .agent
+        .acp_processes
+        .lock()
+        .await
+        .remove(thread_id);
     if let Some(process) = process {
         process.stop().await;
     }

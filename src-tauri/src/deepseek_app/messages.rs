@@ -21,7 +21,7 @@ pub async fn run(
     let client = MessagesClient::resolve_provider(state, &request.provider).await?;
     super::client::validate_request(&client.provider, &request)?;
     let (body, assistant_id, initial_blocks) = {
-        let db = state.db.lock().map_err(|_| "database unavailable")?;
+        let db = state.core.db.lock().map_err(|_| "database unavailable")?;
         store::init(&db)?;
         store::ensure_thread(&db, &request.thread_id)?;
         let history = store::messages(&db, &request.thread_id)?;
@@ -118,7 +118,7 @@ pub async fn run(
         }
         Err(_) => ("error", None),
     };
-    if let Ok(db) = state.db.lock() {
+    if let Ok(db) = state.core.db.lock() {
         store::settle(&db, &assistant_id, &blocks, status, reason)?;
         store::sync_snapshot(&db, &request.thread_id, reply.title.as_deref())?;
     }
@@ -170,7 +170,7 @@ async fn stream(
                     .filter(|block| !block.is_null())
                     .cloned(),
             );
-            let db = state.db.lock().map_err(|_| "database unavailable")?;
+            let db = state.core.db.lock().map_err(|_| "database unavailable")?;
             store::settle(
                 &db,
                 assistant_id,

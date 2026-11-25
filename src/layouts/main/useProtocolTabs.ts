@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { sessionToObjectStorageConfig } from "../../lib/objectStorage";
 import { parseVncViewerOptions, writeVncViewerOptions } from "../../lib/vncOptions";
-import type { VncSessionProperties } from "../../components/vnc/VncPropertiesDialog";
+import type { VncSessionProperties } from "../../lib/vnc/viewerContract";
 import type { Tab, DbConnectInfo } from "../../types";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";

@@ -13,7 +13,7 @@ pub type CodexProcessRegistry = Mutex<HashMap<String, Arc<CodexAppServer>>>;
 
 #[tauri::command]
 pub async fn codex_detect(state: State<'_, AppState>) -> Result<CodexStatusResult, String> {
-    let ai_ctx = state.ai_ctx.read().await;
+    let ai_ctx = state.legacy.ai_ctx.read().await;
     if ai_ctx.config.full_local_mode || ai_ctx.config.fully_disabled {
         return Ok(CodexStatusResult {
             status: crate::agent::codex_bridge::CodexStatus::NotFound,
@@ -35,7 +35,10 @@ pub async fn codex_detect(state: State<'_, AppState>) -> Result<CodexStatusResul
 #[tauri::command]
 pub async fn codex_get_custom_config(state: State<'_, AppState>) -> Result<Option<String>, String> {
     let config = AiConfig::load(&default_ai_config_path());
-    crate::agent::codex_bridge::config::resolve_custom_config(&config.codex_bridge, &state.vault)
+    crate::agent::codex_bridge::config::resolve_custom_config(
+        &config.codex_bridge,
+        &state.core.vault,
+    )
 }
 
 #[tauri::command]
@@ -46,7 +49,7 @@ pub async fn codex_get_profile_config(
     if !vault_ref.starts_with("vault:") {
         return Err("Invalid vault reference".into());
     }
-    match state.vault.resolve(&vault_ref) {
+    match state.core.vault.resolve(&vault_ref) {
         Ok(Some(plaintext)) => Ok(Some(plaintext.to_string())),
         Ok(None) => Ok(None),
         Err(e) if e.contains(crate::vault::ERR_VAULT_LOCKED) => Err(format!(
@@ -62,7 +65,15 @@ pub async fn codex_stop_session(
     thread_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let process = { state.agent.codex_processes.lock().await.remove(&thread_id) };
+    let process = {
+        state
+            .core
+            .agent
+            .codex_processes
+            .lock()
+            .await
+            .remove(&thread_id)
+    };
     if let Some(process) = process {
         process.stop().await;
     }
@@ -70,11 +81,19 @@ pub async fn codex_stop_session(
 }
 
 pub(crate) async fn recycle_thread_process(state: &AppState, thread_id: &str) {
-    let process = { state.agent.codex_processes.lock().await.remove(thread_id) };
+    let process = {
+        state
+            .core
+            .agent
+            .codex_processes
+            .lock()
+            .await
+            .remove(thread_id)
+    };
     if let Some(process) = process {
         process.stop().await;
     }
-    state.agent.captures.purge_thread(thread_id);
+    state.core.agent.captures.purge_thread(thread_id);
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -118,7 +137,15 @@ pub async fn codex_test_config(
     };
 
     {
-        let old = { state.agent.codex_processes.lock().await.remove(&thread_id) };
+        let old = {
+            state
+                .core
+                .agent
+                .codex_processes
+                .lock()
+                .await
+                .remove(&thread_id)
+        };
         if let Some(old) = old {
             old.stop().await;
         }
@@ -205,6 +232,7 @@ pub async fn codex_test_config(
 
     {
         state
+            .core
             .agent
             .codex_processes
             .lock()
@@ -246,7 +274,15 @@ pub async fn codex_test_config(
 
     let stderr = process.get_stderr().await.trim().to_string();
     {
-        let old = { state.agent.codex_processes.lock().await.remove(&thread_id) };
+        let old = {
+            state
+                .core
+                .agent
+                .codex_processes
+                .lock()
+                .await
+                .remove(&thread_id)
+        };
         if let Some(old) = old {
             old.stop().await;
         }

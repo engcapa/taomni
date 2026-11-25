@@ -145,7 +145,7 @@ pub fn resolve_window<'a>(
 
 pub async fn list_windows(core: &Core) -> Result<Vec<DesktopWindow>, String> {
     #[cfg(test)]
-    if let Some(driver) = core.state().mobile.desktop.test_driver() {
+    if let Some(driver) = core.state().legacy.mobile.desktop.test_driver() {
         return driver.list_windows();
     }
     let Core::Desktop(app) = core else {
@@ -164,7 +164,7 @@ pub async fn send_window_input(
 ) -> Result<WindowInputResult, String> {
     let parsed_key = validate_window_input(&request)?;
     #[cfg(test)]
-    if let Some(driver) = core.state().mobile.desktop.test_driver() {
+    if let Some(driver) = core.state().legacy.mobile.desktop.test_driver() {
         return driver.send_window_input(window_id, &request);
     }
     let Core::Desktop(app) = core else {
@@ -174,7 +174,7 @@ pub async fn send_window_input(
     let target = resolve_window(&windows, window_id)?.clone();
 
     #[cfg(target_os = "macos")]
-    if !crate::servers::rdp::control_permission_granted() {
+    if !taomni_capture::permissions::control_permission_granted() {
         return Err("desktop_input_permission_required".into());
     }
 

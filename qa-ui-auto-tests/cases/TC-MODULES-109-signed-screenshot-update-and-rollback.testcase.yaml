@@ -1,0 +1,151 @@
+id: TC-MODULES-109
+title: Signed Screenshot switches versions and preserves OCR and redaction without restarting Taomni
+description: >-
+  Install an independently compiled Screenshot prerelease, verify real OCR and auto-redaction
+  through the active host and offline WASM assets, confirm disabled refusal keeps native capture
+  available, download the current signed package from the loopback catalog, update and roll back
+  both while disabled and while active without restarting Taomni, recover from a handshake-failure
+  candidate, uninstall cleanly with stateless data locator verification, and reinstall the current
+  version with OCR working again.
+covers: [F-Modules-1, F27.1]
+tags: [modules, screenshot, marketplace, lifecycle, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, module_signed_screenshot_archive, module_marketplace, release_build_required]
+timeout_sec: 480
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- module_marketplace_probe: {phase: source}
+- reload_window: null
+- wait_for: '[data-testid="system-screenshot"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.screenshot_previous_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.screenshot_previous_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-screenshot"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-screenshot"]'
+- click: '[data-testid="nav-mode-home"]'
+- native_screenshot_scenario: {scenario: ocr-redact}
+- native_screenshot_scenario: {scenario: ocr-offline-module}
+- assert_signed_module_lifecycle: {slug: screenshot, phase: old-enabled}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-disable-screenshot"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-enable-screenshot"]:enabled'
+- assert_signed_module_lifecycle: {slug: screenshot, phase: old-disabled}
+- click: '[data-testid="nav-mode-home"]'
+- native_screenshot_scenario: {scenario: ocr-disabled}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-update"]'
+- click: '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-download"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: {selector: '[data-testid="module-download-task"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-review"]'
+- assert_text: {selector: '[data-testid="confirm-dialog-message"]', contains: '${fixture.screenshot_current_version}'}
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-current"]'
+- assert_signed_module_lifecycle: {slug: screenshot, phase: updated-disabled}
+- click: '[data-testid="module-action-rollback-screenshot"]'
+- assert_text: {selector: '[data-testid="module-action-rollback-screenshot"]:enabled', contains: '${fixture.screenshot_current_version}'}
+- assert_signed_module_lifecycle: {slug: screenshot, phase: rolled-back-disabled}
+- press: {selector: '[data-testid="module-action-enable-screenshot"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-screenshot"]'
+- click: '[data-testid="nav-mode-home"]'
+- native_screenshot_scenario: {scenario: ocr-redact}
+- assert_signed_module_lifecycle: {slug: screenshot, phase: old-reenabled}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-update"]'
+- click: '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-review"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-current"]'
+- assert_signed_module_lifecycle: {slug: screenshot, phase: updated-enabled}
+- click: '[data-testid="nav-mode-home"]'
+- native_screenshot_scenario: {scenario: ocr-redact}
+- native_screenshot_scenario: {scenario: ocr-offline-module}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.screenshot_failed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.screenshot_failed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="failed"]', timeout_sec: 45}
+- assert_text: {selector: '[data-testid="module-offline-error"]', contains: 'Plugin permission denied'}
+- assert_signed_module_lifecycle: {slug: screenshot, phase: failed-update}
+- click: '[data-testid="module-action-rollback-screenshot"]'
+- assert_text: {selector: '[data-testid="module-action-rollback-screenshot"]:enabled', contains: '${fixture.screenshot_current_version}'}
+- assert_signed_module_lifecycle: {slug: screenshot, phase: rolled-back-enabled}
+- click: '[data-testid="nav-mode-home"]'
+- native_screenshot_scenario: {scenario: ocr-redact}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-uninstall-screenshot"]:enabled', key: Enter}
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-screenshot"]'
+- assert_signed_module_lifecycle: {slug: screenshot, phase: uninstalled}
+- click: '[data-testid="nav-mode-home"]'
+- native_screenshot_scenario: {scenario: ocr-disabled}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.screenshot_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.screenshot_signed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-screenshot"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-screenshot"]'
+- click: '[data-testid="nav-mode-home"]'
+- native_screenshot_scenario: {scenario: ocr-redact}
+- assert_signed_module_lifecycle: {slug: screenshot, phase: reinstalled}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: disabled-update-and-rollback
+    requirement: Update and roll back a disabled Screenshot package without restarting the desktop process while keeping native OCR refusal active when disabled.
+    actions: [10, 12, 20, 29, 32, 34, 37]
+    checkpoints:
+    - {step: 15, expectation: Signed Screenshot performs real native OCR and redaction.}
+    - {step: 16, expectation: Signed Screenshot offline WASM assets verify rendered word geometry.}
+    - {step: 17, expectation: The earlier signed Screenshot host owns the writer lease after real OCR/redaction and offline WASM verification.}
+    - {step: 22, expectation: Disabling releases the writer lease and keeps versions clean.}
+    - {step: 24, expectation: Native capture stays available while OCR and recording direct to Module Store.}
+    - {step: 36, expectation: Updating while disabled activates the new version and signed frontend without starting the host.}
+    - {step: 39, expectation: Rolling back while disabled restores the earlier version with no running host.}
+    results: [15, 16, 17, 22, 24, 36, 39]
+  - id: enabled-update-and-failed-handshake
+    requirement: Replace and roll back an active Screenshot host, run OCR and redaction on each switched version, and recover cleanly when an update fails handshake.
+    actions: [40, 49, 50, 60, 64]
+    checkpoints:
+    - {step: 43, expectation: Re-enabled earlier Screenshot host completes real native OCR and redaction.}
+    - {step: 44, expectation: Re-enabled earlier Screenshot host owns its writer lease.}
+    - {step: 52, expectation: Live update transitions cleanly to the current signed host without restarting Taomni.}
+    - {step: 54, expectation: Updated current Screenshot host completes real OCR and redaction.}
+    - {step: 55, expectation: Updated Screenshot offline WASM assets match the active version.}
+    - {step: 62, expectation: Handshake-failure candidate surfaces permission denied without replacing active version.}
+    - {step: 63, expectation: Failed update keeps the active current host running cleanly.}
+    - {step: 66, expectation: Manual rollback switches the active host back to the earlier version.}
+    - {step: 68, expectation: Rolled-back earlier Screenshot host completes live OCR and redaction.}
+    results: [43, 44, 52, 54, 55, 62, 63, 66, 68]
+  - id: stateless-uninstall-and-reinstall
+    requirement: Uninstalling Screenshot clears code and runtime with an empty retained-data locator, refuses OCR while uninstalled, and restores OCR on reinstall.
+    actions: [71, 72, 81, 83]
+    checkpoints:
+    - {step: 74, expectation: Uninstall removes versions and runtime cleanly with stateless empty retained-data locator.}
+    - {step: 76, expectation: Uninstalled state refuses OCR and directs to Module Store.}
+    - {step: 86, expectation: Reinstalled current Screenshot host restores real OCR and redaction.}
+    - {step: 87, expectation: Reinstalled Screenshot host owns its writer lease and passes final lifecycle checks.}
+    - {step: 88, expectation: No renderer runtime errors occurred across the full lifecycle.}
+    results: [74, 76, 86, 87, 88]
+  visual:
+  - check: Module Store version/rollback controls and runtime Module Store status across install, update, rollback, and uninstall.
+    method: automated
+    reason: Verified through Module Store assertions and native screenshot OCR/redaction outcomes.
+  native:
+  - check: Real OS process lineage, signed host/frontend hashes, writer lease, stateless empty retained locator, and real clipboard OCR redaction across all 10 lifecycle phases.
+    method: automated
+    reason: Native assert_signed_module_lifecycle and native_screenshot_scenario inspect real binaries, leases, and pixels in isolated QA profiles.

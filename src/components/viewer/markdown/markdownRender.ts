@@ -1,4 +1,5 @@
 import DOMPurify from "dompurify";
+import { marked } from "marked";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
 import { renderMermaid } from "../../editor/workspace/model/mermaid";
 import { highlightTree, classHighlighter } from "@lezer/highlight";
@@ -146,16 +147,19 @@ export async function enhanceMarkdown(root: HTMLElement, owner: RenderOwner): Pr
 }
 
 /** Parse in an inert template; remove image sources before nodes are attached. */
-export function markdownFragment(content: string): HTMLElement {
+export function markdownFragment(content: string, inline = false): HTMLElement {
   const root = document.createElement("div");
   const template = document.createElement("template");
-  template.innerHTML = renderMarkdown(content);
+  const math = replaceMarkdownMath(content);
+  template.innerHTML = inline
+    ? renderFormatted(marked.parseInline(math.content, { async: false }), "html") ?? ""
+    : renderMarkdown(content);
   template.content.querySelectorAll("img").forEach((image) => {
     image.dataset.fvSource = image.getAttribute("src") || "";
     image.removeAttribute("src");
   });
   root.append(template.content);
-  restoreMarkdownTasks(root, content);
-  enhanceMarkdownMath(root, replaceMarkdownMath(content).formulas);
+  if (!inline) restoreMarkdownTasks(root, content);
+  enhanceMarkdownMath(root, math.formulas);
   return root;
 }

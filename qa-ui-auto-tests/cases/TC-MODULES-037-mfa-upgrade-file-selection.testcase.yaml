@@ -1,0 +1,50 @@
+id: TC-MODULES-037
+title: MFA upgrade keeps archive and signature selections separate
+description: Select an archive using the browser preview picker, cancel the signature picker, and verify that the original selection remains.
+covers: [F-Modules-1]
+tags: [modules, upgrade, mfa, p1]
+modes: [browser]
+fixtures: [reset_db, module_upgrade]
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-upgrade-mfa-open"]', key: Enter}
+- click: '[data-testid="module-upgrade-mfa-choose-archive"]'
+- fill: {selector: '[data-testid="text-input-dialog-input"]', value: /preview/mfa.taomni-plugin}
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_attribute: {selector: '[data-testid="module-upgrade-mfa-archive"]', name: value, equals: /preview/mfa.taomni-plugin}
+- click: '[data-testid="module-upgrade-mfa-choose-signature"]'
+- wait_for: '[data-testid="text-input-dialog-input"]'
+- click: '[data-testid="text-input-dialog-cancel"]'
+- assert_not_visible: '[data-testid="text-input-dialog-input"]'
+- assert_attribute: {selector: '[data-testid="module-upgrade-mfa-archive"]', name: value, equals: /preview/mfa.taomni-plugin}
+- assert_attribute: {selector: '[data-testid="module-upgrade-mfa-signature"]', name: value, equals: ''}
+- assert_visible: '[data-testid="module-upgrade-mfa-submit"][disabled]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Selecting the archive and cancelling the signature picker preserves the archive and leaves submission disabled.
+    actions: [3, 5, 6, 7, 8, 9, 11, 13]
+    checkpoints:
+    - {step: 10, expectation: The archive path is populated by its picker.}
+    - {step: 12, expectation: The signature picker has opened independently.}
+    - {step: 14, expectation: Cancelling dismisses the signature picker.}
+    - {step: 15, expectation: The archive selection is unchanged.}
+    - {step: 16, expectation: The signature field remains empty.}
+    - {step: 17, expectation: Restart remains disabled.}
+    - {step: 18, expectation: The picker sequence has no unhandled runtime errors.}
+    results: [10, 14, 15, 16, 17, 18]
+  visual:
+  - check: The picker updates the correct labelled field and cancellation preserves the form.
+    method: automated
+    reason: Actual inputs and enabled state are checked.
+  native:
+  - check: Native archive verification is exercised in TC-MODULES-036.
+    method: external
+    reason: This case operates the browser path dialog.

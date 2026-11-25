@@ -1,0 +1,16 @@
+[package]
+name = "taomni-vnc-api"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "Connection requests and transport between the desktop and the VNC client host"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+subtle = "2.6.1"
+tokio = { version = "1", features = ["io-util", "net", "rt", "time", "macros"] }
+tracing = "0.1"
+uuid = { version = "1", features = ["v4"] }
+zeroize = { version = "1", features = ["serde"] }

@@ -11,7 +11,7 @@ pub async fn execute(
     state: &AppState,
     client: &MessagesClient,
 ) -> Result<ToolOutput, String> {
-    let config = state.ai_ctx.read().await.config.clone();
+    let config = state.legacy.ai_ctx.read().await.config.clone();
     if config.full_local_mode || config.fully_disabled {
         return Err("disabled: external research is disabled".into());
     }
@@ -34,6 +34,7 @@ pub async fn execute(
     let response = match search.client_provider.as_str() {
         "tavily" | "serper" => {
             let key = state
+                .core
                 .vault
                 .resolve(&search.byok_key)
                 .map_err(|_| "vault_locked: unlock the search credential")?

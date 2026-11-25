@@ -2,7 +2,7 @@ use super::*;
 
 #[cfg(target_os = "linux")]
 pub(super) async fn start_linux_capture(
-    app: &AppHandle,
+    _app: &AppHandle,
     state: &State<'_, AppState>,
     cfg: &SocksCapConfig,
     caps: &capture::SocksCapCapabilities,
@@ -15,28 +15,43 @@ pub(super) async fn start_linux_capture(
         .linux
         .as_ref()
         .is_some_and(|linux| linux.transparent_available);
+    let processes = if sudo_password.is_some() || transparent_available {
+        match state.legacy.sockscap.xray() {
+            Some(manager) => manager.processes().await?,
+            None => None,
+        }
+    } else {
+        None
+    };
     let capture = if sudo_password.is_some() {
         let backend = LinuxCaptureImpl;
-        LinuxCaptureHandle::Transparent(backend.start(cfg, Arc::clone(&ctx), sudo_password).await?)
+        LinuxCaptureHandle::Transparent(
+            backend
+                .start(cfg, Arc::clone(&ctx), processes.as_ref(), sudo_password)
+                .await?,
+        )
     } else if transparent_available {
         let backend = LinuxCaptureImpl;
-        match backend.start(cfg, Arc::clone(&ctx), None).await {
+        match backend
+            .start(cfg, Arc::clone(&ctx), processes.as_ref(), None)
+            .await
+        {
             Ok(capture) => LinuxCaptureHandle::Transparent(capture),
             Err(error) if caps.privileged_required => return Err(error),
             Err(error) => {
                 tracing::warn!(
                     "Linux transparent capture became unavailable after preflight; falling back to launch-only capture: {error}"
                 );
-                start_linux_launched_capture(app, Arc::clone(&ctx)).await?
+                start_linux_launched_capture(state, Arc::clone(&ctx)).await?
             }
         }
     } else {
-        start_linux_launched_capture(app, Arc::clone(&ctx)).await?
+        start_linux_launched_capture(state, Arc::clone(&ctx)).await?
     };
     let relay_port = capture.relay_port();
     let launch_only = capture.is_launch_only();
 
-    let mut orch = state.sockscap.orch.write().await;
+    let mut orch = state.legacy.sockscap.orch.write().await;
     let gfw_note = orch
         .gfwlist_meta()
         .map(|meta| format!(", gfw={}", meta.rule_count))
@@ -75,11 +90,11 @@ pub(super) async fn start_linux_capture(
 
 #[cfg(target_os = "linux")]
 pub(super) async fn start_linux_launched_capture(
-    app: &AppHandle,
+    state: &State<'_, AppState>,
     ctx: Arc<RwLock<relay::RelayContext>>,
 ) -> Result<capture::linux::LinuxCaptureHandle, String> {
-    let runtime_dir = data_dir(app)?.join("runtime");
+    let launcher_path = capture::linux::launched::prepare_launcher(&state.plugins).await?;
     Ok(capture::linux::LinuxCaptureHandle::Launched(
-        capture::linux::launched::LaunchedCaptureHandle::start(ctx, &runtime_dir).await?,
+        capture::linux::launched::LaunchedCaptureHandle::start(ctx, launcher_path).await?,
     ))
 }

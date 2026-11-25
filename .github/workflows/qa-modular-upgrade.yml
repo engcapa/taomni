@@ -7,6 +7,104 @@ on:
         description: Commit or ref to test (empty = workflow ref)
         type: string
         default: ''
+      package_run:
+        description: Inspect only the real packages uploaded by this Release Bundle run (empty = normal contracts)
+        type: string
+        default: ''
+      package_source:
+        description: Exact 40-character source SHA of the selected package producer
+        type: string
+        default: ''
+      package_version:
+        description: Version embedded in the selected release packages
+        type: string
+        default: '0.6.0'
+      package_targets:
+        description: Package targets to inspect (all or comma-separated release targets)
+        type: string
+        default: all
+      package_windows_nsis:
+        description: Exercise the Windows NSIS upgrade and removal of legacy voice DLLs
+        type: boolean
+        default: false
+      package_upgrade_linux:
+        description: Validate Linux deb replacement and rollback with the installed MFA account
+        type: boolean
+        default: false
+      package_first_release_linux:
+        description: Verify the first modular upgrade on Linux. Combine with the desktop check to cover all four targets.
+        type: boolean
+        default: false
+      package_first_release_version:
+        description: Public monolith version for the first upgrade (empty selects the current stable release)
+        type: string
+        default: ''
+      package_relocation_linux:
+        description: Exercise noexec profile recovery through the Linux deb, RPM and AppImage
+        type: boolean
+        default: false
+      package_rdp_perf:
+        description: Measure RDP performance on the installed Linux candidate with the standalone probe
+        type: boolean
+        default: false
+      package_signed_run:
+        description: Reuse the matching signed MFA input from a successful installed Linux upgrade run
+        type: string
+        default: ''
+      package_first_release_desktop:
+        description: Replace the pinned monolithic MSI and DMGs and exercise the full signed first-release roster
+        type: boolean
+        default: false
+      package_upgrade_desktop:
+        description: Exercise real Windows MSI and macOS DMG replacement and rollback
+        type: boolean
+        default: false
+      package_macos_hardened_mfa:
+        description: Verify the static-Kerberos DMG and run its matching signed MFA host.
+        type: boolean
+        default: false
+      package_macos_arm_runner:
+        description: Hosted ARM64 runner for macOS bundle inspection and installation
+        type: choice
+        options: [macos-15, macos-26]
+        default: macos-15
+      download_only:
+        description: Run only the three-platform native downloader and restart contracts
+        type: boolean
+        default: false
+      network_only:
+        description: Run downloader and persisted Settings/Vault proxy contracts without signed package builds
+        type: boolean
+        default: false
+      system_execution_only:
+        description: Run only the macOS and Windows system host execution experiments
+        type: boolean
+        default: false
+      protocol_only:
+        description: Run only the plugin wire and QA selection unit contracts
+        type: boolean
+        default: false
+      rdp_pipeline:
+        description: Include native desktop display and encoder comparisons with protocol_only
+        type: boolean
+        default: false
+      host_only:
+        description: Run only the three-platform real host process and cleanup contracts
+        type: boolean
+        default: false
+      signed_mfa_only:
+        description: Run only the selected signed module checks
+        type: boolean
+        default: false
+      signed_migration_module:
+        description: Module to verify. VNC runs the four-target package and signature checks.
+        type: choice
+        options: [mfa, mail, vnc-client]
+        default: mfa
+      signed_native_macos:
+        description: Apply the fixed macOS system signature in the signed module gate
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       head:
@@ -14,12 +112,102 @@ on:
         type: string
         required: false
         default: ''
+      package_run:
+        type: string
+        required: false
+        default: ''
+      package_source:
+        type: string
+        required: false
+        default: ''
+      package_version:
+        type: string
+        required: false
+        default: '0.6.0'
+      package_targets:
+        type: string
+        required: false
+        default: all
+      package_windows_nsis: {type: boolean, default: false}
+      package_upgrade_linux:
+        type: boolean
+        default: false
+      package_first_release_linux:
+        type: boolean
+        default: false
+      package_first_release_version: {type: string, default: ''}
+      package_relocation_linux:
+        type: boolean
+        default: false
+      package_rdp_perf:
+        type: boolean
+        default: false
+      package_signed_run:
+        type: string
+        default: ''
+      package_first_release_desktop:
+        type: boolean
+        default: false
+      package_upgrade_desktop:
+        type: boolean
+        default: false
+      package_macos_hardened_mfa:
+        type: boolean
+        default: false
+      package_macos_arm_runner:
+        type: string
+        default: macos-15
+      download_only:
+        type: boolean
+        required: false
+        default: false
+      network_only:
+        type: boolean
+        required: false
+        default: false
+      system_execution_only:
+        type: boolean
+        required: false
+        default: false
+      protocol_only:
+        type: boolean
+        required: false
+        default: false
+      rdp_pipeline:
+        type: boolean
+        default: false
+      host_only:
+        type: boolean
+        required: false
+        default: false
+      signed_mfa_only:
+        type: boolean
+        required: false
+        default: false
+      signed_migration_module:
+        type: string
+        default: mfa
+      signed_native_macos:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: modular-upgrade-${{ github.ref }}
+  group: >-
+    modular-upgrade-${{ github.ref }}-${{
+      inputs.signed_mfa_only && format('signed-{0}', inputs.signed_migration_module || 'mfa') ||
+      (inputs.package_run && format('packages-{0}-{1}-{2}-{3}', inputs.package_run, inputs.package_targets,
+        inputs.package_first_release_version || 'current',
+        inputs.package_first_release_linux && inputs.package_first_release_desktop && 'first-release-all' ||
+        inputs.package_first_release_linux && 'first-release-linux' || inputs.package_rdp_perf && 'rdp-perf-linux' ||
+        inputs.package_relocation_linux && 'relocate-linux' || inputs.package_upgrade_linux && 'upgrade-linux' ||
+        inputs.package_first_release_desktop && 'first-release-desktop' ||
+        inputs.package_upgrade_desktop && 'upgrade-desktop' || inputs.package_windows_nsis && 'windows-nsis' || 'inventory') ||
+      inputs.protocol_only && 'protocol' || inputs.host_only && 'host' || inputs.system_execution_only && 'system-execution' ||
+      inputs.network_only && 'network' || inputs.download_only || false) }}
   cancel-in-progress: true
 
 env:
@@ -29,7 +217,484 @@ env:
   PYTHONUNBUFFERED: '1'
 
 jobs:
+  first-upgrade-baseline:
+    if: inputs.package_run && (inputs.package_first_release_linux || inputs.package_first_release_desktop || inputs.package_windows_nsis)
+    runs-on: ubuntu-latest
+    outputs:
+      baseline: ${{ steps.freeze.outputs.baseline }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - name: Freeze the public monolith and its four installer identities
+        id: freeze
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QA_FIRST_UPGRADE_VERSION: ${{ inputs.package_first_release_version }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+        run: python -m qa_ui_auto.legacy_baseline
+      - uses: actions/upload-artifact@v4
+        with:
+          name: first-upgrade-baseline-${{ github.run_id }}
+          path: first-upgrade-baseline.json
+          if-no-files-found: error
+
+  installed-linux-mfa:
+    needs: first-upgrade-baseline
+    if: ${{ !cancelled() && needs.first-upgrade-baseline.result != 'failure' && !inputs.signed_mfa_only && inputs.package_run != '' && (inputs.package_first_release_linux || inputs.package_upgrade_linux || inputs.package_relocation_linux || inputs.package_rdp_perf) }}
+    uses: ./.github/workflows/qa-modular-installed-mfa.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+      package_run: ${{ inputs.package_run }}
+      package_source: ${{ inputs.package_source }}
+      package_version: ${{ inputs.package_version }}
+      first_release: ${{ inputs.package_first_release_linux }}
+      first_release_baseline: ${{ needs.first-upgrade-baseline.outputs.baseline }}
+      first_release_version: ${{ inputs.package_first_release_version }}
+      verify_relocation: ${{ inputs.package_relocation_linux }}
+      verify_rdp_perf: ${{ inputs.package_rdp_perf }}
+      signed_run: ${{ inputs.package_signed_run }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  release-bundle-samples:
+    needs: first-upgrade-baseline
+    if: >-
+      ${{ !cancelled() && needs.first-upgrade-baseline.result != 'failure' && !inputs.signed_mfa_only && inputs.package_run != '' &&
+      ((inputs.package_first_release_linux && inputs.package_first_release_desktop) ||
+      (!inputs.package_first_release_linux && !inputs.package_upgrade_linux &&
+      !inputs.package_relocation_linux && !inputs.package_rdp_perf)) }}
+    uses: ./.github/workflows/qa-modular-bundles.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+      package_run: ${{ inputs.package_run }}
+      package_source: ${{ inputs.package_source }}
+      package_version: ${{ inputs.package_version }}
+      package_targets: ${{ inputs.package_targets }}
+      windows_nsis: ${{ inputs.package_windows_nsis }}
+      upgrade_desktop: ${{ inputs.package_upgrade_desktop || inputs.package_first_release_desktop }}
+      first_release: ${{ inputs.package_first_release_desktop }}
+      first_release_baseline: ${{ needs.first-upgrade-baseline.outputs.baseline }}
+      first_release_version: ${{ inputs.package_first_release_version }}
+      include_linux_inventory: ${{ inputs.package_first_release_linux && inputs.package_first_release_desktop }}
+      macos_hardened_mfa: ${{ inputs.package_macos_hardened_mfa }}
+      macos_arm_runner: ${{ inputs.package_macos_arm_runner || 'macos-15' }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
+  verify-current-first-upgrade:
+    needs: [first-upgrade-baseline, installed-linux-mfa, release-bundle-samples]
+    if: >-
+      ${{ !cancelled() && needs.first-upgrade-baseline.result == 'success' &&
+      (inputs.package_first_release_version == '' || inputs.package_first_release_version == 'latest') &&
+      (!inputs.package_first_release_linux || needs.installed-linux-mfa.result == 'success') &&
+      (!inputs.package_first_release_desktop || needs.release-bundle-samples.result == 'success') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: first-upgrade-baseline-${{ github.run_id }}
+          path: checked-baseline
+      - name: Compare the tested installers to the current public monolith
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m qa_ui_auto.legacy_baseline --verify-current checked-baseline/first-upgrade-baseline.json
+
+  protocol-contracts:
+    if: ${{ !inputs.signed_mfa_only && !inputs.package_run && inputs.protocol_only }}
+    uses: ./.github/workflows/qa-modular-protocol.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+      rdp_pipeline: ${{ inputs.rdp_pipeline }}
+
+  system-execution:
+    if: ${{ !inputs.signed_mfa_only && !inputs.package_run && !inputs.protocol_only && !inputs.host_only && inputs.system_execution_only }}
+    uses: ./.github/workflows/qa-modular-plugin-host.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+      system_execution_only: true
+    secrets:
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
+  download-contracts:
+    if: ${{ !inputs.signed_mfa_only && !inputs.package_run && !inputs.protocol_only && !inputs.host_only && !inputs.system_execution_only }}
+    uses: ./.github/workflows/qa-modular-download.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+
+  signed-vnc-packages:
+    if: ${{ inputs.signed_mfa_only && inputs.signed_migration_module == 'vnc-client' }}
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+      module: vnc-client
+      macos_runner: ${{ inputs.package_macos_arm_runner || 'macos-15' }}
+      native_macos_signing: ${{ inputs.signed_native_macos }}
+    secrets: inherit
+
+  signed-mfa-install:
+    if: ${{ inputs.signed_mfa_only && inputs.signed_migration_module != 'vnc-client' || !inputs.signed_mfa_only && !inputs.package_run && !inputs.protocol_only && !inputs.host_only && !inputs.system_execution_only && (inputs.network_only || !inputs.download_only) }}
+    uses: ./.github/workflows/qa-modular-mfa-install.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+      package_run: ${{ inputs.signed_mfa_only && inputs.package_run || '' }}
+      network_only: ${{ !inputs.signed_mfa_only && inputs.network_only || false }}
+      module: ${{ inputs.signed_mfa_only && inputs.signed_migration_module || 'mfa' }}
+      macos_runner: ${{ inputs.signed_mfa_only && (inputs.signed_migration_module == 'mail' || inputs.signed_native_macos) && inputs.package_macos_arm_runner || 'macos-latest' }}
+      native_macos_signing: ${{ inputs.signed_mfa_only && inputs.signed_native_macos || false }}
+    secrets: inherit
+
+  mfa-engine-contracts:
+    if: ${{ !inputs.signed_mfa_only && !inputs.package_run && !inputs.protocol_only && !inputs.host_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
+    name: MFA engine and host (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-mfa-engine-${{ matrix.target }}
+      - name: Compile MFA engine and host for the release target and run business units
+        run: |
+          mkdir -p modular-evidence
+          git rev-parse HEAD > modular-evidence/source-sha.txt
+          rustc --version > modular-evidence/rustc-version.txt
+          set -o pipefail
+          cargo check --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine -p taomni-plugin-mfa --target '${{ matrix.target }}' --all-targets --locked 2>&1 | tee modular-evidence/mfa-engine-check.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine -p taomni-plugin-mfa --lib --locked 2>&1 | tee modular-evidence/mfa-engine-unit.log
+      - name: Verify the MFA engine has no application or IPC runtime dependencies
+        run: |
+          set -o pipefail
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine --target '${{ matrix.target }}' --edges normal,build --prefix none --format '{p}' --locked > modular-evidence/mfa-engine-tree.txt
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mfa --target '${{ matrix.target }}' --edges normal,build --prefix none --format '{p}' --locked > modular-evidence/mfa-host-tree.txt
+          node scripts/modular-boundaries.mjs --mfa-tree modular-evidence/mfa-engine-tree.txt --mfa-host-tree modular-evidence/mfa-host-tree.txt 2>&1 | tee modular-evidence/mfa-engine-boundary.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-mfa-engine-${{ matrix.target }}
+          path: modular-evidence
+          if-no-files-found: error
+
+  vault-foundations:
+    if: ${{ !inputs.signed_mfa_only && !inputs.package_run && !inputs.protocol_only && !inputs.host_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
+    name: Vault foundations (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-vault-foundations
+      - name: Service contracts and SQLite WAL snapshot units
+        run: |
+          mkdir -p modular-evidence
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-api -p taomni-plugin-services -p taomni-plugin-sdk -p taomni-profile-locks -p taomni-sqlite-snapshot --lib --locked 2>&1 | tee modular-evidence/vault-foundation-unit.log
+      - name: Real process profile and writer leases with crash release
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-profile-locks --test process_locks --locked -- --ignored --test-threads=1 --exact surviving_host_excludes_restore_writer_and_rekey_until_a_crash_releases_them --nocapture 2>&1 | tee modular-evidence/profile-process.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-vault-foundations-${{ matrix.os }}
+          path: modular-evidence
+          if-no-files-found: error
+
+  host-lifecycle:
+    if: ${{ !inputs.signed_mfa_only && !inputs.package_run && !inputs.protocol_only && (inputs.host_only || (!inputs.system_execution_only && !inputs.download_only && !inputs.network_only)) }}
+    name: Real host lifecycle (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-host-gates
+      - name: Compile production host, hello fixture and actual MFA process
+        run: |
+          mkdir -p modular-evidence
+          git rev-parse HEAD > modular-evidence/source-sha.txt
+          rustc --version > modular-evidence/rustc-version.txt
+          set -o pipefail
+          cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin --bin taomni-hello-plugin --locked 2>&1 | tee modular-evidence/host-build.log
+          cargo build --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mfa --bin taomni-plugin-mfa --locked 2>&1 | tee modular-evidence/mfa-host-build.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --lib --locked 2>&1 | tee modular-evidence/host-unit.log
+      - name: Exercise idle heartbeats, cancellation, restart and core-kill cleanup
+        run: |
+          set -o pipefail
+          python - <<'PY' 2>&1 | tee modular-evidence/host-process.log
+          import os
+          import pathlib
+          import subprocess
+          suffix = ".exe" if os.name == "nt" else ""
+          os.environ["TAOMNI_GATE_EVIDENCE_DIR"] = str(pathlib.Path("modular-evidence").resolve())
+          os.environ["TAOMNI_HELLO_PLUGIN_BIN"] = str(pathlib.Path(f"src-tauri/target/debug/taomni-hello-plugin{suffix}").resolve())
+          os.environ["TAOMNI_MFA_PLUGIN_BIN"] = str(pathlib.Path(f"src-tauri/target/debug/taomni-plugin-mfa{suffix}").resolve())
+          subprocess.run([
+              "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml",
+              "-p", "taomni-host-gates", "--test", "lifecycle", "--test", "activation", "--test", "cleanup", "--test", "services", "--test", "profile", "--test", "snapshot", "--test", "mfa", "--test", "mfa_snapshot",
+              "--locked", "--", "--ignored", "--test-threads=1", "--nocapture",
+          ], check=True)
+          PY
+      - name: Exercise actual Linux noexec mounts and executable alternatives
+        if: runner.os == 'Linux'
+        run: python scripts/run-module-execution-gates.py --evidence modular-evidence
+      - name: Record actual hosted process scenario selections
+        if: ${{ !inputs.package_run && !cancelled() }}
+        run: |
+          python - <<'PY' > modular-evidence/service-selection.txt
+          import subprocess
+          for target, expected in {"services": 9, "lifecycle": 7, "activation": 3, "cleanup": 2, "profile": 6, "snapshot": 4, "mfa": 5, "mfa_snapshot": 2}.items():
+              listing = subprocess.check_output([
+                  "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml", "-p", "taomni-host-gates",
+                  "--test", target, "--locked", "--", "--ignored", "--list",
+              ], text=True)
+              print(target, listing)
+              assert sum(line.endswith(": test") for line in listing.splitlines()) == expected, f"Missing {target} process scenarios"
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-host-${{ matrix.os }}
+          path: modular-evidence
+          if-no-files-found: error
+
+  legacy-export-contracts:
+    if: ${{ !inputs.signed_mfa_only && !inputs.package_run && !inputs.protocol_only && (inputs.host_only || (!inputs.system_execution_only && !inputs.download_only && !inputs.network_only)) }}
+    uses: ./.github/workflows/qa-modular-legacy-export.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+
+  capture-contracts:
+    if: ${{ !inputs.signed_mfa_only && !inputs.package_run && !inputs.protocol_only && !inputs.host_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
+    name: Capture contracts (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-capture-${{ matrix.target }}
+      - name: Linux capture dependencies and real X11 fixture
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpipewire-0.3-dev libclang-dev libdbus-1-dev xvfb
+      - name: Compile the shared library for the release target
+        run: |
+          mkdir -p modular-evidence
+          set -o pipefail
+          cargo check --manifest-path src-tauri/Cargo.toml -p taomni-capture --target '${{ matrix.target }}' --all-targets --locked 2>&1 | tee modular-evidence/capture-check.log
+      - name: Shared capture unit contracts on the runner architecture
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-capture --lib --locked 2>&1 | tee modular-evidence/capture-unit.log
+      - name: Native XDamage, MIT-SHM and plain capture behavior
+        if: runner.os == 'Linux'
+        run: |
+          set -o pipefail
+          xvfb-run -a -s '-noreset -screen 0 1280x800x24 +extension DAMAGE +extension MIT-SHM' cargo test --manifest-path src-tauri/Cargo.toml -p taomni-capture --lib --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-evidence/capture-x11.log
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-capture --target x86_64-unknown-linux-gnu --edges normal,build,dev --locked > modular-evidence/capture-linux-tree.txt
+          node scripts/modular-boundaries.mjs --linux-tree modular-evidence/capture-linux-tree.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-capture-${{ matrix.target }}
+          path: modular-evidence
+          if-no-files-found: error
+
+  rdp-shared-check:
+    if: ${{ !inputs.signed_mfa_only && !inputs.package_run && !inputs.protocol_only && !inputs.host_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
+    name: Shared RDP check (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-rdp-check-${{ matrix.target }}
+      - name: Compile shared RDP libraries for the release target
+        run: |
+          mkdir -p modular-evidence
+          set -o pipefail
+          cargo check --manifest-path src-tauri/Cargo.toml -p taomni-rdp-common -p taomni-rdp-client-engine -p taomni-file-uri --target '${{ matrix.target }}' --all-targets --all-features --locked 2>&1 | tee modular-evidence/rdp-shared-check.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-rdp-check-${{ matrix.target }}
+          path: modular-evidence
+          if-no-files-found: error
+
+  rdp-shared-unit:
+    if: ${{ !inputs.signed_mfa_only && !inputs.package_run && !inputs.protocol_only && !inputs.host_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
+    name: Shared RDP units (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-rdp-unit
+      - name: Pure shared RDP and URI units on the runner architecture
+        run: |
+          mkdir -p modular-evidence
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-rdp-common -p taomni-rdp-client-engine -p taomni-file-uri --all-features --locked 2>&1 | tee modular-evidence/rdp-shared-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-rdp-common --no-default-features --locked 2>&1 | tee modular-evidence/rdp-shared-minimal-unit.log
+      - name: Verify protocol-free URI and minimal shared dependencies
+        run: |
+          set -o pipefail
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-rdp-common --no-default-features --edges normal,build --prefix none --format '{p}' --locked > modular-evidence/rdp-common-minimal-tree.txt
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-file-uri --edges normal,build --prefix none --format '{p}' --locked > modular-evidence/file-uri-tree.txt
+          python - <<'PY' 2>&1 | tee modular-evidence/rdp-shared-boundary.log
+          import os
+          from pathlib import Path
+
+          def packages(filename):
+              return {line.split()[0] for line in Path(filename).read_text(encoding="utf-8").splitlines() if line.strip()}
+
+          expected = {"taomni-rdp-common", "taomni-file-uri"}
+          if os.name != "nt":
+              expected.add("libc")
+          common = packages("modular-evidence/rdp-common-minimal-tree.txt")
+          uri = packages("modular-evidence/file-uri-tree.txt")
+          if common != expected:
+              raise SystemExit(f"Unexpected minimal RDP dependencies: {sorted(common)}; expected {sorted(expected)}")
+          if uri != {"taomni-file-uri"}:
+              raise SystemExit(f"File URI library acquired runtime/build dependencies: {sorted(uri)}")
+          print(f"Minimal RDP dependencies: {sorted(common)}")
+          print("File URI library has zero runtime/build dependencies; neither tree links IronRDP, Tauri, wry or core.")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-rdp-unit-${{ matrix.os }}
+          path: modular-evidence
+          if-no-files-found: error
+
   upgrade-contracts:
+    if: ${{ !inputs.signed_mfa_only && !inputs.package_run && !inputs.protocol_only && !inputs.host_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
     name: Upgrade contracts (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -46,9 +711,14 @@ jobs:
         with:
           mode: browser
       - uses: dtolnay/rust-toolchain@stable
-      - uses: arduino/setup-protoc@v3
+      - name: Install verified fixed protoc
+        run: python .agents/skills/qa-ui-auto/scripts/ci_setup_protoc.py
+      - uses: Swatinem/rust-cache@v2
+        if: runner.os == 'Linux'
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          workspaces: src-tauri -> target
+          shared-key: modular-core-unit-${{ runner.os }}-${{ runner.arch }}
+          cache-on-failure: true
       - name: Linux native dependencies for the core migration unit
         if: runner.os == 'Linux'
         run: |
@@ -65,10 +735,202 @@ jobs:
           pnpm exec vitest run
           src/lib/pluginRegistry.test.ts
           src/lib/pluginLoader.test.ts
+          src/lib/pluginFrontendHost.test.ts
+          src/lib/helloPluginFrontend.test.tsx
           src/lib/ipc/plugin.test.ts
+          src/stores/moduleNetworkStore.test.ts
+          src/stores/moduleDownloadStore.test.ts
+          src/stores/moduleMarketplaceStore.test.ts
+          src/components/settings/ModuleMarketplace.test.tsx
+          src/components/settings/ModuleNetworkSettings.test.tsx
+          src/components/settings/ModuleDownloads.test.tsx
+          src/components/settings/AppProxyPanel.test.tsx
+          src/layouts/main/useMainUtilityTabs.test.tsx
+          src/components/tao/home/DockRow.test.tsx
+          src/components/welcome/__tests__/HomeModeWelcomePanel.test.tsx
+          src/components/welcome/__tests__/WelcomePanel.background.test.tsx
+          src/stubs/moduleDownloadPreview.test.ts
+          src/stubs/moduleMarketplacePreview.test.ts
           src/lib/nativeAppMenu.test.ts
+          src/lib/updateService.test.ts
+          src/components/tabbar/tabs/TabItem.test.tsx
+          src/components/tabbar/TabBar.test.tsx
+          src/stores/mfaStore.test.ts
+          src/stores/mfaVaultLifecycle.test.ts
+          src-tauri/plugins/mfa/renderer/MfaAddDialog.test.tsx
+          src-tauri/plugins/mfa/renderer/MfaPanel.test.tsx
+          src-tauri/plugins/mfa/renderer/MfaQrDialog.test.tsx
+          src-tauri/plugins/mfa/renderer/MfaQrDialog.lifecycle.test.tsx
+          src-tauri/plugins/mfa/renderer/__tests__/MfaFloatingWindow.test.tsx
+          src/components/vault/VaultSettings.test.tsx
+          src/components/vault/VaultSetupDialog.test.tsx
+          src/components/vault/VaultUnlockDialog.test.tsx
+          src/components/vault/StartupVaultUnlockGate.test.tsx
+          src/lib/backupSettings.test.ts
+          src/components/settings/backup/BackupRangeEditor.test.tsx
+          src/components/settings/BackupSettingsPanel.test.tsx
       - name: Plugin protocol unit contracts
         run: cargo test --manifest-path src-tauri/crates/taomni-plugin-api/Cargo.toml --locked
-      - name: 0.5.x migration journal and legacy detection contracts
+      - name: Native observation unit regressions
+        shell: bash
+        run: |
+          mkdir -p modular-evidence
+          set -o pipefail
+          python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_module_download_observation test_module_marketplace_observation test_module_upgrade_observation test_legacy_release test_module_network_gate test_module_retained_observation test_module_backup_observation test_module_live_backup_observation test_module_restore_observation test_native_restore_relaunch test_module_profile_observation test_native_restart_failure test_native_fixture_cleanup test_module_signed_archive test_module_package_signing test_module_signed_host_gate 2>&1 | tee modular-evidence/native-observation-unit.log
+      - name: Preserve native observation evidence on every platform
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-native-observation-${{ matrix.os }}
+          path: modular-evidence/native-observation-unit.log
+          if-no-files-found: warn
+      - name: Retained RDP client engine unit contracts
         if: runner.os == 'Linux'
-        run: cargo test --manifest-path src-tauri/Cargo.toml --lib plugin::migration -- --nocapture
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --locked --manifest-path src-tauri/Cargo.toml -p taomni-rdp-client-engine --lib 2>&1 | tee modular-evidence/rdp-client-engine.log
+      - name: RDP server clipboard contracts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --locked --manifest-path src-tauri/Cargo.toml -p taomni-rdp-server-engine --lib clipboard::tests 2>&1 | tee modular-evidence/rdp-server-engine.log
+      - name: Core migration, retained RDP, Vault and application lifecycle unit contracts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p modular-evidence
+          # Keep all filters bound to one compiled harness; do not rebuild the
+          # core between filters when build-script inputs are refreshed.
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni --lib --no-run --locked --message-format=json > modular-evidence/core-build.jsonl
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import subprocess
+
+          root = Path("modular-evidence")
+          artifacts = [json.loads(line) for line in (root / "core-build.jsonl").read_text().splitlines()]
+          executables = {
+              row["executable"] for row in artifacts
+              if row.get("reason") == "compiler-artifact"
+              and row.get("target", {}).get("name") == "taomni_lib"
+              and row.get("profile", {}).get("test") is True
+              and row.get("executable")
+          }
+          if len(executables) != 1:
+              raise SystemExit(f"Expected one freshly built core unit harness, got {len(executables)}")
+          executable = Path(executables.pop()).resolve()
+          filters = [
+              "plugin::",
+              "config::tests",
+              "mail::mbox::tests::export_then_import_on_fake_server",
+              "mail::tests::accounts_and_authentication",
+              "mail::tests::compose_and_drafts",
+              "vault::plugin_access::tests",
+              "vault::data_access_tests",
+              "vault::tests",
+              "mfa::access_tests",
+              "mfa::tests",
+              "runtime::bootstrap::tests",
+              "runtime::generation::tests",
+              "backup::generation_tests",
+              "backup::protected_snapshot_tests",
+              "backup::plugins::",
+              "backup::compat_tests",
+              "backup::tests::",
+              "backup::range::tests::",
+              "backup::snapshot_tests",
+              "runtime::tasks::tests",
+              "runtime::paths::tests",
+              "runtime::reaper::tests",
+              "app_exit::tests",
+              "terminal::observation::tests",
+              "backup::scheduler::tests",
+          ]
+          receipt = {
+              "head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+              "executable": str(executable),
+              "sha256": hashlib.file_digest(executable.open("rb"), "sha256").hexdigest(),
+              "filters": [],
+          }
+          failures = []
+          for selected in filters:
+              listing = subprocess.check_output([str(executable), selected, "--list"], text=True)
+              count = sum(line.endswith(": test") for line in listing.splitlines())
+              if count == 0:
+                  raise SystemExit(f"Required core unit filter selected no tests: {selected}")
+              result = subprocess.run(
+                  [str(executable), selected, "--test-threads=1", "--nocapture"],
+                  text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+              )
+              (root / f"{selected.replace('::', '-')}.log").write_text(result.stdout)
+              print(result.stdout, flush=True)
+              receipt["filters"].append({"filter": selected, "selected": count, "exit_code": result.returncode})
+              (root / "core-unit-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
+              if result.returncode:
+                  failures.append(selected)
+          if failures:
+              raise SystemExit(f"Core unit filters failed: {', '.join(failures)}")
+          PY
+      - name: Exercise production Vault through real SDK stdio
+        if: runner.os == 'Linux'
+        run: |
+          set -o pipefail
+          cargo build --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --bin host-gate-services --locked 2>&1 | tee modular-evidence/vault-sdk-build.log
+          python - <<'PY' 2>&1 | tee modular-evidence/vault-sdk-process.log
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          root = Path("modular-evidence")
+          core = Path(json.loads((root / "core-unit-receipt.json").read_text())["executable"])
+          fixture = Path("src-tauri/target/debug/host-gate-services").resolve()
+          os.environ["TAOMNI_SERVICE_PLUGIN_BIN"] = str(fixture)
+          selected = "vault::plugin_access::host_tests"
+          listing = subprocess.check_output([str(core), selected, "--ignored", "--list"], text=True)
+          count = sum(line.endswith(": test") for line in listing.splitlines())
+          assert count == 2, f"Expected two real Vault/SDK gates, got {count}"
+          result = subprocess.run([str(core), selected, "--ignored", "--test-threads=1", "--nocapture"])
+          receipt = {"head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+                     "selected": count, "exitCode": result.returncode,
+                     "coreSha256": hashlib.file_digest(core.open("rb"), "sha256").hexdigest(),
+                     "sdkFixtureSha256": hashlib.file_digest(fixture.open("rb"), "sha256").hexdigest()}
+          (root / "vault-sdk-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
+          raise SystemExit(result.returncode)
+          PY
+      - name: Exercise actual MFA host with the production persisted Vault
+        if: runner.os == 'Linux'
+        run: |
+          set -o pipefail
+          cargo build --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mfa --bin taomni-plugin-mfa --locked 2>&1 | tee modular-evidence/vault-mfa-host-build.log
+          python - <<'PY' 2>&1 | tee modular-evidence/vault-mfa-host-process.log
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          root = Path("modular-evidence")
+          core = Path(json.loads((root / "core-unit-receipt.json").read_text())["executable"])
+          fixture = Path("src-tauri/target/debug/taomni-plugin-mfa").resolve()
+          os.environ["TAOMNI_MFA_PLUGIN_BIN"] = str(fixture)
+          selected = "vault::plugin_access::mfa_host_tests"
+          listing = subprocess.check_output([str(core), selected, "--ignored", "--list"], text=True)
+          count = sum(line.endswith(": test") for line in listing.splitlines())
+          assert count == 3, f"Expected three actual Vault/MFA gates, got {count}"
+          result = subprocess.run([str(core), selected, "--ignored", "--test-threads=1", "--nocapture"])
+          receipt = {"head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+                     "selected": count, "exitCode": result.returncode,
+                     "coreSha256": hashlib.file_digest(core.open("rb"), "sha256").hexdigest(),
+                     "mfaHostSha256": hashlib.file_digest(fixture.open("rb"), "sha256").hexdigest()}
+          (root / "vault-mfa-host-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
+          raise SystemExit(result.returncode)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always() && runner.os == 'Linux'
+        with:
+          name: modular-retained-rdp-core-linux
+          path: modular-evidence
+          if-no-files-found: error

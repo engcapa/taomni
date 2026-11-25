@@ -168,6 +168,7 @@ impl Runtime {
             let raw_id = term.strip_prefix("term:").unwrap_or(&term);
             let mut rx = core
                 .state()
+                .legacy
                 .mobile
                 .broker
                 .subscribe(raw_id)
@@ -265,7 +266,7 @@ impl Runtime {
             return Err("feishu_already_running_stop_before_reconfiguring".into());
         }
         actions::prepare(&core)?;
-        let events = core.state().mobile.events.tasks.subscribe();
+        let events = core.state().legacy.mobile.events.tasks.subscribe();
         let cancel = CancellationToken::new();
         let runtime = self.clone();
         let task_core = core.clone();

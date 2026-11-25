@@ -4,6 +4,7 @@ import { formatBytes, formatPosixMode, type FileEntry } from "../../lib/sftp";
 import { useFocusReturn } from "../editor/workspace/useFocusReturn";
 import { useExplorerLabels } from "./explorerLabels";
 import type { ExplorerOperations } from "./useExplorerOperations";
+import { ExplorerNewFileDialog } from "./ExplorerNewFileDialog";
 
 function ExplorerDialog({ children, onClose, testId, focusTestId }: { children: React.ReactNode; onClose: () => void; testId: string; focusTestId?: string }) {
   useFocusReturn(true);
@@ -67,6 +68,7 @@ export function ExplorerDialogs({ operations }: { operations: ExplorerOperations
   const label = useExplorerLabels();
   const prompt = operations.deletePrompt;
   return <>
+    {operations.newFile && <ExplorerNewFileDialog operations={operations} />}
     {prompt && <ExplorerDialog testId="explorer-delete-dialog" onClose={() => operations.setDeletePrompt(null)}
       focusTestId={prompt.reason || prompt.defaultIntent === "permanent" ? "explorer-delete-confirm" : "explorer-delete-trash"}>
       <h3>{prompt.reason ? label("永久删除", "Permanently delete") : label("删除", "Delete")} {prompt.entries.length === 1 ? `“${prompt.entries[0].name}”` : label(`${prompt.entries.length} 项`, `${prompt.entries.length} items`)}?</h3>

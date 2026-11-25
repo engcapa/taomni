@@ -2,7 +2,6 @@ import {
   GitBranch,
   Inbox,
   KeyRound,
-  MessageSquare,
   Network,
   Server,
   Shield,
@@ -61,12 +60,6 @@ export function ToolsPanel({ onCommand }: { onCommand?: (command: AppCommand) =>
       label: t("tabs.mailUnified"),
       icon: <Inbox className="w-4 h-4 shrink-0" />,
       testId: "sidebar-tool-mail-unified",
-    },
-    {
-      id: "lan-chat",
-      label: t("tabs.lanChat"),
-      icon: <MessageSquare className="w-4 h-4 shrink-0" />,
-      testId: "sidebar-tool-lan-chat",
     },
     {
       id: "mfa",

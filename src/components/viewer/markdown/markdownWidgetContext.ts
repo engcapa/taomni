@@ -1,6 +1,9 @@
 import { EditorView } from "@codemirror/view";
 import { Transaction } from "@codemirror/state";
+import { isolateHistory } from "@codemirror/commands";
 import type { MarkdownWarningHandler } from "./markdownRenderFallback";
+
+export interface WidgetEdit { userEvent?: string; isolate?: "before" | "full" }
 
 export interface MarkdownWidgetContext {
   docPath: string;
@@ -15,9 +18,11 @@ export interface MarkdownWidgetContext {
   revealImage: (reference: string) => void;
 }
 
-export function replaceWidgetSource(view: EditorView, from: number, raw: string, insert: string): boolean {
+export function replaceWidgetSource(view: EditorView, from: number, raw: string, insert: string, edit: WidgetEdit = {}): boolean {
   if (view.state.readOnly || view.state.doc.sliceString(from, from + raw.length) !== raw) return false;
-  view.dispatch({ changes: { from, to: from + raw.length, insert }, annotations: Transaction.userEvent.of("input") });
+  view.dispatch({ changes: { from, to: from + raw.length, insert }, annotations: [
+    Transaction.userEvent.of(edit.userEvent ?? "input"), ...(edit.isolate ? [isolateHistory.of(edit.isolate)] : []),
+  ] });
   return true;
 }
 

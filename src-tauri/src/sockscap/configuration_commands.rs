@@ -11,7 +11,10 @@ pub async fn sockscap_redirector_install_status(
 ) -> Result<serde_json::Value, String> {
     #[cfg(target_os = "macos")]
     {
-        serde_json::to_value(redirector::installer::status(&app))
+        let status = tokio::task::spawn_blocking(move || redirector::installer::status(&app))
+            .await
+            .map_err(|error| format!("Redirector status task failed: {error}"))??;
+        serde_json::to_value(status)
             .map_err(|error| format!("serialize Redirector install status: {error}"))
     }
     #[cfg(not(target_os = "macos"))]
@@ -43,9 +46,11 @@ pub async fn sockscap_install_redirector(app: AppHandle) -> Result<serde_json::V
 /* ---------------------------- config ------------------------------------ */
 
 #[tauri::command]
-pub async fn sockscap_get_config(app: AppHandle) -> Result<SocksCapConfig, String> {
-    let path = config_path(&app)?;
-    Ok(SocksCapConfig::load(&path))
+pub async fn sockscap_get_config(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<SocksCapConfig, String> {
+    module_settings::load(&app, &state.plugins).await
 }
 
 /// Resolve and validate a macOS application selector before it is persisted.
@@ -74,10 +79,14 @@ pub async fn sockscap_set_config(
     config: SocksCapConfig,
 ) -> Result<(), String> {
     config.validate()?;
-    let path = config_path(&app)?;
-    let mut orch = state.sockscap.orch.write().await;
+    let _operation = state
+        .legacy
+        .sockscap
+        .begin_activation(&state.plugins)
+        .await?;
+    let mut orch = state.legacy.sockscap.orch.write().await;
     ensure_configuration_unlocked(&orch)?;
-    config.save(&path)?;
+    module_settings::save(&app, &state.plugins, &config).await?;
     orch.apply_config(config);
     Ok(())
 }
@@ -95,20 +104,21 @@ pub async fn sockscap_gfwlist_status(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<GfwListStatus, String> {
-    let orch = state.sockscap.orch.read().await;
-    if let Some(meta) = orch.gfwlist_meta() {
-        return Ok(GfwListStatus {
-            loaded: true,
-            rule_count: meta.rule_count,
-            skipped: meta.skipped,
-            last_refresh: meta.last_refresh.clone(),
-            source: meta.source.clone(),
-            error: None,
-        });
-    }
-    // Fall back to disk meta if engine has not loaded yet.
-    let meta_path = rules_dir(&app)?.join("gfwlist.meta.json");
-    match GfwListMeta::load(&meta_path) {
+    let live = state
+        .legacy
+        .sockscap
+        .orch
+        .read()
+        .await
+        .gfwlist_meta()
+        .cloned();
+    let meta = match live {
+        Some(meta) => Some(meta),
+        None => module_rules::load(&app, &state.plugins)
+            .await?
+            .map(|rules| rules.meta),
+    };
+    match meta {
         Some(m) => Ok(GfwListStatus {
             loaded: true,
             rule_count: m.rule_count,
@@ -134,12 +144,16 @@ pub async fn sockscap_refresh_gfwlist(
     state: State<'_, AppState>,
     url: Option<String>,
 ) -> Result<GfwListStatus, String> {
+    let _operation = state
+        .legacy
+        .sockscap
+        .begin_activation(&state.plugins)
+        .await?;
     // Hold the write lock for the complete mutation so Start cannot snapshot
     // the old rules while a refresh is being committed.
-    let mut orch = state.sockscap.orch.write().await;
+    let mut orch = state.legacy.sockscap.orch.write().await;
     ensure_configuration_unlocked(&orch)?;
-    let cfg_path = config_path(&app)?;
-    let mut cfg = SocksCapConfig::load(&cfg_path);
+    let mut cfg = module_settings::load(&app, &state.plugins).await?;
     let fetch_url = url
         .filter(|u| !u.trim().is_empty())
         .unwrap_or_else(|| cfg.gfwlist.url.clone());
@@ -147,12 +161,11 @@ pub async fn sockscap_refresh_gfwlist(
         cfg.gfwlist.url = fetch_url.clone();
     }
 
-    let dir = rules_dir(&app)?;
-    let result = rules::source::refresh_from_url(&fetch_url, &dir).await;
+    let result = module_rules::refresh(&app, &state.plugins, &fetch_url).await;
     match result {
         Ok(compiled) => {
             let meta = compiled.meta.clone();
-            cfg.save(&cfg_path)?;
+            module_settings::save(&app, &state.plugins, &cfg).await?;
             orch.apply_config(cfg);
             orch.set_rules(compiled);
             Ok(GfwListStatus {
@@ -195,10 +208,14 @@ pub async fn sockscap_import_rules(
     state: State<'_, AppState>,
     path: String,
 ) -> Result<GfwListStatus, String> {
-    let mut orch = state.sockscap.orch.write().await;
+    let _operation = state
+        .legacy
+        .sockscap
+        .begin_activation(&state.plugins)
+        .await?;
+    let mut orch = state.legacy.sockscap.orch.write().await;
     ensure_configuration_unlocked(&orch)?;
-    let dir = rules_dir(&app)?;
-    let compiled = rules::source::import_from_path(std::path::Path::new(&path), &dir)?;
+    let compiled = module_rules::import(&app, &state.plugins, PathBuf::from(path)).await?;
     let meta = compiled.meta.clone();
     orch.set_rules(compiled);
     Ok(GfwListStatus {
@@ -224,40 +241,33 @@ pub async fn sockscap_test_target(
         return Err("host is empty".into());
     }
 
-    // Ensure rules are loaded into the orchestrator for dry-run.
+    let _operation = state
+        .legacy
+        .sockscap
+        .begin_activation(&state.plugins)
+        .await?;
+    if let Some(result) = module_host::test_saved_target(&app, &state.plugins, &host, port).await? {
+        return Ok(result);
+    }
+
+    // Older modules evaluate a probe built from the desktop's current settings.
     {
-        let mut orch = state.sockscap.orch.write().await;
+        let mut orch = state.legacy.sockscap.orch.write().await;
         if orch.rules().is_none() {
-            let dir = rules_dir(&app)?;
-            if let Some(c) = rules::source::load_cached(&dir) {
+            if let Some(c) = module_rules::load(&app, &state.plugins).await? {
                 orch.set_rules(c);
             }
         }
         if orch.config().is_none() {
-            let cfg = SocksCapConfig::load(&config_path(&app)?);
+            let cfg = module_settings::load(&app, &state.plugins).await?;
             orch.apply_config(cfg);
         }
     }
 
-    let orch = state.sockscap.orch.read().await;
-    let cfg = orch
-        .config()
-        .cloned()
-        .unwrap_or_else(SocksCapConfig::default);
-    let engine = PolicyEngine::from_config(&cfg, orch.rules());
-    let input = PolicyInput {
-        host: Some(host.clone()),
-        ip: host.parse().ok(),
-        port,
-        process_path: None,
-        pid: None,
+    let probe = {
+        let orch = state.legacy.sockscap.orch.read().await;
+        let cfg = orch.config().cloned().unwrap_or_default();
+        policy::TargetRuleProbe::for_config(&cfg, orch.rules(), host, port)
     };
-    let trace = engine.decide(&input);
-    Ok(TargetTestResult {
-        host,
-        port,
-        decision: trace.decision,
-        reason: trace.reason,
-        matched_rule: trace.matched_rule,
-    })
+    module_host::test_target(&state.plugins, probe).await
 }

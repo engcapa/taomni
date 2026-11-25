@@ -1,0 +1,70 @@
+id: TC-MAIL-IMPORT-01
+title: Cancelling Mail file pickers preserves the selected folder
+description: Open the folder import and export actions through the signed Mail preview and cancel both path prompts. Verify Archive retains both seeded messages and the actions can be reopened.
+covers: [F-MAIL-14]
+tags: [mail, modules, p1]
+modes: [browser]
+fixtures: [reset_db, mail_server, module_mail_preview]
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- click: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- mail_server_assert_list_matches: {folder: Archive, timeout_sec: 30}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- click: '[data-testid="context-menu-item-import-messages-mbox-eml"]'
+- assert_text: {selector: '[data-testid="text-input-dialog"]', contains: Select files to send}
+- click: '[data-testid="text-input-dialog-cancel"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Import cancelled}
+- mail_server_assert_folder_count: {folder: Archive, equals: 2}
+- mail_server_assert_list_matches: {folder: Archive, timeout_sec: 20}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- assert_enabled: '[data-testid="context-menu-item-import-messages-mbox-eml"]'
+- press: {key: Escape}
+- assert_no_runtime_errors: null
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- click: '[data-testid="context-menu-item-export-as-mbox"]'
+- assert_text: {selector: '[data-testid="text-input-dialog"]', contains: Export Archive as mbox}
+- click: '[data-testid="text-input-dialog-cancel"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Export cancelled}
+- mail_server_assert_folder_count: {folder: Archive, equals: 2}
+- mail_server_assert_list_matches: {folder: Archive, timeout_sec: 20}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: cancel-import
+    requirement: Cancel returns to Archive with both seeded messages and leaves its import action available.
+    actions: [12, 14, 15, 17, 21, 23]
+    checkpoints:
+    - {step: 13, expectation: The selected Archive list matches its server folder.}
+    - {step: 16, expectation: The browser opens the file selection prompt from the folder action.}
+    - {step: 18, expectation: Mail displays the cancel result.}
+    - {step: 19, expectation: The model server still has the two seeded Archive messages.}
+    - {step: 20, expectation: The selected list has the same messages as the model server.}
+    - {step: 22, expectation: The import action can be selected again.}
+    - {step: 24, expectation: The renderer reports no runtime errors.}
+    results: [16, 18, 19, 20, 22, 24]
+  - id: cancel-export
+    requirement: Cancel dismisses the export dialog and preserves the folder.
+    actions: [25, 26, 28]
+    checkpoints:
+    - {step: 27, expectation: The export dialog identifies Archive as the source.}
+    - {step: 29, expectation: The status confirms cancellation.}
+    - {step: 30, expectation: Archive still holds both seeded messages.}
+    - {step: 31, expectation: The selected list has the same messages as the model server.}
+    - {step: 32, expectation: The renderer reports no runtime errors.}
+    results: [27, 29, 30, 31, 32]
+  visual:
+  - {check: Cancel returns to the visible Archive list and an enabled import action, method: automated, reason: The runner checks the messages and actionable control.}
+  native:
+  - {check: Native choosers and IMAP transfer, method: not-applicable, reason: TC-MODULES-095 exercises these desktop paths.}

@@ -1,0 +1,119 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { RdpCaptureProbe, ServerConfig } from "../../../../src/lib/servers";
+import RdpSettings from "./RdpSettings";
+
+const mocks = vi.hoisted(() => ({
+  platform: "macos" as "macos" | "windows",
+  probe: vi.fn<
+    (requestCapture?: boolean, requestControl?: boolean) => Promise<RdpCaptureProbe>
+  >(),
+}));
+
+vi.mock("../../../../src/lib/runtime", () => ({
+  getAppPlatform: () => mocks.platform,
+}));
+
+vi.mock("../../../../src/lib/servers", () => ({
+  probeRdpCapture: mocks.probe,
+}));
+
+const config: ServerConfig = {
+  port: 3389,
+  bindAddress: "127.0.0.1",
+  autoStop: true,
+  autoStopSeconds: 3600,
+  startOnLaunch: false,
+  viewOnly: false,
+  requireControlApproval: true,
+};
+
+describe("RdpSettings macOS permissions", () => {
+  beforeEach(() => {
+    mocks.platform = "macos";
+    mocks.probe.mockReset();
+    mocks.probe.mockResolvedValue({
+      permission: "granted",
+      controlPermission: "denied",
+      displays: [],
+      summary: "ready",
+    });
+  });
+
+  afterEach(() => cleanup());
+
+  it("probes silently on mount and requests Accessibility independently", async () => {
+    render(<RdpSettings config={config} onChange={vi.fn()} />);
+
+    await waitFor(() => expect(mocks.probe).toHaveBeenCalledWith(false, false));
+    fireEvent.click(screen.getByRole("button", { name: "Grant permission…" }));
+
+    await waitFor(() => expect(mocks.probe).toHaveBeenCalledWith(false, true));
+  });
+
+  it("reports the Windows capture backend and exposes display selection", async () => {
+    mocks.platform = "windows";
+    mocks.probe.mockResolvedValue({
+      permission: "notRequired",
+      controlPermission: "notRequired",
+      displays: [
+        {
+          id: "1",
+          name: "Primary display",
+          width: 1920,
+          height: 1080,
+          primary: true,
+        },
+      ],
+      summary: "Windows: Windows Graphics Capture with GDI compatibility fallback",
+    });
+
+    render(<RdpSettings config={config} onChange={vi.fn()} />);
+
+    await waitFor(() => expect(mocks.probe).toHaveBeenCalledWith(false, false));
+    expect(screen.getByText(/Windows Graphics Capture \(WGC\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/not implemented/i)).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("option", { name: /Primary display.*1920×1080/ }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("RdpSettings sound and microphone", () => {
+  beforeEach(() => {
+    mocks.platform = "windows";
+    mocks.probe.mockReset();
+    mocks.probe.mockResolvedValue({
+      permission: "notRequired",
+      controlPermission: "notRequired",
+      displays: [],
+      summary: "ready",
+    });
+  });
+
+  afterEach(() => cleanup());
+
+  it("defaults both on and saves the toggles and the microphone device", async () => {
+    const onChange = vi.fn();
+    render(<RdpSettings config={config} onChange={onChange} />);
+    await waitFor(() => expect(mocks.probe).toHaveBeenCalledWith(false, false));
+
+    const playback = screen.getByTestId("rdp-field-audio-playback") as HTMLInputElement;
+    const microphone = screen.getByTestId("rdp-field-microphone") as HTMLInputElement;
+    expect(playback.checked).toBe(true);
+    expect(microphone.checked).toBe(true);
+
+    fireEvent.click(playback);
+    expect(onChange).toHaveBeenCalledWith({ audioPlayback: false });
+    fireEvent.change(screen.getByTestId("rdp-field-microphone-device"), {
+      target: { value: "CABLE Input" },
+    });
+    expect(onChange).toHaveBeenCalledWith({ microphoneDevice: "CABLE Input" });
+  });
+
+  it("hides the device field when the microphone is off", () => {
+    render(<RdpSettings config={{ ...config, microphone: false }} onChange={vi.fn()} />);
+    expect((screen.getByTestId("rdp-field-microphone") as HTMLInputElement).checked).toBe(false);
+    expect(screen.queryByTestId("rdp-field-microphone-device")).not.toBeInTheDocument();
+  });
+});

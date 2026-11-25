@@ -1,0 +1,57 @@
+id: TC-MODULES-001
+title: Core workspace starts when the optional plugin registry is empty
+description: >-
+  The modular runtime scans optional plugin metadata during startup. An empty
+  or invalid plugin directory must not prevent the core workspace from opening;
+  this case checks the retained welcome surface in browser and native modes.
+  Plugin manifest and migration edge cases are covered by Rust/Vitest unit
+  tests because the browser preview does not execute the native registry.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- core-only
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 45
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="tao-home-local-terminal"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Core startup remains available with no installed plugin metadata.
+    actions:
+    - 2
+    - 3
+    - 4
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 3
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-local-terminal\"]"}'
+    - step: 5
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 2
+    - 3
+    - 4
+    - 5
+  visual:
+  - check: 检查核心欢迎页在插件目录为空或含无效元数据时仍完整渲染，无空白、遮挡或运行时错误；截图只作为评审证据。
+    method: manual
+    reason: 插件扫描由 native 核心执行，browser 预览只验证同一核心入口表面。
+  native:
+  - check: Native mode confirms the packaged app reaches the same core welcome surface.
+    method: external
+    reason: Browser preview does not execute Tauri plugin scanning or IPC registration.

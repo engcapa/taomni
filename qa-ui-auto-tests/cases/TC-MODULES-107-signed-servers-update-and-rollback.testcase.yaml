@@ -1,0 +1,195 @@
+id: TC-MODULES-107
+title: Signed Local servers switches versions and preserves HTTP settings and listener safety in one session
+description: >-
+  Install an independently compiled Local servers prerelease, configure HTTP on 127.0.0.1:28489,
+  and verify live static file serving. Download the current signed package from the loopback catalog,
+  update and roll back both while disabled and while running, verify host replacement cleanly stops
+  the HTTP listener without restarting Taomni, recover from a handshake-failure candidate, uninstall
+  with data retained, and reinstall the current version with the HTTP configuration intact.
+covers: [F-Modules-1, F-Servers-1, F-WS-3]
+tags: [modules, servers, marketplace, lifecycle, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, local_servers_http, module_signed_servers_archive, module_marketplace, release_build_required]
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- module_marketplace_probe: {phase: source}
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.servers_previous_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.servers_previous_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-servers"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-servers"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="global-search-trigger"]'
+- wait_for: '[data-testid="global-search-modal"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-http"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="servers"][data-plugin-version="${fixture.servers_previous_version}"] [data-testid="server-field-http-root-dir"]', timeout_sec: 25}
+- fill: {selector: '[data-testid="server-field-bind-address"]', value: 127.0.0.1}
+- fill: {selector: '[data-testid="server-field-port"]', value: '28489'}
+- fill: {selector: '[data-testid="server-field-http-root-dir"]', value: '${fixture.local_servers_http_root}'}
+- click: '[data-testid="server-row-http-start"]'
+- wait_for: {selector: '[data-testid="server-row-http"][data-status="running"]', timeout_sec: 25}
+- assert_local_servers_http: serving
+- assert_signed_module_lifecycle: {slug: servers, phase: old-enabled}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-disable-servers"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-enable-servers"]:enabled'
+- assert_local_servers_http: stopped
+- assert_signed_module_lifecycle: {slug: servers, phase: old-disabled}
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-update"]'
+- click: '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-download"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: {selector: '[data-testid="module-download-task"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-review"]'
+- assert_text: {selector: '[data-testid="confirm-dialog-message"]', contains: '${fixture.servers_current_version}'}
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-current"]'
+- assert_signed_module_lifecycle: {slug: servers, phase: updated-disabled}
+- click: '[data-testid="module-action-rollback-servers"]'
+- assert_text: {selector: '[data-testid="module-action-rollback-servers"]:enabled', contains: '${fixture.servers_current_version}'}
+- assert_signed_module_lifecycle: {slug: servers, phase: rolled-back-disabled}
+- press: {selector: '[data-testid="module-action-enable-servers"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-servers"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- click: '[data-testid="server-row-http"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="servers"][data-plugin-version="${fixture.servers_previous_version}"] [data-testid="server-field-http-root-dir"]', timeout_sec: 25}
+- wait_for: {selector: '[data-testid="server-field-port"][value="28489"]', timeout_sec: 10}
+- assert_attribute: {selector: '[data-testid="server-field-http-root-dir"]', name: value, equals: '${fixture.local_servers_http_root}'}
+- click: '[data-testid="server-row-http-start"]'
+- wait_for: {selector: '[data-testid="server-row-http"][data-status="running"]', timeout_sec: 25}
+- assert_local_servers_http: serving
+- assert_signed_module_lifecycle: {slug: servers, phase: old-reenabled}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-update"]'
+- click: '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-review"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-current"]'
+- assert_local_servers_http: stopped
+- assert_signed_module_lifecycle: {slug: servers, phase: updated-enabled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- click: '[data-testid="server-row-http"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="servers"][data-plugin-version="${fixture.servers_current_version}"] [data-testid="server-field-http-root-dir"]', timeout_sec: 25}
+- wait_for: {selector: '[data-testid="server-field-port"][value="28489"]', timeout_sec: 10}
+- click: '[data-testid="server-row-http-start"]'
+- wait_for: {selector: '[data-testid="server-row-http"][data-status="running"]', timeout_sec: 25}
+- assert_local_servers_http: serving
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.servers_failed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.servers_failed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="failed"]', timeout_sec: 45}
+- assert_text: {selector: '[data-testid="module-offline-error"]', contains: 'Plugin permission denied'}
+- assert_local_servers_http: stopped
+- assert_signed_module_lifecycle: {slug: servers, phase: failed-update}
+- click: '[data-testid="module-action-rollback-servers"]'
+- assert_text: {selector: '[data-testid="module-action-rollback-servers"]:enabled', contains: '${fixture.servers_current_version}'}
+- assert_local_servers_http: stopped
+- assert_signed_module_lifecycle: {slug: servers, phase: rolled-back-enabled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- click: '[data-testid="server-row-http"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="servers"][data-plugin-version="${fixture.servers_previous_version}"] [data-testid="server-field-http-root-dir"]', timeout_sec: 25}
+- click: '[data-testid="server-row-http-start"]'
+- wait_for: {selector: '[data-testid="server-row-http"][data-status="running"]', timeout_sec: 25}
+- assert_local_servers_http: serving
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-uninstall-servers"]:enabled', key: Enter}
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-servers"]'
+- assert_visible: '[data-testid="module-data-retained-servers"]'
+- assert_local_servers_http: stopped
+- assert_signed_module_lifecycle: {slug: servers, phase: uninstalled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="servers"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="servers"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+- assert_count: {selector: '[data-testid="server-field-http-root-dir"]', equal: 0}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.local_servers_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.local_servers_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-servers"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-servers"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- click: '[data-testid="server-row-http"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="servers"][data-plugin-version="${fixture.servers_current_version}"] [data-testid="server-field-http-root-dir"]', timeout_sec: 25}
+- wait_for: {selector: '[data-testid="server-field-port"][value="28489"]', timeout_sec: 10}
+- assert_attribute: {selector: '[data-testid="server-field-http-root-dir"]', name: value, equals: '${fixture.local_servers_http_root}'}
+- click: '[data-testid="server-row-http-start"]'
+- wait_for: {selector: '[data-testid="server-row-http"][data-status="running"]', timeout_sec: 25}
+- assert_local_servers_http: serving
+- assert_signed_module_lifecycle: {slug: servers, phase: reinstalled}
+- click: '[data-testid="server-row-http-stop"]'
+- wait_for: {selector: '[data-testid="server-row-http"][data-status="stopped"]', timeout_sec: 15}
+- assert_local_servers_http: stopped
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: disabled-update-and-rollback
+    requirement: Update and roll back a disabled Local servers package without restarting the desktop process and retain the saved HTTP settings.
+    actions: [10, 12, 24, 30, 36, 41, 44]
+    checkpoints:
+    - {step: 27, expectation: The earlier signed host owns the writer lease and serves the HTTP document.}
+    - {step: 33, expectation: Disabling releases the writer lease and closes the HTTP listener.}
+    - {step: 43, expectation: Updating while disabled activates the new version without starting the host.}
+    - {step: 46, expectation: Rolling back while disabled restores the earlier version with no running host.}
+    results: [27, 33, 43, 46]
+  - id: enabled-update-and-failed-handshake
+    requirement: Replace and roll back a running Local servers host, cleanly stop active listeners across switches, and recover when an update fails handshake.
+    actions: [47, 57, 65, 66, 77, 84, 89, 99]
+    checkpoints:
+    - {step: 60, expectation: Re-enabled earlier host preserves port 28489 and root directory and serves HTTP again.}
+    - {step: 69, expectation: Live update closes the previous HTTP listener and restarts the current host cleanly.}
+    - {step: 79, expectation: Updated host reads the saved settings and serves HTTP.}
+    - {step: 86, expectation: Handshake-failure version reports permission denied error.}
+    - {step: 88, expectation: Failed update restores the active host cleanly with zero leaked listeners.}
+    - {step: 92, expectation: Manual rollback switches the running host back to the earlier version cleanly.}
+    - {step: 101, expectation: Rolled-back earlier host serves the saved HTTP document again.}
+    results: [60, 69, 79, 86, 88, 92, 101]
+  - id: retained-uninstall-and-reinstall
+    requirement: Uninstall removes Local servers versions while retaining config data and restores live HTTP serving on reinstall.
+    actions: [104, 105, 112, 119, 121, 131, 135]
+    checkpoints:
+    - {step: 107, expectation: Uninstall shows retained data indicator.}
+    - {step: 109, expectation: All executable versions are removed while config.json locator and writer lease remain intact.}
+    - {step: 113, expectation: Open Local servers panel shows missing-module unavailable notice.}
+    - {step: 134, expectation: Reinstalled current host serves the retained HTTP document on the original desktop process.}
+    - {step: 137, expectation: Stopping HTTP cleanly closes the listener without runtime errors.}
+    results: [107, 109, 113, 134, 137]
+  native:
+  - check: Record desktop and host process identities, signed digests, writer lease, retained locator and HTTP state on Linux, Windows and macOS.
+    method: external
+    reason: Native observation verifies each phase outside the renderer.
+  visual:
+  - check: Confirm disabled/missing placeholders and live panel version mounts through Settings and tab transitions.
+    method: automated
+    reason: Explicit DOM wait assertions verify each mounted plugin version and unavailable notice.

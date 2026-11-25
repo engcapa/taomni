@@ -1,0 +1,494 @@
+id: TC-EXPLORER-013
+title: Files created by Explorer open in their real editor and save exact source through reopen
+description: Create Markdown, HTML, SVG, JSON and TypeScript using the type selector; open through Explorer and edit/save/reopen through
+  their existing editor routes. Independently read full bytes after creation, save and reopen. This is native disk/IPC coverage on native
+  runners, not a browser stub claim. Code goes through the real loose-file Code Workspace route.
+modes:
+- browser
+- native
+covers:
+- F-EXPLORER-1
+- F-FILEOPEN-1
+tags:
+- p1
+- explorer
+- file-open
+- editor
+- filesystem
+- native-boundary
+- crash-regression
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 360
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-new-editor
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- wait_for: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: md
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: authored.md
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="authored.md"][aria-selected="true"]'
+- assert_not_visible: '[data-testid="explorer-new-file-dialog"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.md
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="authored.md"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="markdown"]'
+- click: '[data-testid="markdown-mode-source"]'
+- wait_for: '[data-testid="viewer-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    value: '# Created Markdown
+
+
+      **中文**
+
+      '
+- click: '[data-testid="viewer-save"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.md
+    equals: '# Created Markdown
+
+
+      **中文**
+
+      '
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="authored.md"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="markdown"]'
+- click: '[data-testid="markdown-mode-source"]'
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - '# Created Markdown'
+    - ''
+    - '**中文**'
+    - ''
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.md
+    equals: '# Created Markdown
+
+
+      **中文**
+
+      '
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- assert_count:
+    selector: '[data-testid="file-viewer"]'
+    equal: 0
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: html
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: authored.html
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="authored.html"][aria-selected="true"]'
+- assert_not_visible: '[data-testid="explorer-new-file-dialog"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.html
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="authored.html"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="html"]'
+- click: '[data-testid="html-mode-split"]'
+- wait_for: '[data-testid="viewer-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    method: paste
+    value: '<!doctype html><h1>Created HTML 中文</h1>
+
+      '
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - <!doctype html><h1>Created HTML 中文</h1>
+    - ''
+- click: '[data-testid="viewer-save"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.html
+    equals: '<!doctype html><h1>Created HTML 中文</h1>
+
+      '
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="authored.html"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="html"]'
+- click: '[data-testid="html-mode-split"]'
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - <!doctype html><h1>Created HTML 中文</h1>
+    - ''
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.html
+    equals: '<!doctype html><h1>Created HTML 中文</h1>
+
+      '
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- assert_count:
+    selector: '[data-testid="file-viewer"]'
+    equal: 0
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: svg
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: authored.svg
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="authored.svg"][aria-selected="true"]'
+- assert_not_visible: '[data-testid="explorer-new-file-dialog"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.svg
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="authored.svg"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="svg"]'
+- click: '[data-testid="image-svg-mode-code"]'
+- wait_for: '[data-testid="viewer-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    value: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><rect width="80" height="40" fill="blue"/></svg>
+
+      '
+- click: '[data-testid="viewer-save"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.svg
+    equals: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><rect width="80" height="40" fill="blue"/></svg>
+
+      '
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="authored.svg"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="svg"]'
+- click: '[data-testid="image-svg-mode-code"]'
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - <svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><rect width="80" height="40" fill="blue"/></svg>
+    - ''
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.svg
+    equals: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><rect width="80" height="40" fill="blue"/></svg>
+
+      '
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- assert_count:
+    selector: '[data-testid="file-viewer"]'
+    equal: 0
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: json
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: authored.json
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="authored.json"][aria-selected="true"]'
+- assert_not_visible: '[data-testid="explorer-new-file-dialog"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.json
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="authored.json"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="text"]'
+- wait_for: '[data-testid="viewer-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    value: '{ "created": true, "text": "中文" }
+
+      '
+- click: '[data-testid="viewer-save"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.json
+    equals: '{ "created": true, "text": "中文" }
+
+      '
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="authored.json"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="text"]'
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - '{ "created": true, "text": "中文" }'
+    - ''
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.json
+    equals: '{ "created": true, "text": "中文" }
+
+      '
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- assert_count:
+    selector: '[data-testid="file-viewer"]'
+    equal: 0
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: ts
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: authored.ts
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="authored.ts"][aria-selected="true"]'
+- assert_not_visible: '[data-testid="explorer-new-file-dialog"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.ts
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- right_click: '[data-testid="explorer-file-row"][data-name="authored.ts"]'
+- click: '[data-testid="explorer-context-open-with"]'
+- click: '[data-testid="file-open-with-workspace"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: 'export const createdFromExplorer = "中文";
+
+      '
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Control+s
+    macos_key: Meta+s
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.ts
+    equals: 'export const createdFromExplorer = "中文";
+
+      '
+- reload_window: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - export const createdFromExplorer = "中文";
+    - ''
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/authored.ts
+    equals: 'export const createdFromExplorer = "中文";
+
+      '
+- assert_no_runtime_errors: null
+- screenshot: TC-EXPLORER-013-created-files-edit-save.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: New Markdown/HTML/SVG/config files open their corresponding editor and retain exact edited bytes after save and reopen.
+    actions:
+    - 11
+    - 12
+    - 14
+    - 15
+    - 16
+    - 20
+    - 21
+    - 23
+    - 25
+    - 26
+    - 28
+    - 29
+    - 31
+    - 34
+    - 36
+    - 37
+    - 39
+    - 40
+    - 41
+    - 45
+    - 46
+    - 48
+    - 50
+    - 52
+    - 54
+    - 55
+    - 57
+    - 60
+    - 62
+    - 63
+    - 65
+    - 66
+    - 67
+    - 71
+    - 72
+    - 74
+    - 76
+    - 77
+    - 79
+    - 80
+    - 82
+    - 85
+    - 87
+    - 88
+    - 90
+    - 91
+    - 92
+    - 96
+    - 97
+    - 100
+    - 101
+    - 103
+    - 104
+    - 108
+    checkpoints:
+    - step: 18
+      expectation: Successful creation closes the dialog.
+    - step: 19
+      expectation: authored.md exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 27
+      expectation: authored.md saves exactly the authored UTF-8 source.
+    - step: 32
+      expectation: Reopened authored.md editor contains every saved line including its trailing newline.
+    - step: 33
+      expectation: Reopening authored.md leaves all bytes unchanged.
+    - step: 35
+      expectation: Closing the saved file releases its viewer before the next creation.
+    - step: 43
+      expectation: Successful creation closes the dialog.
+    - step: 44
+      expectation: authored.html exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 51
+      expectation: The real paste completes with exactly the authored HTML source and final empty line before Save, without duplicated
+        auto-closing tags.
+    - step: 53
+      expectation: authored.html saves exactly the authored UTF-8 source.
+    - step: 58
+      expectation: Reopened authored.html editor contains every saved line including its trailing newline.
+    - step: 59
+      expectation: Reopening authored.html leaves all bytes unchanged.
+    - step: 61
+      expectation: Closing the saved file releases its viewer before the next creation.
+    - step: 69
+      expectation: Successful creation closes the dialog.
+    - step: 70
+      expectation: authored.svg exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 78
+      expectation: authored.svg saves exactly the authored UTF-8 source.
+    - step: 83
+      expectation: Reopened authored.svg editor contains every saved line including its trailing newline.
+    - step: 84
+      expectation: Reopening authored.svg leaves all bytes unchanged.
+    - step: 86
+      expectation: Closing the saved file releases its viewer before the next creation.
+    - step: 94
+      expectation: Successful creation closes the dialog.
+    - step: 95
+      expectation: authored.json exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 102
+      expectation: authored.json saves exactly the authored UTF-8 source.
+    - step: 106
+      expectation: Reopened authored.json editor contains every saved line including its trailing newline.
+    - step: 107
+      expectation: Reopening authored.json leaves all bytes unchanged.
+    - step: 109
+      expectation: Closing the saved file releases its viewer before the next creation.
+    results:
+    - 18
+    - 19
+    - 27
+    - 32
+    - 33
+    - 35
+    - 43
+    - 44
+    - 51
+    - 53
+    - 58
+    - 59
+    - 61
+    - 69
+    - 70
+    - 78
+    - 83
+    - 84
+    - 86
+    - 94
+    - 95
+    - 102
+    - 106
+    - 107
+    - 109
+  - id: R2
+    requirement: New source files open in Code Workspace through Explorer’s Open with menu, save exact UTF-8 through the existing save command and survive renderer reload.
+    actions:
+    - 110
+    - 111
+    - 113
+    - 114
+    - 115
+    - 119
+    - 120
+    - 121
+    - 122
+    - 124
+    - 125
+    - 127
+    - 128
+    checkpoints:
+    - step: 117
+      expectation: Successful creation closes the dialog.
+    - step: 118
+      expectation: authored.ts exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 126
+      expectation: Code Workspace save writes all authored TypeScript bytes to the created file.
+    - step: 130
+      expectation: Reload recovers the actual loose source file and exact saved text.
+    - step: 131
+      expectation: Code recovery does not replace or truncate the saved source.
+    - step: 132
+      expectation: All preceding creation/edit/lifecycle actions have no uncaught renderer errors.
+    results:
+    - 117
+    - 118
+    - 126
+    - 130
+    - 131
+    - 132
+  visual:
+  - check: New-file dialog and resulting editor/table layout.
+    method: manual
+    reason: Retained screenshots require review; DOM assertions alone do not certify visual layout.
+  native:
+  - check: Real editor routing, atomic disk save and reread of newly created rich-text/config/source files.
+    method: automated
+    reason: Native mode uses real Tauri IPC and independent host bytes; browser mode proves only its isolated VFS. WebView key delivery
+      does not prove physical OS or AppKit accelerator input.

@@ -1,14 +1,19 @@
 use super::bridge::SocketCleanup;
 use super::bridge::bind_private_listener;
-use super::bridge::launch_bridge;
 use super::bridge::random_socket_path;
-use super::bridge::stop_bridge;
+use super::bridge::terminate_bridge_child;
+use super::limits::{CONTROL_CONNECT_TIMEOUT, STOP_TIMEOUT};
 use crate::sockscap::redirector::installed_executable_path;
 use crate::sockscap::redirector::scope::inert_actions;
 use std::net::SocketAddr;
 use std::process::Stdio;
 use std::time::Duration;
-use tokio::process::Command;
+use taomni_redirector::{identity::verify_redirector_peer, ipc::send_intercept_config};
+use tokio::io::AsyncWriteExt;
+use tokio::net::UnixListener;
+use tokio::process::{Child, Command};
+
+const DISABLE_DRAIN: Duration = Duration::from_millis(300);
 
 /// Reacquire Redirector control after an unclean shutdown and replace any
 /// residual process scope with a fresh inert sentinel. No business scope or
@@ -27,28 +32,24 @@ pub async fn recover() -> Result<(), String> {
         | super::super::installer::RedirectorSystemExtensionState::Other
         | super::super::installer::RedirectorSystemExtensionState::Unavailable => {}
     }
-    let flow_socket_path = random_socket_path("recovery-flow");
     let provider_socket_path = random_socket_path("recovery-provider");
-    let listener = bind_private_listener(&flow_socket_path)?;
-    let cleanup = SocketCleanup(flow_socket_path.clone());
-    let mut bridge = launch_bridge(
-        &installed_executable_path(),
-        &provider_socket_path,
-        &flow_socket_path,
-        &inert_actions(),
-        &uuid::Uuid::new_v4().to_string(),
-    )
-    .await
-    .map_err(|error| error.to_string())?;
-    stop_bridge(&mut bridge).await?;
+    let listener = bind_private_listener(&provider_socket_path)?;
+    let cleanup = SocketCleanup(provider_socket_path.clone());
+    let mut launcher = Command::new(installed_executable_path())
+        .arg(&provider_socket_path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true)
+        .spawn()
+        .map_err(|error| format!("launch signed Redirector for recovery: {error}"))?;
+    let result = apply_inert_scope(&listener, &mut launcher).await;
+    terminate_bridge_child(&mut launcher).await;
     drop(listener);
     drop(cleanup);
-    // Applying and then stopping the bridge both write the inert scope through
-    // the verified Provider control channel. That is the same completion
-    // boundary used by a normal Stop. A public TCP endpoint is only a useful
-    // post-condition diagnostic: the host may be offline, behind a captive
-    // portal, or on a network that blocks the fixed probe addresses. Do not
-    // turn those unrelated conditions into a permanently dirty journal.
+    let provider_pid = result?;
+    // Direct TCP connectivity is diagnostic. The verified control-channel
+    // write is the completion boundary, including on an offline system.
     if let Some(error) =
         connectivity_probe_warning(verify_direct_connectivity_after_recovery().await)
     {
@@ -58,10 +59,48 @@ pub async fn recover() -> Result<(), String> {
         );
     }
     tracing::info!(
-        provider_pid = bridge.provider_pid,
+        provider_pid,
         "sockscap: Redirector recovery inert scope applied"
     );
     Ok(())
+}
+
+/// A stranded monolithic scope can be cleared before module enrollment. The
+/// core only sends the inert configuration to the verified upstream provider.
+async fn apply_inert_scope(listener: &UnixListener, launcher: &mut Child) -> Result<u32, String> {
+    let mut launcher_running = true;
+    let (mut control, provider_pid) = tokio::time::timeout(CONTROL_CONNECT_TIMEOUT, async {
+        loop {
+            let stream = tokio::select! {
+                connection = listener.accept() => connection
+                    .map_err(|error| format!("accept Redirector recovery channel: {error}"))?.0,
+                status = launcher.wait(), if launcher_running => {
+                    let status = status.map_err(|error| format!("wait for Redirector launcher: {error}"))?;
+                    if !status.success() {
+                        return Err(format!("Redirector launcher exited with {status}"));
+                    }
+                    launcher_running = false;
+                    continue;
+                }
+            };
+            match verify_redirector_peer(&stream) {
+                Ok(pid) => return Ok((stream, pid)),
+                Err(error) => tracing::warn!(%error, "SocksCap rejected a Redirector recovery peer"),
+            }
+        }
+    })
+    .await
+    .map_err(|_| "timed out waiting for the signed Redirector recovery channel")??;
+    tokio::time::timeout(
+        STOP_TIMEOUT,
+        send_intercept_config(&mut control, &inert_actions()),
+    )
+    .await
+    .map_err(|_| "timed out clearing the Redirector scope")?
+    .map_err(|error| format!("clear the Redirector scope: {error}"))?;
+    tokio::time::sleep(DISABLE_DRAIN).await;
+    let _ = control.shutdown().await;
+    Ok(provider_pid)
 }
 
 pub(super) fn connectivity_probe_warning(result: Result<(), String>) -> Option<String> {

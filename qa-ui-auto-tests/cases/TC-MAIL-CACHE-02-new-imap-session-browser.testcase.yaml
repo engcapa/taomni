@@ -1,0 +1,78 @@
+id: TC-MAIL-CACHE-02
+title: A new IMAP account stays unique through its first save and a settings edit
+description: Create a saved IMAP account with its default storage setting, edit its name and reopen it. Verify the session stays unique and the account reader displays the cached message again after closing its tab.
+covers: [F-MAIL-1, F-MAIL-3, F-MAIL-5, F-MAIL-23]
+tags: [mail, p1]
+modes: [browser]
+fixtures: [reset_db, mail_server]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill: {selector: 'input[aria-label="IMAP server"]', value: '${fixture.mail_host}'}
+- select_option: {selector: '[data-testid="mail-imap-security"]', value: None}
+- fill: {selector: 'input[aria-label="IMAP port"]', value: '${fixture.mail_imap_port}'}
+- fill: {selector: 'input[aria-label="Mail email or username"]', value: qa@example.com}
+- fill: {selector: 'input[aria-label="Mail password or app password token"]', value: qa-pass}
+- fill: {selector: 'input[aria-label="SMTP server"]', value: '${fixture.mail_host}'}
+- select_option: {selector: '[data-testid="mail-smtp-security"]', value: None}
+- fill: {selector: 'input[aria-label="SMTP port"]', value: '${fixture.mail_smtp_port}'}
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: QA owned IMAP}
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-fresh-imap-password
+- wait_for: {selector: '[data-testid="session-editor"]', state: detached, timeout_sec: 45}
+- assert_count: {selector: '[data-testid="session-tree-item"][data-session-name="QA owned IMAP"]', equal: 1}
+- click: '[data-testid="session-tree-item"][data-session-name="QA owned IMAP"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-bookmark"]'
+- fill: {selector: '[data-testid="session-name"]', value: QA renamed IMAP}
+- click: '[data-testid="session-save"]'
+- wait_for: {selector: '[data-testid="session-editor"]', state: detached}
+- assert_count: {selector: '[data-testid="session-tree-item"][data-session-name="QA owned IMAP"]', equal: 0}
+- assert_count: {selector: '[data-testid="session-tree-item"][data-session-name="QA renamed IMAP"]', equal: 1}
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA renamed IMAP"]'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 40}
+- mail_server_deliver: {count: 1, prefix: Reopened cached mail}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- click: '[data-testid="mail-message-row"][data-subject="Reopened cached mail 0001"]'
+- assert_text: {selector: '[data-testid="mail-reader-text"]', contains: 'Subject: Reopened cached mail 0001'}
+- click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="mail-client-tab"]', state: detached}
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA renamed IMAP"]'
+- click: '[data-testid="mail-message-row"][data-subject="Reopened cached mail 0001"]'
+- assert_text: {selector: '[data-testid="mail-reader-text"]', contains: 'Subject: Reopened cached mail 0001'}
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: Loaded body from cache}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: first-save
+    requirement: Creating and editing the Mail account preserves one session which can open and synchronize.
+    actions: [4, 6, 17, 19, 23, 26, 27, 31]
+    checkpoints:
+    - {step: 21, expectation: The initial save adds one account.}
+    - {step: 29, expectation: The old name is gone after saving the edit.}
+    - {step: 30, expectation: Exactly one renamed session appears.}
+    - {step: 32, expectation: The renamed account opens and its cached list matches the server.}
+    results: [21, 29, 30, 32]
+  - id: reopen-reader
+    requirement: The renamed account still opens the selected cached body after its tab is closed and reopened.
+    actions: [33, 34, 35, 37, 39, 40]
+    checkpoints:
+    - {step: 36, expectation: The new delivery opens in the account reader.}
+    - {step: 38, expectation: The first reader has closed.}
+    - {step: 41, expectation: The same specific body renders after reopening the account.}
+    - {step: 42, expectation: The active account pane reports using its cache.}
+    - {step: 43, expectation: The account and reader complete without runtime errors.}
+    results: [36, 38, 41, 42, 43]
+  visual:
+  - {check: The session tree shows one account before and after a name change., method: automated, reason: The case counts the original and renamed session entries.}
+  native:
+  - {check: Module-owned SQLite database and signed host., method: not-applicable, reason: TC-MODULES-068 and TC-MODULES-101 check signed cached body reads and native storage.}

@@ -1,0 +1,217 @@
+id: TC-MODULES-010
+title: Uninstall retains business data and its locator across restart and deletes both only on explicit request
+description: Install an official current-source signed hello package through Settings. Supply one fixed opaque
+  business-data file while the module is inactive; the fixture never changes code, registry state, pointers,
+  keys or permissions. Cancel a default uninstall, then confirm it and verify exact original bytes and the
+  core data-only locator. Restart normally and verify persisted uninstalled state and the retained-data label.
+  Reinstall through the same trusted form, then cancel and confirm explicit deletion. Verify both the data and locator
+  stay absent after another normal restart. This is native data/lifecycle evidence, not plugin snapshot/restore
+  or a real MFA migration.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- uninstall
+- persistence
+- security
+modes:
+- native
+fixtures:
+- reset_db
+- module_signed_archive
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-offline-install"]'
+- fill:
+    selector: '[data-testid="module-offline-archive"]'
+    value: ${fixture.module_signed_archive}
+- fill:
+    selector: '[data-testid="module-offline-signature"]'
+    value: ${fixture.module_signed_signature}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- module_signed_probe:
+    phase: installed
+- module_signed_probe:
+    phase: seed-data
+- click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Hello Plugin
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_visible: '[data-testid="module-action-uninstall-hello-plugin"]'
+- module_signed_probe:
+    phase: installed-data
+- click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-hello-plugin"]'
+- module_signed_probe:
+    phase: retained
+- assert_visible: '[data-testid="module-data-retained-hello-plugin"]'
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- module_signed_probe:
+    phase: retained
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-action-install-hello-plugin"]'
+- assert_visible: '[data-testid="module-data-retained-hello-plugin"]'
+- fill:
+    selector: '[data-testid="module-offline-archive"]'
+    value: ${fixture.module_signed_archive}
+- fill:
+    selector: '[data-testid="module-offline-signature"]'
+    value: ${fixture.module_signed_signature}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- wait_for: '[data-testid="module-action-uninstall-hello-plugin"]'
+- module_signed_probe:
+    phase: installed-data
+- click: '[data-testid="module-delete-data-hello-plugin"]'
+- click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: This cannot be undone.
+- click: '[data-testid="confirm-dialog-cancel"]'
+- module_signed_probe:
+    phase: installed-data
+- click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-hello-plugin"]'
+- module_signed_probe:
+    phase: deleted
+- assert_count:
+    selector: '[data-testid="module-data-retained-hello-plugin"]'
+    equal: 0
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- module_signed_probe:
+    phase: deleted
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-action-install-hello-plugin"]'
+- assert_count:
+    selector: '[data-testid="module-data-retained-hello-plugin"]'
+    equal: 0
+- assert_no_runtime_errors: null
+- screenshot: module-explicit-data-deletion-after-restart.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Cancelling default uninstall preserves activation and original business data.
+    actions:
+    - 9
+    - 12
+    - 13
+    - 16
+    checkpoints:
+    - step: 11
+      expectation: Real pinned-key installation leaves the exact official package inactive with invoke denied.
+    - step: 17
+      expectation: Cancelling the confirmation leaves the installed module's uninstall action available.
+    - step: 18
+      expectation: The real registry remains installed, invoke stays denied, and exact opaque business bytes
+        remain.
+    results:
+    - 11
+    - 17
+    - 18
+  - id: R2
+    requirement: Confirmed default uninstall records data-only metadata and preserves data and uninstalled
+      state across normal restart.
+    actions:
+    - 19
+    - 21
+    - 25
+    - 28
+    - 30
+    checkpoints:
+    - step: 23
+      expectation: All installed code is absent, the pointer is inactive, original file bytes remain and the locator
+        contains only the expected owner/schema/file.
+    - step: 24
+      expectation: Settings identifies retained data after the actual default uninstall.
+    - step: 27
+      expectation: A newly started native process observes the same inactive pointer, data bytes and locator.
+    - step: 32
+      expectation: Reopened Settings hydrates the actual retained-data status from the native registry.
+    results:
+    - 23
+    - 24
+    - 27
+    - 32
+  - id: R3
+    requirement: Trusted reinstall preserves data and explicit deletion removes both data and locator durably.
+    actions:
+    - 33
+    - 34
+    - 35
+    - 39
+    - 40
+    - 42
+    - 44
+    - 45
+    - 49
+    - 52
+    - 54
+    checkpoints:
+    - step: 38
+      expectation: Reinstalling through the real signed form preserves exact existing business bytes and leaves
+        invoke inactive.
+    - step: 41
+      expectation: Explicit deletion shows its irreversible effect before performing any filesystem mutation.
+    - step: 43
+      expectation: Cancelling explicit deletion preserves the installed package and the exact business data.
+    - step: 47
+      expectation: Confirmed deletion leaves no code, data directory or locator and the native registry reports dataRetained=false.
+    - step: 48
+      expectation: The deletion result does not display a retained-data label.
+    - step: 51
+      expectation: A newly started process still reports uninstalled state, no data, no locator and invoke
+        denied.
+    - step: 56
+      expectation: Reopened Settings does not invent retained data after explicit deletion.
+    - step: 57
+      expectation: Install, cancel, retain, restart, reinstall and delete produce no runtime errors.
+    results:
+    - 38
+    - 41
+    - 43
+    - 47
+    - 48
+    - 51
+    - 56
+    - 57
+  native:
+  - check: Real signed installation, native registry, file bytes, atomic locator and normal process restarts.
+    method: automated
+    reason: Browser stubs cannot establish native data retention, deletion or startup persistence.
+  visual:
+  - check: Retained-data status and uninstall controls remain readable in desktop Settings.
+    method: manual
+    reason: Automated assertions establish status and lifecycle; retained screenshots support layout review.

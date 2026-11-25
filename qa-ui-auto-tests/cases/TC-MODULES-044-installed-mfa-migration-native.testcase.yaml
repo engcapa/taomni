@@ -1,0 +1,116 @@
+id: TC-MODULES-044
+title: Migrate the old MFA store into an already installed signed module
+description: Create an original Vault and HOTP account through the app. Install the signed MFA module through Settings and verify it directs the user to migrate the old account.
+  The upgrade selects its existing verified package and requests the original Vault password, then the owned macOS app
+  relaunches. The previous package pointer and original encrypted database are verified independently.
+covers: [F-Modules-1, F-MFA-1, F-MFA-2]
+tags: [modules, mfa, upgrade, native-boundary, macos, p0]
+modes: [native]
+native_platforms: [macOS]
+fixtures: [reset_db, module_signed_mfa_archive, release_build_required]
+timeout_sec: 330
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-original-mfa-044}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-original-mfa-044}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: Installed MFA Upgrade}
+- fill: {selector: '[data-testid="mfa-add-secret"]', value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ}
+- click: '[data-testid="mfa-add-advanced"]'
+- select_option: {selector: '[data-testid="mfa-add-kind"]', value: hotp}
+- click: '[data-testid="mfa-add-submit"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 755 224}
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mfa_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mfa_signed_signature_text}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- assert_text: {selector: '[data-testid="module-status-mfa"]', contains: Installed}
+- press: {selector: '[data-testid="module-action-enable-mfa"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mfa"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- assert_text:
+    selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="mfa"] [data-testid="mfa-load-error"][data-code="MFA_LEGACY_MIGRATION_REQUIRED"]'
+    contains: Migrate your existing MFA accounts from the Module Store in Settings
+- assert_count: {selector: '[data-testid="mfa-account-code"]', equal: 0}
+- assert_visible: '[data-testid="module-release-mfa"]'
+- click: '[data-testid="module-release-open-store"]'
+- press: {selector: '[data-testid="module-upgrade-mfa-open"]', key: Enter}
+- assert_count: {selector: '[data-testid="module-upgrade-mfa-archive"]', equal: 0}
+- assert_count: {selector: '[data-testid="module-upgrade-mfa-signature"]', equal: 0}
+- fill: {selector: '[data-testid="module-upgrade-mfa-password"]', value: wrong-password}
+- press: {selector: '[data-testid="module-upgrade-mfa-submit"]:not([disabled])', key: Enter}
+- assert_text: {selector: '[data-testid="module-upgrade-mfa-error"]', contains: Incorrect Vault password, timeout_sec: 30}
+- assert_no_runtime_errors: null
+- fill: {selector: '[data-testid="module-upgrade-mfa-password"]', value: qa-original-mfa-044}
+- native_confirm_mfa_upgrade_relaunch: null
+- wait_for: {selector: '[data-testid="status-bar"]', timeout_sec: 60}
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-original-mfa-044}
+- click: '[data-testid="vault-unlock-confirm"]'
+- wait_for: {selector: '[data-testid="vault-unlock-dialog"]', state: detached, timeout_sec: 30}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- assert_visible: '[data-testid="module-upgrade-mfa-result"][data-state="complete"]'
+- assert_count: {selector: '[data-testid="module-upgrade-mfa-open"]', equal: 0}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- assert_visible: '[data-testid="mfa-account-row"][data-issuer="Installed MFA Upgrade"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082, timeout_sec: 30}
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 359 152}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Verify the signed preinstalled MFA package and the original Vault password before applying the data migration.
+    actions: [21, 23, 24, 25, 26, 29, 31, 32, 33, 36, 37, 38, 41, 42, 45, 46]
+    checkpoints:
+    - {step: 27, expectation: The package is installed through the real signed installer.}
+    - {step: 28, expectation: The settings registry lists the signed package as installed.}
+    - {step: 34, expectation: The signed manager instructs the user to migrate the existing account through Settings.}
+    - {step: 35, expectation: The signed manager shows no codes before the data is migrated.}
+    - {step: 36, expectation: The workspace displays the pending MFA migration and links to the module store.}
+    - {step: 39, expectation: The upgrade form selects the installed package automatically.}
+    - {step: 40, expectation: The upgrade form selects the installed detached signature automatically.}
+    - {step: 43, expectation: The wrong Vault password leaves the original app open.}
+    - {step: 46, expectation: The helper rejects a different binary and relaunches the same verified core. The installed pointer and legacy encrypted records persist while the module database is published.}
+    - {step: 55, expectation: Settings reports the completed migration.}
+    - {step: 56, expectation: The profile has no pending MFA migration action.}
+    results: [27, 34, 35, 39, 40, 43, 46, 55, 56]
+  - id: R2
+    requirement: Use the signed host with the migrated account and original Vault key.
+    actions: [17, 19, 49, 50, 57, 58, 60, 63]
+    checkpoints:
+    - {step: 20, expectation: The original HOTP counter is already one before migration.}
+    - {step: 61, expectation: The original issuer appears after Vault unlock.}
+    - {step: 62, expectation: The migrated account returns the counter-one HOTP code.}
+    - {step: 64, expectation: The subsequent operation advances to the counter-two code.}
+    - {step: 65, expectation: The application reports no unhandled runtime errors.}
+    results: [20, 61, 62, 64, 65]
+  native:
+  - check: Read the signed installed proof and observe the real macOS process relaunch.
+    method: automated
+    reason: The native bridge records both processes, the publisher's bytes and the profile state.
+  visual:
+  - check: The installed-package upgrade form and migrated account appear in the desktop app.
+    method: automated
+    reason: The browser bridge checks their actual native renderer state.

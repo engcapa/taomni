@@ -1,0 +1,127 @@
+id: TC-MODULES-045
+title: A signed catalog offers a new module and waits for explicit installation
+description: Checking two signed release catalogs shows the new module name and description. The user dismisses
+  the offer, restarts the application and later installs the module through the store. The oracle verifies
+  the saved choice, actual network requests and the active version pointer.
+covers: [F-Modules-1]
+tags: [p1, modules, marketplace, upgrade]
+modes: [native]
+fixtures: [reset_db, module_signed_archive, module_marketplace]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- module_marketplace_probe: {phase: source}
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-marketplace-empty"]'
+- assert_count:
+    selector: '[data-testid="module-release-new-item"]'
+    equal: 0
+- click: '[data-testid="module-marketplace-source-toggle"]'
+- fill:
+    selector: '[data-testid="module-marketplace-source"]'
+    value: ${fixture.module_marketplace_new_url}
+- wait_for: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- press: {selector: '[data-testid="module-marketplace-refresh"]:not([disabled])', key: Enter}
+- wait_for: '[data-testid="module-release-new-item"]'
+- assert_text:
+    selector: '[data-testid="module-release-new-item"]'
+    contains: Hello Plugin
+- assert_text:
+    selector: '[data-testid="module-release-new-item"]'
+    contains: Verify that a signed module can open its own tab and save text in a separate data directory.
+- assert_visible: '[data-testid="module-marketplace-new"]'
+- module_marketplace_probe: {phase: new-available}
+- screenshot: module-new-offer-native.png
+- click: '[data-testid="module-release-open-store"]'
+- wait_for: '[data-testid="module-marketplace"]'
+- click: '[data-testid="module-release-later"]'
+- wait_for:
+    selector: '[data-testid="module-release-notice"]'
+    state: detached
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-marketplace-download"]'
+- assert_count:
+    selector: '[data-testid="module-release-new-item"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="module-marketplace-installed"]'
+    equal: 0
+- module_marketplace_probe: {phase: new-dismissed}
+- click: '[data-testid="module-marketplace-download"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-marketplace-review"]'
+- click: '[data-testid="module-marketplace-review"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Hello Plugin 0.1.0
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-marketplace-current"]'
+- module_marketplace_probe: {phase: installed}
+- assert_no_runtime_errors: null
+- screenshot: module-new-opt-in-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Compare signed releases and show a new module with its description while waiting for consent.
+    actions: [3, 4, 10, 11, 13, 20]
+    checkpoints:
+    - step: 9
+      expectation: The signed baseline has no offer.
+    - step: 12
+      expectation: The baseline check has finished and the refresh button accepts a new catalog request.
+    - step: 15
+      expectation: The main window shows the module name.
+    - step: 16
+      expectation: The main window shows the signed description.
+    - step: 17
+      expectation: The store marks the module as new.
+    - step: 18
+      expectation: The profile records the new ID, with zero archive requests, staged bytes or active pointer.
+    - step: 21
+      expectation: The offer opens the store.
+    results: [9, 12, 15, 16, 17, 18, 21]
+  - id: R2
+    requirement: Keep the dismissal after a normal restart and install the module after explicit download and review.
+    actions: [22, 24, 32, 33, 35, 37]
+    checkpoints:
+    - step: 23
+      expectation: Later dismisses the visible offer.
+    - step: 29
+      expectation: The offer remains dismissed after a normal restart.
+    - step: 30
+      expectation: The module remains uninstalled before confirmation.
+    - step: 31
+      expectation: The profile remembers the dismissal and the signed archive has still received zero requests.
+    - step: 36
+      expectation: The review opens with the name and version from the verified package after the startup catalog check.
+    - step: 38
+      expectation: The store shows the confirmed module as current.
+    - step: 39
+      expectation: Exactly one verified archive transfer occurred and the matching version is active on disk.
+    - step: 40
+      expectation: The renderer records no unhandled errors.
+    results: [23, 29, 30, 31, 36, 38, 39, 40]
+  native:
+  - check: Catalog authentication, profile history, HTTP transfer and active version.
+    method: external
+    reason: The fixture serves signed bytes and the oracle reads the real request log and app data.
+  visual:
+  - check: The offer shows the module name, description and actions.
+    method: manual
+    reason: Review the saved offer screenshot.

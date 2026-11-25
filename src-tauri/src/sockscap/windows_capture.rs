@@ -22,7 +22,7 @@ pub(super) async fn start_windows_capture(
     // 2) Resolve upstream credentials (manual fields; vault password_ref).
     let (mut up_host, mut up_port, mut up_user, mut up_pass) = relay::upstream_from_config(cfg);
     if !cfg.upstream.password_ref.is_empty() {
-        if let Ok(Some(p)) = state.vault.resolve(&cfg.upstream.password_ref) {
+        if let Ok(Some(p)) = state.core.vault.resolve(&cfg.upstream.password_ref) {
             up_pass = (*p).clone();
         }
     }
@@ -32,7 +32,7 @@ pub(super) async fn start_windows_capture(
     let mut up_session: Option<crate::session::models::SessionConfig> = None;
     if !cfg.upstream.session_id.is_empty() {
         let sess = {
-            let db = state.db.lock().ok();
+            let db = state.core.db.lock().ok();
             db.and_then(|db| crate::session::db::get_session(&db, &cfg.upstream.session_id).ok())
         };
         if let Some(sess) = sess {
@@ -41,7 +41,7 @@ pub(super) async fn start_windows_capture(
             if let Some(u) = sess.username.clone().filter(|u| !u.is_empty()) {
                 up_user = u;
             }
-            if let Some(pass) = session_proxy_password(&state.vault, &sess) {
+            if let Some(pass) = session_proxy_password(&state.core.vault, &sess) {
                 up_pass = pass;
             }
             up_session = Some(sess);
@@ -69,13 +69,13 @@ pub(super) async fn start_windows_capture(
             p_session = up_session.clone();
         } else {
             if !p.upstream.password_ref.is_empty() {
-                if let Ok(Some(pass)) = state.vault.resolve(&p.upstream.password_ref) {
+                if let Ok(Some(pass)) = state.core.vault.resolve(&p.upstream.password_ref) {
                     ppass = (*pass).clone();
                 }
             }
             if !p.upstream.session_id.is_empty() {
                 let sess = {
-                    let db = state.db.lock().ok();
+                    let db = state.core.db.lock().ok();
                     db.and_then(|db| {
                         crate::session::db::get_session(&db, &p.upstream.session_id).ok()
                     })
@@ -86,7 +86,7 @@ pub(super) async fn start_windows_capture(
                     if let Some(u) = sess.username.clone().filter(|u| !u.is_empty()) {
                         puser = u;
                     }
-                    if let Some(pass) = session_proxy_password(&state.vault, &sess) {
+                    if let Some(pass) = session_proxy_password(&state.core.vault, &sess) {
                         ppass = pass;
                     }
                     p_session = Some(sess);
@@ -98,7 +98,7 @@ pub(super) async fn start_windows_capture(
             use crate::sockscap::egress::ssh_pool::SshPool;
             use crate::terminal::ssh::SshAuth;
             let auth = if let Some(sess) = &p_session {
-                session_ssh_auth(&state.vault, sess)
+                session_ssh_auth(&state.core.vault, sess)
             } else if !ppass.is_empty() {
                 SshAuth::Password(ppass.clone())
             } else if !p.upstream.password_ref.is_empty()
@@ -180,7 +180,7 @@ pub(super) async fn start_windows_capture(
         use crate::sockscap::egress::ssh_pool::SshPool;
         use crate::terminal::ssh::SshAuth;
         let auth = if let Some(sess) = &up_session {
-            session_ssh_auth(&state.vault, sess)
+            session_ssh_auth(&state.core.vault, sess)
         } else if !up_pass.is_empty() {
             SshAuth::Password(up_pass.clone())
         } else if !cfg.upstream.password_ref.is_empty()
@@ -203,11 +203,11 @@ pub(super) async fn start_windows_capture(
     };
 
     let (stats, domains) = {
-        let orch = state.sockscap.orch.read().await;
+        let orch = state.legacy.sockscap.orch.read().await;
         (Arc::clone(&orch.stats), Arc::clone(&orch.domains))
     };
     let rules = {
-        let orch = state.sockscap.orch.read().await;
+        let orch = state.legacy.sockscap.orch.read().await;
         orch.rules().map(|r| r.clone())
     };
     let dns_map = Arc::new(std::sync::Mutex::new(
@@ -219,6 +219,7 @@ pub(super) async fn start_windows_capture(
     // One persistent control channel for the whole capture session, instead of
     // a fresh blocking TCP connection per captured flow.
     let helper_client = state
+        .legacy
         .sockscap
         .helper
         .inner
@@ -232,7 +233,7 @@ pub(super) async fn start_windows_capture(
         config: cfg.clone(),
         rules,
         engine,
-        helper: Arc::clone(&state.sockscap.helper),
+        helper: Arc::clone(&state.legacy.sockscap.helper),
         helper_client,
         stats,
         upstream_host: up_host.clone(),
@@ -281,7 +282,7 @@ pub(super) async fn start_windows_capture(
     // Bypass every xray core: its own connection to the remote node must not be
     // re-captured (that would loop node traffic back into the relay). Robust for
     // domain nodes / multi-IP resolution where endpoint bypass alone can miss.
-    let xray_pids: Vec<u32> = match state.sockscap.xray() {
+    let xray_pids: Vec<u32> = match state.legacy.sockscap.xray() {
         Some(mgr) => mgr.pids().await,
         None => Vec::new(),
     };
@@ -296,12 +297,13 @@ pub(super) async fn start_windows_capture(
     // a snapshot; the path survives a core crashing and being respawned with a
     // new pid, which would otherwise have its node connection captured and
     // looped back into the relay.
-    if let Some(xray) = paths::resolve_xray_exe(app) {
-        let norm = paths::normalize_exe_path(&xray.display().to_string());
-        if !norm.is_empty() && !bypass_paths.contains(&norm) {
-            bypass_paths.push(norm);
-        }
-    }
+    let xray = state
+        .core
+        .paths
+        .data
+        .join(taomni_sockscap_api::XRAY_RUN_DIR)
+        .join(taomni_sockscap_api::XRAY_FILE);
+    bypass_paths.push(paths::normalize_exe_path(&xray.display().to_string()));
     if !loopback_proxy_ports.is_empty() {
         let procs = process::list_processes().unwrap_or_default();
         for port in &loopback_proxy_ports {
@@ -355,6 +357,7 @@ pub(super) async fn start_windows_capture(
 
     let capture_result = {
         let guard = state
+            .legacy
             .sockscap
             .helper
             .inner
@@ -370,7 +373,7 @@ pub(super) async fn start_windows_capture(
         Ok(info) => {
             // Keep the helper's bypass list current as cores are respawned.
             spawn_xray_bypass_updater(state, &args.bypass_pids, &xray_pids, &args.bypass_paths);
-            let mut orch = state.sockscap.orch.write().await;
+            let mut orch = state.legacy.sockscap.orch.write().await;
             orch.relay = Some(relay_handle);
             orch.relay_ctx = Some(ctx);
             orch.dns_stop = Some(dns_stop);
@@ -391,7 +394,7 @@ pub(super) async fn start_windows_capture(
         Err(e) => {
             dns_stop.store(true, std::sync::atomic::Ordering::SeqCst);
             relay_handle.stop().await;
-            let mut orch = state.sockscap.orch.write().await;
+            let mut orch = state.legacy.sockscap.orch.write().await;
             orch.set_start_failed(format!("helper/capture failed: {e}"));
             Err(e)
         }
@@ -416,13 +419,13 @@ pub(super) fn spawn_xray_bypass_updater(
     initial_core_pids: &[u32],
     bypass_paths: &[String],
 ) {
-    let Some(mgr) = state.sockscap.xray() else {
+    let Some(mgr) = state.legacy.sockscap.xray() else {
         return;
     };
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u32>>();
     mgr.set_respawn_notifier(tx);
 
-    let helper = Arc::clone(&state.sockscap.helper);
+    let helper = Arc::clone(&state.legacy.sockscap.helper);
     // Everything except the core pids, which the notification re-supplies in
     // full. Dropping the dead ones matters: a recycled pid could later belong to
     // a process that should be captured.

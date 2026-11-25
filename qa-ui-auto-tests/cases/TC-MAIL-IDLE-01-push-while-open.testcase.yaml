@@ -74,6 +74,7 @@ steps:
 - mail_server_assert_idle_clients:
     equals: 0
     timeout_sec: 10
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -102,7 +103,7 @@ verification:
     - 13
     - 14
   - id: R2
-    requirement: 关闭标签后 IDLE 连接在 10 秒内释放（AC-37，DEC-01 不做后台收信）。
+    requirement: 关闭标签后 IDLE 连接在 10 秒内释放，应用无运行时错误（AC-37）。
     actions:
     - 17
     checkpoints:
@@ -110,8 +111,12 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
     - step: 19
       expectation: '{"mail_server_assert_idle_clients": {"equals": 0, "timeout_sec": 10}}'
+    - step: 20
+      expectation: '{"assert_no_runtime_errors": null}'
     results:
     - 18
+    - 19
+    - 20
   visual:
   - check: 截图中 Sync 旁显示 Push 状态，推送的邮件出现在列表顶部。
     method: manual

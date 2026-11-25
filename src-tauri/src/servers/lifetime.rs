@@ -11,6 +11,7 @@ use crate::servers::engine;
 use crate::servers::engine::ServerCtx;
 use crate::servers::engine::set_status;
 use crate::state::AppState;
+use std::time::Duration;
 use tauri::AppHandle;
 use tauri::State;
 use tokio::task::JoinHandle;
@@ -18,8 +19,7 @@ use tokio_util::sync::CancellationToken;
 
 /* ---------------------------- internals ----------------------------- */
 
-/// Tear down a running server: cancel its token, abort its supervisor (and any
-/// auto-stop timer), remove it from the registry, and publish `Stopped`.
+/// Cancel the server and its auto-stop timer, then publish `Stopped`.
 /// Safe to call when nothing is running (no-op apart from publishing Stopped).
 pub(super) async fn stop_internal(
     app: &AppHandle,
@@ -28,12 +28,11 @@ pub(super) async fn stop_internal(
 ) -> ServerStatus {
     {
         let mut running = registry.running.lock().await;
-        if let Some(active) = running.remove(&server_type) {
-            active.cancel.cancel();
-            active.task.abort();
-            if let Some(t) = active.auto_stop_task {
+        if let Some(mut active) = running.remove(&server_type) {
+            if let Some(t) = active.auto_stop_task.take() {
                 t.abort();
             }
+            finish_server(active).await;
         }
     }
     let info = ServerStatus::stopped(server_type);
@@ -57,14 +56,11 @@ pub(super) fn spawn_auto_stop(
         tokio::select! {
             _ = tokio::time::sleep(std::time::Duration::from_secs(seconds)) => {
                 log.line(format!("Auto-stopped after {}s", seconds));
-                // Minimal teardown that never aborts this task itself: cancel
-                // the server token, abort its supervisor, drop the entry.
                 {
                     let mut running = registry.running.lock().await;
                     if let Some(active) = running.remove(&server_type) {
-                        active.cancel.cancel();
-                        active.task.abort();
                         // active.auto_stop_task is this very task — just drop it.
+                        finish_server(active).await;
                     } else {
                         // Already stopped elsewhere; nothing to do.
                         return;
@@ -75,6 +71,46 @@ pub(super) fn spawn_auto_stop(
             _ = cancel.cancelled() => {
                 // Server stopped (manually or on error) before the timer fired.
             }
+        }
+    })
+}
+
+async fn finish_server(mut active: ActiveServer) {
+    active.cancel.cancel();
+    if active.wait_for_stop {
+        // The monitor forwards cancellation and waits for the listener to close.
+        if tokio::time::timeout(Duration::from_secs(12), &mut active.task)
+            .await
+            .is_ok()
+        {
+            return;
+        }
+    }
+    active.task.abort();
+}
+
+fn watch_desktop_server_exit(
+    ctx: ServerCtx,
+    registry: std::sync::Arc<ServerRegistry>,
+    task: JoinHandle<()>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let server_type = ctx.server_type;
+        if let Err(error) = task.await {
+            ctx.log.line(format!("Server monitor stopped: {error}"));
+        }
+        // Manual and automatic stops already own the registry and publish
+        // Stopped after the module has reaped its process.
+        let mut running = tokio::select! {
+            biased;
+            _ = ctx.cancel.cancelled() => return,
+            running = registry.running.lock() => running,
+        };
+        if let Some(active) = running.remove(&server_type) {
+            if let Some(timer) = &active.auto_stop_task {
+                timer.abort();
+            }
+            set_status(&ctx.app, &registry, ServerStatus::stopped(server_type)).await;
         }
     })
 }
@@ -93,7 +129,7 @@ pub async fn start_local_server(
 
     // Ignore duplicate start: return the current status.
     {
-        let running = state.servers.running.lock().await;
+        let running = state.legacy.servers.running.lock().await;
         if let Some(active) = running.get(&st) {
             return Ok(active.status.clone());
         }
@@ -118,7 +154,7 @@ pub async fn start_local_server(
         started_at: None,
         error: None,
     };
-    set_status(&app, &state.servers, starting).await;
+    set_status(&app, &state.legacy.servers, starting).await;
 
     if st == ServerType::Rdp {
         if let Err(e) = resolve_rdp_password(&state, &mut config) {
@@ -129,7 +165,7 @@ pub async fn start_local_server(
                 started_at: None,
                 error: Some(e.clone()),
             };
-            set_status(&app, &state.servers, info).await;
+            set_status(&app, &state.legacy.servers, info).await;
             return Err(e);
         }
     }
@@ -138,7 +174,13 @@ pub async fn start_local_server(
     let cancel = CancellationToken::new();
     let ctx = ServerCtx::new(app.clone(), st, cancel.clone());
     let log = ctx.log.clone();
-    let started = match engine::start(ctx, config.clone()).await {
+    let wait_for_stop = matches!(st, ServerType::Vnc | ServerType::Rdp)
+        || (super::local_host::kind(st).is_some()
+            && state
+                .plugins
+                .get(taomni_server_process::local::SLUG)
+                .is_some());
+    let started = match engine::start(ctx.clone(), config.clone()).await {
         Ok(s) => s,
         Err(e) => {
             cancel.cancel();
@@ -149,7 +191,7 @@ pub async fn start_local_server(
                 started_at: None,
                 error: Some(e.clone()),
             };
-            set_status(&app, &state.servers, info).await;
+            set_status(&app, &state.legacy.servers, info).await;
             return Err(e);
         }
     };
@@ -166,7 +208,7 @@ pub async fn start_local_server(
     let auto_stop_task = if config.auto_stop {
         Some(spawn_auto_stop(
             app.clone(),
-            state.servers.clone(),
+            state.legacy.servers.clone(),
             st,
             cancel.clone(),
             log,
@@ -177,19 +219,25 @@ pub async fn start_local_server(
     };
 
     {
-        let mut running = state.servers.running.lock().await;
+        let mut running = state.legacy.servers.running.lock().await;
+        let task = if wait_for_stop {
+            watch_desktop_server_exit(ctx, state.legacy.servers.clone(), started.task)
+        } else {
+            started.task
+        };
         running.insert(
             st,
             ActiveServer {
                 cancel,
-                task: started.task,
+                task,
                 auto_stop_task,
                 status: running_status.clone(),
+                wait_for_stop,
                 _process_lock: process_lock,
             },
         );
+        set_status(&app, &state.legacy.servers, running_status.clone()).await;
     }
-    set_status(&app, &state.servers, running_status.clone()).await;
     Ok(running_status)
 }
 
@@ -201,7 +249,7 @@ pub async fn stop_local_server(
 ) -> Result<ServerStatus, String> {
     let st = ServerType::from_str(&server_type)
         .ok_or_else(|| format!("unknown server type: {}", server_type))?;
-    Ok(stop_internal(&app, &state.servers, st).await)
+    Ok(stop_internal(&app, &state.legacy.servers, st).await)
 }
 
 #[tauri::command]
@@ -211,7 +259,7 @@ pub async fn get_server_status(
 ) -> Result<ServerStatus, String> {
     let st = ServerType::from_str(&server_type)
         .ok_or_else(|| format!("unknown server type: {}", server_type))?;
-    let s = state.servers.statuses.lock().await;
+    let s = state.legacy.servers.statuses.lock().await;
     Ok(s.get(&st)
         .cloned()
         .unwrap_or_else(|| ServerStatus::stopped(st)))
@@ -219,7 +267,7 @@ pub async fn get_server_status(
 
 #[tauri::command]
 pub async fn list_server_statuses(state: State<'_, AppState>) -> Result<Vec<ServerStatus>, String> {
-    let s = state.servers.statuses.lock().await;
+    let s = state.legacy.servers.statuses.lock().await;
     // Return a status for every known server type so the UI has a complete
     // list even before anything has started.
     let out = ServerType::all()

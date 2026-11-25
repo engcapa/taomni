@@ -21,10 +21,10 @@ pub async fn mobile_status(
 ) -> Result<Value, String> {
     // Settings shows the opt-ins before the service ever starts.
     if let Ok(data) = crate::resolved_app_data_dir(&app) {
-        state.mobile.open_requests.ensure_loaded(&data);
-        state.mobile.desktop.ensure_loaded(&data);
+        state.legacy.mobile.open_requests.ensure_loaded(&data);
+        state.legacy.mobile.desktop.ensure_loaded(&data);
     }
-    status(&state.mobile).await
+    status(&state.legacy.mobile).await
 }
 #[tauri::command]
 pub fn mobile_set_screen_capture(
@@ -33,7 +33,11 @@ pub fn mobile_set_screen_capture(
     state: State<'_, AppState>,
 ) -> Result<bool, String> {
     let data = crate::resolved_app_data_dir(&app)?;
-    state.mobile.desktop.set_screen_allowed(&data, enabled)?;
+    state
+        .legacy
+        .mobile
+        .desktop
+        .set_screen_allowed(&data, enabled)?;
     Ok(enabled)
 }
 #[tauri::command]
@@ -44,6 +48,7 @@ pub async fn mobile_start(
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
     state
+        .legacy
         .mobile
         .start(
             Core::Desktop(app.clone()),
@@ -52,12 +57,12 @@ pub async fn mobile_start(
             port,
         )
         .await?;
-    status(&state.mobile).await
+    status(&state.legacy.mobile).await
 }
 #[tauri::command]
 pub async fn mobile_stop(state: State<'_, AppState>) -> Result<Value, String> {
-    state.mobile.stop().await;
-    status(&state.mobile).await
+    state.legacy.mobile.stop().await;
+    status(&state.legacy.mobile).await
 }
 #[tauri::command]
 pub async fn mobile_listener_get(
@@ -65,6 +70,7 @@ pub async fn mobile_listener_get(
     state: State<'_, AppState>,
 ) -> Result<ListenerConfig, String> {
     state
+        .legacy
         .mobile
         .listener_config(&crate::resolved_app_data_dir(&app)?)
         .await
@@ -76,6 +82,7 @@ pub async fn mobile_listener_save(
     state: State<'_, AppState>,
 ) -> Result<ListenerConfig, String> {
     state
+        .legacy
         .mobile
         .save_listener_config(&crate::resolved_app_data_dir(&app)?, config)
         .await
@@ -83,6 +90,7 @@ pub async fn mobile_listener_save(
 #[tauri::command]
 pub async fn mobile_pairing_code(state: State<'_, AppState>) -> Result<String, String> {
     if !state
+        .legacy
         .mobile
         .lifecycle
         .lock()
@@ -93,6 +101,7 @@ pub async fn mobile_pairing_code(state: State<'_, AppState>) -> Result<String, S
         return Err("service_disabled".into());
     }
     Ok(state
+        .legacy
         .mobile
         .auth
         .lock()
@@ -102,12 +111,17 @@ pub async fn mobile_pairing_code(state: State<'_, AppState>) -> Result<String, S
 #[tauri::command]
 pub fn mobile_revoke(device_id: String, state: State<'_, AppState>) -> Result<(), String> {
     state
+        .legacy
         .mobile
         .auth
         .lock()
         .map_err(|_| "auth_unavailable")?
         .revoke(&device_id)?;
-    state.mobile.open_requests.cancel_pending(Some(&device_id));
-    state.mobile.devices_changed.notify_waiters();
+    state
+        .legacy
+        .mobile
+        .open_requests
+        .cancel_pending(Some(&device_id));
+    state.legacy.mobile.devices_changed.notify_waiters();
     Ok(())
 }

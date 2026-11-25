@@ -64,7 +64,7 @@ impl Agent {
     /// and task routing all stay in sync with the user's config without
     /// re-reading ai.json on every call.
     pub async fn from_state(state: &AppState, task: TaskKind, tools: ToolRegistry) -> Option<Self> {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         // Pick the provider id this task would actually route to.
         let provider_id = ai_ctx.llm.provider_for_task(task);
         let llm = ai_ctx.llm.provider(&provider_id)?;

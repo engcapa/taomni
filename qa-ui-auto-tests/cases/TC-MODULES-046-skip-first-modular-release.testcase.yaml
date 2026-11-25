@@ -1,0 +1,86 @@
+id: TC-MODULES-046
+title: A legacy profile jumping to a later release installs the frozen roster and offers extra modules
+description: The legacy profile first sees a later signed release containing MFA in its original roster and Hello as
+  an optional addition. Observe MFA's automatic installation, zero Hello transfers before consent, and the user's
+  subsequent verified installation. TC-MODULES-027 covers input from the actually installed legacy application.
+covers: [F-Modules-1]
+tags: [p1, modules, upgrade, marketplace]
+modes: [native]
+fixtures: [reset_db, module_upgrade, module_signed_archive, module_legacy_roster]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- module_marketplace_probe: {phase: source}
+- reload_window: null
+- wait_for: '[data-testid="module-release-new-item"][data-module-id="taomni-plugin-hello-plugin"]'
+- assert_text:
+    selector: '[data-testid="module-release-new-item"]'
+    contains: Hello Plugin
+- assert_text:
+    selector: '[data-testid="module-release-new-item"]'
+    contains: Verify that a signed module can open its own tab and save text in a separate data directory.
+- assert_count:
+    selector: '[data-testid="module-release-new-item"]'
+    equal: 1
+- screenshot: module-skipped-release-offer.png
+- click: '[data-testid="module-release-open-store"]'
+- wait_for: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
+- assert_visible: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-new"]'
+- module_marketplace_probe: {phase: legacy-new-available}
+- click: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-download"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-review"]'
+- click: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-review"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Hello Plugin 0.1.0
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-current"]'
+- assert_count:
+    selector: '[data-testid="module-marketplace-current"]'
+    equal: 2
+- module_marketplace_probe: {phase: installed}
+- assert_no_runtime_errors: null
+- screenshot: module-skipped-release-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: On the first signed catalog check, automatically install the roster and show later additions for opt-in.
+    actions: [3, 4, 10]
+    checkpoints:
+    - step: 6
+      expectation: The main window names the later module.
+    - step: 7
+      expectation: The notice includes the description bound to the signed catalog.
+    - step: 8
+      expectation: Exactly one optional module is offered.
+    - step: 11
+      expectation: MFA has been installed automatically.
+    - step: 12
+      expectation: Hello stays marked as a new choice in the store.
+    - step: 13
+      expectation: MFA's signed package and version match the roster. Hello has zero requests, partial bytes or active pointer.
+    results: [6, 7, 8, 11, 12, 13]
+  - id: R2
+    requirement: Install the later addition only after the user requests and confirms it.
+    actions: [14, 15, 17, 19]
+    checkpoints:
+    - step: 18
+      expectation: The dialog shows the version and name from the verified archive.
+    - step: 21
+      expectation: Both signed modules are installed.
+    - step: 22
+      expectation: The optional archive had exactly one matching transfer and its active version matches.
+    - step: 23
+      expectation: The renderer records no unhandled errors.
+    results: [18, 21, 22, 23]
+  native:
+  - check: Catalog authentication, actual automatic transfer, active version and prior absence of optional module on disk.
+    method: external
+    reason: The probe reads native profile state and the request log for packages signed on the GitHub runner.
+  visual:
+  - check: The main-window notice shows the new module and its description.
+    method: manual
+    reason: Review the screenshot captured before opening the store.

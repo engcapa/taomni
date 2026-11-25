@@ -23,12 +23,7 @@ function fixture(t) {
   };
   put(join(app, "Contents/MacOS/taomni"), "#!/bin/sh\n# app executable\n", true);
   put(join(app, "Contents/Frameworks/libgssapi_krb5.2.2.dylib"), "bundled krb5");
-  put(join(app, "Contents/Resources/sockscap/macos/xray"), "#!/bin/sh\n# xray executable\n", true);
-  for (const name of ["Mitmproxy Redirector.app.tar", "manifest.json", "LICENSE"]) {
-    const relative = `sockscap/macos/redirector/0.12.11/${name}`;
-    put(join(root, "src-tauri/resources", relative), `pinned ${name}`);
-    put(join(app, "Contents/Resources", relative), `pinned ${name}`);
-  }
+  mkdirSync(join(app, "Contents/Resources"), { recursive: true });
   const pack = () => execFileSync("tar", ["-czf", `${app}.tar.gz`, "-C", bundle, "Taomni.app"], { env: { ...process.env, LC_ALL: "C", LANG: "C" }, stdio: "ignore" });
   pack();
   put(`${app}.tar.gz.sig`, "fixture signature");
@@ -81,6 +76,44 @@ test("self-signed release gate validates the app and archived updater against th
   const trace = readFileSync(f.trace, "utf8");
   assert.equal(trace.split("\n").filter((line) => line.startsWith("codesign --verify --deep --strict")).length, 2);
   assert(!trace.includes("spctl"));
+});
+
+test("macOS release rejects SocksCap resources from another desktop platform", (t) => {
+  const f = fixture(t);
+  mkdirSync(join(f.app, "Contents/Resources/sockscap/windows"), { recursive: true });
+  const result = f.run();
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /SocksCap module installer or runtime was included/);
+});
+
+test("core and archived updater each exclude the standalone Redirector bridge", (t) => {
+  const f = fixture(t);
+  const bridge = join(f.app, "Contents/MacOS/sockscap-redirector-bridge");
+  writeFileSync(bridge, "legacy bridge fixture");
+  assert.match(f.run().stderr, /SocksCap module installer or runtime was included/);
+  f.pack();
+  rmSync(bridge);
+  assert.match(f.run().stderr, /SocksCap module installer or runtime was included/);
+});
+
+test("core and archived updater each exclude the module-owned Redirector installer", (t) => {
+  const f = fixture(t);
+  const archive = join(f.app, "Contents/Resources/Mitmproxy Redirector.app.tar");
+  writeFileSync(archive, "installer fixture");
+  assert.match(f.run().stderr, /SocksCap module installer or runtime was included/);
+  f.pack();
+  rmSync(archive);
+  assert.match(f.run().stderr, /SocksCap module installer or runtime was included/);
+});
+
+test("both the macOS application and updater archive exclude the ACP test fixture", (t) => {
+  const f = fixture(t);
+  const helper = join(f.app, "Contents/MacOS/acp-fake-agent");
+  writeFileSync(helper, "test-only executable");
+  assert.match(f.run().stderr, /ACP integration test fixture/);
+  f.pack();
+  rmSync(helper);
+  assert.match(f.run().stderr, /ACP integration test fixture/);
 });
 
 for (const failure of ["TEST_INVALID_SIGNATURE", "TEST_DIFFERENT_CERTIFICATE", "TEST_CDHASH", "TEST_DIFFERENT_REQUIREMENT", "TEST_WRONG_ARCH", "TEST_HARDENED_RUNTIME", "TEST_BOTTLE_PATH"]) {

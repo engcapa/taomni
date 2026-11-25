@@ -168,5 +168,3 @@
 - browser：`TC-EXPLORER-012`、`TC-EXPLORER-011`、`TC-NP-007` 3/3 通过（`qa-ui-auto-report/ux-browser-railonly`）。
 - native（Windows QA debug 构建）：`TC-EXPLORER-012`、`TC-EXPLORER-010`、`TC-EXPLORER-003` 3/3 通过（`qa-ui-auto-report/ux-native-railonly`）。
 - 浏览器实测：explorer 下无 panel/handle，旧位置拖拽无任何展开；往返 Sessions 后内容 DOM 节点保持连接（无重挂载），控制台无错误。
-
-

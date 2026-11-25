@@ -1,0 +1,746 @@
+name: Release Module Catalog
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: GitHub Release tag for the module-only release
+        required: true
+        type: string
+      module:
+        description: Stable module slug to release
+        required: true
+        type: string
+      head:
+        description: Commit or ref containing the module change
+        required: false
+        default: ''
+        type: string
+      macos_runner:
+        description: Hosted macOS builder for both Darwin targets
+        required: false
+        default: macos-15
+        type: choice
+        options: [macos-15, macos-15-intel, macos-26, macos-latest]
+      rehearsal_baseline_run:
+        description: Artifact-only Release Bundle run ID for read-only single-module catalog rehearsal (never publishes)
+        required: false
+        default: ''
+        type: string
+      baseline_tag:
+        description: Baseline core release tag for read-only catalog rehearsal URLs
+        required: false
+        default: v0.6.0
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        description: GitHub Release tag for the module-only release
+        required: true
+        type: string
+      module:
+        description: Stable module slug to release
+        required: true
+        type: string
+      head:
+        description: Commit or ref containing the module change
+        required: false
+        default: ''
+        type: string
+      macos_runner:
+        description: Hosted macOS builder for both Darwin targets
+        required: false
+        default: macos-15
+        type: string
+      package_only:
+        description: Build and sign GitHub Actions artifacts for the calling core workflow
+        default: false
+        type: boolean
+      rehearsal_baseline_run:
+        description: Artifact-only Release Bundle run ID for read-only single-module catalog rehearsal (never publishes)
+        required: false
+        default: ''
+        type: string
+      baseline_tag:
+        description: Baseline core release tag for read-only catalog rehearsal URLs
+        required: false
+        default: v0.6.0
+        type: string
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: true
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
+      APPLE_CERTIFICATE:
+        required: false
+      APPLE_CERTIFICATE_PASSWORD:
+        required: false
+      APPLE_SIGNING_IDENTITY:
+        required: false
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: module-release-${{ inputs.tag || github.ref }}-${{ inputs.module }}
+  cancel-in-progress: false
+
+jobs:
+  source:
+    name: Validate module source
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+      committed_at: ${{ steps.source.outputs.committed_at }}
+      slug: ${{ steps.source.outputs.slug }}
+      package: ${{ steps.source.outputs.package }}
+      version: ${{ steps.source.outputs.version }}
+      matrix: ${{ steps.source.outputs.matrix }}
+      macos_runner: ${{ steps.source.outputs.macos_runner }}
+      built_frontend: ${{ steps.source.outputs.built_frontend }}
+      rehearsal_baseline_run: ${{ steps.source.outputs.rehearsal_baseline_run }}
+      baseline_tag: ${{ steps.source.outputs.baseline_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Inspect the stable module manifest and build targets
+        id: source
+        env:
+          MODULE_SLUG: ${{ inputs.module }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          PACKAGE_ONLY: ${{ inputs.package_only || false }}
+          MACOS_RUNNER: ${{ inputs.macos_runner || 'macos-15' }}
+          REHEARSAL_BASELINE_RUN: ${{ inputs.rehearsal_baseline_run || '' }}
+          BASELINE_TAG: ${{ inputs.baseline_tag || 'v0.6.0' }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, re, subprocess
+
+          slug = os.environ['MODULE_SLUG'].strip()
+          tag = os.environ['RELEASE_TAG'].strip()
+          package_only = os.environ['PACKAGE_ONLY'] == 'true'
+          macos_runner = os.environ['MACOS_RUNNER']
+          rehearsal_baseline_run = os.environ['REHEARSAL_BASELINE_RUN'].strip()
+          baseline_tag = os.environ['BASELINE_TAG'].strip()
+          if not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]*[a-z0-9])?', slug):
+              raise SystemExit('module must be a lowercase module slug')
+          if (tag or not package_only) and not re.fullmatch(r'v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)*', tag):
+              raise SystemExit('tag must be a semantic version prefixed with v')
+          if macos_runner not in {'macos-15', 'macos-15-intel', 'macos-26', 'macos-latest'}:
+              raise SystemExit('select a supported GitHub-hosted macOS runner')
+          if rehearsal_baseline_run:
+              if package_only:
+                  raise SystemExit('rehearsal_baseline_run cannot be combined with package_only')
+              if not re.fullmatch(r'[1-9][0-9]*', rehearsal_baseline_run):
+                  raise SystemExit('rehearsal_baseline_run must be a numeric workflow run ID')
+              if not re.fullmatch(r'v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)*', baseline_tag) or baseline_tag == tag:
+                  raise SystemExit('baseline_tag must be a distinct semantic version prefixed with v')
+          manifest_path = pathlib.Path('src-tauri/plugins') / slug / 'module.json'
+          if not manifest_path.is_file():
+              raise SystemExit(f'module manifest is missing: {manifest_path}')
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          if manifest.get('id') != f'taomni-plugin-{slug}':
+              raise SystemExit('module id must match the selected slug')
+          status = manifest.get('status')
+          if status != 'stable' and not ((package_only and not tag and status == 'provisional') or (rehearsal_baseline_run and status == 'provisional')):
+              raise SystemExit('only stable modules can enter a production catalog')
+          if not manifest.get('description', '').strip():
+              raise SystemExit('stable modules require a store description')
+          cargo = manifest_path.parent / 'Cargo.toml'
+          if not cargo.is_file():
+              raise SystemExit('module-only release requires a native Cargo package')
+          package = None
+          for line in cargo.read_text(encoding='utf-8').splitlines():
+              if line.startswith('name = '):
+                  package = json.loads(line.split('=', 1)[1].strip())
+                  break
+          if not package:
+              raise SystemExit('module Cargo.toml has no package name')
+          targets = [
+              {'os': 'ubuntu-22.04', 'target': 'x86_64-unknown-linux-gnu', 'platform': 'linux-x86_64'},
+              {'os': 'windows-latest', 'target': 'x86_64-pc-windows-msvc', 'platform': 'windows-x86_64'},
+              {'os': macos_runner, 'target': 'aarch64-apple-darwin', 'platform': 'darwin-aarch64'},
+              {'os': macos_runner, 'target': 'x86_64-apple-darwin', 'platform': 'darwin-x86_64'},
+          ]
+          declared = set(manifest.get('platforms', []))
+          if not declared or declared - {target['platform'] for target in targets}:
+              raise SystemExit('manifest must declare supported production release targets')
+          targets = [target for target in targets if target['platform'] in declared]
+          built_frontend = slug in {'vnc-client', 'rdp-client', 'mail', 'mfa', 'screenshot', 'sockscap',
+                                   'rdp-server', 'vnc-server', 'servers'}
+          output = os.environ['GITHUB_OUTPUT']
+          with open(output, 'a', encoding='utf-8') as stream:
+              stream.write(f"sha={subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()}\n")
+              stream.write(f"committed_at={subprocess.check_output(['git', 'show', '-s', '--format=%cI', 'HEAD'], text=True).strip()}\n")
+              stream.write(f'slug={slug}\npackage={package}\nversion={manifest["version"]}\n')
+              stream.write('matrix=' + json.dumps({'include': targets}, separators=(',', ':')) + '\n')
+              stream.write(f'macos_runner={macos_runner}\n')
+              stream.write(f'built_frontend={str(built_frontend).lower()}\n')
+              stream.write(f'rehearsal_baseline_run={rehearsal_baseline_run}\n')
+              stream.write(f'baseline_tag={baseline_tag}\n')
+          PY
+
+  desktop-frontend:
+    if: needs.source.outputs.built_frontend == 'true'
+    needs: source
+    uses: ./.github/workflows/build-vnc-frontend.yml
+    with:
+      source: ${{ needs.source.outputs.sha }}
+      artifact: release-desktop-frontend-${{ needs.source.outputs.slug }}-${{ github.run_id }}
+      module: ${{ needs.source.outputs.slug }}
+
+  build:
+    name: Build unsigned ${{ needs.source.outputs.slug }} (${{ matrix.platform }})
+    needs: source
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.source.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: module-release-${{ needs.source.outputs.slug }}-${{ matrix.target }}-${{ matrix.os }}
+      - name: Prepare complete Perl for the Windows desktop client TLS build
+        if: (needs.source.outputs.slug == 'vnc-client' || needs.source.outputs.slug == 'rdp-client' || needs.source.outputs.slug == 'rdp-server') && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
+          & $perl -MIPC::Cmd -e 'print "Perl ready"'
+          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+          'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
+      - name: Install Linux dependencies for the RDP Server host
+        if: needs.source.outputs.slug == 'rdp-server' && runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y libpipewire-0.3-dev libasound2-dev libxkbcommon-dev libclang-dev libdbus-1-dev libudev-dev meson ninja-build pkg-config
+          bash scripts/install-release-pipewire.sh
+      - name: Refresh cached Local Voice runtime
+        if: needs.source.outputs.slug == 'ai-voice-local'
+        run: node scripts/refresh-sherpa-onnx-cache.mjs src-tauri/Cargo.toml '${{ matrix.target }}'
+      - name: Build the module host without signing credentials
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p '${{ needs.source.outputs.package }}' --release --target '${{ matrix.target }}' --locked
+      - name: Build the Windows VNC key helper
+        if: needs.source.outputs.slug == 'vnc-client' && runner.os == 'Windows'
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-vnc-key-helper --bin taomni-vnc-key-helper --release --target '${{ matrix.target }}' --locked
+      - name: Build the Windows SocksCap capture helper
+        if: needs.source.outputs.slug == 'sockscap' && runner.os == 'Windows'
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-sockscap-tools --bin sockscap-helper --release --target '${{ matrix.target }}' --locked
+      - name: Verify the upstream-signed macOS SocksCap installer
+        if: needs.source.outputs.slug == 'sockscap' && runner.os == 'macOS'
+        run: bash scripts/stage-mitmproxy-redirector-macos.sh --stage
+      - name: Stage the exact package payload
+        env:
+          MODULE_TARGET: ${{ matrix.target }}
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SLUG: ${{ needs.source.outputs.slug }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+          BUILT_FRONTEND: ${{ needs.source.outputs.built_frontend }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, shutil, sys
+          sys.path.insert(0, 'scripts')
+          from local_voice_runtime import stage_runtime
+          import sockscap_redirector_resource as redirector
+          slug = os.environ['MODULE_SLUG']
+          source = pathlib.Path('src-tauri/plugins') / slug
+          manifest = json.loads((source / 'module.json').read_text(encoding='utf-8'))
+          host = manifest.get('entry', {}).get('host')
+          if host and os.environ['MODULE_PLATFORM'].startswith('windows') and not host.endswith('.exe'):
+              host += '.exe'
+              manifest['entry']['host'] = host
+          payload = pathlib.Path('unsigned-module')
+          payload.mkdir()
+          (payload / 'module.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+          binaries = pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release'
+          if host:
+              shutil.copyfile(binaries / host, payload / host)
+          stage_runtime(slug, os.environ['MODULE_PLATFORM'], binaries, payload)
+          redirector.stage(slug, os.environ['MODULE_PLATFORM'], source, payload)
+          if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
+              helper = 'taomni-vnc-key-helper.exe'
+              shutil.copyfile(binaries / helper, payload / helper)
+          frontend = manifest.get('entry', {}).get('frontend')
+          if frontend and os.environ['BUILT_FRONTEND'] != 'true':
+              source_frontend = source / pathlib.Path(frontend).parent
+              shutil.copytree(source_frontend, payload / source_frontend.relative_to(source))
+          pathlib.Path('candidate-source.json').write_text(json.dumps({
+              'sourceSha': os.environ['MODULE_SOURCE_SHA'],
+              'platform': os.environ['MODULE_PLATFORM'],
+              'module': slug,
+          }, sort_keys=True) + '\n', encoding='utf-8')
+          PY
+      - name: Stage pinned SocksCap Xray payload
+        if: needs.source.outputs.slug == 'sockscap'
+        env:
+          MODULE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          python -m unittest discover -s scripts -p test_sockscap_xray_resource.py
+          python scripts/sockscap_xray_resource.py stage src-tauri/plugins/sockscap "$MODULE_PLATFORM" unsigned-module
+      - name: Stage pinned WinDivert and the module capture helper
+        if: needs.source.outputs.slug == 'sockscap' && runner.os == 'Windows'
+        env:
+          MODULE_TARGET: ${{ matrix.target }}
+        run: python scripts/sockscap_windows_resource.py src-tauri/plugins/sockscap unsigned-module --helper "src-tauri/target/$MODULE_TARGET/release/sockscap-helper.exe"
+      - name: Build and stage Linux SocksCap trace launcher
+        if: needs.source.outputs.slug == 'sockscap' && runner.os == 'Linux'
+        run: |
+          python -m unittest discover -s scripts -p test_sockscap_linux_resource.py
+          python scripts/sockscap_linux_resource.py stage src-tauri/plugins/sockscap unsigned-module
+      - uses: actions/upload-artifact@v4
+        with:
+          name: module-unsigned-${{ needs.source.outputs.slug }}-${{ matrix.platform }}-${{ github.run_id }}
+          path: |
+            unsigned-module/
+            candidate-source.json
+          if-no-files-found: error
+          retention-days: 14
+
+  sign:
+    name: Sign ${{ needs.source.outputs.slug }} (${{ matrix.platform }})
+    needs: [source, build, desktop-frontend]
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.repository == 'engcapa/taomni' && needs.build.result == 'success' && (needs.desktop-frontend.result == 'success' || (needs.source.outputs.built_frontend == 'false' && needs.desktop-frontend.result == 'skipped')) }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.source.outputs.matrix) }}
+    runs-on: ${{ startsWith(matrix.platform, 'darwin-') && needs.source.outputs.macos_runner || 'ubuntu-24.04' }}
+    timeout-minutes: 25
+    steps:
+      - name: Checkout trusted signing tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build and test the trusted packager
+        run: |
+          cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
+          cargo build --manifest-path scripts/plugin-package/Cargo.toml --release --locked
+      - uses: actions/download-artifact@v4
+        with:
+          name: module-unsigned-${{ needs.source.outputs.slug }}-${{ matrix.platform }}-${{ github.run_id }}
+          path: candidate
+      - name: Check candidate identity against the trusted manifest
+        id: candidate
+        env:
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+          MODULE_SLUG: ${{ needs.source.outputs.slug }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          PACKAGE_ONLY: ${{ inputs.package_only || false }}
+          REHEARSAL_BASELINE_RUN: ${{ needs.source.outputs.rehearsal_baseline_run }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, re, sys
+          sys.path.insert(0, 'scripts')
+          from local_voice_runtime import verify_runtime
+          import sockscap_linux_resource as linux_capture
+          import sockscap_redirector_resource as redirector
+          root = pathlib.Path('candidate')
+          observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
+          expected_observed = {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': os.environ['MODULE_SLUG']}
+          if observed != expected_observed:
+              raise SystemExit('candidate source identity does not match the selected commit')
+          trusted = json.loads((pathlib.Path('src-tauri/plugins') / os.environ['MODULE_SLUG'] / 'module.json').read_text(encoding='utf-8'))
+          candidate = json.loads((root / 'unsigned-module/module.json').read_text(encoding='utf-8'))
+          redirector.verify(os.environ['MODULE_SLUG'], os.environ['MODULE_PLATFORM'], pathlib.Path('src-tauri/plugins') / os.environ['MODULE_SLUG'], root / 'unsigned-module')
+          linux_capture.verify(os.environ['MODULE_SLUG'], os.environ['MODULE_PLATFORM'], root / 'unsigned-module')
+          host = trusted.get('entry', {}).get('host')
+          if host and os.environ['MODULE_PLATFORM'].startswith('windows-') and not host.endswith('.exe'):
+              host += '.exe'
+              trusted['entry']['host'] = host
+          if trusted != candidate:
+              raise SystemExit('candidate module metadata differs from trusted source')
+          status = candidate.get('status')
+          rehearsal = os.environ['PACKAGE_ONLY'] == 'true' and not os.environ['RELEASE_TAG'].strip()
+          catalog_rehearsal = bool(os.environ.get('REHEARSAL_BASELINE_RUN', '').strip())
+          if (status != 'stable' and not ((rehearsal or catalog_rehearsal) and status == 'provisional')) or candidate.get('id') != f"taomni-plugin-{os.environ['MODULE_SLUG']}":
+              raise SystemExit('candidate module status or identity is invalid for this release')
+          if any(path.is_symlink() for path in root.rglob('*')):
+              raise SystemExit('candidate payload contains a symlink')
+          verify_runtime(os.environ['MODULE_SLUG'], os.environ['MODULE_PLATFORM'], root / 'unsigned-module')
+          if os.environ['MODULE_SLUG'] == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
+              helper = root / 'unsigned-module/taomni-vnc-key-helper.exe'
+              if not helper.is_file() or helper.stat().st_size == 0:
+                  raise SystemExit('candidate Windows VNC key helper is missing')
+          if host:
+              if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', host) or not (root / 'unsigned-module' / host).is_file():
+                  raise SystemExit('candidate host binary is missing or has an invalid name')
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
+                  stream.write(f'host={host}\n')
+          PY
+      - uses: actions/download-artifact@v4
+        if: needs.source.outputs.built_frontend == 'true'
+        with:
+          name: release-desktop-frontend-${{ needs.source.outputs.slug }}-${{ github.run_id }}
+          path: trusted-desktop-frontend
+      - name: Stage the verified module frontend bytes
+        if: needs.source.outputs.built_frontend == 'true'
+        env:
+          MODULE_SOURCE: ${{ needs.source.outputs.sha }}
+          FRONTEND_TOOLING: ${{ github.workflow_sha }}
+          MODULE_SLUG: ${{ needs.source.outputs.slug }}
+        run: python scripts/stage-vnc-frontend.py trusted-desktop-frontend candidate/unsigned-module "$MODULE_SOURCE" "$FRONTEND_TOOLING" "$MODULE_SLUG"
+      - name: Verify the module Xray files against trusted pinned digests
+        if: needs.source.outputs.slug == 'sockscap'
+        env:
+          MODULE_PLATFORM: ${{ matrix.platform }}
+        run: python scripts/sockscap_xray_resource.py verify src-tauri/plugins/sockscap "$MODULE_PLATFORM" candidate/unsigned-module
+      - name: Verify the module-owned Windows capture files
+        if: needs.source.outputs.slug == 'sockscap' && matrix.platform == 'windows-x86_64'
+        run: python scripts/sockscap_windows_resource.py src-tauri/plugins/sockscap candidate/unsigned-module
+      - name: Verify the module-owned Linux trace launcher
+        if: needs.source.outputs.slug == 'sockscap' && matrix.platform == 'linux-x86_64'
+        run: python scripts/sockscap_linux_resource.py verify sockscap linux-x86_64 candidate/unsigned-module
+      - name: Check Linux module ABI against the core baseline
+        if: matrix.platform == 'linux-x86_64'
+        env:
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: python scripts/check_linux_module_abi.py --source "$MODULE_SOURCE_SHA" --output linux-abi.json candidate/unsigned-module/module.json
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.platform == 'linux-x86_64' && hashFiles('linux-abi.json') != ''
+        with:
+          name: module-linux-abi-${{ needs.source.outputs.slug }}-${{ github.run_id }}
+          path: linux-abi.json
+      - uses: actions/setup-node@v4
+        if: startsWith(matrix.platform, 'darwin-') && steps.candidate.outputs.host != ''
+        with:
+          node-version: '22'
+      - name: Import the fixed macOS signing identity
+        if: startsWith(matrix.platform, 'darwin-') && steps.candidate.outputs.host != ''
+        env:
+          RELEASE_PLATFORM: macOS
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
+        run: node scripts/configure-release-signing.mjs
+      - name: Sign the macOS host before signing its module archive
+        if: startsWith(matrix.platform, 'darwin-') && steps.candidate.outputs.host != ''
+        env:
+          MODULE_HOST: ${{ steps.candidate.outputs.host }}
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SLUG: ${{ needs.source.outputs.slug }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: bash scripts/sign-macos-module-host.sh "candidate/unsigned-module/$MODULE_HOST" macos-signing
+      - name: Sign and verify the immutable package
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: |
+          scripts/plugin-package/target/release/taomni-plugin-package \
+            --payload candidate/unsigned-module --platform "$MODULE_PLATFORM" \
+            --output signed-module --source-sha "$MODULE_SOURCE_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: module-signed-${{ needs.source.outputs.slug }}-${{ matrix.platform }}-${{ github.run_id }}
+          path: |
+            signed-module/
+            macos-signing/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Clean temporary macOS signing keychain
+        if: always() && env.MACOS_SIGNING_WORK_DIR != ''
+        run: node scripts/configure-release-signing.mjs --cleanup-macos
+
+  publish:
+    name: Publish module catalog and packages
+    needs: [source, sign]
+    if: ${{ !inputs.package_only && needs.source.result == 'success' && needs.sign.result == 'success' && needs.source.outputs.rehearsal_baseline_run == '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: taomni-release-catalog-publication
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.tag }}
+      MODULE_SLUG: ${{ needs.source.outputs.slug }}
+      MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run release and catalog contracts
+        run: |
+          node --test scripts/fetch-published-module-assets.test.mjs scripts/compose-modules-manifest.test.mjs scripts/stage-published-module-catalog.test.mjs scripts/verify-module-catalog-delta.test.mjs scripts/release-modules-workflow.test.mjs
+          cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
+          cargo build --manifest-path scripts/plugin-package/Cargo.toml --release --locked
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: module-signed-${{ needs.source.outputs.slug }}-*-${{ github.run_id }}
+          path: signed-artifacts
+          merge-multiple: false
+      - name: Stage the signed public catalog baseline
+        id: catalog-baseline
+        run: |
+          set -euo pipefail
+          core_tag="$(gh release view --json tagName,assets --jq 'select(any(.assets[]; .name == "latest.json")).tagName')"
+          if [[ -z "$core_tag" || "$core_tag" == "$TAG" ]]; then
+            echo 'Use a separate module tag and start from a published core release.' >&2
+            exit 1
+          fi
+          catalog_source="$(node scripts/stage-published-module-catalog.mjs current-catalog)"
+          test "$catalog_source" = "source_tag=$core_tag"
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog-signature current-catalog
+          node scripts/fetch-published-module-assets.mjs current-catalog current-catalog
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog current-catalog
+          echo "core_tag=$core_tag" >> "$GITHUB_OUTPUT"
+      - name: Compose and merge the next module catalog
+        env:
+          MODULES_PUBLISHED_CATALOG: current-catalog/modules.json
+          MODULE_SEQUENCE: ${{ github.run_number }}
+          MODULES_REQUIRE_SIGNATURE: '0'
+          MODULE_UPDATED_AT: ${{ needs.source.outputs.committed_at }}
+          MODULE_TARGETS: ${{ needs.source.outputs.matrix }}
+        run: |
+          set -euo pipefail
+          mkdir -p changed-modules
+          find signed-artifacts -type f -name '*.taomni-plugin' -exec cp {} changed-modules/ \;
+          find signed-artifacts -type f -name '*.taomni-plugin.minisig' -exec cp {} changed-modules/ \;
+          expected="$(node -e 'console.log(JSON.parse(process.env.MODULE_TARGETS).include.length)')"
+          test "$(find changed-modules -type f -name '*.taomni-plugin' | wc -l)" = "$expected"
+          node scripts/compose-modules-manifest.mjs changed-modules changed-catalog --delta
+          scripts/plugin-package/target/release/taomni-plugin-package \
+            --prepare-catalog-update current-catalog changed-catalog next-catalog > new-assets.json
+          cp changed-catalog/SHA256SUMS next-catalog/SHA256SUMS
+          (cd next-catalog && sha256sum --check --strict SHA256SUMS)
+      - name: Sign the complete module catalog
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: scripts/plugin-package/target/release/taomni-plugin-package --sign-catalog next-catalog
+      - name: Verify and record the signed catalog
+        run: |
+          set -euo pipefail
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog next-catalog
+          printf '%s\n' "$MODULE_SOURCE_SHA" > module-release-evidence-source-sha.txt
+          cp next-catalog/modules.json module-release-evidence-modules.json
+          cp new-assets.json module-release-evidence-assets.json
+      - name: Create or reuse the draft module release
+        run: |
+          set -euo pipefail
+          if core_manifest="$(gh release view "$TAG" --json assets --jq 'any(.assets[]; .name == "latest.json")' 2>/dev/null)"; then
+            test "$core_manifest" = false
+          else
+            gh release create "$TAG" --draft --title "Taomni modules $TAG" --generate-notes --target "$MODULE_SOURCE_SHA"
+          fi
+      - name: Upload changed packages before the signed catalog
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import filecmp, json, os, pathlib, subprocess, tempfile
+
+          tag = os.environ['TAG']
+          release = json.loads(subprocess.check_output(['gh', 'release', 'view', tag, '--json', 'assets'], text=True))
+          existing = {asset['name'] for asset in release['assets']}
+          for name in [*json.loads(pathlib.Path('new-assets.json').read_text(encoding='utf-8')), 'SHA256SUMS']:
+              candidate = f'next-catalog/{name}'
+              if name not in existing:
+                  subprocess.run(['gh', 'release', 'upload', tag, candidate], check=True)
+                  continue
+              with tempfile.TemporaryDirectory() as work:
+                  downloaded = str(pathlib.Path(work) / name)
+                  subprocess.run(['gh', 'release', 'download', tag, '--pattern', name, '--output', downloaded], check=True)
+                  if not filecmp.cmp(downloaded, candidate, shallow=False):
+                      raise SystemExit(f'Existing release asset has different bytes: {name}')
+          PY
+          gh release upload "$TAG" next-catalog/modules.json.minisig --clobber
+          gh release upload "$TAG" next-catalog/modules.json --clobber
+      - name: Publish the module assets and update the core release catalog
+        env:
+          CORE_TAG: ${{ steps.catalog-baseline.outputs.core_tag }}
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --draft=false --latest=false
+          test "$(gh release view --json tagName --jq .tagName)" = "$CORE_TAG"
+          if ! gh release upload "$CORE_TAG" next-catalog/modules.json.minisig --clobber \
+            || ! gh release upload "$CORE_TAG" next-catalog/modules.json --clobber; then
+            gh release upload "$CORE_TAG" current-catalog/modules.json.minisig --clobber
+            gh release upload "$CORE_TAG" current-catalog/modules.json --clobber
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: module-release-evidence-${{ github.run_id }}
+          path: |
+            module-release-evidence-source-sha.txt
+            module-release-evidence-modules.json
+            module-release-evidence-assets.json
+            new-assets.json
+            next-catalog/modules.json
+            next-catalog/modules.json.minisig
+          if-no-files-found: error
+          retention-days: 30
+
+  rehearse-catalog:
+    name: Rehearse read-only single-module catalog delta
+    needs: [source, sign]
+    if: ${{ !inputs.package_only && needs.source.outputs.rehearsal_baseline_run != '' && needs.source.result == 'success' && needs.sign.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.tag }}
+      BASELINE_TAG: ${{ needs.source.outputs.baseline_tag }}
+      BASELINE_RUN: ${{ needs.source.outputs.rehearsal_baseline_run }}
+      MODULE_SLUG: ${{ needs.source.outputs.slug }}
+      MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run release and catalog contracts
+        run: |
+          node --test scripts/fetch-published-module-assets.test.mjs scripts/compose-modules-manifest.test.mjs scripts/stage-published-module-catalog.test.mjs scripts/verify-module-catalog-delta.test.mjs scripts/release-modules-workflow.test.mjs
+          cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
+          cargo build --manifest-path scripts/plugin-package/Cargo.toml --release --locked
+      - id: baseline
+        name: Validate baseline Release Bundle run
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+
+          repo = os.environ['GH_REPO']
+          run_id = os.environ['BASELINE_RUN']
+          raw = subprocess.check_output(['gh', 'api', f'repos/{repo}/actions/runs/{run_id}'], text=True)
+          run = json.loads(raw)
+          if (
+              run.get('path') != '.github/workflows/release.yml'
+              or run.get('event') != 'workflow_dispatch'
+              or run.get('status') != 'completed'
+              or run.get('conclusion') != 'success'
+              or (run.get('repository') or {}).get('full_name') != repo
+          ):
+              raise SystemExit(f'Invalid baseline Release Bundle run {run_id}: {run}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
+              stream.write(f"sha={run['head_sha']}\n")
+              stream.write(f"updated_at={run['created_at']}\n")
+          PY
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          run-id: ${{ needs.source.outputs.rehearsal_baseline_run }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: module-signed-*-${{ needs.source.outputs.rehearsal_baseline_run }}
+          path: baseline-signed-artifacts
+          merge-multiple: false
+      - name: Stage and sign baseline rehearsal catalog
+        env:
+          BASELINE_UPDATED_AT: ${{ steps.baseline.outputs.updated_at }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          TAG="$BASELINE_TAG" MODULE_SEQUENCE=1 MODULE_UPDATED_AT="$BASELINE_UPDATED_AT" MODULES_REQUIRE_SIGNATURE=0 \
+            node scripts/compose-modules-manifest.mjs baseline-signed-artifacts current-catalog --rehearsal-first-release
+          scripts/plugin-package/target/release/taomni-plugin-package --sign-catalog current-catalog --rehearsal-allow-provisional
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog-signature current-catalog
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog current-catalog --rehearsal-allow-provisional
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: module-signed-${{ needs.source.outputs.slug }}-*-${{ github.run_id }}
+          path: signed-artifacts
+          merge-multiple: false
+      - name: Compose and merge module catalog delta
+        env:
+          MODULES_PUBLISHED_CATALOG: current-catalog/modules.json
+          MODULE_SEQUENCE: ${{ github.run_number }}
+          MODULES_REQUIRE_SIGNATURE: '0'
+          MODULE_UPDATED_AT: ${{ needs.source.outputs.committed_at }}
+          MODULE_TARGETS: ${{ needs.source.outputs.matrix }}
+        run: |
+          set -euo pipefail
+          mkdir -p changed-modules
+          find signed-artifacts -type f -name '*.taomni-plugin' -exec cp {} changed-modules/ \;
+          find signed-artifacts -type f -name '*.taomni-plugin.minisig' -exec cp {} changed-modules/ \;
+          expected="$(node -e 'console.log(JSON.parse(process.env.MODULE_TARGETS).include.length)')"
+          test "$(find changed-modules -type f -name '*.taomni-plugin' | wc -l)" = "$expected"
+          node scripts/compose-modules-manifest.mjs changed-modules changed-catalog --delta
+          scripts/plugin-package/target/release/taomni-plugin-package \
+            --prepare-catalog-update current-catalog changed-catalog next-catalog --rehearsal-allow-provisional > new-assets.json
+          cp changed-catalog/SHA256SUMS next-catalog/SHA256SUMS
+          (cd next-catalog && sha256sum --check --strict SHA256SUMS)
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-release-roster next-catalog current-catalog
+      - name: Sign and verify rehearsed catalog
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          scripts/plugin-package/target/release/taomni-plugin-package --sign-catalog next-catalog --rehearsal-allow-provisional
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog next-catalog --rehearsal-allow-provisional
+      - name: Verify single-module catalog delta invariants
+        env:
+          BASELINE_SHA: ${{ steps.baseline.outputs.sha }}
+        run: |
+          node scripts/verify-module-catalog-delta.mjs \
+            --baseline current-catalog/modules.json \
+            --next next-catalog/modules.json \
+            --new-assets new-assets.json \
+            --sha256sums next-catalog/SHA256SUMS \
+            --module "$MODULE_SLUG" \
+            --tag "$TAG" \
+            --baseline-tag "$BASELINE_TAG" \
+            --repository "$GH_REPO" \
+            --source-sha "$MODULE_SOURCE_SHA" \
+            --baseline-run "$BASELINE_RUN" \
+            --baseline-sha "$BASELINE_SHA" \
+            --output delta-verification.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: module-rehearsal-evidence-${{ needs.source.outputs.slug }}-${{ github.run_id }}
+          path: |
+            delta-verification.json
+            new-assets.json
+            current-catalog/modules.json
+            current-catalog/modules.json.minisig
+            next-catalog/modules.json
+            next-catalog/modules.json.minisig
+            next-catalog/SHA256SUMS
+          if-no-files-found: warn
+          retention-days: 30

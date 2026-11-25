@@ -2,7 +2,11 @@ use super::*;
 
 /// Real OCR and automatic-redaction UI over a native text fixture.
 #[tauri::command]
-pub async fn screenshot_qa_ocr_redact(app: AppHandle) -> Result<String, String> {
+pub async fn screenshot_qa_ocr_redact(
+    app: AppHandle,
+    expect_disabled: Option<bool>,
+    expect_offline: Option<bool>,
+) -> Result<String, String> {
     ensure_qa(&app)?;
     let _cleanup = ScenarioCleanup(app.clone());
     let (_fixture, display, region) = open_fixture(&app, "ocr")
@@ -17,8 +21,64 @@ pub async fn screenshot_qa_ocr_redact(app: AppHandle) -> Result<String, String> 
         region.3,
     )
     .await?;
-    let ocr = super::super::screenshot_ocr(source.path.clone()).await?;
-    let boxes = super::super::screenshot_auto_redact(source.path.clone()).await?;
+    if expect_offline == Some(true) {
+        return signed_offline_ocr(&app, &source.path).await;
+    }
+    let ocr = super::super::screenshot_ocr(source.path.clone(), app.state()).await;
+    let boxes = super::super::screenshot_auto_redact(source.path.clone(), app.state()).await;
+    if expect_disabled == Some(true) {
+        let probe = super::super::screenshot_probe(app.state()).await?;
+        let expected = super::super::ocr::MODULE_UNAVAILABLE;
+        let artifact = keep_artifact(
+            std::path::Path::new(&source.path),
+            "ocr-disabled-capture.png",
+        );
+        let recognition_error = ocr.err();
+        let redaction_error = boxes.err();
+        // Mimic a second instance owning the capture lock. Module admission
+        // must report the disabled encoder before touching the desktop.
+        let lease = super::super::session::SessionLease::acquire()?
+            .ok_or("The clean screenshot scenario already held the capture lease")?;
+        let recording_error = super::super::screenshot_start_recording(
+            app.clone(),
+            Some(display.id),
+            Some(region.0),
+            Some(region.1),
+            Some(region.2),
+            Some(region.3),
+            "gif".into(),
+            None,
+        )
+        .await
+        .err();
+        drop(lease);
+        let recorder_idle = super::super::screenshot_current_recording()
+            .await?
+            .is_none()
+            && app
+                .get_webview_window(super::super::RECORDER_LABEL)
+                .is_none();
+        let ok = artifact.is_some()
+            && recognition_error.as_deref() == Some(expected)
+            && redaction_error.as_deref() == Some(expected)
+            && !probe.ocr_available
+            && !probe.mp4_available
+            && probe.ocr_hint.as_deref() == Some(expected)
+            && recording_error.as_deref() == Some(super::super::record::MODULE_UNAVAILABLE)
+            && recorder_idle;
+        return Ok(report(
+            ok,
+            json!({
+                "artifact": artifact,
+                "recognitionError": recognition_error,
+                "redactionError": redaction_error,
+                "recordingError": recording_error,
+                "recorderIdle": recorder_idle,
+                "probe": probe,
+            }),
+        ));
+    }
+    let (ocr, boxes) = (ocr?, boxes?);
     let ocr_ok = ocr.text.contains("user@example.com") && ocr.text.contains("13812345678");
     let boxes_ok = boxes.boxes.iter().any(|b| b.kind == "email")
         && boxes.boxes.iter().any(|b| b.kind == "phone")
@@ -121,6 +181,58 @@ pub async fn screenshot_qa_ocr_redact(app: AppHandle) -> Result<String, String> 
         ok,
         json!({"ocr":ocr,"boxes":boxes,"page":page,"inputsRetained":inputs_retained,"pixelsChanged":changed,"overlayClosed":closed,
         "sourceArtifact":source_artifact,"artifact":artifact}),
+    ))
+}
+
+async fn signed_offline_ocr(app: &AppHandle, path: &str) -> Result<String, String> {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+
+    let state = app.state::<crate::state::AppState>();
+    let module = state
+        .plugins
+        .get(taomni_screenshot_api::SLUG)
+        .filter(|record| record.state == crate::plugin::LifecycleState::Enabled)
+        .ok_or("Enable the signed Screenshot module before verifying offline recognition")?;
+    let entry = module
+        .manifest
+        .entry
+        .frontend
+        .ok_or("Missing signed OCR renderer")?;
+    let route = format!(
+        "/__taomni_plugins__/screenshot/{}/{}",
+        module.manifest.version, entry
+    );
+    let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
+    let data = format!("data:image/png;base64,{}", STANDARD.encode(bytes));
+    let main = app
+        .get_webview_window("main")
+        .ok_or("Missing native main window")?;
+    let script = format!(
+        r#"
+      const entry = new URL({route}, location.href).href;
+      const renderer = await import(entry);
+      return await renderer.recognizeOffline({data}, new URL('screenshot-ocr/', entry).href);
+    "#,
+        route = json!(route),
+        data = json!(data)
+    );
+    let result = run_js(&main, &script, Duration::from_secs(105))
+        .await
+        .map_err(|error| format!("{error:#}"))?;
+    let recognized = result["text"]
+        .as_str()
+        .is_some_and(|text| text.contains("user@example.com"));
+    let tsv = result["tsv"]
+        .as_str()
+        .ok_or("Missing offline OCR word geometry")?;
+    let sensitive = super::super::ocr::screenshot_redact_tsv(tsv.to_owned(), state).await?;
+    let email_box = sensitive
+        .boxes
+        .iter()
+        .any(|item| item.kind == "email" && item.w > 0 && item.h > 0);
+    Ok(report(
+        recognized && email_box && result["langs"] == json!("bundled:eng+chi_sim"),
+        json!({"recognition":result,"redaction":sensitive}),
     ))
 }
 

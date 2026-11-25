@@ -16,6 +16,31 @@ import yaml
 
 def is_check(step: dict) -> bool:
     verb, args = next(iter(step.items()))
+    if verb == "module_upgrade_probe":
+        return isinstance(args, dict) and args.get("phase") in {
+            "preflight", "pending", "repeat", "after-first-install", "vnc-retained",
+            "rdp-pins-retained", "rdp-sessions-retained", "rdp-legacy-restore-applied", "legacy-restore-applied",
+        }
+    if verb == "module_execution_probe":
+        return isinstance(args, dict) and args.get("phase") in {"rejected", "recovered"}
+    if verb == "module_marketplace_probe":
+        return isinstance(args, dict) and args.get("phase") in {
+            "no-download", "downloaded", "installed", "rejected", "legacy-installed", "legacy-uninstalled",
+            "new-available", "new-dismissed", "legacy-new-available", "old-enabled", "updated-disabled", "old-disabled",
+            "updated-enabled", "failed-update", "rolled-back-enabled", "removed-before-update",
+        }
+    if verb == "module_download_probe":
+        return isinstance(args, dict) and args.get("phase") in {"advance-background", "cancelled", "recovered", "proxy-failed", "completed", "forgotten"}
+    if verb == "module_restore_probe":
+        return isinstance(args, dict) and args.get("phase") in {"running-archive", "disabled-archive", "retained-archive", "reject-password", "staged", "restored", "restart-persisted", "ui-restored"}
+    if verb in {"native_confirm_restore_relaunch", "native_confirm_mfa_upgrade_relaunch"}:
+        return True  # One UI click plus independent process/isolation/reattachment checks.
+    if verb == "module_live_backup_probe":
+        return isinstance(args, dict) and args.get("phase") in {"first-archive", "second-archive", "after-restart"}
+    if verb == "module_backup_probe":
+        return isinstance(args, dict) and args.get("phase") in {"disabled-archive", "retained-archive", "unchanged"}
+    if verb == "module_signed_probe":
+        return isinstance(args, dict) and args.get("phase") in {"installed", "enabled", "disabled", "invalid", "uninstalled", "retained", "installed-data", "deleted"}
     if verb == "viewer_raster":
         return isinstance(args, dict) and args.get("action") == "clipboard"
     if verb == "file_clipboard":

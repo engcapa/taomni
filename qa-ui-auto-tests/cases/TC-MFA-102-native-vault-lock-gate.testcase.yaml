@@ -59,6 +59,10 @@ steps:
 - assert_text_equals:
     selector: '[data-testid="vault-state-badge"]'
     equals: locked
+- assert_count:
+    selector: '[data-testid="mfa-account-code"], [data-testid="mfa-floating-code"], [data-testid="mfa-qr-secret"], [data-testid="mfa-qr-image"]'
+    equal: 0
+- assert_no_runtime_errors: null
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mfa"]'
@@ -82,6 +86,7 @@ steps:
     selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Lock"] *)'
     equals: 755 224
     timeout_sec: 30
+- assert_no_runtime_errors: null
 - screenshot: mfa-102-unlocked.png
 verification:
   review: reviewed
@@ -115,9 +120,9 @@ verification:
     - 20
     - 22
     - 24
-    - 26
-    - 27
     - 28
+    - 29
+    - 30
     checkpoints:
     - step: 21
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
@@ -125,31 +130,40 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"vault-lock-button\"]"}'
     - step: 25
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"vault-state-badge\"]", "equals": "locked"}}'
-    - step: 29
-      expectation: '{"wait_for": "[data-testid=\"vault-unlock-dialog\"]"}'
-    - step: 30
-      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-reason\"]", "contains": "MFA secrets are encrypted"}}'
+    - step: 26
+      expectation: No account code, floating code, QR image or exported secret remains after native Vault lock.
+    - step: 27
+      expectation: Locking both mounted consumers produces no unhandled runtime error.
     - step: 31
+      expectation: '{"wait_for": "[data-testid=\"vault-unlock-dialog\"]"}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-reason\"]", "contains": "MFA secrets are encrypted"}}'
+    - step: 33
       expectation: '{"assert_count": {"selector": "[data-testid=\"mfa-account-row\"]", "equal": 0}}'
     results:
-    - 29
-    - 30
+    - 26
+    - 27
     - 31
+    - 32
+    - 33
   - id: R3
     requirement: A wrong master password is refused and the right one restores the codes (AC-14).
     actions:
-    - 32
-    - 33
+    - 34
     - 35
-    - 36
+    - 37
+    - 38
     checkpoints:
-    - step: 34
+    - step: 36
       expectation: '{"assert_visible": "[data-testid=\"vault-unlock-error\"]"}'
-    - step: 37
+    - step: 39
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"mfa-account-code\"]:is([data-issuer=\"QA Lock\"] *)", "equals": "755 224", "timeout_sec":
         30}}'
+    - step: 40
+      expectation: Native lock, wrong-password refusal and verified recovery finish without unhandled errors.
     results:
-    - 37
+    - 39
+    - 40
   visual:
   - check: Unlock dialog over the MFA tab is legible.
     method: manual

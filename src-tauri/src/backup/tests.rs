@@ -356,15 +356,14 @@ fn test_scope_flags_include_mfa_with_its_vault_key() {
         );
     }
     let core = resolve_scope_flags("core", None);
-    assert!(!core.lanchat && !core.mail && !core.local_history);
+    assert!(!core.mail && !core.local_history);
     let full = resolve_scope_flags("full", None);
-    assert!(full.lanchat && full.mail && !full.local_history);
+    assert!(full.mail && !full.local_history);
 
     let mfa_only = BackupCustomOptions {
         include_sessions: false,
         include_notes: false,
         include_vault: false,
-        include_lanchat: false,
         include_configs: false,
         include_mail: false,
         include_local_history: false,
@@ -389,61 +388,128 @@ fn test_backup_restore_replaces_mfa_db_and_keeps_safety_copy() {
     use super::engine::{StagedFile, pack_staged_archive};
     use super::restore::{apply_pending_restore, stage_restore_to_dir};
 
-    let dir = tempdir().unwrap();
-    let app_data = dir.path().to_path_buf();
+    use crate::{
+        mfa::store::{self, MfaAccountInput, MfaStore},
+        plugin::test_services::VaultHarness,
+    };
+    use base64::Engine;
+    use zeroize::Zeroizing;
+    let harness = VaultHarness::new();
+    harness.initialize();
+    let app_data = harness.root.path().to_path_buf();
+    let old_generation = crate::runtime::generation::current(&app_data).unwrap();
     let mfa_path = app_data.join("mfa.db");
+    let store = MfaStore::new(mfa_path.clone());
+    super::protected_snapshot_tests::seed_hotp(&harness, &store);
     let count = |path: &std::path::Path| -> i64 {
         Connection::open(path)
             .unwrap()
-            .query_row("SELECT count(*) FROM mfa_accounts", [], |r| r.get(0))
+            .query_row("SELECT count(*) FROM mfa_accounts", [], |row| row.get(0))
             .unwrap()
     };
-    {
-        let conn = Connection::open(&mfa_path).unwrap();
-        crate::mfa::store::init_db(&conn).unwrap();
-        conn.execute(
-            "INSERT INTO mfa_accounts (id, secret_ct, secret_nonce, fingerprint, created_at, updated_at) \
-             VALUES ('a1', x'00', x'00', 'fp', 1, 1)",
-            [],
-        )
-        .unwrap();
-    }
-    let staged = dir.path().join("staged-mfa.db");
+    let staged = app_data.join("staged-mfa.db");
     hot_backup_conn(&Connection::open(&mfa_path).unwrap(), &staged).unwrap();
-    let archive = dir.path().join("mfa.taobak");
-    let staged_files = vec![StagedFile {
-        archive_path: "databases/mfa.db".into(),
-        disk_path: staged,
-    }];
+    let staged_vault = app_data.join("staged-vault.db");
+    harness.vault.backup_to(&staged_vault).unwrap();
+    let archive = app_data.join("mfa.taobak");
+    let staged_files = vec![
+        StagedFile {
+            archive_path: "databases/mfa.db".into(),
+            disk_path: staged,
+        },
+        StagedFile {
+            archive_path: "databases/vault.db".into(),
+            disk_path: staged_vault,
+        },
+    ];
     let (manifest, _) =
         pack_staged_archive(&staged_files, "0.4.29", "core", None, &archive).unwrap();
-    assert!(manifest.files.iter().any(|f| f.path == "databases/mfa.db"));
-
-    Connection::open(&mfa_path)
+    assert!(
+        manifest
+            .files
+            .iter()
+            .any(|file| file.path == "databases/mfa.db")
+    );
+    let encoded = harness
+        .vault
+        .get_fixed(crate::vault::MFA_DATA_KEY_ENTRY_ID)
         .unwrap()
-        .execute(
-            "INSERT INTO mfa_accounts (id, secret_ct, secret_nonce, fingerprint, created_at, updated_at) \
-             VALUES ('a2', x'00', x'00', 'fp2', 2, 2)",
-            [],
-        )
+        .unwrap();
+    let bytes = Zeroizing::new(
+        base64::engine::general_purpose::STANDARD
+            .decode(encoded.as_bytes())
+            .unwrap(),
+    );
+    let key = Zeroizing::new(bytes.as_slice().try_into().unwrap());
+    store
+        .with_conn(|conn| {
+            let input = store::validate_input(&MfaAccountInput {
+                issuer: "Second".into(),
+                account_name: "backup".into(),
+                secret: "JBSWY3DPEHPK3PXP".into(),
+                kind: "hotp".into(),
+                algorithm: "SHA1".into(),
+                digits: 6,
+                period: 30,
+                counter: 1,
+                group: String::new(),
+                note: String::new(),
+            })?;
+            store::insert_account(conn, &key, &input)
+        })
         .unwrap();
     assert_eq!(count(&mfa_path), 2);
-
+    drop(store); // Startup applies before any business DB handle opens.
+    let VaultHarness {
+        registry,
+        services,
+        vault,
+        root: _keep_profile,
+    } = harness;
+    drop(registry);
+    drop(services);
+    drop(vault);
     stage_restore_to_dir(&app_data, &archive, None).unwrap();
     apply_pending_restore(&app_data).unwrap();
+    let restored_generation = crate::runtime::generation::current(&app_data).unwrap();
+    assert_ne!(old_generation, restored_generation);
+    apply_pending_restore(&app_data).unwrap();
+    assert_eq!(
+        crate::runtime::generation::current(&app_data).unwrap(),
+        restored_generation
+    );
     assert_eq!(
         count(&mfa_path),
         1,
         "restored mfa.db holds the backed-up account"
     );
-    let safety = app_data
-        .join("backups")
-        .join("pre_restore_safety_copy")
-        .join("mfa.db");
+    let safety = app_data.join("backups/pre_restore_safety_copy/mfa.db");
     assert_eq!(
         count(&safety),
         2,
         "safety copy keeps the pre-restore mfa.db"
+    );
+    let restored = Connection::open(&mfa_path).unwrap();
+    let restored_vault = crate::vault::Vault::open(&app_data.join("vault.db")).unwrap();
+    restored_vault
+        .unlock(crate::plugin::test_services::PASSWORD)
+        .unwrap();
+    let restored_encoded = restored_vault
+        .get_fixed(crate::vault::MFA_DATA_KEY_ENTRY_ID)
+        .unwrap()
+        .unwrap();
+    let restored_bytes = Zeroizing::new(
+        base64::engine::general_purpose::STANDARD
+            .decode(restored_encoded.as_bytes())
+            .unwrap(),
+    );
+    let restored_key = Zeroizing::new(restored_bytes.as_slice().try_into().unwrap());
+    assert_eq!(*restored_key, *key);
+    let accounts = store::list_sealed(&restored).unwrap();
+    let secret = store::open_secret(&restored_key, &accounts[0]).unwrap();
+    assert_eq!(
+        store::code_for(&accounts[0].account, &secret, 0).code,
+        "755224"
     );
 }
 
@@ -480,7 +546,7 @@ fn complete_mail_snapshot_survives_cleanup_and_restores_from_a_custom_directory(
             .any(|f| f.path.ends_with(".eml.gz"))
     );
     let target_db = restore.path().join("mail-cache").join(format!("{stem}.db"));
-    let cached = crate::mail::coordination::MailDatabase::new(target_db.clone());
+    let cached = crate::mail::coordination::mailbox_database(target_db.clone());
     drop(cached.lock().unwrap());
     crate::mail::coordination::write_redirect(
         &target_db,
@@ -500,7 +566,7 @@ fn complete_mail_snapshot_survives_cleanup_and_restores_from_a_custom_directory(
     // Windows correctly prevents replacing a database held open by this fixture.
     drop(cached);
     apply_pending_restore(restore.path()).unwrap();
-    let cached = crate::mail::coordination::MailDatabase::new(target_db.clone());
+    let cached = crate::mail::coordination::mailbox_database(target_db.clone());
     assert!(!crate::mail::coordination::redirect_path(&target_db).exists());
     assert_eq!(
         storage::read(&cached.lock().unwrap(), "mail-qa", "INBOX", 1)
@@ -536,7 +602,6 @@ fn mail_backup_choice_overrides_core_and_full_without_losing_other_scope_flags()
             && include.configs
             && include.mfa
     );
-    assert!(!include.lanchat);
     let exclude = resolve_scope_flags(
         "full",
         Some(BackupCustomOptions {
@@ -545,7 +610,7 @@ fn mail_backup_choice_overrides_core_and_full_without_losing_other_scope_flags()
         }),
     );
     assert!(!exclude.mail);
-    assert!(exclude.lanchat && exclude.sessions && exclude.mfa);
+    assert!(exclude.sessions && exclude.mfa);
     assert!(resolve_scope_flags("full", None).mail);
     assert!(!resolve_scope_flags("core", None).mail);
 }

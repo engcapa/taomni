@@ -74,6 +74,17 @@ class NativeCleanupTransportTest(TestCase):
                          ("DELETE", "complete", 200))
         self.assertGreaterEqual(request["duration_sec"], 0)
 
+    def test_discarding_an_obsolete_channel_does_not_delete_a_session_or_release_its_owner(self):
+        connection = Mock()
+        self.session._connection = connection
+        self.session.discard_connection()
+        self.session.discard_connection()
+        connection.close.assert_called_once_with()
+        self.assertIsNone(self.session._connection)
+        self.assertEqual(self.session.session_id, "owned-session")
+        self.assertEqual(self.server.requests, [])
+        self.owner.assert_not_called()
+
     def test_stalled_response_headers_fail_without_retry_and_still_release_owner(self):
         self.assert_stalled("stalled_headers", "response_headers")
 
@@ -111,6 +122,18 @@ class NativeCleanupTransportTest(TestCase):
             self.session.close()
         self.assert_released()
         self.assertEqual(self.session.cleanup_diagnostics["delete_request"]["phase"], "decode_response")
+
+    def test_execute_preserves_a_successful_restore_observation_with_null_error(self):
+        state = {"dialog": True, "count": 1, "enabled": True, "visible": True, "staged": False, "error": None}
+        self.session._local_endpoint = None
+        response = Mock()
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=False)
+        response.read.return_value = json.dumps({"value": state}).encode()
+        self.session._open = Mock(return_value=response)
+        self.assertEqual(self.session.execute("return {error: null};"), state)
+        self.assertEqual(self.session.last_request["phase"], "complete")
+        self.assertNotIn("error_type", self.session.last_request)
 
     def test_owner_failure_remains_an_error_after_successful_delete(self):
         self.owner.side_effect = RuntimeError("owned process survives")

@@ -56,10 +56,10 @@ def mail_server_deliver(ctx: StepContext, args: Any) -> None:
     _require_control(ctx)
     prefix = str(args.get("prefix") or "QA")
     delivered = ctx.page.evaluate(  # type: ignore[attr-defined]
-        f"""([folder, count, prefix, thread, list, invite, receipt]) => {_CONTROL}.accounts()
-              .map((id) => {_CONTROL}.deliver(id, folder, count, prefix, thread, list, invite, receipt).length)""",
+        f"""([folder, count, prefix, thread, list, invite, receipt, body]) => {_CONTROL}.accounts()
+              .map((id) => {_CONTROL}.deliver(id, folder, count, prefix, thread, list, invite, receipt, body).length)""",
         [_folder(args), count, prefix, bool(args.get("thread")), args.get("list_unsubscribe") or None,
-         args.get("invite") or None, bool(args.get("read_receipt"))],
+         args.get("invite") or None, bool(args.get("read_receipt")), args.get("body")],
     )
     if not delivered:
         raise StepError("mail_server_deliver: no browser mail account exists yet; open the mail tab first")
@@ -191,7 +191,7 @@ def mail_server_assert_smtp_contains(ctx: StepContext, args: Any) -> None:
 @verb("mail_server_assert_list_matches")
 def mail_server_assert_list_matches(ctx: StepContext, args: Any) -> None:
     """The visible, fully loaded list has exactly the server's message count
-    (and, with ``unread: true``, the server's unseen count)."""
+    and optionally matches the unseen count and flagged UID set."""
     args = args if isinstance(args, dict) else {}
     if ctx.dry_run:
         return
@@ -204,14 +204,17 @@ def mail_server_assert_list_matches(ctx: StepContext, args: Any) -> None:
         last = ctx.page.evaluate(  # type: ignore[attr-defined]
             f"""(folder) => {{
               const ids = {_CONTROL}.accounts();
-              const server = ids.length ? {_CONTROL}.observe(ids[0], folder).server.length : -1;
+              const mailbox = ids.length ? {_CONTROL}.observe(ids[0], folder) : null;
               const el = document.querySelector('[data-testid="mail-message-count"]');
               return {{
-                server,
+                server: mailbox?.server.length ?? -1,
                 shown: el ? Number(el.getAttribute('data-count')) : -1,
                 hasMore: el ? el.getAttribute('data-has-more') : null,
                 unreadRows: document.querySelectorAll('[data-testid="mail-message-row"][data-unread="true"]').length,
                 serverUnread: ids.length ? {_CONTROL}.unseen?.(ids[0], folder) ?? null : null,
+                flaggedUids: Array.from(document.querySelectorAll('[data-testid="mail-message-row"][data-flagged="true"]'),
+                  row => Number(row.dataset.uid)).sort((a, b) => a - b),
+                serverFlagged: mailbox?.flagged ?? null,
               }};
             }}""",
             folder,
@@ -221,6 +224,7 @@ def mail_server_assert_list_matches(ctx: StepContext, args: Any) -> None:
             and last.get("server") == last.get("shown")
             and last.get("hasMore") == "false"
             and (not args.get("unread") or last.get("unreadRows") == last.get("serverUnread"))
+            and (not args.get("flagged") or last.get("flaggedUids") == last.get("serverFlagged"))
         ):
             return
         if isinstance(last, dict) and last.get("hasMore") == "true":
@@ -243,6 +247,15 @@ def mail_storage_assert(ctx: StepContext, args: Any) -> None:
 def mail_performance_probe(ctx: StepContext, args: Any) -> None:
     from ..mail_performance import run
     run(ctx, args)
+
+
+@verb("mail_server_prefetch_paused")
+def mail_server_prefetch_paused(ctx: StepContext, paused: Any) -> None:
+    if not isinstance(paused, bool):
+        raise StepError("mail_server_prefetch_paused expects true or false")
+    if not ctx.dry_run:
+        _require_control(ctx)
+        ctx.page.evaluate(f"(paused) => {_CONTROL}.setPrefetchPaused(paused)", paused)
 
 
 @verb("mail_server_delay_next_read")

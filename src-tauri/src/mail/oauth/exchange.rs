@@ -10,7 +10,6 @@ use crate::mail::oauth_model::OAuthDeviceCodeResponse;
 use crate::mail::oauth_model::OAuthTokenResponse;
 use crate::mail::utilities::non_empty_str;
 use crate::terminal::network::NetworkSettings;
-use lettre::Transport;
 use rusqlite::params;
 use std::time::Duration;
 use std::time::Instant;

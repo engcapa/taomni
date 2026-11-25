@@ -12,13 +12,14 @@ pub async fn sockscap_stop(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SocksCapStatus, String> {
-    if !state.sockscap.has_activation_lock() {
-        let orch = state.sockscap.orch.read().await;
+    let _operation = state.legacy.sockscap.operation.lock().await;
+    if !state.legacy.sockscap.has_activation_lock() {
+        let orch = state.legacy.sockscap.orch.read().await;
         return Ok(orch.status());
     }
     full_teardown(&app, &state, true).await?;
-    state.sockscap.release_activation_lock();
-    let orch = state.sockscap.orch.read().await;
+    state.legacy.sockscap.release_activation_lock();
+    let orch = state.legacy.sockscap.orch.read().await;
     Ok(orch.status())
 }
 
@@ -29,9 +30,10 @@ pub async fn sockscap_stop(
 /// credential are still available. If teardown fails, the exit command returns
 /// an error and the UI keeps the process alive so the user can retry or Recover.
 pub async fn prepare_for_exit(app: &AppHandle, state: State<'_, AppState>) -> Result<(), String> {
-    let owns_capture = state.sockscap.has_activation_lock();
+    let _operation = state.legacy.sockscap.operation.lock().await;
+    let owns_capture = state.legacy.sockscap.has_activation_lock();
     let recovery_required = matches!(
-        state.sockscap.orch.read().await.status().phase,
+        state.legacy.sockscap.orch.read().await.status().phase,
         orchestrator::EnginePhase::RecoveryRequired
     );
     // A dirty journal discovered by boot recovery is durable evidence for the
@@ -51,18 +53,18 @@ pub async fn prepare_for_exit(app: &AppHandle, state: State<'_, AppState>) -> Re
         if let Err(error) = full_teardown(app, &state, true).await {
             errors.push(error);
         }
-    } else if let Some(manager) = state.sockscap.xray() {
+    } else if let Some(manager) = state.legacy.sockscap.xray() {
         // Core probes can exist without an active OS-capture lock.
         manager.shutdown_all().await;
     }
 
-    if let Err(error) = helper::sockscap_helper_stop(state.clone()).await {
+    if let Err(error) = helper::stop_registered(&state.legacy.sockscap.helper).await {
         errors.push(format!("SocksCap helper shutdown failed: {error}"));
     }
 
     if errors.is_empty() {
         if owns_capture {
-            state.sockscap.release_activation_lock();
+            state.legacy.sockscap.release_activation_lock();
         }
         Ok(())
     } else {

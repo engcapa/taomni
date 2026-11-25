@@ -6,6 +6,10 @@ pub(crate) fn configure<'a>(
     app: &AppHandle,
     mut builder: WebviewWindowBuilder<'a, tauri::Wry, AppHandle>,
 ) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
+    let asset_app = app.clone();
+    builder = builder.on_web_resource_request(move |request, response| {
+        crate::plugin::protocol::serve_app_resource(&asset_app, request, response);
+    });
     let qa_webview_override = std::env::var("TAOMNI_QA_WEBVIEW_DIR")
         .ok()
         .map(|raw| std::path::PathBuf::from(raw.trim()))

@@ -16,7 +16,7 @@ impl MessagesClient {
     }
 
     pub async fn resolve_provider(state: &AppState, provider_id: &str) -> Result<Self, String> {
-        let config = state.ai_ctx.read().await.config.clone();
+        let config = state.legacy.ai_ctx.read().await.config.clone();
         let provider = provider_config(&config, provider_id)?;
         provider.validate_custom()?;
         let base_url = provider.base_url.trim_end_matches('/');
@@ -38,6 +38,7 @@ impl MessagesClient {
             return Err("configuration: provider API key is missing".into());
         }
         let api_key = state
+            .core
             .vault
             .resolve(key)
             .map_err(|_| "vault_locked: unlock Vault to use the provider key")?
@@ -46,16 +47,21 @@ impl MessagesClient {
             .ok_or("configuration: provider credential was not found")?;
         let proxy = {
             let db = state
+                .core
                 .db
                 .lock()
                 .map_err(|_| "session database unavailable")?;
             if provider.runtime == "opencode-go" {
-                crate::ai::config::resolve_go_proxy_url(provider, Some(&db), Some(&state.vault))?
+                crate::ai::config::resolve_go_proxy_url(
+                    provider,
+                    Some(&db),
+                    Some(&state.core.vault),
+                )?
             } else {
                 crate::ai::config::resolve_provider_proxy_url(
                     provider,
                     Some(&db),
-                    Some(&state.vault),
+                    Some(&state.core.vault),
                 )?
             }
         };

@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 import platform
 import shutil
-import subprocess
 
 from .deadline import remaining_timeout
 from .steps import StepError
@@ -48,10 +47,11 @@ def validate(ctx, args):
 
 
 def operate(ctx, args, path, click=None):
-    from .folder_dialog import command, linux_dialog
+    from .folder_dialog import linux_dialog, run_picker
     title = args.get("title", TITLES[args["kind"]])
+    step_index = getattr(getattr(ctx, "fixture_context", None), "step_index", 0)
     record = {"kind": args["kind"], "action": args["action"], "path": str(path) if path else None,
-              "title": title, "trigger": args.get("trigger"), "passed": False}
+              "title": title, "trigger": args.get("trigger"), "step_index": step_index, "passed": False}
     try:
         system = platform.system()
         if system == "Linux":
@@ -62,7 +62,7 @@ def operate(ctx, args, path, click=None):
                    "QA_PICKER_KIND": args["kind"], "QA_PICKER_ACTION": args["action"], "QA_PICKER_TITLE": title,
                    "QA_PICKER_PATH": str(path) if path else "", "QA_PICKER_DIRECTORY": str(path.parent) if path else "",
                    "QA_PICKER_FILENAME": path.name if path else "", "QA_PICKER_CANCEL_AFTER_PATH": "1" if args["action"] == "cancel" and path else "",
-                   "QA_PICKER_SCREENSHOT": str(ctx.case_dir / f"native-file-dialog-{getattr(ctx, 'step_index', 0)}.png")}
+                   "QA_PICKER_SCREENSHOT": str(ctx.case_dir / f"native-file-dialog-{step_index}.png")}
             if system == "Windows":
                 runtime = shutil.which("pwsh")
                 if not runtime:
@@ -72,8 +72,9 @@ def operate(ctx, args, path, click=None):
                 argv = ["osascript", "-l", "JavaScript", str(helper / "folder_dialog_macos.js")]
             else:
                 raise StepError("native_file_dialog: unsupported platform")
-            result = subprocess.run(argv, env=env, text=True, capture_output=True, timeout=60)
-            (ctx.case_dir / f"native-file-dialog-{getattr(ctx, 'step_index', 0)}.log").write_text(result.stderr, encoding="utf-8")
+            log = f"native-file-dialog-{step_index}.log"
+            record["helper_log"] = log
+            result = run_picker(argv, env, ctx.case_dir / log)
             if result.returncode:
                 raise StepError("native_file_dialog: " + (result.stderr or result.stdout).strip())
             record.update(json.loads(result.stdout))

@@ -1,0 +1,216 @@
+id: TC-MODULES-022
+title: Official marketplace verifies catalog, downloads and installs a native signed module
+description: Real loopback HTTP serves the exact source-matched official CI package and two signed catalog sequences.
+  UI owns download/review/install/enable/save. Independent observations check SHA-256, unchanged trusted cache, active
+  pointer and durable anti-rollback state; no key or registry result is seeded.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- marketplace
+- lifecycle
+modes:
+- native
+fixtures:
+- reset_db
+- module_signed_archive
+- module_marketplace
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- module_marketplace_probe:
+    phase: source
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-marketplace-checked"]'
+- fill:
+    selector: '[data-testid="module-marketplace-search"]'
+    value: not-a-real-module
+- assert_count:
+    selector: '[data-testid="module-marketplace-card"]'
+    equal: 0
+- fill:
+    selector: '[data-testid="module-marketplace-search"]'
+    value: Hello
+- wait_for: '[data-testid="module-marketplace-card"]'
+- click: '[data-testid="module-marketplace-download"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: 0.1.0
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: plugins/hello-plugin/data/
+- click: '[data-testid="confirm-dialog-cancel"]'
+- module_marketplace_probe:
+    phase: no-download
+- click: '[data-testid="module-marketplace-download"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-download-task"][data-phase="completed"]'
+- module_marketplace_probe:
+    phase: downloaded
+- click: '[data-testid="module-marketplace-review"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_count:
+    selector: '[data-testid="module-action-enable-hello-plugin"]'
+    equal: 0
+- click: '[data-testid="module-marketplace-review"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-marketplace-current"]'
+- module_marketplace_probe:
+    phase: installed
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-disable-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- wait_for: '[data-testid="hello-plugin-empty"]'
+- fill:
+    selector: '[data-testid="hello-plugin-value"]'
+    value: marketplace-saved-value
+- click: '[data-testid="hello-plugin-save"]'
+- assert_text:
+    selector: '[data-testid="hello-plugin-values"]'
+    contains: marketplace-saved-value
+- click: '[data-testid="tab-item"][data-tab-type="settings"]'
+- click: '[data-testid="module-marketplace-source-toggle"]'
+- fill:
+    selector: '[data-testid="module-marketplace-source"]'
+    value: ${fixture.module_marketplace_bad_url}
+- click: '[data-testid="module-marketplace-refresh"]'
+- wait_for: '[data-testid="module-marketplace-error"]'
+- wait_for: '[data-testid="module-marketplace-current"]'
+- fill:
+    selector: '[data-testid="module-marketplace-source"]'
+    value: ${fixture.module_marketplace_older_url}
+- click: '[data-testid="module-marketplace-refresh"]'
+- wait_for: '[data-testid="module-marketplace-error"]'
+- wait_for: 'xpath=//*[@data-testid="module-marketplace-error"][contains(., "older than the highest seen")]'
+- module_marketplace_probe:
+    phase: rejected
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: 'xpath=//*[@data-testid="module-marketplace-error"][contains(., "older than the highest seen")]'
+- click: '[data-testid="module-marketplace-source-toggle"]'
+- fill:
+    selector: '[data-testid="module-marketplace-source"]'
+    value: ${fixture.module_marketplace_url}
+- click: '[data-testid="module-marketplace-refresh"]'
+- wait_for: '[data-testid="module-marketplace-current"]'
+- assert_no_runtime_errors: null
+- screenshot: module-marketplace-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Search the signed catalog and cancel download confirmation without creating a transfer or activating
+      a module.
+    actions:
+    - 9
+    - 11
+    - 13
+    - 17
+    checkpoints:
+    - step: 10
+      expectation: Search hides nonmatching entries.
+    - step: 12
+      expectation: The official matching entry returns.
+    - step: 15
+      expectation: Confirmation pins the selected version.
+    - step: 16
+      expectation: The module data location is shown.
+    - step: 18
+      expectation: Cancelling confirmation produces no download or install.
+    results:
+    - 10
+    - 12
+    - 15
+    - 16
+    - 18
+  - id: R2
+    requirement: Download once, inspect the verified package, cancel review, then install explicitly through the signed
+      native boundary.
+    actions:
+    - 19
+    - 20
+    - 23
+    - 24
+    - 26
+    - 27
+    checkpoints:
+    - step: 21
+      expectation: The transfer completes through the production download manager.
+    - step: 22
+      expectation: One real signed artifact matches the expected SHA-256 and trusted catalog bytes.
+    - step: 25
+      expectation: Cancelling installation review does not install the downloaded module.
+    - step: 28
+      expectation: Only the actual installed registry result shows the version as current.
+    - step: 29
+      expectation: The real active pointer and installed manifest match the verified artifact.
+    results:
+    - 21
+    - 22
+    - 25
+    - 28
+    - 29
+  - id: R3
+    requirement: Preserve a working module and saved data while rejecting a tampered feed and older sequence, retaining
+      recovery across renderer reload.
+    actions:
+    - 30
+    - 32
+    - 34
+    - 35
+    - 37
+    - 38
+    - 39
+    - 40
+    - 43
+    - 44
+    - 48
+    - 53
+    - 54
+    - 55
+    checkpoints:
+    - step: 36
+      expectation: The enabled module performs a real save/read interaction.
+    - step: 41
+      expectation: Tampered signed bytes produce an explicit error.
+    - step: 42
+      expectation: Feed failure does not remove the installed version.
+    - step: 46
+      expectation: An authenticated older catalog is rejected.
+    - step: 47
+      expectation: Both rejected feeds leave the working cache, sequence 42 and active version unchanged.
+    - step: 52
+      expectation: The persisted source and rollback protection remain effective after renderer reload.
+    - step: 56
+      expectation: Restoring the valid source recovers the installed module card.
+    - step: 57
+      expectation: The entire workflow has no unhandled renderer errors.
+    results:
+    - 36
+    - 41
+    - 42
+    - 46
+    - 47
+    - 52
+    - 56
+    - 57
+  native:
+  - check: Catalog signature, real package download, installed pointer and anti-rollback protection.
+    method: external
+    reason: The actual application pinned verifier and isolated files are observed independently.
+  visual:
+  - check: Catalog cards, permission confirmations and error recovery are readable.
+    method: manual
+    reason: Retained screenshots support visual review.

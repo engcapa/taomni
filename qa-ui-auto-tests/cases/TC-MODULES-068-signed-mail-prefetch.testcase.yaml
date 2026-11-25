@@ -1,0 +1,93 @@
+id: TC-MODULES-068
+title: Signed Mail warms recent bodies on one background IMAP connection
+description: Install the signed Mail package, sync newly delivered headers and verify native cached body reads before and after reopening the account.
+covers: [F-Modules-1, F-MAIL-3]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, mail_server, module_signed_mail_archive]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]'
+- mail_server_assert_list_matches: {timeout_sec: 35}
+- wait_for: {selector: '[data-testid="mail-body-warming-progress"]', state: detached, timeout_sec: 35}
+- mail_server_deliver: {count: 4, prefix: Signed prefetch}
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- wait_for: '[data-testid="mail-message-row"][data-subject="Signed prefetch 0004"]'
+- assert_signed_mail_host: {phase: imap-prefetch, subject_prefix: Signed prefetch, count: 4}
+- wait_for: {selector: '[data-testid="mail-body-warming-progress"]', state: detached, timeout_sec: 35}
+- click: '[data-testid="mail-message-row"][data-subject="Signed prefetch 0001"]'
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent ||
+       document.querySelector('.taomni-mail-reader-text')?.textContent || '').includes('Body of Signed prefetch 0001')
+    expect_truthy: true
+    timeout_sec: 20
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: Loaded body from cache}
+- wait_for: '[data-testid="mail-message-row"][data-subject="Signed prefetch 0001"][data-unread="false"]'
+- assert_attribute: {selector: '[data-testid="mail-message-row"][data-subject="Signed prefetch 0004"]', name: data-unread, equals: 'true'}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="mail-client-tab"]', state: detached}
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"][data-active="true"]'
+- click: '[data-testid="mail-message-row"][data-subject="Signed prefetch 0004"]'
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent ||
+       document.querySelector('.taomni-mail-reader-text')?.textContent || '').includes('Body of Signed prefetch 0004')
+    expect_truthy: true
+    timeout_sec: 20
+- assert_text: {selector: '[data-testid="mail-client-tab"][data-active="true"]', contains: Loaded body from cache}
+- assert_signed_mail_host: imap-cached-body
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-mail"]'
+- wait_for: '[data-testid="module-action-enable-mail"]'
+- assert_signed_mail_host: disabled
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: warmed-bodies
+    requirement: A foreground header refresh uses a bounded background session to fill the native body cache.
+    actions: [8, 10, 16, 20, 21, 25, 31, 34, 36, 42]
+    checkpoints:
+    - {step: 12, expectation: The verified Mail package supplied the installed binary and renderer.}
+    - {step: 22, expectation: The synchronized headers are available in the account list.}
+    - {step: 23, expectation: The signed host fetches four bodies over one IMAP connection and commits them to SQLite without marking them read.}
+    - {step: 26, expectation: Opening the oldest warmed message displays its matching body.}
+    - {step: 27, expectation: The reader reports SQLite as the source without downloading the body again.}
+    - {step: 28, expectation: Opening the cached message marks it as read.}
+    - {step: 29, expectation: Warming an unopened body leaves its header unread.}
+    - {step: 32, expectation: The original reader instance closes.}
+    - {step: 37, expectation: The reopened account reads the newest warmed body.}
+    - {step: 38, expectation: The new reader finds the persisted body in SQLite.}
+    - {step: 39, expectation: The signed host declares the cached-body command and IMAP sees no further body fetch for the reopened message.}
+    - {step: 44, expectation: Disabling the module releases the writer lease.}
+    - {step: 45, expectation: The account and module transitions produce no runtime errors.}
+    results: [12, 22, 23, 26, 27, 28, 29, 32, 37, 38, 39, 44, 45]
+  visual:
+  - check: New message headers and the cached reader are visible in the signed account pane.
+    method: automated
+    reason: The case checks the active list and the reader text for the selected subject.
+  native:
+  - check: Signed app module uses a real IMAP socket and a native SQLite cache.
+    method: automated
+    reason: The protocol and read-only SQLite observations bind the fetched and stored bodies to the signed test package and app checkout.

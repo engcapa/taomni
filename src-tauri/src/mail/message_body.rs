@@ -1,0 +1,226 @@
+//! Read cached bodies or fetch and decode them through the signed Mail host.
+
+use taomni_mail_api::{body_cache::ImapBodyCacheSource, cache_query::CacheQuery};
+
+use super::*;
+
+#[tauri::command]
+pub async fn mail_get_message_body(
+    config: MailAccountConfig,
+    folder: String,
+    uid: u32,
+    state: State<'_, AppState>,
+) -> Result<MailMessageBody, String> {
+    get_message_body(config, folder, uid, false, state).await
+}
+
+/// Warm the disk cache without transferring unused HTML/CID data into the
+/// WebView or updating the reader for every prefetched message.
+#[tauri::command]
+pub async fn mail_prefetch_message_body(
+    config: MailAccountConfig,
+    folder: String,
+    uid: Option<u32>,
+    uids: Option<Vec<u32>>,
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    use taomni_mail_api::imap_exchange::MAX_PREFETCH_BODIES;
+
+    let mut uids = uids.unwrap_or_else(|| uid.into_iter().collect());
+    if uids.is_empty() || uids.len() > MAX_PREFETCH_BODIES || uids.contains(&0) {
+        return Err("Invalid Mail body prefetch UIDs".into());
+    }
+    if !config.cache.enabled {
+        return Ok(true);
+    }
+    let mut seen = HashSet::new();
+    uids.retain(|uid| seen.insert(*uid));
+
+    if pop3_store::is_hosted(&state, &config.session_id).await? {
+        return Ok(true);
+    }
+    if !pop3::is_pop3(&config) && module_host::prefetches_imap_bodies(&state.plugins) {
+        module_host::prefetch_imap_bodies(&state, config, folder, uids).await?;
+        return Ok(true);
+    }
+
+    let mut result = Ok(());
+    for uid in uids {
+        let saved_folder = folder.clone();
+        let saved = with_mail_db_async(&state, &config.session_id, move |db, account| {
+            storage::lookup(db, account, &saved_folder, uid)
+                .map(|entry| entry.is_some())
+                .map_err(storage::as_sql_error)
+        })
+        .await?;
+        // A complete original already supplies offline reading. Background
+        // warming must not repeatedly decompress and parse its attachments.
+        if saved {
+            continue;
+        }
+        if let Err(error) =
+            get_message_body(config.clone(), folder.clone(), uid, true, state.clone()).await
+        {
+            result = Err(error);
+        }
+    }
+    result.map(|()| true)
+}
+
+async fn get_message_body(
+    config: MailAccountConfig,
+    folder: String,
+    uid: u32,
+    background: bool,
+    state: State<'_, AppState>,
+) -> Result<MailMessageBody, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::get_body(&state, &config.session_id, folder.trim(), uid).await;
+    }
+    let account_id = config.session_id.clone();
+    if let Some(body) = cached_imap_body(&state, &config, &folder, uid).await? {
+        return Ok(body);
+    }
+
+    let account = resolve_config(&state, config)?;
+    let cache_enabled = account.config.cache.enabled;
+    let publish_to_host = module_host::publishes_body_cache(&state.plugins);
+    let observed_at = sync::now_ms();
+    // Older Mail packages keep their pooled background connection.
+    let mut message = if module_host::fetches_imap_body(&state.plugins)
+        && (!background || !cfg!(any(test, feature = "legacy-mail-imap")))
+    {
+        fetch_host_body(state.plugins.clone(), account, folder, uid).await?
+    } else {
+        legacy_imap!({ fetch_legacy_body(&state, account, folder, uid, background).await })?
+    };
+
+    if cache_enabled && publish_to_host {
+        let cache = state.mail_db(&account_id)?;
+        (_, message) = module_host::publish_body_cache(
+            state.plugins.clone(),
+            cache,
+            account_id,
+            message,
+            observed_at,
+            ImapBodyCacheSource::Opened,
+        )
+        .await?;
+    } else if cache_enabled {
+        message = with_mail_db_async(&state, &account_id, move |db, _| {
+            upsert_message_at(db, &message, Some(observed_at))?;
+            Ok(message)
+        })
+        .await?;
+    }
+
+    Ok(cached_to_body(message, "remote"))
+}
+
+async fn cached_imap_body(
+    state: &State<'_, AppState>,
+    config: &MailAccountConfig,
+    folder: &str,
+    uid: u32,
+) -> Result<Option<MailMessageBody>, String> {
+    let account_id = &config.session_id;
+    let cache_enabled = config.cache.enabled;
+    if module_host::reads_imap_cached_body(&state.plugins) {
+        let body: Option<MailMessageBody> = module_host::query_account_cache(
+            state.plugins.clone(),
+            state.mail_db(account_id)?,
+            account_id.clone(),
+            CacheQuery::Body {
+                folder: folder.to_owned(),
+                uid,
+                cache_enabled,
+            },
+        )
+        .await?;
+        if body.as_ref().is_some_and(|body| {
+            body.account_id != *account_id
+                || body.folder != folder
+                || body.uid != uid
+                || !(body.source == "archive" || (cache_enabled && body.source == "cache"))
+        }) {
+            return Err("Mail module returned another cached message".into());
+        }
+        return Ok(body);
+    }
+
+    // Hosts predating the cache query accept a verified original for decoding.
+    let cache_folder = folder.to_owned();
+    let (original, cached) = with_mail_db_async(state, account_id, move |db, account| {
+        let original =
+            storage::open(db, account, &cache_folder, uid).map_err(storage::as_sql_error)?;
+        let cached = if original.is_none() && cache_enabled {
+            get_cached_body(db, account, &cache_folder, uid)?
+        } else {
+            None
+        };
+        Ok((original, cached))
+    })
+    .await?;
+    if let Some(original) = original {
+        return module_host::decode_archive_original(
+            state.plugins.clone(),
+            original,
+            account_id.clone(),
+            folder.to_owned(),
+            uid,
+        )
+        .await
+        .map(Some);
+    }
+    Ok(cached)
+}
+
+async fn fetch_host_body(
+    registry: Arc<crate::plugin::PluginRegistry>,
+    account: ResolvedMailAccount,
+    folder: String,
+    uid: u32,
+) -> Result<MailMessageCached, String> {
+    let first = module_host::fetch_imap_body(registry.clone(), &account, &folder, uid).await;
+    let (message, original) = if first
+        .as_ref()
+        .is_err_and(|error| is_imap_transport_error(error))
+    {
+        module_host::fetch_imap_body(registry, &account, &folder, uid).await?
+    } else {
+        first?
+    };
+    if let Some(original) = original {
+        tokio::task::spawn_blocking(move || save_raw_message(&account, &folder, uid, &original))
+            .await
+            .map_err(|error| format!("mail original save task failed: {error}"))??;
+    }
+    Ok(message)
+}
+
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+async fn fetch_legacy_body(
+    state: &State<'_, AppState>,
+    account: ResolvedMailAccount,
+    folder: String,
+    uid: u32,
+    background: bool,
+) -> Result<MailMessageCached, String> {
+    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
+    tokio::task::spawn_blocking(move || {
+        with_imap_session(
+            &pool,
+            &account,
+            &handle,
+            if background {
+                ImapSessionOpts::background()
+            } else {
+                ImapSessionOpts::default()
+            },
+            |imap| imap.fetch_body(&account, &folder, uid),
+        )
+    })
+    .await
+    .map_err(|e| format!("mail body task failed: {e}"))?
+}

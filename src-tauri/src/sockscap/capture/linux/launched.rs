@@ -17,6 +17,8 @@ mod preparation;
 
 mod ingress;
 
+mod package;
+
 #[cfg(test)]
 mod tests;
 
@@ -24,4 +26,10 @@ pub use model::{LaunchedAppInfo, LaunchedAppPhase};
 
 pub use lifetime::LaunchedCaptureHandle;
 
+pub(crate) use package::prepare as prepare_launcher;
+
+#[cfg(test)]
+pub(in crate::sockscap::capture::linux) use preparation::materialize_launcher;
 pub use preparation::preflight;
+#[cfg(test)]
+pub(in crate::sockscap::capture::linux) use preparation::test_launcher_bytes;

@@ -82,13 +82,13 @@ pub async fn deepseek_app_execute_action(
         return Err("confirmation: action requires explicit approval".into());
     }
     if matches!(
-        state.vault.status()?.state,
+        state.core.vault.status()?.state,
         crate::vault::VaultStateKind::Locked
     ) {
         return Err("vault_locked: unlock Vault before executing actions".into());
     }
     let saved = {
-        let db = state.db.lock().map_err(|_| "database unavailable")?;
+        let db = state.core.db.lock().map_err(|_| "database unavailable")?;
         store::last_request(&db, &request.thread_id)?
     };
     let level = super::action_authorization::authorize(&mut request.action, &saved)?;
@@ -100,7 +100,7 @@ pub async fn deepseek_app_execute_action(
     // result and undo record to the originating thread before looking up caches.
     let id = format!("{}:{}", request.thread_id, request.action.id);
     {
-        let db = state.db.lock().map_err(|_| "database unavailable")?;
+        let db = state.core.db.lock().map_err(|_| "database unavailable")?;
         init_undo(&db)?;
         let prior: Option<String> = db
             .query_row(
@@ -123,14 +123,14 @@ pub async fn deepseek_app_execute_action(
     let mut result = match request.action.kind {
         ActionKind::WriteFile => {
             let (path, old, hash) = write_file(&request.action)?;
-            let db = state.db.lock().map_err(|_| "database unavailable")?;
+            let db = state.core.db.lock().map_err(|_| "database unavailable")?;
             init_undo(&db)?;
             db.execute("INSERT OR REPLACE INTO tao_action_undo(action_id,kind,path,old_content,new_hash,created_at) VALUES(?1,'file',?2,?3,?4,?5)", rusqlite::params![id,path.to_string_lossy(),old,hash,store::now()]).map_err(|e| e.to_string())?;
             Ok(output_value(&id, "completed", started, String::new(), Some(0)))
         }
         ActionKind::WriteNote => write_note(&request.action, &state)
             .map(|note| {
-                if let Ok(db) = state.db.lock() {
+                if let Ok(db) = state.core.db.lock() {
                     let _ = init_undo(&db);
                     let _ = db.execute("INSERT OR REPLACE INTO tao_action_undo(action_id,kind,note_id,created_at) VALUES(?1,'note',?2,?3)", rusqlite::params![id,note,store::now()]);
                 }
@@ -145,7 +145,7 @@ pub async fn deepseek_app_execute_action(
     drop(run);
     if let Ok(ref mut value) = result {
         value["actionId"] = json!(id);
-        if let Ok(db) = state.db.lock() {
+        if let Ok(db) = state.core.db.lock() {
             refresh_undo_availability(&db, &id, value);
             db.execute("INSERT OR REPLACE INTO tao_action_results(action_id,status,result,created_at) VALUES(?1,?2,?3,?4)", rusqlite::params![id, value["status"].as_str().unwrap_or("failed"), value.to_string(), store::now()]).map_err(|e| e.to_string())?;
         }
@@ -162,7 +162,7 @@ pub fn deepseek_app_undo_action(
     if !confirmed {
         return Err("confirmation: undo requires explicit approval".into());
     }
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     init_undo(&db)?;
     let row: (
         String,
@@ -194,6 +194,7 @@ pub fn deepseek_app_undo_action(
         }
         "note" => {
             let notes = state
+                .core
                 .notes_db
                 .lock()
                 .map_err(|_| "notes database unavailable")?;
@@ -268,6 +269,7 @@ fn write_note(action: &ActionProposal, state: &AppState) -> Result<String, Strin
         .and_then(Value::as_str)
         .unwrap_or(&action.title);
     let db = state
+        .core
         .notes_db
         .lock()
         .map_err(|_| "notes database unavailable")?;
@@ -301,7 +303,7 @@ async fn run_command(
         .as_ref()
         .and_then(|t| t.cwd.as_deref())
         .unwrap_or(root.to_str().unwrap_or("."));
-    let dir = state.agent.captures.thread_dir(&request.thread_id);
+    let dir = state.core.agent.captures.thread_dir(&request.thread_id);
     tokio::fs::create_dir_all(&dir)
         .await
         .map_err(|_| "action: capture directory unavailable")?;

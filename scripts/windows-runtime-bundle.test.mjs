@@ -12,13 +12,9 @@ const dlls = ["sherpa-onnx-c-api.dll", "sherpa-onnx-cxx-api.dll", "onnxruntime.d
 const native = process.platform === "win32" && makensis && existsSync(makensis);
 if (process.env.TAOMNI_REQUIRE_NSIS_TESTS === "1" && !native) throw new Error("Native NSIS tests require makensis on Windows");
 
-function fixture(t, missing, forwardSlashes = false) {
+function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), "taomni nsis runtime "));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const binary = join(root, "custom target/x86_64-pc-windows-msvc/debug/taomni.exe");
-  mkdirSync(dirname(binary), { recursive: true });
-  writeFileSync(binary, "fixture executable");
-  for (const name of dlls) if (name !== missing) writeFileSync(join(dirname(binary), name), `new ${name}`);
   const destination = join(root, "install");
   const installer = join(root, "setup.exe");
   const script = join(root, "test.nsi");
@@ -32,8 +28,6 @@ InstallDir "${destination}"
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
 Var UpdateMode
-!define MAINBINARYNAME "taomni"
-!define MAINBINARYSRCPATH "${forwardSlashes ? binary.replaceAll("\\", "/") : binary}"
 !include "${hooks}"
 Section
   ClearErrors
@@ -58,6 +52,7 @@ SectionEnd
 
 test("only a restarting update marks the installer child with its actual PID", { skip: !native }, (t) => {
   const f = fixture(t);
+  mkdirSync(f.destination, { recursive: true });
   const compiled = f.compile();
   assert.equal(compiled.status, 0, compiled.stdout + compiled.stderr);
   for (const options of [[], ["/R"], ["/UPDATE"], ["/UPDATE", "/R"]]) {
@@ -68,35 +63,25 @@ test("only a restarting update marks the installer child with its actual PID", {
   }
 });
 
-for (const forwardSlashes of [false, true]) {
-  test(`real NSIS installs and overwrites all runtime DLLs (forward slashes: ${forwardSlashes})`, { skip: !native }, (t) => {
-    const f = fixture(t, undefined, forwardSlashes);
-    const result = f.compile();
-    assert.equal(result.status, 0, result.stdout + result.stderr);
-    for (const upgrade of [false, true]) {
-      if (upgrade) for (const name of dlls) writeFileSync(join(f.destination, name), `old ${name}`);
-      const install = spawnSync(f.installer, ["/S"], { timeout: 30000 });
-      assert.equal(install.status, 0, String(install.error));
-      for (const name of dlls) assert.equal(readFileSync(join(f.destination, name), "utf8"), `new ${name}`);
-    }
-    writeFileSync(join(f.destination, "user-file.txt"), "keep me");
-    // NSIS requires _?= to be the unquoted remainder of the command line.
-    const uninstall = spawnSync(join(f.destination, "uninstall.exe"), ["/S", `_?=${f.destination}`], { timeout: 30000, windowsVerbatimArguments: true });
-    assert.equal(uninstall.status, 0, String(uninstall.error));
-    for (const name of dlls) assert(!existsSync(join(f.destination, name)));
-    assert.equal(readFileSync(join(f.destination, "user-file.txt"), "utf8"), "keep me");
-  });
-}
+test("Windows core setup cleans up the old Local Voice libraries", { skip: !native }, (t) => {
+  const f = fixture(t);
+  const result = f.compile();
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  mkdirSync(f.destination, { recursive: true });
+  for (const name of dlls) writeFileSync(join(f.destination, name), `old ${name}`);
+  writeFileSync(join(f.destination, "user-file.txt"), "keep me");
+  const install = spawnSync(f.installer, ["/S"], { timeout: 30000 });
+  assert.equal(install.status, 0, String(install.error));
+  for (const name of dlls) assert(!existsSync(join(f.destination, name)));
+  assert.equal(readFileSync(join(f.destination, "user-file.txt"), "utf8"), "keep me");
 
-for (const missing of dlls) {
-  test(`NSIS compilation rejects missing ${missing}`, { skip: !native }, (t) => {
-    const f = fixture(t, missing);
-    const result = f.compile();
-    assert.notEqual(result.status, 0);
-    assert.match(result.stdout + result.stderr, new RegExp(missing.replaceAll(".", "\\.")));
-    assert(!existsSync(f.installer));
-  });
-}
+  // Verify uninstall still clears a holdover from a previous installation.
+  for (const name of dlls) writeFileSync(join(f.destination, name), `old ${name}`);
+  const uninstall = spawnSync(join(f.destination, "uninstall.exe"), ["/S", `_?=${f.destination}`], { timeout: 30000, windowsVerbatimArguments: true });
+  assert.equal(uninstall.status, 0, String(uninstall.error));
+  for (const name of dlls) assert(!existsSync(join(f.destination, name)));
+  assert.equal(readFileSync(join(f.destination, "user-file.txt"), "utf8"), "keep me");
+});
 
 test("release verifies both Windows installer payloads before artifact collection", () => {
   const workflow = readFileSync(resolve(".github/workflows/release.yml"), "utf8");

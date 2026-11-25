@@ -30,6 +30,10 @@ on:
         description: Release package targets to verify (all or comma-separated)
         type: string
         default: all
+      first_release:
+        description: Verify the pinned monolith upgrade using the signed module roster from the candidate build
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -67,6 +71,7 @@ jobs:
           PACKAGE_RUN: ${{ inputs.package_run }}
           PACKAGE_VERSION: ${{ inputs.package_version }}
           PACKAGE_TARGETS: ${{ inputs.package_targets }}
+          FIRST_RELEASE: ${{ inputs.first_release }}
         run: python .github/scripts/modular_gate_runs.py
       - uses: actions/upload-artifact@v4
         if: always()
@@ -102,20 +107,134 @@ jobs:
           git rev-parse HEAD > gate-inventory/source-sha.txt
           rustc --version > gate-inventory/rustc-version.txt
           for target in x86_64-unknown-linux-gnu x86_64-pc-windows-msvc aarch64-apple-darwin x86_64-apple-darwin; do
-            cargo tree --manifest-path src-tauri/Cargo.toml --locked -p taomni --edges normal,build \
+            cargo tree --manifest-path src-tauri/Cargo.toml --locked -p taomni --edges normal,build --prefix none \
               --target "$target" > "gate-inventory/cargo-tree-$target.txt"
+            cargo tree --manifest-path src-tauri/Cargo.toml --locked -p taomni --edges normal,build --prefix none \
+              --target "$target" --invert taomni-mail-storage --format '{p} {f}' > "gate-inventory/mail-storage-features-$target.txt"
           done
           git ls-files src-tauri/resources > gate-inventory/resource-sources.txt
           git ls-files src-tauri/tauri.conf.json 'src-tauri/tauri.*.conf.json' > gate-inventory/bundle-configs.txt
-          git grep -n -E -- '"--(headless|vnc-special-key-hook|sockscap-redirector-bridge)"' \
-            -- src-tauri/src src-tauri/plugins > gate-inventory/entrypoints.txt || test "$?" -eq 1
+          git grep -n -E -- '"--(headless|ssh-stdio-forward|screenshot-scroll-input|vnc-special-key-hook|sockscap-redirector-bridge)"|REDIRECTOR_BRIDGE_ARG|taomni-vnc-key-helper\.exe' \
+            -- src-tauri/src src-tauri/plugins src-tauri/crates/taomni-sockscap-api > gate-inventory/entrypoints.txt
+      - name: Check that the default core dependency graph excludes remote desktop and Screenshot modules
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          core_entry = Path("src-tauri/src/main.rs").read_text()
+          for argument in ("--headless", "--ssh-stdio-forward", "--screenshot-scroll-input"):
+              assert f'"{argument}"' in core_entry, f"Missing core entrypoint {argument}"
+          for entry in ("--vnc-special-key-hook", "--sockscap-redirector-bridge", "REDIRECTOR_BRIDGE_ARG"):
+              assert entry not in core_entry, f"The core dispatches the module entrypoint {entry}"
+          assert "REDIRECTOR_BRIDGE_ARG" in Path("src-tauri/plugins/sockscap/src/main.rs").read_text()
+
+          for target in ("x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc",
+                         "aarch64-apple-darwin", "x86_64-apple-darwin"):
+              tree = Path(f"gate-inventory/cargo-tree-{target}.txt").read_text()
+              packages = {line.split()[0] for line in tree.splitlines() if line.strip()}
+              assert {"taomni-vnc-api", "taomni-rdp-client-api"} <= packages, f"{target}: missing shared client types"
+              assert not packages.intersection({
+                  "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-vnc-key-helper",
+                  "taomni-plugin-vnc-client", "taomni-rdp-client-engine", "taomni-plugin-rdp-client",
+                  "taomni-rdp-common", "ironrdp", "ironrdp-core", "ironrdp-pdu", "ironrdp-connector",
+                  "ironrdp-session", "ironrdp-tokio", "ironrdp-bulk", "ironrdp-async", "rcgen",
+              }), f"{target}: the core still depends on a remote desktop client implementation"
+              assert "taomni-plugin-vnc-server" not in packages, f"{target}: the core depends on the VNC daemon host"
+              assert not packages.intersection({"taomni-plugin-servers", "taomni-local-servers-engine"}), f"{target}: the core depends on the Local servers engine"
+              assert "taomni-sockscap-api" in packages, f"{target}: missing the shared SocksCap contract"
+              assert not packages.intersection({"taomni-plugin-sockscap", "taomni-sockscap-tools", "taomni-sockscap-xray"}), f"{target}: the core depends on the SocksCap host, tools or Xray manager"
+              assert not packages.intersection({
+                  "taomni-plugin-ai-voice-local", "taomni-local-voice-engine",
+                  "whisper-rs", "whisper-rs-sys", "sherpa-onnx", "sherpa-onnx-sys", "llama-cpp-2",
+              }), f"{target}: the core depends on local voice or model inference"
+              assert not packages.intersection({
+                  "taomni-plugin-rdp-server", "taomni-rdp-server-engine", "ironrdp-server",
+              }), f"{target}: the core depends on the RDP Server engine"
+              assert "taomni-screenshot-api" in packages, f"{target}: missing shared screenshot contract"
+              assert not packages.intersection({
+                  "taomni-plugin-screenshot", "taomni-screenshot-ocr", "taomni-screenshot-recording",
+              }), f"{target}: the core still depends on a screenshot module engine"
+              assert "taomni-mfa-api" in packages, f"{target}: missing the shared MFA contract"
+              assert not packages.intersection({"taomni-mfa-engine", "taomni-plugin-mfa", "quircs"}), f"{target}: the core depends on the MFA engine or decoder"
+              assert {"taomni-mail-api", "taomni-mail-storage"} <= packages, f"{target}: missing the Mail contract or profile compatibility"
+              assert not packages.intersection({"imap", "imap-proto", "lettre", "mail-parser", "taomni-mail-engine", "taomni-plugin-mail"}), f"{target}: the core includes the Mail protocol engine, MIME codec or signed host"
+              storage = Path(f"gate-inventory/mail-storage-features-{target}.txt").read_text()
+              assert "mime-parse" not in storage and "mime-compose" not in storage, f"{target}: the core enables Mail MIME codecs"
+          resources = json.loads(Path("src-tauri/tauri.windows.conf.json").read_text())["bundle"]["resources"]
+          assert all("resources/vnc/" not in entry for entry in resources), "Core declares VNC module resources"
+          macos = json.loads(Path("src-tauri/tauri.macos.conf.json").read_text())
+          assert all("sockscap" not in entry for entry in macos["bundle"]["resources"]), "Core declares macOS SocksCap module resources"
+          assert all("sockscap" not in command for command in macos["build"].values()), "Core stages a macOS SocksCap helper"
+          build_script = Path("src-tauri/build.rs").read_text()
+          assert "compile_linux_sockscap_launcher" not in build_script and "taomni-sockscap-trace-launcher" not in build_script, "Core build.rs embeds the SocksCap Linux launcher"
+          assert not Path("src-tauri/src/sockscap/capture/linux/trace_launcher.c").exists(), "Core retains SocksCap Linux launcher source"
+          PY
       - name: Build the release frontend and record actual chunk hashes
+        env:
+          TAURI_ENV_PLATFORM: linux
         shell: bash
         run: |
           pnpm install --frozen-lockfile
           pnpm run build --manifest
           cp dist/.vite/manifest.json gate-inventory/vite-manifest.json
           find dist -type f -print0 | sort -z | xargs -0 -r sha256sum > gate-inventory/dist-sha256.txt
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { existsSync, readFileSync } from 'node:fs';
+          const manifest = JSON.parse(readFileSync('gate-inventory/vite-manifest.json', 'utf8'));
+          assert(!existsSync('dist/screenshot-ocr'), 'Core contains module OCR language and worker assets');
+          assert(!Object.keys(manifest).some((path) => path.includes('plugins/screenshot/renderer/')), 'Core contains the Screenshot OCR renderer');
+          for (const path of Object.keys(manifest)) {
+            assert(!/plugins\/(vnc|rdp)-client\/renderer\//.test(path), `Bundled remote desktop frontend ${path}`);
+            assert(!path.includes('plugins/mfa/renderer/'), `Bundled MFA frontend ${path}`);
+            assert(!path.includes('plugins/mail/renderer/'), `Bundled Mail frontend ${path}`);
+            assert(!/plugins\/(?:rdp-server|vnc-server|servers)\/renderer\//.test(path), `Bundled server settings frontend ${path}`);
+          }
+          for (const [source, asset] of Object.entries(manifest)) {
+            assert(!source.includes('plugins/sockscap/renderer/'), `Bundled SocksCap renderer ${source}`);
+            if (!/\.(js|css)$/.test(asset.file)) continue;
+            const bytes = readFileSync(`dist/${asset.file}`, 'utf8');
+            assert(!bytes.includes('taomni.sockscap.macosSetupGuide.v1') && !bytes.includes('.sockscap-panel'),
+              `Bundled SocksCap panel or stylesheet in ${asset.file}`);
+          }
+          JS
+      - name: Record the build inventory receipt
+        env:
+          EXPECTED_SOURCE: ${{ needs.dispatch.outputs.head }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          directory = Path("gate-inventory")
+          source = (directory / "source-sha.txt").read_text().strip()
+          assert source == os.environ["EXPECTED_SOURCE"], "Core inventory source differs"
+          files = {}
+          for path in sorted(directory.iterdir()):
+              if path.is_file():
+                  contents = path.read_bytes()
+                  files[path.name] = {"bytes": len(contents), "sha256": hashlib.sha256(contents).hexdigest()}
+          receipt = {
+              "schema": "taomni.core-build-inventory.v1",
+              "sourceSha": source,
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "runId": os.environ["GITHUB_RUN_ID"],
+              "runAttempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "runner": {
+                  "os": os.environ["RUNNER_OS"],
+                  "architecture": os.environ["RUNNER_ARCH"],
+                  "image": os.environ["ImageOS"],
+                  "imageVersion": os.environ["ImageVersion"],
+              },
+              "files": files,
+          }
+          (directory / "inventory-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:

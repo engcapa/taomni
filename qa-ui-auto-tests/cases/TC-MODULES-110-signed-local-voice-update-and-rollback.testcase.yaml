@@ -1,0 +1,237 @@
+id: TC-MODULES-110
+title: Signed Local Voice switches versions and decodes real speech in one desktop session
+description: >-
+  Install an independently compiled Local Voice host-only prerelease, select the cached whisper-base
+  English model, verify real JFK audio decoding in the AI chat drawer, confirm disabled refusal links
+  to Module Store, download the current signed build from the loopback catalog, update and roll back
+  both while disabled and while active without restarting Taomni, recover from a handshake-failure
+  candidate, uninstall with cached ASR weights intact and an empty retained locator, verify install
+  guidance when missing, and reinstall with real speech decoding restored.
+covers: [F-Modules-1, F-AI-2.3]
+tags: [modules, voice, marketplace, lifecycle, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, module_signed_voice_archive, module_marketplace, release_build_required]
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- module_marketplace_probe: {phase: source}
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.local_voice_previous_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.local_voice_previous_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-ai-voice-local"]:enabled', key: Enter}
+- wait_for: {selector: '[data-testid="module-action-disable-ai-voice-local"]', timeout_sec: 60}
+- fill: {selector: '[data-testid="settings-search-input"]', value: asr}
+- wait_for: '[data-testid="asr-settings"]'
+- assert_text: {selector: '[data-testid="asr-model-whisper-base"]', contains: Downloaded}
+- click: '[data-testid="asr-select-whisper-base"]:not([disabled])'
+- assert_text: {selector: '[data-testid="asr-model-whisper-base"]', contains: Selected}
+- select_option: {selector: '[data-testid="asr-language"]', value: en}
+- assert_text: {selector: '[data-testid="asr-settings"]', contains: 'Auto local language prior: en'}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
+- fill: {selector: '[data-testid="chat-composer-textarea"]', value: ''}
+- assert_attribute: {selector: '[data-testid="chat-voice-button"]', name: data-state, equals: idle}
+- click: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="recording"]', timeout_sec: 40}
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 90}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 15}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: country}
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- wait_for: {selector: '[data-testid="ai-chat-drawer"][data-open="true"]', state: detached}
+- assert_signed_module_lifecycle: {slug: ai-voice-local, phase: old-enabled}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-disable-ai-voice-local"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-enable-ai-voice-local"]:enabled'
+- assert_signed_module_lifecycle: {slug: ai-voice-local, phase: old-disabled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: '[data-testid="voice-open-module-store"]'
+- assert_text: {selector: '[data-testid="voice-dictation-error"]', contains: 'Enable Local Voice'}
+- assert_attribute: {selector: '[data-testid="chat-voice-button"]', name: data-state, equals: idle}
+- click: '[data-testid="voice-open-module-store"]'
+- wait_for: {selector: '[data-testid="ai-chat-drawer"][data-open="true"]', state: detached}
+- right_click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- click: '[data-testid="context-menu-item-close"]'
+- wait_for: {selector: '[data-testid="tab-item"][data-tab-type="terminal"]', state: detached}
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-update"]'
+- click: '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-download"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: {selector: '[data-testid="module-download-task"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-review"]'
+- assert_text: {selector: '[data-testid="confirm-dialog-message"]', contains: '${fixture.local_voice_current_version}'}
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-current"]'
+- assert_signed_module_lifecycle: {slug: ai-voice-local, phase: updated-disabled}
+- click: '[data-testid="module-action-rollback-ai-voice-local"]'
+- assert_text: {selector: '[data-testid="module-action-rollback-ai-voice-local"]:enabled', contains: '${fixture.local_voice_current_version}'}
+- assert_signed_module_lifecycle: {slug: ai-voice-local, phase: rolled-back-disabled}
+- press: {selector: '[data-testid="module-action-enable-ai-voice-local"]:enabled', key: Enter}
+- wait_for: {selector: '[data-testid="module-action-disable-ai-voice-local"]', timeout_sec: 60}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
+- fill: {selector: '[data-testid="chat-composer-textarea"]', value: ''}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value === ""'}
+- click: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="recording"]', timeout_sec: 40}
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 90}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 15}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: country}
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- wait_for: {selector: '[data-testid="ai-chat-drawer"][data-open="true"]', state: detached}
+- assert_signed_module_lifecycle: {slug: ai-voice-local, phase: old-reenabled}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-update"]'
+- click: '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-review"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: {selector: '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-current"]', timeout_sec: 60}
+- assert_signed_module_lifecycle: {slug: ai-voice-local, phase: updated-enabled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
+- fill: {selector: '[data-testid="chat-composer-textarea"]', value: ''}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value === ""'}
+- click: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="recording"]', timeout_sec: 40}
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 90}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 15}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: country}
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- wait_for: {selector: '[data-testid="ai-chat-drawer"][data-open="true"]', state: detached}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.local_voice_failed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.local_voice_failed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="failed"]', timeout_sec: 45}
+- assert_text: {selector: '[data-testid="module-offline-error"]', contains: 'Plugin permission denied'}
+- assert_signed_module_lifecycle: {slug: ai-voice-local, phase: failed-update}
+- click: '[data-testid="module-action-rollback-ai-voice-local"]'
+- assert_text: {selector: '[data-testid="module-action-rollback-ai-voice-local"]:enabled', contains: '${fixture.local_voice_current_version}'}
+- assert_signed_module_lifecycle: {slug: ai-voice-local, phase: rolled-back-enabled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
+- fill: {selector: '[data-testid="chat-composer-textarea"]', value: ''}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value === ""'}
+- click: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="recording"]', timeout_sec: 40}
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 90}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 15}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: country}
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- wait_for: {selector: '[data-testid="ai-chat-drawer"][data-open="true"]', state: detached}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-uninstall-ai-voice-local"]:enabled', key: Enter}
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-ai-voice-local"]'
+- assert_signed_module_lifecycle: {slug: ai-voice-local, phase: uninstalled}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: '[data-testid="voice-open-module-store"]'
+- assert_text: {selector: '[data-testid="voice-dictation-error"]', contains: 'Install Local Voice'}
+- assert_attribute: {selector: '[data-testid="chat-voice-button"]', name: data-state, equals: idle}
+- click: '[data-testid="voice-open-module-store"]'
+- wait_for: {selector: '[data-testid="ai-chat-drawer"][data-open="true"]', state: detached}
+- right_click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- click: '[data-testid="context-menu-item-close"]'
+- wait_for: {selector: '[data-testid="tab-item"][data-tab-type="terminal"]', state: detached}
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.local_voice_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.local_voice_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-ai-voice-local"]:enabled', key: Enter}
+- wait_for: {selector: '[data-testid="module-action-disable-ai-voice-local"]', timeout_sec: 60}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
+- fill: {selector: '[data-testid="chat-composer-textarea"]', value: ''}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value === ""'}
+- click: '[data-testid="ai-chat-drawer"]:not([aria-hidden="true"]) [data-testid="chat-voice-button"]'
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="recording"]', timeout_sec: 40}
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: {selector: '[data-testid="chat-voice-button"][data-state="idle"]', timeout_sec: 90}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: 'ask not', timeout_sec: 15}
+- eval_readonly: {expression: 'document.getElementById("chat-composer-textarea")?.value?.toLowerCase()', contains: country}
+- assert_signed_module_lifecycle: {slug: ai-voice-local, phase: reinstalled}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: disabled-update-and-rollback
+    requirement: Update and roll back a disabled Local Voice host-only package without restarting Taomni while rejecting dictation cleanly when disabled and preserving the cached Whisper model.
+    actions: [10, 12, 17, 19, 27, 29, 38, 46, 58, 61, 63, 66]
+    checkpoints:
+    - {step: 31, expectation: The earlier signed host decodes JFK speech into the empty composer draft.}
+    - {step: 32, expectation: The decoded transcript includes the distinct reference word country.}
+    - {step: 35, expectation: The earlier signed host owns the writer lease and cached model hash matches.}
+    - {step: 40, expectation: Disabling releases the writer lease cleanly.}
+    - {step: 48, expectation: Dictation while disabled surfaces Enable Local Voice guidance and remains idle.}
+    - {step: 65, expectation: Updating while disabled activates the current host-only version without starting the host.}
+    - {step: 68, expectation: Rolling back while disabled restores the earlier version with no running host.}
+    results: [31, 32, 35, 40, 48, 65, 68]
+  - id: enabled-update-and-failed-handshake
+    requirement: Replace and roll back an active Local Voice host, decode real speech on every switched version, and recover cleanly when an update fails handshake.
+    actions: [69, 77, 79, 90, 91, 101, 103, 113, 117, 127, 129]
+    checkpoints:
+    - {step: 81, expectation: Re-enabled earlier host freshly decodes JFK speech after clearing the composer.}
+    - {step: 85, expectation: Old host is re-enabled and owns its writer lease.}
+    - {step: 93, expectation: Live update starts the current signed host cleanly.}
+    - {step: 105, expectation: Current signed host freshly decodes JFK speech in the composer.}
+    - {step: 115, expectation: Handshake-failure version reports permission denied without interrupting the active host.}
+    - {step: 116, expectation: Failed update preserves the running current host and its writer lease.}
+    - {step: 119, expectation: Manual rollback switches the running host back to the earlier version.}
+    - {step: 131, expectation: Rolled-back earlier host freshly decodes JFK speech.}
+    results: [81, 85, 93, 105, 115, 116, 119, 131]
+  - id: stateless-uninstall-and-reinstall
+    requirement: Uninstalling Local Voice clears binaries and runtime with an empty retained locator while preserving cached ASR model weights, shows install guidance while missing, and restores real decoding on reinstall.
+    actions: [137, 138, 146, 158, 160, 168, 170]
+    checkpoints:
+    - {step: 140, expectation: Uninstall removes versions and runtime cleanly with stateless empty retained-data locator and preserved whisper-base cache.}
+    - {step: 148, expectation: Dictation while uninstalled displays Install Local Voice guidance.}
+    - {step: 172, expectation: Reinstalling and enabling current Local Voice restores JFK speech decoding.}
+    - {step: 174, expectation: Reinstalled host owns its writer lease and passes final lifecycle checks.}
+    - {step: 175, expectation: No renderer runtime errors occurred across all lifecycle transitions.}
+    results: [140, 148, 172, 174, 175]
+  visual:
+  - check: Whisper model selection, composer transcription text, and Module Store action/error badges across all switches.
+    method: automated
+    reason: UI waits and assertions confirm model state, decoded speech text, and dictation alerts.
+  native:
+  - check: Real OS process lineage, signed host bytes (without frontend), writer lease, cached ggml-base.bin SHA-256, and stateless empty retained locator.
+    method: automated
+    reason: assert_signed_module_lifecycle inspects native process tables, writer leases, cached weights, and on-disk directories.

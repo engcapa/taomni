@@ -1,0 +1,77 @@
+id: TC-MODULES-091
+title: The signed Mail module owns the agenda cache and keeps it when disabled
+description: Use a verified Mail package with the runner-local IMAP and CalDAV fixtures. Accept an invitation, read it in the agenda and verify the event and collection state in the module mailbox before and after disabling Mail.
+covers: [F-Modules-1, F-MAIL-22]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, mail_server, module_signed_mail_archive]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-mail"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_caldav_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"] [data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches: {timeout_sec: 35}
+- mail_server_deliver: {count: 1, prefix: Invite, invite: Signed planning meeting}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_list_matches: {timeout_sec: 35}
+- fill: {selector: '[data-testid="mail-search-input"]', value: Invite 0001}
+- click: '[data-testid="mail-message-row"][data-subject="Invite 0001"]'
+- wait_for: '[data-testid="mail-invite-card"]'
+- click: '[data-testid="mail-invite-accept"]'
+- wait_for: {selector: '[data-testid="mail-invite-in-calendar"]', timeout_sec: 40}
+- mail_server_assert_caldav_contains: {text: Signed planning meeting, timeout_sec: 20}
+- mail_server_assert_caldav_contains: {text: 'PARTSTAT=ACCEPTED', timeout_sec: 20}
+- click: '[data-testid="mail-agenda-open"]'
+- wait_for: '[data-testid="mail-agenda-event"][data-summary="Signed planning meeting"]'
+- assert_signed_mail_host: agenda-written
+- click: '[data-testid="mail-agenda-close"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-action-disable-mail"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-enable-mail"]'
+- assert_signed_mail_host: agenda-retained
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: hosted-agenda
+    requirement: The signed module persists the accepted event and collection state in its mailbox.
+    actions: [8, 10, 15, 18, 19, 22, 24, 28]
+    checkpoints:
+    - {step: 9, expectation: The offline installer completes the signed installation.}
+    - {step: 16, expectation: Mail is opened from the installed module frontend.}
+    - {step: 25, expectation: The invitation card reports the meeting is in the calendar.}
+    - {step: 26, expectation: The CalDAV fixture received the matching event.}
+    - {step: 27, expectation: The event includes the accepted reply status.}
+    - {step: 29, expectation: The event is visible in the agenda.}
+    - {step: 30, expectation: The signed writer saved the event and discovery state in the module mailbox.}
+    results: [9, 16, 25, 26, 27, 29, 30]
+  - id: retained-agenda
+    requirement: Disabling Mail releases its writer and preserves calendar data.
+    actions: [31, 34]
+    checkpoints:
+    - {step: 36, expectation: The stopped host released its lease and the same calendar event remains in the module mailbox.}
+    - {step: 37, expectation: The renderer reports no runtime errors.}
+    results: [36, 37]
+  visual:
+  - check: The invitation and agenda show the accepted meeting.
+    method: automated
+    reason: The case asserts the corresponding views and event summary.
+  native:
+  - check: Verify the signed writer, actual CalDAV PUT and module database rows.
+    method: automated
+    reason: The runner reads the installed digests, writer lease, server receipt and SQLite rows.

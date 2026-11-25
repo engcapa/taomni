@@ -1,8 +1,6 @@
 use super::message_model::MailFolder;
-use crate::mail::folders;
-use crate::mail::imap_messages::merge_selected_folder;
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
+use crate::mail::folders::merge_selected_folder;
+pub(super) use taomni_mail_storage::now_ts;
 
 /// Whether header sync should issue a remote IMAP LIST.
 /// Refresh requests always list; otherwise list only when the local folder
@@ -30,10 +28,6 @@ pub(super) fn non_empty_str(value: &str) -> Option<&str> {
     if value.is_empty() { None } else { Some(value) }
 }
 
-pub(super) fn normalize_preview(value: &str) -> String {
-    value.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
 pub(super) fn non_empty(value: String) -> Option<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -41,11 +35,4 @@ pub(super) fn non_empty(value: String) -> Option<String> {
     } else {
         Some(trimmed.to_string())
     }
-}
-
-pub(super) fn now_ts() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
 }

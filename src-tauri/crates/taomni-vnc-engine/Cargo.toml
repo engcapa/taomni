@@ -1,0 +1,43 @@
+[package]
+name = "taomni-vnc-engine"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "VNC client protocol, security negotiation, and framebuffer decoding"
+
+[dependencies]
+aes = "0.9"
+base64 = "0.22"
+des = "0.9"
+flate2 = "1"
+futures = "0.3"
+image = { version = "0.25", default-features = false, features = ["png"] }
+log = "0.4"
+md-5 = "0.11"
+# RFB security type 18 uses anonymous TLS. Build with a complete Perl
+# distribution to keep the same OpenSSL implementation across desktop targets.
+openssl = { version = "0.10.81", features = ["vendored"] }
+rsa = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha1 = "0.11"
+sha2 = "0.11"
+taomni-vnc-api = { path = "../taomni-vnc-api" }
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-openssl = "0.6.5"
+tokio-tungstenite = "0.29"
+tokio-util = "0.7"
+tracing = "0.1"
+uuid = { version = "1", features = ["v4"] }
+zeroize = { version = "1", features = ["serde"] }
+# Persistent-stream inflate for VNC ZRLE and Tight (VNC-PERF-003).
+zlib-rs = { version = "0.6", default-features = false, features = ["std"] }
+zune-core = "0.5"
+zune-jpeg = "0.5"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["windef", "winuser"] }
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["jpeg"] }

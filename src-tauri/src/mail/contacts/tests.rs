@@ -1,15 +1,5 @@
 use super::dav_protocol::card_file_name;
 use super::dav_sync::sync_collection;
-use super::entries::delete_entry;
-use super::entries::export_cards;
-use super::entries::import_cards;
-use super::entries::save_entry;
-use super::model::MailAddressBookEntry;
-use super::storage::apply_changes;
-use super::storage::load_cards;
-use super::suggestions::address_book_suggestions;
-use super::suggestions::merge_suggestions;
-use crate::mail::MailContactSuggestion;
 use crate::mail::webdav::CARDDAV;
 use crate::mail::webdav::DavAuth;
 use crate::mail::webdav::DavClient;
@@ -18,6 +8,9 @@ use crate::mail::webdav::parse_multistatus;
 use reqwest::Url;
 use rusqlite::Connection;
 use std::collections::HashMap;
+use taomni_mail_storage::contacts::{
+    MailAddressBookEntry, apply_changes, delete_entry, load_cards, save_entry,
+};
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -242,68 +235,6 @@ fn multistatus_keeps_only_successful_props() {
         !parsed[0].props.contains_key("displayname"),
         "404 propstat dropped"
     );
-}
-
-#[test]
-fn local_entries_suggestions_and_files() {
-    let conn = db();
-    let saved = save_entry(
-        &conn,
-        "acct",
-        MailAddressBookEntry {
-            display_name: "Jane Doe".into(),
-            emails: vec![" jane@example.com ".into()],
-            ..Default::default()
-        },
-        "local",
-    )
-    .unwrap();
-    assert!(!saved.uid.is_empty());
-    assert_eq!(saved.book, "local");
-    assert!(!saved.pending_sync);
-    assert!(save_entry(&conn, "acct", MailAddressBookEntry::default(), "local").is_err());
-    let bad = MailAddressBookEntry {
-        display_name: "x".into(),
-        emails: vec!["nope".into()],
-        ..Default::default()
-    };
-    assert!(
-        save_entry(&conn, "acct", bad, "local")
-            .unwrap_err()
-            .contains("not an email")
-    );
-
-    let hits = address_book_suggestions(&conn, "acct", "doe", 5).unwrap();
-    assert_eq!(hits[0].email, "jane@example.com");
-    assert_eq!(hits[0].source, "addressBook");
-    let collected = vec![MailContactSuggestion {
-        name: None,
-        email: "JANE@example.com".into(),
-        source: "history".into(),
-        score: 10,
-        last_seen_at: None,
-    }];
-    assert_eq!(
-        merge_suggestions(hits, collected, 5).len(),
-        1,
-        "dedupe by email"
-    );
-
-    assert_eq!(
-        import_cards(
-            &conn,
-            "acct",
-            &card_text("imp-1", "Imported", "imp@example.com"),
-            "local"
-        )
-        .unwrap(),
-        1
-    );
-    let (text, count) = export_cards(&conn, "acct").unwrap();
-    assert_eq!(count, 2);
-    assert!(text.contains("UID:imp-1") && text.contains("X-CUSTOM:keep"));
-    assert!(delete_entry(&conn, "acct", &saved.uid).unwrap());
-    assert_eq!(load_cards(&conn, "acct").unwrap().len(), 1);
 }
 
 #[tokio::test]

@@ -1,12 +1,14 @@
 id: TC-MFA-103
-title: A native backup archive contains mfa.db together with the vault that holds its key
-description: V-21 (AC-15). Isolated native profile. After an MFA account exists, Settings → Backup & Restore → Backup Now
-  creates a core backup in the profile's backup directory. Follow the job ID returned by this manual invocation, wait for
-  that exact task to complete, and verify its archive appears first in refreshed history. Inspecting that archive through
-  the real archive reader lists databases/mfa.db and databases/vault.db; cancelling the restore stages nothing.
-  An earlier startup backup may predate the MFA account and must not satisfy either task or archive assertion.
+title: A locked native backup contains MFA and Vault together and retains the original account after unlock
+description: V-21 (AC-15). Isolated native profile. After an MFA account exists, Settings → Backup & Restore → Backup Now creates a core backup in the profile's
+  backup directory. Follow the job ID returned by this manual invocation, wait for that exact task to complete, and verify its archive appears first in
+  refreshed history. Inspecting that archive through the real archive reader lists databases/mfa.db and databases/vault.db; cancelling the restore stages
+  nothing. An earlier startup backup may predate the MFA account and must not satisfy either task or archive assertion. Lock Vault before the manual snapshot,
+  require it to remain locked after archive inspection, then explicitly unlock MFA and verify the original account remains available with no runtime errors.
 covers:
 - F-MFA-3
+- F-MFA-1
+- F12.1
 tags:
 - mfa
 - backup
@@ -48,6 +50,16 @@ steps:
 - wait_for: '[data-testid="mfa-account-row"][data-issuer="QA Backup"]'
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-security"]'
+- wait_for: '[data-testid="vault-lock-button"]'
+- click: '[data-testid="vault-lock-button"]'
+- assert_text_equals:
+    selector: '[data-testid="vault-state-badge"]'
+    equals: locked
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="mfa-account-code"], [data-testid="mfa-floating-code"], [data-testid="mfa-qr-secret"], [data-testid="mfa-qr-image"]'
+    equal: 0
 - click: '[data-testid="settings-group-toggle-backup"]'
 - wait_for: '[data-testid="backup-selected-start"]'
 - click: '[data-testid="backup-selected-start"]'
@@ -56,14 +68,12 @@ steps:
     timeout_sec: 90
 - wait_for: '[data-testid="backup-manual-result"][data-target-id="local"][data-job-id]'
 - eval_readonly:
-    expression: >-
-      !!document.querySelector('[data-job-id'+String.fromCharCode(61)+'"'+document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-manual-result"][data-target-id'+String.fromCharCode(61)+'"local"]').getAttribute('data-job-id')+'"][data-phase'+String.fromCharCode(61)+'"completed"]')
+    expression: '!!document.querySelector(''[data-job-id''+String.fromCharCode(61)+''"''+document.querySelector(''[data-testid''+String.fromCharCode(61)+''"backup-manual-result"][data-target-id''+String.fromCharCode(61)+''"local"]'').getAttribute(''data-job-id'')+''"][data-phase''+String.fromCharCode(61)+''"completed"]'')'
     expect_truthy: true
     timeout_sec: 90
 - click: '[data-testid="backup-history-refresh"]'
 - eval_readonly:
-    expression: >-
-      document.querySelector('[data-job-id'+String.fromCharCode(61)+'"'+document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-manual-result"][data-target-id'+String.fromCharCode(61)+'"local"]').getAttribute('data-job-id')+'"][data-phase]').textContent.includes(document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-history-row"]').getAttribute('data-file-name'))
+    expression: document.querySelector('[data-job-id'+String.fromCharCode(61)+'"'+document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-manual-result"][data-target-id'+String.fromCharCode(61)+'"local"]').getAttribute('data-job-id')+'"][data-phase]').textContent.includes(document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-history-row"]').getAttribute('data-file-name'))
     expect_truthy: true
     timeout_sec: 30
 - click: '[data-testid="backup-history-row"]:first-child [data-testid="backup-history-restore"]'
@@ -78,6 +88,26 @@ steps:
     contains: databases/vault.db
 - click: '[data-testid="backup-restore-cancel"]'
 - assert_not_visible: '[data-testid="backup-restore-files"]'
+- assert_text_equals:
+    selector: '[data-testid="vault-state-badge"]'
+    equals: locked
+    timeout_sec: 30
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mfa"]'
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- fill:
+    selector: '[data-testid="vault-unlock-pw"]'
+    value: qa-mfa-native-103
+- click: '[data-testid="vault-unlock-confirm"]'
+- wait_for:
+    selector: '[data-testid="mfa-account-row"][data-issuer="QA Backup"]'
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="mfa-account-row"]'
+    equal: 1
+- assert_visible: '[data-testid="mfa-account-row"][data-issuer="QA Backup"]'
+- assert_no_runtime_errors: null
 - screenshot: mfa-103-backup-history.png
 verification:
   review: reviewed
@@ -95,41 +125,71 @@ verification:
     - 14
     - 15
     - 17
-    - 19
-    - 21
-    - 25
-    - 27
+    - 24
+    - 26
+    - 30
+    - 32
     checkpoints:
     - step: 16
       expectation: MFA account stored
-    - step: 20
+    - step: 25
       expectation: backup panel open
-    - step: 22
+    - step: 27
       expectation: Manual backup accepted; actual completion is checked next.
-    - step: 23
-      expectation: The manual invocation exposes the local job ID, so an earlier startup task cannot satisfy completion.
-    - step: 24
-      expectation: The manual local task completed before refreshing and selecting the newest archive.
-    - step: 26
-      expectation: The first history row names the completed manual job's actual local archive.
     - step: 28
-      expectation: archive inspected
+      expectation: The manual invocation exposes the local job ID, so an earlier startup task cannot satisfy completion.
     - step: 29
+      expectation: The manual local task completed before refreshing and selecting the newest archive.
+    - step: 31
+      expectation: The first history row names the completed manual job's actual local archive.
+    - step: 33
+      expectation: archive inspected
+    - step: 34
       expectation: databases/mfa.db included
-    - step: 30
+    - step: 35
       expectation: databases/vault.db included
     results:
-    - 29
-    - 30
+    - 34
+    - 35
   - id: R2
     requirement: Cancelling the restore closes the confirmation without staging (AC-15).
     actions:
-    - 31
+    - 36
     checkpoints:
-    - step: 32
+    - step: 37
       expectation: restore confirmation closed
     results:
-    - 32
+    - 37
+  - id: R3
+    requirement: Snapshotting a locked Vault does not unlock it or reveal codes; explicit unlock reloads the retained MFA account.
+    actions:
+    - 19
+    - 21
+    - 39
+    - 40
+    - 41
+    - 43
+    - 44
+    checkpoints:
+    - step: 22
+      expectation: The Vault is locked before the manual backup starts.
+    - step: 23
+      expectation: All MFA code and export DOM nodes are absent while locked.
+    - step: 38
+      expectation: The snapshot and archive inspection preserve the locked state.
+    - step: 46
+      expectation: Exactly the original single account reloads after explicit unlock.
+    - step: 47
+      expectation: The original QA Backup account is available again.
+    - step: 48
+      expectation: No runtime error occurs during lock, snapshot, inspection and recovery.
+    results:
+    - 22
+    - 23
+    - 38
+    - 46
+    - 47
+    - 48
   visual:
   - check: Backup history and restore confirmation are legible.
     method: manual

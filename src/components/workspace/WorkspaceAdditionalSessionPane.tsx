@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { MailClientTab } from "../mail/MailClientTab";
+import MailSessionPane from "../plugins/MailSessionPane";
 import { ObjectStorageBrowser } from "../objectstorage/ObjectStorageBrowser";
 import { ProxyTestTab } from "../../layouts/main/panels";
 import { mailSmtpPasswordRefFromOptions, sessionToMailTabInfo } from "../../layouts/main/mailSession";
@@ -27,7 +27,7 @@ export function WorkspaceAdditionalSessionPane({ session, tab, visible, password
   return (
     <div data-testid="workspace-session-pane" data-kind={protocol.toLowerCase()} data-session-id={session.id}
       className="h-full min-h-0 w-full" style={{ display: visible ? "block" : "none" }}>
-      {protocol === "Mail" && <MailClientTab tabId={tab.id} info={sessionToMailTabInfo(session, password, mailSmtpPasswordRefFromOptions(session) ?? undefined)} visible={visible}
+      {protocol === "Mail" && <MailSessionPane view="account" tabId={tab.id} info={sessionToMailTabInfo(session, password, mailSmtpPasswordRefFromOptions(session) ?? undefined)} active={visible}
         onEditSession={(id) => {
           if (onEditSession) { onEditSession(id); return; }
           useSessionStore.getState().setSelectedSession(id);

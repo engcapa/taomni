@@ -19,7 +19,6 @@ mod hbase;
 mod history;
 mod java_debug_adapter;
 mod java_test;
-mod lanchat;
 mod llm;
 mod local_history;
 mod lsp;
@@ -31,6 +30,9 @@ mod notepad;
 mod notes;
 mod objectstorage;
 mod perf;
+mod plugin;
+mod plugin_marketplace;
+mod plugin_network;
 mod proxy;
 mod rdp;
 mod screenshot;
@@ -676,6 +678,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "voice_sherpa_model_installation"
         | "voice_install_sherpa_model" => asr::handle(invoke),
         "voice_capture_supported"
+        | "voice_check_local_module"
         | "voice_start_capture"
         | "voice_start_stream"
         | "voice_cleanup_text"
@@ -687,50 +690,6 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         "get_app_proxy_config" | "save_app_proxy_config" | "get_app_proxy_url" => {
             proxy::handle(invoke)
         }
-        "lanchat_status"
-        | "lanchat_list_peers"
-        | "lanchat_get_profile"
-        | "lanchat_update_profile"
-        | "lanchat_send_text"
-        | "lanchat_resend_message"
-        | "lanchat_list_conversations"
-        | "lanchat_list_messages"
-        | "lanchat_mark_read"
-        | "lanchat_create_group"
-        | "lanchat_send_group_text"
-        | "lanchat_list_groups"
-        | "lanchat_leave_group"
-        | "lanchat_send_file"
-        | "lanchat_send_group_file"
-        | "lanchat_send_dir"
-        | "lanchat_accept_file"
-        | "lanchat_open_path"
-        | "lanchat_reject_file"
-        | "lanchat_transfer_control"
-        | "lanchat_send_screenshot"
-        | "lanchat_send_clipboard_image"
-        | "lanchat_send_image_bytes"
-        | "lanchat_send_signal"
-        | "lanchat_signal_group"
-        | "nmedia_start"
-        | "nmedia_stop"
-        | "nmedia_ws_port"
-        | "nmedia_add_peer"
-        | "nmedia_remove_peer"
-        | "nmedia_peer_state"
-        | "nmedia_toggle_mic"
-        | "nmedia_toggle_screen"
-        | "nmedia_toggle_cam"
-        | "lanchat_get_retention"
-        | "lanchat_set_retention"
-        | "lanchat_get_service_state"
-        | "lanchat_start_service"
-        | "lanchat_set_start_on_launch"
-        | "lanchat_delete_message"
-        | "lanchat_clear_conversation"
-        | "lanchat_clear_all_history"
-        | "lanchat_list_pinned"
-        | "lanchat_retrust_peer" => lanchat::handle(invoke),
         "screenshot_list_displays"
         | "screenshot_capture_full"
         | "screenshot_capture_region"
@@ -858,7 +817,8 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "backup_remote_cancel"
         | "backup_remote_retry"
         | "backup_remote_history_url" => backup::handle(invoke),
-        "exit_app" => application::handle(invoke),
+        command if plugin::handles(command) => plugin::handle(invoke),
+        "exit_app" | "restart_app" => application::handle(invoke),
         _ => false,
     }
 }

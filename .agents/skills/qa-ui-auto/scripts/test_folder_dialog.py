@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from qa_ui_auto import folder_dialog
+from qa_ui_auto import file_dialog, folder_dialog
 from qa_ui_auto.steps import StepError
 
 
@@ -103,6 +103,27 @@ class FolderDialogContracts(unittest.TestCase):
                     folder_dialog.run_folder_dialog(ctx, {"action": "cancel"})
             self.assertEqual((ctx.case_dir / "native-folder-dialog-helper.log").read_text(), "owned NSOpenPanel found\n")
             self.assertFalse(json.loads((ctx.case_dir / "native-folder-dialogs.jsonl").read_text())["passed"])
+
+    def test_file_picker_timeout_retains_the_log_for_the_failed_native_step(self):
+        with TemporaryDirectory() as directory:
+            ctx = SimpleNamespace(
+                case_dir=Path(directory),
+                session=SimpleNamespace(application="/qa/taomni"),
+                fixture_context=SimpleNamespace(step_index=17),
+            )
+            error = subprocess.TimeoutExpired(["osascript"], 60, stderr=b"Go to Folder submitted\n")
+            with (
+                patch.object(file_dialog.platform, "system", return_value="Darwin"),
+                patch.object(folder_dialog.subprocess, "run", side_effect=error) as run,
+                self.assertRaises(subprocess.TimeoutExpired),
+            ):
+                file_dialog.run(ctx, {"kind": "folder", "action": "choose", "path": directory})
+            receipt = json.loads((ctx.case_dir / "native-file-dialogs.jsonl").read_text())
+            self.assertFalse(receipt["passed"])
+            self.assertEqual(receipt["step_index"], 17)
+            self.assertEqual(receipt["helper_log"], "native-file-dialog-17.log")
+            self.assertEqual((ctx.case_dir / receipt["helper_log"]).read_text(), "Go to Folder submitted\n")
+            self.assertEqual(run.call_args.kwargs["env"]["QA_PICKER_SCREENSHOT"], str(ctx.case_dir / "native-file-dialog-17.png"))
 
     def test_windows_uses_the_available_powershell_7_runtime(self):
         with TemporaryDirectory() as directory:

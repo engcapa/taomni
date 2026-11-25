@@ -12,6 +12,8 @@ import { useSftpStore } from "../../stores/sftpStore";
 import { clipboardMatches, getExplorerClipboard, setExplorerClipboard } from "./explorerClipboard";
 import { useExplorerLabels } from "./explorerLabels";
 import { openFile, UnavailableFileHandlerError } from "../../lib/openFile";
+import { EXPLORER_TEXT_FILE_TYPES, newFileNameError, uniqueNewFileName, type ExplorerQuickExtension } from "./explorerFileTypes";
+import { setExplorerPreferences } from "./explorerPreferences";
 
 export interface ExplorerToast { message: string; error?: boolean; undo?: () => void }
 export interface DeletePrompt { entries: FileEntry[]; reason?: string; defaultIntent?: "trash" | "permanent" }
@@ -25,6 +27,7 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
   const [properties, setProperties] = useState<FileEntry[] | null>(null);
   const [progress, setProgress] = useState<ExplorerProgress | null>(null);
   const [busy, setBusy] = useState(false);
+  const [newFile, setNewFile] = useState(false);
   const operation = useRef<string | null>(null);
   const mounted = useRef(true);
   const lock = useRef(false);
@@ -189,27 +192,39 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
       return true;
     } catch (error) { notify(String(error), true); return false; }
   }, [notify, refreshAll, tabId]);
-  const create = useCallback((directory: boolean, extension = "txt") => run(async () => {
+  const suggestFileName = useCallback((name: string) => uniqueNewFileName(name,
+    useSftpStore.getState().sessions[tabId]?.local.entries.map((entry) => entry.name) ?? []), [tabId]);
+  const createEntry = useCallback(async (name: string, directory: boolean) => {
     const pane = useSftpStore.getState().sessions[tabId]?.local;
-    if (!pane) return;
-    const names: Record<string, [string, string]> = {
-      txt: ["新建文本文档", "New text document"], md: ["新建 Markdown 文档", "New Markdown document"],
-      html: ["新建 HTML 文档", "New HTML document"], css: ["新建 CSS 文档", "New CSS document"],
-      js: ["新建 JavaScript 文件", "New JavaScript file"], ts: ["新建 TypeScript 文件", "New TypeScript file"],
-      json: ["新建 JSON 文档", "New JSON document"],
-    };
-    const localized = names[extension] ?? [extension.toUpperCase(), extension.toUpperCase()];
-    const base = directory ? label("新建文件夹", "New folder") : label(localized[0], localized[1]);
-    const suffix = directory ? "" : `.${extension}`;
-    const existing = new Set(pane.entries.map((entry) => entry.name));
-    let name = `${base}${suffix}`;
-    let i = 2;
-    while (existing.has(name)) name = `${base} (${i++})${suffix}`;
+    if (!pane) throw new Error(label("目录不可用", "Folder is unavailable"));
     const path = await localCreateEntry(pane.path, name, directory);
+    if (name.startsWith(".")) setExplorerPreferences({ showHidden: true });
     await refreshAll();
     useSftpStore.getState().setSelection(tabId, "local", [path]);
     setRenamePath(path);
-  }), [label, refreshAll, run, tabId]);
+  }, [label, refreshAll, tabId]);
+  const create = useCallback((directory: boolean, extension: ExplorerQuickExtension = "txt") => run(async () => {
+    const fileType = EXPLORER_TEXT_FILE_TYPES.find((type) => type.extension === extension)!;
+    const name = directory ? label("新建文件夹", "New folder") : `${label(fileType.name[0], fileType.name[1])}.${extension}`;
+    await createEntry(suggestFileName(name), directory);
+  }), [createEntry, label, run, suggestFileName]);
+  const createFile = useCallback(async (name: string) => {
+    let created = false;
+    await run(async () => {
+      setToast(null);
+      const error = newFileNameError(name, label);
+      if (error) throw new Error(error);
+      const entries = useSftpStore.getState().sessions[tabId]?.local.entries ?? [];
+      if (entries.some((entry) => entry.name.toLowerCase() === name.toLowerCase())) {
+        throw new Error(label("该文件已存在，请选择其他名称", "This file already exists; choose another name"));
+      }
+      await createEntry(name, false);
+      setNewFile(false);
+      created = true;
+    });
+    return created;
+  }, [createEntry, label, run, tabId]);
+  const startNewFile = useCallback(() => { setToast(null); setNewFile(true); }, []);
   const copyPath = useCallback(async (paths: string[]) => {
     try { await writeText(paths.join("\n")); notify(label("已复制路径", "Path copied")); }
     catch (error) { notify(String(error), true); }
@@ -222,8 +237,8 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
     if (operation.current) void explorerCancelOperation(operation.current).catch((error) => notify(String(error), true));
   }, [notify]);
   return { toast, notify, busy, progress, cancel, open, openWithSystemFallback, copy, paste, drop, transfer, remove, trash, permanentDelete,
-    rename, renamePath, setRenamePath, create, copyPath, reveal, deletePrompt, setDeletePrompt,
-    unavailablePrompt, setUnavailablePrompt, properties, setProperties };
+    rename, renamePath, setRenamePath, create, createFile, suggestFileName, newFile, setNewFile, startNewFile,
+    copyPath, reveal, deletePrompt, setDeletePrompt, unavailablePrompt, setUnavailablePrompt, properties, setProperties };
 }
 
 export type ExplorerOperations = ReturnType<typeof useExplorerOperations>;

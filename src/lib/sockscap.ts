@@ -44,6 +44,8 @@ export type EnginePhase =
   | "stopping"
   | "recoveryRequired";
 
+export const SOCKSCAP_RECOVERY_STATUS_EVENT = "sockscap-recovery-status";
+
 export interface LaunchPreparation {
   workingDirectory?: string;
   environment?: Record<string, string>;
@@ -201,6 +203,7 @@ export interface RedirectorInstallStatus {
     | "resourceMissing";
   packageVersion: string;
   resourceAvailable: boolean;
+  resourceSource?: "module" | "legacyBundle" | null;
   systemExtensionState:
     | "enabled"
     | "waitingForUser"

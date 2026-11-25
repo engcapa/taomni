@@ -1,0 +1,22 @@
+[package]
+name = "taomni-server-process"
+version = "0.1.0"
+description = "Supervise system daemons for Taomni servers"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[dependencies]
+taomni-module-settings = { path = "../taomni-module-settings" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["io-util", "macros", "process", "rt"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+which = "8"
+
+[dev-dependencies]
+tempfile = "3"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Services", "Win32_System_Threading", "Win32_UI_Shell"] }
+winreg = "0.55"

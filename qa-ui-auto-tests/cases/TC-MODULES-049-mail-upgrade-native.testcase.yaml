@@ -1,0 +1,72 @@
+id: TC-MODULES-049
+title: Legacy Mail accounts produce one pending migration and retain their original data
+description: A saved SSH session and two Mail accounts use an isolated old-schema profile. The actual desktop preflight
+  recommends Mail once. Confirming the migration records the pending source while preserving both accounts and the custom
+  cache. Reopening and retrying retains the same journal and leaves unused default Mail storage absent.
+covers: [F-Modules-1]
+tags: [p1, modules, upgrade, mail]
+modes: [native]
+fixtures: [reset_db, module_upgrade]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-upgrade-status"][data-state="candidates"]'
+- assert_count: {selector: '[data-testid="module-upgrade-candidates"] li', equal: 1}
+- assert_text_equals: {selector: '[data-testid="module-upgrade-candidates"] li', equals: mail}
+- module_upgrade_probe: {phase: preflight}
+- assert_file_sha256: {path: '${fixture.legacy_mail_cache_path}', equals: '${fixture.legacy_mail_cache_hash}'}
+- press: {selector: '[data-testid="module-upgrade-migrate"]', key: Enter}
+- wait_for: '[data-testid="module-upgrade-pending"]'
+- assert_text: {selector: '[data-testid="module-upgrade-pending"]', contains: verified}
+- module_upgrade_probe: {phase: pending}
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-upgrade-status"][data-state="candidates"]'
+- assert_count: {selector: '[data-testid="module-upgrade-candidates"] li', equal: 1}
+- assert_text_equals: {selector: '[data-testid="module-upgrade-candidates"] li', equals: mail}
+- module_upgrade_probe: {phase: repeat}
+- press: {selector: '[data-testid="module-upgrade-migrate"]', key: Enter}
+- wait_for: '[data-testid="module-upgrade-pending"]'
+- wait_for: '[data-testid="module-upgrade-migrate"]:not([disabled])'
+- module_upgrade_probe: {phase: repeat}
+- assert_file_sha256: {path: '${fixture.legacy_mail_cache_path}', equals: '${fixture.legacy_mail_cache_hash}'}
+- assert_no_runtime_errors: null
+- screenshot: mail-upgrade-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Preflight lists Mail once for multiple accounts. A pending migration and normal reopening preserve the original sessions and cache.
+    actions: [3, 5, 11, 15, 17, 19, 24]
+    checkpoints:
+    - {step: 7, expectation: The SSH session adds no recommendation and both Mail accounts share one recommendation.}
+    - {step: 8, expectation: The recommendation identifies the Mail module.}
+    - {step: 9, expectation: "The preflight preserves the original session rows and leaves the journal, module and unused default cache absent."}
+    - {step: 10, expectation: Opening Settings preserves the custom cache bytes.}
+    - {step: 13, expectation: The pending status describes the verified package requirement.}
+    - {step: 14, expectation: The journal contains one pending Mail entry bound to the legacy database.}
+    - {step: 22, expectation: The same Mail recommendation appears after normal restart.}
+    - {step: 23, expectation: The original journal and session rows survive restart.}
+    - {step: 27, expectation: Retrying preserves the journal and leaves the Mail module and unused default cache absent.}
+    - {step: 28, expectation: The custom cache bytes still match their original digest.}
+    - {step: 29, expectation: No renderer runtime error occurred.}
+    results: [7, 8, 9, 10, 13, 14, 22, 23, 27, 28, 29]
+  native:
+  - check: The real desktop uses read-only SQLite preflight and records retryable pending state.
+    method: automated
+    reason: An independent disk probe checks session rows, the journal and the absence of unused Mail directories.
+  visual:
+  - check: The Module Store displays the Mail recommendation and its pending message.
+    method: manual
+    reason: The runner retains a screenshot after the retry.

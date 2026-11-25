@@ -86,7 +86,7 @@ pub async fn tab_suggest_fim(
         return Ok(None);
     }
 
-    let ai_ctx = state.ai_ctx.read().await;
+    let ai_ctx = state.legacy.ai_ctx.read().await;
     if ai_ctx.config.fully_disabled {
         return Ok(None);
     }
@@ -175,7 +175,7 @@ pub async fn tab_rewrite_command(
 ) -> Result<String, String> {
     use crate::llm::{ChatMessage, ChatRequest, TaskKind};
 
-    let ai_ctx = state.ai_ctx.read().await;
+    let ai_ctx = state.legacy.ai_ctx.read().await;
     if ai_ctx.config.fully_disabled {
         return Err("AI is fully disabled.".into());
     }

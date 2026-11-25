@@ -68,7 +68,7 @@ pub async fn agent_explain_error(
     };
 
     let resp = {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         ai_ctx
             .llm
             .complete(req, TaskKind::AgentDefault)

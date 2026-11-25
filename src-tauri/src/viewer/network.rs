@@ -28,10 +28,11 @@ pub(crate) fn resolve_proxy(
         _ => return Err("Unknown preview proxy mode".into()),
     };
     let db = state
+        .core
         .db
         .lock()
         .map_err(|_| "Proxy session database is unavailable")?;
-    crate::proxy::resolve_strict_with_db(&config, Some(&db), Some(&state.vault))
+    crate::proxy::resolve_strict_with_db(&config, Some(&db), Some(&state.core.vault))
 }
 
 pub(super) fn resource_client(

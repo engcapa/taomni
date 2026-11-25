@@ -422,12 +422,13 @@ async fn task_notifications_link_to_the_session() {
     );
     let (sender, _receiver) = tokio::sync::oneshot::channel();
     f.state
+        .core
         .agent
         .cc_pending_permissions
         .lock()
         .unwrap()
         .insert("cid".into(), sender);
-    f.state.mobile.confirmations.lock().unwrap().insert(
+    f.state.legacy.mobile.confirmations.lock().unwrap().insert(
         "cid".into(),
         json!({"id":"cid","thread_id":"abcd1234-0000","tool":"write_file","supported":true}),
     );

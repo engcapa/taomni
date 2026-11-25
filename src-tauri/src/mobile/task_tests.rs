@@ -10,7 +10,7 @@ fn thread(state: &crate::state::AppState, id: &str, provider: &str) {
     let value = serde_json::from_value(json!({"id":id,"title":"QA task","provider_id":provider,
         "created_at":1,"updated_at":1,"source":"drawer","mode":"chat","linked_session_id":null}))
     .unwrap();
-    crate::chat::store::create_thread(&state.db.lock().unwrap(), &value).unwrap();
+    crate::chat::store::create_thread(&state.core.db.lock().unwrap(), &value).unwrap();
 }
 
 #[tokio::test]
@@ -40,7 +40,7 @@ async fn headless_followup_is_a_real_turn_cancellable_and_never_overlaps() {
     let f = Fixture::with_config(config).await;
     thread(&f.state, "task", "local");
     let core = Core::Headless(f.state.clone());
-    let mut notifications = f.state.mobile.events.tasks.subscribe();
+    let mut notifications = f.state.legacy.mobile.events.tasks.subscribe();
     agent_view::message(core.clone(), "thread:task", "First turn")
         .await
         .unwrap();
@@ -65,6 +65,7 @@ async fn headless_followup_is_a_real_turn_cancellable_and_never_overlaps() {
     tokio::time::timeout(std::time::Duration::from_secs(10), async {
         while f
             .state
+            .legacy
             .mobile
             .pending_turns
             .lock()
@@ -86,6 +87,7 @@ async fn headless_followup_is_a_real_turn_cancellable_and_never_overlaps() {
     tokio::time::timeout(std::time::Duration::from_secs(10), async {
         while f
             .state
+            .legacy
             .mobile
             .pending_turns
             .lock()
@@ -97,7 +99,8 @@ async fn headless_followup_is_a_real_turn_cancellable_and_never_overlaps() {
     })
     .await
     .unwrap();
-    let messages = crate::chat::store::list_messages(&f.state.db.lock().unwrap(), "task").unwrap();
+    let messages =
+        crate::chat::store::list_messages(&f.state.core.db.lock().unwrap(), "task").unwrap();
     assert_eq!(messages.iter().filter(|m| m.role == "user").count(), 2);
     assert!(
         messages
@@ -114,10 +117,10 @@ async fn headless_followup_is_a_real_turn_cancellable_and_never_overlaps() {
     }
     assert_eq!(counts.get("stopped"), Some(&1));
     assert_eq!(counts.get("turn_finished"), Some(&1));
-    let before = f.state.mobile.events.seq();
+    let before = f.state.legacy.mobile.events.seq();
     agent_view::stop(&core, "thread:task").await.unwrap();
     assert_eq!(
-        f.state.mobile.events.seq(),
+        f.state.legacy.mobile.events.seq(),
         before,
         "idle stops must not send notifications"
     );
@@ -140,12 +143,13 @@ async fn confirmations_are_thread_scoped_and_first_answer_wins() {
     let f = Fixture::new().await;
     let (tx, rx) = tokio::sync::oneshot::channel();
     f.state
+        .core
         .agent
         .cc_pending_permissions
         .lock()
         .unwrap()
         .insert("gate".into(), tx);
-    f.state.mobile.confirmations.lock().unwrap().insert(
+    f.state.legacy.mobile.confirmations.lock().unwrap().insert(
         "gate".into(),
         json!({"id":"gate","thread_id":"task","tool":"write","supported":true}),
     );
@@ -187,14 +191,15 @@ async fn real_git_file_diff_bounds_and_notifications_without_a_terminal() {
     git(&["add", "test.txt"]);
     git(&["commit", "-m", "fixture"]);
     f.state
+        .legacy
         .mobile
         .file_roots
         .lock()
         .unwrap()
         .insert("task".into(), root.path().to_owned());
-    f.state.mobile.roots_changed.notify_one();
+    f.state.legacy.mobile.roots_changed.notify_one();
     // Watch establishment is asynchronous; wait for a real filesystem event.
-    let mut events = f.state.mobile.events.tx.subscribe();
+    let mut events = f.state.legacy.mobile.events.tx.subscribe();
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
             std::fs::write(root.path().join("test.txt"), "new\n").unwrap();
@@ -209,7 +214,16 @@ async fn real_git_file_diff_bounds_and_notifications_without_a_terminal() {
     })
     .await
     .unwrap();
-    assert!(f.state.mobile.broker.terminals.lock().unwrap().is_empty());
+    assert!(
+        f.state
+            .legacy
+            .mobile
+            .broker
+            .terminals
+            .lock()
+            .unwrap()
+            .is_empty()
+    );
     let changes = file_view::changes(&f.state, "thread:task").await.unwrap();
     assert_eq!(changes["changes"][0]["path"], "test.txt");
     let diff = file_view::diff(&f.state, "thread:task", "test.txt")

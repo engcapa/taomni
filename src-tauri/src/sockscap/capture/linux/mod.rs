@@ -83,6 +83,7 @@ pub trait LinuxCapture: Send + Sync {
         &self,
         config: &SocksCapConfig,
         ctx: Arc<RwLock<RelayContext>>,
+        upstreams: Option<&taomni_sockscap_api::XrayProcesses>,
         sudo_password: Option<String>,
     ) -> Result<TransparentCaptureHandle, String>;
 }
@@ -249,6 +250,7 @@ impl LinuxCapture for LinuxCaptureImpl {
         &self,
         config: &SocksCapConfig,
         ctx: Arc<RwLock<RelayContext>>,
+        upstreams: Option<&taomni_sockscap_api::XrayProcesses>,
         sudo_password: Option<String>,
     ) -> Result<TransparentCaptureHandle, String> {
         let scope = capture_scope(config)?;
@@ -256,7 +258,7 @@ impl LinuxCapture for LinuxCaptureImpl {
         let sudo_pw = sudo_password.as_deref().map(|password| password.as_str());
         self.preflight(sudo_pw)?;
 
-        let cgroups = match &scope {
+        let mut cgroups = match &scope {
             CaptureScope::Global => {
                 cgroup::CgroupSession::prepare_global(std::process::id(), sudo_pw)?
             }
@@ -277,6 +279,15 @@ impl LinuxCapture for LinuxCaptureImpl {
                 cgroup::CgroupSession::prepare_mixed(&target_groups, std::process::id(), sudo_pw)?
             }
         };
+        if let Some(upstreams) = upstreams
+            && let Err(error) = cgroups.enroll_upstreams(upstreams, sudo_pw)
+        {
+            let cleanup = cgroups.cleanup(sudo_pw);
+            return match cleanup {
+                Ok(()) => Err(error),
+                Err(cleanup_error) => Err(format!("{error}; restore cgroups: {cleanup_error}")),
+            };
+        }
         let cgroups = Arc::new(Mutex::new(cgroups));
 
         let mut relays = Vec::new();

@@ -615,6 +615,29 @@ class NativePointerReadinessTest(TestCase):
         self.assertIn("block:'center'", scroll.args[2]['script'])
         self.assertEqual(scroll.args[2]['args'], [self.origin])
 
+    def test_delayed_search_scroll_can_reclip_a_prepared_target_inside_the_viewport(self):
+        # Settings search can finish its own smooth scroll after the first
+        # centering attempt. The target remains inside the WebView, but its
+        # center is below the settings scrollport and cannot receive input.
+        scrolls, probes = 0, 0
+        def request(method, path, payload):
+            nonlocal scrolls, probes
+            if 'scrollIntoView' in payload['script']:
+                scrolls += 1
+                return None
+            probes += 1
+            if scrolls == 0:
+                return {**self.geometry(y=59, ready=False), 'outside': False}
+            if scrolls == 1:
+                if probes == 2:
+                    return self.geometry()
+                return {**self.geometry(y=688, ready=False), 'outside': False}
+            return self.geometry(y=300)
+        self.session.request.side_effect = request
+        self.assertEqual(prepare_pointer_target(self.session, self.origin), {'x': 270, 'y': 300})
+        self.assertEqual(scrolls, 2)
+        self.assertTrue(all(c.args[1].endswith('/execute/sync') for c in self.session.request.call_args_list))
+
     def test_persistent_overlay_fails_without_dispatching_input(self):
         self.session.request.return_value = self.geometry(ready=False)
         with self.assertRaisesRegex(WebDriverError, 'hit-testable'):

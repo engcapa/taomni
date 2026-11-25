@@ -37,7 +37,13 @@ def build_peer_shared_data_env(
 ) -> dict[str, str]:
     """Share the primary lock root while isolating the peer WebView directory."""
     resolved_system = system or platform.system()
+    if resolved_system not in {"Linux", "Windows", "Darwin"}:
+        raise StepError(f"servers_multi_instance_probe: unsupported platform {resolved_system}")
+    data_dir = primary_env.get("NEWMOB_DATA_DIR")
+    if not data_dir:
+        raise StepError("servers_multi_instance_probe: primary NEWMOB_DATA_DIR is missing")
     shared: dict[str, str] = {
+        "NEWMOB_DATA_DIR": data_dir,
         "TAOMNI_QA_WEBVIEW_DIR": str((peer_root / "native-webview").resolve()),
     }
     if resolved_system == "Linux":
@@ -46,20 +52,9 @@ def build_peer_shared_data_env(
             raise StepError("servers_multi_instance_probe: primary XDG_DATA_HOME is missing")
         shared["XDG_DATA_HOME"] = data_home
     elif resolved_system == "Windows":
-        data_dir = primary_env.get("NEWMOB_DATA_DIR")
-        if not data_dir:
-            raise StepError("servers_multi_instance_probe: primary NEWMOB_DATA_DIR is missing")
-        shared["NEWMOB_DATA_DIR"] = data_dir
         appdata = primary_env.get("APPDATA")
         if appdata:
             shared["APPDATA"] = appdata
-    elif resolved_system == "Darwin":
-        data_dir = primary_env.get("NEWMOB_DATA_DIR")
-        if not data_dir:
-            raise StepError("servers_multi_instance_probe: primary NEWMOB_DATA_DIR is missing")
-        shared["NEWMOB_DATA_DIR"] = data_dir
-    else:
-        raise StepError(f"servers_multi_instance_probe: unsupported platform {resolved_system}")
     return shared
 
 
@@ -302,6 +297,7 @@ def native_run(ctx: Any, args: Any) -> str:
         {
             "mode": "native",
             "platform": platform.system(),
+            "sharedDataRoot": shared_env["NEWMOB_DATA_DIR"],
             "blockedMessage": blocked_message,
             "primaryBlockedMessage": primary_blocked_message,
             "assertions": [

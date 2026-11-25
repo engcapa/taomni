@@ -1,0 +1,24 @@
+[package]
+name = "taomni-mfa-engine"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "MFA account, OTP and encrypted storage engine independent of the application runtime"
+license = "MIT"
+
+[dependencies]
+taomni-mfa-api = { path = "../taomni-mfa-api", features = ["legacy-snapshot"] }
+aes-gcm = "0.10"
+chrono = "0.4"
+hex = "0.4"
+hmac = "0.13"
+rand = "0.10"
+rusqlite = { version = "0.40", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+sha1 = "0.11"
+sha2 = "0.11"
+uuid = { version = "1", features = ["v4"] }
+zeroize = { version = "1", features = ["zeroize_derive"] }
+
+[dev-dependencies]
+serde_json = "1"

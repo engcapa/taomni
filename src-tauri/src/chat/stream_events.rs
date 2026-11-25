@@ -16,6 +16,7 @@ pub(crate) fn emit_stream_event(
         StreamEventOut::End { .. } => return, // the turn owner publishes the terminal state exactly once
         StreamEventOut::Error { .. } => {
             if let Some(turn) = state
+                .legacy
                 .mobile
                 .pending_turns
                 .lock()
@@ -33,7 +34,12 @@ pub(crate) fn emit_stream_event(
             call_id,
             ..
         } => {
-            let mut tools = state.mobile.tools.lock().unwrap_or_else(|e| e.into_inner());
+            let mut tools = state
+                .legacy
+                .mobile
+                .tools
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
             let calls = tools.entry(thread.into()).or_default();
             if phase == "use" {
                 if calls.len() >= 20 {
@@ -54,5 +60,5 @@ pub(crate) fn emit_stream_event(
         }
         _ => return,
     };
-    state.mobile.task_status(thread, status, summary);
+    state.legacy.mobile.task_status(thread, status, summary);
 }

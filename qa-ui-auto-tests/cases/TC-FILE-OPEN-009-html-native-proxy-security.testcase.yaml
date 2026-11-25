@@ -153,9 +153,9 @@ steps:
 - click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="security.html"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
-- click: '[data-testid="html-console-toggle"]'
 - html_preview_click:
     target: security
+- click: '[data-testid="html-console-toggle"]'
 - assert_pattern:
     selector: '[data-testid="html-console"]'
     regex: HTML_QA TRAVERSAL (403|BLOCKED)
@@ -244,7 +244,7 @@ verification:
     - 20
     - 23
     - 25
-    - 78
+    - 77
     checkpoints:
     - step: 21
       expectation: Next page code executes through the same token.

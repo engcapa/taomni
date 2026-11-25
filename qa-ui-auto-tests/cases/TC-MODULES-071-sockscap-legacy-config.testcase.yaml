@@ -1,0 +1,83 @@
+id: TC-MODULES-071
+title: SocksCap opens and saves a legacy proxy configuration
+description: Load a configuration written before profile metadata and QUIC settings. Change its proxy protocol, then verify the original endpoint and the updated protocol after reopening.
+covers: [F-Sockscap-1]
+tags: [modules, sockscap, p1]
+modes: [browser, native]
+fixtures: [reset_db, sockscap_legacy_config]
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.sockscap.config.v1, value: '${fixture.sockscap_legacy_config}'}
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-testid="sockscap-panel"]'
+- show_sockscap_section: upstream
+- wait_for: '[data-testid="sockscap-upstream-host"][value="127.0.0.1"]'
+- assert_attribute: {selector: '[data-testid="sockscap-upstream-port"]', name: value, equals: '19391'}
+- eval_readonly:
+    expression: "document.getElementById('sockscap-section-gfwlist-content')?.querySelector('input')?.checked === true"
+    expect_truthy: true
+- select_option: {selector: '[data-testid="sockscap-upstream-kind"]', value: http}
+- eval_readonly:
+    expression: "document.getElementById('sockscap-section-upstream-content')?.querySelector('select')?.value === 'http' && document.querySelector('.sockscap-panel')?.getAttribute('aria-busy') === 'false'"
+    expect_truthy: true
+    timeout_sec: 10
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-testid="sockscap-panel"]'
+- show_sockscap_section: upstream
+- wait_for: '[data-testid="sockscap-upstream-host"][value="127.0.0.1"]'
+- assert_attribute: {selector: '[data-testid="sockscap-upstream-port"]', name: value, equals: '19391'}
+- eval_readonly:
+    expression: "document.getElementById('sockscap-section-upstream-content')?.querySelector('select')?.value === 'http'"
+    expect_truthy: true
+- assert_no_runtime_errors: null
+- fill: {selector: '[data-testid="sockscap-upstream-port"]', value: '19397'}
+- eval_readonly:
+    expression: "document.getElementsByName('upstreamPort')[0]?.value === '19397' && document.querySelector('.sockscap-panel')?.getAttribute('aria-busy') === 'false'"
+    expect_truthy: true
+    timeout_sec: 10
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- show_sockscap_section: upstream
+- wait_for: '[data-testid="sockscap-upstream-port"][value="19397"]'
+- assert_attribute: {selector: '[data-testid="sockscap-upstream-host"]', name: value, equals: '127.0.0.1'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: legacy-settings
+    requirement: Opening old settings restores the endpoint and applies the current QUIC default. The selected protocol survives reload with the original endpoint.
+    actions: [3, 4, 5, 7, 11, 13, 14, 15, 17]
+    checkpoints:
+    - {step: 6, expectation: The SocksCap panel loads the existing configuration.}
+    - {step: 8, expectation: The settings form receives the original loopback host.}
+    - {step: 9, expectation: The settings form receives the original listening port.}
+    - {step: 10, expectation: The QUIC checkbox uses the current default.}
+    - {step: 12, expectation: The panel shows the new proxy protocol after saving.}
+    - {step: 18, expectation: Reload restores the original host.}
+    - {step: 19, expectation: Reload restores the original port.}
+    - {step: 20, expectation: Reload restores the selected protocol.}
+    - {step: 21, expectation: Opening and editing the profile produces no runtime errors.}
+    results: [6, 8, 9, 10, 12, 18, 19, 20, 21]
+  - id: edit-reopened-settings
+    requirement: A second edit to the restored profile persists with the previously retained host.
+    actions: [22, 24, 25, 26, 27]
+    checkpoints:
+    - {step: 23, expectation: The focused port field shows the second edit and the profile write is complete.}
+    - {step: 28, expectation: Reopening the tool restores the new port.}
+    - {step: 29, expectation: The original host is retained.}
+    - {step: 30, expectation: The second edit and reopen produce no runtime errors.}
+    results: [23, 28, 29, 30]
+  visual:
+  - check: The legacy settings can be opened from the native and browser Tools areas.
+    method: automated
+    reason: The same panel selector is observed in both modes.
+  native:
+  - check: The real desktop reads the old config file from the isolated profile.
+    method: automated
+    reason: The native fixture writes an actual legacy configuration before the app starts.

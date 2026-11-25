@@ -169,6 +169,7 @@ pub async fn lsp_java_project_model(
         document.uri = uri.to_string();
     }
     Ok(state
+        .core
         .workspace
         .lsp
         .java_project_model(

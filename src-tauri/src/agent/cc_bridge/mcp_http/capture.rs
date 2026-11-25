@@ -107,7 +107,7 @@ impl CcHandler {
             })?;
         let state = self.app_state();
 
-        if state.agent.captures.running_count(&scope.thread_id) >= 2 {
+        if state.core.agent.captures.running_count(&scope.thread_id) >= 2 {
             return Err(ErrorData::internal_error(
                 "too many captures already running for this thread; retry shortly".to_string(),
                 None,
@@ -123,11 +123,11 @@ impl CcHandler {
             Local,
         }
         let target = {
-            // `sid` is a tab id (token scope / fill_session_id). `state.terminal.terminals`
+            // `sid` is a tab id (token scope / fill_session_id). `state.core.terminal.terminals`
             // is keyed by the backend session id, so translate before lookup —
             // otherwise this always misses and reports a live terminal as dead.
             let backend_sid = resolve_backend_session_id(&state, &sid);
-            let terms = state.terminal.terminals.read().await;
+            let terms = state.core.terminal.terminals.read().await;
             match terms.get(&backend_sid) {
                 Some(ActiveTerminal::Ssh {
                     handle, channel, ..
@@ -143,6 +143,7 @@ impl CcHandler {
         };
 
         let cwd = state
+            .core
             .agent
             .agent_thread_cwd
             .lock()
@@ -186,7 +187,7 @@ impl CcHandler {
                     ));
                 }
             };
-            let meta = state.agent.captures.begin(
+            let meta = state.core.agent.captures.begin(
                 &scope.thread_id,
                 command,
                 CaptureSource::RemoteFile {
@@ -198,13 +199,17 @@ impl CcHandler {
             let (family, path) = exec_c::start_c_ssh(&handle, &write_half, command, &meta.id)
                 .await
                 .map_err(|e| {
-                    state
-                        .agent
-                        .captures
-                        .finish(&meta.id, CaptureStatus::Failed, None, 0, 0, false);
+                    state.core.agent.captures.finish(
+                        &meta.id,
+                        CaptureStatus::Failed,
+                        None,
+                        0,
+                        0,
+                        false,
+                    );
                     ErrorData::invalid_params(e, None)
                 })?;
-            state.agent.captures.set_source(
+            state.core.agent.captures.set_source(
                 &meta.id,
                 CaptureSource::RemoteFile {
                     session_id: sid.clone(),
@@ -213,6 +218,7 @@ impl CcHandler {
                 },
             );
             state
+                .core
                 .agent
                 .cc_capture_cancels
                 .lock()
@@ -238,6 +244,7 @@ impl CcHandler {
                     }
                 };
             state
+                .core
                 .agent
                 .cc_capture_cancels
                 .lock()
@@ -245,6 +252,7 @@ impl CcHandler {
                 .remove(&meta.id);
             let (lines, bytes) = *counts.lock().unwrap();
             state
+                .core
                 .agent
                 .captures
                 .finish(&meta.id, status, rc, lines, bytes, false);
@@ -280,8 +288,8 @@ impl CcHandler {
         }
 
         // ---- B path: independent channel / local child, Taomni-local file --
-        let dir = state.agent.captures.thread_dir(&scope.thread_id);
-        let meta = state.agent.captures.begin(
+        let dir = state.core.agent.captures.thread_dir(&scope.thread_id);
+        let meta = state.core.agent.captures.begin(
             &scope.thread_id,
             command,
             CaptureSource::LocalFile(dir.join("placeholder")),
@@ -289,10 +297,12 @@ impl CcHandler {
         let writer = crate::agent::capture::CaptureWriter::create(&dir, &meta.id)
             .map_err(|e| ErrorData::internal_error(format!("capture file: {e}"), None))?;
         state
+            .core
             .agent
             .captures
             .set_source(&meta.id, CaptureSource::LocalFile(writer.path()));
         state
+            .core
             .agent
             .cc_capture_cancels
             .lock()
@@ -323,7 +333,7 @@ impl CcHandler {
             match tokio::time::timeout(Duration::from_secs(CAPTURE_TIMEOUT_SECS), run).await {
                 Ok(Ok(o)) => o,
                 Ok(Err(e)) => {
-                    state.agent.captures.finish(
+                    state.core.agent.captures.finish(
                         &meta.id,
                         CaptureStatus::Failed,
                         None,
@@ -332,6 +342,7 @@ impl CcHandler {
                         writer.truncated(),
                     );
                     state
+                        .core
                         .agent
                         .cc_capture_cancels
                         .lock()
@@ -349,13 +360,14 @@ impl CcHandler {
             };
 
         state
+            .core
             .agent
             .cc_capture_cancels
             .lock()
             .unwrap()
             .remove(&meta.id);
         let truncated = writer.truncated();
-        state.agent.captures.finish(
+        state.core.agent.captures.finish(
             &meta.id,
             outcome.status,
             outcome.exit_code,
@@ -484,6 +496,7 @@ impl CcHandler {
         use crate::agent::capture::CaptureSource;
         let meta = self
             .app_state()
+            .core
             .agent
             .captures
             .get_scoped(&scope.thread_id, &p.capture_id)
@@ -515,7 +528,7 @@ impl CcHandler {
                 let st = self.app_state();
                 let backend_sid = resolve_backend_session_id(&st, session_id);
                 let handle = {
-                    let terms = st.terminal.terminals.read().await;
+                    let terms = st.core.terminal.terminals.read().await;
                     match terms.get(&backend_sid) {
                         Some(ActiveTerminal::Ssh { handle, .. }) => handle.clone(),
                         _ => {

@@ -1,15 +1,7 @@
+use super::book_store;
 use super::dav_protocol::collection_url;
 use super::dav_sync::sync_collection;
-use super::entries::default_book;
-use super::entries::delete_entry;
-use super::entries::entries;
-use super::entries::export_cards;
-use super::entries::import_cards;
-use super::entries::save_entry;
-use super::model::MailAddressBookEntry;
 use super::model::MailCardDavSyncResult;
-use super::storage::apply_changes;
-use super::storage::load_cards;
 use crate::mail::MailAccountConfig;
 use crate::mail::MailAuthMode;
 use crate::mail::now_ts;
@@ -17,19 +9,27 @@ use crate::mail::resolve_config;
 use crate::mail::webdav::CARDDAV;
 use crate::mail::webdav::DavAuth;
 use crate::mail::webdav::DavClient;
-use crate::mail::with_mail_db;
 use crate::state::AppState;
 use reqwest::Url;
-use rusqlite::OptionalExtension;
-use rusqlite::params;
+use taomni_mail_storage::contacts::{
+    MailAddressBookEntry, StoredCard,
+    mailbox::{BookAction, DavState},
+};
 use tauri::State;
+
+fn uses_carddav(config: &MailAccountConfig) -> bool {
+    config
+        .carddav
+        .as_ref()
+        .is_some_and(|settings| !settings.url.trim().is_empty())
+}
 
 #[tauri::command]
 pub async fn mail_list_address_book(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailAddressBookEntry>, String> {
-    with_mail_db(&state, &account_id, |db| entries(db, &account_id))
+    book_store::run(&state, &account_id, BookAction::List).await
 }
 
 #[tauri::command]
@@ -38,12 +38,15 @@ pub async fn mail_save_address_book_entry(
     entry: MailAddressBookEntry,
     state: State<'_, AppState>,
 ) -> Result<MailAddressBookEntry, String> {
-    let account_id = config.session_id.clone();
-    let book = default_book(&config);
-    let db = state.mail_db(&account_id)?;
-    let db = db.lock().map_err(|e| e.to_string())?;
-    super::super::init_mail_tables(&db).map_err(|e| e.to_string())?;
-    save_entry(&db, &account_id, entry, book)
+    book_store::run(
+        &state,
+        &config.session_id,
+        BookAction::Save {
+            entry,
+            carddav: uses_carddav(&config),
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -52,9 +55,7 @@ pub async fn mail_delete_address_book_entry(
     uid: String,
     state: State<'_, AppState>,
 ) -> Result<bool, String> {
-    with_mail_db(&state, &account_id, |db| {
-        delete_entry(db, &account_id, uid.trim())
-    })
+    book_store::run(&state, &account_id, BookAction::Delete { uid }).await
 }
 
 #[tauri::command]
@@ -63,17 +64,29 @@ pub async fn mail_import_vcards(
     source_path: String,
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
-    let bytes =
-        std::fs::read(source_path.trim()).map_err(|e| format!("failed to read vCard file: {e}"))?;
-    if bytes.len() > 64 * 1024 * 1024 {
+    use tokio::io::AsyncReadExt;
+    const LIMIT: u64 = 64 * 1024 * 1024;
+    let file = tokio::fs::File::open(source_path.trim())
+        .await
+        .map_err(|e| format!("failed to read vCard file: {e}"))?;
+    let mut bytes = Vec::new();
+    file.take(LIMIT + 1)
+        .read_to_end(&mut bytes)
+        .await
+        .map_err(|e| format!("failed to read vCard file: {e}"))?;
+    if bytes.len() as u64 > LIMIT {
         return Err("vCard file is larger than 64 MB".into());
     }
-    let text = String::from_utf8_lossy(&bytes).to_string();
-    let book = default_book(&config);
-    let account_id = config.session_id.clone();
-    let count = with_mail_db(&state, &account_id, |db| {
-        import_cards(db, &account_id, &text, book)
-    })?;
+    let text = String::from_utf8_lossy(&bytes).into_owned();
+    let count = book_store::run(
+        &state,
+        &config.session_id,
+        BookAction::Import {
+            text,
+            carddav: uses_carddav(&config),
+        },
+    )
+    .await?;
     if count == 0 {
         return Err("no contacts found in the file".into());
     }
@@ -86,8 +99,10 @@ pub async fn mail_export_vcards(
     target_path: String,
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
-    let (text, count) = with_mail_db(&state, &account_id, |db| export_cards(db, &account_id))?;
-    std::fs::write(target_path.trim(), text)
+    let (text, count): (String, usize) =
+        book_store::run(&state, &account_id, BookAction::Export).await?;
+    tokio::fs::write(target_path.trim(), text)
+        .await
         .map_err(|e| format!("failed to write vCard file: {e}"))?;
     Ok(count)
 }
@@ -117,35 +132,34 @@ pub async fn mail_carddav_sync(
     };
     let client = DavClient::new(CARDDAV, auth, false)?;
     let base = settings.url.trim().to_string();
-    let cached: Option<(Option<String>, Option<String>)> =
-        with_mail_db(&state, &account_id, |db| {
-            db.query_row(
-                "SELECT collection_url, base_url FROM mail_carddav_state WHERE account_id = ?1",
-                params![account_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .optional()
-        })?;
+    let (cached, cards): (Option<DavState>, Vec<StoredCard>) =
+        book_store::run(&state, &account_id, BookAction::StartSync).await?;
     let collection = match cached {
-        Some((Some(url), Some(cached_base))) if cached_base == base => collection_url(&url)?,
+        Some(DavState {
+            collection_url: Some(url),
+            base_url: Some(cached_base),
+            ..
+        }) if cached_base == base => collection_url(&url)?,
         _ => {
             let start = Url::parse(&base).map_err(|e| format!("invalid CardDAV URL: {e}"))?;
             collection_url(client.discover(&start).await?.as_str())?
         }
     };
-    let cards = with_mail_db(&state, &account_id, |db| load_cards(db, &account_id))?;
-    let (result, changes) = sync_collection(&client, &collection, cards).await;
-    let error = result.errors.first().cloned();
-    with_mail_db(&state, &account_id, |db| {
-        apply_changes(db, &account_id, &changes)?;
-        db.execute(
-            "INSERT INTO mail_carddav_state (account_id, collection_url, base_url, last_sync, last_error)
-             VALUES (?1, ?2, ?3, ?4, ?5)
-             ON CONFLICT(account_id) DO UPDATE SET collection_url = excluded.collection_url,
-                base_url = excluded.base_url, last_sync = excluded.last_sync, last_error = excluded.last_error",
-            params![account_id, collection.as_str(), base, now_ts(), error],
-        )?;
-        Ok(())
-    })?;
+    let (result, changes) = sync_collection(&client, &collection, cards.clone()).await;
+    book_store::run::<()>(
+        &state,
+        &account_id,
+        BookAction::FinishSync {
+            original: cards,
+            changes,
+            state: DavState {
+                collection_url: Some(collection.to_string()),
+                base_url: Some(base),
+                last_sync: Some(now_ts()),
+                last_error: result.errors.first().cloned(),
+            },
+        },
+    )
+    .await?;
     Ok(result)
 }

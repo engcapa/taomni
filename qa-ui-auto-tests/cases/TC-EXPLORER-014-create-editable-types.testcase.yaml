@@ -1,0 +1,556 @@
+id: TC-EXPLORER-014
+title: Explorer creates recognized editable file types and rejects invalid names without overwriting files
+description: Toolbar and directory blank-area context entry open the same type selector. Exercise cancellation, path/preview-only rejection,
+  an existing-file conflict, retry, extension-specific numbered names, selected rename and exact empty bytes. Native proves real exclusive
+  file creation; browser proves VFS only. Existing folder/txt workflow remains protected by TC-EXPLORER-003.
+modes:
+- browser
+- native
+covers:
+- F-EXPLORER-1
+- F-FILEOPEN-1
+tags:
+- p1
+- explorer
+- file-open
+- filesystem
+- native-boundary
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 360
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-types
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- wait_for: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- screenshot: explorer-new-editable-file-dialog.png
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="md"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="html"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="svg"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="json"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="yaml"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="xml"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="csv"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="ts"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="py"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="sql"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="name:dockerfile"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="pdf"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="png"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="explorer-new-file-type"] option[value="bin"]'
+    equal: 0
+- click: '[data-testid="explorer-new-file-cancel"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/New file.md
+    absent: true
+- fill:
+    selector: '[data-testid="explorer-filter"]'
+    value: New file.md
+- wait_for: '[data-testid="explorer-file-list"] .ex-empty'
+- right_click: '[data-testid="explorer-file-list"] .ex-empty'
+- click: '[data-testid="explorer-context-new-typed-file"]'
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: ../escape.md
+- click: '[data-testid="explorer-new-file-create"]'
+- assert_text:
+    selector: '[data-testid="explorer-new-file-error"]'
+    contains: valid file name
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: image.png
+- click: '[data-testid="explorer-new-file-create"]'
+- assert_text:
+    selector: '[data-testid="explorer-new-file-error"]'
+    contains: Taomni can edit
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/image.png
+    absent: true
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: notes.txt
+- click: '[data-testid="explorer-new-file-create"]'
+- assert_visible: '[data-testid="explorer-new-file-error"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/notes.txt
+    sha256: ${fixture.file_open_original_sha}
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: md
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: New file.md
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="New file.md"][aria-selected="true"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/New file.md
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/notes.txt
+    sha256: ${fixture.file_open_original_sha}
+- fill:
+    selector: '[data-testid="explorer-filter"]'
+    value: ''
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="explorer-new-file-name"]'
+    name: value
+    equals: New file (2).md
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="New file (2).md"][aria-selected="true"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/New file (2).md
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: html
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: created.html
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="created.html"][aria-selected="true"]'
+- assert_not_visible: '[data-testid="explorer-new-file-dialog"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/created.html
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: svg
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: created.svg
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="created.svg"][aria-selected="true"]'
+- assert_not_visible: '[data-testid="explorer-new-file-dialog"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/created.svg
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: json
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: created.json
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="created.json"][aria-selected="true"]'
+- assert_not_visible: '[data-testid="explorer-new-file-dialog"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/created.json
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: yaml
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: created.yaml
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="created.yaml"][aria-selected="true"]'
+- assert_not_visible: '[data-testid="explorer-new-file-dialog"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/created.yaml
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: xml
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: created.xml
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="created.xml"][aria-selected="true"]'
+- assert_not_visible: '[data-testid="explorer-new-file-dialog"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/created.xml
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: csv
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: created.csv
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="created.csv"][aria-selected="true"]'
+- assert_not_visible: '[data-testid="explorer-new-file-dialog"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/created.csv
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: py
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: created.py
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="created.py"][aria-selected="true"]'
+- assert_not_visible: '[data-testid="explorer-new-file-dialog"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/created.py
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: name:dockerfile
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: dockerfile
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="dockerfile"][aria-selected="true"]'
+- assert_not_visible: '[data-testid="explorer-new-file-dialog"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/dockerfile
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- click: '[data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-typed-file"]'
+- wait_for: '[data-testid="explorer-new-file-dialog"]'
+- select_option:
+    selector: '[data-testid="explorer-new-file-type"]'
+    value: env
+- fill:
+    selector: '[data-testid="explorer-new-file-name"]'
+    value: .env
+- click: '[data-testid="explorer-new-file-create"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name=".env"][aria-selected="true"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/.env
+    equals: ''
+- press:
+    selector: '[data-testid="explorer-rename-input"]'
+    key: Enter
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/New file.md
+    equals: ''
+- assert_no_runtime_errors: null
+- screenshot: TC-EXPLORER-014-create-editable-types.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Both new-type entries expose the editable inventory; cancel and invalid names do not create or change files.
+    actions:
+    - 11
+    - 12
+    - 29
+    - 31
+    - 33
+    - 34
+    - 35
+    - 36
+    - 38
+    - 39
+    checkpoints:
+    - step: 15
+      expectation: Type selector includes the editable md type.
+    - step: 16
+      expectation: Type selector includes the editable html type.
+    - step: 17
+      expectation: Type selector includes the editable svg type.
+    - step: 18
+      expectation: Type selector includes the editable json type.
+    - step: 19
+      expectation: Type selector includes the editable yaml type.
+    - step: 20
+      expectation: Type selector includes the editable xml type.
+    - step: 21
+      expectation: Type selector includes the editable csv type.
+    - step: 22
+      expectation: Type selector includes the editable ts type.
+    - step: 23
+      expectation: Type selector includes the editable py type.
+    - step: 24
+      expectation: Type selector includes the editable sql type.
+    - step: 25
+      expectation: Type selector includes the editable name:dockerfile type.
+    - step: 26
+      expectation: Preview-only or unsupported pdf is excluded.
+    - step: 27
+      expectation: Preview-only or unsupported png is excluded.
+    - step: 28
+      expectation: Preview-only or unsupported bin is excluded.
+    - step: 30
+      expectation: Cancel creates no Markdown file.
+    - step: 32
+      expectation: The visible directory filter leaves an actual blank-area target, with no file row beneath the right click.
+    - step: 37
+      expectation: Parent-path names are rejected in the dialog.
+    - step: 40
+      expectation: Preview-only names are rejected without a file write.
+    - step: 41
+      expectation: Rejected image creation has no disk/VFS side effect.
+    results:
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 30
+    - 32
+    - 37
+    - 40
+    - 41
+  - id: R2
+    requirement: An actual existing-file conflict preserves original bytes and permits a corrected retry.
+    actions:
+    - 42
+    - 43
+    - 46
+    - 47
+    - 48
+    - 51
+    checkpoints:
+    - step: 44
+      expectation: The create dialog refuses the existing filename and keeps the dialog retryable.
+    - step: 45
+      expectation: Existing text retains exactly its original bytes.
+    - step: 50
+      expectation: Retry creates only the corrected empty Markdown file.
+    - step: 52
+      expectation: Completing the retry leaves the existing conflicting file untouched.
+    results:
+    - 44
+    - 45
+    - 50
+    - 52
+  - id: R3
+    requirement: The chosen editable types create selected empty files with their extensions; repeated Markdown creation suggests a
+      distinct name.
+    actions:
+    - 53
+    - 54
+    - 55
+    - 58
+    - 61
+    - 62
+    - 63
+    - 65
+    - 66
+    - 67
+    - 71
+    - 72
+    - 73
+    - 75
+    - 76
+    - 77
+    - 81
+    - 82
+    - 83
+    - 85
+    - 86
+    - 87
+    - 91
+    - 92
+    - 93
+    - 95
+    - 96
+    - 97
+    - 101
+    - 102
+    - 103
+    - 105
+    - 106
+    - 107
+    - 111
+    - 112
+    - 113
+    - 115
+    - 116
+    - 117
+    - 121
+    - 122
+    - 123
+    - 125
+    - 126
+    - 127
+    - 131
+    - 132
+    - 133
+    - 135
+    - 136
+    - 137
+    - 141
+    - 142
+    - 143
+    - 145
+    - 146
+    - 147
+    - 150
+    checkpoints:
+    - step: 57
+      expectation: Same-extension collision is numbered before the extension.
+    - step: 60
+      expectation: Numbered Markdown is a distinct empty file.
+    - step: 69
+      expectation: Successful creation closes the dialog.
+    - step: 70
+      expectation: created.html exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 79
+      expectation: Successful creation closes the dialog.
+    - step: 80
+      expectation: created.svg exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 89
+      expectation: Successful creation closes the dialog.
+    - step: 90
+      expectation: created.json exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 99
+      expectation: Successful creation closes the dialog.
+    - step: 100
+      expectation: created.yaml exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 109
+      expectation: Successful creation closes the dialog.
+    - step: 110
+      expectation: created.xml exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 119
+      expectation: Successful creation closes the dialog.
+    - step: 120
+      expectation: created.csv exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 129
+      expectation: Successful creation closes the dialog.
+    - step: 130
+      expectation: created.py exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 139
+      expectation: Successful creation closes the dialog.
+    - step: 140
+      expectation: dockerfile exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 149
+      expectation: Creating a hidden configuration file reveals and selects it for renaming, and independent bytes are exactly empty.
+    - step: 151
+      expectation: Later creations leave the first same-type file unchanged.
+    - step: 152
+      expectation: All preceding creation/edit/lifecycle actions have no uncaught renderer errors.
+    results:
+    - 57
+    - 60
+    - 69
+    - 70
+    - 79
+    - 80
+    - 89
+    - 90
+    - 99
+    - 100
+    - 109
+    - 110
+    - 119
+    - 120
+    - 129
+    - 130
+    - 139
+    - 140
+    - 149
+    - 151
+    - 152
+  visual:
+  - check: New-file dialog and resulting editor/table layout.
+    method: manual
+    reason: Retained screenshots require review; DOM assertions alone do not certify visual layout.
+  native:
+  - check: Exclusive empty-file creation, refusal to overwrite, selection and extension-specific repeat creation.
+    method: automated
+    reason: Native mode uses real Tauri IPC and independent host bytes; browser mode proves only its isolated VFS. WebView key delivery
+      does not prove physical OS or AppKit accelerator input.

@@ -45,4 +45,3 @@ export function hasPlaintextVaultableKey(provider: LlmProviderConfig): boolean {
       (key !== "local" || provider.custom !== undefined),
   );
 }
-

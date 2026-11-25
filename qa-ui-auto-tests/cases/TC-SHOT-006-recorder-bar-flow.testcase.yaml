@@ -7,7 +7,7 @@ modes: [browser]
 fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}#screenshot-recorder
-- wait_for: '[data-testid="screenshot-recorder-stop"]:enabled'
+- wait_for: '[data-testid="screenshot-recorder"][data-renderer="bundled"] [data-testid="screenshot-recorder-stop"]:enabled'
 - assert_visible: '[data-testid="screenshot-recorder-timer"]'
 - assert_text:
     selector: '[data-testid="screenshot-recorder-range-hint"]'
@@ -55,6 +55,7 @@ steps:
 - assert_not_visible: '[data-testid="screenshot-recorder"]'
 - eval_readonly:
     expression: JSON.stringify(window.__taomniStubScreenshotCalls).split('"cmd":"screenshot_stop_recording"').length === 2 && window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_close_overlay"
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -85,7 +86,8 @@ verification:
     - {step: 25, expectation: Cancel has not sent a save-image command.}
     - {step: 28, expectation: Done unmounts the recorder.}
     - {step: 29, expectation: There is exactly one stop request and a final close.}
-    results: [17, 18, 21, 23, 24, 25, 28, 29]
+    - {step: 30, expectation: Preview and close did not report runtime errors.}
+    results: [17, 18, 21, 23, 24, 25, 28, 29, 30]
   visual:
   - check: Recording controls transition to preview, metadata and completion controls.
     method: automated

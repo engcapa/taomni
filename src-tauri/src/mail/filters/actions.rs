@@ -1,13 +1,10 @@
-use super::model::MailFilterRunResult;
-use super::planning::MessagePlan;
-use crate::mail::ImapSessionOpts;
 use crate::mail::MailAccountConfig;
 use crate::mail::MailMessageHeader;
-use crate::mail::now_ts;
-use crate::mail::resolve_config;
-use crate::mail::with_imap_session;
+use crate::mail::message_source::fetch_original_from_server;
 use crate::state::AppState;
 use std::collections::BTreeMap;
+use std::io::Write;
+use taomni_mail_storage::filters::{MailFilterRunResult, MessagePlan};
 use tauri::State;
 
 pub(super) async fn raw_bytes(
@@ -17,23 +14,9 @@ pub(super) async fn raw_bytes(
     uid: u32,
 ) -> Result<Vec<u8>, String> {
     if super::super::pop3::is_pop3(config) {
-        return super::super::local_cmds::raw(state, &config.session_id, folder, uid);
+        return super::super::local_cmds::raw(state, &config.session_id, folder, uid).await;
     }
-    let account = resolve_config(state, config.clone())?;
-    let handle = tokio::runtime::Handle::current();
-    let pool = std::sync::Arc::clone(&state.mail.mail_imap_pool);
-    let folder = folder.to_string();
-    tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            ImapSessionOpts::default(),
-            |imap| imap.fetch_raw(&folder, uid),
-        )
-    })
-    .await
-    .map_err(|e| format!("forward: fetch task failed: {e}"))?
+    fetch_original_from_server(state, config.clone(), folder, uid).await
 }
 
 /// Forward as a `message/rfc822` attachment (keeps the original intact).
@@ -44,13 +27,14 @@ pub(super) async fn forward_message(
     to: &str,
 ) -> Result<(), String> {
     let raw = raw_bytes(state, config, &header.folder, header.uid).await?;
-    let path = std::env::temp_dir().join(format!(
-        "taomni-filter-forward-{}-{}-{}.eml",
-        std::process::id(),
-        header.uid,
-        now_ts()
-    ));
-    std::fs::write(&path, &raw).map_err(|e| format!("forward: cannot stage message: {e}"))?;
+    let stage = tokio::task::spawn_blocking(move || -> std::io::Result<_> {
+        let mut file = tempfile::Builder::new().suffix(".eml").tempfile()?;
+        file.write_all(&raw)?;
+        Ok(file)
+    })
+    .await
+    .map_err(|error| format!("forward: staging task failed: {error}"))?
+    .map_err(|error| format!("forward: cannot stage message: {error}"))?;
     let subject = if header.subject.trim().is_empty() {
         "Fwd: (no subject)".to_string()
     } else {
@@ -61,15 +45,15 @@ pub(super) async fn forward_message(
         "subject": subject,
         "textBody": "Forwarded by a Taomni mail filter.\n",
         "attachments": [{
-            "path": path.to_string_lossy(),
+            "path": stage.path().to_string_lossy(),
             "name": "forwarded-message.eml",
             "contentType": "message/rfc822",
         }],
     }))
     .map_err(|e| format!("forward: {e}"))?;
-    let sent = super::super::send_message(config.clone(), request, None, state.clone()).await;
-    let _ = std::fs::remove_file(&path);
-    sent.map(|_| ())
+    super::super::send_message(config.clone(), request, None, state.clone())
+        .await
+        .map(|_| ())
 }
 
 pub(super) fn group(

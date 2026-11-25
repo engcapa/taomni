@@ -99,7 +99,7 @@ pub fn prompt(db: &Connection, question: &str) -> Result<String, String> {
 
 #[tauri::command]
 pub fn deepseek_app_memory_list(state: State<'_, AppState>) -> Result<Vec<Value>, String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     list(&db)
 }
 #[tauri::command]
@@ -108,7 +108,7 @@ pub fn deepseek_app_memory_save(
     confirmed: bool,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     save(&db, entry, confirmed)
 }
 #[tauri::command]
@@ -120,7 +120,7 @@ pub fn deepseek_app_memory_delete(
     if !confirmed {
         return Err("confirmation: deleting memory requires approval".into());
     }
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     init(&db)?;
     db.execute("DELETE FROM tao_memory_entries WHERE id=?1", [id])
         .map_err(|error| error.to_string())?;
@@ -128,7 +128,7 @@ pub fn deepseek_app_memory_delete(
 }
 #[tauri::command]
 pub fn deepseek_app_memory_export(state: State<'_, AppState>) -> Result<Vec<Value>, String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     list(&db)
 }
 

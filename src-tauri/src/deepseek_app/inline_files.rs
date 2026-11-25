@@ -54,7 +54,7 @@ pub async fn attach(
         "inline-{}",
         digest(format!("{thread}:{provider}:{hash}").as_bytes())
     );
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     let reused = storage::remember(
         &db,
         &id,
@@ -80,7 +80,7 @@ pub async fn resolve(
     id: &str,
 ) -> Result<Value, String> {
     let file = {
-        let db = state.db.lock().map_err(|_| "database unavailable")?;
+        let db = state.core.db.lock().map_err(|_| "database unavailable")?;
         storage::lookup(&db, thread, provider, id)?
     };
     read_part(file).await
@@ -99,7 +99,7 @@ async fn read_part(file: storage::StoredFile) -> Result<Value, String> {
 }
 
 pub fn remove(state: &AppState, id: &str) -> Result<(), String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     storage::remove(&db, id)
 }
 

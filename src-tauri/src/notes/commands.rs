@@ -14,7 +14,7 @@ use crate::state::AppState;
 /// Lock the dedicated notes.db connection, mapping poison errors to a string.
 macro_rules! notes_conn {
     ($state:expr) => {
-        $state.notes_db.lock().map_err(|e| e.to_string())?
+        $state.core.notes_db.lock().map_err(|e| e.to_string())?
     };
 }
 
@@ -72,6 +72,7 @@ pub async fn notes_save_content(
     state: State<'_, AppState>,
 ) -> Result<NoteItem, db::ContentSaveError> {
     let conn = state
+        .core
         .notes_db
         .lock()
         .map_err(|e| db::ContentSaveError::Storage(e.to_string()))?;

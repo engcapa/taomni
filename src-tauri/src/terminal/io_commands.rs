@@ -37,7 +37,7 @@ pub(super) fn read_loop_local(
     use tauri::Manager;
     let code = {
         let state = app.state::<AppState>();
-        let terminals = state.terminal.terminals.blocking_read();
+        let terminals = state.core.terminal.terminals.blocking_read();
         match terminals.get(&session_id) {
             Some(ActiveTerminal::Local { child, .. }) => child
                 .lock()
@@ -47,7 +47,7 @@ pub(super) fn read_loop_local(
             _ => None,
         }
     };
-    outputs.broker.exit_with_code(&session_id, code);
+    outputs.observations.exited(&session_id, code);
     crate::mobile::events::EventSink::emit(
         &crate::mobile::events::DesktopSink(app),
         &format!("terminal-exit-{}", session_id),
@@ -86,7 +86,7 @@ pub(crate) async fn write_desktop_terminal(
     data: &str,
     source: TerminalInputSource,
 ) -> Result<(), String> {
-    let gate = state.mobile.broker.gate(session_id).ok();
+    let gate = state.legacy.mobile.broker.gate(session_id).ok();
     let _guard = match gate.as_ref() {
         Some(g) => Some(g.lock().await),
         None => None,
@@ -95,10 +95,15 @@ pub(crate) async fn write_desktop_terminal(
         // Only the controlling emulator should answer queries (in particular
         // CPR must describe the phone's geometry). Desktop replies neither
         // reclaim control nor feed a second, stale response into the PTY.
-        if !state.mobile.broker.desktop_response_allowed(session_id) {
+        if !state
+            .legacy
+            .mobile
+            .broker
+            .desktop_response_allowed(session_id)
+        {
             return Ok(());
         }
-    } else if let Some((cols, rows)) = state.mobile.broker.desktop(session_id, None) {
+    } else if let Some((cols, rows)) = state.legacy.mobile.broker.desktop(session_id, None) {
         let _ = resize_terminal_inner(state, session_id, cols, rows).await;
     }
     write_terminal_inner(state, session_id, data).await
@@ -113,7 +118,7 @@ pub(crate) async fn write_terminal_inner(
         .decode(&data)
         .map_err(|e| format!("Invalid base64: {}", e))?;
 
-    let terminals = state.terminal.terminals.read().await;
+    let terminals = state.core.terminal.terminals.read().await;
     let terminal = terminals
         .get(session_id)
         .ok_or_else(|| format!("Terminal {} not found", session_id))?;
@@ -145,12 +150,16 @@ pub async fn resize_terminal(
     rows: u16,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let gate = state.mobile.broker.gate(&session_id).ok();
+    let gate = state.legacy.mobile.broker.gate(&session_id).ok();
     let _guard = match gate.as_ref() {
         Some(g) => Some(g.lock().await),
         None => None,
     };
-    state.mobile.broker.desktop(&session_id, Some((cols, rows)));
+    state
+        .legacy
+        .mobile
+        .broker
+        .desktop(&session_id, Some((cols, rows)));
     resize_terminal_inner(&state, &session_id, cols, rows).await
 }
 
@@ -160,7 +169,7 @@ pub(crate) async fn resize_terminal_inner(
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
-    let terminals = state.terminal.terminals.read().await;
+    let terminals = state.core.terminal.terminals.read().await;
     let terminal = terminals
         .get(session_id)
         .ok_or_else(|| format!("Terminal {} not found", session_id))?;
@@ -196,7 +205,7 @@ pub(crate) async fn send_terminal_signal_inner(
     session_id: &str,
     signal: &str,
 ) -> Result<(), String> {
-    let terminals = state.terminal.terminals.read().await;
+    let terminals = state.core.terminal.terminals.read().await;
     let terminal = terminals
         .get(session_id)
         .ok_or_else(|| format!("Terminal {} not found", session_id))?;
@@ -217,9 +226,9 @@ pub(crate) async fn send_terminal_signal_inner(
 
 #[tauri::command]
 pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
-    state.mobile.broker.remove(&session_id);
+    state.legacy.mobile.broker.remove(&session_id);
     let removed = {
-        let mut terminals = state.terminal.terminals.write().await;
+        let mut terminals = state.core.terminal.terminals.write().await;
         terminals.remove(&session_id)
     };
     if let Some(ActiveTerminal::Ssh { forwards, .. }) = removed {
@@ -230,12 +239,12 @@ pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> R
             h.abort();
         }
     }
-    if let Ok(mut outputs) = state.terminal.terminal_outputs.lock() {
+    if let Ok(mut outputs) = state.core.terminal.terminal_outputs.lock() {
         outputs.remove(&session_id);
     }
     // A closed terminal can never accept late cwd reports; drop its
     // per-runtime dedup entry (design §4.1.5).
-    if let Ok(mut runtime) = state.terminal.local_directory_runtime.lock() {
+    if let Ok(mut runtime) = state.core.terminal.local_directory_runtime.lock() {
         runtime.remove(&session_id);
     }
     Ok(())

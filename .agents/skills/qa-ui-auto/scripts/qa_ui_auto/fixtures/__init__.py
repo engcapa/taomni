@@ -57,8 +57,10 @@ from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from . import mobile_web, mobile_service, mobile_openssh
+from .. import servers_http_observation, servers_ssh_observation
 from . import ard_required, editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_desktop_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, vnc_required, welcome_recents, workspace_root
 from . import platform_workspace_root
+from . import sockscap_legacy, sockscap_redirector
 from . import workspace_restore_sessions
 from . import bookmark_assets
 from . import clickhouse_required
@@ -96,6 +98,7 @@ from . import rdp_baseline_required
 from . import rdp_audio_required
 from . import xrdp_server_required
 from . import backup_policy
+from . import core_profile_state
 from . import model_inspector_gateway
 from . import backup_cloud
 from . import credential_store
@@ -103,6 +106,15 @@ from . import path_completion
 from . import java_real_project
 from . import dual_display_required
 from . import rdp_deferred_clipboard
+from . import module_offline_archive
+from . import module_signed_archive, module_backup_data, module_voice
+from . import module_preview
+from . import module_upgrade
+from . import module_legacy_install, module_legacy_mfa
+from . import module_download
+from . import module_download_preview
+from . import module_marketplace, module_marketplace_preview
+from . import module_execution
 from . import tao_llm
 from . import tao_custom_llm
 from . import tao_messages
@@ -131,6 +143,37 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "module_preview": Fixture("module_preview", module_preview.setup),
+    "module_vnc_preview": Fixture("module_vnc_preview", module_preview.setup_vnc),
+    "module_rdp_preview": Fixture("module_rdp_preview", module_preview.setup_rdp),
+    "module_mail_preview": Fixture("module_mail_preview", module_preview.setup_mail),
+    "module_sockscap_preview": Fixture("module_sockscap_preview", module_preview.setup_sockscap),
+    "sockscap_legacy_config": Fixture("sockscap_legacy_config", sockscap_legacy.setup),
+    "sockscap_pending_recovery": Fixture("sockscap_pending_recovery", sockscap_legacy.setup_pending_recovery),
+    "module_signed_sockscap_archive": Fixture("module_signed_sockscap_archive", sockscap_legacy.setup_signed, sockscap_redirector.teardown),
+    "module_upgrade": Fixture("module_upgrade", module_upgrade.setup, module_upgrade.teardown),
+    "module_legacy_install": Fixture("module_legacy_install", module_legacy_install.setup),
+    "module_legacy_mfa": Fixture("module_legacy_mfa", module_legacy_mfa.setup),
+    "module_download": Fixture("module_download", module_download.setup, module_download.teardown),
+    "module_download_preview": Fixture("module_download_preview", module_download_preview.setup),
+    "module_marketplace": Fixture("module_marketplace", module_marketplace.setup, module_marketplace.teardown),
+    "module_legacy_roster": Fixture("module_legacy_roster", module_marketplace.setup_roster, module_marketplace.teardown),
+    "module_marketplace_preview": Fixture("module_marketplace_preview", module_marketplace_preview.setup),
+    "module_offline_archive": Fixture("module_offline_archive", module_offline_archive.setup),
+    "module_backup_data": Fixture("module_backup_data", module_backup_data.setup, module_backup_data.teardown),
+    "module_signed_archive": Fixture("module_signed_archive", module_signed_archive.setup),
+    "module_signed_mfa_archive": Fixture("module_signed_mfa_archive", module_signed_archive.setup_mfa),
+    "module_signed_vnc_archive": Fixture("module_signed_vnc_archive", module_signed_archive.setup_vnc),
+    "module_signed_rdp_archive": Fixture("module_signed_rdp_archive", module_signed_archive.setup_rdp),
+    "module_signed_mail_archive": Fixture("module_signed_mail_archive", module_signed_archive.setup_mail),
+    "module_signed_screenshot_archive": Fixture("module_signed_screenshot_archive", module_signed_archive.setup_screenshot),
+    "module_signed_vnc_server_archive": Fixture("module_signed_vnc_server_archive", module_signed_archive.setup_vnc_server),
+    "module_signed_rdp_server_archive": Fixture("module_signed_rdp_server_archive", module_signed_archive.setup_rdp_server),
+    "module_signed_servers_archive": Fixture("module_signed_servers_archive", module_signed_archive.setup_servers),
+    "module_signed_voice_archive": Fixture("module_signed_voice_archive", module_voice.setup),
+    "local_servers_http": Fixture("local_servers_http", servers_http_observation.setup),
+    "local_servers_ssh": Fixture("local_servers_ssh", servers_ssh_observation.setup),
+    "module_execution": Fixture("module_execution", module_execution.setup, module_execution.teardown),
     "markdown_testing": Fixture("markdown_testing", markdown_testing.setup, markdown_testing.teardown),
     "markdown_quality": Fixture("markdown_quality", markdown_quality.setup, markdown_quality.teardown),
     "markdown_drawio": Fixture("markdown_drawio", markdown_drawio.setup, markdown_drawio.teardown),
@@ -153,6 +196,7 @@ REGISTRY: dict[str, Fixture] = {
     "dual_display_required": Fixture("dual_display_required", dual_display_required.setup),
     "path_completion": Fixture("path_completion", path_completion.setup),
     "backup_policy": Fixture("backup_policy", backup_policy.setup),
+    "core_profile_state": Fixture("core_profile_state", core_profile_state.setup),
     "backup_cloud": Fixture("backup_cloud", backup_cloud.setup, backup_cloud.teardown),
     "credential_store": Fixture("credential_store", credential_store.setup),
     "project_tree": Fixture("project_tree", project_tree.setup),

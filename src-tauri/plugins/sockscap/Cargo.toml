@@ -1,0 +1,25 @@
+[package]
+name = "taomni-plugin-sockscap"
+version = "0.1.14"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "Official SocksCap host"
+
+[dependencies]
+taomni-module-settings = { path = "../../crates/taomni-module-settings" }
+taomni-plugin-stream = { path = "../../crates/taomni-plugin-stream" }
+tokio = { version = "1", features = ["rt-multi-thread", "time", "net"] }
+serde = "1"
+serde_json = "1"
+taomni-plugin-api = { path = "../../crates/taomni-plugin-api" }
+taomni-plugin-sdk = { path = "../../crates/taomni-plugin-sdk" }
+taomni-sockscap-api = { path = "../../crates/taomni-sockscap-api" }
+taomni-sockscap-xray = { path = "xray" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+taomni-sockscap-tools = { path = "tools" }
+taomni-redirector = { path = "../../crates/taomni-redirector" }
+
+[dev-dependencies]
+tempfile = "3"

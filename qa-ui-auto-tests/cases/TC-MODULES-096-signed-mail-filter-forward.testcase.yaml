@@ -1,0 +1,69 @@
+id: TC-MODULES-096
+title: Signed Mail forwards the complete matched message to the rule recipient
+description: Install signed Mail and save a forwarding rule. Deliver a matching message and an unrelated one. Verify the loopback SMTP recipient and the original MIME attachment while both originals remain in the inbox.
+covers: [F-Modules-1, F-MAIL-19]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, mail_server, module_signed_mail_archive]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- press: {selector: '[data-testid="module-action-enable-mail"]:enabled', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="mail"] [data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches: {timeout_sec: 45}
+- click: '[data-testid="mail-filters-open"]'
+- click: '[data-testid="mail-filter-new"]'
+- fill: {selector: '[data-testid="mail-filter-name"]', value: QA forward}
+- select_option: {selector: '[data-testid="mail-filter-condition-field"]', value: subject}
+- fill: {selector: '[data-testid="mail-filter-condition-value"]', value: Forward sample}
+- select_option: {selector: '[data-testid="mail-filter-action-kind"]', value: forward}
+- fill: {selector: '[data-testid="mail-filter-action-address"]', value: forward-target@example.com}
+- click: '[data-testid="mail-filter-save"]'
+- wait_for: '[data-testid="mail-filter-row"][data-filter-name="QA forward"]'
+- click: '[data-testid="mail-filters-close"]'
+- mail_server_deliver: {count: 1, prefix: Forward sample, body: Original content for one configured recipient.}
+- mail_server_deliver: {count: 1, prefix: Leave alone, body: An unrelated message.}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_smtp_contains: {text: 'Subject: Fwd: Forward sample 0001', timeout_sec: 45}
+- mail_server_assert_list_matches: {timeout_sec: 30}
+- assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Forward sample 0001"]', equal: 1}
+- assert_count: {selector: '[data-testid="mail-message-row"][data-subject="Leave alone 0001"]', equal: 1}
+- assert_signed_mail_host: imap-forward
+- assert_no_runtime_errors: null
+- screenshot: signed-mail-forward.png
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-forward
+    requirement: The saved rule forwards one complete message to its configured recipient.
+    actions: [8, 10, 16, 19, 20, 21, 22, 23, 24, 25, 26, 28, 29, 30, 31]
+    checkpoints:
+    - {step: 12, expectation: The verified Mail package is installed and its writer lease is idle.}
+    - {step: 17, expectation: Quick Connect opens the signed Mail tab.}
+    - {step: 27, expectation: The forwarding rule is saved.}
+    - {step: 32, expectation: The SMTP server receives the forwarded subject.}
+    - {step: 33, expectation: The visible inbox agrees with the IMAP server.}
+    - {step: 34, expectation: The matched message remains present once.}
+    - {step: 35, expectation: The other original remains present once.}
+    - {step: 36, expectation: The signed host report ties the raw IMAP fetch to one SMTP delivery with the original attachment.}
+    - {step: 37, expectation: The renderer reports no runtime errors.}
+    results: [12, 17, 27, 32, 33, 34, 35, 36, 37]
+  visual:
+  - {check: Both original messages stay visible in the inbox, method: automated, reason: The runner checks both exact subjects.}
+  native:
+  - {check: IMAP source bytes and the delivered MIME attachment identify the same original, method: automated, reason: The report matches the original message identifier and body and records the only SMTP recipient.}

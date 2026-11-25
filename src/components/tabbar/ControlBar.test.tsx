@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { openExplorer } from "../../lib/explorer/openExplorer";
 import { useAppStore } from "../../stores/appStore";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { useTabOverviewStore } from "../../stores/tabOverviewStore";
@@ -160,6 +161,24 @@ describe("ControlBar settings button", () => {
     expect(onWorkspaceCommand).toHaveBeenCalledWith("workspace.findInFiles");
   });
 
+  it("switches from Tools to the dedicated Explorer tab strip and back", async () => {
+    useAppStore.setState({
+      activeSideTab: "tools",
+      tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }],
+      activeTabId: "welcome",
+    });
+    renderControlBar(vi.fn());
+    expect(screen.getByTestId("platform-mode-title")).toHaveTextContent("Tools");
+    await act(async () => { await openExplorer("/docs", { title: "Documents" }); });
+    const explorer = screen.getByTestId("explorer-tab-strip");
+    expect(within(explorer).getByRole("tab", { name: /Documents/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("tab-bar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("platform-mode-title")).not.toBeInTheDocument();
+    act(() => useAppStore.getState().setActiveSideTab("tools"));
+    expect(screen.getByTestId("platform-mode-title")).toHaveTextContent("Tools");
+    expect(screen.queryByTestId("explorer-tab-strip")).not.toBeInTheDocument();
+  });
+
   it("shows the dedicated Explorer strip and its tab filter when the Explorer rail is active", () => {
     useAppStore.setState({ activeSideTab: "explorer", tabs: [], activeTabId: null });
     useExplorerStore.setState({
@@ -184,6 +203,7 @@ describe("ControlBar settings button", () => {
     });
     expect(screen.queryByTestId("explorer-tabs-filter-trigger")).not.toBeInTheDocument();
     expect(screen.getByTestId("platform-mode-title")).toHaveTextContent("Tools");
+    expect(screen.queryByTestId("explorer-tab-strip")).not.toBeInTheDocument();
     // Leaving Explorer restores the sidebar collapse affordance.
     expect(screen.getByTestId("toggle-left-sidebar")).toBeInTheDocument();
   });

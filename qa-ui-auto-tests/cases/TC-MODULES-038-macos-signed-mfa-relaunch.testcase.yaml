@@ -1,0 +1,120 @@
+id: TC-MODULES-038
+title: The macOS Settings upgrade relaunches with a working signed MFA module
+description: >-
+  Create an encrypted MFA account in the candidate's legacy store. In Settings
+  present the matching production-signed MFA package and reject a wrong Vault
+  password. Confirm with the correct password, observe the original process
+  exit normally, and attach to the application's own new process. Reopen MFA
+  and confirm the migrated HOTP counter and the next code. Scan an external QR
+  through the relaunched app's core capture service and the installed host.
+covers: [F-Modules-1, F-MFA-1, F-MFA-2]
+tags: [modules, mfa, upgrade, native-boundary, macos, p0]
+modes: [native]
+native_platforms: [macOS]
+fixtures: [reset_db, module_signed_mfa_archive, release_build_required]
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-original-mfa-038}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-original-mfa-038}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: Signed Upgrade}
+- fill: {selector: '[data-testid="mfa-add-secret"]', value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ}
+- click: '[data-testid="mfa-add-advanced"]'
+- select_option: {selector: '[data-testid="mfa-add-kind"]', value: hotp}
+- click: '[data-testid="mfa-add-submit"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 755 224}
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- press: {selector: '[data-testid="module-upgrade-mfa-open"]', key: Enter}
+- fill: {selector: '[data-testid="module-upgrade-mfa-archive"]', value: '${fixture.mfa_signed_archive}'}
+- fill: {selector: '[data-testid="module-upgrade-mfa-signature"]', value: '${fixture.mfa_signed_signature}'}
+- fill: {selector: '[data-testid="module-upgrade-mfa-password"]', value: wrong-password}
+- press: {selector: '[data-testid="module-upgrade-mfa-submit"]:not([disabled])', key: Enter}
+- assert_text: {selector: '[data-testid="module-upgrade-mfa-error"]', contains: Incorrect Vault password, timeout_sec: 30}
+- assert_no_runtime_errors: null
+- fill: {selector: '[data-testid="module-upgrade-mfa-password"]', value: qa-original-mfa-038}
+- native_confirm_mfa_upgrade_relaunch: null
+- wait_for: {selector: '[data-testid="status-bar"]', timeout_sec: 60}
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-original-mfa-038}
+- click: '[data-testid="vault-unlock-confirm"]'
+- wait_for: {selector: '[data-testid="vault-unlock-dialog"]', state: detached, timeout_sec: 30}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- assert_visible: '[data-testid="module-upgrade-mfa-result"][data-state="complete"]'
+- assert_count: {selector: '[data-testid="module-upgrade-mfa-open"]', equal: 0}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- assert_visible: '[data-testid="mfa-account-row"][data-issuer="Signed Upgrade"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082, timeout_sec: 30}
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 359 152}
+- assert_no_runtime_errors: null
+- click: '[data-testid="mfa-add"]'
+- click: '[data-testid="mfa-add-mode-screen"]'
+- native_show_image_window: {path: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png, x: 16, y: 60}
+- click: '[data-testid="mfa-screen-scan"]'
+- wait_for: {selector: '[data-testid="mfa-add-dialog"][data-mode="preview"]', timeout_sec: 60}
+- assert_attribute: {selector: '[data-testid="mfa-add-dialog"]', name: data-screen-decoder, equals: module}
+- assert_items: {selector: '[data-testid="mfa-import-item"]', attribute: data-issuer, equals: [QA Bank]}
+- native_show_image_window: {action: close}
+- press: Escape
+- assert_not_visible: '[data-testid="mfa-add-dialog"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 359 152}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Real package verification and a valid Vault password are required before automatically restarting the app.
+    actions: [21, 23, 24, 25, 26, 27, 28, 31, 32]
+    checkpoints:
+    - {step: 29, expectation: The wrong Vault password leaves the original UI open.}
+    - {step: 32, expectation: The helper rejects a different binary. The original process exits normally and the bridge attaches to a new process from the same verified binary.}
+    - {step: 41, expectation: Settings reports a committed MFA upgrade.}
+    - {step: 42, expectation: The committed profile has no remaining MFA migration action.}
+    results: [29, 32, 41, 42]
+  - id: R2
+    requirement: The signed host reads and updates the migrated encrypted account using its retained Vault key.
+    actions: [17, 19, 35, 36, 43, 44, 46, 49]
+    checkpoints:
+    - {step: 20, expectation: The legacy store has the counter-one RFC HOTP code.}
+    - {step: 47, expectation: The original issuer appears after Vault unlock.}
+    - {step: 48, expectation: The hosted account preserves the counter-one code.}
+    - {step: 50, expectation: Next returns the counter-two code from the signed host.}
+    - {step: 51, expectation: The relaunched UI has no unhandled runtime errors.}
+    results: [47, 48, 50, 51]
+  - id: R3
+    requirement: The relaunched macOS app captures an external QR and the signed MFA host produces the import preview.
+    actions: [52, 53, 54, 55, 59, 60]
+    checkpoints:
+    - {step: 56, expectation: The real screen scan opens the import preview.}
+    - {step: 57, expectation: The installed module provides the decoded result.}
+    - {step: 58, expectation: The decoded issuer matches the QR in the external AppKit window.}
+    - {step: 61, expectation: The restored app accepts Escape after capture.}
+    - {step: 62, expectation: The migrated account retains its original counter.}
+    - {step: 63, expectation: Screen scan and review produce no unhandled runtime errors.}
+    results: [56, 57, 58, 61, 62, 63]
+  visual:
+  - check: Wrong password, successful result and the migrated account are visible in the actual application.
+    method: automated
+    reason: The native bridge observes each application state.
+  native:
+  - check: The ordinary Settings flow runs the signed artifact and restarts the same isolated macOS app.
+    method: automated
+    reason: Both process identities, normal exit and the reattached native UI are recorded.

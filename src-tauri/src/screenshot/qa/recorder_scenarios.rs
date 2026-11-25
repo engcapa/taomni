@@ -429,7 +429,12 @@ pub(super) async fn finish_recorder(bar: &WebviewWindow) -> Result<(), String> {
 /// the preview loads (asset protocol), then finish and confirm the session
 /// ends with the main window restored.
 #[tauri::command]
-pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<String, String> {
+pub async fn screenshot_qa_recorder(
+    app: AppHandle,
+    format: String,
+    expect_signed_renderer: Option<bool>,
+    expect_cancel: Option<bool>,
+) -> Result<String, String> {
     ensure_qa(&app)?;
     let _cleanup = ScenarioCleanup(app.clone());
     super::super::close_session(&app);
@@ -484,6 +489,16 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     let bar = wait_window(&app, super::super::RECORDER_LABEL, Duration::from_secs(10))
         .await
         .map_err(|e| format!("{e:#}"))?;
+    if expect_cancel == Some(true) {
+        return cancel_recorder(
+            &app,
+            &bar,
+            &started.recording_id,
+            &output,
+            expect_signed_renderer,
+        )
+        .await;
+    }
     let geometry = capture_surfaces(&app, &display, region, super::super::RECORDER_LABEL, true)
         .await
         .map_err(|e| e.to_string())?;
@@ -523,6 +538,7 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
       } else if (!preview.complete || preview.naturalWidth <= 0) throw new Error('GIF preview did not load');
       return {
         timerBefore, timerAfter, tag: preview.tagName,
+        renderer: q('[data-testid="screenshot-recorder"]')?.dataset.renderer,
         naturalWidth: preview.naturalWidth || preview.videoWidth || 0,
         naturalHeight: preview.naturalHeight || preview.videoHeight || 0,
         duration: preview.duration || 0, playbackMoved,
@@ -556,7 +572,10 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     let preview_ok = info["naturalWidth"].as_u64() == Some(clip.width as u64)
         && info["naturalHeight"].as_u64() == Some(clip.height as u64)
         && (format != "mp4" || info["playbackMoved"] == json!(true));
-    let ok = main_hidden
+    let renderer_ok =
+        expect_signed_renderer != Some(true) || info["renderer"] == json!("signed-module");
+    let ok = renderer_ok
+        && main_hidden
         && selection_layer_closed
         && geometry["controlsOutside"] == json!(true)
         && geometry["bordersOutside"] == json!(true)
@@ -578,5 +597,63 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
         json!({ "page":info,"clip":clip,"barClosed":closed,"mainHidden":main_hidden,"mainRestored":restored,
         "selectionLayerEntry":selection_layer_entry,"selectionLayerClosed":selection_layer_closed,
         "gifCopied":copied,"previewRetained":preview_retained,"tempRemoved":output_removed,"format":format,"originalComparison":content,"artifact":artifact,"captureGeometry":geometry }),
+    ))
+}
+
+async fn cancel_recorder(
+    app: &AppHandle,
+    bar: &WebviewWindow,
+    recording_id: &str,
+    output: &std::path::Path,
+    expect_signed_renderer: Option<bool>,
+) -> Result<String, String> {
+    let page = run_js(
+        bar,
+        r#"
+          const q = id => document.querySelector('[data-testid="' + id + '"]');
+          for (let i = 0; i < 100; i++) {
+            if (q('screenshot-recorder-stop')?.disabled === false &&
+                q('screenshot-recorder-cancel')?.disabled === false) {
+              return { renderer: q('screenshot-recorder')?.dataset.renderer,
+                       previewOpen: !!q('screenshot-recorder-preview') };
+            }
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          throw new Error('Active recorder controls did not become ready');
+        "#,
+        Duration::from_secs(15),
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+    bar.eval("document.querySelector('[data-testid=\"screenshot-recorder-cancel\"]').click()")
+        .map_err(|error| error.to_string())?;
+    let closed = wait_closed(app, super::super::RECORDER_LABEL, Duration::from_secs(15)).await;
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while std::time::Instant::now() < deadline
+        && (!main_visible(app) || super::super::runtime::tool_state().session_lease.is_some())
+    {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let idle = super::super::screenshot_current_recording()
+        .await?
+        .is_none();
+    let temp_removed =
+        super::super::record::output_path(recording_id).is_none() && !output.exists();
+    let lease_released = super::super::session::SessionLease::acquire()?.is_some();
+    let restored = main_visible(app);
+    let renderer_ok =
+        expect_signed_renderer != Some(true) || page["renderer"] == json!("signed-module");
+    Ok(report(
+        renderer_ok
+            && page["previewOpen"] == json!(false)
+            && closed
+            && idle
+            && temp_removed
+            && lease_released
+            && restored,
+        json!({
+            "page": page, "barClosed": closed, "mainRestored": restored,
+            "tempRemoved": temp_removed, "idle": idle, "leaseReleased": lease_released,
+        }),
     ))
 }

@@ -23,8 +23,9 @@ pub async fn start(
     config: &SocksCapConfig,
     ctx: Arc<RwLock<RelayContext>>,
     session_id: &str,
+    cancel: &tokio_util::sync::CancellationToken,
 ) -> Result<MacosCaptureHandle, runtime::RedirectorStartError> {
-    runtime::start(app, config, ctx, session_id).await
+    runtime::start(app, config, ctx, session_id, cancel).await
 }
 
 /// Reacquire Redirector control and replace any scope stranded by an unclean

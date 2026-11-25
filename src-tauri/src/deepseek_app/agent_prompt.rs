@@ -38,7 +38,7 @@ pub fn capabilities() -> &'static str {
      mail/mail-unified: 邮件账户与统一收件箱（默认不读正文）；notes: Markdown笔记、步骤、标签；\n\
      nettools/proxy-test/sockscap/servers: 网络诊断、代理检查/进程代理、本地服务；\n\
      welcome/settings: Tao首页、会话分组、最近工作区/目录、设置；file-viewer: Markdown/PDF/图片及导出；\n\
-     lan-chat: 局域网通信（不隐式检索他人消息）；mfa: 身份验证（秘密不可检索）；\n\
+     mfa: 身份验证（秘密不可检索）；\n\
      Tao: 新旧对话、记忆/技能（显式保存）、问/做/深研工作流。复杂编码可交接Claude Code/Codex/ACP。\n\
      可用的本地检索来源及执行器以工具声明为准；没有声明的远端/桌面操作只能提供建议，不能宣称已完成。"
 }

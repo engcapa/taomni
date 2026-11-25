@@ -1,4 +1,6 @@
+import { emit } from "../tauri-event";
 
+const RECOVERY_FIXTURE_KEY = "taomni.preview.sockscapRecovery";
 
 export async function invokeSockscap<T>(cmd: string, args?: any): Promise<T> {
   switch (cmd) {
@@ -141,9 +143,11 @@ export async function invokeSockscap<T>(cmd: string, args?: any): Promise<T> {
     }
 
     case "sockscap_status": {
+      const value: unknown = JSON.parse(localStorage.getItem(RECOVERY_FIXTURE_KEY) ?? "null");
+      const pending = typeof value === "string" ? value : null;
       return {
-        phase: "idle",
-        message: "browser preview",
+        phase: pending ? "recoveryRequired" : "idle",
+        message: pending ?? "browser preview",
         ruleCount: 0,
         captureBackend: "none",
       } as T;
@@ -206,6 +210,8 @@ export async function invokeSockscap<T>(cmd: string, args?: any): Promise<T> {
     }
 
     case "sockscap_recover":
+      localStorage.removeItem(RECOVERY_FIXTURE_KEY);
+      await emit("sockscap-recovery-status", null);
       return undefined as T;
 
     case "sockscap_stats_snapshot": {
@@ -241,6 +247,7 @@ export async function invokeSockscap<T>(cmd: string, args?: any): Promise<T> {
     case "sockscap_detect_tun_conflicts":
       return [] as T;
 
+    case "sockscap_test_core_upstream":
     case "sockscap_test_upstream":
       throw new Error("Upstream test is only available in the desktop build.");
 

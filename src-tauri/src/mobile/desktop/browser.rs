@@ -63,13 +63,13 @@ pub fn normalize_browser_url(raw: &str) -> Result<url::Url, String> {
 pub async fn open_browser(core: &Core, raw_url: &str) -> Result<BrowserOpenResult, String> {
     let parsed = normalize_browser_url(raw_url)?;
     #[cfg(test)]
-    if let Some(driver) = core.state().mobile.desktop.test_driver() {
+    if let Some(driver) = core.state().legacy.mobile.desktop.test_driver() {
         return driver.open_browser(&parsed);
     }
     let Core::Desktop(app) = core else {
         return Err("desktop_required".into());
     };
-    let desktop = core.state().mobile.desktop.browser_load_seq.clone();
+    let desktop = core.state().legacy.mobile.desktop.browser_load_seq.clone();
     let prev_seq = desktop.load(Ordering::SeqCst);
     let title = format!("Taomni Browser - {parsed}");
     let result_url = parsed.to_string();
@@ -103,6 +103,7 @@ pub async fn open_browser(core: &Core, raw_url: &str) -> Result<BrowserOpenResul
             if payload.event() == tauri::webview::PageLoadEvent::Finished {
                 app_for_load
                     .state::<crate::AppState>()
+                    .legacy
                     .mobile
                     .desktop
                     .mark_browser_loaded();
@@ -117,6 +118,7 @@ pub async fn open_browser(core: &Core, raw_url: &str) -> Result<BrowserOpenResul
     }
 
     core.state()
+        .legacy
         .mobile
         .desktop
         .wait_browser_loaded(prev_seq, std::time::Duration::from_millis(1200))

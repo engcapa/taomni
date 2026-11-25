@@ -274,14 +274,23 @@ export interface OcrResponse {
 async function offlineOcr(path: string) {
   const url = await loadScreenshotUrl(path);
   try {
-    const { recognizeOffline } = await import("./screenshotOcr");
-    return await recognizeOffline(url);
+    const { loadSignedScreenshotRenderer } = await import("./screenshotRenderer");
+    const signed = await loadSignedScreenshotRenderer();
+    if (signed) {
+      return await signed.renderer.recognizeOffline(url, new URL("screenshot-ocr/", signed.entry).href);
+    }
+    if (__TAOMNI_BUNDLED_SCREENSHOT_MEDIA__) {
+      const { recognizeOffline } = await import("../../src-tauri/plugins/screenshot/renderer");
+      return await recognizeOffline(url, new URL("screenshot-ocr/", document.baseURI).href);
+    }
+    throw new Error("Install and enable the Screenshot module for offline OCR.");
   } finally { revokeScreenshotUrl(url); }
 }
 
 export async function ocrImage(path: string): Promise<OcrResponse> {
   try { return await invoke<OcrResponse>("screenshot_ocr", { path }); }
   catch (nativeError) {
+    if (String(nativeError).startsWith("OCR_MODULE_UNAVAILABLE:")) throw nativeError;
     try { return await offlineOcr(path); }
     catch (error) { throw new Error(`OCR: ${String(nativeError)}; offline engine: ${String(error)}`); }
   }
@@ -294,7 +303,8 @@ export interface RedactResponse {
 
 export async function autoRedact(path: string): Promise<RedactResponse> {
   try { return await invoke<RedactResponse>("screenshot_auto_redact", { path }); }
-  catch {
+  catch (nativeError) {
+    if (String(nativeError).startsWith("OCR_MODULE_UNAVAILABLE:")) throw nativeError;
     const { tsv } = await offlineOcr(path);
     return invoke<RedactResponse>("screenshot_redact_tsv", { tsv });
   }

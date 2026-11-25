@@ -1,0 +1,258 @@
+id: TC-MFA-014
+title: Changing the Vault master password preserves the MFA key, HOTP counter and password-gated export
+description: TASK-025-E and AC-015/016 retained behavior. Create and advance an RFC 4226 HOTP account through the UI, change the master password in Settings,
+  then lock and unlock. The old password must fail; the new password must decrypt the same account at its advanced counter. Export also rejects the old
+  password and reveals the original secret only with the new password. Browser verifies renderer flows; native verifies real Rust rekey and encrypted Vault/MFA
+  stores in the isolated profile.
+covers:
+- F-MFA-1
+- F12.1
+tags:
+- mfa
+- vault
+- lifecycle
+- modules
+- p0
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 360
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-rekey-014
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-rekey-014
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="mfa-empty"]'
+    timeout_sec: 30
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill:
+    selector: '[data-testid="mfa-add-issuer"]'
+    value: QA Rekey Recovery
+- fill:
+    selector: '[data-testid="mfa-add-secret"]'
+    value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ
+- click: '[data-testid="mfa-add-advanced"]'
+- select_option:
+    selector: '[data-testid="mfa-add-kind"]'
+    value: hotp
+- click: '[data-testid="mfa-add-submit"]'
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 755 224
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 287 082
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-security"]'
+- wait_for: '[data-testid="vault-change-master-button"]'
+- click: '[data-testid="vault-change-master-button"]'
+- wait_for: '[data-testid="vault-change-master-form"]'
+- fill:
+    selector: '[data-testid="vault-change-master-old"]'
+    value: qa-mfa-rekey-014
+- fill:
+    selector: '[data-testid="vault-change-master-new1"]'
+    value: qa-mfa-rekey-014-new
+- fill:
+    selector: '[data-testid="vault-change-master-new2"]'
+    value: qa-mfa-rekey-014-new
+- click: '[data-testid="vault-change-master-submit"]'
+- assert_text:
+    selector: '[data-testid="vault-change-master-form"]'
+    contains: Master password updated.
+    timeout_sec: 30
+- assert_text_equals:
+    selector: '[data-testid="vault-state-badge"]'
+    equals: unlocked
+    timeout_sec: 30
+- click: '[data-testid="vault-lock-button"]'
+- assert_text_equals:
+    selector: '[data-testid="vault-state-badge"]'
+    equals: locked
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="mfa-account-code"], [data-testid="mfa-floating-code"], [data-testid="mfa-qr-secret"], [data-testid="mfa-qr-image"]'
+    equal: 0
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mfa"]'
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- fill:
+    selector: '[data-testid="vault-unlock-pw"]'
+    value: qa-mfa-rekey-014
+- click: '[data-testid="vault-unlock-confirm"]'
+- assert_visible: '[data-testid="vault-unlock-error"]'
+- assert_count:
+    selector: '[data-testid="mfa-account-row"]'
+    equal: 0
+- fill:
+    selector: '[data-testid="vault-unlock-pw"]'
+    value: qa-mfa-rekey-014-new
+- click: '[data-testid="vault-unlock-confirm"]'
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 287 082
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="mfa-account-row"]'
+    equal: 1
+- click: '[data-testid="mfa-account-menu"]'
+- click: '[data-testid="mfa-menu-qr"]'
+- wait_for: '[data-testid="mfa-qr-dialog"][data-state="locked"]'
+- fill:
+    selector: '[data-testid="mfa-qr-password"]'
+    value: qa-mfa-rekey-014
+- click: '[data-testid="mfa-qr-reveal"]'
+- assert_text:
+    selector: '[data-testid="mfa-qr-error"]'
+    contains: Incorrect master password
+- assert_count:
+    selector: '[data-testid="mfa-qr-image"], [data-testid="mfa-qr-secret"]'
+    equal: 0
+- fill:
+    selector: '[data-testid="mfa-qr-password"]'
+    value: qa-mfa-rekey-014-new
+- click: '[data-testid="mfa-qr-reveal"]'
+- wait_for:
+    selector: '[data-testid="mfa-qr-image"]'
+    timeout_sec: 30
+- click: '[data-testid="mfa-qr-toggle-secret"]'
+- assert_text:
+    selector: '[data-testid="mfa-qr-secret"]'
+    contains: GEZD GNBV GY3T QOJQ GEZD GNBV GY3T QOJQ
+- click: '[data-testid="mfa-qr-close"]'
+- assert_count:
+    selector: '[data-testid="mfa-qr-image"], [data-testid="mfa-qr-secret"]'
+    equal: 0
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 287 082
+    timeout_sec: 30
+- assert_no_runtime_errors: null
+- screenshot: mfa-014-master-rekey-retained.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The advanced HOTP counter is saved before the master password changes.
+    actions:
+    - 3
+    - 5
+    - 7
+    - 8
+    - 9
+    - 11
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 19
+    checkpoints:
+    - step: 18
+      expectation: The initial RFC HOTP is 755 224.
+    - step: 20
+      expectation: Advancing once yields 287 082.
+    results:
+    - 18
+    - 20
+  - id: R2
+    requirement: Rekey succeeds and a subsequent lock rejects the old master password without revealing codes.
+    actions:
+    - 21
+    - 23
+    - 25
+    - 27
+    - 28
+    - 29
+    - 30
+    - 33
+    - 36
+    - 37
+    - 38
+    - 40
+    - 41
+    checkpoints:
+    - step: 31
+      expectation: Settings confirms that the master password changed.
+    - step: 32
+      expectation: A successful rekey retains the current unlock.
+    - step: 34
+      expectation: Explicit lock transitions to locked.
+    - step: 35
+      expectation: No sensitive MFA element remains after lock.
+    - step: 42
+      expectation: The original password cannot unlock the rekeyed Vault.
+    - step: 43
+      expectation: A rejected password exposes no account rows.
+    results:
+    - 31
+    - 32
+    - 34
+    - 35
+    - 42
+    - 43
+  - id: R3
+    requirement: The new password restores the same account and advanced counter; export uses the new password and original data key.
+    actions:
+    - 44
+    - 45
+    - 48
+    - 49
+    - 51
+    - 52
+    - 55
+    - 56
+    - 58
+    - 60
+    checkpoints:
+    - step: 46
+      expectation: The original account still produces 287 082.
+    - step: 47
+      expectation: Exactly one account remains.
+    - step: 53
+      expectation: Export independently rejects the original password.
+    - step: 54
+      expectation: The failed export reveals no secret or QR.
+    - step: 59
+      expectation: The new password reveals the original RFC secret.
+    - step: 61
+      expectation: Closing export removes the secret and QR.
+    - step: 62
+      expectation: The HOTP counter stays advanced after export.
+    - step: 63
+      expectation: Rekey, lock, recovery and export have no unhandled errors.
+    results:
+    - 46
+    - 47
+    - 53
+    - 54
+    - 59
+    - 61
+    - 62
+    - 63
+  visual:
+  - check: Lock and failed password gates hide sensitive MFA content.
+    method: automated
+    reason: Visibility and document counts assert the sensitive states; the screenshot is retained for inspection.
+  native:
+  - check: Real master-password rewrap retains the fixed MFA data key and encrypted HOTP account.
+    method: automated
+    reason: Native uses production Rust IPC and isolated Vault/MFA databases; browser stubs do not establish ciphertext integrity.

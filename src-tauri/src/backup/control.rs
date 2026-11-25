@@ -24,7 +24,7 @@ pub fn root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         }
     }
     let state = app.state::<crate::state::AppState>();
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     let path = db
         .path()
         .ok_or("Cloud backups require a file-backed SQLite database")?;

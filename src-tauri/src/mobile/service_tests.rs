@@ -23,6 +23,7 @@ impl Fixture {
         let dir = tempfile::tempdir().unwrap();
         let state = Arc::new(headless::initialize_with_config(dir.path(), config).unwrap());
         let endpoint = state
+            .legacy
             .mobile
             .start(
                 Core::Headless(state.clone()),
@@ -40,7 +41,7 @@ impl Fixture {
         }
     }
     pub(super) async fn pair(&self) -> (String, String) {
-        let code = self.state.mobile.auth.lock().unwrap().pairing_code();
+        let code = self.state.legacy.mobile.auth.lock().unwrap().pairing_code();
         let value: Value = self
             .client
             .post(format!("{}/api/v1/pair", self.endpoint))
@@ -98,7 +99,7 @@ impl Fixture {
             .unwrap()
     }
     pub(super) async fn finish(self) {
-        self.state.mobile.stop().await;
+        self.state.legacy.mobile.stop().await;
     }
 }
 async fn frame(ws: &mut Ws, kind: &str) -> Value {
@@ -126,8 +127,8 @@ async fn send(ws: &mut Ws, value: Value) {
 async fn session_list_exposes_latest_real_terminal_summary() {
     let f = Fixture::new().await;
     let (_, token) = f.pair().await;
-    f.state.mobile.broker.register("summary");
-    f.state.mobile.broker.output(
+    f.state.legacy.mobile.broker.register("summary");
+    f.state.legacy.mobile.broker.output(
         "summary",
         b"old output\r\n\x1b[32mDatabase maintenance\x1b[0m",
     );
@@ -207,6 +208,7 @@ async fn http_security_cors_revocation_and_listener_shutdown() {
     let mut ws = f.ws(&token, "/events").await;
     assert_eq!(frame(&mut ws, "hello").await["run_mode"], "headless");
     f.state
+        .legacy
         .mobile
         .events
         .publish(json!({"type":"task_status","task_id":"thread:test","status":"running"}));
@@ -214,8 +216,15 @@ async fn http_security_cors_revocation_and_listener_shutdown() {
         frame(&mut ws, "task_status").await["task_id"],
         "thread:test"
     );
-    f.state.mobile.auth.lock().unwrap().revoke(&device).unwrap();
-    f.state.mobile.devices_changed.notify_waiters();
+    f.state
+        .legacy
+        .mobile
+        .auth
+        .lock()
+        .unwrap()
+        .revoke(&device)
+        .unwrap();
+    f.state.legacy.mobile.devices_changed.notify_waiters();
     let close = tokio::time::timeout(std::time::Duration::from_secs(2), ws.next())
         .await
         .unwrap();
@@ -257,8 +266,8 @@ async fn two_viewers_share_real_pty_with_readonly_resize_control_and_replay() {
     };
     let (pty, mut reader) = pty::create_command_pty(80, 24, program, &args).unwrap();
     let id = "opaque-running-key";
-    f.state.mobile.broker.register(id);
-    f.state.terminal.terminals.write().await.insert(
+    f.state.legacy.mobile.broker.register(id);
+    f.state.core.terminal.terminals.write().await.insert(
         id.into(),
         ActiveTerminal::Local {
             _route: crate::database::forward::ForwardGuard(None),
@@ -267,7 +276,7 @@ async fn two_viewers_share_real_pty_with_readonly_resize_control_and_replay() {
             child: Mutex::new(pty.child),
         },
     );
-    let broker = f.state.mobile.broker.clone();
+    let broker = f.state.legacy.mobile.broker.clone();
     let read = std::thread::spawn(move || {
         let mut bytes = [0; 4096];
         while let Ok(n) = reader.read(&mut bytes) {
@@ -368,7 +377,7 @@ async fn two_viewers_share_real_pty_with_readonly_resize_control_and_replay() {
     send(&mut a, json!({"type":"resize","cols":999,"rows":999})).await;
     tokio::time::timeout(std::time::Duration::from_secs(2), async {
         loop {
-            if f.state.mobile.broker.terminals.lock().unwrap()[id].size == Some((300, 100)) {
+            if f.state.legacy.mobile.broker.terminals.lock().unwrap()[id].size == Some((300, 100)) {
                 break;
             }
             tokio::task::yield_now().await;
@@ -376,10 +385,10 @@ async fn two_viewers_share_real_pty_with_readonly_resize_control_and_replay() {
     })
     .await
     .unwrap();
-    let gate = f.state.mobile.broker.gate(id).unwrap();
+    let gate = f.state.legacy.mobile.broker.gate(id).unwrap();
     {
         let _guard = gate.lock().await;
-        f.state.mobile.broker.desktop(id, Some((80, 24)));
+        f.state.legacy.mobile.broker.desktop(id, Some((80, 24)));
         crate::terminal::resize_terminal_inner(&f.state, id, 80, 24)
             .await
             .unwrap();
@@ -398,6 +407,6 @@ async fn two_viewers_share_real_pty_with_readonly_resize_control_and_replay() {
         .await
         .unwrap();
     let _ = tokio::task::spawn_blocking(move || read.join()).await;
-    assert!(!f.state.mobile.broker.terminals.lock().unwrap()[id].running);
+    assert!(!f.state.legacy.mobile.broker.terminals.lock().unwrap()[id].running);
     f.finish().await;
 }

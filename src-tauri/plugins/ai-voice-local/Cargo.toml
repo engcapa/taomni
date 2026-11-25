@@ -1,0 +1,17 @@
+[package]
+name = "taomni-plugin-ai-voice-local"
+version = "0.1.0"
+description = "Official Taomni offline speech inference host"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[dependencies]
+serde = "1"
+serde_json = "1"
+taomni-asr-models = { path = "../../crates/taomni-asr-models" }
+taomni-local-voice-api = { path = "../../crates/taomni-local-voice-api" }
+taomni-local-voice-engine = { path = "engine", features = ["asr-whisper", "asr-sherpa"] }
+taomni-plugin-api = { path = "../../crates/taomni-plugin-api" }
+taomni-plugin-sdk = { path = "../../crates/taomni-plugin-sdk" }
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "sync", "time"] }

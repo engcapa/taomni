@@ -1,0 +1,37 @@
+id: TC-MODULES-093
+title: Open SocksCap network recovery from the status bar without the module installed
+description: Start with a pending recovery in the browser model. Open Module Store from the status bar, run recovery, and check both surfaces clear the notice.
+covers: [F-Modules-1, F-Sockscap-1]
+tags: [modules, sockscap, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 100
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.preview.sockscapRecovery, value: '"Previous capture cleanup requires attention."'}
+- reload_window: null
+- click: '[data-testid="status-sockscap-recovery"]'
+- wait_for: '[data-testid="module-sockscap-recovery"]'
+- assert_text: {selector: '[data-testid="module-sockscap-recovery"]', contains: Previous capture cleanup requires attention.}
+- assert_count: {selector: '[data-testid="module-action-disable-sockscap"]', equal: 0}
+- click: '[data-testid="module-sockscap-recover"]'
+- wait_for: {selector: '[data-testid="module-sockscap-recovery"]', state: detached}
+- wait_for: {selector: '[data-testid="status-sockscap-recovery"]', state: detached}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: recover-from-settings
+    requirement: A missing SocksCap module leaves the status and recovery action available.
+    actions: [2, 3, 4, 8]
+    checkpoints:
+    - {step: 6, expectation: Settings explains the pending network recovery.}
+    - {step: 7, expectation: Recovery is available even without an enabled module.}
+    - {step: 9, expectation: The Settings notice clears after recovery.}
+    - {step: 10, expectation: The status bar also clears its notice.}
+    - {step: 11, expectation: No renderer runtime errors occur.}
+    results: [6, 7, 9, 10, 11]
+  visual:
+  - {check: Both recovery surfaces clear together, method: automated, reason: The case observes the Settings notice and status button.}
+  native:
+  - {check: The core reports a real pending recovery with the module absent, method: not-applicable, reason: TC-MODULES-094 verifies native startup from an isolated profile.}

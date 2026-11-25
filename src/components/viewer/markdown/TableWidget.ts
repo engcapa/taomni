@@ -1,16 +1,19 @@
 import { EditorView, WidgetType, runScopeHandlers } from "@codemirror/view";
 import { type MarkdownTable, modifyTable, serializeTable } from "./markdownModel";
-import { replaceWidgetSource, widgetButton, type MarkdownWidgetContext } from "./markdownWidgetContext";
-import { updateTableCellContent } from "./tableCellContent";
-import { openExternalUrl } from "../../../lib/sftp";
+import { replaceWidgetSource, widgetButton, type MarkdownWidgetContext, type WidgetEdit } from "./markdownWidgetContext";
+import { TableCell } from "./TableCell";
 
-interface Runtime { widget: TableWidget }
+interface Runtime { widget: TableWidget; cells: Map<HTMLElement, TableCell> }
 const runtimes = new WeakMap<HTMLElement, Runtime>();
 
 export class TableWidget extends WidgetType {
   constructor(readonly from: number, readonly raw: string, readonly table: MarkdownTable, readonly context: MarkdownWidgetContext) { super(); }
   eq(other: TableWidget): boolean { return this.from === other.from && this.raw === other.raw && this.context === other.context; }
   ignoreEvent(): boolean { return true; }
+  destroy(dom: HTMLElement): void {
+    runtimes.get(dom)?.cells.forEach((cell) => cell.destroy());
+    runtimes.delete(dom);
+  }
 
   updateDOM(dom: HTMLElement): boolean {
     const runtime = runtimes.get(dom);
@@ -20,8 +23,8 @@ export class TableWidget extends WidgetType {
     dom.dataset.markdownBlockFrom = String(this.from);
     dom.dataset.markdownBlockLength = String(this.raw.length);
     dom.querySelectorAll<HTMLElement>("[data-cell-row]").forEach((cell) => {
-      const row = Number(cell.dataset.cellRow), column = Number(cell.dataset.cellColumn);
-      updateTableCellContent(cell, this.table.rows[row]?.[column] ?? "", this.context.readOnly);
+      const column = Number(cell.dataset.cellColumn);
+      runtime.cells.get(cell)?.sync();
       cell.style.textAlign = this.table.align[column] || "left";
     });
     return true;
@@ -34,14 +37,7 @@ export class TableWidget extends WidgetType {
     root.dataset.tableFrom = String(this.from);
     root.dataset.markdownBlockFrom = String(this.from);
     root.dataset.markdownBlockLength = String(this.raw.length);
-    root.addEventListener("click", event => {
-      const anchor = event.target instanceof Element ? event.target.closest("a") : null;
-      if (!anchor) return;
-      event.preventDefault();
-      const href = anchor.getAttribute("href") || "";
-      if (/^(https?:|mailto:)/i.test(href)) void openExternalUrl(href).catch(error => this.context.onError(String(error)));
-    });
-    const runtime: Runtime = { widget: this };
+    const runtime: Runtime = { widget: this, cells: new Map() };
     runtimes.set(root, runtime);
     const label = this.context.label;
     let activeRow = 0, activeColumn = 0;
@@ -49,9 +45,9 @@ export class TableWidget extends WidgetType {
       const container = view.dom.querySelector<HTMLElement>(`[data-table-from="${runtime.widget.from}"]`);
       container?.querySelector<HTMLElement>(`[data-cell-row="${row}"][data-cell-column="${column}"]`)?.focus();
     });
-    const commit = (next: MarkdownTable) => {
+    const commit = (next: MarkdownTable, edit?: WidgetEdit) => {
       const current = runtime.widget;
-      return replaceWidgetSource(view, current.from, current.raw, serializeTable(next));
+      return replaceWidgetSource(view, current.from, current.raw, serializeTable(next), edit);
     };
     const action = (name: Parameters<typeof modifyTable>[1]) => {
       const next = modifyTable(runtime.widget.table, name, activeRow, activeColumn);
@@ -82,52 +78,34 @@ export class TableWidget extends WidgetType {
     tools.append(hint);
     const table = document.createElement("table");
     const head = document.createElement("thead"), body = document.createElement("tbody");
-    this.table.rows.forEach((cells, rowIndex) => {
+    this.table.rows.forEach((_, rowIndex) => {
       const row = document.createElement("tr");
       Array.from({ length: this.table.align.length }, (_, columnIndex) => {
         const cell = document.createElement(rowIndex ? "td" : "th");
-        updateTableCellContent(cell, cells[columnIndex] ?? "", this.context.readOnly);
         cell.setAttribute("contenteditable", this.context.readOnly ? "false" : "true");
         cell.dataset.cellRow = String(rowIndex);
         cell.dataset.cellColumn = String(columnIndex);
         cell.style.textAlign = this.table.align[columnIndex] || "left";
         row.append(cell);
-        if (this.context.readOnly) return;
-        cell.spellcheck = false;
-        cell.tabIndex = 0;
-        cell.setAttribute("aria-label", label(`第 ${rowIndex + 1} 行，第 ${columnIndex + 1} 列`, `Row ${rowIndex + 1}, column ${columnIndex + 1}`));
-        cell.onfocus = () => {
+        const activate = () => {
           activeRow = rowIndex; activeColumn = columnIndex;
-          updateTableCellContent(cell, runtime.widget.table.rows[rowIndex]?.[columnIndex] ?? "", runtime.widget.context.readOnly);
           root.querySelectorAll(".is-active").forEach((node) => node.classList.remove("is-active"));
           cell.classList.add("is-active");
           root.classList.add("is-active");
         };
-        cell.onblur = () => updateTableCellContent(cell, runtime.widget.table.rows[rowIndex]?.[columnIndex] ?? "", runtime.widget.context.readOnly);
-        let composing = false;
-        const update = () => {
-          if (composing || runtime.widget.context.readOnly) return;
-          const current = runtime.widget.table;
-          const rows = current.rows.map((cells) => [...cells]);
-          rows[rowIndex][columnIndex] = cell.textContent || "";
-          commit({ rows, align: current.align });
-        };
-        cell.addEventListener("compositionstart", () => { composing = true; });
-        cell.addEventListener("compositionend", () => { composing = false; update(); });
-        cell.oninput = update;
-        cell.onpaste = (event) => {
-          event.preventDefault();
-          const text = event.clipboardData?.getData("text/plain") || "";
-          const selection = window.getSelection();
-          const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-          if (range && cell.contains(range.commonAncestorContainer)) {
-            range.deleteContents();
-            const node = document.createTextNode(text);
-            range.insertNode(node); range.setStartAfter(node); range.collapse(true);
-            selection?.removeAllRanges(); selection?.addRange(range);
-          } else cell.textContent = text;
-          update();
-        };
+        runtime.cells.set(cell, new TableCell(cell, view, { context: this.context, activate,
+          source: () => runtime.widget.table.rows[rowIndex]?.[columnIndex] ?? "",
+          commit: (source, edit) => {
+            const current = runtime.widget.table;
+            const rows = current.rows.map((cells) => [...cells]);
+            if (rows[rowIndex][columnIndex] === source) return false;
+            rows[rowIndex][columnIndex] = source;
+            return commit({ rows, align: current.align }, edit);
+          } }));
+        if (this.context.readOnly) return;
+        cell.spellcheck = false;
+        cell.tabIndex = 0;
+        cell.setAttribute("aria-label", label(`第 ${rowIndex + 1} 行，第 ${columnIndex + 1} 列`, `Row ${rowIndex + 1}, column ${columnIndex + 1}`));
         cell.onkeydown = (event) => {
           if (event.isComposing) return;
           if ((event.ctrlKey || event.metaKey) && ["z", "y", "s", "p"].includes(event.key.toLowerCase()) && runScopeHandlers(view, event, "editor")) {

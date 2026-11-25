@@ -88,7 +88,7 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
     else operations.notify(label("终端入口暂不可用", "Terminal entry is unavailable"), true);
   }, [workspaceId, onOpenTerminal, operations.notify, label]);
   const onKeyDown = (event: React.KeyboardEvent) => {
-    if (event.defaultPrevented || event.nativeEvent.isComposing || operations.deletePrompt || operations.properties) return;
+    if (event.defaultPrevented || event.nativeEvent.isComposing || operations.deletePrompt || operations.properties || operations.newFile) return;
     const target = event.target as HTMLElement;
     const editable = !!target.closest("input,textarea,select,[contenteditable=true]");
     const mac = getAppPlatform() === "macos";

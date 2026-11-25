@@ -1,4 +1,4 @@
-// Operates only the NSOpenPanel belonging to this invocation's QA executable.
+// Operates only the AppKit file panel belonging to this invocation's QA executable.
 ObjC.import("AppKit");
 const env = $.NSProcessInfo.processInfo.environment;
 const readEnv = (key) => ObjC.unwrap(env.objectForKey(key));
@@ -24,24 +24,56 @@ for (let i = 0; i < applications.count; i++) {
 if (owners.length !== 1) throw new Error("No unique process for the QA executable: " + JSON.stringify(owners));
 const process = events.processes.whose({ unixId: owners[0] })[0];
 log("owned process " + owners[0]);
-function buttons(owner, name, enabled = false) {
-  return owner.buttons.whose({ name })().filter((button) => !enabled || button.enabled());
+const layoutRoles = new Set([
+  "AXGroup", "AXLayoutArea", "AXLayoutItem", "AXPane", "AXRemoteElement", "AXRemoteView",
+  "AXScrollArea", "AXSplitGroup", "AXUnknown", "AXView",
+]);
+const safely = (read, fallback) => {
+  try { return read(); } catch (_) { return fallback; }
+};
+const elements = (owner) => safely(() => owner.uiElements(), []);
+const role = (node) => safely(() => node.role(), "");
+function controls(owner, collection, expectedRole) {
+  const typed = safely(() => owner[collection](), []);
+  return typed.length ? typed : elements(owner).filter((node) => role(node) === expectedRole);
 }
-function actionButtons(owner, enabled = false) {
-  for (const name of actionNames) {
-    try { const found = buttons(owner, name, enabled); if (found.length) return found; } catch (_) { }
+function nativeContainers(owner) {
+  const nodes = [owner];
+  for (let depth = 0, start = 0; depth < 6 && start < nodes.length; depth++) {
+    const end = nodes.length;
+    for (let i = start; i < end; i++) {
+      // These roots belong to an identified OS sheet or native modal window.
+      // Do not enter WebView, outline or table content below those roots.
+      const layouts = elements(nodes[i]).filter((node) => layoutRoles.has(role(node)));
+      nodes.push(...(layouts.length ? layouts : safely(() => nodes[i].groups(), [])));
+    }
+    start = end;
   }
-  return [];
+  return nodes;
 }
-function findPanel() {
+function buttons(owner, names, enabled = false) {
+  return nativeContainers(owner)
+    .flatMap((node) => controls(node, "buttons", "AXButton"))
+    .filter((button) => safely(() => names.includes(button.name()) && (!enabled || button.enabled()), false));
+}
+function candidatePanels() {
   const panels = [];
   for (const window of process.windows()) {
-    try { panels.push(...window.sheets()); } catch (_) { }
-    try { if (window.subrole() === "AXDialog" || window.name() === title) panels.push(window); } catch (_) { }
+    panels.push(...controls(window, "sheets", "AXSheet"));
+    try {
+      if (["AXDialog", "AXSystemDialog"].includes(window.subrole()) || [title, ...actionNames].includes(window.name())) {
+        panels.push(window);
+      } else if (window.attributes.byName("AXModal").value() === true) {
+        panels.push(window);
+      }
+    } catch (_) { }
   }
-  const owned = panels.filter((owner) => {
-    try { return actionButtons(owner).length === 1 && buttons(owner, "Cancel").length === 1; } catch (_) { return false; }
-  });
+  return panels;
+}
+function findPanel() {
+  const owned = candidatePanels().filter((owner) =>
+    buttons(owner, actionNames).length === 1 && buttons(owner, ["Cancel"]).length === 1
+  );
   return owned.length === 1 ? owned[0] : null;
 }
 function waitFor(probe, description, timeout = 10000) {
@@ -53,44 +85,41 @@ function waitFor(probe, description, timeout = 10000) {
   throw new Error(description);
 }
 function locationField(panel) {
-  // Only descend native sheets/groups of NSOpenPanel. Never recurse through
-  // the underlying application's WebView accessibility tree.
-  const sheets = panel.sheets();
-  const candidates = [...sheets];
+  const candidates = nativeContainers(panel)
+    .flatMap((node) => controls(node, "sheets", "AXSheet"));
   for (const window of process.windows()) {
     try { if (window.subrole() === "AXDialog" && window.name() !== title) candidates.push(window); } catch (_) { }
   }
   for (const sheet of candidates) {
-    const nodes = [sheet];
-    for (let depth = 0, start = 0; depth < 3; depth++) {
-      const end = nodes.length;
-      for (let i = start; i < end; i++) {
-        try { const fields = nodes[i].textFields(); if (fields.length === 1) return fields[0]; } catch (_) { }
-        try {
-          const combos = nodes[i].comboBoxes();
-          if (combos.length === 1) {
-            const fields = combos[0].textFields();
-            return fields.length === 1 ? fields[0] : combos[0];
-          }
-        } catch (_) { }
-        try { nodes.push(...nodes[i].groups()); } catch (_) { }
+    for (const node of nativeContainers(sheet)) {
+      const fields = controls(node, "textFields", "AXTextField");
+      if (fields.length === 1) return fields[0];
+      const combos = controls(node, "comboBoxes", "AXComboBox");
+      if (combos.length === 1) {
+        const entry = controls(combos[0], "textFields", "AXTextField");
+        return entry.length === 1 ? entry[0] : combos[0];
       }
-      start = end;
     }
   }
   return null;
 }
 function describePanel(panel) {
   try {
-    return JSON.stringify({ buttons: panel.buttons().map((button) => ({ name: button.name(), enabled: button.enabled() })),
-      sheets: panel.sheets().map((sheet) => ({ name: sheet.name(), role: sheet.role() })) });
+    return {
+      rootRole: role(panel),
+      children: elements(panel).slice(0, 12).map(role),
+      buttons: controls(panel, "buttons", "AXButton").map((button) => ({
+        name: safely(() => button.name(), null), enabled: safely(() => button.enabled(), null),
+      })),
+      sheets: controls(panel, "sheets", "AXSheet").map((sheet) => ({
+        name: safely(() => sheet.name(), null), role: role(sheet),
+      })),
+    };
   } catch (error) { return String(error); }
 }
-const panel = waitFor(findPanel, "No unique folder chooser owned by the QA executable", 20000);
-log("owned NSOpenPanel found");
-process.frontmost = true;
 const screenshot = readEnv("QA_PICKER_SCREENSHOT");
-if (screenshot) {
+function captureScreenshot() {
+  if (!screenshot) return;
   const capture = $.NSTask.alloc.init;
   capture.launchPath = "/usr/sbin/screencapture";
   capture.arguments = ["-x", screenshot];
@@ -98,10 +127,29 @@ if (screenshot) {
   capture.waitUntilExit;
   if (Number(capture.terminationStatus) !== 0) throw new Error("Could not capture the owned folder chooser");
 }
+let panel;
+try {
+  panel = waitFor(findPanel, "No unique file chooser owned by the QA executable", 20000);
+} catch (error) {
+  try {
+    log("AX windows " + JSON.stringify(process.windows().map((window) => ({
+      name: window.name(), role: window.role(), subrole: window.subrole(), contents: describePanel(window),
+    }))));
+    log("AX candidate panels " + JSON.stringify(candidatePanels().map((owner) =>
+      nativeContainers(owner).slice(0, 24).map(describePanel))));
+  } catch (_) { }
+  try { captureScreenshot(); } catch (_) { }
+  throw error;
+}
+log("owned AppKit file panel found");
+process.frontmost = true;
+captureScreenshot();
 try {
   const cancelAfterPath = readEnv("QA_PICKER_CANCEL_AFTER_PATH") === "1";
   if (readEnv("QA_PICKER_ACTION") === "cancel" && !cancelAfterPath) {
-    buttons(panel, "Cancel", true)[0].click();
+    const cancel = buttons(panel, ["Cancel"], true);
+    if (cancel.length !== 1) throw new Error("Native chooser cancel button unavailable");
+    cancel[0].click();
   } else {
     events.keystroke("g", { using: ["command down", "shift down"] });
     const field = waitFor(() => locationField(findPanel() || panel), "Go to Folder location field unavailable");
@@ -110,46 +158,41 @@ try {
     if (field.value() !== location) throw new Error("Go to Folder did not retain the complete path");
     events.keyCode(36);
     log("Go to Folder submitted");
-    waitFor(() => !locationField(findPanel() || panel), "Go to Folder did not finish navigation");
+    // The location field belongs to the nested Go to Folder sheet. Poll its
+    // existence directly so scrolling the directory contents cannot stall AX
+    // traversal of the whole file panel during navigation.
+    waitFor(() => !field.exists(), "Go to Folder did not finish navigation");
+    log("Go to Folder sheet closed");
     if (kind === "save") {
       // Limit traversal to native panel groups. NSSavePanel's filename is the
       // enabled text field whose AX identifier or label names the save name.
-      const current = findPanel();
-      const nodes = [current];
-      const candidates = [];
-      for (let depth = 0, start = 0; depth < 4; depth++) {
-        const end = nodes.length;
-        for (let i = start; i < end; i++) {
-          try { candidates.push(...nodes[i].textFields()); } catch (_) { }
-          try { nodes.push(...nodes[i].groups()); } catch (_) { }
-        }
-        start = end;
-      }
+      const current = waitFor(findPanel, "NSSavePanel unavailable after directory navigation");
+      const candidates = nativeContainers(current)
+        .flatMap((node) => controls(node, "textFields", "AXTextField"))
+        .filter((field) => safely(() => field.enabled(), false));
       const named = candidates.filter((candidate) => {
-        try {
-          const identifier = String(candidate.attributes.byName("AXIdentifier").value());
-          return /save|name/i.test(identifier) && candidate.enabled();
-        } catch (_) {
-          try { return /save as|name/i.test(String(candidate.description())) && candidate.enabled(); } catch (_) { return false; }
-        }
+        const identifier = safely(() => candidate.attributes.byName("AXIdentifier").value(), "");
+        const description = safely(() => candidate.description(), "");
+        return /save|name/i.test(identifier) || /save as|name/i.test(description);
       });
-      const target = named.length === 1 ? named[0] : candidates.filter((candidate) => {
-        try { return candidate.enabled() && String(candidate.value()).includes("."); } catch (_) { return false; }
-      });
-      const name = Array.isArray(target) ? (target.length === 1 ? target[0] : null) : target;
-      if (!name) throw new Error("NSSavePanel filename field is not unique");
+      const populated = candidates.filter((candidate) => safely(() => !!candidate.value(), false));
+      const target = named.length ? named : populated;
+      if (target.length !== 1) throw new Error("NSSavePanel filename field is not unique");
+      const name = target[0];
       name.value = filename;
       if (name.value() !== filename) throw new Error("NSSavePanel did not retain filename");
     }
     const open = waitFor(() => {
       const current = findPanel();
-      return current && (cancelAfterPath ? buttons(current, "Cancel", true)[0] : actionButtons(current, true)[0]);
+      if (!current) return null;
+      const choices = buttons(current, cancelAfterPath ? ["Cancel"] : actionNames, true);
+      return choices.length === 1 ? choices[0] : null;
     }, "Native chooser action button unavailable");
     open.click();
   }
   waitFor(() => !findPanel(), "Folder chooser did not close");
 } catch (error) {
-  log("AX state " + describePanel(findPanel() || panel));
+  log("AX state " + JSON.stringify(nativeContainers(findPanel() || panel).slice(0, 24).map(describePanel)));
   throw error;
 }
 log("chooser action submitted");

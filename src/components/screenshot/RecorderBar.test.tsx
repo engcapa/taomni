@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RecordingFile } from "../../lib/screenshot";
-import { formatElapsed, RecorderBar } from "./RecorderBar";
+import { formatElapsed, RecorderBar } from "../../../src-tauri/plugins/screenshot/renderer/RecorderBar";
 
 type RecordingEnded = { recordingId: string; error: string | null };
 type EndListener = (event: { payload: RecordingEnded }) => void;

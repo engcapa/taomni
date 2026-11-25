@@ -1,0 +1,120 @@
+id: TC-MODULES-073
+title: Signed SocksCap evaluates an existing routing rule in Test Target
+description: Install the signed module, verify the migrated profile and saved rules through Test Target, and reopen the saved rules after re-enabling SocksCap. Then change only the isolated module rule file and check that the running host uses the current file.
+covers: [F-Sockscap-1, F-Modules-1]
+tags: [modules, sockscap, native-boundary, p1]
+modes: [native]
+native_platforms: [Windows, macOS]
+fixtures: [reset_db, sockscap_legacy_config, module_signed_sockscap_archive]
+timeout_sec: 175
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.sockscap_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.sockscap_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- assert_file_sha256: {path: '${fixture.sockscap_signed_host}', equals: '${fixture.sockscap_signed_host_sha256}'}
+- assert_file_contains: {path: '${fixture.sockscap_module_config}', contains: 'route.example.test', timeout_sec: 15}
+- click: '[data-testid="module-action-enable-sockscap"]'
+- wait_for: '[data-testid="module-action-disable-sockscap"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]'
+- show_sockscap_section: test
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: route.example.test}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Decision: block'}
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Matched rule: route.example.test'}
+- assert_signed_sockscap_host: running
+- click: '[data-testid="sockscap-test-detail-close"]'
+- assert_no_runtime_errors: null
+- assert_file_contains: {path: '${fixture.sockscap_module_rules}', contains: '||proxied.example.test'}
+- assert_file_contains: {path: '${fixture.sockscap_module_rules}', contains: '2026-01-01T00:00:00Z'}
+- assert_file_sha256: {path: '${fixture.sockscap_legacy_rules}', equals: '${fixture.sockscap_legacy_rules_sha256}'}
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: proxied.example.test}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Decision: proxy'}
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Matched rule: ||proxied.example.test'}
+- click: '[data-testid="sockscap-test-detail-close"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-sockscap"]'
+- wait_for: '[data-testid="module-action-enable-sockscap"]'
+- assert_file_contains: {path: '${fixture.sockscap_module_rules}', contains: '||proxied.example.test'}
+- click: '[data-testid="module-action-enable-sockscap"]'
+- wait_for: '[data-testid="module-action-disable-sockscap"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]'
+- show_sockscap_section: test
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: proxied.example.test}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Matched rule: ||proxied.example.test'}
+- assert_signed_sockscap_host: running
+- click: '[data-testid="sockscap-test-detail-close"]'
+- assert_no_runtime_errors: null
+- host_write_file:
+    path: '${fixture.sockscap_module_rules}'
+    text: '{"raw":"[AutoProxy 0.2.9]\n||module-only.example.test\n","meta":{"source":"file:qa-module-rules","ruleCount":1,"skipped":1,"lastRefresh":"2026-01-01T00:00:00Z"}}'
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: module-only.example.test}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Decision: proxy'}
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Matched rule: ||module-only.example.test'}
+- click: '[data-testid="sockscap-test-detail-close"]'
+- fill: {selector: '[data-testid="sockscap-test-host"]', value: proxied.example.test}
+- click: '[data-testid="sockscap-test-target"]'
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Decision: direct'}
+- assert_text: {selector: '[data-testid="sockscap-test-detail"]', contains: 'Matched rule: -'}
+- assert_file_sha256: {path: '${fixture.sockscap_legacy_rules}', equals: '${fixture.sockscap_legacy_rules_sha256}'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-policy-probe
+    requirement: Testing the target uses the installed host and shows the matching rule from the legacy profile.
+    actions: [6, 10, 14, 16, 17, 18, 22]
+    checkpoints:
+    - {step: 8, expectation: The executable identity matches the signed package.}
+    - {step: 9, expectation: Installation imports the old routing rule before the host is enabled or its tool is opened.}
+    - {step: 19, expectation: The result reports that the target is blocked.}
+    - {step: 20, expectation: The result identifies the exact retained rule.}
+    - {step: 21, expectation: The signed module holds its writer lease after the target test.}
+    - {step: 23, expectation: The dry-run completes without runtime errors.}
+    results: [8, 9, 19, 20, 21, 23]
+  - id: adopted-rules
+    requirement: The host adopts legacy GFWList rules once and uses them again after a disable and enable cycle.
+    actions: [6, 10, 14, 27, 28, 34, 37, 41, 45]
+    checkpoints:
+    - {step: 24, expectation: The module owns the original AutoProxy rule.}
+    - {step: 25, expectation: The saved rule cache preserves the legacy refresh date.}
+    - {step: 26, expectation: The original legacy rule file retains its exact bytes.}
+    - {step: 29, expectation: The signed policy returns the proxy decision.}
+    - {step: 30, expectation: The active host names the rule from the adopted cache.}
+    - {step: 36, expectation: Disabling the module retains the adopted rule on disk.}
+    - {step: 46, expectation: After re-enabling the same tool uses the adopted rule again.}
+    - {step: 47, expectation: The signed host owns its native writer lease.}
+    - {step: 49, expectation: Re-enabling and evaluating the cached rule produce no runtime errors.}
+    results: [24, 25, 26, 29, 30, 36, 46, 47, 49]
+  - id: current-module-rules
+    requirement: An active signed host evaluates the current module rule file after the desktop has already evaluated the former rule.
+    actions: [50, 51, 52, 55, 56, 57]
+    checkpoints:
+    - {step: 53, expectation: The rule found only in the module file enables proxy routing.}
+    - {step: 54, expectation: The current rule file supplies the displayed match.}
+    - {step: 58, expectation: The target that matched the previous file now routes directly.}
+    - {step: 59, expectation: The previous rule is absent from the current result.}
+    - {step: 60, expectation: The original legacy rule file still has its initial digest.}
+    - {step: 61, expectation: Repeated previews complete without runtime errors.}
+    results: [53, 54, 58, 59, 60, 61]
+  visual:
+  - check: The dry-run dialog displays the decision and matched rule.
+    method: automated
+    reason: The visible dialog is checked after clicking the normal action.
+  native:
+  - check: The verified host holds the writer lease and reads its current policy from the module data directory.
+    method: automated
+    reason: The test checks the writer lease and the result of evaluating a module-only rule during an active host lifetime. Linux launch-only mode lacks this panel control.

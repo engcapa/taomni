@@ -12,9 +12,23 @@ const ipcMocks = vi.hoisted(() => ({
   getAppProxyConfig: vi.fn(),
   listSessions: vi.fn(),
   vaultStatus: vi.fn().mockResolvedValue({ state: "unlocked", entry_count: 0 }),
-  lanchatGetServiceState: vi.fn().mockResolvedValue({ running: false, port: 0, peers_count: 0 }),
   sdkGetRegistry: vi.fn().mockResolvedValue({ version: 1, installations: [] }),
   subscribeSdkRegistryChanged: vi.fn().mockReturnValue(() => {}),
+  listPlugins: vi.fn().mockResolvedValue([]),
+  installStagedPlugin: vi.fn(),
+  setPluginEnabled: vi.fn(),
+  uninstallPlugin: vi.fn(),
+  rollbackPlugin: vi.fn(),
+  inspectLegacyInstall: vi.fn().mockResolvedValue({
+    from_version: "0.5.x",
+    database_path: null,
+    database_tables: [],
+    candidates: [],
+    source_fingerprints: {},
+    retained_paths: [],
+    vault: null,
+  }),
+  executePluginMigration: vi.fn().mockResolvedValue({ status: "complete", committed: [], skipped: [] }),
   selectFilePath: vi.fn(),
   selectSaveDirectory: vi.fn(),
   selectSaveFilePath: vi.fn(),
@@ -47,6 +61,8 @@ describe("SettingsPanel", () => {
     });
     ipcMocks.listSessions.mockReset();
     ipcMocks.listSessions.mockResolvedValue([]);
+    ipcMocks.listPlugins.mockReset();
+    ipcMocks.listPlugins.mockResolvedValue([]);
     window.localStorage.clear();
     useAppStore.setState({ vaultUnlockMode: "startup", welcomeRecentSessionLimit: 20 });
     setAppThemeMode("system");
@@ -307,6 +323,49 @@ describe("SettingsPanel", () => {
     expect(container.querySelector('[data-search-id="sql-execution"]'))
       .toHaveAttribute("data-search-match", "true");
     expect(screen.getByTestId("sql-execution-settings")).toBeInTheDocument();
+  });
+
+  it("hydrates the module store from the native registry and exposes the searchable panel", async () => {
+    const user = userEvent.setup();
+    ipcMocks.listPlugins.mockResolvedValueOnce([{
+      slug: "hello-plugin",
+      lifecycle: "enabled",
+      manifest: {
+        id: "taomni-plugin-hello-plugin",
+        slug: "hello-plugin",
+        name: "Hello Plugin",
+        version: "1.0.0",
+        coreApiVersion: "1",
+        kind: "local-server",
+        status: "stable",
+        platforms: ["linux-x86_64"],
+        entry: { protocol: 1 },
+        tabs: [],
+        commands: [],
+        permissions: [],
+        dataDir: "plugins/hello-plugin",
+        backupPaths: [],
+        legacyTables: [],
+        vaultFixedKeys: [],
+        snapshot: "file",
+      },
+    }]);
+    render(<SettingsPanel />);
+
+    await user.type(screen.getByTestId("settings-search-input"), "module store");
+    await waitFor(() => expect(screen.getByTestId("module-card-hello-plugin")).toBeInTheDocument());
+    expect(screen.getByTestId("module-status-hello-plugin")).toHaveTextContent("Enabled");
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 1");
+  });
+
+  it("shows an explicit module registry error while keeping the empty catalog state", async () => {
+    const user = userEvent.setup();
+    ipcMocks.listPlugins.mockRejectedValueOnce(new Error("registry unavailable"));
+    render(<SettingsPanel />);
+
+    await user.type(screen.getByTestId("settings-search-input"), "plugin");
+    await waitFor(() => expect(screen.getByTestId("module-store-catalog-error")).toHaveTextContent("registry unavailable"));
+    expect(screen.getByTestId("module-store-empty")).toBeInTheDocument();
   });
 
 

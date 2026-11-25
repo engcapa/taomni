@@ -1,0 +1,127 @@
+id: TC-MODULES-043
+title: Review and update an installed disabled module and keep it disabled on rollback
+description: The browser fixture models a disabled earlier version with saved data and a later marketplace artifact.
+  The renderer checks the version and requires confirmation. Rollback remains available in the installed list.
+  The destructive uninstall confirmation can be cancelled, and an uninstalled module can only be installed explicitly.
+covers: [F-Modules-1]
+tags: [p1, modules, marketplace, lifecycle]
+modes: [browser]
+fixtures: [reset_db, module_marketplace_preview]
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-marketplace-update"]'
+- assert_text:
+    selector: '[data-testid="module-marketplace-installed"]'
+    contains: 0.0.9
+- click: '[data-testid="module-marketplace-download"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-confirm"]'
+    contains: Download update
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-marketplace-review"]'
+- click: '[data-testid="module-marketplace-review"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-confirm"]'
+    contains: Update
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-marketplace-current"]'
+- assert_text:
+    selector: '[data-testid="module-status-hello-plugin"]'
+    contains: Disabled
+- click: '[data-testid="module-action-rollback-hello-plugin"]'
+- wait_for:
+    selector: '[data-testid="module-marketplace-current"]'
+    state: detached
+- assert_text:
+    selector: '[data-testid="module-marketplace-installed"]'
+    contains: 0.0.9
+- assert_text:
+    selector: '[data-testid="module-status-hello-plugin"]'
+    contains: Disabled
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- assert_text:
+    selector: '[data-testid="hello-plugin-values"]'
+    contains: retained across module versions
+- assert_no_runtime_errors: null
+- screenshot: module-update-browser.png
+- click: '[data-testid="tab-item"][data-tab-type="settings"]'
+- wait_for: '[data-testid="module-marketplace-update"]'
+- click: '[data-testid="module-delete-data-hello-plugin"]'
+- click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: This cannot be undone.
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_visible: '[data-testid="module-marketplace-update"]'
+- click: '[data-testid="module-delete-data-hello-plugin"]'
+- click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-hello-plugin"]'
+- assert_visible: '[data-testid="module-data-retained-hello-plugin"]'
+- assert_count:
+    selector: '[data-testid="module-marketplace-update"], [data-testid="module-action-rollback-hello-plugin"]'
+    equal: 0
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Offer and confirm a verified update for the installed version while preserving the disabled state.
+    actions: [3, 4, 7, 9, 11, 13]
+    checkpoints:
+    - step: 6
+      expectation: The installed version is shown separately from the update.
+    - step: 8
+      expectation: The download confirmation identifies this as an update.
+    - step: 12
+      expectation: The final review offers the Update action.
+    - step: 14
+      expectation: The approved version appears as current.
+    - step: 15
+      expectation: The updated module remains disabled.
+    results: [6, 8, 12, 14, 15]
+  - id: R2
+    requirement: Roll back the code while preserving disabled state and data.
+    actions: [16, 20, 21]
+    checkpoints:
+    - step: 18
+      expectation: The earlier installed version is current after rollback.
+    - step: 19
+      expectation: Rollback does not enable the module.
+    - step: 22
+      expectation: After enabling, the original saved value can be read.
+    - step: 23
+      expectation: The renderer reports no unhandled errors.
+    results: [18, 19, 22, 23]
+  - id: R3
+    requirement: Cancel explicit deletion and uninstall with data retained. The higher version is available only as an explicit install.
+    actions: [27, 28, 30, 32, 33, 34]
+    checkpoints:
+    - step: 29
+      expectation: The confirmation explains the permanent effect before deletion.
+    - step: 31
+      expectation: The update remains available after cancelling deletion.
+    - step: 35
+      expectation: The uninstalled module has an explicit install action.
+    - step: 36
+      expectation: Settings identifies data retained by the default uninstall.
+    - step: 37
+      expectation: Settings offers neither update nor rollback after uninstall.
+    - step: 38
+      expectation: The renderer reports no unhandled errors during removal.
+    results: [29, 31, 35, 36, 37, 38]
+  native:
+  - check: Real package verification, host start and data ownership.
+    method: external
+    reason: TC-MODULES-042 exercises the production native boundary.
+  visual:
+  - check: Inspect the module tab after update and rollback.
+    method: manual
+    reason: The retained screenshot shows the saved value.

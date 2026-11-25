@@ -3,7 +3,6 @@ use super::privileged_files::wait_for_privileged_files_unlocked;
 use super::teardown::full_teardown;
 use crate::module_lock::ModuleLock;
 use crate::sockscap::capture;
-use crate::sockscap::data_dir;
 use crate::sockscap::helper;
 use crate::sockscap::orchestrator;
 use crate::sockscap::recovery;
@@ -33,9 +32,10 @@ pub async fn sockscap_prepare_for_update(
     state: State<'_, AppState>,
     sudo_password: Option<String>,
 ) -> Result<(), String> {
-    let owned_capture = state.sockscap.has_activation_lock();
+    let _operation = state.legacy.sockscap.operation.lock().await;
+    let owned_capture = state.legacy.sockscap.has_activation_lock();
     let recovery_required = matches!(
-        state.sockscap.orch.read().await.status().phase,
+        state.legacy.sockscap.orch.read().await.status().phase,
         orchestrator::EnginePhase::RecoveryRequired
     );
     #[cfg(not(target_os = "linux"))]
@@ -45,18 +45,18 @@ pub async fn sockscap_prepare_for_update(
                 .into(),
         );
     }
-    if !state.sockscap.has_activation_lock() {
+    let journals = recovery::JournalLocations::load(&state.core.paths.data)?;
+    if !state.legacy.sockscap.has_activation_lock() {
         let lock = ModuleLock::try_acquire_for_app(
             &app,
             "sockscap",
             "global",
             "SocksCap update preparation",
         )?;
-        state.sockscap.install_activation_lock(lock);
+        state.legacy.sockscap.install_activation_lock(lock);
     }
 
-    let journal_path = data_dir(&app).ok().map(|dir| recovery::journal_path(&dir));
-    let dirty_journal = journal_path.as_deref().is_some_and(recovery::needs_repair);
+    let dirty_journal = recovery::needs_repair(journals.active());
 
     // A previous Linux process may have exited after installing nftables and
     // cgroups but before clearing its journal. The updater already has the old
@@ -67,34 +67,36 @@ pub async fn sockscap_prepare_for_update(
     if should_recover_stale_capture_for_update(owned_capture, recovery_required, dirty_journal) {
         let sudo_password = sudo_password.map(Zeroizing::new);
         let sudo_pw = sudo_password.as_deref().map(|password| password.as_str());
-        if let Err(error) = capture::recover_system(sudo_pw).await {
+        if let Err(error) = capture::recover_system(&state.plugins, sudo_pw).await {
             let message = format!("automatic SocksCap recovery before updating failed: {error}");
             state
+                .legacy
                 .sockscap
                 .orch
                 .write()
                 .await
                 .set_recovery_required(&capture::capabilities().capture_backend, message.clone());
-            state.sockscap.release_activation_lock();
+            state.legacy.sockscap.release_activation_lock();
             if sudo_pw.is_none() && linux_recovery_requires_elevation(&error) {
                 return Err(format!("SOCKSCAP_UPDATE_SUDO_REQUIRED: {message}"));
             }
             return Err(message);
         }
-        if let Some(journal) = journal_path.as_deref() {
-            if let Err(error) = recovery::mark_clean_and_clear(journal) {
-                let message = format!(
-                    "SocksCap network recovery succeeded, but its journal could not be cleared before updating: {error}"
-                );
-                state.sockscap.orch.write().await.set_recovery_required(
-                    &capture::capabilities().capture_backend,
-                    message.clone(),
-                );
-                state.sockscap.release_activation_lock();
-                return Err(message);
-            }
+        if let Err(error) = journals.clear_after_repair() {
+            let message = format!(
+                "SocksCap network recovery succeeded, but its journal could not be cleared before updating: {error}"
+            );
+            state
+                .legacy
+                .sockscap
+                .orch
+                .write()
+                .await
+                .set_recovery_required(&capture::capabilities().capture_backend, message.clone());
+            state.legacy.sockscap.release_activation_lock();
+            return Err(message);
         }
-        state.sockscap.orch.write().await.force_idle();
+        state.legacy.sockscap.orch.write().await.force_idle();
         tracing::info!("sockscap: automatically recovered stale Linux state before update");
     }
 
@@ -102,7 +104,7 @@ pub async fn sockscap_prepare_for_update(
     // stale state cannot be safely repaired with a Linux sudo credential.
     #[cfg(not(target_os = "linux"))]
     if !owned_capture && dirty_journal {
-        state.sockscap.release_activation_lock();
+        state.legacy.sockscap.release_activation_lock();
         return Err(
             "SocksCap recovery is required before updating; use Recover network first".into(),
         );
@@ -114,7 +116,7 @@ pub async fn sockscap_prepare_for_update(
     let teardown_error = if owned_capture {
         full_teardown(&app, &state, true).await.err()
     } else {
-        if let Some(manager) = state.sockscap.xray() {
+        if let Some(manager) = state.legacy.sockscap.xray() {
             manager.shutdown_all().await;
         }
         None
@@ -122,7 +124,7 @@ pub async fn sockscap_prepare_for_update(
 
     // 2) Ask the elevated helper to exit, freeing `sockscap-helper.exe` and
     //    `WinDivert.dll`. Reuses the same shutdown path as the Stop button.
-    let helper_error = helper::sockscap_helper_stop(state.clone())
+    let helper_error = helper::stop_registered(&state.legacy.sockscap.helper)
         .await
         .err()
         .map(|error| format!("SocksCap helper shutdown failed: {error}"));
@@ -142,7 +144,7 @@ pub async fn sockscap_prepare_for_update(
         errors.push(error);
     }
     if errors.is_empty() {
-        state.sockscap.release_activation_lock();
+        state.legacy.sockscap.release_activation_lock();
         Ok(())
     } else {
         Err(errors.join("; "))

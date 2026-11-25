@@ -1,11 +1,12 @@
-use super::limits::LAUNCHER_BYTES;
 use super::limits::PREPARATION_WRAPPER;
+use crate::plugin::PluginRegistry;
 use crate::sockscap::capture::linux::tracer::LaunchCommand;
 use crate::sockscap::config::AppLaunchPreparation;
 use std::ffi::OsString;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -101,16 +102,39 @@ pub(super) fn validate_executable(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-pub(super) fn materialize_launcher(runtime_dir: &Path) -> Result<PathBuf, String> {
+pub(in crate::sockscap::capture::linux) fn materialize_launcher(
+    runtime_dir: &Path,
+    bytes: &[u8],
+) -> Result<PathBuf, String> {
+    if !bytes.starts_with(b"\x7fELF") {
+        return Err("SocksCap trace launcher is not a valid ELF executable".into());
+    }
     fs::create_dir_all(runtime_dir)
         .map_err(|error| format!("create SocksCap runtime directory: {error}"))?;
+    let dir_meta = fs::symlink_metadata(runtime_dir)
+        .map_err(|error| format!("inspect SocksCap runtime directory: {error}"))?;
+    if dir_meta.file_type().is_symlink() || !dir_meta.is_dir() {
+        return Err(format!(
+            "Invalid SocksCap runtime directory: {}",
+            runtime_dir.display()
+        ));
+    }
     fs::set_permissions(runtime_dir, fs::Permissions::from_mode(0o700))
         .map_err(|error| format!("secure SocksCap runtime directory: {error}"))?;
     let path = runtime_dir.join("taomni-sockscap-trace-launcher");
-    if fs::read(&path).ok().as_deref() == Some(LAUNCHER_BYTES) {
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
-            .map_err(|error| format!("secure SocksCap trace launcher: {error}"))?;
-        return Ok(path);
+    match fs::symlink_metadata(&path) {
+        Ok(meta) if meta.file_type().is_symlink() || !meta.is_file() => {
+            return Err(format!(
+                "Invalid SocksCap trace launcher path: {}",
+                path.display()
+            ));
+        }
+        Ok(_) if fs::read(&path).ok().as_deref() == Some(bytes) => {
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
+                .map_err(|error| format!("secure SocksCap trace launcher: {error}"))?;
+            return Ok(path);
+        }
+        Ok(_) | Err(_) => (),
     }
     let temporary = runtime_dir.join(format!(
         ".taomni-sockscap-trace-launcher-{}.tmp",
@@ -118,7 +142,7 @@ pub(super) fn materialize_launcher(runtime_dir: &Path) -> Result<PathBuf, String
     ));
     let mut file = File::create(&temporary)
         .map_err(|error| format!("create SocksCap trace launcher: {error}"))?;
-    file.write_all(LAUNCHER_BYTES)
+    file.write_all(bytes)
         .and_then(|()| file.sync_all())
         .map_err(|error| format!("write SocksCap trace launcher: {error}"))?;
     fs::set_permissions(&temporary, fs::Permissions::from_mode(0o700))
@@ -129,16 +153,63 @@ pub(super) fn materialize_launcher(runtime_dir: &Path) -> Result<PathBuf, String
 }
 
 /// Read-only capability probe used before rootless backend selection.
-pub fn preflight() -> Result<(), String> {
+pub fn preflight_with_bytes(bytes: &[u8]) -> Result<(), String> {
     let directory = std::env::temp_dir().join(format!(
         "taomni-sockscap-preflight-{}-{}",
         unsafe { libc::geteuid() },
         uuid::Uuid::new_v4()
     ));
-    let launcher = materialize_launcher(&directory)?;
+    let launcher = materialize_launcher(&directory, bytes)?;
     let result = super::super::tracer::preflight(&launcher);
     let _ = fs::remove_file(&launcher);
     let _ = fs::remove_dir(&directory);
     result
 }
-use std::os::unix::fs::PermissionsExt;
+
+/// Read-only capability probe using the active verified SocksCap module.
+pub fn preflight(registry: Option<&PluginRegistry>) -> Result<(), String> {
+    let Some(registry) = registry else {
+        return Err(
+            "Install and enable the SocksCap module to use Linux application capture".into(),
+        );
+    };
+    let (_, bytes) = super::package::read_verified_launcher(registry)?;
+    preflight_with_bytes(&bytes)
+}
+
+#[cfg(test)]
+pub(in crate::sockscap::capture::linux) fn test_launcher_bytes() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    BYTES
+        .get_or_init(|| {
+            let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("plugins/sockscap/resources/linux/trace_launcher.c");
+            let temp = tempfile::tempdir().expect("tempdir for test trace launcher");
+            let output = temp.path().join("taomni-sockscap-trace-launcher");
+            let compiler = std::env::var_os("CC").unwrap_or_else(|| OsString::from("cc"));
+            let status = std::process::Command::new(compiler)
+                .args([
+                    "-fPIE",
+                    "-pie",
+                    "-O2",
+                    "-fvisibility=hidden",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    "-Wl,-z,relro",
+                    "-Wl,-z,now",
+                    "-Wl,-z,noexecstack",
+                ])
+                .arg(&source)
+                .arg("-o")
+                .arg(&output)
+                .status()
+                .expect("compile Linux SocksCap test trace launcher");
+            assert!(
+                status.success(),
+                "Linux SocksCap test trace launcher compiler failed"
+            );
+            fs::read(&output).expect("read compiled Linux SocksCap test trace launcher")
+        })
+        .as_slice()
+}

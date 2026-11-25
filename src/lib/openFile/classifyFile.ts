@@ -6,6 +6,11 @@ const source = new Set(["ts", "tsx", "js", "jsx", "mjs", "cjs", "rs", "py", "pyi
 const textNames = new Set(["readme", "license", "licence", "copying", "changelog", "authors"]);
 const sourceNames = new Set(["makefile", "dockerfile", "gemfile", "procfile", "cmakelists.txt"]);
 
+// Creation and opening share this inventory so preview-only formats never
+// appear as editable new-file types and aliases remain available.
+export const editableFileExtensions: readonly string[] = [...text, ...source, "md", "markdown", "mdown", "html", "htm", "svg"];
+export const editableFileNames: readonly string[] = [...textNames, ...sourceNames];
+
 export function fileExtension(path: string): string {
   const name = path.split(/[\\/]/).pop()?.toLowerCase() ?? "";
   const dot = name.lastIndexOf(".");

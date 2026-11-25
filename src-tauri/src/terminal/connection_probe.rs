@@ -18,7 +18,7 @@ pub async fn test_ssh_connection(
     let auth = match auth_method.as_str() {
         "Password" => {
             let raw = auth_data.unwrap_or_default();
-            let resolved = state.vault.resolve(&raw)?;
+            let resolved = state.core.vault.resolve(&raw)?;
             ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
         }
         "PrivateKey" => {
@@ -28,7 +28,7 @@ pub async fn test_ssh_connection(
         "Gssapi" | "None" => ssh::SshAuth::Gssapi,
         _ => {
             let raw = auth_data.unwrap_or_default();
-            let resolved = state.vault.resolve(&raw)?;
+            let resolved = state.core.vault.resolve(&raw)?;
             ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
         }
     };
@@ -37,7 +37,7 @@ pub async fn test_ssh_connection(
     let network = match network {
         Some(mut n) => {
             resolve_proxy_session(&state, &mut n)?;
-            n.resolve_proxy_pass(&state.vault)?;
+            n.resolve_proxy_pass(&state.core.vault)?;
             resolve_jump_credentials(&state, &mut n)?;
             Some(n)
         }
@@ -88,6 +88,7 @@ pub async fn test_proxy_connection(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let resolved_pass = state
+        .core
         .vault
         .resolve(&proxy_pass)?
         .map(|z| (*z).clone())

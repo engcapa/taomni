@@ -45,7 +45,7 @@ import { useAppTheme } from "../../lib/appTheme";
 import { isTauriRuntime } from "../../lib/runtime";
 import { redactVncHandoff, vncConsumeDetachClaim, vncCreateDetachClaim } from "../../lib/vnc";
 import { deserializeVncViewerOptions, serializeVncViewerOptions, type VncViewerOptions } from "../../lib/vncOptions";
-import type { VncSessionProperties } from "../vnc/VncPropertiesDialog";
+import type { VncSessionProperties } from "../../lib/vnc/viewerContract";
 import {
   TerminalPanel,
   type TerminalReattachState,
@@ -57,9 +57,9 @@ import { TabActionSlotProvider } from "../tabbar/TabActionSlot";
 import { ChatDrawer } from "../chat/ChatDrawer";
 import { TaoRibbon } from "../tao/TaoRibbon";
 import { CcAgentBridge } from "../agent/CcAgentBridge";
+import VncSessionPane from "../plugins/VncSessionPane";
+import RdpSessionPane from "../plugins/RdpSessionPane";
 
-const RdpPanel = lazy(() => import("../rdp/RdpPanel"));
-const VncPanel = lazy(() => import("../vnc/VncPanel"));
 const DbClientTab = lazy(() => import("../database/DbClientTab"));
 
 /* ── Handoff payload shapes ──────────────────────────────────────────── */
@@ -123,7 +123,7 @@ interface DetachedChatTab {
 /* ── Component ───────────────────────────────────────────────────────── */
 
 interface DetachedSessionWindowProps {
-  kind: Exclude<DetachedKind, "sftp">;
+  kind: Exclude<DetachedKind, "sftp" | "plugin">;
   id: string;
 }
 
@@ -538,7 +538,7 @@ export default function DetachedSessionWindow({
 }
 
 function chatTabForDetached(
-  kind: Exclude<DetachedKind, "sftp">,
+  kind: Exclude<DetachedKind, "sftp" | "plugin">,
   id: string,
   params: unknown,
   title: string,
@@ -576,7 +576,7 @@ function chatTabForDetached(
 }
 
 function renderInner(
-  kind: Exclude<DetachedKind, "sftp">,
+  kind: Exclude<DetachedKind, "sftp" | "plugin">,
   id: string,
   params: unknown,
   detachedWindowControls: {
@@ -592,7 +592,7 @@ function renderInner(
       const p = params as DetachedRdpParams;
       return (
         <Suspense fallback={<LoadingScreen label={tr("rdp.loading")} />}>
-          <RdpPanel
+          <RdpSessionPane
             tabId={p.tabId ?? `detached-rdp-${id}`}
             host={p.host}
             port={p.port}
@@ -611,7 +611,7 @@ function renderInner(
       if (!p.host || !p.port) return <LoadingScreen label={tr("vnc.loading")} />;
       return (
         <Suspense fallback={<LoadingScreen label={tr("vnc.loading")} />}>
-          <VncPanel
+          <VncSessionPane
             tabId={p.tabId ?? `detached-vnc-${id}`}
             host={p.host}
             port={p.port}

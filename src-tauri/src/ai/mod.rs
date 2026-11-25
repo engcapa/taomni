@@ -7,7 +7,7 @@ pub mod shell_prompt;
 pub mod shell_safety;
 pub mod tools_shell;
 
-use crate::asr::manager::AsrManager;
+use crate::asr::manager::{AsrManager, configured as configure_asr};
 use crate::llm::router::{LlmRouter, build_router_from_ai, build_router_from_ai_with_proxy_db};
 use crate::vault::Vault;
 use config::AiConfig;
@@ -38,7 +38,7 @@ impl AppAiCtx {
         vault: Arc<Vault>,
         proxy_db: Option<&rusqlite::Connection>,
     ) -> Self {
-        let asr = AsrManager::configured(cfg.asr.routed_model(), &cfg.asr.language);
+        let asr = configure_asr(cfg.asr.routed_model(), &cfg.asr.language);
 
         let llm = build_router_from_ai_with_proxy_db(&cfg, Some(vault.as_ref()), proxy_db);
         Self {
@@ -56,10 +56,7 @@ impl AppAiCtx {
         self.update_inspector_policy(&cfg);
         self.llm = build_router_from_ai(&cfg, Some(self.vault.as_ref()));
         if self.config.asr != cfg.asr || cfg.fully_disabled {
-            self.asr = Arc::new(AsrManager::configured(
-                cfg.asr.routed_model(),
-                &cfg.asr.language,
-            ));
+            self.asr = Arc::new(configure_asr(cfg.asr.routed_model(), &cfg.asr.language));
         }
         self.config = cfg;
     }
@@ -68,10 +65,7 @@ impl AppAiCtx {
         self.update_inspector_policy(&cfg);
         self.llm = build_router_from_ai_with_proxy_db(&cfg, Some(self.vault.as_ref()), proxy_db);
         if self.config.asr != cfg.asr || cfg.fully_disabled {
-            self.asr = Arc::new(AsrManager::configured(
-                cfg.asr.routed_model(),
-                &cfg.asr.language,
-            ));
+            self.asr = Arc::new(configure_asr(cfg.asr.routed_model(), &cfg.asr.language));
         }
         self.config = cfg;
     }
@@ -80,10 +74,7 @@ impl AppAiCtx {
         self.update_inspector_policy(&cfg);
         self.llm = llm;
         if self.config.asr != cfg.asr || cfg.fully_disabled {
-            self.asr = Arc::new(AsrManager::configured(
-                cfg.asr.routed_model(),
-                &cfg.asr.language,
-            ));
+            self.asr = Arc::new(configure_asr(cfg.asr.routed_model(), &cfg.asr.language));
         }
         self.config = cfg;
     }

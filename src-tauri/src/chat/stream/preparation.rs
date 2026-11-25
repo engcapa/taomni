@@ -34,6 +34,7 @@ pub async fn chat_stream(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
+        .core
         .agent
         .thread_windows
         .record(&req.thread_id, window.label());
@@ -49,11 +50,14 @@ pub async fn chat_stream_inner(
     let tid = req.thread_id.clone();
     let mut guard = match reserved {
         Some(guard) => guard,
-        None => crate::mobile::turn::TurnGuard::reserve(&state.mobile, &tid)?,
+        None => crate::mobile::turn::TurnGuard::reserve(&state.legacy.mobile, &tid)?,
     };
-    guard.bind_runs(state.agent.chat_runs.clone());
+    guard.bind_runs(state.core.agent.chat_runs.clone());
     let cancel = guard.turn.cancel.clone();
-    state.mobile.task_status(&tid, "running", "turn_starting");
+    state
+        .legacy
+        .mobile
+        .task_status(&tid, "running", "turn_starting");
     use futures::FutureExt;
     let result = match std::panic::AssertUnwindSafe(stream_inner(req, app, state))
         .catch_unwind()
@@ -68,9 +72,9 @@ pub async fn chat_stream_inner(
     if cancel.is_cancelled() {
         crate::chat::stop_thread_runtime_inner(&tid, None, state).await;
     }
-    state.agent.chat_runs.lock().await.remove(&tid);
+    state.core.agent.chat_runs.lock().await.remove(&tid);
     let failed = guard.failed();
-    state.mobile.task_status(
+    state.legacy.mobile.task_status(
         &tid,
         "idle",
         if cancel.is_cancelled() {
@@ -92,7 +96,7 @@ async fn stream_inner(
     state: &AppState,
 ) -> Result<(), String> {
     {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         if ai_ctx.config.fully_disabled {
             return Err("AI is fully disabled.".into());
         }
@@ -107,7 +111,7 @@ async fn stream_inner(
 
     // Load thread + history.
     let (thread, history) = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         let thread = store::get_thread(&db, &req.thread_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("Thread '{}' not found", req.thread_id))?;
@@ -135,7 +139,7 @@ async fn stream_inner(
         attachments: attachments.clone(),
     };
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         store::insert_message(&db, &user_msg).map_err(|e| e.to_string())?;
     }
     emit(&StreamEventOut::UserMessage {

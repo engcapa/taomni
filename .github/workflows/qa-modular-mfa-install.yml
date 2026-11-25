@@ -1,0 +1,245 @@
+name: QA Signed MFA Installation
+
+on:
+  workflow_dispatch:
+    inputs:
+      head:
+        description: Repository commit/ref to test (QA artifacts only)
+        type: string
+        default: ''
+      package_run:
+        description: Completed Release Bundle run of the selected source to test its signed module
+        type: string
+        default: ''
+      network_only:
+        description: Compile the core and run persisted proxy contracts without signed MFA packages
+        type: boolean
+        default: false
+      module:
+        description: Signed module migration to execute
+        type: choice
+        options: [mfa, mail]
+        default: mfa
+      macos_runner:
+        description: Hosted ARM64 macOS image for the native gate
+        type: choice
+        options: [macos-latest, macos-26]
+        default: macos-latest
+      native_macos_signing:
+        description: Apply the fixed macOS system signature before packing the QA module
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      head: {type: string, default: ''}
+      package_run: {type: string, default: ''}
+      network_only: {type: boolean, default: false}
+      module: {type: string, default: mfa}
+      macos_runner: {type: string, default: macos-latest}
+      native_macos_signing: {type: boolean, default: false}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: {required: true}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
+      APPLE_CERTIFICATE: {required: false}
+      APPLE_CERTIFICATE_PASSWORD: {required: false}
+      APPLE_SIGNING_IDENTITY: {required: false}
+
+permissions:
+  contents: read
+  actions: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Verify the candidate package producer
+        if: inputs.package_run != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_RUN: ${{ inputs.package_run }}
+          SOURCE: ${{ steps.source.outputs.sha }}
+        run: |
+          [[ "$PACKAGE_RUN" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN" |
+            jq -e --arg source "$SOURCE" '.path == ".github/workflows/release.yml" and .event == "workflow_dispatch" and .head_sha == $source and .conclusion == "success"'
+
+  packages:
+    if: ${{ !inputs.network_only && inputs.package_run == '' }}
+    needs: source
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.source.outputs.sha }}
+      module: ${{ inputs.module }}
+      artifact_key: ${{ inputs.module }}-install-${{ github.run_id }}
+      macos_runner: ${{ inputs.macos_runner }}
+      native_macos_signing: ${{ inputs.native_macos_signing }}
+    secrets: inherit
+
+  installed-host:
+    name: ${{ inputs.network_only && 'Core network' || format('Installed {0}', inputs.module) }} (${{ matrix.platform }})
+    needs: [source, packages]
+    if: ${{ !cancelled() && needs.source.result == 'success' && (inputs.network_only || inputs.package_run != '' || needs.packages.result == 'success') }}
+    strategy:
+      fail-fast: false
+      # Intel macOS has a release-target build/signature above. These gates
+      # execute on the three native runner architectures used by the UI suite.
+      matrix:
+        include:
+          - {os: ubuntu-24.04, platform: linux-x86_64}
+          - {os: windows-latest, platform: windows-x86_64}
+          - {os: macos-latest, platform: darwin-aarch64}
+    runs-on: ${{ matrix.platform == 'darwin-aarch64' && inputs.macos_runner || matrix.os }}
+    timeout-minutes: 360
+    env:
+      PYTHONUTF8: '1'
+      PYTHONUNBUFFERED: '1'
+      QA_RUNNER_LABEL: ${{ matrix.platform == 'darwin-aarch64' && inputs.macos_runner || matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install verified fixed protoc
+        run: python .agents/skills/qa-ui-auto/scripts/ci_setup_protoc.py
+      - name: Scope Windows host builds to the runner image
+        id: windows-cache-scope
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+
+          image = os.environ.get("ImageVersion")
+          scope = f"image-{image}" if image else f"run-{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}"
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"suffix=-{scope}\n")
+          PY
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-core-unit-${{ runner.os }}-${{ runner.arch }}${{ steps.windows-cache-scope.outputs.suffix }}
+          cache-on-failure: true
+      - name: Refresh sherpa native runtime after cache restore
+        run: node scripts/refresh-sherpa-onnx-cache.mjs
+      - name: Linux core dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf \
+            libkrb5-dev libasound2-dev libpipewire-0.3-dev libclang-dev \
+            libdbus-1-dev libudev-dev libgbm-dev nasm
+      - name: macOS core dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install krb5
+          echo "LIBGSSAPI_IMPL=mit" >> "$GITHUB_ENV"
+          echo "LIBGSSAPI_PREFIX=$(brew --prefix krb5)" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$(brew --prefix krb5)/lib/pkgconfig" >> "$GITHUB_ENV"
+          # tauri_build validates configured framework files even for a unit
+          # harness. Match the production pre-compile staging step.
+          bash scripts/bundle-krb5-macos.sh stage
+      - name: Windows complete Perl
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
+          & $perl -MIPC::Cmd -e 'print "Perl ready"'
+          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+          'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
+      - uses: actions/download-artifact@v4
+        if: ${{ !inputs.network_only && inputs.package_run == '' }}
+        with:
+          name: qa-modular-package-${{ matrix.platform }}-${{ inputs.module }}-install-${{ github.run_id }}
+          path: signed-module-package
+      - name: Download the candidate's signed module
+        if: ${{ !inputs.network_only && inputs.package_run != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: module-signed-${{ inputs.module }}-${{ matrix.platform }}-${{ inputs.package_run }}
+          run-id: ${{ inputs.package_run }}
+          github-token: ${{ github.token }}
+          path: candidate-module
+      - name: Select the release package and record its producer
+        if: ${{ !inputs.network_only && inputs.package_run != '' }}
+        env:
+          PACKAGE_RUN: ${{ inputs.package_run }}
+        run: |
+          mv candidate-module/signed-module signed-module-package
+          mkdir -p modular-mfa-install
+          echo "$PACKAGE_RUN" > modular-mfa-install/package-run.txt
+      - name: Read the signed MFA test fixture for this verification
+        if: inputs.module == 'mfa' && !inputs.network_only && needs.source.outputs.sha != github.sha
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: verification-source
+          sparse-checkout-cone-mode: false
+          sparse-checkout: /src-tauri/src/plugin/signed_mfa_support.rs
+          persist-credentials: false
+      - name: Record the test fixture used with the candidate's module manifest
+        if: inputs.module == 'mfa' && !inputs.network_only && needs.source.outputs.sha != github.sha
+        run: |
+          mkdir -p modular-mfa-install
+          cp verification-source/src-tauri/src/plugin/signed_mfa_support.rs src-tauri/src/plugin/
+          git diff HEAD -- src-tauri/src/plugin/signed_mfa_support.rs > modular-mfa-install/test-fixture.patch
+          echo "$GITHUB_SHA" > modular-mfa-install/verification-sha.txt
+      - name: Compile a dedicated harness with the production pinned trust anchor
+        run: |
+          mkdir -p modular-mfa-install
+          git rev-parse HEAD > modular-mfa-install/source-sha.txt
+          rustc --version > modular-mfa-install/rustc-version.txt
+          set -o pipefail
+          # Keep the current product's default feature set. Ordinary
+          # fixture-key tests run separately in qa-modular-upgrade.
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni --lib \
+            --features qa-release-trust-gates --no-run \
+            --locked --message-format=json > modular-mfa-install/core-build.jsonl \
+            2> >(tee modular-mfa-install/core-build.log >&2)
+      - name: Exercise the installed production registry and persisted Vault
+        if: ${{ !inputs.network_only && inputs.module == 'mfa' }}
+        env:
+          TAOMNI_SIGNED_MFA_PACKAGE_DIR: signed-module-package
+          TAOMNI_SIGNED_MFA_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: python scripts/run-signed-mfa-host-gates.py --evidence modular-mfa-install
+      - name: Migrate an encrypted legacy fixture and recover an interrupted activation
+        if: ${{ !inputs.network_only && inputs.module == 'mfa' }}
+        env:
+          TAOMNI_SIGNED_MFA_PACKAGE_DIR: signed-module-package
+          TAOMNI_SIGNED_MFA_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: python scripts/run-signed-mfa-host-gates.py --evidence modular-mfa-install --suite legacy-migration
+      - name: Migrate the old Mail profile and read its cache through the installed host
+        if: ${{ !inputs.network_only && inputs.module == 'mail' }}
+        env:
+          TAOMNI_SIGNED_MAIL_PACKAGE_DIR: signed-module-package
+          TAOMNI_SIGNED_MAIL_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: python scripts/run-signed-mfa-host-gates.py --evidence modular-mfa-install --suite legacy-mail
+      - name: Exercise persisted module proxy modes and Vault credentials
+        if: ${{ inputs.network_only || inputs.module == 'mfa' }}
+        run: python scripts/run-module-network-gates.py --evidence modular-mfa-install
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ inputs.network_only && 'modular-network' || format('modular-signed-{0}-install', inputs.module) }}-${{ matrix.platform }}
+          path: modular-mfa-install/
+          if-no-files-found: error
+          retention-days: 14

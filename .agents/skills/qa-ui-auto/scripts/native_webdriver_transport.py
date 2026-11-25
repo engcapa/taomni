@@ -90,7 +90,9 @@ class WebDriverTransport:
             try:
                 parsed = json.loads(data)
                 value = parsed.get("value", parsed)
-                if isinstance(value, dict) and "error" in value:
+                # execute/sync may return an application observation whose
+                # optional error is null. W3C errors carry a nonempty code.
+                if isinstance(value, dict) and isinstance(value.get("error"), str) and value["error"]:
                     raise WebDriverError(value.get("message") or value["error"])
             except Exception as e:
                 observation["error_type"] = type(e).__name__
@@ -101,6 +103,12 @@ class WebDriverTransport:
             # Never record payloads or response bodies: execute/fill requests
             # can contain credentials. Keep only the latest command's phase.
             observation["duration_sec"] = time.monotonic() - started
+
+    def discard_connection(self) -> None:
+        """Drop a known obsolete HTTP channel without actions or owner cleanup."""
+        connection, self._connection = self._connection, None
+        if connection is not None:
+            connection.close()
 
     def close(self) -> None:
         from qa_ui_auto.deadline import Deadline

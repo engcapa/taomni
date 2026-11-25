@@ -20,7 +20,6 @@ export type AppCommand =
   | "git"
   | "code-workspace"
   | "file-explorer"
-  | "lan-chat"
   | "mail-unified"
   | "mfa"
   | "settings"

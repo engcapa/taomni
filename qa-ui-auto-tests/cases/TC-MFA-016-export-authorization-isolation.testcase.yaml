@@ -1,0 +1,102 @@
+id: TC-MFA-016
+title: MFA export authorizes each account separately
+description: >-
+  Create two accounts, authorize the first export, and close it. Opening the
+  second account starts with a blank password prompt. Refusing its wrong
+  password leaves the secret hidden. Cancelling and reopening clears both the
+  password and error, and the correct password reveals only the second key.
+covers: [F-MFA-1]
+tags: [mfa, export, modular-retained, p1]
+modes: [browser, native]
+fixtures: [reset_db]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-export-016}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-export-016}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: First Export}
+- fill: {selector: '[data-testid="mfa-add-secret"]', value: JBSWY3DPEHPK3PXP}
+- click: '[data-testid="mfa-add-submit"]'
+- wait_for: '[data-testid="mfa-account-row"][data-issuer="First Export"]'
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: Second Export}
+- fill: {selector: '[data-testid="mfa-add-secret"]', value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ}
+- click: '[data-testid="mfa-add-submit"]'
+- wait_for: '[data-testid="mfa-account-row"][data-issuer="Second Export"]'
+- click: '[data-testid="mfa-account-menu"]:is([data-issuer="First Export"] *)'
+- click: '[data-testid="mfa-menu-qr"]'
+- wait_for: '[data-testid="mfa-qr-dialog"][data-state="locked"]'
+- fill: {selector: '[data-testid="mfa-qr-password"]', value: qa-mfa-export-016}
+- click: '[data-testid="mfa-qr-reveal"]'
+- wait_for: {selector: '[data-testid="mfa-qr-image"]', timeout_sec: 30}
+- click: '[data-testid="mfa-qr-toggle-secret"]'
+- assert_text_equals: {selector: '[data-testid="mfa-qr-secret"]', equals: 'JBSW Y3DP EHPK 3PXP'}
+- click: '[data-testid="mfa-qr-close"]'
+- assert_count: {selector: '[data-testid="mfa-qr-image"], [data-testid="mfa-qr-secret"]', equal: 0}
+- click: '[data-testid="mfa-account-menu"]:is([data-issuer="Second Export"] *)'
+- click: '[data-testid="mfa-menu-qr"]'
+- wait_for: '[data-testid="mfa-qr-dialog"][data-state="locked"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"mfa-qr-password"]').value.length === 0
+    expect_truthy: true
+- fill: {selector: '[data-testid="mfa-qr-password"]', value: wrong-master-password}
+- click: '[data-testid="mfa-qr-reveal"]'
+- assert_text: {selector: '[data-testid="mfa-qr-error"]', contains: Incorrect master password, timeout_sec: 30}
+- assert_count: {selector: '[data-testid="mfa-qr-image"], [data-testid="mfa-qr-secret"]', equal: 0}
+- click: '[data-testid="mfa-qr-close"]'
+- click: '[data-testid="mfa-account-menu"]:is([data-issuer="Second Export"] *)'
+- click: '[data-testid="mfa-menu-qr"]'
+- wait_for: '[data-testid="mfa-qr-dialog"][data-state="locked"]'
+- assert_count: {selector: '[data-testid="mfa-qr-error"]', equal: 0}
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"mfa-qr-password"]').value.length === 0
+    expect_truthy: true
+- fill: {selector: '[data-testid="mfa-qr-password"]', value: qa-mfa-export-016}
+- click: '[data-testid="mfa-qr-reveal"]'
+- wait_for: {selector: '[data-testid="mfa-qr-image"]', timeout_sec: 30}
+- click: '[data-testid="mfa-qr-toggle-secret"]'
+- assert_text_equals: {selector: '[data-testid="mfa-qr-secret"]', equals: 'GEZD GNBV GY3T QOJQ GEZD GNBV GY3T QOJQ'}
+- click: '[data-testid="mfa-qr-close"]'
+- assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 2}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A successful export is scoped to one account and the next account still requires authorization.
+    actions: [23, 24, 26, 27, 29, 31, 33, 34, 37, 38]
+    checkpoints:
+    - {step: 30, expectation: The first account reveals its own key.}
+    - {step: 32, expectation: Closing removes the export content.}
+    - {step: 36, expectation: The second prompt begins with an empty password.}
+    - {step: 39, expectation: The second account refuses a wrong password.}
+    - {step: 40, expectation: The refusal exposes no QR or key.}
+    results: [30, 32, 36, 39, 40]
+  - id: R2
+    requirement: Cancelling a rejected export clears the prompt and the verified retry reveals the second key.
+    actions: [41, 42, 43, 47, 48, 50, 52]
+    checkpoints:
+    - {step: 45, expectation: The previous error is gone.}
+    - {step: 46, expectation: The previous password is gone.}
+    - {step: 51, expectation: The second account reveals its own key.}
+    - {step: 53, expectation: Both accounts are still stored.}
+    - {step: 54, expectation: The export sequence raises no unhandled runtime error.}
+    results: [45, 46, 51, 53, 54]
+  visual:
+  - check: Each account starts with a locked export dialog and exposes its key only after verification.
+    method: automated
+    reason: Dialog states, the error, and visible keys are asserted in both modes.
+  native:
+  - check: Native export verifies the actual Vault password before revealing an account key.
+    method: automated
+    reason: Native runs the typed MFA commands against a disposable desktop profile.

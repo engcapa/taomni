@@ -65,7 +65,7 @@ pub(in crate::sockscap) fn read_ready_files(dir: &std::path::Path) -> Vec<StaleR
 /// launch, which runs under UAC. Nothing else in the system can do it.
 pub async fn boot_repair(app: &AppHandle, state: &AppState) {
     #[cfg(target_os = "macos")]
-    let _ready = RecoveryReadyGuard(&state.sockscap);
+    let _ready = RecoveryReadyGuard(&state.legacy.sockscap);
 
     // Another live instance may own the dirty journal. Never repair global
     // network state underneath its active capture session.
@@ -143,15 +143,31 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
         }
     }
 
-    let journal_path = recovery::journal_path(&dir);
-    let dirty = recovery::needs_repair(&journal_path);
+    let journals = match recovery::JournalLocations::load(&state.core.paths.data) {
+        Ok(journals) => journals,
+        Err(error) => {
+            state
+                .legacy
+                .sockscap
+                .orch
+                .write()
+                .await
+                .set_recovery_required(
+                    &capture::capabilities().capture_backend,
+                    format!("Cannot inspect SocksCap recovery data: {error}"),
+                );
+            return;
+        }
+    };
+    let journal_path = journals.active();
+    let dirty = recovery::needs_repair(journal_path);
     if !dirty && orphans.is_empty() {
         return;
     }
 
     if dirty {
         tracing::warn!("sockscap: dirty recovery journal — repairing network state");
-        if let Some(j) = recovery::read_journal(&journal_path) {
+        if let Some(j) = recovery::read_journal(journal_path) {
             tracing::warn!(
                 "sockscap: dirty journal pid={} backend={} relay={:?} helper={:?}",
                 j.pid,
@@ -176,19 +192,20 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
             redirector::installer::system_extension_state(),
             redirector::installer::RedirectorSystemExtensionState::WaitingForUser
         )
-        && recovery::read_journal(&journal_path)
+        && journals.only_dirty() == Some(journal_path)
+        && recovery::read_journal(journal_path)
             .as_ref()
             .is_some_and(pending_approval_never_recorded_scope)
     {
-        match recovery::mark_clean_and_clear(&journal_path) {
+        match recovery::mark_clean_and_clear(journal_path) {
             Ok(()) => {
                 tracing::info!(
                     "sockscap: cleared aborted first-use approval journal; waiting for System Settings approval"
                 );
-                state.sockscap.orch.write().await.force_idle();
+                state.legacy.sockscap.orch.write().await.force_idle();
             }
             Err(error) => {
-                state.sockscap.orch.write().await.set_recovery_required(
+                state.legacy.sockscap.orch.write().await.set_recovery_required(
                     "mitmproxy-redirector",
                     format!(
                         "Redirector never applied capture while System Extension approval was pending, but its journal could not be cleared: {error}"
@@ -201,7 +218,7 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
 
     // The previous helper cannot be contacted without its token, so recovery
     // terminates what it can and reports what needs elevation.
-    match capture::recover_system(None).await {
+    match capture::recover_system(&state.plugins, None).await {
         Ok(needs_elevation) => {
             for pid in needs_elevation {
                 if !orphans.contains(&pid) {
@@ -214,35 +231,37 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
             // declaring potentially-live nftables/cgroup state recovered.
             tracing::warn!("sockscap: boot recover failed; leaving journal dirty: {e}");
             queue_reap(state, &orphans);
-            #[cfg(target_os = "macos")]
-            state.sockscap.orch.write().await.set_recovery_required(
-                "mitmproxy-redirector",
-                format!("macOS Redirector recovery failed: {e}"),
-            );
+            state
+                .legacy
+                .sockscap
+                .orch
+                .write()
+                .await
+                .set_recovery_required(
+                    &capture::capabilities().capture_backend,
+                    format!("SocksCap recovery failed: {e}"),
+                );
             return;
         }
     }
 
     queue_reap(state, &orphans);
     if orphans.is_empty() {
-        #[cfg(target_os = "macos")]
-        match recovery::mark_clean_and_clear(&journal_path) {
+        match journals.clear_after_repair() {
             Ok(()) => tracing::info!("sockscap: recovery complete"),
             Err(error) => {
                 tracing::warn!("sockscap: recovery journal cleanup failed: {error}");
-                #[cfg(target_os = "macos")]
-                state.sockscap.orch.write().await.set_recovery_required(
-                    "mitmproxy-redirector",
-                    format!(
-                        "macOS network recovery succeeded, but journal cleanup failed: {error}"
-                    ),
-                );
+                state
+                    .legacy
+                    .sockscap
+                    .orch
+                    .write()
+                    .await
+                    .set_recovery_required(
+                        &capture::capabilities().capture_backend,
+                        format!("Network recovery succeeded, but journal cleanup failed: {error}"),
+                    );
             }
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            let _ = recovery::mark_clean_and_clear(&journal_path);
-            tracing::info!("sockscap: recovery complete");
         }
     } else {
         // Do not declare success while an elevated orphan is still diverting
@@ -255,6 +274,7 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
         );
         tracing::warn!("sockscap: {message}");
         state
+            .legacy
             .sockscap
             .orch
             .write()
@@ -267,7 +287,7 @@ pub(in crate::sockscap) fn queue_reap(state: &AppState, pids: &[u32]) {
     if pids.is_empty() {
         return;
     }
-    if let Ok(mut slot) = state.sockscap.pending_reap.lock() {
+    if let Ok(mut slot) = state.legacy.sockscap.pending_reap.lock() {
         for pid in pids {
             if !slot.contains(pid) {
                 slot.push(*pid);

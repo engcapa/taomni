@@ -1,14 +1,16 @@
 id: TC-MAIL-FILTER-01
-title: Mail filter created in the filter dialog moves matching new mail out of the Inbox
+title: Saved subject and body filters move matching new mail out of the Inbox
 description: 'TASK-13 (docs-feature/mail-thunderbird-parity-design.md AC-40, DEC-11).
 
   Creates a filter "Subject contains Filtered -> Move to Archive" in the
 
-  Message filters dialog, delivers one matching and one non-matching message,
+  Message filters dialog, reopens the dialog to read the saved rule, delivers one matching and one non-matching message,
 
   syncs, and requires the server to hold the matching message in Archive and
 
-  only the other one in INBOX. Manual runs, failures (AC-41/AC-42), body
+  only the other one in INBOX. Adds a second rule whose keyword must appear in
+  the body and delivers mail with the keyword in either its subject or body.
+  Manual runs, failures (AC-41/AC-42), other condition operators
 
   conditions and the rule semantics are covered by Rust and Vitest tests.
 
@@ -30,7 +32,7 @@ modes:
 fixtures:
 - reset_db
 - mail_server
-timeout_sec: 150
+timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - seed_storage:
@@ -64,6 +66,11 @@ steps:
     selector: '[data-testid="mail-filter-row"][data-filter-name="QA archive"]'
     timeout_sec: 20
 - click: '[data-testid="mail-filters-close"]'
+- click: '[data-testid="mail-filters-open"]'
+- wait_for:
+    selector: '[data-testid="mail-filter-row"][data-filter-name="QA archive"]'
+    timeout_sec: 20
+- click: '[data-testid="mail-filters-close"]'
 - mail_server_deliver:
     count: 1
     prefix: Filtered
@@ -80,12 +87,46 @@ steps:
     has_subject: Keep 0001
     lacks_subject: Filtered 0001
     timeout_sec: 20
+- assert_no_runtime_errors: null
+- click: '[data-testid="mail-filters-open"]'
+- click: '[data-testid="mail-filter-new"]'
+- fill: {selector: '[data-testid="mail-filter-name"]', value: QA body archive}
+- select_option: {selector: '[data-testid="mail-filter-condition-field"]', value: body}
+- fill: {selector: '[data-testid="mail-filter-condition-value"]', value: invoice marker}
+- select_option: {selector: '[data-testid="mail-filter-action-folder"]', value: Archive}
+- click: '[data-testid="mail-filter-save"]'
+- wait_for: '[data-testid="mail-filter-row"][data-filter-name="QA body archive"]'
+- click: '[data-testid="mail-filters-close"]'
+- mail_server_deliver: {count: 1, prefix: Receivable, body: 'Contains the INVOICE MARKER from accounting.'}
+- mail_server_deliver: {count: 1, prefix: invoice marker, body: 'This note is unrelated.'}
+- click: '[data-testid="mail-sync-button"]:enabled'
+- mail_server_assert_folder_count: {folder: Archive, has_subject: Receivable 0001, lacks_subject: invoice marker 0001, timeout_sec: 45}
+- mail_server_assert_folder_count: {folder: INBOX, has_subject: invoice marker 0001, lacks_subject: Receivable 0001}
+- assert_no_runtime_errors: null
 - screenshot: mail-filter-01-after-sync.png
+- click: '[data-testid="mail-filters-open"]'
+- click: '[data-testid="mail-filter-new"]'
+- fill: {selector: '[data-testid="mail-filter-name"]', value: QA forwarding rule}
+- fill: {selector: '[data-testid="mail-filter-condition-value"]', value: Forward only future mail}
+- select_option: {selector: '[data-testid="mail-filter-action-kind"]', value: forward}
+- fill: {selector: '[data-testid="mail-filter-action-address"]', value: forward-target@example.com}
+- click: '[data-testid="mail-filter-save"]'
+- wait_for: '[data-testid="mail-filter-row"][data-filter-name="QA forwarding rule"]'
+- click: '[data-testid="mail-filters-close"]'
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"][data-active="true"]'
+    contains: new headers across
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="mail-message-row"][data-subject="invoice marker 0001"]'
+    equal: 1
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 在“Message filters”对话框中创建多字段规则（主题包含 Filtered → 移动到 Archive）并保存，规则出现在列表中（DEC-11）。
+    requirement: 在“Message filters”对话框中创建并保存规则（主题包含 Filtered → 移动到 Archive），重新打开对话框后仍可读到保存的规则（DEC-11）。
     actions:
     - 1
     - 2
@@ -99,30 +140,56 @@ verification:
     - 13
     - 14
     - 15
+    - 17
+    - 18
     checkpoints:
     - step: 8
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
     - step: 16
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-filter-row\"][data-filter-name=\"QA archive\"]", "timeout_sec": 20}}'
+    - step: 19
+      expectation: 重新打开的对话框显示已保存的 QA archive 规则。
     results:
     - 16
+    - 19
   - id: R2
     requirement: 同步到达的新邮件经收信过滤器处理：匹配的邮件在服务器上被移入 Archive，不匹配的留在 INBOX（AC-40）。
     actions:
-    - 17
-    - 18
-    - 19
     - 20
-    checkpoints:
-    - step: 21
-      expectation: '{"mail_server_assert_folder_count": {"folder": "Archive", "has_subject": "Filtered 0001", "timeout_sec": 60}}'
-    - step: 22
-      expectation: '{"mail_server_assert_folder_count": {"folder": "INBOX", "has_subject": "Keep 0001", "lacks_subject": "Filtered 0001", "timeout_sec": 20}}'
-    results:
     - 21
     - 22
+    - 23
+    checkpoints:
+    - step: 24
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Archive", "has_subject": "Filtered 0001", "timeout_sec": 60}}'
+    - step: 25
+      expectation: '{"mail_server_assert_folder_count": {"folder": "INBOX", "has_subject": "Keep 0001", "lacks_subject": "Filtered 0001", "timeout_sec": 20}}'
+    - step: 26
+      expectation: 保存和应用过滤规则期间没有运行时错误。
+    results:
+    - 24
+    - 25
+    - 26
+  - id: R3
+    requirement: 正文规则忽略大小写，并且不会移动只在主题中含有该关键词的邮件。
+    actions: [27, 28, 29, 30, 31, 32, 33, 35, 36, 37, 38]
+    checkpoints:
+    - {step: 34, expectation: 消息过滤器显示已保存的正文规则。}
+    - {step: 39, expectation: 正文包含关键词的邮件移到 Archive。}
+    - {step: 40, expectation: 仅主题包含关键词的邮件留在 INBOX。}
+    - {step: 41, expectation: 完成过滤时无运行时错误。}
+    results: [34, 39, 40, 41]
+  - id: R4
+    requirement: The filter editor accepts a forwarding recipient and saves the rule.
+    actions: [43, 44, 45, 46, 47, 48, 49, 51, 52]
+    checkpoints:
+    - {step: 50, expectation: The saved forwarding rule is listed.}
+    - {step: 53, expectation: A repeat sync completes after closing the rule editor.}
+    - {step: 54, expectation: The subject-only match appears exactly once after a repeat sync.}
+    - {step: 55, expectation: Saving and applying the rules reports no runtime errors.}
+    results: [50, 53, 54, 55]
   visual:
-  - check: 截图中 INBOX 列表不含 Filtered 0001，含 Keep 0001。
+  - check: 截图中 INBOX 列表保留只匹配主题的邮件和 Keep 0001。
     method: manual
     reason: 像素与布局需人工评审。
   native:

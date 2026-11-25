@@ -1,211 +1,12 @@
-//! Short account-scoped OS locks protect SQLite references and immutable files
-//! across application processes. Network and MIME work never holds this lock.
-use rusqlite::Connection;
-use std::fs::{self, File, OpenOptions, TryLockError};
-use std::ops::{Deref, DerefMut};
-use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
-use std::time::{Duration, Instant};
+//! Cache ownership for the existing desktop commands and backup adapter.
+use std::path::PathBuf;
 
-pub struct ProcessLock(File);
+pub(crate) use taomni_mail_storage::database::{
+    MailDatabase, ProcessLock, redirect_path, write_redirect,
+};
 
-impl ProcessLock {
-    pub fn try_at(database: &Path, purpose: &str) -> Result<Option<Self>, String> {
-        let parent = database.parent().ok_or("Invalid mail database path")?;
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        let path = database.with_extension(format!("{purpose}.lock"));
-        let file = OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .read(true)
-            .write(true)
-            .open(path)
-            .map_err(|e| format!("Open mailbox lock: {e}"))?;
-        match file.try_lock() {
-            Ok(()) => Ok(Some(Self(file))),
-            Err(TryLockError::WouldBlock) => Ok(None),
-            Err(TryLockError::Error(e)) => Err(format!("Lock mailbox: {e}")),
-        }
-    }
-
-    pub fn access(database: &Path) -> Result<Self, String> {
-        Self::access_cancellable(database, &tokio_util::sync::CancellationToken::new())
-    }
-
-    fn access_cancellable(
-        database: &Path,
-        cancel: &tokio_util::sync::CancellationToken,
-    ) -> Result<Self, String> {
-        let start = Instant::now();
-        loop {
-            if cancel.is_cancelled() {
-                return Err("BACKUP_CANCELLED".into());
-            }
-            if let Some(lock) = Self::try_at(database, "access")? {
-                return Ok(lock);
-            }
-            if start.elapsed() >= Duration::from_secs(3) {
-                return Err("Mail storage is busy in another instance (moving or taking a snapshot); retry shortly".into());
-            }
-            std::thread::sleep(Duration::from_millis(10));
-        }
-    }
-}
-
-impl Drop for ProcessLock {
-    fn drop(&mut self) {
-        let _ = self.0.unlock();
-    }
-}
-
-pub fn redirect_path(database: &Path) -> PathBuf {
-    database.with_extension("redirect.json")
-}
-
-pub fn write_redirect(source: &Path, target: &Path) -> Result<(), String> {
-    use std::io::Write;
-    let mut file =
-        tempfile::NamedTempFile::new_in(source.parent().unwrap()).map_err(|e| e.to_string())?;
-    serde_json::to_writer(file.as_file_mut(), target).map_err(|e| e.to_string())?;
-    file.as_file_mut().flush().map_err(|e| e.to_string())?;
-    file.as_file().sync_all().map_err(|e| e.to_string())?;
-    file.persist(redirect_path(source))
-        .map_err(|e| e.error.to_string())?;
-    Ok(())
-}
-
-struct MailConnection {
-    path: PathBuf,
-    connection: Option<Connection>,
-    initialized: bool,
-    generation: Option<Vec<u8>>,
-}
-
-pub struct MailDatabase(Mutex<MailConnection>);
-
-impl MailDatabase {
-    /// Opening SQLite is deferred to a blocking worker, including first access.
-    pub fn new(path: PathBuf) -> Self {
-        Self(Mutex::new(MailConnection {
-            path,
-            connection: None,
-            initialized: false,
-            generation: None,
-        }))
-    }
-
-    pub fn lock(&self) -> Result<MailGuard<'_>, String> {
-        self.lock_cancellable(&tokio_util::sync::CancellationToken::new())
-    }
-
-    pub fn lock_cancellable(
-        &self,
-        cancel: &tokio_util::sync::CancellationToken,
-    ) -> Result<MailGuard<'_>, String> {
-        self.lock_inner(cancel, true)
-    }
-
-    /// Backups copy existing data without running migrations that inspect MIME
-    /// objects, especially when the original-message category is excluded.
-    pub(crate) fn lock_for_snapshot(
-        &self,
-        cancel: &tokio_util::sync::CancellationToken,
-    ) -> Result<MailGuard<'_>, String> {
-        self.lock_inner(cancel, false)
-    }
-
-    fn lock_inner(
-        &self,
-        cancel: &tokio_util::sync::CancellationToken,
-        initialize: bool,
-    ) -> Result<MailGuard<'_>, String> {
-        let mut inner = loop {
-            if cancel.is_cancelled() {
-                return Err("BACKUP_CANCELLED".into());
-            }
-            match self.0.try_lock() {
-                Ok(guard) => break guard,
-                Err(std::sync::TryLockError::WouldBlock) => {
-                    std::thread::sleep(Duration::from_millis(10))
-                }
-                Err(error) => return Err(error.to_string()),
-            }
-        };
-        // Migration updates the existing Connection while holding this guard.
-        if let Some(connection) = inner.connection.as_ref() {
-            inner.path = PathBuf::from(connection.path().ok_or("Mail storage has no disk path")?);
-        }
-        for _ in 0..32 {
-            let lock = ProcessLock::access_cancellable(&inner.path, cancel)?;
-            let redirect = redirect_path(&inner.path);
-            if redirect.exists() {
-                let target: PathBuf =
-                    serde_json::from_slice(&fs::read(redirect).map_err(|e| e.to_string())?)
-                        .map_err(|e| format!("Read mailbox relocation: {e}"))?;
-                if !target.is_absolute() || target.file_name() != inner.path.file_name() {
-                    return Err("Invalid mailbox relocation target".into());
-                }
-                // Close a cached connection before following the relocation.
-                // Never recreate a stale source database after a move.
-                inner.connection = None;
-                inner.path = target;
-                drop(lock);
-                continue;
-            }
-            let generation = match fs::read(inner.path.with_extension("generation")) {
-                Ok(value) => Some(value),
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-                Err(error) => return Err(error.to_string()),
-            };
-            if generation != inner.generation {
-                inner.connection = None;
-                inner.generation = generation;
-            }
-            if inner.connection.is_none() {
-                let db = Connection::open(&inner.path)
-                    .map_err(|e| format!("Open mail database: {e}"))?;
-                db.busy_timeout(Duration::from_secs(3))
-                    .map_err(|e| e.to_string())?;
-                inner.connection = Some(db);
-                inner.initialized = false;
-            }
-            if initialize && !inner.initialized {
-                let db = inner.connection.as_ref().unwrap();
-                let cancellation = cancel.clone();
-                db.progress_handler(1_000, Some(move || cancellation.is_cancelled()))
-                    .map_err(|e| e.to_string())?;
-                let result = super::init_mail_tables(&db).map_err(|e| e.to_string());
-                db.progress_handler(0, None::<fn() -> bool>)
-                    .map_err(|e| e.to_string())?;
-                if cancel.is_cancelled() {
-                    return Err("BACKUP_CANCELLED".into());
-                }
-                result?;
-                inner.initialized = true;
-            }
-            return Ok(MailGuard {
-                inner,
-                _process: lock,
-            });
-        }
-        Err("Mailbox relocation chain is too long or contains a cycle".into())
-    }
-}
-
-pub struct MailGuard<'a> {
-    inner: MutexGuard<'a, MailConnection>,
-    _process: ProcessLock,
-}
-impl Deref for MailGuard<'_> {
-    type Target = Connection;
-    fn deref(&self) -> &Connection {
-        self.inner.connection.as_ref().unwrap()
-    }
-}
-impl DerefMut for MailGuard<'_> {
-    fn deref_mut(&mut self) -> &mut Connection {
-        self.inner.connection.as_mut().unwrap()
-    }
+pub(crate) fn mailbox_database(path: PathBuf) -> MailDatabase {
+    MailDatabase::new(path, super::init_mail_tables)
 }
 
 #[cfg(test)]
@@ -213,6 +14,11 @@ mod tests {
     use super::*;
     use std::io::{Read, Write};
     use std::process::{Child, Command, Stdio};
+    use std::{
+        fs,
+        path::Path,
+        time::{Duration, Instant},
+    };
 
     struct ChildGuard(Child);
     impl Drop for ChildGuard {
@@ -253,7 +59,7 @@ mod tests {
             return;
         };
         let root = Path::new(&root);
-        let db = MailDatabase::new(database(root));
+        let db = mailbox_database(database(root));
         let mode = std::env::var("TAOMNI_MAIL_PROCESS_MODE").unwrap();
         let lease = if mode == "worker" {
             Some(
@@ -302,7 +108,7 @@ mod tests {
                 .is_none()
         );
         // Reading and other accounts continue while this account downloads.
-        drop(MailDatabase::new(database(root.path())).lock().unwrap());
+        drop(mailbox_database(database(root.path())).lock().unwrap());
         let _other = ProcessLock::try_at(&root.path().join("second.db"), "archive")
             .unwrap()
             .unwrap();
@@ -317,7 +123,7 @@ mod tests {
     #[test]
     fn another_process_follows_relocation_and_writes_only_to_the_new_database() {
         let root = tempfile::tempdir().unwrap();
-        let db = MailDatabase::new(database(root.path()));
+        let db = mailbox_database(database(root.path()));
         {
             let conn = db.lock().unwrap();
             super::super::storage::store(
@@ -353,7 +159,7 @@ mod tests {
             .unwrap();
         assert!(exists);
         // An instance starting with stale session settings follows the same link.
-        let fresh = MailDatabase::new(database(root.path()));
+        let fresh = mailbox_database(database(root.path()));
         let fresh_path = fresh.lock().unwrap().path().unwrap().to_string();
         let current_path = db.lock().unwrap().path().unwrap().to_string();
         assert_eq!(fresh_path, current_path);

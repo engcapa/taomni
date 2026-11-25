@@ -21,6 +21,7 @@ use tokio::process::Child;
 use tokio::process::ChildStdin;
 use tokio::process::ChildStdout;
 use tokio::process::Command;
+use tokio_util::sync::CancellationToken;
 
 pub(super) struct SocketCleanup(pub(super) PathBuf);
 
@@ -50,17 +51,81 @@ pub(super) fn random_socket_path(label: &str) -> PathBuf {
 pub(super) fn bind_private_listener(path: &PathBuf) -> Result<UnixListener, String> {
     let listener = UnixListener::bind(path)
         .map_err(|error| format!("bind Redirector IPC {}: {error}", path.display()))?;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
-        .map_err(|error| format!("secure Redirector IPC {}: {error}", path.display()))?;
+    if let Err(error) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)) {
+        let _ = std::fs::remove_file(path);
+        return Err(format!("secure Redirector IPC {}: {error}", path.display()));
+    }
     Ok(listener)
 }
 
+/// The enabled package advertises its secondary entrypoint over the host channel.
+async fn spawn_bridge(
+    registry: &std::sync::Arc<crate::plugin::PluginRegistry>,
+    redirector: &std::path::Path,
+    provider_socket: &std::path::Path,
+    flow_socket: &std::path::Path,
+) -> Result<Child, String> {
+    use crate::plugin::LifecycleState;
+    use taomni_sockscap_api::{REDIRECTOR_BRIDGE_ARG, RUNTIME_INFO, RuntimeInfo, SLUG};
+    let provider = provider_socket.to_path_buf();
+    let flow = flow_socket.to_path_buf();
+    let redirector = redirector.to_path_buf();
+    let spawn = move |mut command: Command| {
+        command
+            .arg("--provider-socket")
+            .arg(provider)
+            .arg("--flow-socket")
+            .arg(flow)
+            .arg("--redirector")
+            .arg(redirector)
+            .arg("--parent-pid")
+            .arg(std::process::id().to_string())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .kill_on_drop(false)
+            .spawn()
+    };
+    let record = registry
+        .get(SLUG)
+        .filter(|record| record.state == LifecycleState::Enabled && record.reason.is_none())
+        .ok_or("Install and enable the SocksCap module before starting capture")?;
+    if !record.manifest.commands.contains(RUNTIME_INFO) {
+        return Err("Update the SocksCap module to start macOS capture".into());
+    }
+    let info: RuntimeInfo =
+        crate::sockscap::module_host::invoke(registry, RUNTIME_INFO, serde_json::json!({})).await?;
+    if info.redirector_bridge_protocol != Some(BRIDGE_PROTOCOL_VERSION) {
+        return Err("The installed SocksCap module has an incompatible Redirector bridge".into());
+    }
+    let birth = info
+        .host_start_micros
+        .filter(|birth| *birth > 0)
+        .ok_or("The SocksCap module did not identify its running host")?;
+    let registry = registry.clone();
+    tokio::task::spawn_blocking(move || {
+        registry.launch_verified_mode(SLUG, &record.manifest.version, RUNTIME_INFO, |executable| {
+            let mut command = Command::new(executable);
+            command
+                .arg(REDIRECTOR_BRIDGE_ARG)
+                .arg("--module-host")
+                .arg(format!("{}:{birth}", info.host_pid));
+            spawn(command)
+        })
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())
+}
+
 pub(super) async fn launch_bridge(
+    registry: &std::sync::Arc<crate::plugin::PluginRegistry>,
     redirector: &std::path::Path,
     provider_socket: &std::path::Path,
     flow_socket: &std::path::Path,
     actions: &[String],
     session_id: &str,
+    cancel: &CancellationToken,
 ) -> Result<BridgeSession, RedirectorStartError> {
     if actions.is_empty() {
         return Err(RedirectorStartError::before_scope(
@@ -72,24 +137,12 @@ pub(super) async fn launch_bridge(
             "Redirector bridge session id must not be empty",
         ));
     }
-    let executable = std::env::current_exe()
-        .map_err(|error| format!("resolve Taomni bridge executable: {error}"))?;
-    let mut child = Command::new(&executable)
-        .arg("--sockscap-redirector-bridge")
-        .arg("--provider-socket")
-        .arg(provider_socket)
-        .arg("--flow-socket")
-        .arg(flow_socket)
-        .arg("--redirector")
-        .arg(redirector)
-        .arg("--parent-pid")
-        .arg(std::process::id().to_string())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .kill_on_drop(false)
-        .spawn()
-        .map_err(|error| format!("launch isolated Redirector bridge: {error}"))?;
+    if cancel.is_cancelled() {
+        return Err(RedirectorStartError::before_scope(
+            "SocksCap activation cancelled",
+        ));
+    }
+    let mut child = spawn_bridge(registry, redirector, provider_socket, flow_socket).await?;
     let Some(stdin) = child.stdin.take() else {
         terminate_bridge_child(&mut child).await;
         return Err(RedirectorStartError::before_scope(
@@ -105,8 +158,13 @@ pub(super) async fn launch_bridge(
     let mut input = BufWriter::new(stdin);
     let mut output = BufReader::new(stdout);
 
-    let ready =
-        match tokio::time::timeout(CONTROL_CONNECT_TIMEOUT, read_bridge_event(&mut output)).await {
+    let ready = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => {
+            terminate_bridge_child(&mut child).await;
+            return Err(RedirectorStartError::before_scope("SocksCap activation cancelled"));
+        }
+        ready = tokio::time::timeout(CONTROL_CONNECT_TIMEOUT, read_bridge_event(&mut output)) => match ready {
             Ok(Ok(event)) => event,
             Ok(Err(error)) => {
                 terminate_bridge_child(&mut child).await;
@@ -118,7 +176,8 @@ pub(super) async fn launch_bridge(
                     "timed out waiting for Redirector bridge control readiness",
                 ));
             }
-        };
+        },
+    };
     let provider_pid = match ready {
         BridgeEvent::ControlReady {
             version,
@@ -136,6 +195,14 @@ pub(super) async fn launch_bridge(
         }
     };
 
+    if cancel.is_cancelled() {
+        terminate_bridge_child(&mut child).await;
+        return Err(RedirectorStartError::before_scope(
+            "SocksCap activation cancelled",
+        ));
+    }
+    // After writing Apply, finish the handshake so the caller can stop any
+    // active scope using the confirmed session or keep its recovery journal.
     let session_id = session_id.to_string();
     if let Err(error) = write_bridge_command(
         &mut input,

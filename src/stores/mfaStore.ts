@@ -25,7 +25,8 @@ import type {
   MfaPrefs,
   MfaSortMode,
 } from "../lib/mfa/types";
-import { useVaultStore } from "./vaultStore";
+import { usePluginFrontendStore } from "./pluginFrontendStore";
+import { useVaultStore, vaultSessionIsCurrent as vaultCurrent, invalidateVaultSensitiveResults, requireVaultUnlock } from "./vaultStore";
 
 export type MfaLoadStatus = "idle" | "loading" | "ready" | "error";
 
@@ -73,13 +74,40 @@ function replaceAccount(accounts: MfaAccount[], next: MfaAccount): MfaAccount[] 
   return accounts.map((account) => (account.id === next.id ? next : account));
 }
 
-let codesInFlight: Promise<void> | null = null;
+let resetPending = false;
+interface MfaRequestOwner {
+  vaultEpoch: number;
+  activation: number;
+}
+
+function currentRequestOwner(): MfaRequestOwner {
+  return {
+    vaultEpoch: useVaultStore.getState().securityEpoch,
+    activation: usePluginFrontendStore.getState().epochs.mfa ?? 0,
+  };
+}
+
+function requestIsCurrent(owner: MfaRequestOwner): boolean {
+  const registry = usePluginFrontendStore.getState();
+  return !resetPending && vaultCurrent(owner.vaultEpoch) && !registry.pending.has("mfa")
+    && owner.activation === (registry.epochs.mfa ?? 0);
+}
+
+function requireSession(owner: MfaRequestOwner): void {
+  if (!requestIsCurrent(owner)) throw new Error("VAULT_LOCKED");
+}
+
+let codesInFlight: { owner: MfaRequestOwner; promise: Promise<void> } | null = null;
 export const useMfaStore = create<MfaState>((set, get) => {
   /** Record an IPC failure; a locked vault sends the tab back to its gate. */
-  const fail = (err: unknown): never => {
+  const fail = (err: unknown, owner: MfaRequestOwner): never => {
+    if (!requestIsCurrent(owner)) throw err;
     const code = mfaErrorCode(err);
-    set({ error: errorText(err), errorCode: code });
-    if (code === "VAULT_LOCKED") void useVaultStore.getState().refresh().catch(() => undefined);
+    if (code === "VAULT_LOCKED") {
+      requireVaultUnlock();
+      set({ status: "error", error: errorText(err), errorCode: code });
+      void useVaultStore.getState().refresh().catch(() => undefined);
+    } else set({ error: errorText(err), errorCode: code });
     throw err;
   };
 
@@ -94,16 +122,21 @@ export const useMfaStore = create<MfaState>((set, get) => {
     lastCopied: null,
 
     load: async () => {
+      const owner = currentRequestOwner();
+      if (!requestIsCurrent(owner)) return;
       set({ status: "loading", error: null, errorCode: null });
       try {
         const snapshot = await mfaList();
+        if (!requestIsCurrent(owner)) return;
         set({ accounts: snapshot.accounts, prefs: snapshot.prefs ?? DEFAULT_PREFS });
         await get().refreshCodes();
+        if (!requestIsCurrent(owner)) return;
         set({ status: "ready" });
       } catch (err) {
+        if (!requestIsCurrent(owner)) return;
         set({ status: "error" });
         try {
-          fail(err);
+          fail(err, owner);
         } catch {
           // Surfaced through state; callers render the error panel.
         }
@@ -111,50 +144,71 @@ export const useMfaStore = create<MfaState>((set, get) => {
     },
 
     refreshCodes: async (ids) => {
-      if (codesInFlight && !ids) return codesInFlight;
+      const owner = currentRequestOwner();
+      if (!requestIsCurrent(owner)) return;
+      if (codesInFlight && requestIsCurrent(codesInFlight.owner) && !ids) return codesInFlight.promise;
       const run = (async () => {
         try {
           const list = await mfaCodes(ids);
+          if (!requestIsCurrent(owner)) return;
           set((state) => {
             const codes = ids ? { ...state.codes } : {};
             for (const code of list) codes[code.id] = code;
             return { codes };
           });
         } catch (err) {
-          fail(err);
+          if (requestIsCurrent(owner)) fail(err, owner);
         }
       })();
       if (!ids) {
-        codesInFlight = run.finally(() => {
-          codesInFlight = null;
-        });
-        return codesInFlight;
+        const pending = { owner, promise: run.finally(() => {
+          if (codesInFlight === pending) codesInFlight = null;
+        }) };
+        codesInFlight = pending;
+        return pending.promise;
       }
       return run;
     },
 
-    inspect: (inputs) => mfaInspect(inputs).catch(fail),
+    inspect: async (inputs) => {
+      const owner = currentRequestOwner();
+      requireSession(owner);
+      try {
+        const result = await mfaInspect(inputs);
+        requireSession(owner);
+        return result;
+      } catch (err) {
+        return fail(err, owner);
+      }
+    },
 
     addAccounts: async (inputs, skipDuplicates) => {
+      const owner = currentRequestOwner();
+      requireSession(owner);
       try {
         const result = await mfaAdd(inputs, skipDuplicates);
+        requireSession(owner);
         if (result.added.length > 0) {
           set((state) => ({ accounts: [...state.accounts, ...result.added], error: null, errorCode: null }));
           await get().refreshCodes(result.added.map((account) => account.id));
         }
+        requireSession(owner);
         return result;
       } catch (err) {
-        return fail(err);
+        return fail(err, owner);
       }
     },
 
     updateAccount: async (id, patch) => {
+      const owner = currentRequestOwner();
+      requireSession(owner);
       try {
         const updated = await mfaUpdate(id, patch);
+        requireSession(owner);
         set((state) => ({ accounts: replaceAccount(state.accounts, updated) }));
         return updated;
       } catch (err) {
-        return fail(err);
+        return fail(err, owner);
       }
     },
 
@@ -165,19 +219,24 @@ export const useMfaStore = create<MfaState>((set, get) => {
     },
 
     deleteAccount: async (id) => {
+      const owner = currentRequestOwner();
+      requireSession(owner);
       try {
         await mfaDelete(id);
+        requireSession(owner);
         set((state) => {
           const codes = { ...state.codes };
           delete codes[id];
           return { accounts: state.accounts.filter((account) => account.id !== id), codes };
         });
       } catch (err) {
-        fail(err);
+        fail(err, owner);
       }
     },
 
     moveAccount: async (movingId, targetId) => {
+      const owner = currentRequestOwner();
+      requireSession(owner);
       const order = moveInCustomOrder(get().accounts, movingId, targetId);
       const previous = get().accounts;
       const rank = new Map(order.map((id, index) => [id, index]));
@@ -185,60 +244,97 @@ export const useMfaStore = create<MfaState>((set, get) => {
       try {
         await mfaReorder(order);
       } catch (err) {
-        set({ accounts: previous });
-        fail(err);
+        if (requestIsCurrent(owner)) set({ accounts: previous });
+        fail(err, owner);
       }
     },
 
     hotpNext: async (id) => {
+      const owner = currentRequestOwner();
+      requireSession(owner);
       try {
         const code = await mfaHotpNext(id);
+        requireSession(owner);
         set((state) => ({
           codes: { ...state.codes, [id]: code },
           accounts: state.accounts.map((account) => (account.id === id ? { ...account, counter: code.counter } : account)),
         }));
       } catch (err) {
-        fail(err);
+        fail(err, owner);
       }
     },
 
     copyCode: async (id, which = "current") => {
+      const owner = currentRequestOwner();
+      if (!requestIsCurrent(owner)) return null;
       const code = get().codes[id];
       const digits = which === "next" ? code?.nextCode : code?.code;
       if (!digits) return null;
       await writeText(digits);
+      if (!requestIsCurrent(owner)) return null;
       set({ lastCopied: { id, at: Date.now() } });
       // Usage feeds the recent/frequent sorts; a failure here must not undo the copy.
       void mfaMarkUsed(id)
-        .then((updated) => set((state) => ({ accounts: replaceAccount(state.accounts, updated) })))
+        .then((updated) => {
+          if (requestIsCurrent(owner)) set((state) => ({ accounts: replaceAccount(state.accounts, updated) }));
+        })
         .catch(() => undefined);
       return digits;
     },
 
     setSortMode: async (mode) => {
+      const owner = currentRequestOwner();
+      requireSession(owner);
       const prefs = { ...get().prefs, sortMode: mode };
       set({ prefs });
-      await mfaSetPrefs(prefs).catch(fail);
+      await mfaSetPrefs(prefs).catch((err: unknown) => fail(err, owner));
     },
 
     setGroupFilter: async (group) => {
+      const owner = currentRequestOwner();
+      requireSession(owner);
       const prefs = { ...get().prefs, groupFilter: group };
       set({ prefs });
-      await mfaSetPrefs(prefs).catch(fail);
+      await mfaSetPrefs(prefs).catch((err: unknown) => fail(err, owner));
     },
 
     setQuery: (query) => set({ query }),
 
     resetStore: async () => {
+      const owner = currentRequestOwner();
+      requireSession(owner);
+      resetPending = true;
+      owner.vaultEpoch = invalidateVaultSensitiveResults();
+      set({ status: "loading" });
       try {
         await mfaResetStore();
       } catch (err) {
-        fail(err);
+        resetPending = false;
+        if (requestIsCurrent(owner)) set({ status: "error" });
+        fail(err, owner);
+      } finally {
+        resetPending = false;
       }
+      requireSession(owner);
       set({ accounts: [], codes: {} });
       await get().load();
     },
 
     clearError: () => set({ error: null, errorCode: null }),
   };
+});
+
+function clearSensitiveMfaState() {
+  codesInFlight = null;
+  useMfaStore.setState({ status: "idle", accounts: [], codes: {}, error: null, errorCode: null, lastCopied: null });
+}
+
+// A lock or module transition invalidates prior work before the native
+// operation finishes, including code requests from the floating window.
+useVaultStore.subscribe((next, previous) => {
+  if (next.securityEpoch === previous.securityEpoch && (next.state === "unlocked" || next.state === previous.state)) return;
+  clearSensitiveMfaState();
+});
+usePluginFrontendStore.subscribe((next, previous) => {
+  if (next.epochs.mfa !== previous.epochs.mfa) clearSensitiveMfaState();
 });

@@ -93,6 +93,10 @@ impl Orchestrator {
         self.rules = Some(Arc::new(rules));
     }
 
+    pub(crate) fn clear_rules(&mut self) {
+        self.rules = None;
+    }
+
     pub fn rules(&self) -> Option<&CompiledRules> {
         self.rules.as_deref()
     }

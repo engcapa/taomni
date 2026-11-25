@@ -17,7 +17,7 @@ pub type CcProcessRegistry = Mutex<HashMap<String, Arc<CcProcess>>>;
 /// so the frontend hides the integration without leaking that CC is installed.
 #[tauri::command]
 pub async fn cc_detect(state: State<'_, AppState>) -> Result<CcStatusResult, String> {
-    let ai_ctx = state.ai_ctx.read().await;
+    let ai_ctx = state.legacy.ai_ctx.read().await;
     if ai_ctx.config.full_local_mode || ai_ctx.config.fully_disabled {
         return Ok(CcStatusResult {
             status: crate::agent::cc_bridge::CcStatus::NotFound,
@@ -44,7 +44,7 @@ pub async fn cc_detect(state: State<'_, AppState>) -> Result<CcStatusResult, Str
 #[tauri::command]
 pub async fn cc_get_custom_settings(state: State<'_, AppState>) -> Result<Option<String>, String> {
     let config = AiConfig::load(&default_ai_config_path());
-    crate::agent::cc_bridge::config::resolve_custom_settings(&config.cc_bridge, &state.vault)
+    crate::agent::cc_bridge::config::resolve_custom_settings(&config.cc_bridge, &state.core.vault)
 }
 
 #[tauri::command]
@@ -55,7 +55,7 @@ pub async fn cc_get_profile_settings(
     if !vault_ref.starts_with("vault:") {
         return Err("Invalid vault reference".into());
     }
-    match state.vault.resolve(&vault_ref) {
+    match state.core.vault.resolve(&vault_ref) {
         Ok(Some(plaintext)) => Ok(Some(plaintext.to_string())),
         Ok(None) => Ok(None),
         Err(e) if e.contains(crate::vault::ERR_VAULT_LOCKED) => Err(format!(
@@ -104,7 +104,7 @@ pub async fn cc_send_message(
     state: State<'_, AppState>,
 ) -> Result<CcSendResponse, String> {
     {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         if ai_ctx.config.fully_disabled || ai_ctx.config.full_local_mode {
             return Err("Claude Code is unavailable in full-local / fully-disabled mode.".into());
         }
@@ -123,7 +123,7 @@ pub async fn cc_send_message(
     // Look up the saved session id for this thread (for --resume continuity)
     // and the linked SSH session (for token trust scoping).
     let (resume_session, linked_session) = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         let thread = crate::chat::store::list_threads(&db, 200)
             .ok()
             .and_then(|ts| ts.into_iter().find(|t| t.id == req.thread_id));
@@ -138,6 +138,7 @@ pub async fn cc_send_message(
     // launched with (scrubbed when the session stops).
     let existing = {
         state
+            .core
             .agent
             .cc_processes
             .lock()
@@ -173,7 +174,7 @@ pub async fn cc_send_message(
             // Resolve the user's custom settings.json from the vault (when set).
             let custom = crate::agent::cc_bridge::config::resolve_custom_settings(
                 &config.cc_bridge,
-                &state.vault,
+                &state.core.vault,
             )?;
             let files = crate::agent::cc_bridge::config::create_session_files(
                 custom.as_deref(),
@@ -218,7 +219,7 @@ pub async fn cc_send_message(
                     .with_proxy_url(effective_proxy)
                     .with_token(cc_token.clone()),
             );
-            let mut registry = state.agent.cc_processes.lock().await;
+            let mut registry = state.core.agent.cc_processes.lock().await;
             match registry.get(&req.thread_id) {
                 Some(existing) => existing.clone(),
                 None => {
@@ -237,7 +238,7 @@ pub async fn cc_send_message(
     let answer = extract_answer(&events);
     let session_id = extract_session_id(&events).or(resume_session);
     if let Some(sid) = &session_id {
-        if let Ok(db) = state.db.lock() {
+        if let Ok(db) = state.core.db.lock() {
             let _ = crate::chat::store::set_cc_session_id(&db, &req.thread_id, sid);
         }
     }
@@ -265,7 +266,7 @@ pub async fn cc_send_message(
 /// Stop the CC process for a thread.
 #[tauri::command]
 pub async fn cc_stop_session(thread_id: String, state: State<'_, AppState>) -> Result<(), String> {
-    let mut registry = state.agent.cc_processes.lock().await;
+    let mut registry = state.core.agent.cc_processes.lock().await;
     if let Some(process) = registry.remove(&thread_id) {
         process.stop().await;
     }
@@ -283,20 +284,21 @@ pub async fn cc_stop_session(thread_id: String, state: State<'_, AppState>) -> R
 /// The registry lock is released before `stop()` so we don't hold it across the
 /// child kill.
 pub(crate) async fn recycle_thread_process(state: &AppState, thread_id: &str) {
-    let process = { state.agent.cc_processes.lock().await.remove(thread_id) };
+    let process = { state.core.agent.cc_processes.lock().await.remove(thread_id) };
     if let Some(process) = process {
         process.stop().await;
     }
     // Best-effort `rm -f` of any remote (C-path) capture temp files before we
     // drop the captures; the local scrub in purge_thread can't reach a remote
     // host. The session may already be gone — failures are harmless.
-    let remote = state.agent.captures.remote_files(thread_id);
+    let remote = state.core.agent.captures.remote_files(thread_id);
     if !remote.is_empty() {
-        let terms = state.terminal.terminals.read().await;
+        let terms = state.core.terminal.terminals.read().await;
         for (session_id, path) in remote {
             // `session_id` is the tab id stored at capture time; `terminals` is
             // keyed by the backend session id, so translate via the live map.
             let backend_sid = state
+                .core
                 .agent
                 .cc_tab_sessions
                 .lock()
@@ -312,7 +314,7 @@ pub(crate) async fn recycle_thread_process(state: &AppState, thread_id: &str) {
     }
     // Drop + scrub this thread's captures (方案4); their files are tied to the
     // process lifetime the same way the temp dir is.
-    state.agent.captures.purge_thread(thread_id);
+    state.core.agent.captures.purge_thread(thread_id);
 }
 
 /// Cancel an in-flight captured run (方案4). Fires the capture's cancel
@@ -324,6 +326,7 @@ pub async fn cc_cancel_capture(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let notify = state
+        .core
         .agent
         .cc_capture_cancels
         .lock()
@@ -338,7 +341,7 @@ pub async fn cc_cancel_capture(
 
 /// Record that a live terminal tab (`tab_id`, the caller-facing id CC's tools
 /// see) is backed by a concrete backend terminal session (`session_id`, the
-/// `state.terminal.terminals` key). The frontend calls this from its terminal registry
+/// `state.core.terminal.terminals` key). The frontend calls this from its terminal registry
 /// as a panel connects, so backend-side CC tools (`run_captured` /
 /// `read_capture`) can resolve the live terminal that `run_in_terminal` reaches
 /// indirectly through the frontend registry. Overwrites on reconnect. Idempotent.
@@ -350,6 +353,7 @@ pub async fn cc_track_terminal(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
+        .core
         .agent
         .cc_tab_sessions
         .lock()
@@ -359,6 +363,7 @@ pub async fn cc_track_terminal(
     // dispatched there instead of the chat window (issue #869: after a detach
     // those are different windows).
     state
+        .core
         .agent
         .cc_tab_windows
         .lock()
@@ -379,6 +384,7 @@ pub async fn cc_untrack_terminal(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let mut map = state
+        .core
         .agent
         .cc_tab_sessions
         .lock()
@@ -389,7 +395,7 @@ pub async fn cc_untrack_terminal(
         // only when it is still this window: a detached panel can adopt the same
         // backend session id, so a late unmount from the old window must not
         // steal the new window's terminal routing.
-        if let Ok(mut windows) = state.agent.cc_tab_windows.lock() {
+        if let Ok(mut windows) = state.core.agent.cc_tab_windows.lock() {
             let label = window.label();
             if windows.get(&tab_id).is_some_and(|owner| owner == label) {
                 windows.remove(&tab_id);
@@ -410,6 +416,7 @@ pub async fn cc_resolve_tool_call(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let sender = state
+        .core
         .agent
         .cc_pending_tool_calls
         .lock()
@@ -438,6 +445,7 @@ pub async fn cc_resolve_permission(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let thread_id = state
+        .legacy
         .mobile
         .confirmations
         .lock()
@@ -447,6 +455,7 @@ pub async fn cc_resolve_permission(
         .and_then(|value| value["thread_id"].as_str())
         .map(str::to_string);
     let sender = state
+        .core
         .agent
         .cc_pending_permissions
         .lock()
@@ -479,7 +488,7 @@ pub async fn cc_stream_message(
     state: State<'_, AppState>,
 ) -> Result<CcSendResponse, String> {
     {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         if ai_ctx.config.fully_disabled || ai_ctx.config.full_local_mode {
             return Err("Claude Code is unavailable in full-local / fully-disabled mode.".into());
         }
@@ -496,7 +505,7 @@ pub async fn cc_stream_message(
     };
 
     let (resume_session, linked_session) = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         let thread = crate::chat::store::list_threads(&db, 200)
             .ok()
             .and_then(|ts| ts.into_iter().find(|t| t.id == req.thread_id));
@@ -508,6 +517,7 @@ pub async fn cc_stream_message(
 
     let existing = {
         state
+            .core
             .agent
             .cc_processes
             .lock()
@@ -540,7 +550,7 @@ pub async fn cc_stream_message(
             let control_server_url = crate::agent::cc_bridge::mcp_http::control_server_url()?;
             let custom = crate::agent::cc_bridge::config::resolve_custom_settings(
                 &config.cc_bridge,
-                &state.vault,
+                &state.core.vault,
             )?;
             let files = crate::agent::cc_bridge::config::create_session_files(
                 custom.as_deref(),
@@ -580,7 +590,7 @@ pub async fn cc_stream_message(
                     .with_proxy_url(effective_proxy)
                     .with_token(cc_token.clone()),
             );
-            let mut registry = state.agent.cc_processes.lock().await;
+            let mut registry = state.core.agent.cc_processes.lock().await;
             match registry.get(&req.thread_id) {
                 Some(existing) => existing.clone(),
                 None => {
@@ -603,7 +613,7 @@ pub async fn cc_stream_message(
     let answer = extract_answer(&events);
     let session_id = extract_session_id(&events).or(resume_session);
     if let Some(sid) = &session_id {
-        if let Ok(db) = state.db.lock() {
+        if let Ok(db) = state.core.db.lock() {
             let _ = crate::chat::store::set_cc_session_id(&db, &req.thread_id, sid);
         }
     }
@@ -659,7 +669,7 @@ pub async fn cc_test_settings(
 
     // Kill any existing test process first to clean up
     {
-        let mut registry = state.agent.cc_processes.lock().await;
+        let mut registry = state.core.agent.cc_processes.lock().await;
         if let Some(old) = registry.remove(&thread_id) {
             old.stop().await;
         }
@@ -712,7 +722,7 @@ pub async fn cc_test_settings(
     );
 
     {
-        let mut registry = state.agent.cc_processes.lock().await;
+        let mut registry = state.core.agent.cc_processes.lock().await;
         registry.insert(thread_id.clone(), process.clone());
     }
 
@@ -738,7 +748,7 @@ pub async fn cc_test_settings(
     // Clean up registry
     let stderr = process.get_stderr().await.trim().to_string();
     {
-        let mut registry = state.agent.cc_processes.lock().await;
+        let mut registry = state.core.agent.cc_processes.lock().await;
         if let Some(old) = registry.remove(&thread_id) {
             old.stop().await;
         }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useUpdateStore } from "../stores/updateStore";
 import { useT, type TranslateFn } from "../lib/i18n";
-import { SocksCapRootPrompt } from "./sockscap/SocksCapRootPrompt";
+import { ElevationPasswordPrompt } from "./ElevationPasswordPrompt";
 
 const DANGER = "#e5534b";
 
@@ -320,7 +320,7 @@ export function UpdateDialog() {
         </div>
       </div>
       {authorizing && (
-        <SocksCapRootPrompt
+        <ElevationPasswordPrompt
           subtitle={t("update.sockscapRecoveryAuthorization")}
           onSubmit={(password) => s.authorizeInstall(password)}
           onCancel={s.cancelAuthorization}

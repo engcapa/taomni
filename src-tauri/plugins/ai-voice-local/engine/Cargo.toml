@@ -1,0 +1,23 @@
+[package]
+name = "taomni-local-voice-engine"
+version = "0.1.0"
+description = "Whisper, SenseVoice and Zipformer inference for Taomni Local Voice"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[features]
+asr-whisper = ["dep:whisper-rs"]
+asr-sherpa = ["dep:sherpa-onnx"]
+
+[dependencies]
+taomni-asr-models = { path = "../../../crates/taomni-asr-models" }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros", "time"] }
+whisper-rs = { version = "0.16", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+# The upstream static libraries use /MT and conflict with Rust MSVC /MD.
+sherpa-onnx = { version = "1.13.8", default-features = false, features = ["shared"], optional = true }
+
+[target.'cfg(not(windows))'.dependencies]
+sherpa-onnx = { version = "1.13.8", optional = true }

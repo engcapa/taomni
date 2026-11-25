@@ -1,0 +1,206 @@
+id: TC-MODULES-060
+title: Mail account and unified panes follow the module selector
+description: >-
+  Enable the preview Mail module from an open account tab. View and save the
+  original of a newly received message. Refresh Unified Mail after delivering
+  a separate message. Disable the module and check both retained tabs show the
+  disabled state. Re-enable Mail and catch up the inbox and open the archive in
+  the same account tab.
+covers: [F-Modules-1, F-MAIL-3, F-MAIL-11, F-MAIL-15, F-MAIL-20, F-MAIL-23, F-FILEOPEN-1]
+tags: [modules, mail, p1]
+modes: [browser]
+fixtures: [reset_db, module_mail_preview, file_open_mail, file_open_files]
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="mail-client-tab"]', equal: 0}
+- click: '[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]'
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-toolbar-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]'
+- mail_server_assert_list_matches: {timeout_sec: 30}
+- wait_for: '[data-testid="mail-message-row"][data-subject="${fixture.file_open_mail_subject}"]'
+- click: '[data-testid="mail-message-row"][data-subject="${fixture.file_open_mail_subject}"]'
+- wait_for: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
+- assert_file_open_bytes:
+    selector: '[data-testid="file-viewer"][data-readonly="true"]'
+    remember: signed-mail-attachment
+    equals: ${fixture.file_open_mail_text}
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="file-viewer"][data-readonly="true"]', state: detached}
+- assert_file_open_bytes: {remember: signed-mail-attachment, absent: true}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- click: '[data-testid="context-menu-item-new-subfolder"]'
+- fill: {selector: '[data-testid="text-input-dialog-input"]', value: QA module folder}
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module folder"]'
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module folder"]'
+- click: '[data-testid="context-menu-item-rename-folder"]'
+- fill: {selector: '[data-testid="text-input-dialog-input"]', value: QA module renamed}
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- assert_count: {selector: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module folder"]', equal: 0}
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- click: '[data-testid="context-menu-item-delete-folder"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_visible: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- right_click: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]'
+- click: '[data-testid="context-menu-item-delete-folder"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: {selector: '[data-testid="mail-folder-row"][data-folder-name="INBOX/QA module renamed"]', state: detached}
+- assert_visible: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- mail_server_deliver: {count: 1, prefix: Module source}
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- wait_for: '[data-testid="mail-message-row"][data-subject="Module source 0001"]'
+- click: '[data-testid="mail-message-row"][data-subject="Module source 0001"]'
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent
+      ?? document.querySelector('.taomni-mail-reader-text')?.textContent
+      ?? '').includes('Subject: Module source 0001')
+    expect_truthy: true
+- right_click: '[data-testid="mail-message-row"][data-subject="Module source 0001"]'
+- click: '[data-testid="context-menu-item-view-source"]'
+- assert_text: {selector: '[role="dialog"][aria-label="Message source"] pre', contains: 'Subject: Module source 0001'}
+- assert_text: {selector: '[role="dialog"][aria-label="Message source"] pre', contains: 'Hello from Taomni Mail preview.'}
+- click: '[role="dialog"][aria-label="Message source"] [aria-label="Close dialog"]'
+- wait_for: {selector: '[role="dialog"][aria-label="Message source"]', state: detached}
+- right_click: '[data-testid="mail-message-row"][data-subject="Module source 0001"]'
+- click: '[data-testid="context-menu-item-save-as-eml"]'
+- fill: {selector: '[data-testid="text-input-dialog-input"]', value: '${fixture.file_open_root}/mail-original.eml'}
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/mail-original.eml
+    equals: "From: qa-sender@example.com\r\nSubject: Module source 0001\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nHello from Taomni Mail preview.\r\n\r\nThis body is shaped like a cached IMAP message body. Use Sync in the desktop build to fetch live mailbox data.\r\n\r\nSubject: Module source 0001"
+- right_click: '[data-testid="mail-message-row"][data-subject="Module source 0001"]'
+- click: '[data-testid="context-menu-item-save-as-eml"]'
+- fill: {selector: '[data-testid="text-input-dialog-input"]', value: '${fixture.file_open_root}/cancelled-original.eml'}
+- click: '[data-testid="text-input-dialog-cancel"]'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Save cancelled}
+- assert_file_open_bytes: {path: '${fixture.file_open_root}/cancelled-original.eml', absent: true}
+- mail_server_deliver: {count: 1, prefix: Module frontend}
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mail-unified"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="mail-unified-tab"]'
+- click: '[data-testid="mail-unified-refresh"]'
+- assert_text: {selector: '[data-testid="mail-unified-tab"]', contains: 'Module frontend 0001', timeout_sec: 30}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-mail"]'
+- wait_for: '[data-testid="module-action-enable-mail"]'
+- wait_for: {selector: '[data-testid="mail-client-tab"], [data-testid="mail-unified-tab"]', state: detached}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-toolbar-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail"]', equal: 1}
+- click: '[data-testid="tab-item"][data-tab-type="mail-unified"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail-unified"]', equal: 1}
+- assert_no_runtime_errors: null
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- assert_count: {selector: '[data-testid="mail-archive-open"]', equal: 0}
+- assert_count: {selector: '[data-testid="mail-sync-button"]', equal: 0}
+- mail_server_deliver: {count: 1, prefix: After Mail re-enable}
+- click: '[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]'
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-toolbar-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: {selector: '[data-testid="mail-message-row"][data-subject="After Mail re-enable 0001"]', timeout_sec: 30}
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 20}
+- wait_for: '[data-testid="mail-archive-open"]'
+- click: '[data-testid="mail-archive-open"]'
+- wait_for: '[data-testid="mail-archive-dialog"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Enabling Mail renders the account list in the original tab and the unified list in its own tab.
+    actions: [5, 6, 9, 10, 12, 14, 68, 69, 70, 72]
+    checkpoints:
+    - {step: 7, expectation: The first open shows the disabled module.}
+    - {step: 8, expectation: The disabled module has no account pane.}
+    - {step: 15, expectation: The existing tab mounts the account pane from the Mail module.}
+    - {step: 16, expectation: The account shows the same inbox as its stub server.}
+    - {step: 71, expectation: The Unified Mail entry mounts the module's unified pane.}
+    - {step: 73, expectation: Refresh populates the unified pane with the new message.}
+    results: [7, 8, 15, 16, 71, 73]
+  - id: R2
+    requirement: Disabling Mail unmounts both panes while preserving both tabs.
+    actions: [74, 75, 76, 79, 81, 84]
+    checkpoints:
+    - {step: 78, expectation: Both module panes have unmounted.}
+    - {step: 82, expectation: The original account tab displays the disabled state.}
+    - {step: 83, expectation: Exactly one account tab remains.}
+    - {step: 85, expectation: The original unified tab displays the disabled state.}
+    - {step: 86, expectation: Exactly one unified tab remains.}
+    - {step: 87, expectation: The transitions produce no uncaught errors.}
+    results: [78, 82, 83, 85, 86, 87]
+  - id: R3
+    requirement: The Mail context menu displays the selected source, saves it to the chosen path and lets the user cancel a subsequent export.
+    actions: [46, 47, 51, 52, 55, 57, 58, 59, 60, 62, 63, 64, 65]
+    checkpoints:
+    - {step: 48, expectation: Sync adds the newly delivered message to the account.}
+    - {step: 53, expectation: The source dialog shows the selected subject header.}
+    - {step: 54, expectation: The source dialog also renders the body.}
+    - {step: 56, expectation: Closing the source dialog leaves the account available.}
+    - {step: 61, expectation: The browser saves the full source in the chosen virtual file.}
+    - {step: 66, expectation: The account reports that the second export was cancelled.}
+    - {step: 67, expectation: Cancelling the save leaves no file at the second destination.}
+    results: [48, 53, 54, 56, 61, 66, 67]
+  - id: R4
+    requirement: Opening the newly delivered message shows its corresponding body before exporting.
+    actions: [49]
+    checkpoints:
+    - {step: 50, expectation: The reader displays the body for the message just selected.}
+    results: [50]
+  - id: R5
+    requirement: The Mail account attachment opens as a read-only browser file and is removed after the viewer closes.
+    actions: [18, 20, 23]
+    checkpoints:
+    - {step: 19, expectation: The selected message exposes the expected attachment.}
+    - {step: 22, expectation: The new read-only viewer holds the exact attachment bytes.}
+    - {step: 25, expectation: Closing the viewer removes the controlled temporary file.}
+    results: [19, 22, 25]
+  - id: R6
+    requirement: The Mail module supports creating and renaming a folder, cancelling deletion and confirming deletion.
+    actions: [29, 34, 39, 43]
+    checkpoints:
+    - {step: 30, expectation: The new empty subfolder appears.}
+    - {step: 35, expectation: The renamed folder replaces its original row.}
+    - {step: 40, expectation: Cancelling deletion leaves the folder visible.}
+    - {step: 44, expectation: Confirmed deletion removes the folder and keeps its parent.}
+    results: [30, 35, 40, 44]
+  - id: archive-module-lifecycle
+    requirement: Re-enabling restores sync and archive access in the retained account tab.
+    actions: [88, 91, 92, 93, 97, 101]
+    checkpoints:
+    - {step: 89, expectation: The disabled account has no Local Archive control.}
+    - {step: 90, expectation: The disabled account has no sync control.}
+    - {step: 98, expectation: The retained account catches up to a message delivered while disabled.}
+    - {step: 99, expectation: The visible inbox matches the model server.}
+    - {step: 102, expectation: The Local Archive opens in the retained account tab.}
+    - {step: 103, expectation: The module transition and archive reopen produce no runtime errors.}
+    results: [89, 90, 98, 99, 102, 103]
+  visual:
+  - check: The account and unified panes each show content when enabled and a status when disabled.
+    method: automated
+    reason: The assertions observe both renderer paths and their disabled placeholders.
+  native:
+  - check: Native uses a verified package and SMTP instead of the browser model.
+    method: not-applicable
+    reason: TC-MODULES-059 verifies the signed artifact, host lease and delivery in the desktop app.

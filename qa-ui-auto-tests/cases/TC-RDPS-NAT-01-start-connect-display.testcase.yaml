@@ -22,7 +22,8 @@ description: |
   On Windows the runner's system Remote Desktop is running, so Start first
   offers it; platform_choice answers "Use Taomni anyway" there and asserts the
   prompt never appears on Linux/macOS. TC-RDPS-NAT-06 covers the rest of the
-  Windows branch (system choice, remembered choice).
+  Windows branch (system choice, remembered choice). Restart retains the first
+  explicit Taomni choice, so no second choice dialog should appear.
 covers:
 - F-RdpServer-1
 - F-Servers-1
@@ -171,6 +172,31 @@ steps:
 - host_helper:
     action: stop
     name: target
+- click: '[data-testid="server-row-rdp-start"]'
+- assert_not_visible: '[data-testid="choice-dialog"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="running"]'
+    timeout_sec: 90
+- rdp_probe:
+    scenario: connect
+    artifact: probe-after-restart
+    args: {seconds: 3, compression: none}
+    expect:
+      graphics_updates: {min: 1}
+      framebuffer.painted_share: {min: 0.95}
+      desktop.width: {min: 640}
+      rfx.bulk.decompression_errors: 0
+- click: '[data-testid="server-row-rdp-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 30
+- rdp_probe:
+    scenario: connect
+    artifact: probe-after-second-stop
+    args: {connect-timeout-sec: 5}
+    expect_exit: 4
+    expect: {error.kind: connection}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -220,6 +246,17 @@ verification:
       expectation: A new connection fails at the transport (exit 4, kind connection).
     results:
     - 27
+  - id: R5
+    requirement: Stop releases the shared capture owner; restarting the same configured server retains the explicit Taomni choice, creates a fresh source that paints a complete client framebuffer and stops cleanly again.
+    actions: [29, 32, 33]
+    checkpoints:
+    - {step: 30, expectation: Restart does not prompt again for the already saved Taomni choice.}
+    - {step: 31, expectation: The same server returns to running after source recreation.}
+    - {step: 32, expectation: A new authenticated client receives graphics and at least 95 percent of its framebuffer grid is painted.}
+    - {step: 34, expectation: Second stop reaches stopped.}
+    - {step: 35, expectation: New connections are refused after the second stop.}
+    - {step: 36, expectation: No WebView runtime errors occurred.}
+    results: [30, 31, 32, 34, 35, 36]
   native:
   - check: Real Tauri IPC, vault-backed credential storage, OS screen capture and OS input injection on the runner desktop.
     method: automated

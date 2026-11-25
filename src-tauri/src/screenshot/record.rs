@@ -12,19 +12,11 @@
 
 mod lifetime;
 
-mod model;
-
 mod frames;
 
 mod capture;
 
-mod encoding;
-
-mod gif;
-
-mod mp4;
-
-mod inspection;
+mod module_encoder;
 
 #[cfg(test)]
 mod tests;
@@ -37,11 +29,27 @@ pub use lifetime::{
 pub(crate) use lifetime::output_path;
 
 pub(super) use lifetime::{Recording, take_for_recovery};
+pub(super) use module_encoder::MODULE_UNAVAILABLE;
+pub(super) use module_encoder::{
+    available as module_recording_available, selected as select_recording_encoder,
+};
 
-pub use model::{RecordFormat, RecordingInfo};
+pub use taomni_screenshot_api::{ClipInfo, RecordFormat, RecordingInfo};
 
-pub(crate) use mp4::annex_b_nals;
+#[cfg(any(test, feature = "legacy-screenshot-media"))]
+pub(crate) use taomni_screenshot_recording::inspect_clip;
+#[cfg(any(test, feature = "legacy-screenshot-media"))]
+pub(crate) use taomni_screenshot_recording::inspect_clip_frames;
 
-pub use inspection::{ClipInfo, inspect_clip};
+#[cfg(not(any(test, feature = "legacy-screenshot-media")))]
+pub(crate) fn inspect_clip(_: &std::path::Path) -> anyhow::Result<ClipInfo> {
+    anyhow::bail!("Recording inspection requires the isolated QA build");
+}
 
-pub(crate) use inspection::inspect_clip_frames;
+#[cfg(not(any(test, feature = "legacy-screenshot-media")))]
+pub(crate) fn inspect_clip_frames(
+    _: &std::path::Path,
+    _: &mut dyn FnMut(&image::RgbaImage, u64) -> anyhow::Result<()>,
+) -> anyhow::Result<ClipInfo> {
+    anyhow::bail!("Recording inspection requires the isolated QA build");
+}

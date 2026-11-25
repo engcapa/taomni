@@ -11,6 +11,31 @@ import native_build
 
 
 class BuildCheckTest(unittest.TestCase):
+    def test_signed_mail_overlay_stays_in_a_file_for_windows_command_shims(self):
+        original = json.loads(native_build.QA_CONFIG.read_text(encoding="utf-8"))
+        with native_build.tauri_config_path(signed_mail=True) as (path, features):
+            overlay = json.loads(path.read_text(encoding="utf-8"))
+            self.assertNotEqual(path, native_build.QA_CONFIG)
+            self.assertEqual(overlay["build"]["features"], features)
+            self.assertEqual(
+                features,
+                [feature for feature in original["build"]["features"] if not feature.startswith("legacy-mail-")],
+            )
+            self.assertEqual(overlay["build"]["beforeBuildCommand"], original["build"]["beforeBuildCommand"])
+        self.assertFalse(path.exists())
+        self.assertEqual(json.loads(native_build.QA_CONFIG.read_text(encoding="utf-8")), original)
+
+    def test_modular_release_has_no_legacy_features_and_its_own_recipe(self):
+        options = native_build.module_build_options(["signed-mail", "modular-release"])
+        self.assertEqual(options, {"signed_mail": False, "modular_release": True})
+        with native_build.tauri_config_path(**options) as (path, features):
+            overlay = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(overlay["identifier"], native_build.QA_APP_ID)
+            self.assertEqual(overlay["build"]["features"], features)
+            self.assertFalse(any(feature.startswith("legacy-") for feature in features))
+        recipe = native_build.recipe_identity(**options)
+        self.assertNotIn(recipe, [native_build.recipe_identity(), native_build.recipe_identity(signed_mail=True)])
+
     def test_check_never_builds_and_reports_changed_inputs_without_values(self):
         with tempfile.TemporaryDirectory() as directory:
             binary = Path(directory) / "taomni.exe"
@@ -22,6 +47,7 @@ class BuildCheckTest(unittest.TestCase):
             record_path.write_text(json.dumps(record), encoding="utf-8")
             original = record_path.read_bytes()
             with patch.object(native_build, "qa_binary", return_value=binary), \
+                 patch.object(native_build.platform, "system", return_value="Linux"), \
                  patch.object(native_build, "build_inputs", return_value=inputs), \
                  patch.object(native_build.subprocess, "run") as compile_process, \
                  contextlib.redirect_stdout(io.StringIO()):
@@ -56,10 +82,43 @@ class BuildCheckTest(unittest.TestCase):
                 "binary_sha256": native_build.binary_digest(binary),
                 "build_inputs": {"source_sha256": "source", "optional": None},
             }), encoding="utf-8")
-            with patch.object(native_build, "qa_binary", return_value=binary):
+            with patch.object(native_build, "qa_binary", return_value=binary), \
+                 patch.object(native_build.platform, "system", return_value="Linux"):
                 result = native_build.check_build(inputs={"source_sha256": "source"})
             self.assertFalse(result["reusable"])
             self.assertEqual(result["changed_inputs"], ["optional"])
+
+    def test_windows_build_reuse_requires_the_matching_helper(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "taomni.exe"
+            binary.write_bytes(b"qa app")
+            helper = binary.with_name("sockscap-helper.exe")
+            helper.write_bytes(b"qa helper")
+            vnc_key_helper = binary.with_name("taomni-vnc-key-helper.exe")
+            vnc_key_helper.write_bytes(b"qa vnc key helper")
+            inputs = {"source_sha256": "source"}
+            record = {"identifier": native_build.QA_APP_ID, "binary_sha256": native_build.binary_digest(binary),
+                      "build_inputs": inputs}
+            path = native_build.identity_path(binary)
+            path.write_text(json.dumps(record), encoding="utf-8")
+            with patch.object(native_build, "qa_binary", return_value=binary), \
+                 patch.object(native_build.platform, "system", return_value="Windows"):
+                self.assertIn("identity missing", native_build.check_build(inputs=inputs)["reason"])
+                record["sockscap_helper_sha256"] = native_build.binary_digest(helper)
+                path.write_text(json.dumps(record), encoding="utf-8")
+                self.assertIn("taomni-vnc-key-helper identity missing",
+                              native_build.check_build(inputs=inputs)["reason"])
+                record["vnc_key_helper_sha256"] = native_build.binary_digest(vnc_key_helper)
+                path.write_text(json.dumps(record), encoding="utf-8")
+                self.assertTrue(native_build.check_build(inputs=inputs)["reusable"])
+                vnc_key_helper.write_bytes(b"stale vnc key helper")
+                self.assertIn("taomni-vnc-key-helper differs",
+                              native_build.check_build(inputs=inputs)["reason"])
+                vnc_key_helper.write_bytes(b"qa vnc key helper")
+                helper.write_bytes(b"stale helper")
+                self.assertIn("helper differs", native_build.check_build(inputs=inputs)["reason"])
+                helper.unlink()
+                self.assertFalse(native_build.check_build(inputs=inputs)["reusable"])
 
     def test_stable_platform_and_reusable_cache_key_exclude_kernel_patch_and_include_recipe(self):
         with patch.object(native_build, "source_identity", return_value="a" * 64), \

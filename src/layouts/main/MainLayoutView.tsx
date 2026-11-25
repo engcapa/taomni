@@ -6,9 +6,6 @@ import { CcAgentBridge } from "../../components/agent/CcAgentBridge";
 import { ChatDrawer } from "../../components/chat/ChatDrawer";
 import { ToolWindowRail } from "../../components/editor/workspace/panels/ToolWindowRail";
 import { effectiveStripeWidth } from "../../components/editor/workspace/toolWindowLayout";
-import { CallOverlay } from "../../components/lanchat/CallOverlay";
-import { EdgeDrawer } from "../../components/lanchat/EdgeDrawer";
-import { WhiteboardOverlay } from "../../components/lanchat/whiteboard/WhiteboardOverlay";
 import { FloatingNotesPanel } from "../../components/notes/FloatingNotesPanel";
 import { QuickConnect } from "../../components/quickconnect/QuickConnect";
 import { AuthPrompt } from "../../components/session/AuthPrompt";
@@ -17,7 +14,7 @@ import { Sidebar } from "../../components/sidebar/Sidebar";
 import { StatusBar } from "../../components/statusbar/StatusBar";
 import { AgentsPlatformView } from "../../components/agents/AgentsPlatformView";
 import { ExplorerPlatformView } from "../../components/explorer/ExplorerPlatformView";
-import { MfaFloatingWindow } from "../../components/mfa/MfaFloatingWindow";
+import { MfaFloatingPane } from "../../components/plugins/MfaSessionPane";
 import { GlobalCommandModal } from "../../components/search/GlobalCommandModal";
 import { WorkspaceMainPanel } from "../../components/workspace/WorkspaceMainPanel";
 import { useAppStore } from "../../stores/appStore";
@@ -30,6 +27,7 @@ import { TaoAlertPoller } from "../../components/tao/TaoAlertPoller";
 import { TabOverview } from "../../components/tabbar/TabOverview";
 import { MultiExecBar } from "../../components/terminal/MultiExecBar";
 import { UpdateDialog } from "../../components/UpdateDialog";
+import { ModuleReleaseNotice } from "../../components/plugins/ModuleReleaseNotice";
 import { ServersTabBlockedDialog } from "../../components/servers/ServersTabBlockedDialog";
 import { VaultUnlockDialog } from "../../components/vault/VaultUnlockDialog";
 import { WindowResizeHandles } from "../../components/window/WindowResizeHandles";
@@ -296,7 +294,6 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     openLocalTab={sessionActions.openLocalTab}
                     handleNewSession={sessionActions.handleNewSession}
                     handleOpenLocalPath={workspaceOpening.handleOpenLocalPath}
-                    openLanChatTab={utilityTabs.openLanChatTab}
                     welcomeRecentSessions={layout.welcomeRecentSessions}
                     welcomeMailSessions={layout.welcomeMailSessions}
                     handleConnectSession={connections.handleConnectSession}
@@ -404,9 +401,10 @@ export function MainLayoutView(props: MainLayoutViewProps) {
 
         {chrome.chatDrawerBottomPinned && <ChatDrawer />}
 
+        <ModuleReleaseNotice openSettings={utilityTabs.openSettingsTab} />
         <StatusBar />
 
-        <MfaFloatingWindow
+        <MfaFloatingPane
           onExpand={() => {
             useAppStore.getState().setActiveSideTab("sessions");
             menuActions.handleCommand("mfa");
@@ -477,9 +475,6 @@ export function MainLayoutView(props: MainLayoutViewProps) {
 
         {layout.appExitConfirmDialog}
         <ServersTabBlockedDialog />
-        <CallOverlay />
-        <WhiteboardOverlay />
-        <EdgeDrawer />
       </div>
     </TabActionSlotProvider>
   ));

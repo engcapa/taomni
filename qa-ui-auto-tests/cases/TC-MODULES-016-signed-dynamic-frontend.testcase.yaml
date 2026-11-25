@@ -1,0 +1,191 @@
+id: TC-MODULES-016
+title: Signed module ESM opens a real tab and follows lifecycle changes across WebViews
+description: >-
+  Install the current-source official hello archive with the production trust
+  anchor. Load its independent ESM through the native custom protocol and use
+  shared React hooks to read/write the actual SDK host database. Preserve an
+  inactive draft, deduplicate Open, restore the locator after renderer reload,
+  revoke the view on disable and restore it on enable. Detach into a real
+  WebView, preserving completion of first-navigation DOM evaluation on macOS,
+  and change lifecycle in the main window; the detached view must follow
+  native notifications and retain real data. Reattach once, close/reopen, then
+  uninstall keeping data and retain a missing-module tab through reload.
+  This is not OS signature/TCC, a migrated business module, or a process restart.
+covers: [F-Modules-1, F-Detach-1]
+tags: [p1, modules, lifecycle, install]
+modes: [native]
+fixtures: [reset_db, module_signed_archive]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-offline-install"]'
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.module_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.module_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- wait_for: '[data-testid="hello-plugin-values"][data-state="empty"] [data-testid="hello-plugin-empty"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="plugin"]', equal: 1}
+- fill: {selector: '[data-testid="hello-plugin-value"]', value: native module message}
+- click: '[data-testid="hello-plugin-save"]'
+- wait_for: '[data-testid="hello-plugin-entry"]'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: native module message}
+- module_signed_probe: {phase: enabled}
+- fill: {selector: '[data-testid="hello-plugin-value"]', value: inactive draft}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="plugin"]', equal: 1}
+- assert_attribute: {selector: '[data-testid="hello-plugin-value"]', name: value, equals: inactive draft}
+- reload_window: null
+- wait_for: '[data-testid="hello-plugin-values"]'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: native module message}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-enable-hello-plugin"]'
+- click: '[data-testid="tab-item"][data-tab-type="plugin"]'
+- wait_for: '[data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="hello-plugin-view"]', equal: 0}
+- click: '[data-testid="plugin-tab-retry"]'
+- wait_for: '[data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- click: '[data-testid="plugin-tab-settings"]'
+- wait_for: '[data-testid="module-action-enable-hello-plugin"]'
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- wait_for: '[data-testid="hello-plugin-values"]'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: native module message}
+- click: '[data-testid="plugin-tab-detach"]'
+- switch_window: {selector: '[data-testid="plugin-detached-window"]'}
+- wait_for: '[data-testid="hello-plugin-values"]'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: native module message}
+- fill: {selector: '[data-testid="hello-plugin-value"]', value: detached module message}
+- click: '[data-testid="hello-plugin-save"]'
+- wait_for: '[data-testid="hello-plugin-entry"]:nth-child(2)'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: detached module message}
+- switch_window: {selector: '[data-testid="status-bar"]'}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="module-action-disable-hello-plugin"]'
+- click: '[data-testid="module-action-disable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-enable-hello-plugin"]'
+- switch_window: {selector: '[data-testid="plugin-detached-window"]'}
+- wait_for: '[data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="hello-plugin-view"]', equal: 0}
+- switch_window: {selector: '[data-testid="status-bar"]'}
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- switch_window: {selector: '[data-testid="plugin-detached-window"]'}
+- wait_for: '[data-testid="hello-plugin-values"]'
+- assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: detached module message}
+- assert_no_runtime_errors: null
+- switch_window:
+    selector: '[data-testid="status-bar"]'
+    close_with: '[data-testid="plugin-tab-reattach"]'
+- wait_for: '[data-testid="hello-plugin-values"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="plugin"]', equal: 1}
+- assert_count: {selector: '[data-testid="hello-plugin-entry"]', equal: 2}
+- click: '[data-testid="tab-item"][data-tab-type="plugin"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"]', state: detached}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- wait_for: '[data-testid="hello-plugin-values"]'
+- assert_count: {selector: '[data-testid="hello-plugin-entry"]', equal: 2}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="module-action-uninstall-hello-plugin"]'
+- click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-hello-plugin"]'
+- click: '[data-testid="tab-item"][data-tab-type="plugin"]'
+- wait_for: '[data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+- assert_count: {selector: '[data-testid="hello-plugin-view"]', equal: 0}
+- module_signed_probe: {phase: uninstalled}
+- reload_window: null
+- wait_for: '[data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+- assert_no_runtime_errors: null
+- screenshot: signed-module-missing-tab-retained.png
+- click: '[data-testid="plugin-tab-settings"]'
+- wait_for: '[data-testid="module-store-panel"]'
+- assert_count: {selector: '[data-testid="module-action-install-hello-plugin"]', equal: 1}
+- click: '[data-testid="tab-item"][data-tab-type="plugin"]'
+- wait_for: '[data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R5
+    requirement: The retained placeholder opens module Settings and returns to the same unavailable locator without executing code.
+    actions: [95, 98]
+    checkpoints:
+    - {step: 96, expectation: Manage modules opens the real module store section.}
+    - {step: 97, expectation: The retained module offers installation after uninstall.}
+    - {step: 99, expectation: Returning to the existing tab retains the missing-module placeholder.}
+    - {step: 100, expectation: Navigation causes no unhandled runtime errors.}
+    results: [96, 97, 99, 100]
+  - id: R1
+    requirement: A production-signed independent ESM and its relative chunk render with shared hooks and write the actual host store.
+    actions: [7, 8, 9, 11, 13, 16, 17]
+    checkpoints:
+    - {step: 10, expectation: The ordinary pinned-key offline installation completes.}
+    - {step: 14, expectation: The module component and relative ESM load through the native protocol.}
+    - {step: 15, expectation: Exactly one real module tab is open.}
+    - {step: 19, expectation: The UI shows the value returned by the actual native module write.}
+    - {step: 20, expectation: Independent registry and host identity evidence confirms the enabled real process and its writer lease.}
+    results: [10, 14, 15, 19, 20]
+  - id: R2
+    requirement: Switching views preserves drafts and Open deduplicates; reload restores locators and disable revokes the view until enable.
+    actions: [21, 22, 24, 27, 33, 35, 38, 40, 42, 44]
+    checkpoints:
+    - {step: 25, expectation: Open focuses the existing tab without creating a duplicate.}
+    - {step: 26, expectation: The inactive component retains the exact unsaved draft.}
+    - {step: 29, expectation: Renderer reload restores the tab and reads the previously saved native value.}
+    - {step: 36, expectation: Disable replaces the module with the explicit disabled placeholder.}
+    - {step: 37, expectation: No executable module view remains mounted while disabled.}
+    - {step: 39, expectation: Retry cannot bypass the disabled native state.}
+    - {step: 46, expectation: Re-enable opens a fresh component with the same persisted native data.}
+    results: [25, 26, 29, 36, 37, 39, 46]
+  - id: R3
+    requirement: A separate WebView initializes the same SDK and follows native disable/enable notifications, then returns exactly one tab.
+    actions: [47, 48, 51, 52, 55, 58, 60, 63, 64, 66, 70]
+    checkpoints:
+    - {step: 50, expectation: A real detached WebView loads the module and reads the original native data.}
+    - {step: 54, expectation: The detached module saves a second value through native IPC.}
+    - {step: 61, expectation: Disabling from the main WebView replaces the detached component with a disabled placeholder.}
+    - {step: 62, expectation: The detached module component is actually unmounted.}
+    - {step: 68, expectation: Enabling from the main WebView restores the detached component and its second native value.}
+    - {step: 69, expectation: No unhandled runtime errors occurred in the detached WebView.}
+    - {step: 72, expectation: Reattach closes the real source WebView and produces exactly one main-window tab.}
+    - {step: 73, expectation: Both values remain present after reattach.}
+    results: [50, 54, 61, 62, 68, 69, 72, 73]
+  - id: R4
+    requirement: Closing/reopening preserves module data; uninstall deactivates code while retaining the unavailable locator through reload.
+    actions: [74, 76, 78, 81, 83, 85, 87, 91]
+    checkpoints:
+    - {step: 75, expectation: Closing the tab removes its module pane.}
+    - {step: 80, expectation: Reopening reads the two original values without duplicate writes.}
+    - {step: 88, expectation: Confirmed uninstall leaves an explicit missing-module tab.}
+    - {step: 89, expectation: No module component remains mounted after uninstall.}
+    - {step: 90, expectation: The native registry is uninstalled with no active host or writer lease.}
+    - {step: 92, expectation: Reload retains the missing locator without evaluating uninstalled code.}
+    - {step: 93, expectation: The main WebView has no unhandled runtime errors.}
+    results: [75, 80, 88, 89, 90, 92, 93]
+  native:
+  - check: Official pinned-key archive, verified custom-protocol ESM and relative resources, real SQLite writer, independent WebView initialization and lifecycle invalidation.
+    method: automated
+    reason: Browser preview cannot establish signatures, native resources, process-owned data or native window events.
+  - check: Host OS signing, Gatekeeper/TCC, Intel macOS execution and full business migration.
+    method: manual
+    reason: Those remain separate G gates and are not established by the hello QA artifact.
+  visual:
+  - check: Module controls and placeholders remain readable in desktop WebViews.
+    method: manual
+    reason: The retained screenshot supports review; assertions prove state and lifecycle results.

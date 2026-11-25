@@ -4,11 +4,13 @@ use serde_json::{Value, json};
 
 pub fn confirmations(state: &AppState, thread: &str) -> Vec<Value> {
     let pending = state
+        .core
         .agent
         .cc_pending_permissions
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     state
+        .legacy
         .mobile
         .confirmations
         .lock()
@@ -36,6 +38,7 @@ pub fn confirm(
         _ => return Err("invalid_decision".into()),
     };
     let known = state
+        .legacy
         .mobile
         .confirmations
         .lock()
@@ -49,6 +52,7 @@ pub fn confirm(
         return Err("not_supported_on_mobile".into());
     }
     let sender = state
+        .core
         .agent
         .cc_pending_permissions
         .lock()
@@ -65,7 +69,7 @@ pub fn confirm(
             Some(tid),
         );
     }
-    state.mobile.events.publish(json!({"type":"task_status", "task_id":id,"status":"running","summary":"confirmation_resolved"}));
+    state.legacy.mobile.events.publish(json!({"type":"task_status", "task_id":id,"status":"running","summary":"confirmation_resolved"}));
     Ok(())
 }
 pub async fn stop(core: &Core, id: &str) -> Result<(), String> {
@@ -76,9 +80,10 @@ pub async fn stop_as(core: &Core, id: &str, device: Option<&str>) -> Result<(), 
     if let Some(tid) = id.strip_prefix("thread:") {
         crate::chat::stop_thread_runtime_inner(tid, core.app().as_ref(), &state).await;
     } else if let Some(tid) = id.strip_prefix("term:") {
-        let gate = state.mobile.broker.gate(tid)?;
+        let gate = state.legacy.mobile.broker.gate(tid)?;
         let _guard = gate.lock().await;
         let running = state
+            .legacy
             .mobile
             .broker
             .terminals
@@ -90,6 +95,7 @@ pub async fn stop_as(core: &Core, id: &str, device: Option<&str>) -> Result<(), 
             return Ok(());
         }
         state
+            .legacy
             .mobile
             .broker
             .ensure_device_holder(tid, device.ok_or("not_holder")?)?;
@@ -110,12 +116,12 @@ pub async fn message(core: Core, id: &str, text: &str) -> Result<(), String> {
     let state = core.state();
     // Shared with desktop preparation: reserve before spawn, including the
     // pre-provider phase where ChatRunRegistry otherwise has no entry yet.
-    let running = state.agent.chat_runs.lock().await.contains_key(&tid);
+    let running = state.core.agent.chat_runs.lock().await.contains_key(&tid);
     if running {
         return Err("turn_in_progress".into());
     }
     let thread = {
-        let db = state.db.lock().map_err(|_| "database_unavailable")?;
+        let db = state.core.db.lock().map_err(|_| "database_unavailable")?;
         crate::chat::store::get_thread(&db, &tid)
             .map_err(|_| "database_unavailable")?
             .ok_or("session_not_found")?
@@ -129,7 +135,7 @@ pub async fn message(core: Core, id: &str, text: &str) -> Result<(), String> {
     let req: crate::chat::ChatSendRequest =
         serde_json::from_value(json!({"thread_id":tid,"content":text,"terminal_context":null}))
             .map_err(|_| "invalid_message")?;
-    let guard = super::turn::TurnGuard::reserve(&state.mobile, &tid)?;
+    let guard = super::turn::TurnGuard::reserve(&state.legacy.mobile, &tid)?;
     drop(state);
     tokio::spawn(async move {
         let state = core.state();

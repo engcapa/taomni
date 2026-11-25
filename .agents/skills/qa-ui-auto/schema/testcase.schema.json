@@ -66,6 +66,7 @@
           "mobile_openssh",
           "unreachable_app_proxy",
           "backup_policy",
+          "core_profile_state",
           "backup_cloud",
           "model_inspector_gateway",
           "tao_messages",
@@ -85,6 +86,37 @@
           "ssh_features_required",
           "x11_session_required",
           "bookmark_assets",
+          "module_offline_archive",
+          "module_preview",
+          "module_vnc_preview",
+          "module_rdp_preview",
+          "module_mail_preview",
+          "module_sockscap_preview",
+          "sockscap_legacy_config",
+          "sockscap_pending_recovery",
+          "module_signed_sockscap_archive",
+          "module_upgrade",
+          "module_legacy_install",
+          "module_legacy_mfa",
+          "module_download",
+          "module_download_preview",
+          "module_marketplace",
+          "module_legacy_roster",
+          "module_marketplace_preview",
+          "module_signed_archive",
+          "module_signed_mfa_archive",
+          "module_signed_vnc_archive",
+          "module_signed_rdp_archive",
+          "module_signed_mail_archive",
+          "module_signed_screenshot_archive",
+          "module_signed_vnc_server_archive",
+          "module_signed_rdp_server_archive",
+          "module_signed_servers_archive",
+          "module_signed_voice_archive",
+          "local_servers_http",
+          "local_servers_ssh",
+          "module_execution",
+          "module_backup_data",
           "vnc_required",
           "ard_required",
           "jdtls_required",
@@ -418,6 +450,11 @@
             "root",
             "expected"
           ],
+          "if": {
+            "required": ["kind"],
+            "properties": {"kind": {"const": "worker"}}
+          },
+          "then": {"required": ["active"]},
           "properties": {
             "root": {
               "type": "string"
@@ -429,9 +466,11 @@
               "enum": [
                 "storage",
                 "backup",
-                "incremental"
+                "incremental",
+                "worker"
               ]
             },
+            "active": {"type": "boolean"},
             "full": {
               "type": "object",
               "additionalProperties": {
@@ -447,6 +486,14 @@
               }
             },
             "include_mail": {
+              "type": "boolean"
+            },
+            "empty_live": {"type": "boolean"},
+            "partial_files": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "paused": {
               "type": "boolean"
             },
             "objects": {
@@ -924,6 +971,164 @@
             }
           }
         },
+        "module_execution_probe": {
+          "type": "object", "additionalProperties": false, "required": ["phase"],
+          "properties": { "phase": { "enum": ["block", "rejected", "restore", "recovered"] } },
+          "description": "Hosted Linux native only: owned noexec bind fault on one verified installed hello version, fixed real IPC rejection/recovery, unchanged code/data and native writer lease. No YAML paths, commands or registry mutations. Fault cleanup restores the original mount."
+        },
+        "assert_vnc_key_helper": {
+          "enum": ["running", "disabled"],
+          "description": "Windows native signed VNC case only. Check exact installed host and helper bytes, process ownership and teardown while the original core stays running."
+        },
+        "assert_signed_screenshot_host": {
+          "enum": ["idle", "running", "disabled"],
+          "description": "Native signed Screenshot case only. Match the installed host to the signed archive and observe its writer lease."
+        },
+        "assert_signed_mfa_lifecycle": {
+          "enum": ["old-enabled", "old-disabled", "updated-disabled", "rolled-back-disabled", "old-reenabled", "updated-enabled", "failed-update", "rolled-back-enabled", "uninstalled", "reinstalled"],
+          "description": "Verify installed MFA version hashes, live host and desktop process identities, writer ownership, and the original retained HOTP account."
+        },
+        "assert_signed_module_lifecycle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["slug", "phase"],
+          "properties": {
+            "slug": {"enum": ["servers", "sockscap", "screenshot", "ai-voice-local", "mail", "vnc-client", "rdp-client", "rdp-server", "vnc-server"]},
+            "phase": {"enum": ["old-enabled", "old-disabled", "updated-disabled", "rolled-back-disabled", "old-reenabled", "updated-enabled", "failed-update", "rolled-back-enabled", "uninstalled", "reinstalled"]}
+          },
+          "description": "Verify installed signed business module version hashes, host and desktop process lineage, writer ownership, and retained module data across updates, rollback, handshake recovery, and uninstall."
+        },
+        "assert_signed_mfa_backup": {
+          "enum": ["initial", "archive", "ready", "restored", "reopened"],
+          "description": "Read the signed MFA package, native host ownership and paired Vault/MFA SQLite data before and after the exact UI-started backup and automatic restore."
+        },
+        "assert_signed_vnc_daemon": {
+          "enum": ["idle", "running", "backup", "stopped", "disabled"],
+          "description": "Verify the signed VNC server host's installed bytes, lease and local daemon endpoint."
+        },
+        "assert_signed_rdp_server": {
+          "enum": ["idle", "running", "backup", "disabled"],
+          "description": "Verify the signed RDP Server host identity, migrated configuration, write lease and loopback listener. The backup phase also checks the module dataset and Vault."
+        },
+        "assert_local_servers_http": {
+          "enum": ["serving", "stopped"],
+          "description": "Native Local servers HTTP case. Check an actual file response or the closed listener on its registered loopback port."
+        },
+        "assert_local_servers_ssh": {
+          "enum": ["serving", "stopped"],
+          "description": "Native Local servers SSH case. Use the isolated server for authenticated SFTP and PTY command output, then check the listener closes."
+        },
+        "assert_signed_servers_host": {
+          "enum": ["running", "backup", "disabled"],
+          "description": "Native signed Local servers case. Check the installed host, listener, settings, Vault, writer lease and running backup."
+        },
+        "assert_signed_mail_host": {
+          "oneOf": [
+            {"enum": ["idle", "folder-tree", "folder-changes", "running", "imap-search", "imap-flags", "imap-source", "imap-delivery", "pop3-delivery", "pop3-sync", "pop3-saved", "pop3-reopened", "pop3-retained", "archive-published", "archive-cleaned", "archive-original", "cache-cleared", "outbox-queued", "outbox-retained", "outbox-sent", "responses", "contact-saved", "contact-retained", "contact-deleted", "attachment-saved", "attachment-reopened", "agenda-written", "agenda-retained", "filter-saved", "filter-retained", "imap-mutations", "imap-mbox", "imap-forward", "imap-cache", "imap-cached-body", "imap-archive-export", "imap-account-created", "imap-account-synced", "disabled"]},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["phase", "subject_prefix", "count"],
+              "properties": {
+                "phase": {"const": "imap-prefetch"},
+                "subject_prefix": {"type": "string", "minLength": 1},
+                "count": {"type": "integer", "minimum": 2, "maximum": 4}
+              }
+            }
+          ],
+          "description": "Native signed Mail case only. Match installed host bytes to the signed input and observe the module writer lease before, during and after using the Mail host."
+        },
+        "assert_signed_redirector_bridge": {
+          "enum": ["pending", "disabled"],
+          "description": "Observe the installed macOS bridge, its module owner, private sockets and recovery journal during first-use approval and disable."
+        },
+        "redirector_installer_fixture": {
+          "enum": ["change", "restore"],
+          "description": "Change or restore one byte in the isolated installed macOS module resource and record both digests."
+        },
+        "sockscap_resource_fixture": {
+          "enum": ["alter", "restore"],
+          "description": "Change or restore a SocksCap resource in an isolated profile and record its signed and observed digests."
+        },
+        "assert_signed_windows_capture": {
+          "type": "string",
+          "enum": ["unstaged", "running", "disabled", "uninstalled"]
+        },
+        "assert_signed_sockscap_host": {
+          "enum": ["idle", "running", "disabled"],
+          "description": "Observe the signed SocksCap host's writer lease as the case imports a link and disables the host."
+        },
+        "show_sockscap_section": {
+          "enum": ["upstream", "test"],
+          "description": "Open a SocksCap section. On macOS, close the optional setup guide through its button when it appears."
+        },
+        "assert_signed_rdp_latency": {
+          "type": "null",
+          "description": "Signed RDP native lifecycle case only. Send 40 clicks to the owned desktop target and record native WebView pointer-to-decoded-frame latency, module identity and the applied p95 limit."
+        },
+        "module_upgrade_probe": {
+          "type": "object", "additionalProperties": false, "required": ["phase"],
+          "properties": { "phase": { "enum": ["preflight", "pending", "repeat", "after-first-install", "vnc-retained", "rdp-pins-retained", "rdp-sessions-retained", "rdp-legacy-restore-applied", "legacy-restore-applied"] } },
+          "description": "Native only: read-only checks of legacy session/config/certificate-pin records, retained chat bytes/sidecars, absent pending module directories and idempotent journal items. TC-MODULES-027 can check after installing the independent signed roster, including MFA. No YAML paths, SQL, commands or product mutations."
+        },
+        "module_marketplace_probe": {
+          "type": "object", "additionalProperties": false, "required": ["phase"],
+          "properties": { "phase": { "enum": ["source", "no-download", "downloaded", "installed", "rejected", "legacy-installed", "legacy-uninstalled", "new-available", "new-dismissed", "legacy-new-available", "old-enabled", "updated-disabled", "old-disabled", "updated-enabled", "failed-update", "rolled-back-enabled", "removed-before-update"] } },
+          "description": "Native only: fixed official signed loopback feed, independent completed bytes, trusted cache, active pointer and rollback watermark observations. Only source sets a transport preference; no native trust, install or registry state is seeded."
+        },
+        "module_download_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phase"],
+          "properties": {
+            "phase": {"enum": ["start", "advance-background", "cancelled", "recovered", "proxy-failed", "finish", "completed", "forgotten"]}
+          },
+          "description": "Native only: fixed case-owned loopback transfer through production IPC; independent Range/partial/hash/recovery observations. Cancellation and resume use Settings. No YAML-selected URL, paths or bytes."
+        },
+        "module_restore_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phase"],
+          "properties": {
+            "phase": {"enum": ["write-original", "running-archive", "disabled-archive", "retained-archive", "write-mutated", "reject-password", "stage", "staged", "restored", "restart-persisted", "ui-ready", "ui-restored"]}
+          },
+          "description": "Native only: fixed real-host input, exact UI archive and production restore staging; independently observe applied data, activation and generations. ui-ready only checks inputs; ui-restored additionally requires native_confirm_restore_relaunch evidence. No YAML-selected commands, paths, credentials or bytes."
+        },
+        "native_confirm_mfa_upgrade_relaunch": {
+          "description": "Native macOS only: submit the real MFA upgrade form once and attach to its own relaunched application.",
+          "type": "null"
+        },
+        "native_confirm_restore_relaunch": {
+          "type": "null",
+          "description": "macOS native only: click the exact restore-confirm button once, observe staged success and original exit=0, validate a different kernel PID/start-time with the same executable and isolated QA environment, then attach to its already running WKWebView bridge. Never launches an application, invokes restore/restart IPC or uses native_restart_app. Saves process/reattachment evidence; Linux/Windows attachment remains unverified."
+        },
+        "module_live_backup_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phase"],
+          "properties": {
+            "phase": {"enum": ["write-first", "first-archive", "write-second", "second-archive", "after-restart"]}
+          },
+          "description": "Native only: fixed declared real-host business input and independent live v2 ZIP/WAL/source-byte/writer-lock observations. No YAML-selected commands, paths, contents or registry mutations."
+        },
+        "module_backup_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phase"],
+          "properties": {
+            "phase": {"enum": ["seed", "disabled-archive", "retained-archive", "unchanged"]}
+          },
+          "description": "Native only: fixed inactive hello data input or independent current-job v2 ZIP/SQLite/source-byte observation; no YAML-selected commands, paths or registry mutations."
+        },
+        "module_signed_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phase"],
+          "properties": {
+            "phase": {"enum": ["installed", "enabled", "disabled", "invalid", "uninstalled", "tamper-frontend", "restore-frontend", "seed-data", "retained", "installed-data", "deleted"]}
+          },
+          "description": "Native only: fixed official hello plugin_list/ping and data oracle, exact isolated frontend fault, or one opaque seed-data fixture; no YAML-selected commands, paths, keys or registry state writes."
+        },
         "eval_readonly": {
           "$ref": "#/$defs/eval_readonly_arg"
         },
@@ -968,8 +1173,9 @@
           "additionalProperties": false,
           "required": ["scenario"],
           "properties": {
-            "scenario": {"enum": ["displays", "capture", "capture-fidelity", "scroll", "overlay-copy", "record", "recorder", "pin", "hotkey", "ocr-redact", "freehand", "controls", "full-recorder", "macos-capture-source", "scroll-permission-error", "capture-permission-error", "scroll-manual", "scroll-exit", "pin-tools", "pin-arrangement", "colors", "annotation-tools", "escape-entry", "startup-timing", "startup-isolation", "startup-flash", "clipboard-retry", "resident-overlay", "x11-compositor-bypass", "current-window"]},
+            "scenario": {"enum": ["displays", "capture", "capture-fidelity", "scroll", "overlay-copy", "record", "recorder", "recorder-cancel", "pin", "hotkey", "ocr-redact", "ocr-disabled", "ocr-offline-module", "freehand", "controls", "full-recorder", "macos-capture-source", "scroll-permission-error", "capture-permission-error", "scroll-manual", "scroll-exit", "pin-tools", "pin-arrangement", "colors", "annotation-tools", "escape-entry", "startup-timing", "startup-isolation", "startup-flash", "clipboard-retry", "resident-overlay", "x11-compositor-bypass", "current-window"]},
             "format": {"enum": ["gif", "mp4"]},
+            "signed_renderer": {"const": true},
             "secs": {"type": "integer", "minimum": 1, "maximum": 8}
           }
         },
@@ -1126,6 +1332,20 @@
           "properties": {"selector": {"type": "string", "minLength": 1}, "timeout_sec": {"type": "number", "minimum": 1}, "close_with": {"type": "string", "minLength": 1}},
           "description": "Switch to a real app-created browser page/native WebView with the matching CSS selector."
         },
+        "assert_core_profile_generation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phase", "path"],
+          "properties": {
+            "phase": {"enum": ["capture", "unchanged"]},
+            "path": {"type": "string", "minLength": 1}
+          },
+          "description": "Read canonical core metadata after readiness, capture once and assert the same generation after a normal native restart; never seed profile state."
+        },
+        "assert_headless_profile_blocked": {
+          "type": "null",
+          "description": "Require the native desktop to reject a headless launch on its isolated profile before opening a listener."
+        },
         "native_restart_app": {
           "oneOf": [
             { "type": "null" },
@@ -1147,6 +1367,10 @@
                 "preserve_dirty_drafts": {
                   "const": true,
                   "description": "Explicitly approve the viewer close dialog's Keep draft action before a native cold restart."
+                },
+                "verify_mode_lease": {
+                  "const": true,
+                  "description": "TC-MODULES-009 starts a headless owner between desktop sessions and checks that a competing desktop is rejected."
                 }
               }
             }
@@ -1622,6 +1846,10 @@
           "required": ["milliseconds"],
           "properties": {"milliseconds": {"type": "integer", "minimum": 1, "maximum": 25000}}
         },
+        "mail_server_prefetch_paused": {
+          "type": "boolean",
+          "description": "Hold or release background body prefetch in the browser Mail fixture."
+        },
         "mail_server_deliver": {
           "type": "object",
           "additionalProperties": false,
@@ -1640,6 +1868,9 @@
             "prefix": {
               "type": "string",
               "minLength": 1
+            },
+            "body": {
+              "type": "string"
             },
             "thread": {
               "type": "boolean"
@@ -1748,6 +1979,9 @@
                 "unread": {
                   "type": "boolean"
                 },
+                "flagged": {
+                  "type": "boolean"
+                },
                 "timeout_sec": {
                   "type": "number",
                   "minimum": 1
@@ -1766,6 +2000,9 @@
             "folder": {
               "type": "string",
               "minLength": 1
+            },
+            "exists": {
+              "type": "boolean"
             },
             "min": {
               "type": "integer",
@@ -2162,8 +2399,15 @@
         },
         "value": {
           "type": "string"
+        },
+        "method": {
+          "enum": ["paste"]
         }
-      }
+      },
+      "allOf": [{
+        "if": {"required": ["method"]},
+        "then": {"properties": {"value": {"minLength": 1}}}
+      }]
     },
     "type_arg": {
       "oneOf": [

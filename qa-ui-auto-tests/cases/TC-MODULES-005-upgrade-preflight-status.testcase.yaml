@@ -1,0 +1,109 @@
+id: TC-MODULES-005
+title: Module upgrade preflight excludes empty feature tables and core-only sessions
+description: Inspect a core SSH profile, change its Mobile desktop policy in Settings, then reopen the module store and Mobile settings to verify core ownership.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- upgrade
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- module_upgrade
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-upgrade-status"][data-state="empty"]'
+- assert_attribute:
+    selector: '[data-testid="module-upgrade-status"]'
+    name: data-state
+    equals: empty
+- assert_visible: '[data-testid="module-upgrade-empty"]'
+- assert_count:
+    selector: '[data-testid="module-upgrade-candidates"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="module-upgrade-migrate"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="module-upgrade-error"]'
+    equal: 0
+- assert_no_runtime_errors: null
+- fill: {selector: '[data-testid="settings-search-input"]', value: mobile}
+- wait_for: '[data-testid="mobile-settings-screen-capture"]'
+- set_check: {selector: '[data-testid="mobile-settings-screen-capture"]', checked: true}
+- wait_for: '[data-testid="mobile-settings-screen-capture"]:checked:not(:disabled)'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-upgrade-status"][data-state="empty"]'
+- assert_count: {selector: '[data-testid="module-upgrade-candidates"] li', equal: 0}
+- fill: {selector: '[data-testid="settings-search-input"]', value: mobile}
+- wait_for: '[data-testid="mobile-settings-screen-capture"]:checked'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Only actual module data may trigger an upgrade recommendation; core SSH sessions and empty feature tables
+      must not.
+    actions:
+    - 3
+    - 5
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-status\"][data-state=\"empty\"]"}'
+    - step: 7
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"module-upgrade-status\"]", "name": "data-state",
+        "equals": "empty"}}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"module-upgrade-empty\"]"}'
+    - step: 9
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-candidates\"]", "equal": 0}}'
+    - step: 10
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-migrate\"]", "equal": 0}}'
+    - step: 11
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-error\"]", "equal": 0}}'
+    - step: 12
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 2
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+  - id: mobile-core
+    requirement: The core Mobile screen-capture preference stays available after upgrade inspection.
+    actions: [13, 15, 17, 18, 19, 22]
+    checkpoints:
+    - {step: 16, expectation: Mobile settings saved the enabled preference.}
+    - {step: 20, expectation: A new inspection reports zero module candidates.}
+    - {step: 21, expectation: The list contains no Mobile module recommendation.}
+    - {step: 23, expectation: Core Mobile settings read back the enabled preference.}
+    - {step: 24, expectation: Both settings views remain usable.}
+    results: [16, 20, 21, 23, 24]
+  native:
+  - check: Native Settings reads back the saved core Mobile policy after upgrade inspection.
+    method: automated
+    reason: TC-MODULES-025 additionally checks the old policy file digest through a desktop restart.
+  visual:
+  - check: Upgrade state, owner and pending notice remain readable in Module Store.
+    method: manual
+    reason: Screenshots retained for 025/026; runtime assertions establish state semantics, not visual review.

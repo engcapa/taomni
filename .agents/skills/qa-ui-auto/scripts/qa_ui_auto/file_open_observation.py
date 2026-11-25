@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -75,7 +76,10 @@ def run(ctx: Any, args: Any, *, mode: str) -> str:
         if target.is_symlink():
             raise StepError("assert_file_open_bytes: symlink refused")
         def read() -> dict:
-            return {"exists": target.is_file(), "bytes": list(target.read_bytes()) if target.is_file() else []}
+            try:
+                return {"exists": True, "bytes": target.read_bytes()}
+            except FileNotFoundError:
+                return {"exists": False}
     else:
         if not path.startswith(manifest["root"] + "/") and not (path.startswith("/preview/.viewer-temp/") and (observed_temp or path in ctx._file_open_paths.values())):
             raise StepError("assert_file_open_bytes: path outside fixture or observed VFS temp")
@@ -84,10 +88,23 @@ def run(ctx: Any, args: Any, *, mode: str) -> str:
     if args.get("remember"):
         ctx._file_open_paths[args["remember"]] = path
     started = time.monotonic()
+    timeout = float(args.get("timeout_sec", 10))
     record: dict[str, Any] = {"mode": mode, "path": path, "passed": False, "samples": []}
     try:
         while True:
-            value = read()
+            try:
+                value = read()
+            except PermissionError as error:
+                # Windows may deny a reader during atomic save. An access error
+                # cannot prove absence, an empty file or a successful save.
+                if mode != "native" or sys.platform != "win32":
+                    raise
+                elapsed = time.monotonic() - started
+                record["samples"].append({"readError": str(error), "elapsedMs": elapsed * 1000})
+                if elapsed >= timeout:
+                    raise
+                time.sleep(0.1)
+                continue
             data = bytes(value.get("bytes", []))
             digest = hashlib.sha256(data).hexdigest()
             if args.get("absent"):
@@ -100,7 +117,7 @@ def run(ctx: Any, args: Any, *, mode: str) -> str:
             if matched:
                 record["passed"] = True
                 return f"{mode} independent byte postcondition matched: {path}"
-            if time.monotonic() - started >= float(args.get("timeout_sec", 10)):
+            if time.monotonic() - started >= timeout:
                 raise StepError(f"assert_file_open_bytes: bytes/existence differ for {path}")
             time.sleep(0.1)
     finally:

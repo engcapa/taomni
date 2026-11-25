@@ -21,12 +21,12 @@ pub async fn list_tunnels(
     state: State<'_, AppState>,
 ) -> Result<Vec<TunnelConfig>, String> {
     let mut list = {
-        let _guard = state.tunnels.store_lock.lock().await;
+        let _guard = state.core.tunnels.store_lock.lock().await;
         load_all(&app)?
     };
     // Annotate each entry with `auth_status` so the UI can show a masked
     // indicator (and enable the eye-toggle) without exposing plaintext.
-    let cache = state.tunnels.session_passwords.lock().await;
+    let cache = state.core.tunnels.session_passwords.lock().await;
     for t in list.iter_mut() {
         t.ssh.auth_status = Some(compute_auth_status(&t.ssh, cache.contains_key(&t.id)));
     }
@@ -53,7 +53,7 @@ pub async fn upsert_tunnel(
     // any prior cache entry to avoid stale secrets surviving an auth
     // method or storage change.
     {
-        let cache = &state.tunnels.session_passwords;
+        let cache = &state.core.tunnels.session_passwords;
         let mut map = cache.lock().await;
         let is_password = matches!(config.ssh.auth_method, TunnelAuthMethod::Password);
         let wants_session = is_password && !config.ssh.save_auth.unwrap_or(false);
@@ -76,7 +76,7 @@ pub async fn upsert_tunnel(
         }
     }
 
-    let _guard = state.tunnels.store_lock.lock().await;
+    let _guard = state.core.tunnels.store_lock.lock().await;
     let mut all = load_all(&app)?;
     if let Some(idx) = all.iter().position(|t| t.id == config.id) {
         all[idx] = config.clone();
@@ -94,13 +94,19 @@ pub async fn delete_tunnel(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     {
-        let _guard = state.tunnels.store_lock.lock().await;
+        let _guard = state.core.tunnels.store_lock.lock().await;
         let mut all = load_all(&app)?;
         all.retain(|t| t.id != id);
         save_all(&app, &all)?;
     }
-    state.tunnels.session_passwords.lock().await.remove(&id);
-    let mut running = state.tunnels.running.lock().await;
+    state
+        .core
+        .tunnels
+        .session_passwords
+        .lock()
+        .await
+        .remove(&id);
+    let mut running = state.core.tunnels.running.lock().await;
     if let Some(active) = running.remove(&id) {
         active.task.abort();
         let bridges = active.bridges.lock().await;
@@ -108,7 +114,7 @@ pub async fn delete_tunnel(
             b.abort();
         }
     }
-    state.tunnels.statuses.lock().await.remove(&id);
+    state.core.tunnels.statuses.lock().await.remove(&id);
     Ok(())
 }
 
@@ -117,7 +123,7 @@ pub async fn get_tunnel_status(
     id: String,
     state: State<'_, AppState>,
 ) -> Result<TunnelStatusInfo, String> {
-    let s = state.tunnels.statuses.lock().await;
+    let s = state.core.tunnels.statuses.lock().await;
     Ok(s.get(&id).cloned().unwrap_or(TunnelStatusInfo {
         id,
         status: TunnelStatus::Stopped,
@@ -130,7 +136,7 @@ pub async fn get_tunnel_status(
 pub async fn list_tunnel_statuses(
     state: State<'_, AppState>,
 ) -> Result<Vec<TunnelStatusInfo>, String> {
-    let s = state.tunnels.statuses.lock().await;
+    let s = state.core.tunnels.statuses.lock().await;
     Ok(s.values().cloned().collect())
 }
 
@@ -140,7 +146,7 @@ pub async fn reorder_tunnels(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let _guard = state.tunnels.store_lock.lock().await;
+    let _guard = state.core.tunnels.store_lock.lock().await;
     let mut all = load_all(&app)?;
     let mut by_id: HashMap<String, TunnelConfig> =
         all.drain(..).map(|t| (t.id.clone(), t)).collect();
@@ -166,7 +172,7 @@ pub async fn test_tunnel(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let configs = {
-        let _guard = state.tunnels.store_lock.lock().await;
+        let _guard = state.core.tunnels.store_lock.lock().await;
         load_all(&app)?
     };
     let mut config = configs
@@ -174,13 +180,14 @@ pub async fn test_tunnel(
         .find(|t| t.id == id)
         .ok_or_else(|| format!("tunnel {} not found", id))?;
     let session_pwd = state
+        .core
         .tunnels
         .session_passwords
         .lock()
         .await
         .get(&id)
         .cloned();
-    resolve_tunnel_creds(&mut config, &state.vault, session_pwd)?;
+    resolve_tunnel_creds(&mut config, &state.core.vault, session_pwd)?;
     let auth = ssh_auth_from(&config.ssh)?;
     let handle = connect_ssh_authenticated(
         &config.ssh.host,

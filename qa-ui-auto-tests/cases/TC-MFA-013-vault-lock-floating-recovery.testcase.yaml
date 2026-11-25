@@ -1,0 +1,122 @@
+id: TC-MFA-013
+title: Vault locking clears MFA tab and floating codes, then restores the retained HOTP account
+description: >-
+  AC-015/016 and TASK-025-E retained behavior. Create a real HOTP account through
+  the UI, advance its counter, and pin its floating view before locking from
+  Settings. Both views must hide codes, and unlocking must reload the retained
+  account at the same counter. Export still rechecks the master password.
+  Browser proves renderer gating; native additionally exercises the production
+  admission coordinator, Vault data key and encrypted mfa.db through Rust IPC.
+covers: [F-MFA-1, F-WS-3]
+tags: [mfa, vault, lifecycle, modules, p0]
+modes: [browser, native]
+fixtures: [reset_db]
+timeout_sec: 360
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-lock-013}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-lock-013}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: QA Lock Recovery}
+- fill: {selector: '[data-testid="mfa-add-secret"]', value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ}
+- click: '[data-testid="mfa-add-advanced"]'
+- select_option: {selector: '[data-testid="mfa-add-kind"]', value: hotp}
+- click: '[data-testid="mfa-add-submit"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 755 224}
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082}
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- assert_text_equals: {selector: '[data-testid="mfa-floating-code"]', equals: 287 082}
+- click: '[data-testid="mfa-floating-pin"]'
+- assert_attribute: {selector: '[data-testid="mfa-floating-pin"]', name: aria-pressed, equals: 'true'}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-security"]'
+- wait_for: '[data-testid="vault-lock-button"]'
+- click: '[data-testid="vault-lock-button"]'
+- assert_visible: '[data-testid="mfa-floating-locked"]'
+- assert_count: {selector: '[data-testid="mfa-account-code"], [data-testid="mfa-floating-code"], [data-testid="mfa-qr-secret"], [data-testid="mfa-qr-image"]', equal: 0}
+- assert_no_runtime_errors: null
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mfa"]'
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- fill: {selector: '[data-testid="vault-unlock-pw"]', value: wrong-master-password}
+- click: '[data-testid="vault-unlock-confirm"]'
+- assert_visible: '[data-testid="vault-unlock-error"]'
+- assert_count: {selector: '[data-testid="mfa-account-code"], [data-testid="mfa-floating-code"]', equal: 0}
+- fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-mfa-lock-013}
+- click: '[data-testid="vault-unlock-confirm"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082, timeout_sec: 30}
+- assert_text_equals: {selector: '[data-testid="mfa-floating-code"]', equals: 287 082, timeout_sec: 30}
+- assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 1}
+- click: '[data-testid="mfa-account-menu"]'
+- click: '[data-testid="mfa-menu-qr"]'
+- wait_for: '[data-testid="mfa-qr-dialog"][data-state="locked"]'
+- fill: {selector: '[data-testid="mfa-qr-password"]', value: wrong-master-password}
+- click: '[data-testid="mfa-qr-reveal"]'
+- assert_text: {selector: '[data-testid="mfa-qr-error"]', contains: Incorrect master password}
+- assert_count: {selector: '[data-testid="mfa-qr-image"], [data-testid="mfa-qr-secret"]', equal: 0}
+- fill: {selector: '[data-testid="mfa-qr-password"]', value: qa-mfa-lock-013}
+- click: '[data-testid="mfa-qr-reveal"]'
+- wait_for: {selector: '[data-testid="mfa-qr-image"]', timeout_sec: 30}
+- click: '[data-testid="mfa-qr-toggle-secret"]'
+- assert_text: {selector: '[data-testid="mfa-qr-secret"]', contains: GEZD GNBV GY3T QOJQ GEZD GNBV GY3T QOJQ}
+- click: '[data-testid="mfa-qr-close"]'
+- assert_count: {selector: '[data-testid="mfa-qr-image"], [data-testid="mfa-qr-secret"]', equal: 0}
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082}
+- assert_no_runtime_errors: null
+- screenshot: mfa-013-lock-recovery.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Advancing HOTP persists its counter and the pinned floating view shows the same code.
+    actions: [3, 5, 7, 8, 9, 11, 13, 14, 15, 16, 17, 19, 21, 24]
+    checkpoints:
+    - {step: 18, expectation: The initial RFC 4226 code is 755 224.}
+    - {step: 20, expectation: Advancing HOTP produces 287 082.}
+    - {step: 23, expectation: The floating view shows the same advanced code.}
+    - {step: 25, expectation: The floating view is pinned before switching to Settings.}
+    results: [18, 20, 23, 25]
+  - id: R2
+    requirement: Lock receipt clears codes from both mounted views; a wrong unlock cannot restore them.
+    actions: [26, 28, 30, 34, 35, 36, 38, 39]
+    checkpoints:
+    - {step: 31, expectation: The pinned floating view shows its locked gate.}
+    - {step: 32, expectation: 'No code, QR image or exported secret remains in the document.'}
+    - {step: 37, expectation: Returning to the MFA tab requires unlock.}
+    - {step: 40, expectation: A wrong password is refused.}
+    - {step: 41, expectation: Both views remain free of codes after the refusal.}
+    results: [31, 32, 40, 41]
+  - id: R3
+    requirement: A verified unlock reloads one retained account at its advanced counter, and export still verifies the password.
+    actions: [42, 43, 47, 48, 50, 51, 54, 55, 57, 59]
+    checkpoints:
+    - {step: 44, expectation: The tab reloads 287 082 from the retained account.}
+    - {step: 45, expectation: The floating view reloads the same code.}
+    - {step: 46, expectation: Exactly one account remains.}
+    - {step: 52, expectation: Export independently refuses the wrong master password.}
+    - {step: 53, expectation: No secret is exposed after the refusal.}
+    - {step: 58, expectation: The correct password reveals the original RFC secret.}
+    - {step: 60, expectation: Closing export removes QR and secret elements.}
+    - {step: 61, expectation: Export did not advance or reset the HOTP counter.}
+    - {step: 62, expectation: The complete lock/recovery/export flow has no unhandled error.}
+    results: [44, 45, 46, 52, 53, 58, 60, 61, 62]
+  visual:
+  - check: Locked consumers show their gates and remove all code and exported-secret elements.
+    method: automated
+    reason: Visibility and document-wide counts verify these states; the final screenshot is retained for inspection.
+  native:
+  - check: Real Vault verification, operation admission, fixed key and mfa.db decryption preserve the HOTP counter after lock/unlock.
+    method: automated
+    reason: Native executes Rust IPC against the isolated QA profile; browser stubs establish renderer behavior only.

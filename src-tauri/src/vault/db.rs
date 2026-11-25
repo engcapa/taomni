@@ -38,7 +38,7 @@ pub fn init(conn: &Connection) -> SqlResult<()> {
     )
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MetaRow {
     pub schema_version: i64,
     pub kdf: String,

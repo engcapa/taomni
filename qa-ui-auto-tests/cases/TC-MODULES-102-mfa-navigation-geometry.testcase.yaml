@@ -1,0 +1,49 @@
+id: TC-MODULES-102
+title: MFA tab activation and Settings close survive consecutive navigator changes
+description: Open MFA from Tools and initialize its Vault. Activate MFA immediately after switching to Sessions, then close Settings after another navigation change and verify MFA remains active.
+covers: [F-MFA-1, F25.3, F25.5]
+tags: [modules, mfa, regression, crash-regression]
+modes: [browser, native]
+fixtures: [reset_db]
+timeout_sec: 85
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="mfa-tab"]'
+- vault_first_run: qa-mfa-navigation
+- wait_for: '[data-testid="mfa-empty"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mfa"]'
+- assert_attribute: {selector: '[data-testid="tab-item"][data-tab-type="mfa"]', name: data-active, equals: 'true'}
+- assert_visible: '[data-testid="mfa-tab"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="settings"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="tab-item"][data-tab-type="settings"]', state: detached}
+- assert_attribute: {selector: '[data-testid="tab-item"][data-tab-type="mfa"]', name: data-active, equals: 'true'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: mfa-navigation
+    requirement: Changes between Home, Tools and Sessions preserve tab click targets and leave MFA active when Settings closes.
+    actions: [3, 4, 6, 8, 10, 11, 12, 15, 16, 17]
+    checkpoints:
+    - {step: 5, expectation: Tools opens the MFA tab.}
+    - {step: 7, expectation: The initialized MFA page renders the empty account list.}
+    - {step: 9, expectation: Settings opens beside MFA.}
+    - {step: 13, expectation: The MFA tab becomes active after the immediate navigation sequence.}
+    - {step: 14, expectation: The active MFA page is visible.}
+    - {step: 18, expectation: Closing Settings detaches its tab.}
+    - {step: 19, expectation: MFA still owns the active tab.}
+    - {step: 20, expectation: The transition produces no uncaught runtime errors.}
+    results: [5, 7, 9, 13, 14, 18, 19, 20]
+  visual:
+  - {check: MFA content and active tab remain visible after navigation., method: automated, reason: The case checks the rendered content and tab state.}
+  native:
+  - {check: Native WebView clicks continue to hit the active tab and close button., method: automated, reason: The same click sequence runs in the packaged QA WebView.}

@@ -73,6 +73,7 @@ pub(crate) async fn request_permission(
     {
         let state = app.state::<AppState>();
         state
+            .core
             .agent
             .cc_pending_permissions
             .lock()
@@ -81,13 +82,13 @@ pub(crate) async fn request_permission(
     }
     {
         let state = app.state::<AppState>();
-        state.mobile.confirmations.lock().unwrap().insert(
+        state.legacy.mobile.confirmations.lock().unwrap().insert(
             call_id.clone(),
             serde_json::json!({
                 "id":call_id, "thread_id":thread_id, "tool":tool, "supported":true
             }),
         );
-        state.mobile.events.publish(serde_json::json!({"type":"task_status", "task_id":format!("thread:{thread_id}"),"status":"awaiting_confirmation", "summary":tool}));
+        state.legacy.mobile.events.publish(serde_json::json!({"type":"task_status", "task_id":format!("thread:{thread_id}"),"status":"awaiting_confirmation", "summary":tool}));
     }
     let payload = serde_json::json!({
         "callId": call_id,
@@ -109,6 +110,7 @@ pub(crate) async fn request_permission(
         stored["windowLabel"] = serde_json::json!(label);
         let state = app.state::<AppState>();
         state
+            .core
             .agent
             .cc_pending_prompt_payloads
             .lock()
@@ -122,6 +124,7 @@ pub(crate) async fn request_permission(
             _ => {
                 let state = app.state::<AppState>();
                 state
+                    .core
                     .agent
                     .cc_pending_permissions
                     .lock()
@@ -140,12 +143,14 @@ pub(crate) async fn request_permission(
         };
     let state = app.state::<AppState>();
     state
+        .core
         .agent
         .cc_pending_prompt_payloads
         .lock()
         .unwrap()
         .remove(&call_id);
     let pending: std::collections::HashSet<_> = state
+        .core
         .agent
         .cc_pending_permissions
         .lock()
@@ -153,13 +158,14 @@ pub(crate) async fn request_permission(
         .keys()
         .cloned()
         .collect();
-    let mut confirmations = state.mobile.confirmations.lock().unwrap();
+    let mut confirmations = state.legacy.mobile.confirmations.lock().unwrap();
     if confirmations.len() > 200 {
         confirmations
             .retain(|id, v| v["supported"] != true || pending.contains(id) || id == &call_id);
     }
     drop(confirmations);
     state
+        .legacy
         .mobile
         .task_status(thread_id, "running", "confirmation_resolved");
     decision

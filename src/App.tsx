@@ -6,7 +6,6 @@ import {
   detectDetachedSftpRoute,
 } from "./components/filebrowser/SftpDetachedWindow";
 import DetachedSessionWindow from "./components/detached/DetachedSessionWindow";
-import LanChatDetachedWindow from "./components/detached/LanChatDetachedWindow";
 import { NotesDetachedWindow } from "./components/notes/NotesDetachedWindow";
 import { RdpServerApprovalBridge } from "./components/servers/RdpServerApprovalBridge";
 import { detectDetachedRoute } from "./lib/detachedSession";
@@ -38,6 +37,7 @@ import { AppDialogProvider } from "./lib/appDialogs";
 import { VaultGateProvider } from "./lib/vaultGate";
 import { StartupVaultUnlockGate } from "./components/vault/StartupVaultUnlockGate";
 import { DEFAULT_TERMINAL_PROFILE } from "./lib/terminalProfile";
+import { PluginDetachedWindow } from "./components/plugins/PluginDetachedWindow";
 
 function App() {
   const { mode, resolvedTheme } = useAppTheme();
@@ -163,10 +163,10 @@ function App() {
     content = <SftpDetachedWindow sessionId={detachedSftpId} />;
   } else {
     const detachedRoute = detectDetachedRoute();
-    if (detachedRoute?.kind === "lan-chat") {
-      content = <LanChatDetachedWindow id={detachedRoute.id} />;
-    } else if (detachedRoute?.kind === "notes") {
+    if (detachedRoute?.kind === "notes") {
       content = <NotesDetachedWindow />;
+    } else if (detachedRoute?.kind === "plugin") {
+      content = <PluginDetachedWindow id={detachedRoute.id} />;
     } else {
       hostsRdpApprovals = !detachedRoute;
       content =

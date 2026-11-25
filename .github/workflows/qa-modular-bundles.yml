@@ -1,0 +1,298 @@
+name: QA Modular Release Bundle Samples
+
+on:
+  workflow_call:
+    inputs:
+      head:
+        type: string
+        required: true
+      package_run:
+        type: string
+        required: true
+      package_source:
+        type: string
+        required: true
+      package_version:
+        type: string
+        required: true
+      package_targets:
+        type: string
+        required: false
+        default: all
+      windows_nsis: {type: boolean, default: false}
+      upgrade_desktop:
+        type: boolean
+        default: false
+      first_release:
+        type: boolean
+        default: false
+      first_release_version: {type: string, default: ''}
+      first_release_baseline: {type: string, default: ''}
+      include_linux_inventory:
+        type: boolean
+        default: false
+      macos_hardened_mfa:
+        type: boolean
+        default: false
+      macos_arm_runner:
+        type: string
+        default: macos-15
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: {required: false}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
+      APPLE_CERTIFICATE: {required: false}
+      APPLE_CERTIFICATE_PASSWORD: {required: false}
+      APPLE_SIGNING_IDENTITY: {required: false}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+      mfa_builds: ${{ steps.targets.outputs.mfa_builds }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Select only supported completed package targets
+        id: targets
+        env:
+          SAMPLE_TARGETS: ${{ inputs.package_targets }}
+          SAMPLE_UPGRADE_DESKTOP: ${{ inputs.upgrade_desktop }}
+          SAMPLE_INCLUDE_LINUX_INVENTORY: ${{ inputs.include_linux_inventory }}
+          SAMPLE_MACOS_HARDENED_MFA: ${{ inputs.macos_hardened_mfa }}
+          SAMPLE_MACOS_ARM_RUNNER: ${{ inputs.macos_arm_runner }}
+        run: |
+          args=()
+          if [[ "$SAMPLE_MACOS_HARDENED_MFA" == true ]] &&
+             [[ "$SAMPLE_UPGRADE_DESKTOP" != true || ! "$SAMPLE_TARGETS" =~ ^darwin-(aarch64|x86_64)$ ]]; then
+            echo 'Select one macOS target and installed desktop verification for the hardened host check.' >&2
+            exit 1
+          fi
+          if [[ "$SAMPLE_UPGRADE_DESKTOP" == true ]]; then
+            args+=(--upgrade-desktop)
+          fi
+          if [[ "$SAMPLE_INCLUDE_LINUX_INVENTORY" == true ]]; then
+            args+=(--include-linux-inventory)
+          fi
+          python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py plan-targets \
+            --targets "$SAMPLE_TARGETS" --macos-arm-runner "$SAMPLE_MACOS_ARM_RUNNER" \
+            --github-output "$GITHUB_OUTPUT" "${args[@]}"
+
+  signed-mfa:
+    if: inputs.upgrade_desktop && !inputs.first_release
+    needs: plan
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ inputs.package_source }}
+      module: mfa
+      artifact_key: installed-desktop-${{ github.run_id }}
+      macos_runner: ${{ inputs.macos_arm_runner }}
+      native_builds: ${{ needs.plan.outputs.mfa_builds }}
+      native_macos_signing: ${{ inputs.macos_hardened_mfa }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
+  bundle-samples:
+    needs: [plan, signed-mfa]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && (!inputs.upgrade_desktop || inputs.first_release || needs.signed-mfa.result == 'success') }}
+    name: Real release bundle (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: utf-8
+      PYTHONUNBUFFERED: '1'
+      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+      SAMPLE_RUN: ${{ inputs.package_run }}
+      SAMPLE_SOURCE: ${{ inputs.package_source }}
+      SAMPLE_VERSION: ${{ inputs.package_version }}
+      SAMPLE_TARGET: ${{ matrix.target }}
+      FIRST_RELEASE: ${{ inputs.first_release }}
+      QA_FIRST_UPGRADE_BASELINE: ${{ inputs.first_release_baseline }}
+      QA_FIRST_UPGRADE_VERSION: ${{ inputs.first_release_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the pinned QA fixture dependencies
+        run: python -m pip install -r .agents/skills/qa-ui-auto/requirements-ci.txt psutil==7.2.2
+      - name: Pure package evidence contracts
+        run: python -m unittest test_modular_bundle_inventory test_installed_desktop_upgrade test_installed_core_resources test_installed_core_resources_desktop test_installed_first_release test_module_first_release
+      - name: Bind the selected package to its exact release producer
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+          import subprocess
+
+          run_id = os.environ['SAMPLE_RUN']
+          if not re.fullmatch(r'[1-9][0-9]*', run_id):
+              raise SystemExit('package_run must be a positive integer')
+          root = Path('bundle-evidence')
+          root.mkdir()
+          repo = os.environ['GITHUB_REPOSITORY']
+          for name, args in [
+              ('producer-run.json', [f'repos/{repo}/actions/runs/{run_id}']),
+              ('producer-artifacts.json', ['--paginate', '--slurp', f'repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100']),
+          ]:
+              with (root / name).open('wb') as stream:
+                  subprocess.run(['gh', 'api', *args], stdout=stream, check=True)
+          PY
+          python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py validate-source \
+            --run bundle-evidence/producer-run.json --artifacts bundle-evidence/producer-artifacts.json \
+            --repository "$GITHUB_REPOSITORY" --run-id "$SAMPLE_RUN" --source "$SAMPLE_SOURCE" \
+            --version "$SAMPLE_VERSION" --target "$SAMPLE_TARGET" \
+            --out bundle-evidence/bundle-source.json --github-output "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.source.outputs.artifact_id }}
+          run-id: ${{ inputs.package_run }}
+          github-token: ${{ github.token }}
+          path: package-input
+          merge-multiple: true
+      - name: Record actual package sizes and SHA-256 values
+        run: |
+          git rev-parse HEAD > bundle-evidence/tooling-source-sha.txt
+          python --version > bundle-evidence/python-version.txt
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          fields = {
+              'runId': 'GITHUB_RUN_ID', 'runAttempt': 'GITHUB_RUN_ATTEMPT',
+              'os': 'RUNNER_OS', 'architecture': 'RUNNER_ARCH',
+              'image': 'ImageOS', 'imageVersion': 'ImageVersion',
+          }
+          runner = {key: os.environ.get(name) for key, name in fields.items()}
+          Path('bundle-evidence/runner.json').write_text(json.dumps(runner, indent=2) + '\n', encoding='utf-8')
+          PY
+          python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py inventory \
+            --directory package-input --identity bundle-evidence/bundle-source.json \
+            --out bundle-evidence --tooling-source "$(git rev-parse HEAD)"
+      - name: Inspect actual Debian and RPM package metadata
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+          python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py inventory \
+            --directory package-input --identity bundle-evidence/bundle-source.json \
+            --out bundle-evidence --tooling-source "$(git rev-parse HEAD)" --linux-metadata
+      - name: Inspect the actual MSI payload and Windows signatures
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./.agents/skills/qa-ui-auto/scripts/modular_bundle_windows.ps1 -Directory package-input -OutputDirectory bundle-evidence -Version $env:SAMPLE_VERSION
+      - name: Exercise actual NSIS replacement and rollback of the monolith's voice runtime
+        if: runner.os == 'Windows' && inputs.windows_nsis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .agents/skills/qa-ui-auto/scripts/installed_windows_nsis.py
+      - name: Inspect the real DMG, updater app, signatures and quarantine assessment
+        if: runner.os == 'macOS'
+        env:
+          MACOS_STATIC_KRB5: ${{ inputs.macos_hardened_mfa && 'true' || 'auto' }}
+        run: |
+          sw_vers > bundle-evidence/macos-version.txt
+          uname -m > bundle-evidence/runner-architecture.txt
+          python .agents/skills/qa-ui-auto/scripts/modular_bundle_macos.py \
+            --directory package-input --identity bundle-evidence/bundle-source.json --out bundle-evidence
+      - name: Require complete raw payload samples
+        run: |
+          python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py validate-payload \
+            --target "$SAMPLE_TARGET" --directory bundle-evidence
+      - uses: actions/checkout@v4
+        if: inputs.first_release && runner.os != 'Linux'
+        with:
+          ref: ${{ inputs.package_source }}
+          path: first-release-input/source
+          sparse-checkout: src-tauri/plugins
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        if: inputs.first_release && runner.os != 'Linux'
+        with:
+          name: modular-candidate-roster-${{ inputs.package_run }}
+          run-id: ${{ inputs.package_run }}
+          github-token: ${{ github.token }}
+          path: first-release-input/catalog
+      - name: Download the target's signed packages across all artifact pages
+        if: inputs.first_release && runner.os != 'Linux'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODULE_RUN: ${{ inputs.package_run }}
+          MODULE_TARGET: ${{ matrix.target }}
+        run: gh run download "$MODULE_RUN" --repo "$GITHUB_REPOSITORY" --pattern "module-signed-*-$MODULE_TARGET-$MODULE_RUN" --dir first-release-input/packages
+      - name: Fetch the platform's pinned legacy installer
+        if: inputs.upgrade_desktop && runner.os != 'Linux'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          args=()
+          if [[ "$FIRST_RELEASE" == true ]]; then
+            args+=(--first-upgrade)
+          fi
+          python -m qa_ui_auto.legacy_release legacy-input "${args[@]}"
+      - uses: actions/download-artifact@v4
+        if: inputs.upgrade_desktop && !inputs.first_release && runner.os != 'Linux'
+        with:
+          name: qa-modular-package-${{ matrix.target }}-installed-desktop-${{ github.run_id }}
+          path: signed-mfa-input
+      - name: Replace the installed application, reopen its profile and roll back
+        if: inputs.upgrade_desktop && runner.os != 'Linux'
+        env:
+          SAMPLE_MACOS_HARDENED_MFA: ${{ inputs.macos_hardened_mfa }}
+          MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
+          COMPARE_MACOS_MEMORY: ${{ inputs.first_release && inputs.package_targets == 'darwin-aarch64' }}
+        run: |
+          args=(--signed signed-mfa-input)
+          if [[ "$FIRST_RELEASE" == true ]]; then
+            args=(--first-release first-release-input)
+          fi
+          if [[ "$FIRST_RELEASE" == true && "$RUNNER_OS" == macOS ]]; then
+            osascript -l JavaScript .agents/skills/qa-ui-auto/scripts/ci_macos_consent.js \
+              > bundle-evidence/macos-fixture-consent.log 2>&1 &
+            consent_pid=$!
+            trap 'kill "$consent_pid" 2>/dev/null || true; wait "$consent_pid" 2>/dev/null || true' EXIT
+          fi
+          if [[ "$COMPARE_MACOS_MEMORY" == true ]]; then
+            args+=(--compare-macos-memory)
+          fi
+          if [[ "$SAMPLE_MACOS_HARDENED_MFA" == true ]]; then
+            args+=(--macos-hardened-mfa)
+          fi
+          python .agents/skills/qa-ui-auto/scripts/installed_desktop_upgrade.py \
+            --identity bundle-evidence/bundle-source.json --legacy legacy-input \
+            --candidate package-input \
+            --work installed-upgrade-work --evidence bundle-evidence "${args[@]}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-bundle-${{ matrix.target }}-${{ inputs.package_run }}
+          path: bundle-evidence
+          if-no-files-found: error

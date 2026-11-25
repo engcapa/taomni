@@ -104,7 +104,7 @@ export function TaoHomeHost(props: WelcomePanelProps) {
           </>,
           belowComposer: <>
             <SuggestionRow controller={controller} hidden={demoMode} />
-            <DockRow {...props} onOpenSettings={openSettings} controller={controller} threads={threads}
+            <DockRow {...props} onOpenTaoSettings={openSettings} controller={controller} threads={threads}
               demoMode={demoMode} historyLoading={history.loading} historyError={history.error} onRefreshHistory={history.refresh} onDeleteThread={history.loading ? undefined : history.remove} />
           </>,
         }} />

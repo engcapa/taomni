@@ -5,9 +5,8 @@ use super::manifest::ModelMeta;
 use futures::StreamExt;
 use reqwest::Client;
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 use std::fs::OpenOptions;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Seek, SeekFrom, Write};
 use std::path::Path;
 use std::time::Duration;
 use tokio::time::timeout;
@@ -107,29 +106,7 @@ async fn download_from(
     Ok(())
 }
 
-/// Verify a file's SHA-256 against the expected digest.
-pub fn sha256_file(path: &Path) -> Result<String, String> {
-    let mut file = std::fs::File::open(path).map_err(|e| format!("open {path:?}: {e}"))?;
-    let mut hasher = Sha256::new();
-    let mut buf = [0u8; 8192];
-    loop {
-        let n = file.read(&mut buf).map_err(|e| format!("read: {e}"))?;
-        if n == 0 {
-            break;
-        }
-        hasher.update(&buf[..n]);
-    }
-    Ok(hex(&hasher.finalize()))
-}
-
-fn hex(bytes: &[u8]) -> String {
-    use std::fmt::Write;
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        let _ = write!(s, "{:02x}", b);
-    }
-    s
-}
+pub use taomni_asr_models::sha256_file;
 
 /// High-level download: probe mirrors → download with resume → verify SHA-256.
 /// Tries each mirror up to MAX_RETRIES_PER_URL times before falling back.

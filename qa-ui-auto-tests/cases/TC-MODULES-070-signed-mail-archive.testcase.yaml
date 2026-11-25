@@ -1,0 +1,348 @@
+id: TC-MODULES-070
+title: Signed Mail archives complete originals after pausing and resuming
+description: Disable Mail during a live archive scan, re-enable it and pause and resume complete storage. Read the archived message in the account reader, then delete the messages on the server and read, search and export from the custom local archive. Compare the original and exported bytes with the fixture. Cancel cleanup, then confirm removal of exactly one saved original. Clear the live cache, reopen the retained original, and verify the exact bytes of the exported EML.
+covers: [F-Modules-1, F-MAIL-23]
+tags: [modules, mail, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, mail_server, mail_storage, module_signed_mail_archive]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mail_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mail_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- assert_signed_mail_host: idle
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill:
+    selector: input[aria-label="IMAP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-imap-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="IMAP port"]
+    value: ${fixture.mail_imap_port}
+- fill:
+    selector: input[aria-label="Mail email or username"]
+    value: qa@example.com
+- fill:
+    selector: input[aria-label="Mail password or app password token"]
+    value: qa-pass
+- fill:
+    selector: input[aria-label="SMTP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-smtp-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="SMTP port"]
+    value: ${fixture.mail_smtp_port}
+- fill:
+    selector: '[data-testid="mail-storage-directory"]'
+    value: ${fixture.mail_storage_a}
+- select_option:
+    selector: '[data-testid="mail-storage-mode"]'
+    value: include
+- assert_text:
+    selector: '[data-testid="mail-storage-settings"]'
+    contains: No cached folders. Connect and sync this account first
+- assert_count:
+    selector: '[data-testid="mail-storage-folders"] input'
+    equal: 0
+- click: '[data-testid="mail-storage-edit-folders"]'
+- fill:
+    selector: '[data-testid="mail-storage-folder-names"]'
+    value: INBOX
+- fill: {selector: 'input[aria-label="Mail recent body limit"]', value: '0'}
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: QA complete mail
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mail-storage-password
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 60
+- wait_for: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
+- wait_for: '[data-testid="mail-storage-pause"]'
+- assert_text: {selector: '[data-testid="mail-storage-progress"]', contains: downloading, timeout_sec: 40}
+- mail_storage_assert: {kind: worker, root: '${fixture.mail_storage_a}', expected: '${fixture.mail_expected}', active: true, timeout_sec: 10}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-mail"]'
+- wait_for: '[data-testid="module-action-enable-mail"]'
+- assert_signed_mail_host: disabled
+- mail_storage_assert: {kind: worker, root: '${fixture.mail_storage_a}', expected: '${fixture.mail_expected}', active: false, timeout_sec: 10}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-toolbar-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- wait_for: '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- click: '[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]'
+- click: '[data-testid="module-action-enable-mail"]'
+- wait_for: '[data-testid="module-action-disable-mail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-toolbar-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- assert_text: {selector: '[data-testid="mail-storage-progress"]', contains: downloading, timeout_sec: 40}
+- click: '[data-testid="mail-storage-pause"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: paused
+    timeout_sec: 60
+- click: '[data-testid="mail-storage-resume"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    partial_files: 0
+    paused: false
+    full:
+      INBOX: 2
+    headers:
+      INBOX: 2
+      Archive: 2
+- assert_signed_mail_host: archive-published
+- click: '[data-testid="mail-message-row"][data-subject="Complete INBOX 1"]'
+- eval_readonly:
+    expression: >-
+      (document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent ||
+       document.querySelector('.taomni-mail-reader-text')?.textContent || '').includes('Offline body Complete INBOX 1')
+    expect_truthy: true
+    timeout_sec: 20
+- assert_visible: '[data-testid="mail-attachment-open"][data-name="complete.bin"]'
+- assert_signed_mail_host: imap-cached-body
+- right_click: '[data-testid="mail-message-row"][data-subject="Complete INBOX 1"]'
+- click: '[data-testid="context-menu-item-view-source"]'
+- assert_text: {selector: '[role="dialog"][aria-label="Message source"] pre', contains: Offline body Complete INBOX 1}
+- click: '[role="dialog"][aria-label="Message source"] [aria-label="Close dialog"]'
+- right_click: '[data-testid="mail-message-row"][data-subject="Complete INBOX 1"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    title: Save message as .eml
+    trigger: '[data-testid="context-menu-item-save-as-eml"]'
+    path: ${fixture.mail_storage_a}/account-original.eml
+- assert_file_sha256: {path: '${fixture.mail_storage_a}/account-original.eml', equals: '${fixture.mail_archive_retained_eml_sha256}'}
+- right_click: '[data-testid="mail-attachment-open"][data-name="complete.bin"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    title: Save attachment
+    trigger: '[data-testid="context-menu-item-save-attachment-as"]'
+    path: ${fixture.mail_storage_a}/account-attachment.bin
+- assert_file_sha256: {path: '${fixture.mail_storage_a}/account-attachment.bin', equals: '${fixture.mail_archive_attachment_sha256}'}
+- assert_signed_mail_host: imap-archive-export
+- mail_server_expunge_newest: {folder: INBOX, count: 2}
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches: {folder: INBOX, timeout_sec: 60}
+- click: '[data-testid="mail-archive-open"]'
+- wait_for: '[data-testid="mail-archive-row"]'
+- assert_count: {selector: '[data-testid="mail-archive-row"]', equal: 2}
+- click: '[data-testid="mail-archive-row"]:first-child [data-testid="mail-archive-read"]'
+- assert_text_equals: {selector: '[data-testid="mail-archive-attachment"]', equals: complete.bin}
+- click: '[data-testid="mail-archive-preview"] [data-testid="mail-body-mode-plain"]'
+- assert_text: {selector: '[data-testid="mail-archive-preview"]', contains: Offline body Complete INBOX}
+- wait_for: '[data-testid="mail-archive-attachment"]:enabled'
+- native_file_dialog:
+    kind: save
+    action: choose
+    trigger: '[data-testid="mail-archive-attachment"]'
+    path: ${fixture.mail_storage_a}/exported-complete.bin
+- assert_text: {selector: '[data-testid="mail-archive-notice"]', contains: exported-complete.bin}
+- assert_file_sha256: {path: '${fixture.mail_storage_a}/exported-complete.bin', equals: '${fixture.mail_archive_attachment_sha256}'}
+- click: '[data-testid="mail-archive-close"]'
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    partial_files: 0
+    paused: false
+    full: {INBOX: 2}
+    headers: {INBOX: 0, Archive: 2}
+- assert_no_runtime_errors: null
+- assert_signed_mail_host: archive-original
+- click: '[data-testid="mail-archive-open"]'
+- fill: {selector: '[data-testid="mail-archive-search"]', value: Complete INBOX}
+- assert_text: {selector: '[data-testid="mail-archive-results"]', contains: of 2 messages, timeout_sec: 30}
+- fill: {selector: '[data-testid="mail-archive-search"]', value: no-saved-message-match}
+- assert_text: {selector: '[data-testid="mail-archive-results"]', contains: of 0 messages, timeout_sec: 30}
+- click: '[data-testid="mail-archive-close"]'
+- assert_no_runtime_errors: null
+- click: '[data-testid="mail-archive-open"]'
+- wait_for:
+    selector: '[data-testid="mail-archive-row"] input[aria-label="Select Complete INBOX 0"]'
+    timeout_sec: 30
+- set_check:
+    selector: '[data-testid="mail-archive-row"] input[aria-label="Select Complete INBOX 0"]'
+    checked: true
+- click: '[data-testid="mail-archive-cleanup"]'
+- assert_text: {selector: '[data-testid="mail-archive-confirm"]', contains: 'Remove 1 local originals?'}
+- click: '[data-testid="mail-archive-confirm-cancel"]'
+- assert_not_visible: '[data-testid="mail-archive-confirm"]'
+- assert_count: {selector: '[data-testid="mail-archive-row"]', equal: 2}
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    paused: false
+    full: {INBOX: 2}
+    headers: {INBOX: 0, Archive: 2}
+- click: '[data-testid="mail-archive-cleanup"]'
+- click: '[data-testid="mail-archive-confirm-remove"]'
+- assert_text: {selector: '[data-testid="mail-archive-notice"]', contains: Removed 1 local originals. Server messages kept.}
+- assert_not_visible: '[data-testid="mail-archive-row"] input[aria-label="Select Complete INBOX 0"]'
+- assert_count: {selector: '[data-testid="mail-archive-row"]', equal: 1}
+- assert_text: {selector: '[data-testid="mail-archive-row"]', contains: Complete INBOX 1}
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    partial_files: 0
+    paused: true
+    full: {INBOX: 1}
+    headers: {INBOX: 0, Archive: 2}
+- assert_signed_mail_host: archive-cleaned
+- click: '[data-testid="mail-archive-close"]'
+- assert_no_runtime_errors: null
+- click: 'button[title="Clear this account cache"]:enabled'
+- assert_text: {selector: '[data-testid="mail-client-tab"]', contains: Mail cache cleared}
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    empty_live: true
+    paused: true
+    full: {INBOX: 1}
+- assert_signed_mail_host: cache-cleared
+- click: '[data-testid="mail-archive-open"]'
+- assert_text: {selector: '[data-testid="mail-archive-row"]', contains: Complete INBOX 1, timeout_sec: 30}
+- assert_count: {selector: '[data-testid="mail-archive-row"]', equal: 1}
+- assert_no_runtime_errors: null
+- click: '[data-testid="mail-archive-read"]'
+- click: '[data-testid="mail-archive-preview"] [data-testid="mail-body-mode-plain"]'
+- assert_text: {selector: '[data-testid="mail-archive-preview"]', contains: Offline body Complete INBOX 1}
+- native_file_dialog:
+    kind: save
+    action: choose
+    trigger: '[data-testid="mail-archive-export"]'
+    path: ${fixture.mail_storage_a}/retained-original.eml
+- assert_text: {selector: '[data-testid="mail-archive-notice"]', contains: retained-original.eml}
+- assert_file_sha256: {path: '${fixture.mail_storage_a}/retained-original.eml', equals: '${fixture.mail_archive_retained_eml_sha256}'}
+- assert_signed_mail_host: archive-original
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: archive-pause-resume
+    requirement: The installed Mail module preserves complete originals after interrupting and resuming a live archive scan.
+    actions: [6, 8, 59, 61]
+    checkpoints:
+    - {step: 40, expectation: The initial scan reaches the downloading phase before it is paused.}
+    - {step: 60, expectation: The scan reports that it paused.}
+    - {step: 62, expectation: The resumed transfer finishes the scan.}
+    - {step: 63, expectation: Gzip originals and SQLite metadata match the fixture. Resume clears the persisted pause and removes partial transfer files.}
+    - {step: 64, expectation: The verified Mail host declares archive publication and holds the Mail writer lease.}
+    results: [40, 60, 62, 63, 64]
+  - id: read-in-account
+    requirement: The regular account reader loads the complete original from the custom archive without requesting the body from IMAP.
+    actions: [30, 65]
+    checkpoints:
+    - {step: 66, expectation: The reader displays the exact archived body with recent body prefetch disabled.}
+    - {step: 67, expectation: The same reader exposes the original attachment.}
+    - {step: 68, expectation: The signed host declares the cached-body command and the fixture observes no additional body fetch.}
+    results: [66, 67, 68]
+  - id: export-from-account
+    requirement: The regular account viewer and export actions use the verified archive without another IMAP body request.
+    actions: [69, 70, 72, 73, 74, 76, 77]
+    checkpoints:
+    - {step: 71, expectation: The source dialog displays the actual archived MIME body for the selected message.}
+    - {step: 75, expectation: The complete EML matches the original fixture bytes.}
+    - {step: 78, expectation: The downloaded attachment matches the MIME fixture bytes.}
+    - {step: 79, expectation: The verified package declares the archive read command and the fixture saw no further IMAP body requests.}
+    results: [71, 75, 78, 79]
+  - id: read-after-server-removal
+    requirement: Local originals and their attachments remain readable after both messages have been removed from IMAP.
+    actions: [80, 81, 83, 86, 88, 91, 94]
+    checkpoints:
+    - {step: 82, expectation: The synced inbox matches the now-empty server inbox.}
+    - {step: 85, expectation: The local archive still lists both originals.}
+    - {step: 87, expectation: The saved MIME exposes the original attachment.}
+    - {step: 89, expectation: The saved plaintext body identifies the expunged fixture message.}
+    - {step: 92, expectation: The archive manager reports saving the selected attachment.}
+    - {step: 93, expectation: The exported file matches the original attachment digest.}
+    - {step: 95, expectation: Both originals and attachments still match the fixture digests after their live headers disappear.}
+    - {step: 96, expectation: The workflow finishes without runtime errors.}
+    - {step: 97, expectation: The verified Mail host declares `mail/open-archive-original` and still holds the writer lease after decoding the saved body and attachment.}
+    results: [82, 85, 87, 89, 92, 93, 95, 96, 97]
+  - id: archive-module-lifecycle
+    requirement: Disabling Mail releases the active archive worker and retains its tab for automatic resume after re-enabling.
+    actions: [44, 50, 52, 53, 55, 57]
+    checkpoints:
+    - {step: 41, expectation: The archive worker holds the account's native lock before disabling.}
+    - {step: 46, expectation: The disabled Mail host has released its writer lease.}
+    - {step: 47, expectation: The account's archive worker has released its native lock.}
+    - {step: 51, expectation: The existing Mail tab shows the disabled module.}
+    - {step: 58, expectation: The same tab again downloads the originals without a manual resume.}
+    - {step: 63, expectation: The final archived bytes and metadata match the server fixture.}
+    results: [41, 46, 47, 51, 58, 63]
+  - id: archive-index-query
+    requirement: Reopening and searching the custom local archive finds both originals after the live inbox is empty and returns an empty page for a missing subject.
+    actions: [98, 99, 101, 103]
+    checkpoints:
+    - {step: 100, expectation: The signed host finds both saved subjects in the configured account cache.}
+    - {step: 102, expectation: A query with no matching subject shows an empty page.}
+    - {step: 104, expectation: Repeated archive queries finish without runtime errors.}
+    results: [100, 102, 104]
+  - id: archive-cleanup-confirmation
+    requirement: The signed Mail host keeps originals when cleanup is cancelled. Confirming a new preview removes the selected local original and pauses full storage.
+    actions: [105, 107, 108, 110, 114, 115, 122]
+    checkpoints:
+    - {step: 109, expectation: The confirmation previews only the selected original.}
+    - {step: 112, expectation: Cancelling the confirmation retains both visible originals.}
+    - {step: 113, expectation: Cancelling leaves both gzip originals on disk and leaves storage active.}
+    - {step: 116, expectation: Confirming a new preview reports removal of one local original.}
+    - {step: 119, expectation: The unselected original remains visible.}
+    - {step: 120, expectation: Disk contains only the remaining verified MIME original and storage is paused.}
+    - {step: 121, expectation: The verified Mail host declares archive cleanup and still holds its writer lease.}
+    - {step: 123, expectation: Cleanup finishes without runtime errors.}
+    results: [109, 112, 113, 116, 119, 120, 121, 123]
+  - id: clear-live-cache
+    requirement: The signed host clears the live index and keeps the remaining verified archive original and persisted pause.
+    actions: [124, 128]
+    checkpoints:
+    - {step: 125, expectation: The toolbar reports that the cache was cleared.}
+    - {step: 126, expectation: SQLite has no live folders or headers and the paused archive still contains the verified original.}
+    - {step: 127, expectation: The installed signed host declares archive-state and cache maintenance and holds the writer lease.}
+    - {step: 129, expectation: The reopened archive query returns the original with the expected subject.}
+    - {step: 130, expectation: The reopened archive manager lists exactly one original.}
+    - {step: 131, expectation: The workflow reports no runtime errors.}
+    results: [125, 126, 127, 129, 130, 131]
+  - id: signed-archive-original
+    requirement: The signed host opens the retained original and exports the complete MIME after the live cache is cleared.
+    actions: [132, 133, 135]
+    checkpoints:
+    - {step: 134, expectation: The retained original still renders its plaintext body.}
+    - {step: 136, expectation: The archive manager reports the chosen EML destination.}
+    - {step: 137, expectation: The exported EML matches the raw fixture bytes for the retained message.}
+    - {step: 138, expectation: The installed host and frontend match the signed input and the host declares the original-reading capability.}
+    - {step: 139, expectation: Reading and exporting the original produce no runtime errors.}
+    results: [134, 136, 137, 138, 139]
+  visual:
+  - check: The Mail pane displays downloading, paused and completed as the scan runs.
+    method: automated
+    reason: The case reads the visible storage progress around the pause and resume actions.
+  native:
+  - check: Signed Mail, loopback IMAP and actual disk storage.
+    method: automated
+    reason: The runner validates signed executables, visible archive state and byte-exact persisted originals.

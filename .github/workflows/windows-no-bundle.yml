@@ -45,7 +45,7 @@ jobs:
             build_args: ""
           - variant: nosherpa
             rustflags: ""
-            build_args: "-- --no-default-features --features hbase-kerberos,rdp-server-audio,voice-capture,asr-whisper"
+            build_args: "-- --no-default-features --features hbase-kerberos,rdp-server-audio,voice-capture,asr-whisper,legacy-vnc-client"
     env:
       RUSTFLAGS: ${{ matrix.rustflags }}
     steps:

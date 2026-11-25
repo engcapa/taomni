@@ -1,0 +1,357 @@
+id: TC-MFA-015
+title: MFA account edits and preferences persist while duplicates and cancelled deletion preserve the HOTP counter
+description: AC-010/016 retained MFA behavior during engine extraction. From an isolated profile create RFC HOTP,
+  advance once, refuse the same secret under another name, edit metadata and pin, select persisted sort/filter,
+  reload, search the saved note, cancel deletion, then confirm and reload again. Native verifies production Rust
+  engine, real Vault and mfa.db; browser verifies renderer workflow with preview stubs. This case does not establish
+  an independent MFA host or normal process restart.
+covers:
+- F-MFA-1
+- F-MFA-2
+tags:
+- mfa
+- p0
+- persistence
+- modular-retained
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-lifecycle-015
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-lifecycle-015
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="mfa-empty"]'
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill:
+    selector: '[data-testid="mfa-add-issuer"]'
+    value: QA Lifecycle
+- fill:
+    selector: '[data-testid="mfa-add-account"]'
+    value: lifecycle@example.com
+- fill:
+    selector: '[data-testid="mfa-add-secret"]'
+    value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ
+- click: '[data-testid="mfa-add-advanced"]'
+- wait_for: '[data-testid="mfa-add-advanced-panel"]'
+- select_option:
+    selector: '[data-testid="mfa-add-kind"]'
+    value: hotp
+- click: '[data-testid="mfa-add-submit"]'
+- assert_not_visible: '[data-testid="mfa-add-dialog"]'
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 755 224
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 287 082
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill:
+    selector: '[data-testid="mfa-add-issuer"]'
+    value: Duplicate Alias
+- fill:
+    selector: '[data-testid="mfa-add-secret"]'
+    value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ
+- click: '[data-testid="mfa-add-advanced"]'
+- wait_for: '[data-testid="mfa-add-advanced-panel"]'
+- select_option:
+    selector: '[data-testid="mfa-add-kind"]'
+    value: hotp
+- click: '[data-testid="mfa-add-submit"]'
+- assert_text:
+    selector: '[data-testid="mfa-add-error"]'
+    contains: already exists
+- click: '[data-testid="mfa-add-cancel"]'
+- assert_not_visible: '[data-testid="mfa-add-dialog"]'
+- assert_count:
+    selector: '[data-testid="mfa-account-row"]'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 287 082
+- click: '[data-testid="mfa-account-menu"]'
+- click: '[data-testid="mfa-menu-edit"]'
+- wait_for: '[data-testid="mfa-edit-dialog"]'
+- fill:
+    selector: '[data-testid="mfa-edit-issuer"]'
+    value: QA Renamed Lifecycle
+- fill:
+    selector: '[data-testid="mfa-edit-account"]'
+    value: renamed.lifecycle@example.com
+- fill:
+    selector: '[data-testid="mfa-edit-group"]'
+    value: Ops
+- fill:
+    selector: '[data-testid="mfa-edit-note"]'
+    value: rotation-lifecycle-015
+- click: '[data-testid="mfa-edit-save"]'
+- assert_not_visible: '[data-testid="mfa-edit-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="mfa-account-row"]'
+    name: data-account
+    equals: renamed.lifecycle@example.com
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-group"]'
+    equals: Ops
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 287 082
+- click: '[data-testid="mfa-account-pin"]'
+- wait_for:
+    selector: '[data-testid="mfa-account-row"][data-pinned="true"]'
+    timeout_sec: 10
+- assert_attribute:
+    selector: '[data-testid="mfa-account-row"]'
+    name: data-pinned
+    equals: 'true'
+- select_option:
+    selector: '[data-testid="mfa-sort-mode"]'
+    value: issuer
+- assert_attribute:
+    selector: '[data-testid="mfa-sort-mode"]'
+    name: value
+    equals: issuer
+- select_option:
+    selector: '[data-testid="mfa-group-filter"]'
+    value: Ops
+- assert_attribute:
+    selector: '[data-testid="mfa-group-filter"]'
+    name: value
+    equals: Ops
+- assert_no_runtime_errors: null
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for:
+    selector: '[data-testid="mfa-account-row"][data-issuer="QA Renamed Lifecycle"]'
+    timeout_sec: 30
+- assert_attribute:
+    selector: '[data-testid="mfa-account-row"]'
+    name: data-account
+    equals: renamed.lifecycle@example.com
+- assert_attribute:
+    selector: '[data-testid="mfa-account-row"]'
+    name: data-pinned
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="mfa-sort-mode"]'
+    name: value
+    equals: issuer
+- assert_attribute:
+    selector: '[data-testid="mfa-group-filter"]'
+    name: value
+    equals: Ops
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 287 082
+- fill:
+    selector: '[data-testid="mfa-search"]'
+    value: rotation-lifecycle-015
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - QA Renamed Lifecycle
+- fill:
+    selector: '[data-testid="mfa-search"]'
+    value: ''
+- click: '[data-testid="mfa-account-menu"]'
+- click: '[data-testid="mfa-menu-delete"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Delete QA Renamed Lifecycle
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- assert_count:
+    selector: '[data-testid="mfa-account-row"]'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]'
+    equals: 287 082
+- click: '[data-testid="mfa-account-menu"]'
+- click: '[data-testid="mfa-menu-delete"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="mfa-empty"]'
+- assert_text:
+    selector: '[data-testid="mfa-status"]'
+    contains: Deleted QA Renamed Lifecycle
+- assert_no_runtime_errors: null
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="mfa-empty"]'
+- assert_count:
+    selector: '[data-testid="mfa-account-row"]'
+    equal: 0
+- assert_no_runtime_errors: null
+- screenshot: mfa-015-lifecycle-empty.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The RFC HOTP account advances once; duplicate rejection preserves the account and counter (AC-03,
+      AC-09).
+    actions:
+    - 3
+    - 5
+    - 7
+    - 8
+    - 9
+    - 11
+    - 13
+    - 14
+    - 15
+    - 16
+    - 18
+    - 19
+    - 22
+    - 24
+    - 26
+    - 27
+    - 28
+    - 30
+    - 31
+    - 33
+    checkpoints:
+    - step: 10
+      expectation: Vault setup opens an empty MFA store
+    - step: 21
+      expectation: RFC 4226 counter zero is 755 224
+    - step: 23
+      expectation: Next persists counter one as 287 082
+    - step: 32
+      expectation: Equivalent HOTP secret is refused
+    - step: 34
+      expectation: Cancel closes the duplicate form
+    - step: 35
+      expectation: No duplicate account was added
+    - step: 36
+      expectation: Duplicate refusal did not advance or reset the original counter
+    results:
+    - 35
+    - 36
+  - id: R2
+    requirement: Metadata, pin, sort/filter preferences and the same HOTP counter survive a WebView reload; the
+      saved note remains searchable (AC-12, AC-13, AC-14).
+    actions:
+    - 37
+    - 38
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 49
+    - 52
+    - 54
+    - 57
+    - 58
+    - 60
+    - 67
+    checkpoints:
+    - step: 46
+      expectation: Edited account name is visible
+    - step: 47
+      expectation: Edited group is Ops
+    - step: 48
+      expectation: Editing metadata keeps counter one
+    - step: 51
+      expectation: Pin is saved
+    - step: 53
+      expectation: Issuer sort is selected
+    - step: 55
+      expectation: Ops filter is selected
+    - step: 56
+      expectation: No runtime error in the document before reloading
+    - step: 61
+      expectation: Renamed account is loaded after reload
+    - step: 62
+      expectation: Renamed account name persists
+    - step: 63
+      expectation: Pin persists
+    - step: 64
+      expectation: Issuer sort persists
+    - step: 65
+      expectation: Ops filter persists
+    - step: 66
+      expectation: Counter one still produces 287 082
+    - step: 68
+      expectation: Saved note finds the same account
+    results:
+    - 56
+    - 62
+    - 63
+    - 64
+    - 65
+    - 66
+    - 68
+  - id: R3
+    requirement: Cancelling deletion preserves the account and counter; confirming deletion persists an empty store
+      after reload without runtime errors (AC-13, AC-14).
+    actions:
+    - 69
+    - 70
+    - 71
+    - 74
+    - 78
+    - 79
+    - 81
+    - 85
+    - 86
+    - 88
+    checkpoints:
+    - step: 73
+      expectation: Confirmation names the renamed account
+    - step: 75
+      expectation: Cancel closes confirmation
+    - step: 76
+      expectation: Account remains after cancellation
+    - step: 77
+      expectation: Counter remains one
+    - step: 82
+      expectation: Confirmed deletion shows empty state
+    - step: 83
+      expectation: Deletion is announced
+    - step: 84
+      expectation: No runtime error in the document before reloading
+    - step: 89
+      expectation: Empty state persists after reload
+    - step: 90
+      expectation: Deleted account is not reloaded
+    - step: 91
+      expectation: No application runtime error
+    results:
+    - 76
+    - 77
+    - 84
+    - 90
+    - 91
+  visual:
+  - check: Metadata and confirmation dialogs, group/filter and pin remain legible in supported WebViews.
+    method: manual
+    reason: Retained screenshots require per-platform visual review.
+  native:
+  - check: Real Tauri commands call the MFA engine with the protected Vault key and persist metadata, pin, preferences,
+      counter and deletion in mfa.db.
+    method: automated
+    reason: Native mode uses the isolated QA release app on Linux, Windows and macOS. Browser mode checks the same
+      renderer workflow with stubs and does not prove encryption or disk effects.

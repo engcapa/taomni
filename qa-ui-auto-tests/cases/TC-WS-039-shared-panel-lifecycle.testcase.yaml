@@ -16,6 +16,7 @@ covers:
 - F-WS-5
 - F25.3
 - F25.5
+- F8.2
 tags:
 - p0
 - workspace-redesign
@@ -269,20 +270,20 @@ steps:
 - assert_no_runtime_errors: null
 - screenshot: workspace-shared-panels-stable.png
 - click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-mfa"]'
-- wait_for: '[data-testid="mfa-tab"]'
-- vault_first_run: qa-ws-shared-panels
-- wait_for: '[data-testid="mfa-empty"]'
+- click: '[data-testid="sidebar-tool-tunneling"]'
+- wait_for: '[data-testid="tunnel-manager"]'
+- wait_for: '[data-testid="tunnel-list"]'
+- assert_visible: '[data-testid="tunnel-new"]'
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="side-tab-sessions"]'
-- click: '[data-testid="tab-item"][data-tab-type="mfa"]'
+- click: '[data-testid="tab-item"][data-tab-type="nettools"]'
 - assert_attribute:
-    selector: '[data-testid="tab-item"][data-tab-type="mfa"]'
+    selector: '[data-testid="tab-item"][data-tab-type="nettools"]'
     name: data-active
     equals: 'true'
-- assert_visible: '[data-testid="mfa-tab"]'
+- assert_visible: '[data-testid="tunnel-manager"]'
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="settings"] [data-testid="tab-close"]'
@@ -290,7 +291,7 @@ steps:
     selector: '[data-testid="tab-item"][data-tab-type="settings"]'
     state: detached
 - assert_attribute:
-    selector: '[data-testid="tab-item"][data-tab-type="mfa"]'
+    selector: '[data-testid="tab-item"][data-tab-type="nettools"]'
     name: data-active
     equals: 'true'
 - assert_no_runtime_errors: null
@@ -469,7 +470,6 @@ verification:
     actions:
     - 144
     - 145
-    - 147
     - 149
     - 151
     - 152
@@ -479,23 +479,26 @@ verification:
     - 158
     checkpoints:
     - step: 146
-      expectation: '{"wait_for": "[data-testid=\"mfa-tab\"]"}'
+      expectation: The core Tunneling panel opens from the Tools sidebar.
+    - step: 147
+      expectation: The tunnel list is initialized.
     - step: 148
-      expectation: '{"wait_for": "[data-testid=\"mfa-empty\"]"}'
+      expectation: The tunnel creation control is visible.
     - step: 150
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 154
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]", "name": "data-active", "equals": "true"}}'
+      expectation: Clicking the Tunneling tab after switching to Sessions activates it.
     - step: 155
-      expectation: '{"assert_visible": "[data-testid=\"mfa-tab\"]"}'
+      expectation: The active tab still shows the Tunneling panel.
     - step: 159
       expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"settings\"]", "state": "detached"}}'
     - step: 160
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]", "name": "data-active", "equals": "true"}}'
+      expectation: Tunneling stays active after closing Settings.
     - step: 161
       expectation: '{"assert_no_runtime_errors": null}'
     results:
     - 146
+    - 147
     - 148
     - 150
     - 154

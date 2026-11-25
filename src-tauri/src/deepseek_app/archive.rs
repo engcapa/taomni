@@ -12,7 +12,7 @@ pub fn deepseek_app_export_archive(
     thread_ids: Option<Vec<String>>,
     state: State<'_, AppState>,
 ) -> Result<Vec<u8>, String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     store::init(&db)?;
     let threads = store::load_threads(&db)?
         .into_iter()
@@ -33,7 +33,7 @@ pub fn deepseek_app_import_archive(
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
     let threads = decode(bytes)?;
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     store::init(&db)?;
     import(&db, threads)
 }

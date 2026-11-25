@@ -31,7 +31,36 @@ def components(ids, dependencies):
     return list(groups.values())
 
 
-def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_workers=2, costs=None):
+def split_signed_mail(entry, by_id, dependencies, capabilities):
+    caps = set(entry['capabilities'])
+    if entry['mode'] != 'native' or not {'signed-mail', 'legacy-mail-imap'} <= caps:
+        return [entry]
+    signed_ids = set()
+    for unit in components(entry['selected_ids'], dependencies):
+        unit_caps = capabilities([by_id[cid] for cid in unit], 'native')
+        if 'signed-mail' in unit_caps and 'legacy-mail-imap' not in unit_caps:
+            signed_ids.update(unit)
+    if not signed_ids:
+        return [entry]
+    variants = []
+    for signed in (False, True):
+        ids = [cid for cid in entry['selected_ids'] if (cid in signed_ids) == signed]
+        variant_caps = set(capabilities([by_id[cid] for cid in ids], 'native'))
+        # The profile applies across every native build for this target.
+        variant_caps.update(caps & {'release'})
+        variants.append({
+            **entry,
+            'id': f"{entry['id']}-signed-mail" if signed else entry['id'],
+            'selected_ids': ids,
+            'capabilities': sorted(variant_caps),
+            'case_digests': {cid: entry['case_digests'][cid] for cid in ids},
+            'rdp_unit_contracts': entry['rdp_unit_contracts'] and not signed,
+        })
+    return variants
+
+
+def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_workers=2, costs=None,
+             modular_release=False):
     from .ci import capabilities
     if shards != 'auto' and (not str(shards).isdigit() or not 1 <= int(shards) <= 8):
         raise ValueError('shards must be auto or an integer from 1 to 8')
@@ -40,7 +69,11 @@ def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_work
     if costs is None:
         costs = json.loads(COSTS.read_text(encoding='utf-8'))['entries'] if COSTS.exists() else {}
     scheduled, groups = [], []
-    for entry in entries:
+    selected_entries = entries
+    if scope == 'selected' and not modular_release:
+        selected_entries = [variant for entry in entries
+                            for variant in split_signed_mail(entry, by_id, dependencies, capabilities)]
+    for entry in selected_entries:
         ids = entry['selected_ids']
         groups.append({'id': entry['id'], 'selected_ids': ids})
         weights = costs.get(entry['id'], {})
@@ -98,6 +131,14 @@ def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_work
             # one shard owns a performance case. One profile, one binary.
             if 'release' in entry['capabilities']:
                 shard['capabilities'] = sorted(set(shard['capabilities']) | {'release'})
+            shard['signed_mail_build'] = scope == 'selected' and (
+                'signed-mail' in entry['capabilities'] and 'legacy-mail-imap' not in entry['capabilities']
+            )
+            if modular_release and entry['mode'] == 'native':
+                shard['capabilities'] = sorted(
+                    {'modular-release'} | {cap for cap in shard['capabilities'] if not cap.startswith('legacy-')}
+                )
+                shard['signed_mail_build'] = False
             shard['case_digests'] = {cid: entry['case_digests'][cid] for cid in assigned}
             shard['rdp_unit_contracts'] = entry['rdp_unit_contracts'] and index == 0
             scheduled.append(shard)
@@ -115,6 +156,10 @@ def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_work
             continue
         profile = 'release' if 'release' in entry['capabilities'] else 'debug'
         key = f"native-build-{entry['platform_key']}-{entry['arch'].lower()}-{profile}"
+        if modular_release:
+            key += '-modular'
+        elif entry['signed_mail_build']:
+            key += '-signed-mail'
         entry['build_id'] = key
         if key not in builds:
             builds[key] = {**deepcopy(entry), 'id': key, 'profile': profile, 'capabilities': [], 'rdp_unit_contracts': False}

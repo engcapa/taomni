@@ -10,20 +10,6 @@ fn decode_imap_modified_utf7_mailbox_names() {
 }
 
 #[test]
-fn imap_login_retry_classifies_transient_and_auth_errors() {
-    assert!(should_retry_imap_login("No Response: LOGIN Login error"));
-    assert!(should_retry_imap_login(
-        "temporary rate limit, try again later"
-    ));
-    assert!(!should_retry_imap_login(
-        "NO [AUTHENTICATIONFAILED] Invalid credentials"
-    ));
-    assert!(!should_retry_imap_login(
-        "NO invalid login or password incorrect"
-    ));
-}
-
-#[test]
 fn parse_body_decodes_headers_and_preview() {
     let parsed = parse_body_message("acct", "INBOX", 7, Some(512), &sample_message(), 4096);
     assert_eq!(parsed.header.subject, "测试邮件");
@@ -136,6 +122,7 @@ fn cache_roundtrips_folders_messages_and_body() {
             header_retention_days: 0,
             ..MailCacheSettings::default()
         },
+        true,
     )
     .unwrap();
 
@@ -171,18 +158,6 @@ fn contact_index_searches_cached_headers() {
 }
 
 #[test]
-fn smtp_size_rejections_get_a_hint() {
-    assert!(
-        smtp_send_error("permanent error (552): 5.3.4 Message size exceeds fixed limit")
-            .contains("SIZE limit")
-    );
-    assert_eq!(
-        smtp_send_error("permanent error (550): no such user"),
-        "SMTP send failed: permanent error (550): no such user"
-    );
-}
-
-#[test]
 fn sent_contacts_raise_sent_source() {
     let conn = Connection::open_in_memory().unwrap();
     init_mail_tables(&conn).unwrap();
@@ -202,7 +177,16 @@ fn sent_contacts_raise_sent_source() {
         request_read_receipt: false,
     };
 
-    assert_eq!(upsert_sent_contacts(&conn, "acct", &request).unwrap(), 1);
+    let addresses = request.to.iter().chain(&request.cc).chain(&request.bcc);
+    assert_eq!(
+        taomni_mail_storage::cache::upsert_sent_contacts(
+            &conn,
+            "acct",
+            addresses.map(String::as_str)
+        )
+        .unwrap(),
+        1
+    );
     let contacts = search_contacts(&conn, "acct", "receiver", 8).unwrap();
 
     assert_eq!(contacts.len(), 1);

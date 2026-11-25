@@ -91,7 +91,7 @@ pub(crate) async fn request_tool_dispatch(
 ) -> CcToolOutcome {
     let call_id = Uuid::new_v4().to_string();
     let state = app.state::<AppState>();
-    let mobile = state.mobile.clone();
+    let mobile = state.legacy.mobile.clone();
     drop(state);
     let _mobile_gate =
         crate::mobile::confirmation::DesktopConfirmation::new(&mobile, &call_id, thread_id, tool);
@@ -99,6 +99,7 @@ pub(crate) async fn request_tool_dispatch(
     {
         let state = app.state::<AppState>();
         state
+            .core
             .agent
             .cc_pending_tool_calls
             .lock()
@@ -108,12 +109,13 @@ pub(crate) async fn request_tool_dispatch(
     let target = {
         let state = app.state::<AppState>();
         let tab_windows = state
+            .core
             .agent
             .cc_tab_windows
             .lock()
             .map(|map| map.clone())
             .unwrap_or_default();
-        let thread_owner = state.agent.thread_windows.owner(thread_id);
+        let thread_owner = state.core.agent.thread_windows.owner(thread_id);
         effect_window(
             app,
             terminal_window_for_tool(tool, &args, &tab_windows),
@@ -138,6 +140,7 @@ pub(crate) async fn request_tool_dispatch(
             // Timed out or sender dropped — clean up the registry slot.
             let state = app.state::<AppState>();
             state
+                .core
                 .agent
                 .cc_pending_tool_calls
                 .lock()

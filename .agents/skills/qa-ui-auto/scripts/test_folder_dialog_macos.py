@@ -20,17 +20,26 @@ const env = { QA_PICKER_APPLICATION:application, QA_PICKER_PATH:'/qa/fixture/pro
   QA_PICKER_CANCEL_AFTER_PATH:config.cancelAfterPath ? '1' : '' };
 let navigated = false, now = 0, opened = true, goTo = false, location = '';
 const actionName = config.actionName || (config.kind === 'save' ? 'Save' : 'Open');
-let savedName='live.html';
-const nameField={enabled:()=>true,attributes:{byName:()=>({value:()=> 'saveAsName'})}};
+let savedName=config.prepopulatedName || 'live.html';
+const nameField={role:()=> 'AXTextField',enabled:()=>true,
+  attributes:{byName:()=>({value:()=> config.remoteLayout ? null : 'saveAsName'})},
+  description:()=> config.remoteLayout ? 'Save As:' : ''};
 Object.defineProperty(nameField,'value',{get:()=>()=>savedName,set:(value)=>{savedName=value;actions.push('name:'+value);}});
-const button = (name) => ({name:()=>name, enabled:()=>name === 'Cancel' || navigated,
+const button = (name) => ({role:()=> 'AXButton',name:()=>name, enabled:()=>name === 'Cancel' || navigated,
   click:()=>{actions.push(name);opened=false;}});
-const field = {};
+const field = {role:()=> 'AXTextField',exists:()=>goTo};
 Object.defineProperty(field,'value',{get:()=>()=>location,set:(value)=>{location=value;actions.push(value);}});
 const locationSheet = {textFields:()=>now >= (config.slowGoTo ? 800 : 0) ? [field] : []};
-const panel = {buttons:Object.assign(()=>[button(actionName),button('Cancel')],
-  {whose:({name})=>()=>name === actionName || name === 'Cancel' ? [button(name)] : []}),
+const normalPanel = {buttons:()=>[button(actionName),button('Cancel')],
   sheets:()=>goTo ? [locationSheet] : [], textFields:()=>config.kind === 'save' ? [nameField] : [], groups:()=>[]};
+const nativeLayout = (role, children) => ({role:()=>role, uiElements:children});
+const locationArea = nativeLayout("AXLayoutArea", ()=>[field]);
+const remoteLocation = nativeLayout("AXSheet", ()=>[locationArea]);
+const webView = nativeLayout("AXWebArea", ()=>{ actions.push("traversed WebView"); return []; });
+const inner = nativeLayout("AXLayoutArea", ()=>[nameField,button(actionName),button('Cancel'),webView,
+  ...(goTo ? [remoteLocation] : [])]);
+const remote = nativeLayout("AXRemoteView", ()=>[inner]);
+const panel = config.remoteLayout ? nativeLayout("AXSheet", ()=>[remote]) : normalPanel;
 const main = {sheets:()=>!opened ? [] : config.standalone ? (goTo ? [locationSheet] : []) : [panel],
   subrole:()=>config.standalone ? 'AXDialog' : 'AXStandardWindow',
   name:()=>config.standalone ? env.QA_PICKER_TITLE : 'Taomni',
@@ -93,6 +102,11 @@ class MacFolderDialogContracts(unittest.TestCase):
 
     def test_save_panel_uses_parent_directory_and_exact_filename(self):
         observed = self.run_helper(action="choose", kind="save")
+        self.assertNotIn("error", observed)
+        self.assertEqual(observed["actions"], ["g", "/qa/fixture/project with spaces", 36, "name:export.html", "Save"])
+
+    def test_remote_save_sheet_finds_nested_controls_and_extensionless_filename(self):
+        observed = self.run_helper(action="choose", kind="save", remoteLayout=True, prepopulatedName="Seed 0030")
         self.assertNotIn("error", observed)
         self.assertEqual(observed["actions"], ["g", "/qa/fixture/project with spaces", 36, "name:export.html", "Save"])
 

@@ -71,9 +71,9 @@ pub async fn chat_new_thread(
         cc_model: None,
         llm_model: None,
     };
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     store::create_thread(&db, &thread).map_err(|e| e.to_string())?;
-    state.mobile.events.publish(serde_json::json!({"type":"session_changed","session_id":format!("thread:{}", thread.id),"change_kind":"opened"}));
+    state.legacy.mobile.events.publish(serde_json::json!({"type":"session_changed","session_id":format!("thread:{}", thread.id),"change_kind":"opened"}));
     Ok(thread)
 }
 
@@ -83,7 +83,7 @@ pub async fn chat_list_threads(
     limit: Option<usize>,
     state: State<'_, AppState>,
 ) -> Result<Vec<store::ChatThread>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     store::list_threads(&db, limit.unwrap_or(50)).map_err(|e| e.to_string())
 }
 
@@ -93,7 +93,7 @@ pub async fn chat_list_messages(
     thread_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<store::ChatMessage>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     store::list_messages(&db, &thread_id).map_err(|e| e.to_string())
 }
 
@@ -105,22 +105,27 @@ pub async fn chat_delete_thread(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         store::delete_thread(&db, &thread_id).map_err(|e| e.to_string())?;
     }
     stop_thread_runtime(&thread_id, &app, state.inner()).await;
-    // The thread can no longer start a turn, so its approval-window ownership
-    // record is dead weight (issue #869).
-    state.agent.thread_windows.forget(&thread_id);
-    state.mobile.file_roots.lock().unwrap().remove(&thread_id);
-    state.mobile.roots_changed.notify_one();
+    state.core.agent.thread_windows.forget(&thread_id);
     state
+        .legacy
+        .mobile
+        .file_roots
+        .lock()
+        .unwrap()
+        .remove(&thread_id);
+    state.legacy.mobile.roots_changed.notify_one();
+    state
+        .legacy
         .mobile
         .task_summaries
         .lock()
         .unwrap()
         .remove(&thread_id);
-    state.mobile.events.publish(serde_json::json!({"type":"session_changed","session_id":format!("thread:{thread_id}"),"change_kind":"deleted"}));
+    state.legacy.mobile.events.publish(serde_json::json!({"type":"session_changed","session_id":format!("thread:{thread_id}"),"change_kind":"deleted"}));
     Ok(())
 }
 
@@ -134,7 +139,7 @@ pub async fn chat_set_thread_provider(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         store::update_thread_provider(&db, &thread_id, &provider_id).map_err(|e| e.to_string())?;
     }
     // Switching away from a local agent provider orphans its per-thread child;
@@ -162,7 +167,7 @@ pub async fn chat_set_thread_cc_model(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         store::update_thread_cc_model(&db, &thread_id, model.as_deref())
             .map_err(|e| e.to_string())?;
     }
@@ -181,7 +186,7 @@ pub async fn chat_set_thread_llm_model(
     model: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     store::update_thread_llm_model(&db, &thread_id, model.as_deref()).map_err(|e| e.to_string())
 }
 
@@ -205,7 +210,7 @@ pub async fn chat_set_thread_output_format(
             ));
         }
     }
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     store::update_thread_output_format(&db, &thread_id, normalized).map_err(|e| e.to_string())
 }
 
@@ -214,7 +219,7 @@ pub async fn chat_set_thread_output_format(
 #[tauri::command]
 pub async fn chat_purge_old(keep_days: u32, state: State<'_, AppState>) -> Result<usize, String> {
     let cutoff = chrono::Utc::now().timestamp() - (keep_days as i64) * 86_400;
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     store::delete_threads_older_than(&db, cutoff).map_err(|e| e.to_string())
 }
 
@@ -227,7 +232,7 @@ pub async fn chat_export_archive(
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
     use serde_json::json;
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     let threads = store::list_threads(&db, 100_000).map_err(|e| e.to_string())?;
     let mut total = 0;
     let mut payload = Vec::with_capacity(threads.len());

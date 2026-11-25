@@ -1,0 +1,98 @@
+id: TC-MODULES-066
+title: Signed Local servers migrates settings, serves HTTP and SSH, and stops both on disable
+description: Install the signed package, load old settings, use a legacy SSH password through Vault, verify PTY exit statuses and disable the running host without restarting the core.
+covers: [F-Modules-1, F-Servers-1, F-BACKUP-1]
+tags: [modules, servers, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, local_servers_http, local_servers_ssh, module_signed_servers_archive]
+timeout_sec: 380
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.local_servers_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.local_servers_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: {selector: '[data-testid="module-offline-install"][data-phase="completed"]', timeout_sec: 45}
+- click: '[data-testid="module-action-enable-servers"]'
+- wait_for: '[data-testid="module-action-disable-servers"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- click: '[data-testid="server-row-http"]'
+- wait_for: {selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="servers"][data-plugin-version="${fixture.server_settings_module_version}"] [data-testid="server-field-http-root-dir"]', timeout_sec: 25}
+- assert_file_sha256: {path: '${fixture.server_settings_frontend}', equals: '${fixture.server_settings_frontend_sha256}'}
+- wait_for: {selector: '[data-testid="server-field-port"][value="28489"]', timeout_sec: 10}
+- assert_attribute: {selector: '[data-testid="server-field-bind-address"]', name: value, equals: '127.0.0.1'}
+- assert_attribute: {selector: '[data-testid="server-field-http-root-dir"]', name: value, equals: '${fixture.local_servers_http_root}'}
+- click: '[data-testid="server-row-http-start"]'
+- wait_for: {selector: '[data-testid="server-row-http"][data-status="running"]', timeout_sec: 20}
+- click: '[data-testid="server-row-ssh"]'
+- wait_for: '[data-testid="server-field-ssh-remove-password"]'
+- assert_attribute: {selector: '[data-testid="server-field-ssh-root-dir"]', name: value, equals: '${fixture.local_servers_ssh_root}'}
+- assert_attribute: {selector: '[data-testid="server-field-ssh-password"]', name: value, equals: ''}
+- click: '[data-testid="server-row-ssh-start"]'
+- wait_for: {selector: '[data-testid="vault-setup-dialog"]', timeout_sec: 30}
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: 'qa-local-server-vault'}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: 'qa-local-server-vault'}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: {selector: '[data-testid="server-row-ssh"][data-status="running"]', timeout_sec: 25}
+- assert_local_servers_ssh: serving
+- assert_signed_servers_host: running
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: backup}
+- wait_for: '[data-testid="backup-global-includePlugins"]'
+- assert_attribute: {selector: '[data-testid="backup-global-includePlugins"]', name: aria-checked, equals: 'true'}
+- set_check: {selector: '[data-testid="backup-local-select"]', checked: true}
+- click: '[data-testid="backup-selected-start"]'
+- wait_for: {selector: '[data-testid="backup-action-success"]', timeout_sec: 90}
+- assert_signed_servers_host: backup
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- click: '[data-testid="module-action-disable-servers"]'
+- wait_for: '[data-testid="module-action-enable-servers"]'
+- assert_signed_servers_host: disabled
+- assert_local_servers_ssh: stopped
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="global-search-trigger"]'
+- fill: {selector: '[data-testid="global-search-input"]', value: Local servers}
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- wait_for: '[data-testid="server-row-http"][data-status="stopped"]'
+- click: '[data-testid="server-row-http"]'
+- wait_for: '[data-testid="plugin-tab-panel"][data-plugin-slug="servers"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_not_visible: '[data-testid="server-field-http-root-dir"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: signed-servers
+    requirement: The module imports legacy settings, serves HTTP and SSH, and closes both listeners when disabled in the same app session.
+    actions: [7, 9, 14, 21, 23, 27, 31, 40, 45, 52, 54]
+    checkpoints:
+    - {step: 8, expectation: The normal offline form accepts the verified package.}
+    - {step: 16, expectation: The loaded HTTP settings form is inside the active signed module version.}
+    - {step: 17, expectation: The installed form entry exactly matches the SHA-256 in the verified archive fixture.}
+    - {step: 18, expectation: The loaded HTTP form shows the exact migrated listening port.}
+    - {step: 20, expectation: The form shows the original HTTP document root.}
+    - {step: 26, expectation: The form hides the legacy password.}
+    - {step: 33, expectation: An independent SSH client uses the legacy password to read the original document and run a PTY command.}
+    - {step: 34, expectation: HTTP serves the expected file and the signed host owns the settings with a Vault reference.}
+    - {step: 42, expectation: The running module backs up its own settings and SSH identity together with Vault.}
+    - {step: 47, expectation: Disabling releases the writer lease and the HTTP listener.}
+    - {step: 48, expectation: A new SSH connection is also refused.}
+    - {step: 53, expectation: Local servers shows HTTP stopped.}
+    - {step: 55, expectation: The selected service directs the user to the disabled module.}
+    - {step: 56, expectation: The optional settings form has been unloaded.}
+    - {step: 57, expectation: The same application session remains usable.}
+    results: [8, 16, 17, 18, 20, 26, 33, 34, 42, 47, 48, 53, 55, 56, 57]
+  visual:
+  - check: The HTTP row reports the actual lifecycle.
+    method: automated
+    reason: The case observes the native tab before and after disabling the module.
+  native:
+  - check: The module starts an independent host and releases the listener and profile writer.
+    method: automated
+    reason: The signed package bytes, lock and HTTP response are observed independently of the renderer.

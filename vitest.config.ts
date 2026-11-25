@@ -17,6 +17,12 @@ export default defineConfig(({ mode }) => ({
     __TAOMNI_QA_SAVE_GATE__: JSON.stringify(false),
     __TAOMNI_QA_COMPLETION_OBSERVATION__: JSON.stringify(false),
     __TAOMNI_QA_UPDATER__: JSON.stringify(false),
+    __TAOMNI_BUNDLED_VNC_VIEWER__: JSON.stringify(true),
+    __TAOMNI_BUNDLED_RDP_VIEWER__: JSON.stringify(true),
+    __TAOMNI_BUNDLED_MAIL_RENDERER__: JSON.stringify(true),
+    __TAOMNI_BUNDLED_MFA_RENDERER__: JSON.stringify(true),
+    __TAOMNI_BUNDLED_SOCKSCAP_RENDERER__: JSON.stringify(true),
+    __TAOMNI_BUNDLED_SERVER_SETTINGS__: JSON.stringify(true),
     __TAOMNI_QA_OVERLAY_TIMING__: JSON.stringify(true),
     // The bridge must not install the approval probe during unit tests; probe
     // tests install it explicitly.

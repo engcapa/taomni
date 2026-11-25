@@ -570,6 +570,8 @@ class Client:
                 self.sock.close()
             except OSError:
                 pass
+            if writer is not None:
+                self.log.write(self.id, "session_closed")
 
 
 def control_loop(server: Server, port: int) -> None:

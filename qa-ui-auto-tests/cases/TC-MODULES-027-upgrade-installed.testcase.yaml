@@ -1,0 +1,262 @@
+id: TC-MODULES-027
+title: Installed 0.5.10 sessions remain available after the signed VNC upgrade
+description: Installs the pinned public 0.5.10 deb/MSI/DMG on an owned GitHub runner and runs its headless entry twice in the
+  candidate QA profile. The old binary creates the actual schema; SSH/VNC business rows are synthetic and must survive its
+  reopening. The candidate then uses real Settings/IPC to recommend only VNC, retain old chat bytes and sidecars, and keep
+  pending state through normal candidate restart. The main window then installs Hello and MFA from the signed release roster.
+  The oracle verifies that both packages, the original data and the pending VNC journal are present. Installing and
+  enabling the signed VNC client completes the original session entry in place and opens the original saved tab.
+  Unix old processes must exit normally.
+  Windows GUI-subsystem old processes are forcibly stopped and recorded as crash input.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- upgrade
+- lifecycle
+modes:
+- native
+fixtures:
+- reset_db
+- module_legacy_install
+- module_signed_archive
+- module_legacy_roster
+- module_signed_vnc_archive
+timeout_sec: 900
+steps:
+- open: ${cfg.app.base_url}
+- &id001
+  wait_for: '[data-testid="status-bar"]'
+- &id002
+  click: '[data-testid="ribbon-settings"]'
+- &id003
+  wait_for: '[data-testid="settings-panel"]'
+- &id004
+  fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- &id005
+  wait_for: '[data-testid="module-upgrade-status"][data-state="candidates"]'
+- &id006
+  assert_count:
+    selector: '[data-testid="module-upgrade-candidates"] li'
+    equal: 1
+- &id007
+  assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li'
+    equals: vnc-client
+- &id008
+  assert_visible: '[data-testid="module-upgrade-retained"]'
+- &id009
+  assert_text:
+    selector: '[data-testid="module-upgrade-retained"]'
+    contains: '2'
+- &id010
+  assert_count:
+    selector: '[data-testid="module-upgrade-error"]'
+    equal: 0
+- module_upgrade_probe:
+    phase: preflight
+- press:
+    selector: '[data-testid="module-upgrade-migrate"]:not([disabled])'
+    key: Enter
+- wait_for: '[data-testid="module-upgrade-pending"]'
+- assert_attribute:
+    selector: '[data-testid="module-upgrade-status"]'
+    name: data-state
+    equals: candidates
+- assert_text:
+    selector: '[data-testid="module-upgrade-pending"]'
+    contains: verified
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li'
+    equals: vnc-client
+- module_upgrade_probe:
+    phase: pending
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- *id001
+- *id002
+- *id003
+- *id004
+- *id005
+- *id006
+- *id007
+- *id008
+- *id009
+- *id010
+- module_upgrade_probe:
+    phase: repeat
+- press:
+    selector: '[data-testid="module-upgrade-migrate"]:not([disabled])'
+    key: Enter
+- wait_for: '[data-testid="module-upgrade-pending"]'
+- wait_for: '[data-testid="module-upgrade-migrate"]:not([disabled])'
+- module_upgrade_probe:
+    phase: repeat
+- assert_no_runtime_errors: null
+- module_marketplace_probe: {phase: source}
+- reload_window: null
+- *id001
+- module_marketplace_probe: {phase: legacy-installed}
+- *id002
+- *id003
+- *id004
+- wait_for: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
+- module_upgrade_probe: {phase: after-first-install}
+- assert_no_runtime_errors: null
+- screenshot: module-upgrade-installed-0510-native.png
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.vnc_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.vnc_signed_signature}'}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- click: '[data-testid="module-action-enable-vnc-client"]'
+- wait_for: '[data-testid="module-action-disable-vnc-client"]'
+- press: {selector: '[data-testid="module-upgrade-migrate"]:not([disabled])', key: Enter}
+- wait_for: '[data-testid="module-upgrade-status"][data-state="empty"]'
+- assert_count: {selector: '[data-testid="module-upgrade-pending"]', equal: 0}
+- module_upgrade_probe: {phase: vnc-retained}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-upgrade-vnc"]'
+- wait_for: '[data-testid="vnc-panel"][data-frontend-source*="/__taomni_plugins__/vnc-client/${fixture.vnc_signed_version}/frontend/index.js"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="vnc"]', equal: 1}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Installs the pinned public 0.5.10 deb/MSI/DMG on an owned GitHub runner and runs its headless entry twice
+      in the candidate QA profile. The old binary creates the actual schema; SSH/VNC business rows are synthetic and must
+      survive its reopening. The candidate then uses real Settings/IPC to recommend only VNC, retain old chat bytes and sidecars,
+      and keep pending state through normal candidate restart. Unix old processes must exit normally. Windows GUI-subsystem
+      old processes are forcibly stopped and recorded as crash input.
+    actions:
+    - 3
+    - 5
+    - 13
+    - 19
+    - 21
+    - 23
+    - 31
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-status\"][data-state=\"candidates\"]"}'
+    - step: 7
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equal": 1}}'
+    - step: 8
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equals": "vnc-client"}}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"module-upgrade-retained\"]"}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"module-upgrade-retained\"]", "contains": "2"}}'
+    - step: 11
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-error\"]", "equal": 0}}'
+    - step: 12
+      expectation: '{"module_upgrade_probe": {"phase": "preflight"}}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-pending\"]"}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"module-upgrade-status\"]", "name": "data-state", "equals":
+        "candidates"}}'
+    - step: 16
+      expectation: '{"assert_text": {"selector": "[data-testid=\"module-upgrade-pending\"]", "contains": "verified"}}'
+    - step: 17
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equals": "vnc-client"}}'
+    - step: 18
+      expectation: '{"module_upgrade_probe": {"phase": "pending"}}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-status\"][data-state=\"candidates\"]"}'
+    - step: 25
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equal": 1}}'
+    - step: 26
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equals": "vnc-client"}}'
+    - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"module-upgrade-retained\"]"}'
+    - step: 28
+      expectation: '{"assert_text": {"selector": "[data-testid=\"module-upgrade-retained\"]", "contains": "2"}}'
+    - step: 29
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-error\"]", "equal": 0}}'
+    - step: 30
+      expectation: '{"module_upgrade_probe": {"phase": "repeat"}}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-pending\"]"}'
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-migrate\"]:not([disabled])"}'
+    - step: 34
+      expectation: '{"module_upgrade_probe": {"phase": "repeat"}}'
+    - step: 35
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 2
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 22
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 32
+    - 33
+    - 34
+    - 35
+  - id: R2
+    requirement: Install all platform-compatible signed roster modules on the real legacy profile and preserve its data migration journal.
+    actions: [36, 37, 40, 42]
+    checkpoints:
+    - step: 39
+      expectation: The main window automatically downloads and installs the signed Hello and MFA packages and records enrollment as complete.
+    - step: 43
+      expectation: The store shows MFA as installed alongside Hello.
+    - step: 44
+      expectation: The first installation preserves complete legacy sessions, historical chat file hashes and the exact pending VNC journal. No VNC module directory is created.
+    - step: 45
+      expectation: The renderer records no unhandled errors after the first installation.
+    results: [39, 43, 44, 45]
+  - id: R3
+    requirement: The signed VNC module opens the original saved session and records retention without copying its database.
+    actions: [47, 48, 49, 51, 53, 57, 58, 59]
+    checkpoints:
+    - {step: 50, expectation: The production verifier accepts the VNC package.}
+    - {step: 54, expectation: The store no longer reports unfinished VNC session work.}
+    - {step: 56, expectation: The journal points to the original database and the full legacy session rows and historical file hashes match.}
+    - {step: 60, expectation: The original VNC session loads the installed renderer.}
+    - {step: 61, expectation: Reopening the original session creates one VNC tab.}
+    - {step: 62, expectation: Opening the retained session records no uncaught renderer errors.}
+    results: [50, 54, 56, 60, 61, 62]
+  native:
+  - check: Pinned real installer, two old app starts, candidate preflight and signed first installation, original sessions and chat bytes.
+    method: automated
+    reason: GitHub fixtures retain installer registration, process receipts, signed package digest, HTTP requests,
+      and the active version pointer on disk.
+  visual:
+  - check: Upgrade state, owner and pending notice remain readable in Module Store.
+    method: manual
+    reason: Screenshot retained for 027; runtime assertions establish state semantics, not visual review.

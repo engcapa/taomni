@@ -1,0 +1,135 @@
+id: TC-MODULES-040
+title: First upgrade installs the signed release roster and remembers a module removal
+description: The pinned monolithic app creates and reopens an isolated profile containing one SSH session.
+  The main window automatically installs the signed roster for this platform. A selected joint release supplies
+  the frozen business roster and the user removes Mail. The focused fixture supplies Hello and MFA and removes Hello.
+  Restarting preserves the removal and each remaining module's original signed version.
+  Reinstalling the retained MFA package offline accepts its original sidecar in the supported base64 form.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- upgrade
+- lifecycle
+modes:
+- native
+fixtures:
+- reset_db
+- module_legacy_install
+- module_signed_archive
+- module_legacy_roster
+timeout_sec: 900
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- module_marketplace_probe:
+    phase: source
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- module_marketplace_probe:
+    phase: legacy-installed
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
+- wait_for: '[data-testid="module-upgrade-status"][data-state="empty"]'
+- module_marketplace_probe:
+    phase: legacy-installed
+- press:
+    selector: '[data-testid="module-action-uninstall-${fixture.module_roster_remove}"]:not([disabled])'
+    key: Enter
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-${fixture.module_roster_remove}"]'
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-marketplace-checked"]'
+- wait_for: '[data-testid="module-action-install-${fixture.module_roster_remove}"]'
+- assert_count:
+    selector: '[data-testid="module-marketplace-update"]'
+    equal: 0
+- assert_count:
+    selector: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="module-release-notice"]'
+    equal: 0
+- module_marketplace_probe:
+    phase: legacy-uninstalled
+- assert_no_runtime_errors: null
+- fill:
+    selector: '[data-testid="module-offline-archive"]'
+    value: ${fixture.module_roster_mfa_archive}
+- fill:
+    selector: '[data-testid="module-offline-signature"]'
+    value: ${fixture.module_roster_mfa_signature}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for:
+    selector: '[data-testid="module-offline-install"][data-phase="completed"]'
+    timeout_sec: 60
+- module_marketplace_probe:
+    phase: legacy-uninstalled
+- assert_no_runtime_errors: null
+- screenshot: module-first-upgrade-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Install every platform-compatible module in the signed release roster for a legacy profile without module data.
+    actions: [3, 4, 7, 8]
+    checkpoints:
+    - step: 6
+      expectation: The main window installs every compatible package in the selected signed roster before opening Settings.
+    - step: 9
+      expectation: MFA appears as installed without a download or install confirmation.
+    - step: 10
+      expectation: Old data discovery has no candidate, although the release module was installed.
+    - step: 11
+      expectation: Each official archive is transferred once. Its signed version is active on disk and enrollment is complete.
+    results: [6, 9, 10, 11]
+  - id: R2
+    requirement: Keep the module uninstalled after the user removes it and checks the same catalog on a normal restart.
+    actions: [12, 14, 16, 18, 19]
+    checkpoints:
+    - step: 21
+      expectation: The module shows the explicit install action.
+    - step: 22
+      expectation: The removed module has no upgrade offer.
+    - step: 23
+      expectation: The retained MFA module is current in the store.
+    - step: 24
+      expectation: The application does not resume first installation.
+    - step: 25
+      expectation: Every retained module is current in the store and has its original signed package on disk. The removed module retains its history without a new transfer. The old sessions and historical files survive restart.
+    - step: 26
+      expectation: The renderer records no unhandled errors.
+    results: [21, 22, 23, 24, 25, 26]
+  - id: R3
+    requirement: Reuse the installed catalog version when the user supplies the official offline package and sidecar.
+    actions: [27, 28, 29]
+    checkpoints:
+    - step: 30
+      expectation: Offline installation succeeds with the same signed envelope in its base64 representation.
+    - step: 31
+      expectation: The same retained modules and signed bytes remain active, and the removed module stays uninstalled.
+    - step: 32
+      expectation: Offline reinstall completes without an unhandled renderer error.
+    results: [30, 31, 32]
+  native:
+  - check: Production downloader, pinned signature, active pointer and persistent profile state.
+    method: external
+    reason: The probe independently verifies original bytes, download count, pointer and enrollment file.
+  visual:
+  - check: Settings shows the profile's migration and installation state.
+    method: manual
+    reason: Inspect the retained screenshot.

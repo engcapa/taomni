@@ -8,7 +8,7 @@
     "rdp-*",
     "vnc-*",
     "terminal-*",
-    "lan-chat-*",
+    "plugin-*",
     "notes-*",
     "screenshot-overlay",
     "screenshot-recorder",
@@ -39,7 +39,6 @@
     "core:window:allow-set-focus",
     "core:window:allow-set-size",
     "updater:default",
-    "process:allow-restart",
     "notification:default",
     "dialog:default",
     {

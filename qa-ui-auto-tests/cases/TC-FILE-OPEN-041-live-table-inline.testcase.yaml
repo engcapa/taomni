@@ -1,0 +1,380 @@
+id: TC-FILE-OPEN-041
+title: Live Markdown tables render inline formatting and preserve standard source through edit, history and reopen
+description: 'User regression: Live showed raw emphasis inside table cells while Split/PDF rendered it. Read-only and inactive editable cells
+  render inline GFM using the shared sanitizer, math and controlled local images. Focus exposes source only for the active editable cell. Verify
+  Live/Split parity, cell edit, Tab, Undo/Redo, escaped pipes, unchanged neighbors, source bytes, Save and reopen. Native asserts real disk bytes
+  and packaged WebView focus/render behavior; synthetic WebView input does not certify physical OS IME.'
+modes:
+- browser
+- native
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- file-open
+- markdown
+- editor
+- regression
+- crash-regression
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 360
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-live-table
+- reload_window: null
+- click: '[data-testid="side-tab-explorer"]'
+- wait_for: '[data-testid="explorer-platform-view"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- wait_for: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="table.md"]'
+- wait_for: '[data-testid="markdown-editor"][data-mode="live"][data-editing="false"]'
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] th strong'
+    equals: Heading
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] strong'
+    equals: bold
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] em'
+    equals: italic
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] del'
+    equals: removed
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] code'
+    equals: code
+- assert_count:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] .katex'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="2"][data-cell-column="0"]'
+    equals: Keep | pipe
+- assert_count:
+    selector: '[data-testid="markdown-table-widget"] script,[data-testid="markdown-table-widget"] [onerror],[data-testid="markdown-table-widget"]
+      a[href^="javascript:"]'
+    equal: 0
+- wait_for: '[data-testid="markdown-table-widget"] img[src^="data:image/"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/table.md
+    sha256: ${fixture.file_open_table_sha}
+- click: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] strong'
+    equals: bold
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'false'
+- click: '[data-testid="markdown-mode-split"]'
+- assert_text_equals:
+    selector: '[data-testid="markdown-preview"] td strong'
+    equals: bold
+- click: '[data-testid="markdown-mode-live"]'
+- click: '[data-testid="markdown-live-edit"]'
+- click: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
+    equals: '**bold** *italic* ~~removed~~ `code` $x^2$'
+- press:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
+    key: Control+a
+    macos_key: Meta+a
+- eval_readonly:
+    expression: window.getSelection()?.toString() === "**bold** *italic* ~~removed~~ `code` $x^2$" && document.activeElement?.contains(window.getSelection()?.anchorNode)
+      && document.activeElement?.contains(window.getSelection()?.focusNode)
+    expect_truthy: true
+- fill:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
+    value: '**changed** *italic* ~~removed~~ `code` $x^2$'
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
+    equals: '**changed** *italic* ~~removed~~ `code` $x^2$'
+- press:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
+    key: Tab
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] strong'
+    equals: changed
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="1"]'
+    equals: '[safe](https://example.test)'
+- press:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="1"]'
+    key: Control+z
+    macos_key: Meta+z
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] strong'
+    equals: bold
+- press:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="1"]'
+    key: Control+y
+    macos_key: Meta+Shift+z
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] strong'
+    equals: changed
+- click: '[data-testid="markdown-live-edit"]'
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] th strong'
+    equals: Heading
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] strong'
+    equals: changed
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] em'
+    equals: italic
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] del'
+    equals: removed
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] code'
+    equals: code
+- assert_count:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] .katex'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="2"][data-cell-column="0"]'
+    equals: Keep | pipe
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="1"] a'
+    equals: safe
+- click: '[data-testid="markdown-mode-source"]'
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - '# Live table'
+    - ''
+    - '| **Heading** | Link | Safety |'
+    - '| :--- | :---: | ---: |'
+    - '| **changed** *italic* ~~removed~~ `code` $x^2$ | [safe](https://example.test) | [bad](javascript:alert(1)) <img src="assets/pixel.png"
+      onerror="window.TABLE_UNSAFE=true"> |'
+    - '| Keep \| pipe | <u>underline</u><br>next | untouched |'
+    - ''
+- click: '[data-testid="viewer-save"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/table.md
+    equals: '# Live table
+
+
+      | **Heading** | Link | Safety |
+
+      | :--- | :---: | ---: |
+
+      | **changed** *italic* ~~removed~~ `code` $x^2$ | [safe](https://example.test) | [bad](javascript:alert(1)) <img src="assets/pixel.png"
+      onerror="window.TABLE_UNSAFE=true"> |
+
+      | Keep \| pipe | <u>underline</u><br>next | untouched |
+
+      '
+- click: '[data-testid="explorer-workspace-tab"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="table.md"]'
+- wait_for: '[data-testid="markdown-editor"][data-mode="live"][data-editing="false"]'
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] th strong'
+    equals: Heading
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] strong'
+    equals: changed
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] em'
+    equals: italic
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] del'
+    equals: removed
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] code'
+    equals: code
+- assert_count:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] .katex'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="2"][data-cell-column="0"]'
+    equals: Keep | pipe
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/table.md
+    equals: '# Live table
+
+
+      | **Heading** | Link | Safety |
+
+      | :--- | :---: | ---: |
+
+      | **changed** *italic* ~~removed~~ `code` $x^2$ | [safe](https://example.test) | [bad](javascript:alert(1)) <img src="assets/pixel.png"
+      onerror="window.TABLE_UNSAFE=true"> |
+
+      | Keep \| pipe | <u>underline</u><br>next | untouched |
+
+      '
+- assert_no_runtime_errors: null
+- screenshot: TC-FILE-OPEN-041-live-table-inline.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Read-only Live and Split render sanitized inline formatting with unchanged exact Markdown bytes.
+    actions:
+    - 11
+    - 23
+    - 26
+    checkpoints:
+    - step: 13
+      expectation: Rendered inline node contains exactly Heading.
+    - step: 14
+      expectation: Rendered inline node contains exactly bold.
+    - step: 15
+      expectation: Rendered inline node contains exactly italic.
+    - step: 16
+      expectation: Rendered inline node contains exactly removed.
+    - step: 17
+      expectation: Rendered inline node contains exactly code.
+    - step: 18
+      expectation: Math uses the existing KaTeX renderer.
+    - step: 19
+      expectation: Escaped source pipes render as literal pipe content.
+    - step: 20
+      expectation: Shared sanitization removes script handlers and unsafe links.
+    - step: 22
+      expectation: Rendering and controlled image resolution leave every source byte unchanged.
+    - step: 24
+      expectation: Readonly focus keeps rendered formatting.
+    - step: 25
+      expectation: Readonly activation does not dirty the document.
+    - step: 27
+      expectation: Split matches the Live emphasis result.
+    results:
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 22
+    - 24
+    - 25
+    - 27
+  - id: R2
+    requirement: Editable cells expose their raw source only while active; Tab, Undo and Redo preserve neighboring rendered cells and all standard
+      source.
+    actions:
+    - 28
+    - 29
+    - 30
+    - 32
+    - 34
+    - 36
+    - 39
+    - 41
+    - 43
+    checkpoints:
+    - step: 31
+      expectation: The active editable cell exposes only its exact raw Markdown.
+    - step: 33
+      expectation: Control+A (Windows/Linux) or Command+A (macOS) selects exactly the active cell source, with both selection endpoints inside
+        it.
+    - step: 35
+      expectation: Character input retains the full exact cell source, including inter-token spaces and token order, before Tab or history.
+    - step: 37
+      expectation: Tab renders the edited cell as it moves focus to the next cell.
+    - step: 38
+      expectation: Tab activates the next cell for raw editing.
+    - step: 40
+      expectation: Undo restores original rendered cell content.
+    - step: 42
+      expectation: Redo restores the changed formatting without changing its neighbor.
+    - step: 44
+      expectation: Rendered inline node contains exactly Heading.
+    - step: 45
+      expectation: Rendered inline node contains exactly changed.
+    - step: 46
+      expectation: Rendered inline node contains exactly italic.
+    - step: 47
+      expectation: Rendered inline node contains exactly removed.
+    - step: 48
+      expectation: Rendered inline node contains exactly code.
+    - step: 49
+      expectation: Math uses the existing KaTeX renderer.
+    - step: 50
+      expectation: Escaped source pipes render as literal pipe content.
+    - step: 51
+      expectation: Leaving edit mode restores the unchanged neighbor link.
+    results:
+    - 31
+    - 33
+    - 35
+    - 37
+    - 38
+    - 40
+    - 42
+    - 44
+    - 45
+    - 46
+    - 47
+    - 48
+    - 49
+    - 50
+    - 51
+  - id: R3
+    requirement: Saving and reopening retain exact Markdown source and show the updated formatting in Live.
+    actions:
+    - 52
+    - 54
+    - 56
+    - 57
+    checkpoints:
+    - step: 53
+      expectation: The full standard GFM source preserves every neighboring cell, escape and raw HTML reference.
+    - step: 55
+      expectation: Save writes exactly the edited standard Markdown bytes on native disk or browser VFS.
+    - step: 59
+      expectation: Rendered inline node contains exactly Heading.
+    - step: 60
+      expectation: Rendered inline node contains exactly changed.
+    - step: 61
+      expectation: Rendered inline node contains exactly italic.
+    - step: 62
+      expectation: Rendered inline node contains exactly removed.
+    - step: 63
+      expectation: Rendered inline node contains exactly code.
+    - step: 64
+      expectation: Math uses the existing KaTeX renderer.
+    - step: 65
+      expectation: Escaped source pipes render as literal pipe content.
+    - step: 66
+      expectation: Reopen preserves exactly the saved Markdown and re-renders the updated table.
+    - step: 67
+      expectation: All preceding creation/edit/lifecycle actions have no uncaught renderer errors.
+    results:
+    - 53
+    - 55
+    - 59
+    - 60
+    - 61
+    - 62
+    - 63
+    - 64
+    - 65
+    - 66
+    - 67
+  visual:
+  - check: New-file dialog and resulting editor/table layout.
+    method: manual
+    reason: Retained screenshots require review; DOM assertions alone do not certify visual layout.
+  native:
+  - check: Packaged WebView Live table rendering, focus/history lifecycle, real disk Save and reopen.
+    method: automated
+    reason: Native mode uses real Tauri IPC and independent host bytes; browser mode proves only its isolated VFS. WebView key delivery does not
+      prove physical OS or AppKit accelerator input.

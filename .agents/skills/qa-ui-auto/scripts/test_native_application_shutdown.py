@@ -5,9 +5,11 @@ from tempfile import TemporaryDirectory
 import threading
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
-from native_application_shutdown import linux_storage_processes, wait_for_application_shutdown
+from native_application_shutdown import (
+    ApplicationShutdownTimeout, linux_storage_processes, wait_for_application_shutdown,
+)
 
 
 class NativeShutdownTest(unittest.TestCase):
@@ -34,6 +36,23 @@ class NativeShutdownTest(unittest.TestCase):
         driver.proc.wait.return_value = 9
         with self.assertRaisesRegex(RuntimeError, "exit 9"):
             wait_for_application_shutdown(driver, session, {})
+
+    def test_timeout_identifies_the_live_storage_owner_and_excludes_a_reused_pid(self):
+        def stat(pid, name, state, identity):
+            fields = [state, "11", "12", *(["0"] * 16), identity]
+            return f"{pid} ({name}) " + " ".join(fields)
+
+        session = SimpleNamespace(transport="tauri-driver", deadline=None)
+        info = [stat(51, "WebKitNetworkProcess", "D", "300"),
+                stat(52, "reused", "S", "302")]
+        with patch("native_application_shutdown.Path.read_text", side_effect=info), \
+                patch("native_application_shutdown.time.monotonic", side_effect=[0, 15]):
+            with self.assertRaises(ApplicationShutdownTimeout) as caught:
+                wait_for_application_shutdown(None, session, {51: "300", 52: "301"})
+        self.assertEqual(caught.exception.processes, [{
+            "pid": 51, "name": "WebKitNetworkProcess", "state": "D",
+            "parent_pid": 11, "process_group": 12, "kernel_start_time": "300",
+        }])
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux process observations")
     def test_storage_shutdown_waits_without_sending_a_signal(self):

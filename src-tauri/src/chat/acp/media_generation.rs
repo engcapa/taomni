@@ -49,7 +49,7 @@ pub(in crate::chat) async fn generate_grok_media(
     );
     let permission_owner_id = process.permission_owner_id().to_string();
     let already_running = {
-        let mut registry = state.agent.acp_media_processes.lock().await;
+        let mut registry = state.core.agent.acp_media_processes.lock().await;
         if registry.contains_key(thread_id) {
             true
         } else {
@@ -108,7 +108,7 @@ pub(in crate::chat) async fn generate_grok_media(
     .await;
 
     let was_registered = {
-        let mut registry = state.agent.acp_media_processes.lock().await;
+        let mut registry = state.core.agent.acp_media_processes.lock().await;
         if registry
             .get(thread_id)
             .is_some_and(|registered| Arc::ptr_eq(registered, &process))

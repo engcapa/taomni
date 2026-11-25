@@ -163,7 +163,6 @@ describe("buildAppMenuSpec", () => {
     expect(toolActions).toContain("git");
     expect(toolActions).toContain("code-workspace");
     expect(toolActions).toContain("file-explorer");
-    expect(toolActions).toContain("lan-chat");
     expect(toolActions).toContain("tools");
     expect(toolActions).not.toContain("packages");
     expect(toolActions).not.toContain("macros");
@@ -173,7 +172,7 @@ describe("buildAppMenuSpec", () => {
     const tools = submenu(buildAppMenuSpec(baseParams), "tools");
     const toolActions = actions(tools.items);
     expect(toolActions).toContain("mfa");
-    expect(toolActions.indexOf("mfa")).toBe(toolActions.indexOf("lan-chat") + 1);
+    expect(toolActions.indexOf("mfa")).toBeGreaterThanOrEqual(0);
     const item = tools.items.find((node) => node.type === "item" && node.id === "mfa");
     expect(item).toMatchObject({ label: "menu.mfa", action: "mfa" });
   });

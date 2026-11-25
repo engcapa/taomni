@@ -1,27 +1,10 @@
-use super::reading::open;
-#[cfg(test)]
-use super::reading::read;
 use rusqlite::Connection;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use taomni_mail_storage::database::{MAIL_MUTATION_LOCK, ProcessLock};
 
-pub fn configured_directory(options: &str, default: &Path) -> Result<PathBuf, String> {
-    let options: serde_json::Value = serde_json::from_str(options).map_err(|e| e.to_string())?;
-    let directory = options
-        .get("mailStorageDirectory")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .trim();
-    if directory.is_empty() {
-        return Ok(default.to_path_buf());
-    }
-    let path = PathBuf::from(directory);
-    if !path.is_absolute() {
-        return Err("Mail storage directory must be an absolute path".into());
-    }
-    Ok(path)
-}
+pub use taomni_mail_storage::database::configured_directory;
 
 pub(super) fn copy_tree(source: &Path, target: &Path) -> Result<(), String> {
     if !source.exists() {
@@ -53,20 +36,31 @@ pub fn save_mail_session(
     config: &crate::session::models::SessionConfig,
 ) -> Result<(), String> {
     let target_root = configured_directory(&config.options_json, state.mail_cache_root())?;
+    let _save = super::fresh_imap::reserve_save(state, &config.id)?;
+    if super::fresh_imap::save(state, config, &target_root)? {
+        return Ok(());
+    }
+    if super::super::pop3_store::receipt_exists(state.plugins.root(), &config.id)? {
+        // Account settings retain the old directory for rollback. The signed
+        // Mail host owns the live cache and portable backup paths.
+        let main_db = state.core.db.lock().map_err(|e| e.to_string())?;
+        return crate::session::db::save_session(&main_db, config).map_err(|e| e.to_string());
+    }
     let _changes = state
+        .legacy
         .mail
         .mail_archive
         .changes
         .lock()
         .map_err(|e| e.to_string())?;
-    state.mail.mail_archive.stop_account(&config.id)?;
+    state.legacy.mail.mail_archive.stop_account(&config.id)?;
     let handle = state.mail_db(&config.id)?;
     let mut db = handle.lock().map_err(|e| e.to_string())?;
     let _worker = super::super::coordination::ProcessLock::try_at(
         Path::new(db.path().ok_or("Mail storage has no disk path")?), "archive",
     )?.ok_or("Another Taomni instance is storing this mailbox. Pause full storage and retry saving its settings")?;
     relocate(&mut db, &config.id, &target_root, || {
-        let main_db = state.db.lock().map_err(|e| e.to_string())?;
+        let main_db = state.core.db.lock().map_err(|e| e.to_string())?;
         crate::session::db::save_session(&main_db, config).map_err(|e| e.to_string())
     })
 }
@@ -89,6 +83,8 @@ pub(in crate::mail) fn relocate(
     if source_root == target_root {
         return persist_settings();
     }
+    let _mutation = ProcessLock::try_at(&source, MAIL_MUTATION_LOCK)?
+        .ok_or("Mail operations are in progress. Wait for them to finish before moving storage")?;
     let stem = crate::state::mail_db_file_stem(account);
     let target_db = target_root.join(format!("{stem}.db"));
     let _target_lock = super::super::coordination::ProcessLock::access(&target_db)?;

@@ -12,7 +12,7 @@ use crate::state::AppState;
 /// safer-failed-open is intentional only for this read; enforcement points
 /// must still fall back to "show preview only" when execution would happen.
 pub fn is_ai_write_disabled(state: &AppState, session_id: &str) -> bool {
-    let db = match state.db.lock() {
+    let db = match state.core.db.lock() {
         Ok(g) => g,
         Err(_) => return false,
     };

@@ -19,6 +19,10 @@ def step_fill(ctx: StepContext, args: Any) -> None:
         raise StepError("fill: expected {selector, value}")
     selector = args["selector"]
     value = args["value"]
+    from .. import fill_paste
+    if fill_paste.requested(args):
+        fill_paste.browser(ctx, selector, value)
+        return
     loc = ctx.page.locator(selector).first  # type: ignore[attr-defined]
     if ctx.dry_run:
         return

@@ -1,11 +1,4 @@
-use super::download::download_one;
-use super::download::parse_chunk;
 use super::lifetime::ArchiveJob;
-use super::lifetime::ArchiveStatus;
-use super::limits::CHUNK;
-use super::limits::ContentFailures;
-use super::sync::download_targets;
-use super::sync::run_folder;
 use crate::mail::MailAccountConfig;
 use crate::mail::MailAuthMode;
 use crate::mail::ResolvedMailAccount;
@@ -24,6 +17,26 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
+use taomni_mail_storage::archive::{
+    CHUNK,
+    progress::ScanProgress,
+    scanner::ContentFailures,
+    writer::{ArchiveMailbox, LocalEncoder},
+};
+
+fn mailbox<'a>(
+    account: &'a ResolvedMailAccount,
+    database: &'a crate::state::MailDbHandle,
+    progress: &'a ScanProgress,
+) -> ArchiveMailbox<'a> {
+    ArchiveMailbox {
+        account: &account.config.session_id,
+        database,
+        progress,
+        encoder: &LocalEncoder,
+        scan_store: database.as_ref(),
+    }
+}
 
 fn fixture(
     fake: &fake_imap::FakeImap,
@@ -47,11 +60,10 @@ fn fixture(
         smtp_password: "pass".into(),
         network_settings: None,
     };
-    let handle = Arc::new(coordination::MailDatabase::new(dir.path().join("qa.db")));
+    let handle = Arc::new(coordination::mailbox_database(dir.path().join("qa.db")));
     let job = ArchiveJob {
-        pause: AtomicBool::new(false),
+        progress: ScanProgress::default(),
         running: AtomicBool::new(true),
-        status: Mutex::new(ArchiveStatus::default()),
         socket: Mutex::new(None),
     };
     let imap = ActiveImapSession::Plain {
@@ -67,16 +79,15 @@ fn archive_publishes_first_batch_before_backfilling_history_and_drains_cached_ma
     fake.deliver("INBOX", 201, "Batched archive");
     let (_dir, account, handle, job, mut imap) = fixture(&fake);
     let mut failures = ContentFailures::default();
-    run_folder(
-        &mut imap,
-        &account,
-        &handle,
-        "INBOX",
-        false,
-        &job,
-        &mut failures,
-    )
-    .unwrap();
+    mailbox(&account, &handle, &job.progress)
+        .run_folder(
+            &mut imap,
+            &account.config.cache,
+            "INBOX",
+            false,
+            &mut failures,
+        )
+        .unwrap();
     let commands = fake.log();
     let first_raw = commands
         .iter()
@@ -94,7 +105,7 @@ fn archive_publishes_first_batch_before_backfilling_history_and_drains_cached_ma
         "complete originals must precede history backfill"
     );
     assert_eq!(failures.count, 0);
-    let status = job.status.lock().unwrap();
+    let status = job.progress.status.lock().unwrap();
     assert_eq!(
         (
             status.saved,
@@ -117,20 +128,16 @@ fn archive_publishes_first_batch_before_backfilling_history_and_drains_cached_ma
     // scan must drain every cached message, not just its first MIME batch.
     db.execute("DELETE FROM mail_full_messages", []).unwrap();
     drop(db);
-    let retry_job = ArchiveJob {
-        status: Mutex::new(ArchiveStatus::default()),
-        ..job
-    };
-    run_folder(
-        &mut imap,
-        &account,
-        &handle,
-        "INBOX",
-        false,
-        &retry_job,
-        &mut failures,
-    )
-    .unwrap();
+    let retry_job = ScanProgress::default();
+    mailbox(&account, &handle, &retry_job)
+        .run_folder(
+            &mut imap,
+            &account.config.cache,
+            "INBOX",
+            false,
+            &mut failures,
+        )
+        .unwrap();
     assert_eq!(retry_job.status.lock().unwrap().saved, 201);
 }
 
@@ -146,18 +153,17 @@ fn batched_archive_attempts_unavailable_content_once_per_scan() {
         .insert(("INBOX".into(), bad));
     let (_dir, account, handle, job, mut imap) = fixture(&fake);
     let mut failures = ContentFailures::default();
-    run_folder(
-        &mut imap,
-        &account,
-        &handle,
-        "INBOX",
-        false,
-        &job,
-        &mut failures,
-    )
-    .unwrap();
+    mailbox(&account, &handle, &job.progress)
+        .run_folder(
+            &mut imap,
+            &account.config.cache,
+            "INBOX",
+            false,
+            &mut failures,
+        )
+        .unwrap();
     assert_eq!(failures.count, 1);
-    let status = job.status.lock().unwrap();
+    let status = job.progress.status.lock().unwrap();
     assert_eq!((status.saved, status.total), (100, 101));
     assert_eq!(
         fake.log()
@@ -189,7 +195,9 @@ fn inaccurate_size_estimates_do_not_truncate_or_block_full_mime() {
             .unwrap()
             .reported_sizes
             .insert(("INBOX".into(), uid), advertised);
-        download_one(&mut imap, &account, &handle, "INBOX", uid, 1000, &job).unwrap();
+        mailbox(&account, &handle, &job.progress)
+            .download_one(&mut imap, "INBOX", uid, 1000)
+            .unwrap();
         assert_eq!(
             storage::read(&handle.lock().unwrap(), "qa", "INBOX", uid)
                 .unwrap()
@@ -212,20 +220,18 @@ fn unavailable_body_does_not_block_others_or_become_a_permanent_skip() {
         .insert(("INBOX".into(), bad));
     let (_dir, account, handle, job, mut imap) = fixture(&fake);
     let mut failures = ContentFailures::default();
-    download_targets(
-        &mut imap,
-        &account,
-        &handle,
-        "INBOX",
-        1000,
-        uids.iter().rev().copied().collect(),
-        &job,
-        &mut failures,
-    )
-    .unwrap();
+    mailbox(&account, &handle, &job.progress)
+        .download_targets(
+            &mut imap,
+            "INBOX",
+            1000,
+            uids.iter().rev().copied().collect(),
+            &mut failures,
+        )
+        .unwrap();
     assert_eq!(failures.count, 1);
     assert!(failures.message().contains(&format!("INBOX, UID {bad}")));
-    assert_eq!(job.status.lock().unwrap().saved, 2);
+    assert_eq!(job.progress.status.lock().unwrap().saved, 2);
     {
         let db = handle.lock().unwrap();
         assert!(storage::read(&db, "qa", "INBOX", bad).unwrap().is_none());
@@ -240,31 +246,15 @@ fn unavailable_body_does_not_block_others_or_become_a_permanent_skip() {
         }
     }
     let mut retry = ContentFailures::default();
-    download_targets(
-        &mut imap,
-        &account,
-        &handle,
-        "INBOX",
-        1000,
-        vec![bad],
-        &job,
-        &mut retry,
-    )
-    .unwrap();
+    mailbox(&account, &handle, &job.progress)
+        .download_targets(&mut imap, "INBOX", 1000, vec![bad], &mut retry)
+        .unwrap();
     assert_eq!(retry.count, 1);
     fake.state.lock().unwrap().empty_bodies.clear();
     let mut recovered = ContentFailures::default();
-    download_targets(
-        &mut imap,
-        &account,
-        &handle,
-        "INBOX",
-        1000,
-        vec![bad],
-        &job,
-        &mut recovered,
-    )
-    .unwrap();
+    mailbox(&account, &handle, &job.progress)
+        .download_targets(&mut imap, "INBOX", 1000, vec![bad], &mut recovered)
+        .unwrap();
     assert_eq!(recovered.count, 0);
     assert!(
         storage::read(&handle.lock().unwrap(), "qa", "INBOX", bad)
@@ -296,7 +286,9 @@ fn resumed_parts_validate_actual_eof_and_size_hint_changes_reset_safely() {
         .unwrap()
         .reported_sizes
         .insert(("INBOX".into(), uid), CHUNK);
-    download_one(&mut imap, &account, &handle, "INBOX", uid, 1000, &job).unwrap();
+    mailbox(&account, &handle, &job.progress)
+        .download_one(&mut imap, "INBOX", uid, 1000)
+        .unwrap();
     assert_eq!(
         storage::read(&handle.lock().unwrap(), "qa", "INBOX", uid)
             .unwrap()
@@ -311,7 +303,8 @@ fn resumed_parts_validate_actual_eof_and_size_hint_changes_reset_safely() {
     fs::write(&changed, &raw[..CHUNK]).unwrap();
     fs::write(changed.with_extension("json"), "10").unwrap();
     assert!(
-        download_one(&mut imap, &account, &handle, "INBOX", next, 1000, &job)
+        mailbox(&account, &handle, &job.progress)
+            .download_one(&mut imap, "INBOX", next, 1000)
             .unwrap_err()
             .contains("size changed")
     );
@@ -321,7 +314,9 @@ fn resumed_parts_validate_actual_eof_and_size_hint_changes_reset_safely() {
             .unwrap()
             .is_none()
     );
-    download_one(&mut imap, &account, &handle, "INBOX", next, 1000, &job).unwrap();
+    mailbox(&account, &handle, &job.progress)
+        .download_one(&mut imap, "INBOX", next, 1000)
+        .unwrap();
     assert_eq!(
         storage::read(&handle.lock().unwrap(), "qa", "INBOX", next)
             .unwrap()
@@ -347,7 +342,9 @@ fn orphaned_resume_metadata_does_not_trap_retry_after_size_changes() {
         if empty_partial {
             fs::write(&path, []).unwrap();
         }
-        download_one(&mut imap, &account, &handle, "INBOX", uid, 1000, &job).unwrap();
+        mailbox(&account, &handle, &job.progress)
+            .download_one(&mut imap, "INBOX", uid, 1000)
+            .unwrap();
         assert_eq!(
             storage::read(&handle.lock().unwrap(), "qa", "INBOX", uid)
                 .unwrap()
@@ -391,18 +388,19 @@ fn loopback_resume_saves_complete_mime_and_leaves_it_unread() {
     )
     .unwrap();
     let job = ArchiveJob {
-        pause: AtomicBool::new(false),
+        progress: ScanProgress::default(),
         running: AtomicBool::new(true),
-        status: Mutex::new(ArchiveStatus::default()),
         socket: Mutex::new(None),
     };
     drop(db);
-    let handle = Arc::new(coordination::MailDatabase::new(dir.path().join("qa.db")));
+    let handle = Arc::new(coordination::mailbox_database(dir.path().join("qa.db")));
     let mut imap = ActiveImapSession::Plain {
         session: fake.session(),
         forward_task: None,
     };
-    download_one(&mut imap, &account, &handle, "INBOX", uid, 1000, &job).unwrap();
+    mailbox(&account, &handle, &job.progress)
+        .download_one(&mut imap, "INBOX", uid, 1000)
+        .unwrap();
     let db = handle.lock().unwrap();
     assert_eq!(
         storage::read(&db, "qa", "INBOX", uid).unwrap().unwrap(),
@@ -433,7 +431,9 @@ fn loopback_resume_saves_complete_mime_and_leaves_it_unread() {
         serde_json::to_vec(&raw.len()).unwrap(),
     )
     .unwrap();
-    download_one(&mut imap, &account, &handle, "INBOX", next_uid, 1000, &job).unwrap();
+    mailbox(&account, &handle, &job.progress)
+        .download_one(&mut imap, "INBOX", next_uid, 1000)
+        .unwrap();
     assert_eq!(
         storage::read(&handle.lock().unwrap(), "qa", "INBOX", next_uid)
             .unwrap()
@@ -447,55 +447,10 @@ fn loopback_resume_saves_complete_mime_and_leaves_it_unread() {
         raw.len(),
         CHUNK
     ))));
-    job.pause.store(true, Ordering::Release);
-    assert!(download_one(&mut imap, &account, &handle, "INBOX", uid, 1000, &job).is_err());
-}
-
-#[test]
-fn resumed_fetch_checks_origin_uid_size_and_literal() {
-    let ok = b"* 1 FETCH (UID 7 RFC822.SIZE 6 BODY[]<3> {3}\r\ndef)\r\n";
-    assert_eq!(parse_chunk(ok, 7, 3).unwrap(), (6, b"def".to_vec()));
-    assert!(parse_chunk(ok, 7, 0).is_err());
-    assert!(parse_chunk(ok, 8, 3).is_err());
+    job.progress.pause.store(true, Ordering::Release);
     assert!(
-        parse_chunk(
-            b"* 1 FETCH (UID 7 RFC822.SIZE 6 BODY[] {3}\r\nabc)\r\n",
-            7,
-            3
-        )
-        .is_err()
+        mailbox(&account, &handle, &job.progress)
+            .download_one(&mut imap, "INBOX", uid, 1000)
+            .is_err()
     );
-    assert_eq!(
-        parse_chunk(
-            b"* 1 FETCH (UID 7 RFC822.SIZE 6 BODY[]<5> {3}\r\nabc)\r\n",
-            7,
-            5
-        )
-        .unwrap(),
-        (6, b"abc".to_vec())
-    );
-    assert_eq!(
-        parse_chunk(
-            b"* 1 FETCH (UID 7 RFC822.SIZE 6 BODY[]<6> {0}\r\n)\r\n",
-            7,
-            6
-        )
-        .unwrap(),
-        (6, vec![])
-    );
-    assert_eq!(parse_chunk(b"* 1 FETCH (UID 7 FLAGS (\\Seen))\r\n* 1 FETCH (UID 7 RFC822.SIZE 9)\r\n* 1 FETCH (UID 7 BODY[]<3> {3}\r\ndef)\r\n", 7, 3).unwrap(), (9, b"def".to_vec()));
-    assert_eq!(
-        parse_chunk(b"* 1 FETCH (UID 7 RFC822.SIZE 8 BODY[] NIL)\r\n", 7, 6).unwrap(),
-        (8, vec![])
-    );
-    assert!(
-        parse_chunk(
-            b"* 1 FETCH (UID 7 RFC822.SIZE 8 BODY[]<0> {0}\r\n)\r\n",
-            7,
-            0
-        )
-        .unwrap_err()
-        .contains("offset 0")
-    );
-    assert!(parse_chunk(b"* 1 FETCH (UID 7 RFC822.SIZE 0 BODY[] NIL)\r\n", 7, 0).is_err());
 }

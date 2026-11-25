@@ -1,0 +1,174 @@
+id: TC-MODULES-042
+title: Signed module update and rollback preserve activation settings and data without restarting Taomni
+description: Two independently built and signed hello protocol versions exercise the actual installer and running host.
+  A third signed package declares a version its host rejects at handshake. Read-only native observations check the
+  active pointer, signed bytes, OS writer lease and host identity during live update and recovery. Removing the
+  older installed module while an update is on offer removes all its versions and leaves the data available.
+covers: [F-Modules-1]
+tags: [p1, modules, marketplace, lifecycle]
+modes: [native]
+fixtures: [reset_db, module_signed_archive, module_marketplace]
+timeout_sec: 360
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- module_marketplace_probe:
+    phase: source
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- fill:
+    selector: '[data-testid="module-offline-archive"]'
+    value: ${fixture.module_previous_archive}
+- fill:
+    selector: '[data-testid="module-offline-signature"]'
+    value: ${fixture.module_previous_signature}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- wait_for: '[data-testid="hello-plugin-empty"]'
+- fill:
+    selector: '[data-testid="hello-plugin-value"]'
+    value: retained across module versions
+- click: '[data-testid="hello-plugin-save"]'
+- assert_text:
+    selector: '[data-testid="hello-plugin-values"]'
+    contains: retained across module versions
+- module_marketplace_probe:
+    phase: old-enabled
+- click: '[data-testid="tab-item"][data-tab-type="settings"]'
+- click: '[data-testid="module-action-disable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-enable-hello-plugin"]'
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-testid="module-marketplace-update"]'
+- click: '[data-testid="module-marketplace-download"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-download-task"][data-phase="completed"]'
+- click: '[data-testid="module-marketplace-review"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Hello Plugin 0.1.0
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-marketplace-current"]'
+- module_marketplace_probe:
+    phase: updated-disabled
+- click: '[data-testid="module-action-rollback-hello-plugin"]'
+- wait_for:
+    selector: '[data-testid="module-marketplace-current"]'
+    state: detached
+- module_marketplace_probe:
+    phase: old-disabled
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- assert_text:
+    selector: '[data-testid="hello-plugin-values"]'
+    contains: retained across module versions
+- click: '[data-testid="tab-item"][data-tab-type="settings"]'
+- click: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- wait_for: '[data-testid="module-marketplace-update"]'
+- click: '[data-testid="module-marketplace-review"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-marketplace-current"]'
+- module_marketplace_probe:
+    phase: updated-enabled
+- fill:
+    selector: '[data-testid="module-offline-archive"]'
+    value: ${fixture.module_handshake_failure_archive}
+- fill:
+    selector: '[data-testid="module-offline-signature"]'
+    value: ${fixture.module_handshake_failure_signature}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="failed"]'
+- assert_visible: '[data-testid="module-offline-error"]'
+- module_marketplace_probe:
+    phase: failed-update
+- click: '[data-testid="module-action-rollback-hello-plugin"]'
+- wait_for:
+    selector: '[data-testid="module-marketplace-current"]'
+    state: detached
+- module_marketplace_probe:
+    phase: rolled-back-enabled
+- click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+- assert_text:
+    selector: '[data-testid="hello-plugin-values"]'
+    contains: retained across module versions
+- assert_no_runtime_errors: null
+- screenshot: module-update-native.png
+- click: '[data-testid="tab-item"][data-tab-type="settings"]'
+- wait_for: '[data-testid="module-marketplace-update"]'
+- click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-hello-plugin"]'
+- assert_visible: '[data-testid="module-data-retained-hello-plugin"]'
+- assert_count:
+    selector: '[data-testid="module-marketplace-update"], [data-testid="module-action-rollback-hello-plugin"]'
+    equal: 0
+- module_marketplace_probe:
+    phase: removed-before-update
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Update an installed disabled module and roll back while preserving its disabled state.
+    actions: [10, 12, 13, 15, 16, 20, 22, 24, 25, 27, 29, 32]
+    checkpoints:
+    - step: 18
+      expectation: The original installed host owns the writer lease and reads the saved text.
+    - step: 23
+      expectation: Checking the signed catalog offers an update for the actual installed version.
+    - step: 28
+      expectation: Verified package review specifies the selected version.
+    - step: 31
+      expectation: The correct signed version is active, while the disabled module has no running host.
+    - step: 34
+      expectation: Rollback restores the original version while keeping the module disabled.
+    results: [18, 23, 28, 31, 34]
+  - id: R2
+    requirement: Replace and roll back a running host. Restore the working version if a signed replacement fails to start.
+    actions: [35, 36, 39, 41, 42, 45, 46, 47, 51, 54]
+    checkpoints:
+    - step: 37
+      expectation: Re-enabling the rolled-back module reads the original saved text.
+    - step: 44
+      expectation: The new signed host is running before the probe sends a request and reads the same data.
+    - step: 49
+      expectation: A handshake failure appears as an installation error.
+    - step: 50
+      expectation: The verified failing candidate was staged and the previous host is already running with its original data.
+    - step: 53
+      expectation: Manual rollback replaces the live host and retains its enabled preference.
+    - step: 55
+      expectation: The dynamic module tab still reads the original saved text.
+    - step: 56
+      expectation: The renderer reports no unhandled errors.
+    results: [37, 44, 49, 50, 53, 55, 56]
+  - id: R3
+    requirement: Uninstall removes the existing and rollback versions and excludes the module from updates.
+    actions: [58, 60, 61]
+    checkpoints:
+    - step: 59
+      expectation: The signed catalog offers a higher version while the previous module is installed.
+    - step: 62
+      expectation: Reinstall requires a new explicit action.
+    - step: 63
+      expectation: Settings identifies the retained data.
+    - step: 64
+      expectation: Update and rollback actions disappear after uninstall.
+    - step: 65
+      expectation: All executable versions are absent, the writer lease is free, invocation is denied and the module has retained data.
+    - step: 66
+      expectation: Uninstalling after repeated version changes produces no unhandled errors.
+    results: [59, 62, 63, 64, 65, 66]
+  native:
+  - check: Verify real signed bytes, active pointers, writer lease and RPC replies throughout the same desktop session.
+    method: external
+    reason: The fixed native probe observes state independently of the renderer.
+  visual:
+  - check: Inspect the live module tab after rollback.
+    method: manual
+    reason: A retained screenshot shows the restored data.

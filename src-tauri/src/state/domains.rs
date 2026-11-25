@@ -1,4 +1,20 @@
-use super::*;
+use super::{
+    CcPermissionResponder, CcToolResponder, ReadStreamHandle, SshAuthResponder, WriteStreamHandle,
+};
+use crate::agent::acp_bridge::{AcpProcess, AcpThreadProcess};
+use crate::agent::cc_bridge::process::CcProcess;
+use crate::agent::codex_bridge::process::CodexAppServer;
+use crate::chat::run::ChatRunRegistry;
+use crate::database::DbSession;
+use crate::filebrowser::{sftp::ActiveSftp, transfer::TransferHandle};
+use crate::hbase::HBaseSession;
+use crate::lsp::LspManager;
+use crate::objectstorage::ObjectStorageSession;
+use crate::sdk::SdkManager;
+use crate::terminal::ActiveTerminal;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use tokio::sync::RwLock;
 
 /// Runtime ownership for the workspace domain.
 pub struct WorkspaceRuntime {
@@ -8,20 +24,6 @@ pub struct WorkspaceRuntime {
     pub dap: Arc<crate::dap::DapManager>,
     /// Versioned SDK installations, defaults and per-workspace manual bindings.
     pub sdk: Arc<SdkManager>,
-}
-
-/// Runtime ownership for the mail domain.
-pub struct MailRuntime {
-    /// Directory containing one SQLite cache database per saved or transient mail
-    /// session. Mail caches are intentionally isolated from `taomni.db`, and
-    /// from each other, so mailbox refresh writes cannot block session CRUD.
-    pub(super) mail_db_dir: PathBuf,
-    pub(super) mail_dbs: Arc<Mutex<HashMap<String, MailDbHandle>>>,
-    /// Live IMAP sessions keyed by mail account/session id. Reuses TCP/TLS/auth
-    /// and any session-level proxy forwarder across mail commands. Never routes
-    /// through the app global proxy.
-    pub mail_imap_pool: Arc<MailImapPool>,
-    pub mail_archive: crate::mail::archive::ArchiveManager,
 }
 
 /// Runtime ownership for the terminal domain.
@@ -48,13 +50,6 @@ pub struct FileRuntime {
     pub oss_sessions: Arc<RwLock<HashMap<String, Arc<ObjectStorageSession>>>>,
     pub read_handles: Arc<Mutex<HashMap<String, ReadStreamHandle>>>,
     pub write_handles: Arc<Mutex<HashMap<String, WriteStreamHandle>>>,
-}
-
-/// Runtime ownership for the remote desktop domain.
-pub struct RemoteDesktopRuntime {
-    pub vnc_sessions: Arc<RwLock<HashMap<String, VncSession>>>,
-    pub vnc_detach_claims: Arc<RwLock<HashMap<String, crate::vnc::VncDetachClaim>>>,
-    pub rdp_sessions: Arc<RwLock<HashMap<String, RdpSession>>>,
 }
 
 /// Runtime ownership for the database domain.
@@ -98,7 +93,7 @@ pub struct AgentRuntime {
     /// Thread id -> label of the webview that started the current chat turn.
     /// Thread-scoped approval and side-effect events are delivered to that
     /// window instead of being broadcast into every window (issue #869).
-    pub thread_windows: Arc<crate::windowing::thread_delivery::ThreadWindows>,
+    pub(crate) thread_windows: Arc<crate::windowing::thread_delivery::ThreadWindows>,
     /// Per-thread captured-command store (方案4). Holds the full stdout/stderr
     /// of `run_captured` runs (B path: Taomni-local files) so CC can grep/page
     /// large output without dumping it into context. Reduction happens here.

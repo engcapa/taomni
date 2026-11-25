@@ -24,6 +24,7 @@ pub async fn cc_pending_permission_prompts(
     state: State<'_, AppState>,
 ) -> Result<Vec<serde_json::Value>, String> {
     let payloads = state
+        .core
         .agent
         .cc_pending_prompt_payloads
         .lock()

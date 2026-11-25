@@ -171,13 +171,13 @@ pub fn authorize(config: &Config, value: &Value) -> Result<Option<Request>, Stri
     }))
 }
 pub fn prepare(core: &Core) -> Result<(), String> {
-    core.state().db.lock().map_err(|_| "database_unavailable")?.execute_batch(
+    core.state().core.db.lock().map_err(|_| "database_unavailable")?.execute_batch(
         "CREATE TABLE IF NOT EXISTS mobile_feishu_events (id TEXT PRIMARY KEY, created_at INTEGER NOT NULL);"
     ).map_err(|_| "feishu_ledger_failed".into())
 }
 pub fn claim(core: &Core, key: &str) -> Result<bool, String> {
     let state = core.state();
-    let mut db = state.db.lock().map_err(|_| "database_unavailable")?;
+    let mut db = state.core.db.lock().map_err(|_| "database_unavailable")?;
     let tx = db.transaction().map_err(|_| "feishu_ledger_failed")?;
     let now = chrono::Utc::now().timestamp();
     tx.execute(
@@ -364,7 +364,7 @@ async fn dispatch(
         // Terminal view falls back to the terminal this user opened last.
         if matches!(action, "term" | "term-refresh" | "show")
             && let Some(selected) =
-                focus(request).and_then(|key| core.state().mobile.im.focus_get(&key))
+                focus(request).and_then(|key| core.state().legacy.mobile.im.focus_get(&key))
         {
             return terminal_reply(
                 core,
@@ -453,6 +453,7 @@ async fn terminal_reply(
     let (title, status, tail) = terminal_snapshot(core, id)?;
     if let (Some(request), Some(chat)) = (request, p2p_chat) {
         core.state()
+            .legacy
             .mobile
             .im
             .focus_set(&format!("{}:{}", request.open_id, chat), id);
@@ -471,6 +472,7 @@ pub(super) fn terminal_snapshot(core: &Core, id: &str) -> Result<(String, String
     let raw = id.strip_prefix("term:").ok_or("terminal_not_found")?;
     let state = core.state();
     let terminals = state
+        .legacy
         .mobile
         .broker
         .terminals
@@ -502,7 +504,7 @@ async fn terminal_input(
     let focus_key = focus(request);
     let focus_id = focus_key
         .as_deref()
-        .and_then(|key| core.state().mobile.im.focus_get(key));
+        .and_then(|key| core.state().legacy.mobile.im.focus_get(key));
     let mut selected = None;
     let text;
     if action == "input" {
@@ -546,6 +548,7 @@ async fn terminal_input(
     let raw_id = id.strip_prefix("term:").ok_or("terminal_not_found")?;
     let mut output_rx = core
         .state()
+        .legacy
         .mobile
         .broker
         .subscribe(raw_id)
@@ -563,6 +566,7 @@ async fn terminal_input(
     settle_terminal_output(output_rx.as_mut()).await;
     if let Some(request) = request {
         core.state()
+            .legacy
             .mobile
             .im
             .focus_set(&format!("{}:{}", request.open_id, request.chat), &id);
@@ -610,7 +614,7 @@ async fn write_terminal(core: &Core, id: &str, bytes: &[u8], raw: bool) -> Resul
         return Err("input_too_large".into());
     }
     let state = core.state();
-    let broker = &state.mobile.broker;
+    let broker = &state.legacy.mobile.broker;
     let gate = broker.gate(raw_id)?;
     let guard = gate.lock().await;
     let connection = uuid::Uuid::new_v4().to_string();
@@ -646,14 +650,19 @@ async fn open_terminal(
         serde_json::json!({"kind":"saved","saved_session_id":saved})
     };
     let state = core.state();
-    let started = crate::mobile::session_open::start_im(core, &state.mobile, &device, &body)?;
+    let started =
+        crate::mobile::session_open::start_im(core, &state.legacy.mobile, &device, &body)?;
     let request_id = started["request_id"]
         .as_str()
         .ok_or("open_failed")?
         .to_owned();
     for _ in 0..40 {
         tokio::time::sleep(Duration::from_millis(500)).await;
-        let status = state.mobile.open_requests.poll(&device, &request_id)?;
+        let status = state
+            .legacy
+            .mobile
+            .open_requests
+            .poll(&device, &request_id)?;
         match status["status"].as_str() {
             Some("opened") => {
                 let id = status["session_id"].as_str().ok_or("open_failed")?;
@@ -699,7 +708,7 @@ fn show_text(core: &Core, detail: &Value) -> Result<String, String> {
         .as_str()
         .and_then(|id| id.strip_prefix("thread:"))
     {
-        let result = core.state().db.lock().map_err(|_| "database_unavailable")?.query_row(
+        let result = core.state().core.db.lock().map_err(|_| "database_unavailable")?.query_row(
             "SELECT CASE WHEN redacted = 0 THEN substr(content,1,1201) ELSE '[内容已隐藏]' END FROM ai_chat_messages WHERE thread_id = ?1 AND role = 'assistant' ORDER BY created_at DESC,rowid DESC LIMIT 1",
             [tid], |r| r.get::<_, String>(0)).optional().map_err(|_| "database_unavailable")?.unwrap_or_default();
         text.push_str("\n最近结果：\n");

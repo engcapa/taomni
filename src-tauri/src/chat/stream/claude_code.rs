@@ -75,6 +75,7 @@ pub(super) async fn stream_claude_code(turn: StreamTurn<'_>) -> Result<(), Strin
     //    when the session stops).
     let existing = {
         state
+            .core
             .agent
             .cc_processes
             .lock()
@@ -140,7 +141,7 @@ pub(super) async fn stream_claude_code(turn: StreamTurn<'_>) -> Result<(), Strin
             // surface it as a stream error and let the UI prompt to unlock.
             let custom = match crate::agent::cc_bridge::config::resolve_custom_settings(
                 &ai_config.cc_bridge,
-                &state.vault,
+                &state.core.vault,
             ) {
                 Ok(c) => c,
                 Err(e) => {
@@ -230,7 +231,7 @@ pub(super) async fn stream_claude_code(turn: StreamTurn<'_>) -> Result<(), Strin
             // Re-check under the lock in case a concurrent send for the
             // same thread created one first; if so, our `p` is dropped and
             // its temp dir cleaned by the Drop impl.
-            let mut registry = state.agent.cc_processes.lock().await;
+            let mut registry = state.core.agent.cc_processes.lock().await;
             match registry.get(&req.thread_id) {
                 Some(existing) => existing.clone(),
                 None => {
@@ -245,12 +246,17 @@ pub(super) async fn stream_claude_code(turn: StreamTurn<'_>) -> Result<(), Strin
     // only a Weak<CcProcess>, so it exits cleanly once the registry drops
     // the process (provider switch / model change → recycle_thread_process).
     process.start_watchdog();
-    state.agent.chat_runs.lock().await.insert(
+    state.core.agent.chat_runs.lock().await.insert(
         req.thread_id.clone(),
         run::ChatRunHandle::bridge_process("claude-code", process.clone()),
     );
 
-    if state.mobile.turn_cancel(&req.thread_id).is_cancelled() {
+    if state
+        .legacy
+        .mobile
+        .turn_cancel(&req.thread_id)
+        .is_cancelled()
+    {
         process.stop().await;
         emit(&StreamEventOut::Error {
             id: assistant_id.clone(),
@@ -359,7 +365,13 @@ pub(super) async fn stream_claude_code(turn: StreamTurn<'_>) -> Result<(), Strin
             }
         })
         .await;
-    state.agent.chat_runs.lock().await.remove(&req.thread_id);
+    state
+        .core
+        .agent
+        .chat_runs
+        .lock()
+        .await
+        .remove(&req.thread_id);
 
     let events = match events {
         Ok(ev) => ev,
@@ -404,7 +416,7 @@ pub(super) async fn stream_claude_code(turn: StreamTurn<'_>) -> Result<(), Strin
     let session_id =
         crate::agent::cc_bridge::protocol::extract_session_id(&events).or(resume_session);
     if let Some(sid) = &session_id {
-        if let Ok(db) = state.db.lock() {
+        if let Ok(db) = state.core.db.lock() {
             let _ = crate::chat::store::set_cc_session_id(&db, &req.thread_id, sid);
         }
     }
@@ -421,7 +433,7 @@ pub(super) async fn stream_claude_code(turn: StreamTurn<'_>) -> Result<(), Strin
 
     let is_first = history.is_empty();
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         store::insert_message(&db, &assistant_msg).map_err(|e| e.to_string())?;
         if is_first {
             let title = user_msg.content.chars().take(40).collect::<String>();

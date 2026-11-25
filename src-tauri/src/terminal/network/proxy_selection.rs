@@ -16,10 +16,11 @@ pub(crate) fn resolve_application(
         AppProxyConfig::load_strict(&crate::proxy::default_app_proxy_path())?
     };
     let db = state
+        .core
         .db
         .lock()
         .map_err(|_| "Proxy session database is unavailable")?;
-    let proxy = resolve_strict_with_db(&config, Some(&db), Some(&state.vault))?;
+    let proxy = resolve_strict_with_db(&config, Some(&db), Some(&state.core.vault))?;
     apply_resolved(network, proxy);
     Ok(())
 }

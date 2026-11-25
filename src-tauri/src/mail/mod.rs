@@ -11,8 +11,35 @@
 //! onto a plain OS thread when a Tokio runtime is already current, to avoid
 //! nested-runtime drop panics in debug builds.
 
+#[cfg(not(any(test, all(feature = "legacy-mail-imap", feature = "legacy-mail-pop3"))))]
+const SIGNED_MAIL_CONNECTION_REQUIRED: &str =
+    "Install or update the Mail module and enable it to connect to this mailbox";
+
+const SIGNED_MAIL_ARCHIVE_REQUIRED: &str =
+    "Install or update the Mail module in Module Store and enable it to read this archive";
+
+fn legacy_archive_without_host(registry: &crate::plugin::PluginRegistry) -> bool {
+    cfg!(feature = "legacy-mail-imap") && registry.get(taomni_mail_api::SLUG).is_none()
+}
+
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+macro_rules! legacy_imap {
+    ($operation:block) => {
+        $operation
+    };
+}
+
+#[cfg(not(any(test, feature = "legacy-mail-imap")))]
+macro_rules! legacy_imap {
+    ($operation:block) => {
+        Err(String::from($crate::mail::SIGNED_MAIL_CONNECTION_REQUIRED))
+    };
+}
+
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 mod imap_pool;
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 pub use imap_pool::*;
 
 mod smtp;
@@ -22,12 +49,20 @@ pub use smtp::*;
 mod imap_transport;
 
 mod cache_access;
+mod local_storage;
 
 pub use cache_access::*;
 
+mod message_attachment;
+mod message_body;
 mod message_commands;
+mod message_source;
+mod module_host;
 
+pub use message_attachment::*;
+pub use message_body::*;
 pub use message_commands::*;
+pub use message_source::*;
 
 mod oauth;
 
@@ -37,19 +72,24 @@ mod sync_commands;
 
 pub use sync_commands::*;
 
+pub(crate) mod draft_store;
 mod drafts;
 
 pub use drafts::*;
 
+mod folder_commands;
 mod mutation_commands;
 
+pub use folder_commands::*;
 pub use mutation_commands::*;
 
 mod account_config;
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 mod imap_messages;
 
 mod attachment_files;
+mod attachment_storage;
 
 mod mime;
 
@@ -60,9 +100,7 @@ mod tests;
 
 pub mod archive;
 
-mod archive_metadata;
-
-pub(crate) mod archive_query;
+pub(crate) use taomni_mail_storage::storage::query as archive_query;
 
 pub mod autoconfig;
 
@@ -98,6 +136,7 @@ pub mod outgoing;
 mod parts;
 
 mod pop3;
+pub(crate) mod pop3_store;
 
 mod read_actions;
 
@@ -111,8 +150,7 @@ pub mod search;
 pub(crate) mod storage;
 
 mod sync;
-
-mod vcard;
+mod sync_cache;
 
 mod webdav;
 
@@ -122,6 +160,7 @@ use imap_transport::*;
 
 use account_config::*;
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 use imap_messages::*;
 
 use attachment_files::*;
@@ -142,22 +181,15 @@ use std::path::Path;
 
 use std::sync::Arc;
 
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use base64::{
     Engine as _,
     engine::general_purpose::{STANDARD as BASE64_STANDARD, URL_SAFE_NO_PAD},
 };
 
-use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart, header::ContentType};
-
-use lettre::transport::smtp::authentication::{Credentials, Mechanism};
-
-use lettre::transport::smtp::client::Tls;
-
-use lettre::{Message, SmtpTransport, Transport};
-
-use mail_parser::{Address as ParsedAddress, MessageParser, MimeHeaders, PartType};
+#[cfg(test)]
+use mail_parser::{MessageParser, MimeHeaders};
 
 use native_tls::TlsConnector;
 
@@ -178,6 +210,7 @@ use crate::state::AppState;
 use crate::terminal::network::NetworkSettings;
 
 use sync::{FolderStepOutcome, FolderSyncState, StepParams};
+use taomni_mail_storage::imap_errors::{imap_catch_result, is_imap_transport_error};
 
 mod limits;
 
@@ -196,9 +229,8 @@ mod outgoing_model;
 mod utilities;
 
 use limits::{
-    DEFAULT_BODY_MAX_BYTES, DEFAULT_MESSAGE_LIMIT, DEFAULT_TIMEOUT_SECS, IMAP_LIVE_IDLE_TTL,
-    IMAP_LOGIN_RETRY_DELAYS_MS, MAX_EMBEDDED_BODY_BYTES, MAX_INLINE_CID_IMAGE_BYTES,
-    OAUTH_REAUTHORIZE_REQUIRED, OAUTH_REFRESH_SKEW_SECS,
+    DEFAULT_MESSAGE_LIMIT, DEFAULT_TIMEOUT_SECS, IMAP_LIVE_IDLE_TTL, OAUTH_REAUTHORIZE_REQUIRED,
+    OAUTH_REFRESH_SKEW_SECS,
 };
 
 pub use connection_model::{
@@ -219,11 +251,7 @@ use oauth_model::{
 
 pub use account_model::{MailAccountConfig, MailAiSettings, MailCacheSettings, MailSyncSettings};
 
-use account_model::{
-    default_body_max_bytes, default_body_recent_limit, default_header_limit_per_folder,
-    default_header_retention_days, default_max_fetch_per_sync, default_sync_interval_minutes,
-    default_true,
-};
+use account_model::{default_max_fetch_per_sync, default_sync_interval_minutes, default_true};
 
 pub use message_model::{
     MailAddress, MailAttachmentInfo, MailFolder, MailMessageBody, MailMessageHeader,
@@ -242,9 +270,6 @@ pub use outgoing_model::{
     MailSendAttachment, MailSendRequest, MailSendResult,
 };
 
-use outgoing_model::DispositionNotificationTo;
-
 use utilities::{
-    folders_for_header_sync, non_empty, non_empty_str, normalize_preview, now_ts,
-    should_list_remote_folders,
+    folders_for_header_sync, non_empty, non_empty_str, now_ts, should_list_remote_folders,
 };

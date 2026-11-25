@@ -19,7 +19,7 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf-8")
 };
 
 export default defineConfig(({ command, mode, isPreview }) => ({
-  plugins: [tailwindcss(), react(), screenshotOcrPlugin(), ...(isTauriBuild ? [] : [sshProxyPlugin(), sftpProxyPlugin(), rdpProxyPlugin(), vncProxyPlugin()])],
+  plugins: [tailwindcss(), react(), ...(mode === "qa" || (command === "serve" && !isPreview) ? [screenshotOcrPlugin()] : []), ...(isTauriBuild ? [] : [sshProxyPlugin(), sftpProxyPlugin(), rdpProxyPlugin(), vncProxyPlugin()])],
   clearScreen: false,
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
@@ -34,6 +34,13 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     __TAOMNI_QA_SAVE_GATE__: JSON.stringify(mode === "qa"),
     __TAOMNI_QA_COMPLETION_OBSERVATION__: JSON.stringify(mode === "qa"),
     __TAOMNI_QA_UPDATER__: JSON.stringify(mode === "qa"),
+    __TAOMNI_BUNDLED_VNC_VIEWER__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview && !isTauriBuild)),
+    __TAOMNI_BUNDLED_RDP_VIEWER__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview && !isTauriBuild)),
+    __TAOMNI_BUNDLED_MAIL_RENDERER__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview && !isTauriBuild)),
+    __TAOMNI_BUNDLED_MFA_RENDERER__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview && !isTauriBuild)),
+    __TAOMNI_BUNDLED_SOCKSCAP_RENDERER__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview && !isTauriBuild)),
+    __TAOMNI_BUNDLED_SERVER_SETTINGS__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview && !isTauriBuild)),
+    __TAOMNI_BUNDLED_SCREENSHOT_MEDIA__: JSON.stringify(mode === "qa" || (command === "serve" && !isPreview)),
     // Screenshot overlay startup marks (P0-0b): read by native QA only.
     __TAOMNI_QA_OVERLAY_TIMING__: JSON.stringify(mode === "qa"),
     // Issue #869: installs the hidden approval probe chord in the isolated QA

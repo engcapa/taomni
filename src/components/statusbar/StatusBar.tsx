@@ -32,6 +32,7 @@ import {
 } from "../../stores/codeWorkspaceStatusStore";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
+import { SocksCapRecoveryStatus } from "./SocksCapRecoveryStatus";
 
 /**
  * Copy-with-feedback state shared by status-bar text: copies to the clipboard,
@@ -247,6 +248,7 @@ export function StatusBar() {
 
   return (
     <div data-testid="status-bar" className="taomni-status min-h-6 flex items-center px-2 gap-3">
+      <SocksCapRecoveryStatus />
       {/* ED-PARITY-010 DEC-010-06: a focused code workspace owns the status
           bar like IDEA — navigation bar left, editor widgets right. */}
       {showWorkspaceSegments && workspaceStatus ? (

@@ -68,7 +68,13 @@ export function mergeFolderMeta(folders: readonly MailFolder[], next: MailFolder
   const merged = folders.map((folder) => {
     if (folder.name !== next.name) return folder;
     found = true;
-    return { ...folder, ...next, displayName: next.displayName ?? folder.displayName };
+    return {
+      ...folder,
+      ...next,
+      displayName: next.displayName ?? folder.displayName,
+      delimiter: folder.delimiter,
+      flags: folder.flags,
+    };
   });
   return found ? merged : [...merged, next];
 }

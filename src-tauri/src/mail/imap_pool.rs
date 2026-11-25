@@ -1,13 +1,15 @@
 use super::*;
+use taomni_mail_api::ImapFolderChange;
+use taomni_mail_engine::imap_folders::{imap_change_folder, imap_list_folders};
 
 pub(super) enum ActiveImapSession {
     Tls {
         session: imap::Session<native_tls::TlsStream<TcpStream>>,
-        forward_task: Option<JoinHandle<()>>,
+        forward_task: Option<ProxyForward>,
     },
     Plain {
         session: imap::Session<TcpStream>,
-        forward_task: Option<JoinHandle<()>>,
+        forward_task: Option<ProxyForward>,
     },
 }
 
@@ -69,15 +71,29 @@ impl ActiveImapSession {
         }
     }
 
-    pub(super) fn folder_status(
+    pub(super) fn sync_folder_round(
         &mut self,
-        folder: &str,
-        condstore: bool,
-    ) -> Option<folders::FolderStatus> {
-        match self {
-            Self::Tls { session, .. } => folders::imap_folder_status(session, folder, condstore),
-            Self::Plain { session, .. } => folders::imap_folder_status(session, folder, condstore),
+        account: &ResolvedMailAccount,
+        request: &taomni_mail_storage::imap_sync::FolderRoundRequest,
+        include_bodies: bool,
+    ) -> Result<taomni_mail_storage::imap_sync::FolderRoundOutcome, String> {
+        use taomni_mail_engine::imap_sync::sync_folder_round;
+
+        let mut mailbox = imap_mailbox(account, &request.folder.name);
+        let result = match self {
+            Self::Tls { session, .. } => {
+                sync_folder_round(session, &mut mailbox, request, include_bodies)
+            }
+            Self::Plain { session, .. } => {
+                sync_folder_round(session, &mut mailbox, request, include_bodies)
+            }
+        };
+        if let Some(error) = &result.error
+            && is_imap_transport_error(error)
+        {
+            return Err(error.clone());
         }
+        Ok(result)
     }
 
     pub(super) fn has_capability(&mut self, name: &str) -> bool {
@@ -115,7 +131,6 @@ impl ActiveImapSession {
 
     pub(super) fn download_attachment(
         &mut self,
-        account: &ResolvedMailAccount,
         folder: &str,
         uid: u32,
         attachment_index: usize,
@@ -125,7 +140,6 @@ impl ActiveImapSession {
         match self {
             Self::Tls { session, .. } => imap_download_attachment(
                 session,
-                account,
                 folder,
                 uid,
                 attachment_index,
@@ -134,7 +148,6 @@ impl ActiveImapSession {
             ),
             Self::Plain { session, .. } => imap_download_attachment(
                 session,
-                account,
                 folder,
                 uid,
                 attachment_index,
@@ -176,36 +189,10 @@ impl ActiveImapSession {
         }
     }
 
-    pub(super) fn create_folder(&mut self, name: &str) -> Result<(), String> {
+    pub(super) fn change_folder(&mut self, change: &ImapFolderChange) -> Result<(), String> {
         match self {
-            Self::Tls { session, .. } => session
-                .create(name)
-                .map_err(|e| format!("IMAP CREATE {name} failed: {e}")),
-            Self::Plain { session, .. } => session
-                .create(name)
-                .map_err(|e| format!("IMAP CREATE {name} failed: {e}")),
-        }
-    }
-
-    pub(super) fn rename_folder(&mut self, from: &str, to: &str) -> Result<(), String> {
-        match self {
-            Self::Tls { session, .. } => session
-                .rename(from, to)
-                .map_err(|e| format!("IMAP RENAME {from} -> {to} failed: {e}")),
-            Self::Plain { session, .. } => session
-                .rename(from, to)
-                .map_err(|e| format!("IMAP RENAME {from} -> {to} failed: {e}")),
-        }
-    }
-
-    pub(super) fn delete_folder(&mut self, name: &str) -> Result<(), String> {
-        match self {
-            Self::Tls { session, .. } => session
-                .delete(name)
-                .map_err(|e| format!("IMAP DELETE {name} failed: {e}")),
-            Self::Plain { session, .. } => session
-                .delete(name)
-                .map_err(|e| format!("IMAP DELETE {name} failed: {e}")),
+            Self::Tls { session, .. } => imap_change_folder(session, change),
+            Self::Plain { session, .. } => imap_change_folder(session, change),
         }
     }
 
@@ -235,9 +222,7 @@ impl Drop for ActiveImapSession {
                 forward_task.take()
             }
         };
-        if let Some(task) = task {
-            task.abort();
-        }
+        drop(task);
     }
 }
 
@@ -264,7 +249,6 @@ pub(super) fn retire_imap_session(mut session: ActiveImapSession) {
 /// session-level proxy forwarder across mail commands. Does not consult the
 /// app global proxy.
 pub struct MailImapPool {
-    pub(super) mutation_gates: std::sync::Mutex<HashMap<String, Arc<std::sync::Mutex<()>>>>,
     pub(super) entries: std::sync::Mutex<HashMap<ImapPoolKey, LiveImapEntry>>,
     /// Each lane owns its connection and proxy forwarder. Never interleave
     /// commands on one stream, but keep interactive work independent of sync.
@@ -317,19 +301,9 @@ impl ImapSessionOpts {
 }
 
 impl MailImapPool {
-    pub(super) fn mutation_gate(&self, account: &str) -> Arc<std::sync::Mutex<()>> {
-        self.mutation_gates
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .entry(account.to_string())
-            .or_insert_with(|| Arc::new(std::sync::Mutex::new(())))
-            .clone()
-    }
-
     pub fn new() -> Self {
         Self {
             entries: std::sync::Mutex::new(HashMap::new()),
-            mutation_gates: std::sync::Mutex::new(HashMap::new()),
             account_gates: std::sync::Mutex::new(HashMap::new()),
         }
     }
@@ -436,32 +410,6 @@ pub(super) fn network_fingerprint(network: Option<&NetworkSettings>) -> String {
         net.jump_port,
         net.jump_user,
     )
-}
-
-pub(super) fn is_imap_transport_error(message: &str) -> bool {
-    let message = message.to_ascii_lowercase();
-    message.contains("connection")
-        || message.contains("broken pipe")
-        || message.contains("reset")
-        || message.contains("timed out")
-        || message.contains("timeout")
-        || message.contains("eof")
-        || message.contains("not connected")
-        || message.contains("noop failed")
-        || message.contains("tls")
-        || message.contains("i/o")
-        || message.contains("io error")
-        || message.contains("protocol desync")
-        || message.contains("desync")
-}
-
-/// Run an IMAP operation that may panic inside the imap crate (tag asserts)
-/// and convert panics into transport errors so the pool can reconnect.
-pub(super) fn imap_catch_result<R>(op: impl FnOnce() -> Result<R, String>) -> Result<R, String> {
-    match catch_unwind(AssertUnwindSafe(op)) {
-        Ok(result) => result,
-        Err(_) => Err("IMAP protocol desync".into()),
-    }
 }
 
 /// Checkout or connect an IMAP session, run `f`, then return the session to

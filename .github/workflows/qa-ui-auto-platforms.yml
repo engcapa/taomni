@@ -26,6 +26,11 @@ on:
         description: 'Linux native profiles (CSV): ubuntu-24.04-xvfb,ubuntu-22.04-x11,ubuntu-22.04-vnc,ubuntu-26.04-wayland'
         type: string
         default: ubuntu-24.04-xvfb
+      macos_runner:
+        description: Hosted macOS image (Intel or macOS 26 can recover unavailable macOS 15 ARM64 capacity)
+        type: choice
+        options: [macos-15, macos-15-intel, macos-26]
+        default: macos-15
       shards:
         description: 'Shards per platform/mode/profile: auto or 1-8 (selected also fans out)'
         type: string
@@ -34,8 +39,21 @@ on:
         description: Workers within independent browser shards (1-4)
         type: number
         default: 2
+      first_release_run:
+        description: Release Bundle run supplying the frozen business roster for TC-MODULES-040 or the full native crash profile
+        type: string
+        default: ''
+      module_profile:
+        description: Installation state for a selected crash-regression run
+        type: choice
+        options: [default, core-only, full]
+        default: default
       native_release:
         description: Use release QA builds for selected native cases (reuse full-run caches)
+        type: boolean
+        default: false
+      modular_rdp_p95:
+        description: Apply the modular release allowance to RDP latency p95
         type: boolean
         default: false
       workspace_stage_trace:
@@ -85,9 +103,13 @@ on:
       platforms: {type: string, default: 'linux,windows,macos'}
       modes: {type: string, default: 'browser,native'}
       linux_profiles: {type: string, default: 'ubuntu-24.04-xvfb'}
+      macos_runner: {type: string, default: macos-15}
       shards: {type: string, default: auto}
       browser_workers: {type: number, default: 2}
+      first_release_run: {type: string, default: ''}
+      module_profile: {type: string, default: default}
       native_release: {type: boolean, default: false}
+      modular_rdp_p95: {type: boolean, default: false}
       workspace_stage_trace: {type: boolean, default: false}
       run_rdp_unit_contracts: {type: boolean, default: true}
       case_ids: {type: string, default: ''}
@@ -106,6 +128,7 @@ on:
       - 'src-tauri/build.rs'
       - 'src-tauri/src/**'
       - 'src-tauri/crates/**'
+      - 'src-tauri/plugins/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -113,7 +136,7 @@ on:
       - 'vite.config.ts'
       - 'src-tauri/Cargo.toml'
       - 'src-tauri/Cargo.lock'
-      - 'src-tauri/tauri.conf.json'
+      - 'src-tauri/tauri*.conf.json'
       - 'src-tauri/capabilities/**'
       - 'src-tauri/resources/**'
       - 'public/**'
@@ -211,7 +234,7 @@ jobs:
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
       - name: Validate QA tools
         if: inputs.scope != 'selected'
-        run: python -m unittest test_native_application_restart test_native_application_shutdown test_native_process_group test_native_driver_lifecycle test_native_windows_integrity test_session_config test_credential_store test_credential_store_readiness test_ci_sharding test_ci_build_pipeline test_ci_native_artifact test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_navigation test_ci_provenance test_ci_services test_ci_tcp_throttle test_ci_mysql test_ci_clickhouse test_ci_maven_warmup test_java_real_project test_vnc_required test_dev_contract test_rdp_encoder_tools test_mstsc_process test_native_fixture_cleanup test_native_webdriver_transport test_tauri_webdriver.NativeSessionTransportTest test_tauri_webdriver.NativeSessionFillTest test_tauri_webdriver.MacosDebuggerProcessTest test_host_clipboard test_folder_dialog test_folder_dialog_wayland test_folder_dialog_macos test_verification_workflow test_native_isolation.NativeIsolationTest test_native_reset_boundaries test_native_window_focus test_window_context test_updater_fixture test_native_app_menu test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
+        run: python -m unittest test_native_application_restart test_native_restore_relaunch test_native_application_shutdown test_native_process_group test_native_driver_lifecycle test_native_windows_integrity test_session_config test_credential_store test_credential_store_readiness test_ci_sharding test_ci_build_pipeline test_ci_native_artifact test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_navigation test_ci_provenance test_ci_services test_ci_tcp_throttle test_ci_mysql test_ci_clickhouse test_ci_maven_warmup test_java_real_project test_vnc_required test_dev_contract test_rdp_encoder_tools test_mstsc_process test_native_fixture_cleanup test_native_webdriver_transport test_tauri_webdriver.NativeSessionTransportTest test_tauri_webdriver.NativeSessionFillTest test_tauri_webdriver.MacosDebuggerProcessTest test_host_clipboard test_folder_dialog test_folder_dialog_wayland test_folder_dialog_macos test_verification_workflow test_native_isolation.NativeIsolationTest test_native_reset_boundaries test_native_window_focus test_window_context test_updater_fixture test_native_app_menu test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
       - name: Native pointer and SSH desktop fixture contracts
         if: inputs.scope != 'selected'
         run: python -m unittest test_native_pointer test_native_element_query test_ci_file_manager test_ci_x11_session test_ci_ssh_features test_runtime_errors test_native_resize_observer test_native_console test_terminal_burst_probe test_ci_windows_ssh_shell test_ci_windows_posix_ssh test_native_drag test_backup_cloud test_backup_journal test_browser_evidence test_keyboard_steps
@@ -291,6 +314,12 @@ jobs:
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
       - name: Mandatory crash regression selection and result contracts
         run: python -m unittest test_crash_regressions
+      - name: Hosted platform selection and dependency recovery contracts
+        run: python -m unittest test_ci_selection.MacosRunnerSelectionTests test_ci_linux_apt
+      - name: Source paste and restore observation contracts
+        run: python -m unittest test_fill_paste test_keyboard_steps test_native_contenteditable test_native_webdriver_transport test_native_restore_relaunch test_module_restore_observation test_module_restore_retained_observation
+      - name: Official module artifact, trust boundary and lifecycle case contracts
+        run: python -m unittest test_module_signed_archive test_module_mail_observation test_module_package_signing test_module_package_runner test_module_first_release test_module_signed_observation test_module_business_lifecycle_observation test_module_execution test_module_download_observation test_module_marketplace_observation test_module_upgrade_observation test_legacy_release test_module_network_gate test_module_offline_archive test_module_backup_observation qa_ui_auto.test_core_profile_state
       - name: Cold-start fixture filesystem contracts
         run: python -m unittest test_workspace_ignored_ancestor test_workspace_home_documents
       - name: Catalog contract gate
@@ -303,10 +332,14 @@ jobs:
           QA_PLATFORMS: ${{ inputs.platforms }}
           QA_MODES: ${{ inputs.modes }}
           QA_LINUX_PROFILES: ${{ inputs.linux_profiles }}
+          QA_MACOS_RUNNER: ${{ inputs.macos_runner }}
           QA_NATIVE_RELEASE: ${{ inputs.native_release }}
+          QA_MODULAR_RDP_P95: ${{ inputs.modular_rdp_p95 }}
           QA_SHARDS: ${{ inputs.shards }}
           QA_BROWSER_WORKERS: ${{ inputs.browser_workers }}
           QA_CASE_IDS: ${{ inputs.case_ids }}
+          QA_FIRST_RELEASE_RUN: ${{ inputs.first_release_run }}
+          QA_MODULE_PROFILE: ${{ inputs.module_profile }}
           QA_FEATURES: ${{ inputs.features }}
           QA_NIGHTLY_POLICY: ${{ (github.event_name == 'schedule' || inputs.nightly_policy) && 'true' || 'false' }}
           QA_NIGHT_LABEL: ${{ inputs.night_label }}
@@ -320,6 +353,267 @@ jobs:
           name: qa-selection-${{ steps.invocation.outputs.key }}
           path: qa-ui-auto-report/selection.json
           if-no-files-found: error
+
+  signed-modular-packages:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.native_matrix, 'signed-module')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      artifact_key: ${{ needs.plan.outputs.artifact_key }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-mfa-linux:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.linux_native_matrix, 'signed-mfa')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: mfa
+      artifact_key: ${{ format('{0}-mfa', needs.plan.outputs.artifact_key) }}
+      native_builds: ${{ needs.plan.outputs.linux_build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-mfa-windows:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.windows_native_matrix, 'signed-mfa')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: mfa
+      artifact_key: ${{ format('{0}-mfa', needs.plan.outputs.artifact_key) }}
+      native_builds: ${{ needs.plan.outputs.windows_build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-mfa-macos:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.macos_native_matrix, 'signed-mfa')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: mfa
+      artifact_key: ${{ format('{0}-mfa', needs.plan.outputs.artifact_key) }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.macos_build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-vnc-linux:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.linux_native_matrix, 'signed-vnc')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: vnc-client
+      artifact_key: ${{ format('{0}-vnc', needs.plan.outputs.artifact_key) }}
+      native_builds: ${{ needs.plan.outputs.linux_build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-vnc-windows:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.windows_native_matrix, 'signed-vnc')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: vnc-client
+      artifact_key: ${{ format('{0}-vnc', needs.plan.outputs.artifact_key) }}
+      native_builds: ${{ needs.plan.outputs.windows_build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-vnc-macos:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.macos_native_matrix, 'signed-vnc')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: vnc-client
+      artifact_key: ${{ format('{0}-vnc', needs.plan.outputs.artifact_key) }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.macos_build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-rdp-linux:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.linux_native_matrix, 'signed-rdp')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: rdp-client
+      artifact_key: ${{ format('{0}-rdp', needs.plan.outputs.artifact_key) }}
+      native_builds: ${{ needs.plan.outputs.linux_build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-rdp-windows:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.windows_native_matrix, 'signed-rdp')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: rdp-client
+      artifact_key: ${{ format('{0}-rdp', needs.plan.outputs.artifact_key) }}
+      native_builds: ${{ needs.plan.outputs.windows_build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-rdp-macos:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.macos_native_matrix, 'signed-rdp')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: rdp-client
+      artifact_key: ${{ format('{0}-rdp', needs.plan.outputs.artifact_key) }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.macos_build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-mail:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.native_matrix, 'signed-mail')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: mail
+      artifact_key: ${{ format('{0}-mail', needs.plan.outputs.artifact_key) }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-screenshot:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.native_matrix, 'signed-screenshot')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: screenshot
+      artifact_key: ${{ format('{0}-screenshot', needs.plan.outputs.artifact_key) }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-vnc-server:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.native_matrix, 'signed-local-vnc')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: vnc-server
+      artifact_key: ${{ format('{0}-vnc-server', needs.plan.outputs.artifact_key) }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-servers:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.native_matrix, 'signed-local-servers')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: servers
+      artifact_key: ${{ format('{0}-servers', needs.plan.outputs.artifact_key) }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-voice:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.native_matrix, 'signed-local-voice')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: ai-voice-local
+      artifact_key: ${{ format('{0}-voice', needs.plan.outputs.artifact_key) }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-sockscap:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.native_matrix, 'signed-sockscap')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: sockscap
+      artifact_key: ${{ format('{0}-sockscap', needs.plan.outputs.artifact_key) }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-rdp-server-linux:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.linux_native_matrix, 'signed-local-rdp')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: rdp-server
+      artifact_key: ${{ format('{0}-rdp-server', needs.plan.outputs.artifact_key) }}
+      native_builds: ${{ needs.plan.outputs.linux_build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-rdp-server-windows:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.windows_native_matrix, 'signed-local-rdp')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: rdp-server
+      artifact_key: ${{ format('{0}-rdp-server', needs.plan.outputs.artifact_key) }}
+      native_builds: ${{ needs.plan.outputs.windows_build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  signed-rdp-server-macos:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.macos_native_matrix, 'signed-local-rdp')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: rdp-server
+      artifact_key: ${{ format('{0}-rdp-server', needs.plan.outputs.artifact_key) }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.macos_build_matrix }}
+      native_macos_signing: true
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
 
   execute-browser:
     needs: plan
@@ -360,11 +654,12 @@ jobs:
       trusted_cache: ${{ inputs.trusted_cache }}
 
   execute-linux-native:
-    needs: [plan, build-linux]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-linux.result == 'success' && needs.plan.outputs.has_linux_native == 'true' }}
+    needs: [plan, build-linux, signed-modular-packages, signed-mfa-linux, signed-vnc-linux, signed-rdp-linux, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-rdp-server-linux]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-linux.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && (needs.signed-mfa-linux.result == 'success' || needs.signed-mfa-linux.result == 'skipped') && (needs.signed-vnc-linux.result == 'success' || needs.signed-vnc-linux.result == 'skipped') && (needs.signed-rdp-linux.result == 'success' || needs.signed-rdp-linux.result == 'skipped') && (needs.signed-mail.result == 'success' || needs.signed-mail.result == 'skipped') && (needs.signed-screenshot.result == 'success' || needs.signed-screenshot.result == 'skipped') && (needs.signed-vnc-server.result == 'success' || needs.signed-vnc-server.result == 'skipped') && (needs.signed-servers.result == 'success' || needs.signed-servers.result == 'skipped') && (needs.signed-voice.result == 'success' || needs.signed-voice.result == 'skipped') && (needs.signed-sockscap.result == 'success' || needs.signed-sockscap.result == 'skipped') && (needs.signed-rdp-server-linux.result == 'success' || needs.signed-rdp-server-linux.result == 'skipped') && needs.plan.outputs.has_linux_native == 'true' }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
       matrix: ${{ needs.plan.outputs.linux_native_matrix }}
+      first_release_run: ${{ inputs.first_release_run }}
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: run
@@ -383,11 +678,12 @@ jobs:
       trusted_cache: ${{ inputs.trusted_cache }}
 
   execute-windows-native:
-    needs: [plan, build-windows]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-windows.result == 'success' && needs.plan.outputs.has_windows_native == 'true' }}
+    needs: [plan, build-windows, signed-modular-packages, signed-mfa-windows, signed-vnc-windows, signed-rdp-windows, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-rdp-server-windows]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-windows.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && (needs.signed-mfa-windows.result == 'success' || needs.signed-mfa-windows.result == 'skipped') && (needs.signed-vnc-windows.result == 'success' || needs.signed-vnc-windows.result == 'skipped') && (needs.signed-rdp-windows.result == 'success' || needs.signed-rdp-windows.result == 'skipped') && (needs.signed-mail.result == 'success' || needs.signed-mail.result == 'skipped') && (needs.signed-screenshot.result == 'success' || needs.signed-screenshot.result == 'skipped') && (needs.signed-vnc-server.result == 'success' || needs.signed-vnc-server.result == 'skipped') && (needs.signed-servers.result == 'success' || needs.signed-servers.result == 'skipped') && (needs.signed-voice.result == 'success' || needs.signed-voice.result == 'skipped') && (needs.signed-sockscap.result == 'success' || needs.signed-sockscap.result == 'skipped') && (needs.signed-rdp-server-windows.result == 'success' || needs.signed-rdp-server-windows.result == 'skipped') && needs.plan.outputs.has_windows_native == 'true' }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
       matrix: ${{ needs.plan.outputs.windows_native_matrix }}
+      first_release_run: ${{ inputs.first_release_run }}
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: run
@@ -406,13 +702,14 @@ jobs:
       trusted_cache: ${{ inputs.trusted_cache }}
 
   execute-macos-native:
-    needs: [plan, build-macos]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-macos.result == 'success' && needs.plan.outputs.has_macos_native == 'true' }}
+    needs: [plan, build-macos, signed-modular-packages, signed-mfa-macos, signed-vnc-macos, signed-rdp-macos, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-rdp-server-macos]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-macos.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && (needs.signed-mfa-macos.result == 'success' || needs.signed-mfa-macos.result == 'skipped') && (needs.signed-vnc-macos.result == 'success' || needs.signed-vnc-macos.result == 'skipped') && (needs.signed-rdp-macos.result == 'success' || needs.signed-rdp-macos.result == 'skipped') && (needs.signed-mail.result == 'success' || needs.signed-mail.result == 'skipped') && (needs.signed-screenshot.result == 'success' || needs.signed-screenshot.result == 'skipped') && (needs.signed-vnc-server.result == 'success' || needs.signed-vnc-server.result == 'skipped') && (needs.signed-servers.result == 'success' || needs.signed-servers.result == 'skipped') && (needs.signed-voice.result == 'success' || needs.signed-voice.result == 'skipped') && (needs.signed-sockscap.result == 'success' || needs.signed-sockscap.result == 'skipped') && (needs.signed-rdp-server-macos.result == 'success' || needs.signed-rdp-server-macos.result == 'skipped') && needs.plan.outputs.has_macos_native == 'true' }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
       # Run all 4 planned shards in one wave within GitHub's hosted macOS limit.
       max_parallel: 4
       matrix: ${{ needs.plan.outputs.macos_native_matrix }}
+      first_release_run: ${{ inputs.first_release_run }}
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: run
@@ -430,6 +727,44 @@ jobs:
       vendor_cache: ${{ inputs.vendor_cache }}
       trusted_cache: ${{ inputs.trusted_cache }}
       run_rdp_unit_contracts: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts }}
+
+  # Keep a live copy of each completed shard while the platform jobs are still
+  # running.  The final summarize job remains the authoritative gate, but this
+  # collector makes failures and completed cases observable without waiting for
+  # every platform to finish.
+  live-shard-collector:
+    name: download completed QA shards
+    needs: plan
+    if: always() && needs.plan.result == 'success'
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_REPOSITORY: ${{ github.repository }}
+      QA_RUN_ID: ${{ github.run_id }}
+      QA_ARTIFACT_KEY: ${{ needs.plan.outputs.artifact_key }}
+      QA_HEAD: ${{ needs.plan.outputs.head }}
+      NO_PROXY: localhost,127.0.0.1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.head }}
+          persist-credentials: false
+      - name: Poll and download completed shard artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest test_ci_live_monitor
+          mkdir -p live-shards
+          python .agents/skills/qa-ui-auto/scripts/ci_live_shards.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-live-shards-${{ needs.plan.outputs.artifact_key }}
+          path: live-shards/
+          if-no-files-found: warn
+          retention-days: 14
 
   # The native packaging hook bundles the frontend on each OS. Check its TS
   # and source contracts once, including focused runs that omit Vitest.
@@ -497,7 +832,7 @@ jobs:
   summarize:
     name: qa-ui-auto-platforms-result
     if: always() && needs.plan.result != 'skipped'
-    needs: [plan, tool-contracts, sftp-contracts, selected-build-checks, frontend-contracts, execute-browser, execute-macos-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
+    needs: [plan, tool-contracts, sftp-contracts, selected-build-checks, frontend-contracts, signed-modular-packages, signed-mfa-linux, signed-mfa-windows, signed-mfa-macos, signed-vnc-linux, signed-vnc-windows, signed-vnc-macos, signed-rdp-linux, signed-rdp-windows, signed-rdp-macos, signed-mail, signed-screenshot, signed-vnc-server, signed-servers, signed-voice, signed-sockscap, signed-rdp-server-linux, signed-rdp-server-windows, signed-rdp-server-macos, execute-browser, execute-macos-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

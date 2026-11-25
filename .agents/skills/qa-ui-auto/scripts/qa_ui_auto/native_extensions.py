@@ -12,6 +12,65 @@ RegisterVerb = Callable[[str], Callable[[NativeVerb], NativeVerb]]
 
 
 def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
+    from .core_profile_observation import run as assert_core_profile_generation
+    from .core_profile_observation import assert_headless_profile_blocked
+    register_verb("assert_core_profile_generation")(assert_core_profile_generation)
+    register_verb("assert_headless_profile_blocked")(assert_headless_profile_blocked)
+    from .module_backup_observation import run as module_backup_probe
+    register_verb("module_backup_probe")(module_backup_probe)
+    from .module_live_backup_observation import run as module_live_backup_probe
+    register_verb("module_live_backup_probe")(module_live_backup_probe)
+    from .module_restore_observation import run as module_restore_probe
+    register_verb("module_restore_probe")(module_restore_probe)
+    from .restore_relaunch import run as native_confirm_restore_relaunch
+    from .restore_relaunch import run_mfa as native_confirm_mfa_upgrade_relaunch
+    register_verb("native_confirm_restore_relaunch")(native_confirm_restore_relaunch)
+    register_verb("native_confirm_mfa_upgrade_relaunch")(native_confirm_mfa_upgrade_relaunch)
+    from .module_signed_observation import run as module_signed_probe
+    register_verb("module_signed_probe")(module_signed_probe)
+    from .module_execution_observation import run as module_execution_probe
+    register_verb("module_execution_probe")(module_execution_probe)
+    from .module_vnc_key_observation import run as assert_vnc_key_helper
+    register_verb("assert_vnc_key_helper")(assert_vnc_key_helper)
+    from .module_mail_observation import run as assert_signed_mail_host
+    register_verb("assert_signed_mail_host")(assert_signed_mail_host)
+    from .module_mfa_lifecycle_observation import run as assert_signed_mfa_lifecycle
+    register_verb("assert_signed_mfa_lifecycle")(assert_signed_mfa_lifecycle)
+    from .module_business_lifecycle_observation import run as assert_signed_module_lifecycle
+    register_verb("assert_signed_module_lifecycle")(assert_signed_module_lifecycle)
+    from .module_mfa_backup_observation import run as assert_signed_mfa_backup
+    register_verb("assert_signed_mfa_backup")(assert_signed_mfa_backup)
+    from .module_sockscap_observation import run as assert_signed_sockscap_host, resource_fixture
+    from .sockscap_redirector_observation import run as assert_signed_redirector_bridge
+    register_verb("assert_signed_redirector_bridge")(assert_signed_redirector_bridge)
+    from .fixtures.sockscap_redirector import check_archive
+    register_verb("redirector_installer_fixture")(check_archive)
+    from .module_sockscap_observation import show_section
+    register_verb("assert_signed_sockscap_host")(assert_signed_sockscap_host)
+    register_verb("sockscap_resource_fixture")(resource_fixture)
+    from .sockscap_windows_observation import run as assert_signed_windows_capture
+    register_verb("assert_signed_windows_capture")(assert_signed_windows_capture)
+    register_verb("show_sockscap_section")(lambda ctx, args: show_section(ctx, args, mode="native"))
+    from .module_screenshot_observation import run as assert_signed_screenshot_host
+    register_verb("assert_signed_screenshot_host")(assert_signed_screenshot_host)
+    from .module_vnc_server_observation import run as assert_signed_vnc_daemon
+    register_verb("assert_signed_vnc_daemon")(assert_signed_vnc_daemon)
+    from .module_rdp_server_observation import run as assert_signed_rdp_server
+    register_verb("assert_signed_rdp_server")(assert_signed_rdp_server)
+    from .servers_http_observation import run as assert_local_servers_http
+    register_verb("assert_local_servers_http")(assert_local_servers_http)
+    from .servers_ssh_observation import run as assert_local_servers_ssh
+    register_verb("assert_local_servers_ssh")(assert_local_servers_ssh)
+    from .module_servers_observation import run as assert_signed_servers_host
+    register_verb("assert_signed_servers_host")(assert_signed_servers_host)
+    from .rdp_helpers.signed_viewer_latency import run as assert_signed_rdp_latency
+    register_verb("assert_signed_rdp_latency")(assert_signed_rdp_latency)
+    from .module_download_observation import run as module_download_probe
+    register_verb("module_download_probe")(module_download_probe)
+    from .module_marketplace_observation import run as module_marketplace_probe
+    register_verb("module_marketplace_probe")(module_marketplace_probe)
+    from .module_upgrade_observation import run as module_upgrade_probe
+    register_verb("module_upgrade_probe")(module_upgrade_probe)
     from .native_editor_probes import register as editor_probes
     from .terminal_rendering_probe import register_native as terminal_rendering
     from .mobile_native import register as mobile

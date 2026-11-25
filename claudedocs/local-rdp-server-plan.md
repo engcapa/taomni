@@ -104,7 +104,7 @@
 
 - 捕获线程 `!Send` 约束与现有 display 线程模型对齐。  
 - 避免引入 AGPL 依赖；可参考公开 DXGI 示例与 RustDesk 架构思路，不 vendor 其源码。  
-- 与 LanChat 屏幕共享复用 `Capturer` trait 的路径保持兼容（`pub(crate) mod capture`）。
+- 屏幕共享复用 `Capturer` trait 的路径保持兼容（`pub(crate) mod capture`）。
 
 **依赖**：R0 建议并行  
 **风险**：高（DXGI 设备丢失、全屏独占游戏、混合 DPI）
@@ -258,7 +258,7 @@ R0 可观测性 ──┬── R1 Windows 捕获 ⭐ ──→  Win 可用
 
 - RDP 只做桌面共享；Shell/SFTP 见 `local-ssh-server-plan.md`。  
 - 共享：Local servers 窗口、配置库、`ServerRegistry`、事件通道。  
-- 捕获模块可能被 LanChat 屏幕共享复用——改 trait 时保持 `pub(crate)` 契约。
+- 捕获模块可能被屏幕共享复用——改 trait 时保持 `pub(crate)` 契约。
 
 ---
 

@@ -1,6 +1,5 @@
 use super::lifetime::start_local_server;
 use super::model::ServerType;
-use super::persistence::load_server_configs;
 use crate::servers::db;
 use crate::servers::rdp;
 use crate::state::AppState;
@@ -25,9 +24,9 @@ pub(super) fn rdp_autostart_allowed(config: &serde_json::Value) -> bool {
 /// `startOnLaunch=true`. Errors are logged but never abort startup; each
 /// failure still surfaces via the normal `server://status/<type>` event.
 pub async fn autostart_servers(app: AppHandle) {
-    let configs = {
+    let mut configs = {
         let state: State<AppState> = app.state();
-        let db = match state.db.lock() {
+        let db = match state.core.db.lock() {
             Ok(db) => db,
             Err(e) => {
                 tracing::warn!("autostart servers: db lock: {}", e);
@@ -42,6 +41,15 @@ pub async fn autostart_servers(app: AppHandle) {
             }
         }
     };
+    super::local_config::project(&app.state::<AppState>(), &mut configs);
+    if let Err(error) = super::vnc_config::project(&app.state::<AppState>(), &mut configs) {
+        configs.remove("vnc");
+        tracing::warn!("autostart VNC Server: {error}");
+    }
+    if let Err(error) = super::rdp_config::project(&app.state::<AppState>(), &mut configs) {
+        configs.remove(ServerType::Rdp.as_str());
+        tracing::warn!("autostart RDP Server: {error}");
+    }
 
     for (type_str, value) in configs {
         // Only autostart entries explicitly flagged for it.

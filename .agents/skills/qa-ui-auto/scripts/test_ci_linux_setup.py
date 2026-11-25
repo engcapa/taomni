@@ -87,6 +87,28 @@ raise SystemExit(int(os.environ.get('QA_APT_EXIT_CODE', '0')))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(list(self.apt.iterdir()), [])
 
+    def test_wayland_browser_platform_persists_for_later_mobile_steps(self):
+        github_env = self.root / "github-env"
+        self.env["GITHUB_ENV"] = str(github_env)
+        self.env.pop("PLAYWRIGHT_HOST_PLATFORM_OVERRIDE", None)
+        command = ('source "$1"; configure_playwright_platform "$2"; '
+                   'printf "%s" "${PLAYWRIGHT_HOST_PLATFORM_OVERRIDE:-}"')
+        for profile in ("ubuntu-24.04-xvfb", "ubuntu-22.04-x11"):
+            result = subprocess.run(["bash", "-euc", command, "qa-playwright-test",
+                                     str(SCRIPT), profile], env=self.env,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "")
+            self.assertFalse(github_env.exists())
+        result = subprocess.run(["bash", "-euc", command, "qa-playwright-test",
+                                 str(SCRIPT), "ubuntu-26.04-wayland"], env=self.env,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "ubuntu24.04-x64")
+        self.assertEqual(github_env.read_text(),
+                         "PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64\n")
+        self.assertFalse(self.log.exists())
+
     def test_setup_skips_runtime_packages_and_installs_lld_on_build(self):
         setup_script = Path(__file__).with_name("ci_linux_setup.sh")
         cases = {}

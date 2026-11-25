@@ -1,0 +1,25 @@
+[package]
+name = "taomni-download-gates"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[dependencies]
+taomni-plugin-api = { path = "../taomni-plugin-api" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "sync", "time"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream", "socks"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rustls-platform-verifier = "0.7"
+futures = "0.3"
+sha2 = "0.11"
+log = "0.4"
+
+[dev-dependencies]
+rcgen = "0.14"
+tempfile = "3"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }

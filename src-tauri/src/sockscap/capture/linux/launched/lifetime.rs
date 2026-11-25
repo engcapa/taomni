@@ -3,8 +3,6 @@ use super::model::LaunchedAppInfo;
 use super::model::LaunchedAppPhase;
 use super::model::LaunchedProcess;
 use super::model::TerminalActivityReader;
-use super::preparation::materialize_launcher;
-use super::preparation::preflight;
 use super::preparation::prepare_launch;
 use super::process_groups::kill_process_group;
 use super::process_groups::process_group_is_alive;
@@ -35,8 +33,22 @@ pub struct LaunchedCaptureHandle {
 }
 
 impl LaunchedCaptureHandle {
-    pub async fn start(ctx: Arc<RwLock<RelayContext>>, runtime_dir: &Path) -> Result<Self, String> {
-        let launcher_path = materialize_launcher(runtime_dir)?;
+    pub async fn start(
+        ctx: Arc<RwLock<RelayContext>>,
+        launcher_path: PathBuf,
+    ) -> Result<Self, String> {
+        let meta = std::fs::symlink_metadata(&launcher_path).map_err(|error| {
+            format!(
+                "inspect SocksCap Linux trace launcher {}: {error}",
+                launcher_path.display()
+            )
+        })?;
+        if meta.file_type().is_symlink() || !meta.is_file() {
+            return Err(format!(
+                "Invalid SocksCap Linux trace launcher path: {}",
+                launcher_path.display()
+            ));
+        }
         super::super::tracer::preflight(&launcher_path).map_err(|error| {
             format!("Linux rootless application capture is unavailable: {error}")
         })?;

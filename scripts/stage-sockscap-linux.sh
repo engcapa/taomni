@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Linux SocksCap bundle preflight.
 #
-# Tauri copies `resources/sockscap/**/*` itself. Do not copy files directly
+# Tauri copies the Linux SocksCap resources itself. Do not copy files directly
 # into target/bundle here: Tauri can recreate that directory later in the same
 # build. This script verifies the Linux runtime material and package metadata
 # before Tauri produces DEB/RPM/AppImage artifacts.
@@ -20,11 +20,12 @@ if [[ "${1:-}" != "--check" && $# -ne 0 ]]; then
   exit 2
 fi
 
+platform_config="$repo_root/src-tauri/tauri.linux.conf.json"
 config="$repo_root/src-tauri/tauri.conf.json"
 runtime_doc="$repo_root/src-tauri/resources/sockscap/linux/README.md"
 
 test -f "$runtime_doc"
-grep -Fq 'resources/sockscap/**/*' "$config"
+grep -Fq 'resources/sockscap/linux/README.md' "$platform_config"
 grep -Fq '"nftables"' "$config"
 
 echo "Linux SocksCap bundle preflight passed: nftables dependency and runtime documentation are staged by Tauri resources."

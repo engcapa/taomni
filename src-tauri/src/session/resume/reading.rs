@@ -66,7 +66,7 @@ pub(super) fn load_record(conn: &Connection) -> Result<Option<RunSnapshotRecord>
 pub async fn get_welcome_run_snapshot(
     state: tauri::State<'_, crate::state::AppState>,
 ) -> Result<GetRunSnapshotResponse, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     get_run_snapshot(&db)
 }
 

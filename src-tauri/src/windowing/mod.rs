@@ -9,7 +9,7 @@
 //! The frontend handoff layer
 //! (`src/lib/detachedSession.ts` + `DetachedSessionWindow` / tool-window
 //! routes) is the source of truth for which `kind` strings are valid.
-//! Supported kinds: sftp, rdp, vnc, terminal, database, lan-chat, notes,
+//! Supported kinds: sftp, rdp, vnc, terminal, database, notes,
 //! servers. Anything else lands in the catch-all error branch below.
 
 pub(crate) mod thread_delivery;
@@ -26,9 +26,6 @@ fn default_size(kind: &str) -> (f64, f64, f64, f64) {
         "terminal" => (1024.0, 680.0, 640.0, 360.0),
         "database" => (1280.0, 820.0, 780.0, 480.0),
         "notes" => (260.0, 320.0, 220.0, 220.0),
-        // A detached LanChat window mirrors the main panel's two-pane
-        // layout (≈252px roster + conversation), so it needs room for both.
-        "lan-chat" => (820.0, 620.0, 600.0, 440.0),
         // SFTP keeps its historical default so existing user layouts
         // don't shift after the migration.
         "sftp" => (1200.0, 760.0, 720.0, 420.0),
@@ -46,7 +43,7 @@ fn label_for(kind: &str, session_id: &str) -> String {
 
 fn validate_kind(kind: &str) -> Result<(), String> {
     match kind {
-        "sftp" | "rdp" | "vnc" | "terminal" | "database" | "lan-chat" | "notes" => Ok(()),
+        "sftp" | "rdp" | "vnc" | "terminal" | "database" | "notes" | "plugin" => Ok(()),
         other => Err(format!("unsupported detached window kind: {}", other)),
     }
 }
@@ -96,7 +93,6 @@ pub async fn open_detached_window(
         "vnc" => format!("VNC — {}", session_id),
         "terminal" => format!("Terminal — {}", session_id),
         "database" => format!("Database — {}", session_id),
-        "lan-chat" => "内网通讯".to_string(),
         "notes" => "便签".to_string(),
         _ => session_id.clone(),
     });

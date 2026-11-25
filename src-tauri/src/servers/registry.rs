@@ -17,6 +17,7 @@ pub struct ActiveServer {
     pub task: JoinHandle<()>,
     pub auto_stop_task: Option<JoinHandle<()>>,
     pub status: ServerStatus,
+    pub(super) wait_for_stop: bool,
     pub(super) _process_lock: ModuleLock,
 }
 
@@ -29,7 +30,11 @@ pub(super) const LOG_HISTORY_LINES: usize = 500;
 pub struct ServerRegistry {
     pub running: AsyncMutex<HashMap<ServerType, ActiveServer>>,
     pub statuses: AsyncMutex<HashMap<ServerType, ServerStatus>>,
-    pub(crate) rdp_approvals: std::sync::Arc<rdp::ApprovalBroker>,
+    pub(super) vnc_settings: AsyncMutex<()>,
+    pub(super) rdp_settings: AsyncMutex<()>,
+    pub(super) local_settings: AsyncMutex<()>,
+    #[cfg(feature = "legacy-rdp-server")]
+    pub(crate) rdp_approvals: std::sync::Arc<taomni_rdp_server_engine::ApprovalBroker>,
     /// Recent `server://output/<type>` lines, oldest first.
     pub(super) logs: std::sync::Mutex<HashMap<ServerType, VecDeque<String>>>,
 }
@@ -40,7 +45,7 @@ pub async fn resolve_rdp_connection_request(
     request_id: String,
     approved: bool,
 ) -> Result<bool, String> {
-    Ok(state.servers.rdp_approvals.resolve(&request_id, approved))
+    rdp::resolve_approval(&state, request_id, approved).await
 }
 
 impl ServerRegistry {
@@ -80,13 +85,13 @@ impl ServerRegistry {
 /// Recent log lines of every server that logged since the app started.
 #[tauri::command]
 pub fn list_server_logs(state: State<'_, AppState>) -> HashMap<String, Vec<String>> {
-    state.servers.log_history()
+    state.legacy.servers.log_history()
 }
 
 #[tauri::command]
 pub fn clear_server_log(state: State<'_, AppState>, server_type: String) -> Result<(), String> {
     let st = ServerType::from_str(&server_type)
         .ok_or_else(|| format!("unknown server type: {}", server_type))?;
-    state.servers.clear_log(st);
+    state.legacy.servers.clear_log(st);
     Ok(())
 }

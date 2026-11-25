@@ -98,10 +98,19 @@ pub(super) fn resolve_rdp_password(
         .get("passwordRef")
         .and_then(|value| value.as_str())
         .ok_or_else(|| "RDP server password is not stored in the credential vault".to_string())?;
-    let password = state
-        .vault
-        .resolve(reference)?
-        .ok_or_else(|| "invalid RDP server password vault reference".to_string())?;
+    let password = if state
+        .plugins
+        .get(taomni_server_process::rdp::SLUG)
+        .is_some()
+    {
+        state
+            .core
+            .vault
+            .resolve_for_kind(reference, RDP_PASSWORD_KIND)
+    } else {
+        state.core.vault.resolve(reference)
+    }?
+    .ok_or_else(|| "invalid RDP server password vault reference".to_string())?;
     config.extra.insert(
         "password".to_string(),
         serde_json::Value::String(password.to_string()),

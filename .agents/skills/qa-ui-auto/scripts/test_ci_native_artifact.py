@@ -86,6 +86,17 @@ class NativeArtifactTests(unittest.TestCase):
         for name in ('../outside','/absolute','src-tauri/target/qa-ui-auto/debug/../../escape','C:/escape','src-tauri/target/qa-ui-auto/release/taomni'):
             self.assertFalse(runtime.allowed(name,'debug'),name)
 
+    def test_signed_mail_build_rejects_legacy_runtime_from_matching_source(self):
+        reusable = self.root / 'reusable.tar.gz'
+        runtime.export_reusable(reusable, self.selection, self.build)
+        self.build['capabilities'] = ['signed-mail']
+        with self.assertRaisesRegex(ValueError, 'build recipe differs'):
+            runtime.export(self.archive, self.selection, self.build)
+        with self.assertRaisesRegex(ValueError, 'identity differs'):
+            runtime.install_reusable(reusable, self.selection, self.build)
+        self.build['capabilities'].append('legacy-mail-imap')
+        runtime.install_reusable(reusable, self.selection, self.build)
+
     def test_reusable_roundtrip_serves_new_run_and_rejects_recipe_or_source_drift(self):
         reusable = self.root / 'reusable.tar.gz'
         runtime.export_reusable(reusable, self.selection, self.build)
@@ -129,7 +140,7 @@ class NativeArtifactTests(unittest.TestCase):
                                 '--build', self.build['id'], '--archive', str(self.archive),
                                 '--reusable-archive', str(reusable)]):
             runtime.main()
-            build_qa.assert_called_once_with(release=False)
+            build_qa.assert_called_once_with(release=False, signed_mail=False, modular_release=False)
         self.assertTrue(reusable.is_file())
         self.binary.unlink()
         self.sidecar.unlink()

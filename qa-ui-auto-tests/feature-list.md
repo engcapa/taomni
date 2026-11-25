@@ -1,5 +1,581 @@
 # Taomni 已完成功能清单
 
+<!-- feature
+id: F-Modules-1
+status: partial
+area: modules/core-startup
+components: [PluginRegistry, MigrationJournal]
+files:
+  - src/lib/pluginRegistry.ts
+  - src/components/settings/ModuleMarketplace.tsx
+  - src/components/settings/ModuleSocksCapRecovery.tsx
+  - src/components/statusbar/SocksCapRecoveryStatus.tsx
+  - src/lib/sockscap/useRecoveryStatus.ts
+  - src/components/plugins/ModuleReleaseNotice.tsx
+  - src/stores/moduleMarketplaceStore.ts
+  - src/lib/ipc/plugin.ts
+  - src-tauri/src/commands/plugin_marketplace.rs
+  - src-tauri/src/plugin/marketplace.rs
+  - src-tauri/src/plugin/release_state.rs
+  - src/lib/pluginDataContract.ts
+  - src/lib/pluginLoader.ts
+  - src/lib/pluginFrontendHost.ts
+  - src/lib/pluginTabs.ts
+  - src/lib/pluginTabPersistence.ts
+  - src/stores/pluginFrontendStore.ts
+  - src/components/plugins/PluginTabPane.tsx
+  - src/components/plugins/PluginUnavailablePane.tsx
+  - src/components/plugins/ModuleTabActions.tsx
+  - src/lib/moduleStore.ts
+  - src/stores/moduleStore.ts
+  - src/stores/moduleInstallStore.ts
+  - src/stores/moduleNetworkStore.ts
+  - src/stores/moduleDownloadStore.ts
+  - src/components/settings/ModuleOfflineInstall.tsx
+  - src/components/settings/ModuleNetworkSettings.tsx
+  - src/components/settings/ModuleDownloads.tsx
+  - src-tauri/src/commands/plugin_network.rs
+  - src-tauri/src/plugin/network.rs
+  - src-tauri/src/plugin/mod.rs
+  - src-tauri/src/plugin/host.rs
+  - src-tauri/src/plugin/install.rs
+  - src-tauri/src/plugin/data_contract.rs
+  - src-tauri/src/plugin/retained_data.rs
+  - src-tauri/src/plugin/uninstallation.rs
+  - src-tauri/src/plugin/migration.rs
+  - src-tauri/src/plugin/migration_preflight.rs
+  - src-tauri/src/migrate.rs
+  - src-tauri/src/plugin/migration_database.rs
+  - src-tauri/src/plugin/migration_source.rs
+controls:
+  - id: module-marketplace
+    selector: '[data-testid="module-marketplace"]'
+    kind: display
+  - id: module-marketplace-search
+    selector: '[data-testid="module-marketplace-search"]'
+    kind: interactive
+  - id: module-marketplace-refresh
+    selector: '[data-testid="module-marketplace-refresh"]'
+    kind: interactive
+  - id: module-marketplace-source-toggle
+    selector: '[data-testid="module-marketplace-source-toggle"]'
+    kind: interactive
+  - id: module-marketplace-source
+    selector: '[data-testid="module-marketplace-source"]'
+    kind: interactive
+  - id: module-marketplace-loading
+    selector: '[data-testid="module-marketplace-loading"]'
+    kind: display
+    optional: true # transient catalog request; mounted ownership tests verify pending state
+  - id: module-marketplace-error
+    selector: '[data-testid="module-marketplace-error"]'
+    aliases:
+    - 'xpath=//*[@data-testid="module-marketplace-error"][contains(., "older than the highest seen")]'
+    kind: display
+  - id: module-marketplace-checked
+    selector: '[data-testid="module-marketplace-checked"]'
+    kind: display
+  - id: module-marketplace-empty
+    selector: '[data-testid="module-marketplace-empty"]'
+    kind: display
+  - id: module-marketplace-card
+    selector: '[data-testid="module-marketplace-card"]'
+    kind: display
+  - id: module-marketplace-installed
+    selector: '[data-testid="module-marketplace-installed"]'
+    kind: display
+  - id: module-marketplace-unavailable
+    selector: '[data-testid="module-marketplace-unavailable"]'
+    kind: display
+    optional: true # native platform support depends on the signed feed; mounted unit covers missing platform assets
+  - id: module-marketplace-task
+    selector: '[data-testid="module-marketplace-task"]'
+    kind: display
+  - id: module-marketplace-action-error
+    selector: '[data-testid="module-marketplace-action-error"]'
+    kind: display
+    optional: true # native command failure is covered by store unit; UI tamper flow also covers catalog errors
+  - id: module-marketplace-current
+    selector: '[data-testid="module-marketplace-current"]'
+    kind: display
+    aliases:
+    - '[data-module-id="taomni-plugin-rdp-client"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-rdp-server"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-vnc-client"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-vnc-server"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-current"]'
+    - '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-current"]'
+  - id: module-marketplace-mfa-current
+    selector: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
+    kind: display
+  - id: module-marketplace-update
+    selector: '[data-testid="module-marketplace-update"]'
+    kind: display
+    aliases:
+    - '[data-module-id="taomni-plugin-rdp-client"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-rdp-server"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-vnc-client"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-vnc-server"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-update"]'
+    - '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-update"]'
+  - id: module-marketplace-new
+    selector: '[data-testid="module-marketplace-new"]'
+    kind: display
+  - id: module-release-notice
+    selector: '[data-testid="module-release-notice"]'
+    kind: display
+  - id: module-release-new
+    selector: '[data-testid="module-release-new"]'
+    kind: display
+  - id: module-release-new-item
+    selector: '[data-testid="module-release-new-item"]'
+    kind: display
+  - id: module-release-mfa
+    selector: '[data-testid="module-release-mfa"]'
+    kind: display
+  - id: module-release-open-store
+    selector: '[data-testid="module-release-open-store"]'
+    kind: interactive
+  - id: module-release-later
+    selector: '[data-testid="module-release-later"]'
+    kind: interactive
+  - id: module-release-legacy
+    selector: '[data-testid="module-release-legacy"]'
+    kind: display
+    optional: true # automatic installation can complete before the next rendered frame
+  - id: module-marketplace-provision
+    selector: '[data-testid="module-marketplace-provision"]'
+    kind: interactive
+    optional: true # signed transfer interruption is also covered by shared download controls
+  - id: module-marketplace-mail-import-failed
+    selector: '[data-testid="module-marketplace-mail-import-failed"]'
+    kind: display
+  - id: module-marketplace-review
+    selector: '[data-testid="module-marketplace-review"]'
+    kind: interactive
+    aliases:
+    - '[data-module-id="taomni-plugin-rdp-client"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-rdp-server"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-vnc-client"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-vnc-server"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-review"]'
+    - '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-review"]'
+  - id: module-marketplace-download
+    selector: '[data-testid="module-marketplace-download"]'
+    kind: interactive
+    aliases:
+    - '[data-module-id="taomni-plugin-rdp-client"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-rdp-server"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-vnc-client"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-vnc-server"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-servers"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-sockscap"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-screenshot"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-ai-voice-local"] [data-testid="module-marketplace-download"]'
+    - '[data-module-id="taomni-plugin-mail"] [data-testid="module-marketplace-download"]'
+  - id: module-network-settings
+    selector: '[data-testid="module-network-settings"]'
+    kind: display
+  - id: module-network-mode
+    selector: '[data-testid="module-network-mode"]'
+    kind: interactive
+  - id: module-network-custom
+    selector: '[data-testid="module-network-custom"]'
+    kind: display
+  - id: module-network-save-status
+    selector: '[data-testid="module-network-save-status"]'
+    kind: display
+  - id: module-network-retry
+    selector: '[data-testid="module-network-retry"]'
+    kind: interactive
+  - id: module-downloads
+    selector: '[data-testid="module-downloads"]'
+    kind: display
+  - id: module-downloads-empty
+    selector: '[data-testid="module-downloads-empty"]'
+    kind: display
+  - id: module-downloads-error
+    selector: '[data-testid="module-downloads-error"]'
+    kind: display
+    optional: true # transient native IPC failure; retained-task unit regression
+  - id: module-download-recovery-error
+    selector: '[data-testid="module-download-recovery-error"]'
+    kind: display
+  - id: module-download-task
+    selector: '[data-testid="module-download-task"]'
+    kind: display
+  - id: module-download-phase
+    selector: '[data-testid="module-download-phase"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-known"][data-phase="downloading"] [data-testid="module-download-phase"]'
+    kind: display
+  - id: module-download-progress
+    selector: '[data-testid="module-download-progress"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-progress"]'
+      - '[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-progress"]'
+    kind: display
+  - id: module-download-bytes
+    selector: '[data-testid="module-download-bytes"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-bytes"]'
+      - '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-bytes"]'
+    kind: display
+  - id: module-download-error
+    selector: '[data-testid="module-download-error"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-error"]'
+      - '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-error"]'
+    kind: display
+  - id: module-download-cancel
+    selector: '[data-testid="module-download-cancel"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-cancel"]'
+      - '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-cancel"]'
+    kind: interactive
+  - id: module-download-resume
+    selector: '[data-testid="module-download-resume"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-resume"]'
+      - '[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-resume"]'
+      - '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-resume"]'
+    kind: interactive
+  - id: module-download-forget
+    selector: '[data-testid="module-download-forget"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-forget"]'
+      - '[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-forget"]'
+      - '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-forget"]'
+    kind: interactive
+  - id: removed-lanchat-context-entry
+    selector: '[data-testid="context-menu-item-lan-chat"]'
+    kind: display
+  - id: removed-lanchat-welcome-entry
+    selector: '[data-testid="welcome-open-lanchat"]'
+    kind: display
+  - id: removed-lanchat-home-card
+    selector: '[data-testid="tao-home-lan-chat"]'
+    kind: display
+  - id: module-store-panel
+    selector: '[data-testid="module-store-panel"]'
+    kind: display
+  - id: status-sockscap-recovery
+    selector: '[data-testid="status-sockscap-recovery"]'
+    kind: interactive
+    optional: true
+  - id: module-sockscap-recovery
+    selector: '[data-testid="module-sockscap-recovery"]'
+    kind: display
+    optional: true
+  - id: module-sockscap-recover
+    selector: '[data-testid="module-sockscap-recover"]'
+    kind: interactive
+    optional: true
+  - id: module-store-core-api
+    selector: '[data-testid="module-store-core-api"]'
+    kind: display
+  - id: module-store-empty
+    selector: '[data-testid="module-store-empty"]'
+    kind: display
+  - id: module-store-catalog-error
+    selector: '[data-testid="module-store-catalog-error"]'
+    kind: display
+  - id: module-store-loading
+    selector: '[data-testid="module-store-loading"]'
+    kind: display
+  - id: module-upgrade-status
+    selector: '[data-testid="module-upgrade-status"]'
+    kind: display
+  - id: module-upgrade-candidates
+    selector: '[data-testid="module-upgrade-candidates"]'
+    aliases:
+      - '[data-testid="module-upgrade-candidates"] li'
+    kind: display
+  - id: module-upgrade-empty
+    selector: '[data-testid="module-upgrade-empty"]'
+    kind: display
+  - id: module-upgrade-error
+    selector: '[data-testid="module-upgrade-error"]'
+    kind: display
+  - id: module-upgrade-migrate
+    selector: '[data-testid="module-upgrade-migrate"]'
+    aliases:
+      - '[data-testid="module-upgrade-migrate"]:not([disabled])'
+    kind: interactive
+  - id: module-upgrade-pending
+    selector: '[data-testid="module-upgrade-pending"]'
+    kind: display
+  - id: module-upgrade-retained
+    selector: '[data-testid="module-upgrade-retained"]'
+    kind: display
+  - id: module-upgrade-mfa-open
+    selector: '[data-testid="module-upgrade-mfa-open"]'
+    kind: interactive
+  - id: module-upgrade-mfa-form
+    selector: '[data-testid="module-upgrade-mfa-form"]'
+    kind: display
+  - id: module-upgrade-mfa-archive
+    selector: '[data-testid="module-upgrade-mfa-archive"]'
+    kind: interactive
+  - id: module-upgrade-mfa-signature
+    selector: '[data-testid="module-upgrade-mfa-signature"]'
+    kind: interactive
+  - id: module-upgrade-mfa-choose-archive
+    selector: '[data-testid="module-upgrade-mfa-choose-archive"]'
+    kind: interactive
+  - id: module-upgrade-mfa-choose-signature
+    selector: '[data-testid="module-upgrade-mfa-choose-signature"]'
+    kind: interactive
+  - id: module-upgrade-mfa-password
+    selector: '[data-testid="module-upgrade-mfa-password"]'
+    kind: interactive
+  - id: module-upgrade-mfa-submit
+    selector: '[data-testid="module-upgrade-mfa-submit"]'
+    aliases:
+      - '[data-testid="module-upgrade-mfa-submit"][disabled]'
+      - '[data-testid="module-upgrade-mfa-submit"]:not([disabled])'
+    kind: interactive
+  - id: module-upgrade-mfa-cancel
+    selector: '[data-testid="module-upgrade-mfa-cancel"]'
+    kind: interactive
+  - id: module-upgrade-mfa-error
+    selector: '[data-testid="module-upgrade-mfa-error"]'
+    kind: display
+  - id: module-upgrade-mfa-result
+    selector: '[data-testid="module-upgrade-mfa-result"]'
+    aliases:
+      - '[data-testid="module-upgrade-mfa-result"][data-state="complete"]'
+    kind: display
+  - id: module-offline-install
+    selector: '[data-testid="module-offline-install"]'
+    kind: display
+  - id: module-offline-archive
+    selector: '[data-testid="module-offline-archive"]'
+    kind: interactive
+  - id: module-offline-choose
+    selector: '[data-testid="module-offline-choose"]'
+    kind: interactive
+  - id: module-offline-signature
+    selector: '[data-testid="module-offline-signature"]'
+    kind: interactive
+  - id: module-offline-submit
+    selector: '[data-testid="module-offline-submit"]'
+    kind: interactive
+  - id: module-offline-error
+    selector: '[data-testid="module-offline-error"]'
+    kind: display
+  - id: module-offline-status
+    selector: '[data-testid="module-offline-status"]'
+    kind: display
+  - id: module-offline-refresh-error
+    selector: '[data-testid="module-offline-refresh-error"]'
+    kind: display
+  - id: module-version-hello-plugin
+    selector: '[data-testid="module-version-hello-plugin"]'
+    kind: display
+  - id: module-status-hello-plugin
+    selector: '[data-testid="module-status-hello-plugin"]'
+    kind: display
+  - id: module-action-rollback-hello-plugin
+    selector: '[data-testid="module-action-rollback-hello-plugin"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="module-action-rollback-rdp-client"]'
+    - '[data-testid="module-action-rollback-rdp-client"]:enabled'
+    - '[data-testid="module-action-rollback-rdp-server"]'
+    - '[data-testid="module-action-rollback-rdp-server"]:enabled'
+    - '[data-testid="module-action-rollback-vnc-client"]'
+    - '[data-testid="module-action-rollback-vnc-client"]:enabled'
+    - '[data-testid="module-action-rollback-vnc-server"]'
+    - '[data-testid="module-action-rollback-vnc-server"]:enabled'
+    - '[data-testid="module-action-rollback-mfa"]'
+    - '[data-testid="module-action-rollback-servers"]'
+    - '[data-testid="module-action-rollback-sockscap"]'
+    - '[data-testid="module-action-rollback-screenshot"]'
+    - '[data-testid="module-action-rollback-ai-voice-local"]'
+    - '[data-testid="module-action-rollback-mail"]'
+  - id: module-action-enable-hello-plugin
+    selector: '[data-testid="module-action-enable-hello-plugin"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="module-action-enable-mfa"]'
+    - '[data-testid="module-action-enable-vnc-client"]'
+    - '[data-testid="module-action-enable-vnc-server"]'
+    - '[data-testid="module-action-enable-rdp-client"]'
+    - '[data-testid="module-action-enable-rdp-server"]'
+    - '[data-testid="module-action-enable-servers"]'
+    - '[data-testid="module-action-enable-mail"]'
+    - '[data-testid="module-action-enable-screenshot"]'
+    - '[data-testid="module-action-enable-ai-voice-local"]'
+    - '[data-testid="module-action-enable-sockscap"]'
+  - id: module-status-mfa
+    selector: '[data-testid="module-status-mfa"]'
+    kind: display
+  - id: module-action-disable-hello-plugin
+    selector: '[data-testid="module-action-disable-hello-plugin"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="module-action-disable-mfa"]'
+    - '[data-testid="module-action-disable-vnc-client"]'
+    - '[data-testid="module-action-disable-vnc-server"]'
+    - '[data-testid="module-action-disable-rdp-client"]'
+    - '[data-testid="module-action-disable-rdp-server"]'
+    - '[data-testid="module-action-disable-servers"]'
+    - '[data-testid="module-action-disable-mail"]'
+    - '[data-testid="module-action-disable-screenshot"]'
+    - '[data-testid="module-action-disable-ai-voice-local"]'
+    - '[data-testid="module-action-disable-sockscap"]'
+  - id: module-action-uninstall-hello-plugin
+    selector: '[data-testid="module-action-uninstall-hello-plugin"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="module-action-uninstall-rdp-client"]:enabled'
+    - '[data-testid="module-action-uninstall-rdp-server"]:enabled'
+    - '[data-testid="module-action-uninstall-vnc-client"]:enabled'
+    - '[data-testid="module-action-uninstall-vnc-server"]:enabled'
+    - '[data-testid="module-action-uninstall-mfa"]'
+    - '[data-testid="module-action-uninstall-mail"]'
+    - '[data-testid="module-action-uninstall-servers"]'
+    - '[data-testid="module-action-uninstall-sockscap"]'
+    - '[data-testid="module-action-uninstall-screenshot"]'
+    - '[data-testid="module-action-uninstall-ai-voice-local"]'
+    - '[data-testid="module-action-uninstall-${fixture.module_roster_remove}"]'
+  - id: module-action-install-hello-plugin
+    selector: '[data-testid="module-action-install-hello-plugin"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="module-action-install-rdp-client"]'
+    - '[data-testid="module-action-install-rdp-server"]'
+    - '[data-testid="module-action-install-vnc-client"]'
+    - '[data-testid="module-action-install-vnc-server"]'
+    - '[data-testid="module-action-install-mfa"]'
+    - '[data-testid="module-action-install-mail"]'
+    - '[data-testid="module-action-install-servers"]'
+    - '[data-testid="module-action-install-sockscap"]'
+    - '[data-testid="module-action-install-screenshot"]'
+    - '[data-testid="module-action-install-ai-voice-local"]'
+    - '[data-testid="module-action-install-${fixture.module_roster_remove}"]'
+  - id: module-delete-data-hello-plugin
+    selector: '[data-testid="module-delete-data-hello-plugin"]'
+    kind: interactive
+  - id: module-data-retained-hello-plugin
+    selector: '[data-testid="module-data-retained-hello-plugin"]'
+    kind: display
+    aliases:
+    - '[data-testid="module-data-retained-rdp-client"]'
+    - '[data-testid="module-data-retained-rdp-server"]'
+    - '[data-testid="module-data-retained-vnc-client"]'
+    - '[data-testid="module-data-retained-vnc-server"]'
+    - '[data-testid="module-data-retained-mfa"]'
+    - '[data-testid="module-data-retained-servers"]'
+    - '[data-testid="module-data-retained-sockscap"]'
+    - '[data-testid="module-data-retained-mail"]'
+  - id: module-action-open-hello-plugin
+    selector: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+    kind: interactive
+  - id: plugin-tab-panel
+    selector: '[data-testid="plugin-tab-panel"]'
+    kind: display
+  - id: plugin-tab-unavailable
+    selector: '[data-testid="plugin-tab-unavailable"]'
+    aliases:
+      - '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+      - '[data-plugin-slug="rdp-server"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="rdp-server"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+      - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+      - '[data-plugin-slug="vnc-server"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="vnc-server"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+      - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="mfa"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+      - '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+      - '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+      - '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="plugin-tab-unavailable"][data-reason="missing"]'
+      - '[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+    kind: display
+  - id: plugin-tab-error
+    selector: '[data-testid="plugin-tab-error"]'
+    kind: display
+  - id: plugin-tab-retry
+    selector: '[data-testid="plugin-tab-retry"]'
+    kind: interactive
+  - id: plugin-tab-settings
+    selector: '[data-testid="plugin-tab-settings"]'
+    aliases:
+      - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-settings"]'
+      - '[data-plugin-slug="rdp-client"] [data-testid="plugin-tab-settings"]'
+      - '[data-plugin-slug="sockscap"] [data-testid="plugin-tab-settings"]'
+      - '[data-plugin-slug="mail"] [data-testid="plugin-tab-settings"]'
+    kind: interactive
+  - id: plugin-tab-loading
+    selector: '[data-testid="plugin-tab-loading"]'
+    kind: display
+    optional: true # transient while the independent ESM is being fetched
+  - id: hello-plugin-view
+    selector: '[data-testid="hello-plugin-view"]'
+    kind: display
+  - id: hello-plugin-value
+    selector: '[data-testid="hello-plugin-value"]'
+    kind: interactive
+  - id: hello-plugin-save
+    selector: '[data-testid="hello-plugin-save"]'
+    kind: interactive
+  - id: hello-plugin-values
+    selector: '[data-testid="hello-plugin-values"]'
+    kind: display
+  - id: hello-plugin-empty
+    selector: '[data-testid="hello-plugin-empty"]'
+    kind: display
+  - id: hello-plugin-error
+    selector: '[data-testid="hello-plugin-error"]'
+    kind: display
+    optional: true # shown only when an actual module request fails
+  - id: hello-plugin-entry
+    selector: '[data-testid="hello-plugin-entry"]'
+    kind: display
+-->
+
+模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载、宿主监督、版本目录安装状态机和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，模块商店设置入口已接入 native registry 的明确状态和旧版本升级预检状态，下载服务和具体插件迁移仍按设计文档 M0–M3 逐批交付。升级预检按实际记录区分 RDP/VNC/Servers，`server_configs` 按小写 `rdp` / `vnc` 分别归属 `rdp-server` / `vnc-server`，其余配置保留 `servers`；空表和 SSH 会话不推荐模块。`TC-MODULES-028/029` 分别覆盖混合服务端真实 SQLite/IPC 和明确 browser 模型、三项 pending、原配置与正常重启；同模块的多类旧数据仅列一次推荐，`TC-MODULES-030/031` 覆盖 RDP/VNC 会话与 RDP pin 的两个推荐、三项独立 pending，以及 native 原 pin/session 字节、正常重启和 browser reload；`TC-MODULES-025/026` 分别覆盖真实只读/pending/restart 与明确 browser 模型；`TC-MODULES-027` 仅在 GitHub 安装固定哈希的正式 0.5.10 并运行两次，由旧 binary 创建 schema，再以合成 SSH/VNC 行验证候选核心预检和 pending。027 独立核对完整旧会话与实际历史 chat/WAL 字节；Windows 旧 GUI-subsystem 进程明确作为强停恢复输入，候选核心重启必须正常退出并精确确认单个 Settings tab。此用例不代表候选安装包替换、真实 MFA exporter、激活或回滚已经通过。核心启动、删除、模块商店与升级预检回归见 `TC-MODULES-001`–`TC-MODULES-005`；`TC-MODULES-006` 保留 browser/native 未可信离线包拒绝，`TC-MODULES-007` 用生产固定公钥和 GitHub 官方签名 artifact 验证真实安装、宿主调用、启禁、重开、重启重验、篡改拒绝与卸载，并用独立 OS 非阻塞锁检查真实宿主 writer lease 的持有/释放；core 退出后 profile lease 的归属由三端真实进程 gate 另行证明。`TC-MODULES-008` 验证核心便签跨 renderer reload 与 registry 同时可用，`TC-MODULES-009` 验证 native 正常退出重启后便签和 registry 恢复，并只读真实 profile metadata，断言正常重启保留同一 generation。`TC-MODULES-010` 覆盖默认卸载取消/确认、原始数据和定位记录跨正常重启保留、可信重装不改数据、显式删除及重开设置后的真实状态；定位记录不授予执行/密钥权限，备份路径只能位于自身 data 子树。`TC-MODULES-011` 通过真实禁用和卸载后的手工任务，独立核验 v2 模块归档、SQLite WAL、源数据不变及正常重启；它不代表运行中 snapshot 协议或三态原生还原通过。`TC-MODULES-012` 验证官方签名 SDK 宿主真实写入、持有 writer 锁时的两次运行中快照、释放后继续写入与正常重启后的数据；独立核验归档 SQLite/WAL、hash、generation 与源字节，仍不代表真实 MFA 迁出或 applied restore。新用例未执行前不代表成功证据。
+
+动态前端基础接入主窗和独立 WebView：共享 React SDK、owner-scoped IPC、仅 locator 的保存恢复、启禁撤销、缺失占位和重试。`TC-MODULES-016` 验证官方签名 ESM/相对资源、真实 host 写入、非活动草稿、reload、分离窗启禁同步和回挂；`TC-MODULES-017` 以明确 browser-only model 覆盖同类 renderer 流程，不代表验签或原生存储；`TC-MODULES-018` 独立篡改已安装前端，验证原生协议拒绝、错误隔离及恢复原字节后重试。它们尚待 matching runner，不将 MFA 产品入口迁出或 TASK-007 全部验收记为完成。
+
+`TC-MODULES-027/040` 从真实安装的单体版打开旧 profile。027 自动安装 Hello 和 MFA，同时复核待迁移的 VNC journal 和旧文件。040 的日常回归使用 Hello 和 MFA。指定同源码的 `first_release_run` 后，040 自动安装该平台的全部首发业务模块，在商店卸载 Mail，重启后逐件核对剩余模块、下载次数、原有会话和历史文件。`TC-MODULES-041/045` 分别在 browser 和 native 检查新模块提示、名称和说明、稍后处理与之后主动安装。045 使用两份正式公钥可验证的 QA 目录，独立核对提示记录、实际请求、包摘要和 active 版本。
+
+`TC-MODULES-046` 从旧配置直接打开后续签名目录，核对 MFA 自动安装，以及新增的 Hello 在用户确认前只展示名称和说明。随后确认安装 Hello，核对两份包与版本指针。
+
+`TC-MODULES-047` 用含待应用备份的旧配置启动。检查原会话名称已从备份恢复，再核对首发签名目录的两份模块均自动安装。
+
+`TC-MODULES-048` 从正式 Linux 旧版界面取得真实加密 MFA 和 Vault 数据，以 v2 暂存格式验证新配置启动恢复。用例核对已恢复的模块数据库摘要、模块缺失提示、正式签名包安装和启用，以及原账号的 HOTP 续号。
+
+`TC-MODULES-049/050` 覆盖旧 Mail 会话的模块推荐。Native 核对多个账号只产生一条 pending 记录、原会话和自定义缓存保留，以及正常重启和重试后的 journal。Browser 核对重新加载设置后仍可处理同一条推荐。
+
+Mail 的签名离线升级另由 GitHub 专项覆盖。用例在旧格式配置中准备默认和自定义缓存，验证配置占用拒绝、旧文件保留、迁移 journal 以及已安装宿主读取两份缓存。
+
+Mail 宿主的跨进程用例还覆盖迁移后的完整归档原信。宿主按归档索引读取模块数据目录内的对象，校验原件后提供正文，并在重开后复核同一份原件。
+
+Mail 0.1.23 的 TC-MODULES-079 通过阅读区发送临时接受邀请与已读回执，核对 SMTP 信封、原事件 UID、原邮件 Message-ID 和 IMAP 的已处理标志。TC-MAIL-INVITE-01 与 TC-MAIL-RECEIPT-01 在 Browser 和 Native 检查对应的可见状态及回复类型。
+
+Mail 宿主跨进程用例在一份草稿写入期间提交第二份，核对单请求限制、重试及重开后的两份记录。TC-MODULES-077 在原生应用比对模块目录与旧缓存中的草稿，核对停用、重启宿主与投递后的同一行。TC-MODULES-078 验证模块启停后发件箱条目、收件人和发送时间。模板和发件箱的桌面入口由 `TC-MAIL-TEMPLATE-01` 和 `TC-MAIL-OUTBOX-01` 覆盖。
+
+`TC-MODULES-052` 检查首次自动准备 Mail 后，商店展示下次启动导入的状态。Browser 刷新后状态保留，签名升级专项通过真实启动应用迁移。
+
+`TC-MODULES-007/010/040/042` 观察真实版本目录删除。010 还确认取消永久删除时签名包和业务数据原样保留，确认后数据和定位记录消失。042 校验存在更新时卸载会释放宿主、清理所有版本并保留业务数据。043 使用浏览器模型检查取消永久删除和卸载后只提供主动安装。独立签名业务模块的双版本在线更新和离线安装、禁用和启用状态下的回滚、握手失败恢复、卸载与重装由 `TC-MODULES-103`（MFA）和 `TC-MODULES-107`–`115` 覆盖。`TC-MODULES-112/113` 检查 VNC/RDP 会话、分离窗口与输入，`TC-MODULES-114/115` 检查 RDP/VNC 服务端配置与监听释放。VNC Server 在 Linux 使用 `x11vnc`，在 Windows 和 macOS 的托管环境检查外部服务或系统共享指引。
+
+原生还原确认的自动重启由 `TC-MODULES-033/034/035` 在 Linux、Windows 和 macOS 覆盖运行、禁用与卸载保留数据三态。用例通过界面创建配对备份，变更模块数据、HOTP 和主密码，再用原生还原对话框拒绝旧密码、接受当前密码。探针观察旧进程正常退出、新进程 PID 和启动时间、可执行文件和 QA 隔离目录，再连接应用重启后的 WebView。还原后核验模块行、active 指针、generation、writer lease、原密码和 HOTP 755224。Browser `TC-BACKUP-RESTORE-001` 覆盖确认、密码错误和重复提交。独立 signed MFA 宿主在运行、禁用与卸载保留数据三态下的自动还原重启由 `TC-MODULES-104/105/106` 在 Linux、Windows 和 macOS 覆盖，核验配对 v2 备份、旧主密码拒止、`generation` 递增、`active.json` 不变与重启后 HOTP 连续性。
+
 > 本文档基于当前仓库代码、稳定 `data-testid` 目录和自动化用例维护，**仅记录已实现并接入主流程的功能**。架构与现状索引见 `DESIGN.md`、`IMPLEMENTATION_PLAN.md`。
 > 标记说明：
 > - ✅ 已完成
@@ -301,10 +877,6 @@ controls:
 - id: tao-home-dock-more
   selector: '[data-testid="tao-home-dock-more"]'
   kind: interactive
-- id: tao-home-lan-chat
-  selector: '[data-testid="tao-home-lan-chat"]'
-  kind: display
-  optional: true
 - id: tao-home-search
   selector: '[data-testid="tao-home-search"]'
   kind: interactive
@@ -1083,10 +1655,15 @@ components: [WelcomePanel]
 files:
   - src/components/WelcomePanel.tsx
   - src/components/welcome/LaunchCards.tsx
+  - src/components/welcome/BrowseModulesButton.tsx
+  - src/components/tao/home/DockRow.tsx
 controls:
   - id: panel-root
     selector: '[data-testid="welcome-panel"]'
     kind: display
+  - id: browse-modules
+    selector: '[data-testid="welcome-browse-modules"]'
+    kind: interactive
   - id: open-local-terminal
     selector: '[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]'
     kind: interactive
@@ -3366,11 +3943,15 @@ controls:
 id: F8.2
 status: done
 area: tunnel
-components: [TunnelManager, TunnelEditor]
+components: [TunnelManager, TunnelEditor, ToolsPanel]
 files:
   - src/components/tunnel/TunnelManager.tsx
   - src/components/tunnel/TunnelEditor.tsx
+  - src/components/sidebar/ToolsPanel.tsx
 controls:
+  - id: sidebar-entry
+    selector: '[data-testid="sidebar-tool-tunneling"]'
+    kind: interactive
   - id: panel-root
     selector: '[data-testid="tunnel-manager"]'
     kind: display
@@ -3506,10 +4087,17 @@ status: done
 area: vnc
 files:
   - src-tauri/src/vnc/
+  - src-tauri/crates/taomni-vnc-api/
+  - src-tauri/crates/taomni-vnc-engine/
+  - src-tauri/plugins/vnc-client/
 controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas surface is owned by F9.6
 -->
 
-- Rust 端 VNC 模块：`src-tauri/src/vnc/{mod,rfb,tls,ws,encodings,tight,pixel,quality,framebuffer,clipboard,error,limits,policy,queue,keyboard_hook,native_pointer}.rs`
+- `taomni-vnc-engine` 提供 RFB 握手、协议编解码、画质策略、帧队列、WebSocket relay 和 Windows 系统光标采样。桌面适配层 `src-tauri/src/vnc/` 提供 IPC、会话记录和代理连接。启用已安装的 VNC Client 模块后，宿主负责认证和帧转发。
+- `taomni-vnc-api` 提供核心与宿主共用的连接参数、错误和经认证的转发协议。关闭 `legacy-vnc-client` 的核心调用已启用的签名宿主。
+- 宿主专项检查转发凭据、连接探测、帧像素、取消和 TCP/WS 释放。TC-MODULES-053 验证签名安装、禁用时关闭连接及重新启用后恢复原标签。TC-156 验证关闭标签时释放原连接，重开后重新认证、绘制和发送输入。TC-151 和原有剪贴板用例继续覆盖认证与会话。
+- TC-MODULES-055 从 Windows 模块商店安装签名包，核对聚焦 VNC 画布后辅助进程的实际路径、摘要和父进程。禁用后检查宿主、辅助进程及 RFB 连接都已退出，原核心进程仍存活。
+- TC-MODULES-027 从正式 0.5.10 的 profile 核对签名 VNC 模块可读取原会话记录。启用后记录原位保留，journal 指向核心会话数据库。完整旧行和 LanChat 历史文件摘要参与检查。
 - Tauri 命令：`vnc_connect / vnc_cancel_connect / vnc_disconnect / vnc_test_connection / vnc_create_detach_claim / vnc_consume_detach_claim / vnc_set_special_key_capture / vnc_special_key_capture_status`
 - 本地动态端口 WebSocket relay：VNC server ↔ 前端 Canvas（前端不再直接持有 TCP 套接字）
 
@@ -3539,7 +4127,7 @@ controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas su
 
 ### 9.5 输入处理 ✅
 - 鼠标：左/中/右键、滚轮、拖拽（pointer capture）；Windows 上画布无按键时 relay 直接采样系统光标位置，绕开 WebView 按刷新对齐的 pointermove（VNC-PERF-005，`TAOMNI_VNC_NATIVE_POINTER=0` 关闭）
-- 键盘：包含 RealVNC 输入修复，组合键正确转发；菜单键（默认 F8，可改或关闭）打开会话菜单而不发往远端；Windows 低级键盘钩子把 Win、Alt+Tab、Alt+Esc、Ctrl+Esc、PrtScn 直通远端（可关闭），AltGr 发送 ISO_Level3_Shift（VNC-INPUT-002/003）
+- 键盘：菜单键（默认 F8，可改或关闭）打开会话菜单，AltGr 发送 ISO_Level3_Shift。Windows 会话启用特殊键直通且画布获得焦点时，低级键盘钩子把 Win、Alt+Tab、Alt+Esc、Ctrl+Esc 和 PrtScn 转发到远端。启用签名 VNC 模块后，由模块宿主启动同版本目录的辅助程序，随失焦或会话关闭结束。
 - 剪贴板：双向同步，自动切换 Extended / Legacy；连接时不推送本地剪贴板，指针进入画布、窗口重新获得焦点或本地复制时发送变化，远端写入本机后不回送（VNC-CLIP-001）
 
 ### 9.6 前端 `VncPanel` ✅
@@ -3550,15 +4138,12 @@ status: done
 area: vnc
 components: [VncPanel, FloatingToolbar, CaptureToolbar, SessionEditor]
 files:
-  - src/components/vnc/VncPanel.tsx
-  - src/components/vnc/vncSessionMenu.ts
-  - src/components/vnc/VncConnectionOverlay.tsx
-  - src/components/vnc/VncConnectionOverlay.css
-  - src/components/vnc/VncPropertiesDialog.tsx
-  - src/components/vnc/VncSessionInfoDialog.tsx
-  - src/components/vnc/VncFullScreenToolbar.tsx
+  - src/components/plugins/VncSessionPane.tsx
+  - src/stubs/modulePreview.ts
+  - src-tauri/plugins/vnc-client/renderer/
+  - src-tauri/plugins/vnc-client/vite.config.ts
   - src/lib/vnc.ts
-  - src/lib/vncFramePainter.ts
+  - src/lib/vnc/
   - src/lib/vncOptions.ts
   - src/components/session/SessionEditor.tsx
   # Browser-preview VNC bridge and the scriptable RFB fixture behind vnc_required.
@@ -3573,6 +4158,7 @@ controls:
   - id: panel-root
     selector: '[data-testid="vnc-panel"]'
     kind: display
+    aliases: ['[data-testid="vnc-panel"][data-frontend-source]']
   - id: canvas
     selector: '[data-testid="vnc-canvas"]'
     kind: display       # pointer / wheel / context-menu handlers fire only after a live RFB session;
@@ -3672,8 +4258,9 @@ controls:
 - 保存的 VNC 会话可从会话树双击连接；没保存密码时直接连接，不弹连接前的密码框，服务器要求密码时由会话内认证表单询问，`vnc://` 快速连接相同（VNC-AUTH-002；TC-151/TC-152/TC-153 经会话内表单登录，TC-107 确认不弹连接前密码框）
 - 浏览器预览（`pnpm dev`）经 dev server VNC bridge 连接真实 RFB 服务器：None/VNCAuth、Raw、DesktopSize、Bell、legacy 与 ExtendedClipboard；不含原生 relay 的编码、OS 输入和系统剪贴板（TC-151 双模式）
 - VNC tab 常驻挂载，切换标签时连接不主动销毁
+- VNC 的签名前端随模块包发布。TC-MODULES-053 核对主窗、分离窗和回挂后的实际加载路径与帧像素。TC-MODULES-054 核对浏览器预览的模块入口、启禁和绘制。
 - 已修复 VNC 剪贴板与输入延迟、Windows 11 上的 client→server 文本粘贴
-- 连续鼠标与键盘输入后，relay 以画布 ACK 作为帧背压、鼠标移动按显示帧合并，仍持续请求并绘制后续 framebuffer 更新（VNC-REG-001；TC-156 双模式）
+- 连续鼠标与键盘输入后，relay 以画布 ACK 作为帧背压、鼠标移动按显示帧合并，仍持续请求并绘制后续 framebuffer 更新。TC-156 在 Browser 和 Native 核对远端缩放完成后，原连接还能传送新的按键。
 - 连接警告、用户名/密码表单和认证错误使用浅色/深色主题的实色卡片，保留密码焦点、遮掩与 Enter 提交（TC-157 双模式，截图检查对比度与布局）
 - ExtendedClipboard 接收兼容完整 zlib 流与 TigerVNC 的每消息 Z_SYNC_FLUSH 边界，继续限制解压大小并拒绝截断格式数据；连续远端复制后反向复制、输入与绘制保持连接（TC-158 native 系统剪贴板、TC-159 browser bridge）
 - Linux WebKitGTK 读取剪贴板为空时，VNC 使用原生读取核对外部 X11 剪贴板，避免反向粘贴丢失新文本（TC-158，系统剪贴板写入后先独立读取核验）
@@ -3688,15 +4275,14 @@ status: partial
 area: rdp
 components: [RdpPanel, RdpOptionsForm]
 files:
-  - src/components/rdp/RdpPanel.tsx
+  - src-tauri/plugins/rdp-client/**
+  - src-tauri/crates/taomni-rdp-client-api/**
+  - src-tauri/crates/taomni-rdp-client-engine/**
+  - src/components/plugins/RdpSessionPane.tsx
+  - src-tauri/src/rdp/**
   - src/components/session/forms/RdpOptionsForm.tsx
   - src/lib/rdp.ts
   - src/types/rdp.ts
-  - src-tauri/src/rdp/mod.rs
-  - src-tauri/src/rdp/ws.rs
-  - src-tauri/src/rdp/session.rs
-  - src-tauri/src/rdp/transport.rs
-  - src-tauri/src/rdp/gateway/mod.rs
 controls:
   - id: panel-root
     selector: '[data-testid="rdp-panel"]'
@@ -3704,6 +4290,18 @@ controls:
   - id: status
     selector: '[data-testid="rdp-status"]'
     kind: display
+  - id: status-overlay
+    selector: '[data-testid="rdp-panel"] .rdp-overlay'
+    kind: display
+  - id: gateway-enabled
+    selector: '[data-testid="rdp-gateway-enabled"]'
+    kind: interactive
+  - id: gateway-host
+    selector: '[data-testid="rdp-gateway-host"]'
+    kind: interactive
+  - id: gateway-use-session
+    selector: '[data-testid="rdp-gateway-use-session"]'
+    kind: interactive
   - id: canvas
     selector: '[data-testid="rdp-canvas"]'
     kind: display       # browser-mode smoke verifies mount; live frame paint is covered by Rust live tests
@@ -3787,6 +4385,9 @@ controls:
 - RDP options 表单已持久化 domain、color depth、NLA/performance、clipboard、audio、drive redirection、RD Gateway 配置
 - 浏览器预览模式只提供 desktop-only stub；真实协议连接和画面验证必须在 Tauri/native 或 Rust live test 环境下执行
 - OS 全屏连接栏（仿 mstsc）：固定、连接质量（服务端 Network Characteristics Result 的 RTT/带宽 → 4 格）、主机名、Ctrl+Alt+Del、最小化、还原、断开；未固定时 2.5 s 后收起，顶部 4 px 热区、Tab 聚焦或 Ctrl+Alt+Home 重新显示；窗口模式工具栏也有 Ctrl+Alt+Del。TC-RDPJ-01 用同一 QA 构建的客户端连接自家服务端联合验证
+- TC-111 检查 Browser 重连操作后仍保留单个 RDP 画布。原生 TC-RDPJ-01-client-server-loopback 检查断开后的重连使用原证书确认，再次完成 NLA，并把第二次画布点击转给宿主桌面。
+- TC-MODULES-056 检查签名 RDP 模块连接、停用后释放、重新启用后沿用证书确认和恢复输入，以及缺少 RD Gateway 用户名的错误。重连后测量 40 次点击到签名查看器收到画面的延迟。TC-MODULES-057 检查网关选项与原标签启停。
+- TC-MODULES-058 检查旧版备份中的证书记录经启动还原进入保留的 RDP 数据库，核心会话一并恢复。
 
 ### 9.8 WSL 会话类型（WSL session）✅
 
@@ -4209,6 +4810,10 @@ controls:
     selector: '[data-testid="vault-lock-button"]'
     kind: interactive
     optional: true       # only when state=unlocked
+  - id: operation-error
+    selector: '[data-testid="vault-operation-error"]'
+    kind: display
+    optional: true       # only when native lock confirmation failed
   - id: change-master-button
     selector: '[data-testid="vault-change-master-button"]'
     kind: interactive
@@ -4478,6 +5083,9 @@ files:
 - src/components/settings/AsrPanel.tsx
 - src-tauri/src/voice/
 - src-tauri/src/asr/
+- src-tauri/plugins/ai-voice-local/
+- src-tauri/crates/taomni-local-voice-api/
+- src-tauri/crates/taomni-asr-models/
 controls:
 - id: chat-voice-button
   selector: '[data-testid="chat-voice-button"]'
@@ -4485,6 +5093,12 @@ controls:
 - id: chat-voice-cancel
   selector: '[data-testid="chat-voice-button-cancel"]'
   kind: interactive
+- id: local-voice-module-store
+  selector: '[data-testid="voice-open-module-store"]'
+  kind: interactive
+- id: voice-dictation-error
+  selector: '[data-testid="voice-dictation-error"]'
+  kind: display
 - id: voice-settings-close
   selector: '[data-testid="voice-settings-close"]'
   kind: interactive
@@ -4646,7 +5260,7 @@ controls:
 - 默认本地 SenseVoice + Small q8 组合，按语种路由；Turbo q5 可选。旧 f16 显式一键替换，校验成功后删除旧权重。模型按需下载或离线导入，版本目录按哈希隔离。
 - 在线阿里／火山／Deepgram／Soniox，共享代理和 vault；Gemini 默认隐藏为实验项。清理默认关，可选轻／全并保留原文和撤销。
 - 标题栏和 Chat、LAN 聊天、终端 AI 改写说明共用听写组件，只填入可编辑文本，不自动发送或执行。
-- AI 全局禁用时隐藏入口。浏览器语音 fixture 仅验证交互；原生采集与跨平台权限需真机检查。
+- AI 全局禁用时隐藏入口。浏览器语音 fixture 仅验证交互；原生采集与跨平台权限需真机检查。`TC-MODULES-110` 覆盖签名 Local Voice 宿主两版本在线更新、禁/启用回滚、握手失败回退与无状态卸载重装后的持续听写。
 
 ### 14.4 AI Chat Drawer ✅
 
@@ -5435,6 +6049,9 @@ area: main/detach
 components: [DetachedSessionWindow, TerminalPanel, VncPanel, RdpPanel, MainLayout]
 files:
   - src/components/detached/DetachedSessionWindow.tsx
+  - src/components/plugins/PluginDetachedWindow.tsx
+  - src/components/plugins/PluginTabPanels.tsx
+  - src/lib/pluginTabWindow.ts
   - src/lib/detachWindowing.ts
   - src/lib/detachedSession.ts
 controls:
@@ -5468,6 +6085,19 @@ controls:
     selector: '[data-testid="detached-os-fullscreen"]'
     kind: interactive
     optional: true
+  - id: plugin-tab-detach
+    selector: '[data-testid="plugin-tab-detach"]'
+    kind: interactive
+  - id: plugin-detached-window
+    selector: '[data-testid="plugin-detached-window"]'
+    kind: display
+  - id: plugin-tab-reattach
+    selector: '[data-testid="plugin-tab-reattach"]'
+    kind: interactive
+  - id: plugin-tab-returned
+    selector: '[data-testid="plugin-tab-returned"]'
+    kind: display
+    optional: true # only visible if a returned window has not closed yet
 -->
 
 - 终端 / VNC / RDP 标签的浮动工具条均提供「分离到独立窗口」按钮（`terminal-detach` / `vnc-detach` / `rdp-detach`）
@@ -5475,6 +6105,7 @@ controls:
 - 终端分离保留后端 PTY/SSH 会话（`preserveSessionOnUnmountRef` + detach-pending 标志跳过 `closeTerminal`），新窗口通过 `consumeDetachedHandoff` adopt 既有连接而非重新拨号
 - 分离窗口由 `DetachedSessionWindow` 承载：镜像主窗口主题 / 字体副作用，提供 `detached-reattach`（把会话送回主窗口）与 `detached-os-fullscreen`
 - 终端面板另提供 `terminal-maximize`（在非分屏模式下最大化/还原当前终端 pane）
+- 模块窗口只传递清理后的 locator；原生 close-request 与返回按钮共用幂等回挂，回挂后立即卸载原模块，即使窗口关闭失败也不保留第二个可操作副本。browser reload 不触发回挂，preview 通过显式按钮返回；浏览器 OS 关闭自动回挂仍未覆盖。
 - **e2e 测试限制**：分离会 spawn 新窗口并销毁源标签，属破坏性操作，用例只在最后一步点击（参照 TC-043/TC-111）；reattach / detached-window 内部控件需真实分离窗口或 Tauri 环境，浏览器冒烟无法挂载，留待 native/手动回归
 
 ---
@@ -5532,14 +6163,17 @@ controls:
 id: F-Servers-1
 status: done
 area: servers
-components: [ServersPanel, ServersTabBlockedDialog, ServerList, ServerRow, ServerSettings, CommonSettings, ServerOutputLog, fields]
+components: [ServersPanel, ServersTabBlockedDialog, ServerList, ServerRow, ServerSettings, ModuleServerSettings, CommonSettings, ServerOutputLog, fields]
 files:
   - src/components/servers/ServersPanel.tsx
   - src/components/servers/ServersTabBlockedDialog.tsx
   - src/components/servers/ServerList.tsx
   - src/components/servers/ServerRow.tsx
   - src/components/servers/ServerSettings.tsx
+  - src/components/servers/ModuleServerSettings.tsx
   - src/components/servers/CommonSettings.tsx
+  - src-tauri/plugins/servers/renderer/
+  - src-tauri/plugins/vnc-server/renderer/
   - src/components/servers/ServerOutputLog.tsx
   - src/components/servers/fields.tsx
   - src/lib/servers.ts
@@ -5549,9 +6183,41 @@ files:
   - src/layouts/main/TabContentRouter.tsx
   - src/components/tabbar/TabBar.tsx
   - src-tauri/src/servers/tab_lock.rs
+  - src-tauri/src/servers/vnc.rs
+  - src-tauri/src/servers/lifetime.rs
+  - src-tauri/crates/taomni-local-servers-engine/src/
+  - src-tauri/crates/taomni-pty/src/
+  - src-tauri/plugins/servers/module.json
+  - src-tauri/plugins/servers/src/
+  - src-tauri/plugins/vnc-server/module.json
+  - src-tauri/plugins/vnc-server/src/daemon.rs
   - src-tauri/src/servers/mod.rs
   - src-tauri/src/windowing/mod.rs
 controls:
+  - id: server-field-http-root-dir
+    selector: '[data-testid="server-field-http-root-dir"]'
+    kind: interactive
+    optional: true
+  - id: server-field-ssh-password
+    selector: '[data-testid="server-field-ssh-password"]'
+    kind: interactive
+    optional: true
+  - id: server-field-ssh-remove-password
+    selector: '[data-testid="server-field-ssh-remove-password"]'
+    kind: interactive
+    optional: true
+  - id: server-field-ftp-password
+    selector: '[data-testid="server-field-ftp-password"]'
+    kind: interactive
+    optional: true
+  - id: server-field-ftp-remove-password
+    selector: '[data-testid="server-field-ftp-remove-password"]'
+    kind: interactive
+    optional: true
+  - id: server-field-ssh-root-dir
+    selector: '[data-testid="server-field-ssh-root-dir"]'
+    kind: interactive
+    optional: true
   # Single-instance tab ("servers") opened by Tools sidebar, Tools menu, Ctrl+Shift+S,
   # or ?servers=main. Protected within a window and across running Taomni instances.
   - id: sidebar-tool-servers
@@ -5619,6 +6285,38 @@ controls:
     selector: '[data-testid="server-row-rdp"]'
     kind: interactive
     optional: true
+  - id: server-row-vnc
+    selector: '[data-testid="server-row-vnc"]'
+    kind: interactive
+    optional: true
+  - id: server-row-vnc-start
+    selector: '[data-testid="server-row-vnc-start"]'
+    kind: interactive
+    optional: true
+  - id: server-row-vnc-stop
+    selector: '[data-testid="server-row-vnc-stop"]'
+    kind: interactive
+    optional: true
+  - id: server-row-vnc-settings
+    selector: '[data-testid="server-row-vnc-settings"]'
+    kind: interactive
+    optional: true
+  - id: server-field-vnc-password
+    selector: '[data-testid="server-field-vnc-password"]'
+    kind: interactive
+    optional: true
+  - id: server-field-vnc-remove-password
+    selector: '[data-testid="server-field-vnc-remove-password"]'
+    kind: interactive
+    optional: true
+  - id: server-field-vnc-view-only
+    selector: '[data-testid="server-field-vnc-view-only"]'
+    kind: interactive
+    optional: true
+  - id: server-field-vnc-shared
+    selector: '[data-testid="server-field-vnc-shared"]'
+    kind: interactive
+    optional: true
   # Per-row Start / Stop / Settings actions (dynamic: server-row-${type}-{start,stop,settings}).
   - id: server-row-ssh-start
     selector: '[data-testid="server-row-ssh-start"]'
@@ -5666,7 +6364,10 @@ controls:
 - 后端 `src-tauri/src/servers/`：`ServerRegistry` 镜像 Tunnel 架构，`tab_lock.rs` 提供 `claim_servers_tab` / `release_servers_tab` 进程级锁管理并在窗口关闭/销毁及导航清理中释放；配置持久化到 SQLite `server_configs` 表并在启动时 `autostart_servers()`；in-process 纯 Rust（ssh/sftp/http/ftp/tftp/telnet/cron）与受监管系统二进制（vnc/nfs/iperf 经 `which` + `spawn_supervised`，缺工具返回明确错误而非假「运行中」）
 - 输出/状态分别通过 `server://output/<type>` / `server://status/<type>` 事件流推送；后端 `ServerRegistry` 另按类型保留最近 500 行输出（`list_server_logs`），重新打开页签可恢复日志，清空按钮同时清空后端历史（`clear_server_log`）；Apply 保存所有 dirty 配置，对运行中且端口已改的服务器提示 `Restart server to apply port change`；有未保存修改时 Cancel 会确认丢弃，切换到其他页签再切回会保留未保存草稿
 - i18n key 在 `servers.*`（en / zh-CN 双语）；前端 store 为 `serversStore`，IPC + 类型 + `SERVER_DEFS` 在 `src/lib/servers.ts`，单实例页签协调逻辑在 `src/lib/serversTab.ts`
-- **e2e 测试覆盖**：`TC-SERVERS-001-tab-singleton-browser`、`TC-auto-F-Servers-1-servers-dialog` 覆盖浏览器单实例页签及跨上下文互斥，`TC-SERVERS-002-tab-singleton-native` 覆盖原生双进程 OS `ModuleLock` 与热路由切换，`TC-SERVERS-003-tab-functional-native` 覆盖原生 HTTP 启停、日志、热改端口提示及配置持久化
+- `TC-SERVERS-001-tab-singleton-browser` 和 `TC-auto-F-Servers-1-servers-dialog` 覆盖浏览器单实例页签及跨上下文互斥，`TC-SERVERS-002-tab-singleton-native` 覆盖原生双进程 `ModuleLock` 与热路由切换。`TC-SERVERS-003-tab-functional-native` 核对 HTTP 文件内容、监听关闭、日志、运行中修改端口提示和配置持久化。应用 HTTP 设置直接保存该服务，其他服务的凭据不参与。
+- VNC 由签名 `vnc-server` 宿主启动和监督系统 daemon。Linux X11 的 `TC-MODULES-063` 核对已安装表单文件的 SHA-256，再验证真实回环连接、停止及禁用后的端口与租约释放。`TC-MODULES-064` 在 Browser 从模块入口核对端口、绑定地址、密码及两个选项的保存和恢复。
+- TC-SERVERS-004 从 Local servers 启动真实 SSH 监听器。独立客户端验证鉴权、SFTP 文件内容、PTY 命令完成和停止后的端口关闭。
+- TC-MODULES-066 核对签名表单的 SHA-256、原 HTTP 和 SSH 设置及原 Vault 口令，停用后同时关闭两个监听。TC-SERVERS-004 及 066 核对 PTY 输出与零和非零退出码。TC-SERVERS-005 验证 Browser 从模块入口保存、重开和明确移除凭据。TC-MODULES-107 覆盖签名 Local servers 宿主两版本更新回滚、握手失败回退与保留配置重装恢复 HTTP 监听。
 
 ### 22.2 RDP Server（与 Windows 远程桌面对齐）🚧
 
@@ -5676,13 +6377,21 @@ status: in-progress
 area: servers/rdp
 components: [RdpSettings, CommonSettings, ServerRow, fields, RdpServerApprovalBridge]
 files:
-  - src/components/servers/settings/RdpSettings.tsx
+  - src-tauri/crates/taomni-capture/src/engine/
+  - src-tauri/crates/taomni-capture/src/permissions.rs
+  - src-tauri/plugins/rdp-server/renderer/
+  - src/components/servers/ModuleServerSettings.tsx
   - src/components/servers/CommonSettings.tsx
   - src/components/servers/ServerRow.tsx
   - src/components/servers/fields.tsx
   - src/components/servers/RdpServerApprovalBridge.tsx
   - src-tauri/src/servers/rdp.rs
-  - src-tauri/src/servers/rdp/
+  - src-tauri/src/servers/rdp_config.rs
+  - src-tauri/src/plugin/migration_rdp_server.rs
+  - src-tauri/crates/taomni-rdp-server-engine/src/
+  - src-tauri/crates/taomni-server-process/src/system_rdp.rs
+  - src-tauri/plugins/rdp-server/module.json
+  - src-tauri/plugins/rdp-server/src/
   - src-tauri/src/bin/rdp-probe/
   - src-tauri/vendor/ironrdp-server/
   - src-tauri/vendor/ironrdp-acceptor/
@@ -5802,6 +6511,7 @@ controls:
 - `TC-RDPJ-02-joint-clipboard-no-echo` 保留联合客户端/服务端 Unicode 文本与无回环校验；`TC-RDPJ-03-deferred-clipboard-publication` 在 macOS 真实 AppKit 中分离类型声明与数据发布（间隔至少 1.2 秒、同一 changeCount），校验迟到文本不会丢失，公告不超过两次、六秒无回环并正常停止。空快照每秒复核一次；非空稳定快照保持廉价变更标记检查。
 - CI：`rdp_server_required` → capability `rdp`；`system_rdp_running`（Windows 系统远程桌面运行中）→ `rdp`；`release_build_required`（性能用例）→ `release`（该条目改用 release QA 构建）；音频/TermService 基线/xrdp 参考服务器分别为 `audio`/`rdp-baseline`/`xrdp`
 - Windows：NAT-01/PERF-01 三端运行，Windows 上经 `platform_choice` 在系统远程桌面提示中选 Taomni；系统远程桌面分支由 TC-RDPS-NAT-06 覆盖，TermService 基线由 TC-RDPS-PERF-02 测量
+- TC-MODULES-065 核对签名表单的 SHA-256，再验证旧 RDP 设置、Vault 凭据、原生图像、远程输入、设置与 TLS 备份，以及停用后的监听和写租约回收。macOS 保存宿主签名和 Gatekeeper 原始结果。TC-RDPS-UI-03 覆盖 Browser 模块表单中的凭据引用、剪贴板级别与音频设置。
 - 声音（RDPSND 播放）：服务器回采本机默认输出（Windows WASAPI loopback、Linux PipeWire sink monitor），按客户端格式重采样为 PCM 下发；macOS 13+ 用 ScreenCaptureKit 系统音频（排除 Taomni 自身声音）；TC-RDPS-NAT-04 在宿主播放单音、由探针经 RDPSND 接收并判定频率。CI `audio`：Linux 为 PipeWire null sink，Windows 为 VB-CABLE，macOS 为 BlackHole 虚拟设备
 
 ---
@@ -6927,14 +7637,17 @@ status: done
 area: mail/compose
 components: [MailClientTab, RecipientField]
 files:
-  - src/components/mail/MailClientTab.tsx
-  - src/components/mail/RecipientField.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/RecipientField.tsx
   - src/lib/mailRecipients.ts
   - src/lib/mail.ts
   - src-tauri/src/mail/mod.rs
 controls:
   - id: mail-client-tab
     selector: '[data-testid="mail-client-tab"]'
+    aliases:
+      - '[data-plugin-slug="mail"] [data-testid="mail-client-tab"]'
+      - '[data-plugin-slug="mail"][data-plugin-kind="account"] [data-testid="mail-client-tab"][data-active="true"]'
     kind: display
   - id: compose-open
     selector: '[data-testid="mail-compose-open"]'
@@ -6989,14 +7702,16 @@ status: done
 area: mail/compose
 components: [MailClientTab, RichMailEditor, RecipientField]
 files:
-  - src/components/mail/MailClientTab.tsx
-  - src/components/mail/client/MailComposer.tsx
-  - src/components/mail/RichMailEditor.tsx
-  - src/components/mail/RecipientField.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/client/MailComposer.tsx
+  - src-tauri/plugins/mail/renderer/RichMailEditor.tsx
+  - src-tauri/plugins/mail/renderer/RecipientField.tsx
   - src/lib/mailHtml.ts
   - src/lib/mail.ts
   - src/stubs/tauri-core.ts
   - src-tauri/src/mail/mod.rs
+  - src-tauri/src/mail/smtp.rs
+  - src-tauri/crates/taomni-mail-engine/src/compose.rs
 controls:
   - id: drafts-open
     selector: '[data-testid="mail-drafts-open"]'
@@ -7121,12 +7836,25 @@ status: done
 area: mail/sync
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mail.ts
   - src-tauri/src/mail/mod.rs
+  - src-tauri/src/mail/message_body.rs
+  - src-tauri/src/mail/module_host/cache_query.rs
+  - src-tauri/plugins/mail/src/cache_query.rs
+  - src-tauri/src/mail/module_host/prefetch.rs
+  - src-tauri/plugins/mail/src/prefetch.rs
+  - src-tauri/src/mail/imap_transport.rs
+  - src-tauri/crates/taomni-mail-engine/src/imap_auth.rs
 controls:
   - id: sync-button
     selector: '[data-testid="mail-sync-button"]'
+    kind: interactive
+  - id: clear-account-cache
+    selector: 'button[title="Clear this account cache"]'
+    kind: interactive
+  - id: test-connection
+    selector: '[data-testid="mail-test-connection"]'
     kind: interactive
   - id: body-warming-progress
     selector: '[data-testid="mail-body-warming-progress"]'
@@ -7138,8 +7866,12 @@ controls:
 -->
 
 - 手工刷新、打开自动刷新和定时刷新默认只同步 headers；headers 写入缓存并重新加载列表后界面即可继续操作。
-- 最近正文缓存按 `bodyRecentLimit` 遍历已缓存 headers，逐封调用 `mail_prefetch_message_body` 写入原生磁盘缓存，并用独立进度显示；预取不向前端传输或渲染正文，手动打开邮件使用独立于同步的 IMAP 连接。
-- 邮件正文读取按 `folder:uid` 缓存在前端内存中；点击已缓存正文优先使用内存/SQLite，自动标记已读不再等待正文加载完成。
+- 签名 Mail 宿主清除当前 IMAP 账户的文件夹与邮件头索引，保留离线原件、归档暂停状态和服务端邮件。清空与当前账户的同步串行执行，作废此前排队的 IDLE 刷新和缓存快照。TC-MAIL-CACHE-01 核对浏览器的本地索引、空列表和刷新重建，TC-MODULES-070 检查签名宿主提交后的实际 SQLite 状态及原件。
+- 邮件工具栏的连接测试在已启用的 Mail 宿主中完成 IMAP 或 POP3 登录和 SMTP 认证。TC-MODULES-059 验证签名宿主与真实协议，TC-MAIL-POP3-01 覆盖连接、重复同步、重开和标记本地文件夹为已读。TC-MODULES-076 核对实际邮件正文、已验签宿主持有的 POP3 UIDL 与原件，以及停用后保留的数据。两条 POP3 用例都核对重复同步完成后新增邮件数为零。
+- Sessions 与 Workspace 使用同一个 Mail 模块入口。已启用的签名前端提供账户和统一收件箱。TC-MODULES-059 比对实际宿主与前端摘要，TC-MODULES-060 覆盖两个标签的启用和停用。
+- 最近正文缓存按 `bodyRecentLimit` 从已缓存的邮件头中选取候选，由 Mail 宿主用独立 IMAP 连接以每文件夹最多四封为一批读取，随后写入原生磁盘缓存。TC-MODULES-068 核对真实 IMAP 连接与缓存读取，TC-MODULES-069 验证独立预取进度和预取期间手动打开邮件。 签名宿主提交前核对当前邮箱代际和已有正文，前台打开的解码结果也由宿主写入缓存。
+- 邮件正文按 `folder:uid` 缓存在前端内存中。签名 Mail 宿主从完整归档或 SQLite 读取未命中内存的正文，自动标记已读无需等待正文加载。TC-MODULES-068 核对关闭并重开账户后读到已预热的正文，且没有再次发起 IMAP 正文请求。TC-MAIL-CACHE-02 核对浏览器会话改名和重开账户后的正文。
+- 已启用的 Mail 宿主读取并解码用户打开的未缓存正文，保留大邮件分段和额外 EML 副本。TC-MODULES-059/060 检查实际阅读区，Mail 宿主协议用例核对解析后的内容及服务器原始字节。
 - 整个 IMAP 文件夹标记已读先查询服务器 UNSEEN，涵盖未下载历史；每批最多 250 个 UID，批间释放账号连接锁，网络断连只重试幂等标记。
 - 标记、移动、删除的 SQLite 写入使用后台线程中的批量事务；本地搜索也在后台线程执行。
 - 同步缓存与联系人索引的数据库工作在阻塞线程池执行；新增历史邮件增量收集联系人，正文清理仅更新实际有正文的记录。
@@ -7195,13 +7927,15 @@ status: done
 area: mail/sync
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailSync.ts
   - src/lib/mail.ts
   - src/lib/quickConnect.ts
   - src/stubs/mailServerStub.ts
   - src-tauri/src/mail/sync.rs
   - src-tauri/src/mail/mod.rs
+  - src-tauri/crates/taomni-mail-api/src/imap_sync.rs
+  - src-tauri/crates/taomni-mail-engine/src/imap_transport.rs
 controls:
   - id: message-count
     selector: '[data-testid="mail-message-count"]'
@@ -7231,8 +7965,9 @@ controls:
 -->
 
 - 同步按持久化的连续 UID 区间 `[sync_low_uid, sync_high_uid]` 进行：打开/重开、定时刷新与手工刷新都按“服务器 UID − 缓存 UID”集合差分批补齐，直到后端 `more=false`，关闭任意时长后重开不再漏收（设计 `docs-feature/mail-thunderbird-parity-design.md` AC-01～AC-12）。
+- TC-MODULES-059 从签名前端测试选中文件夹补齐、全账户手工刷新和重新启用后接收停用期间收到的邮件。 已验签宿主在同一账户事务中保存同步结果、UID 水位、标记变化和部分失败记录。TC-MODULES-060 检查浏览器保留的账户标签重新同步和打开归档。Mail 宿主负责邮件头同步，核心过渡仓储提交 UID 水位。
 - 定时刷新在 catch-up 之后对最新窗口对账，手工刷新对全区间对账：服务器端删除/移动的邮件从缓存移除，已读/未读/星标以 FETCH FLAGS 为准（CONDSTORE 可用时用 `CHANGEDSINCE`）。
-- 列表只读本地缓存；缓存到底后“加载更早邮件”向服务器回补历史，选中文件夹在后台回补并显示进度。默认保留全部邮件头（0 = 不限制），按天保留时使用服务器到达时间。
+- 列表只读本地缓存；缓存到底后“加载更早邮件”向服务器回补历史，选中文件夹在后台回补并显示进度。默认保留全部邮件头（0 = 不限制），按天保留时使用服务器到达时间。签名 Mail 宿主提供 IMAP 缓存文件夹和邮件分页。TC-MODULES-098 通过常规 Mail 标签核对文件夹树、首屏和下一页，保留签名包及宿主身份。
 - 同一 Quick Connect 邮件地址复用同一会话缓存；`mail://user:pass@host:port?security=none&smtp=host:port` 支持口令、明文/STARTTLS 与 SMTP 端点。
 
 ---
@@ -7245,13 +7980,14 @@ status: done
 area: mail/compose
 components: [MailClientTab, SessionEditor]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailThreads.ts
   - src/lib/mail.ts
   - src/components/session/SessionEditor.tsx
   - src/stubs/tauri-core.ts
   - src-tauri/src/mail/outgoing.rs
   - src-tauri/src/mail/mod.rs
+  - src-tauri/crates/taomni-mail-engine/src/compose.rs
 controls:
   - id: thread-view-toggle
     selector: '[data-testid="mail-thread-view-toggle"]'
@@ -7272,8 +8008,10 @@ controls:
 - 回复/全部回复发送 `In-Reply-To` 与 `References`（转发开启新会话），Thunderbird/Gmail 可将回复归入原会话；同步时缓存每封邮件的 `In-Reply-To`/`References`（schema v3）。
 - 列表“Threads”切换按邮件头严格线程化（不按主题猜测），会话折叠为最新一封并显示数量与未读数，展开后按回复层级缩进；开关按查看者保存在 localStorage。
 - SMTP 接受后立即反馈，Sent 副本结果通过独立提示显示；事件先于发送响应到达、或随后刷新邮箱，都不会覆盖副本结果。
+- 启用的 Mail 宿主负责组装 MIME、SMTP 连通性检查和发送，并在接受后把 IMAP 副本写入 Sent、清理服务器草稿。TC-MODULES-059 比对实际 SMTP 投递和 IMAP Sent 的正文与 Message-ID，并检查 POP3 本地 Sent 和停用后的入口。TC-MODULES-078 检查停用后隐藏写信入口及重新启用后发件箱继续发送。TC-MAIL-SEND-01 在 Browser 和 Native 打开 Sent 副本核对正文。
+- 已验签宿主在 SMTP 确认后记录 To、Cc 和 Bcc，查询同账户的联系人，并在重建邮箱索引时保留已发送联系人。TC-MODULES-059 核对模块命令和 SQLite 计数，并在重新启用后从收件箱查回已发送联系人。TC-MAIL-SEND-01 在 Browser 和 Native 从收件箱重开写信窗口，按部分地址查到原收件人。
 - 发信成功后按账户设置把带 Bcc 的副本 APPEND 到 Sent（SPECIAL-USE 优先，找不到时按名称，缺失时创建）；Gmail/Outlook 默认不重复保存。副本失败不影响“已发送”，状态栏提示原因。
-- 手工保存草稿会把草稿 APPEND 到服务器 Drafts（`\Draft \Seen`，按 Message-ID 找回 UID 并替换旧副本）；发送或删除草稿时移除服务器副本；自动保存仍只写本地。
+- 手工保存草稿时，Mail 签名宿主把草稿 APPEND 到服务器 Drafts，并按 Message-ID 找回 UID 后替换旧副本。编辑和自动保存保留上一份服务器草稿的位置。TC-MAIL-SEND-01 与 TC-MODULES-059 检查替换、发送和显式删除后的服务器状态。
 
 ---
 
@@ -7285,10 +8023,16 @@ status: done
 area: mail/search
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mail.ts
   - src/stubs/mailServerStub.ts
   - src-tauri/src/mail/search.rs
+  - src-tauri/crates/taomni-mail-api/src/search.rs
+  - src-tauri/crates/taomni-mail-engine/src/search.rs
+  - src-tauri/crates/taomni-mail-api/src/cache_query.rs
+  - src-tauri/plugins/mail/src/cache_query.rs
+  - src-tauri/src/mail/module_host/cache_query.rs
+  - src-tauri/plugins/mail/src/imap_exchange.rs
 controls:
   - id: search-input
     selector: '[data-testid="mail-search-input"]'
@@ -7323,7 +8067,10 @@ controls:
 
 - 搜索框查询本地 SQLite FTS5（trigram 分词，支持中文子串；少于 3 字的词回退 LIKE）覆盖整个缓存的邮件头与已缓存正文，可选“本文件夹/所有文件夹”和字段（全部/主题/发件人/收件人/正文）；用户输入按字面短语处理，不解释 FTS 语法。
 - “Server”（或 Shift+Enter）对当前文件夹执行 IMAP `UID SEARCH`（非 ASCII 用 `CHARSET UTF-8`），结果与本地结果合并，不写入缓存。
+- 启用的签名 Mail 宿主执行本地索引查询和 IMAP 搜索，核心核对服务器结果的账户和文件夹。TC-MODULES-059 核对真实服务器返回的主题。TC-MODULES-098 对照 SQLite 中仍可搜索的归档记录和服务器已删除的记录。TC-MAIL-SEARCH-01 检查所有文件夹、当前文件夹、服务器搜索及删除后的状态。
 - 快捷过滤（未读/星标/附件）同时作用于普通列表与搜索结果；跨文件夹结果显示所在文件夹。
+- TC-MODULES-059 在已启用的签名 Mail 宿主中给选中邮件加星并取消星标。TC-MAIL-KEYS-01 同时检查列表焦点快捷键。两个用例都将可见星标邮件的 UID 与服务器状态对照。
+- Mail 签名宿主执行按文件夹查询未读 UID 和批量标记已读。 服务端确认后由宿主更新账户索引的旗标和未读数。TC-MODULES-059 核对服务器剩余未读和列表状态。TC-MAIL-BULK-01 覆盖批量操作和完成后按钮状态。
 
 ---
 
@@ -7335,7 +8082,7 @@ status: done
 area: mail/organize
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailTags.ts
   - src/stubs/tauri-core.ts
 controls:
@@ -7370,7 +8117,7 @@ status: done
 area: mail/compose
 components: [MailClientTab, SessionEditor, MailIdentitiesEditor]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailIdentities.ts
   - src/components/session/MailIdentitiesEditor.tsx
   - src/components/session/SessionEditor.tsx
@@ -7420,11 +8167,12 @@ status: done
 area: mail/sync
 components: [MailClientTab, SessionEditor]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/components/session/SessionEditor.tsx
   - src/lib/mail.ts
   - src/lib/lanNotify.ts
   - src-tauri/src/mail/idle.rs
+  - src-tauri/src/mail/imap_transport.rs
 controls:
   - id: idle-status
     selector: '[data-testid="mail-idle-status"]'
@@ -7453,14 +8201,24 @@ status: done
 area: mail/folders
 components: [MailClientTab, SessionEditor]
 files:
-  - src/components/mail/MailClientTab.tsx
-  - src/components/mail/client/subscriptionSnapshots.ts
-  - src/components/mail/client/useMailSubscriptions.ts
-  - src/components/mail/client/useMailCacheState.ts
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/client/subscriptionSnapshots.ts
+  - src-tauri/plugins/mail/renderer/client/useMailSubscriptions.ts
+  - src-tauri/plugins/mail/renderer/client/useMailCacheState.ts
   - src/lib/mailFolders.ts
   - src/components/session/SessionEditor.tsx
   - src-tauri/src/mail/folders.rs
+  - src-tauri/src/mail/folder_commands.rs
 controls:
+  - id: mail-new-subfolder
+    selector: '[data-testid="context-menu-item-new-subfolder"]'
+    kind: interactive
+  - id: mail-rename-folder
+    selector: '[data-testid="context-menu-item-rename-folder"]'
+    kind: interactive
+  - id: mail-delete-folder
+    selector: '[data-testid="context-menu-item-delete-folder"]'
+    kind: interactive
   - id: subscriptions-open
     selector: '[data-testid="mail-subscriptions-open"]'
     kind: interactive
@@ -7491,6 +8249,9 @@ controls:
 
 - 文件夹属性按 RFC 形式保存（`\Noselect`、`\Sent`），LSUB 报告的文件夹带 `\Subscribed`（RFC 5258）；服务器没有订阅数据时视为全部已订阅。
 - 文件夹栏 “Manage folder subscriptions” 对话框调用 SUBSCRIBE/UNSUBSCRIBE；“Show only subscribed folders”（按账户保存）开启后未订阅文件夹不在树中显示，也不参与全文件夹同步（INBOX 始终保留）。
+- TC-MODULES-059 从常规 Mail 标签加载 IMAP 文件夹，检查签名宿主的写租约，并通过订阅对话框在真实 IMAP 服务器上取消订阅。
+- 签名 Mail 宿主负责创建、重命名和删除 IMAP 文件夹，并在账户缓存事务中保存目录与订阅状态。TC-MODULES-059/060 覆盖目录操作和删除取消，Native 核对服务器与缓存的实际状态。
+- TC-MAIL-FOLDER-01 检查选中文件夹抓取后仍保留 LIST/LSUB 返回的订阅属性。同步只更新邮件计数和 UID 状态。
 - 会话编辑器 “Special folders” 可手动指定 Sent/Drafts/Trash/Junk/Archive，优先于 SPECIAL-USE 属性与名称匹配（中文或自定义命名）。
 - 定时的全文件夹扫描在服务器支持 CONDSTORE 时先发 `STATUS (MESSAGES UNSEEN UIDNEXT UIDVALIDITY HIGHESTMODSEQ)`，未变化的文件夹只更新计数、跳过 EXAMINE/SEARCH；手动同步始终完整对账。
 
@@ -7504,10 +8265,12 @@ status: done
 area: mail/list
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailShortcuts.ts
   - src/lib/mailMutations.ts
   - src-tauri/src/mail/mutations.rs
+  - src-tauri/src/mail/module_host/mutations.rs
+  - src-tauri/crates/taomni-mail-engine/src/mutation_transport.rs
 controls:
   - id: message-row-shortcuts
     selector: '[data-testid="mail-message-row"][aria-pressed="true"]'
@@ -7538,6 +8301,7 @@ controls:
 - Thunderbird 风格快捷键（列表焦点下，输入框/编辑器内不生效）：F/B 下一封/上一封，N 下一封未读，R 回复，Shift+R 或 Ctrl/Cmd+Shift+R 全部回复，Ctrl/Cmd+L 转发，M 切换已读，S 星标，A 归档，J/Shift+J 垃圾/非垃圾，Del 删除，Ctrl/Cmd+Shift+K 聚焦搜索。Ctrl+Shift+L（聊天）与 Ctrl+Shift+S（服务器）保持全局含义。
 - 列表支持复选框、Ctrl/Cmd 点击、Shift 范围选择；普通点击或键盘导航选择单封，可继续追加选择。列表内 Ctrl/Cmd+A 选择已显示的行，Escape 清空选择。独立工具条显示选中数量和 Delete selected，普通删除移入 Trash，永久删除须确认。标记整文件夹已读进行中仍可删除新选择，已读完成保留当前选择。移动、复制及删除按 50 封更新进度，后端按服务器数量限制自动缩小批次；成功部分立即更新界面，失败保留未完成选择并可续做。持久化 COPY 阶段和请求 ID 防止重试重复复制；响应不明时停止自动重发；不使用全文件夹 EXPUNGE。标记操作仍按 250 封分批；跨文件夹或未加载页面的搜索结果同样参与批量操作。
 - 邮件行可拖到文件夹树：默认移动，按住 Ctrl（macOS 为 Option）复制；勾选多封时拖动全部勾选项。
+- 已启用的 Mail 签名宿主执行批量移动、复制和删除的 IMAP 命令，并在账户写前日志中保留每项操作的确认或不确定状态。TC-MAIL-BULK-02 核对部分成功后的选择与续做，TC-MAIL-BULK-03 核对签名安装、COPY 回执丢失、STORE 重试与 UIDPLUS 恢复。
 - 长列表的行使用 `content-visibility: auto`，屏幕外的行跳过布局和绘制，同时保留在 DOM 中（查找、无障碍与选择不受影响）；未引入虚拟列表依赖。
 
 ---
@@ -7550,10 +8314,12 @@ status: done
 area: mail/compose
 components: [MailClientTab, SessionEditor]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailOutbox.ts
   - src/components/session/SessionEditor.tsx
   - src-tauri/src/mail/mod.rs
+  - src-tauri/crates/taomni-mail-engine/src/compose.rs
+  - src-tauri/crates/taomni-mail-engine/src/drafts.rs
 controls:
   - id: compose-send-later
     selector: '[data-testid="mail-compose-send-later"]'
@@ -7638,18 +8404,27 @@ status: partial
 area: mail/lists
 components: [MailClientTab, MailMessageBodyView, MailHtmlReader]
 files:
-  - src/components/mail/MailClientTab.tsx
-  - src/components/mail/MailHtmlReader.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailHtmlReader.tsx
   - src/lib/mailto.ts
   - src-tauri/src/mail/lists.rs
   - src-tauri/src/mail/mbox.rs
+  - src-tauri/crates/taomni-mail-engine/src/mbox.rs
+  - src-tauri/plugins/mail/src/archive.rs
+  - src-tauri/plugins/mail/src/mbox_export.rs
 controls:
   - id: unsubscribe
     selector: '[data-testid="mail-unsubscribe"]'
     kind: interactive
+  - id: import-messages
+    selector: '[data-testid="context-menu-item-import-messages-mbox-eml"]'
+    kind: interactive
+  - id: export-mbox
+    selector: '[data-testid="context-menu-item-export-as-mbox"]'
+    kind: interactive
 -->
 
-- 文件夹右键 “Export as mbox…” 导出 mboxrd（Thunderbird 可导入，`From - ` 分隔、`>From ` 转义，每批 50 封流式写入）；“Import messages (mbox/.eml)…” 拆分 mbox 或读取单封 .eml，经 IMAP APPEND 写入该文件夹并同步到列表。文件对话框无法由 WebDriver 驱动，导入导出由 Rust 往返测试覆盖。
+- 文件夹右键 “Export as mbox…” 由签名宿主每批读取 50 封，生成带 `From - ` 分隔和 `>From ` 转义的 mboxrd。基座收到完成回执后发布用户选定的文件。“Import messages (mbox/.eml)…” 由签名宿主执行 IMAP APPEND 并同步到列表。TC-MAIL-IMPORT-01 核对取消，TC-MODULES-095 经系统对话框核对导入内容、已读标记和导出的 mbox 文件。
 - 带 `List-Unsubscribe` 的邮件在阅读区显示 “Unsubscribe”：支持 RFC 8058 一键退订时先确认再 POST；否则优先 mailto（打开写信窗口），再退回浏览器打开 https 链接。表头在拉取时解析并缓存。
 - 阅读区（HTML 与纯文本）中的 `mailto:` 链接在应用内打开写信窗口并填好收件人、抄送、主题与正文。
 - 未完成：注册为系统 `mailto:` 默认处理程序需要引入 Tauri deep-link 插件并修改三端安装注册，尚未实施。
@@ -7664,8 +8439,9 @@ status: done
 area: mail/attachments
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailAttachReminder.ts
+  - src-tauri/src/mail/message_attachment.rs
   - src-tauri/src/mail/parts.rs
   - src-tauri/src/mail/mod.rs
 controls:
@@ -7684,6 +8460,7 @@ controls:
 -->
 
 - 超过正文部分拉取上限的邮件，打开时先取 `BODYSTRUCTURE`，只拉 text/plain 与 text/html 分段（完整、不截断），并列出全部附件及其 IMAP 分段号；下载时只取该分段（`BODY.PEEK[<section>]`），不再拉整封邮件。
+- 签名 Mail 宿主读取未归档、未缓存的 IMAP 附件，核心验证字节数后写入目标。TC-MODULES-059/060 核对只读预览的文件字节与关闭后的清理，宿主协议用例检查整封邮件提取和 IMAP 分段下载。
 - 会话设置 “Attachment cache” 开启后，下载过的附件写入 `<app_data>/mail-cache/attachments/`，再次打开直接使用本地副本。
 - 发送被服务器以大小拒绝（552 / SIZE）时给出明确提示。
 - 附件提醒：正文（不含引用部分）或主题提到 “attached/附件” 而没有附件时，发送前提醒，可 “Attach…” 或 “Send anyway”。
@@ -7699,9 +8476,10 @@ area: mail/account
 components: [SessionEditor, MailClientTab]
 files:
   - src/components/session/SessionEditor.tsx
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src-tauri/src/mail/autoconfig.rs
   - src-tauri/src/mail/certs.rs
+  - src-tauri/crates/taomni-mail-engine/src/imap_auth.rs
 controls:
   - id: autoconfig
     selector: '[data-testid="mail-autoconfig"]'
@@ -7747,7 +8525,12 @@ files:
   - src/components/session/SessionEditor.tsx
   - src/lib/quickConnect.ts
   - src-tauri/src/mail/pop3.rs
+  - src-tauri/src/mail/pop3/connection.rs
+  - src-tauri/src/mail/imap_transport.rs
   - src-tauri/src/mail/local_cmds.rs
+  - src-tauri/crates/taomni-mail-engine/src/pop3.rs
+  - src-tauri/src/mail/module_host/pop3_attachment.rs
+  - src-tauri/plugins/mail/src/pop3_attachment.rs
 controls:
   - id: incoming-protocol
     selector: '[data-testid="mail-incoming-protocol"]'
@@ -7757,11 +8540,15 @@ controls:
     selector: '[data-testid="mail-pop3-leave-days"]'
     kind: interactive
     optional: true
+  - id: received-text
+    selector: '[data-testid="mail-reader-text"]'
+    kind: display
 -->
 
 - 会话编辑器 “Incoming” 可选 POP3（本地文件夹），Quick Connect 支持 `pop3://` / `pop3s://`（默认端口 995/110）。支持 TLS、STLS 与明文；明文且服务器提供时间戳时使用 APOP，OAuth 使用 XOAUTH2。
 - 以 `UIDL` 去重下载到本地 INBOX（每批 50 封，重复同步不产生重复邮件）；“Delete from server after N days”（空 = 保留，0 = 下载后立即删除）按下载时间在服务器执行 `DELE`。
 - 本地文件夹（INBOX/Sent/Drafts/Trash/Junk 与自建文件夹）支持移动、复制、删除、标记、搜索、重命名与 mbox 导入导出；发出的邮件副本存入本地 Sent。本地邮件不受邮件头保留策略裁剪，清空缓存会被拒绝（邮件只有本地一份）。
+- 签名 Mail 宿主从 POP3 的本地原件解码附件，基座在收齐字节后保存文件。TC-MODULES-076 删除服务器副本后，用原生保存对话框校验取消、重试和文件摘要。TC-MAIL-POP3-01 校验只读预览的内容和关闭后的文件清理。
 
 ---
 
@@ -7773,7 +8560,7 @@ status: partial
 area: mail/calendar
 components: [MailClientTab]
 files:
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailInvite.ts
   - src-tauri/src/mail/calendar.rs
 controls:
@@ -7824,10 +8611,15 @@ status: done
 area: mail/filters
 components: [MailFiltersPanel, MailClientTab]
 files:
-  - src/components/mail/MailFiltersPanel.tsx
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailFiltersPanel.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mailFilters.ts
   - src-tauri/src/mail/filters.rs
+  - src-tauri/src/mail/filters/execution.rs
+  - src-tauri/src/mail/filters/store.rs
+  - src-tauri/src/mail/filters/actions.rs
+  - src-tauri/crates/taomni-mail-engine/src/filters/imap.rs
+  - src-tauri/plugins/mail/src/imap_exchange.rs
 controls:
   - id: filters-open
     selector: '[data-testid="mail-filters-open"]'
@@ -7925,6 +8717,8 @@ controls:
 - 邮箱栏的漏斗按钮打开 “Message filters” 对话框（DEC-11，Thunderbird 式）：规则列表可启用/停用、上移下移（即执行顺序）、编辑、删除、对当前文件夹单独运行或全部运行，并可导出/导入 JSON。
 - 编辑器支持多条件（From/To/Cc/To 或 Cc/主题/正文/大小 KB/天数/标签/有附件；包含、不包含、是、不是、开头、结尾、正则、大于、小于；全部或任一匹配）与多动作（移动、复制、标记已读/未读、加星、加标签、删除到废纸篓、转发、停止执行后续过滤器）。邮件右键 “Create filter from message…” 预填发件人。
 - 收信过滤：标签打开期间，INBOX 同步取到新邮件后执行（DEC-01，不在后台运行）；每个文件夹记录已过滤的最高 UID，只处理之后到达的邮件，保存规则时不回溯旧邮件；UIDVALIDITY 变化后重新建立基线。POP3 账户同样适用。
+- Mail 0.1.32 由签名宿主查询未缓存的 IMAP 正文。TC-MAIL-FILTER-01 覆盖主题和正文的过滤区别，TC-MODULES-092 核对启用签名包后服务器的实际邮件位置。
+- Mail 0.1.33 将规则定义保存在模块邮箱。TC-MODULES-092 同时验证模块库写入和停用后的保留。签名宿主从当前邮箱代际选择候选，完成后只推进同一 UIDVALIDITY 的过滤水位。
 - 正文条件：正文已缓存时本地匹配，未缓存时用服务器 `UID SEARCH BODY` 判断（因此正文只支持包含/不包含）。
 - 动作失败（例如目标文件夹不存在）时邮件留在原处，错误显示在状态栏，漏斗按钮出现警示，打开对话框可看到失败明细（AC-42）。
 
@@ -7938,7 +8732,7 @@ status: done
 area: mail/unified
 components: [MailUnifiedTab, Sidebar, ControlBar]
 files:
-  - src/components/mail/MailUnifiedTab.tsx
+  - src-tauri/plugins/mail/renderer/MailUnifiedTab.tsx
   - src/lib/mailUnified.ts
   - src/layouts/MainLayout.tsx
 controls:
@@ -7951,6 +8745,8 @@ controls:
     optional: true       # app menu (Tools); macOS uses the native menu
   - id: unified-tab
     selector: '[data-testid="mail-unified-tab"]'
+    aliases:
+      - '[data-plugin-slug="mail"][data-plugin-kind="unified"] [data-testid="mail-unified-tab"]'
     kind: display
   - id: unified-refresh
     selector: '[data-testid="mail-unified-refresh"]'
@@ -8033,10 +8829,15 @@ status: partial
 area: mail/contacts
 components: [MailAddressBookPanel, MailClientTab, SessionEditor]
 files:
-  - src/components/mail/MailAddressBookPanel.tsx
+  - src-tauri/plugins/mail/renderer/MailAddressBookPanel.tsx
   - src/lib/mailContacts.ts
   - src-tauri/src/mail/contacts.rs
-  - src-tauri/src/mail/vcard.rs
+  - src-tauri/crates/taomni-mail-engine/src/contacts.rs
+  - src-tauri/crates/taomni-mail-engine/src/vcard.rs
+  - src-tauri/plugins/mail/src/commands.rs
+  - src-tauri/src/mail/contacts/book_store.rs
+  - src-tauri/plugins/mail/src/address_book.rs
+  - src-tauri/crates/taomni-mail-engine/src/contacts/handoff.rs
 controls:
   - id: address-book-open
     selector: '[data-testid="mail-address-book-open"]'
@@ -8112,6 +8913,7 @@ controls:
 - 邮箱栏 “Address book” 按钮打开地址簿：联系人（姓名、多个邮箱与电话、单位、备注）增删改与搜索；邮件右键 “Add sender to address book…” 预填发件人；联系人行可直接写信。
 - vCard 2.1/3.0/4.0 导入（一个 .vcf 可含多张卡片，支持 quoted-printable 与 Apple 分组属性）与导出（vCard 3.0）；照片、地址等未建模的属性原样保留，往返不丢数据（DEC-13：自行实现，不新增依赖）。
 - 写信自动补全先列出地址簿联系人（带姓名），再列出收发历史中收集的联系人，按邮箱去重（AC-61）。
+- TC-MAIL-CONTACTS-01 在 Browser 和 Native 检查写信建议以及重开地址簿后的联系人地址。签名 Mail 升级检查默认和自定义旧缓存中的地址簿查询。
 - CardDAV：会话设置填写 CardDAV URL（服务器、principal 或地址簿地址均可，按 `/.well-known/carddav`、`current-user-principal`、`addressbook-home-set` 发现），用户名默认与 IMAP 相同，密码使用邮件密码（OAuth 账户发送 Bearer 令牌）。“Sync” 先上传本地修改（`If-Match`/`If-None-Match`，冲突时以服务器为准），再按 ETag 拉取变化（`addressbook-multiget`，不支持时逐个 GET），服务器删除的卡片同步删除（AC-60）。
 - 未完成：CardDAV 不走会话代理/跳板机；Google 通讯录需要额外 OAuth scope，未接入；CardDAV 只同步发现到的第一个地址簿；不定时自动同步（手动 Sync）。托管 UI 用例不连 CardDAV 服务器，CardDAV 流程由 Rust 进程内服务器测试覆盖，仅在 Windows 本机执行过。
 
@@ -8125,7 +8927,7 @@ status: partial
 area: mail/calendar
 components: [MailAgendaPanel, MailClientTab, SessionEditor]
 files:
-  - src/components/mail/MailAgendaPanel.tsx
+  - src-tauri/plugins/mail/renderer/MailAgendaPanel.tsx
   - src/lib/mailCalendar.ts
   - src-tauri/src/mail/caldav.rs
   - src-tauri/src/mail/webdav.rs
@@ -8187,6 +8989,12 @@ controls:
 
 ### 13.23 完整邮件存储、本地归档与目录迁移
 
+Mail 宿主从旧库的归档记录返回保存时间。只有 POP3 原件时，读取正文不生成缓存时间。归档和本地原件的内容、时间字段及重开后的结果由 `profile_host` 跨进程用例核对，Browser 和 Native 归档操作由 `TC-MAIL-STORAGE-01/02` 覆盖。TC-MODULES-070 检查普通账户阅读器从自定义归档加载正文和附件名，核对 IMAP 正文请求数。
+
+查看原文和保存 EML 优先读取已归档的原件。启用的签名 Mail 宿主从 IMAP 读取未归档的 MIME 原件，由核心保存到用户选定的位置。TC-MODULES-059 检查真实 IMAP 原文与本机保存的 EML 文件，TC-MODULES-060 检查 Browser 的原文对话框和导出内容。`TC-MODULES-111` 覆盖签名 Mail 宿主两版本在线更新、禁/启用回滚、握手失败恢复、卸载保留 SQLite 邮箱库/归档定位记录，以及重装后无重启恢复真实 IMAP 同步与邮件阅读。
+
+Mail 宿主使用独立协议引擎。基座通过共享存储库迁移和还原旧 SQLite 邮箱及归档对象。`TC-MODULES-049/101` 分别核对旧账号迁移和新 IMAP 账号的数据库归属。四目标 G9 清单检查默认基座的 Cargo 依赖。
+
 <!-- feature
 id: F-MAIL-23
 status: partial
@@ -8194,21 +9002,42 @@ area: mail/storage
 components: [MailStorageSettings, MailArchivePanel, MailArchiveDialog, SessionEditor, MailClientTab]
 files:
   - src/components/mail/MailStorageSettings.tsx
-  - src/components/mail/MailArchivePanel.tsx
-  - src/components/mail/MailArchiveDialog.tsx
+  - src-tauri/plugins/mail/renderer/MailArchivePanel.tsx
+  - src-tauri/plugins/mail/renderer/MailArchiveDialog.tsx
   - src/components/session/SessionEditor.tsx
-  - src/components/mail/MailClientTab.tsx
+  - src-tauri/plugins/mail/renderer/MailClientTab.tsx
   - src/lib/mail.ts
   - src/lib/mailFolders.ts
   - src/stubs/mailArchiveStub.ts
   - src-tauri/src/mail/storage.rs
   - src-tauri/src/mail/archive.rs
   - src-tauri/src/mail/archive_query.rs
+  - src-tauri/src/mail/archive/local_commands.rs
+  - src-tauri/src/mail/module_host/archive_original.rs
+  - src-tauri/plugins/mail/src/archive_original.rs
+  - src-tauri/plugins/mail/src/archive_cleanup.rs
+  - src-tauri/plugins/mail/src/archive_scan.rs
+  - src-tauri/src/mail/storage/fresh_imap.rs
+  - src-tauri/plugins/mail/src/imap_initialization.rs
   - src-tauri/src/mail/archive_metadata.rs
+  - src-tauri/src/mail/message_source.rs
+  - src-tauri/plugins/mail/renderer/client/MailSourceDialog.tsx
   - src-tauri/src/mail/coordination.rs
   - src-tauri/src/state.rs
   - src-tauri/src/session/mod.rs
 controls:
+  - id: mail-view-source
+    selector: '[data-testid="context-menu-item-view-source"]'
+    kind: interactive
+  - id: mail-save-eml
+    selector: '[data-testid="context-menu-item-save-as-eml"]'
+    kind: interactive
+  - id: mail-save-attachment-as
+    selector: '[data-testid="context-menu-item-save-attachment-as"]'
+    kind: interactive
+  - id: mail-source-dialog
+    selector: '[role="dialog"][aria-label="Message source"]'
+    kind: display
   - id: mail-storage-settings
     selector: '[data-testid="mail-storage-settings"]'
     kind: display
@@ -8220,6 +9049,21 @@ controls:
     kind: interactive
   - id: mail-storage-mode
     selector: '[data-testid="mail-storage-mode"]'
+    kind: interactive
+  - id: mail-cache-attachments
+    selector: '[data-testid="mail-cache-attachments"]'
+    kind: interactive
+  - id: mail-cache-enabled
+    selector: '[data-testid="mail-cache-enabled"]'
+    kind: interactive
+  - id: mail-recent-body-limit
+    selector: 'input[aria-label="Mail recent body limit"]'
+    kind: interactive
+  - id: mail-sync-interval
+    selector: 'input[aria-label="Mail sync interval minutes"]'
+    kind: interactive
+  - id: mail-sync-fetch-limit
+    selector: 'input[aria-label="Mail max fetch per sync"]'
     kind: interactive
   - id: mail-storage-folders
     selector: '[data-testid="mail-storage-folders"]'
@@ -8370,6 +9214,11 @@ controls:
 -->
 
 - 每会话可设置目录；默认仍为应用 mail-cache。完整原件按封 gzip 压缩，包含 MIME 正文、内联资源及附件，SHA-256 校验和去重。
+- Mail 签名宿主用独立 IMAP 连接读取归档邮件头和分段原件。TC-MODULES-070 验证停用时归档任务释放本机文件锁、重新启用后恢复扫描、暂停续传，以及服务端删除后的本地正文和附件摘要。TC-MODULES-060 检查停用后隐藏归档入口，重新启用后在原标签中打开。TC-MAIL-STORAGE-01 核对导出后仍可再次保存同一附件。TC-MAIL-STORAGE-06 验证清理后保持暂停，恢复后打开保留的原件并检查 EML 导出入口。
+- 签名 Mail 宿主通过只读 SQLite 查询当前账户的归档索引。TC-MODULES-070 核对服务器删除邮件后自选目录的搜索结果。TC-MAIL-STORAGE-08 核对重开归档后的邮件数量。
+- Mail 签名宿主发布已校验的 IMAP 完整原件并提交归档索引。TC-MODULES-070 核对签名命令、暂停续传和磁盘摘要。TC-MAIL-STORAGE-01 覆盖重开归档后查找已保存的邮件。
+- 签名 Mail 宿主读取归档原件，并流式返回 EML 和附件。TC-MODULES-070 核对清空实时缓存后仍能打开并导出保留原件，保存的 EML 和附件与原始摘要一致。TC-MAIL-STORAGE-01 检查取消 EML 导出后可从同一个预览重试。
+- Mail 签名宿主管理本地归档的清理预览和确认。TC-MODULES-070 核对取消后保留两封、确认后仅移除所选原件，以及磁盘上的剩余原件和暂停状态。TC-MAIL-STORAGE-01 核对取消和重新确认的选择状态。
 - IMAP 原件以实际字节范围与 EOF 确认完整性，兼容不准确的 RFC822.SIZE；空正文或错误范围保留明确的文件夹/UID 错误，不阻塞其它可读取邮件，也不把失败项永久跳过。`TC-MAIL-STORAGE-03` 通过真实 Retry 和独立 MIME/附件校验覆盖恢复流程。
 - IMAP 全部/仅选中/排除文件夹均保留其它文件夹的摘要。后台暂停保留可续传片段，普通删除/远端消失保留归档，主动清理才物理删除最后引用。
 - 本地归档独立于实时邮件列表，可以读取/导出服务器已消失的邮件。POP3 原始本地库保持兼容并保留压缩归档。
@@ -8387,8 +9236,14 @@ status: partial
 area: network/sockscap
 components: [SocksCapPanel]
 files:
-  - src/components/sockscap/SocksCapPanel.tsx
-  - src/components/sockscap/SocksCapRootPrompt.tsx
+  - src/components/plugins/SocksCapSessionPane.tsx
+  - src/components/ElevationPasswordPrompt.tsx
+  - src/lib/sockscap/
+  - src-tauri/crates/taomni-sockscap-api/
+  - src-tauri/crates/taomni-module-settings/
+  - src-tauri/plugins/sockscap/
+  - src-tauri/src/sockscap/
+  # The signed module's capture journal is observed by TC-MODULES-080 and TC-MODULES-085.
   - src/lib/sockscap.ts
   - src/stubs/tauri-core.ts
 controls:
@@ -8401,13 +9256,43 @@ controls:
   - id: sidebar-entry
     selector: '[data-testid="sidebar-tool-sockscap"]'
     kind: interactive
+  - id: module-panel
+    selector: '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"]'
+    kind: display
+    optional: true
   - id: panel
     selector: '[data-testid="sockscap-panel"]'
+    aliases:
+      - '[data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]'
+      - '[data-testid="plugin-tab-panel"][data-plugin-slug="sockscap"] [data-testid="sockscap-panel"]'
+      - '[data-testid="sockscap-panel"][aria-busy="false"]'
     kind: display
   - id: locked-banner
     selector: '[data-testid="sockscap-locked-banner"]'
     kind: display
     optional: true       # shown only while capture is preparing/running/stopping
+  - id: macos-setup-help
+    selector: '[data-testid="sockscap-macos-setup-help"]'
+    kind: interactive
+    optional: true
+  - id: macos-setup-status
+    selector: '[data-testid="sockscap-macos-setup-status"]'
+    aliases:
+      - '[data-testid="sockscap-macos-setup-status"][data-installer-source="module"]'
+    kind: display
+    optional: true
+  - id: macos-setup-close
+    selector: '[data-testid="sockscap-macos-setup-close"]'
+    kind: interactive
+    optional: true
+  - id: macos-setup-install
+    selector: '[data-testid="sockscap-macos-setup-install"]'
+    kind: interactive
+    optional: true
+  - id: macos-setup-error
+    selector: '[data-testid="sockscap-macos-setup-error"]'
+    kind: display
+    optional: true
   - id: add-profile
     selector: '[data-testid="sockscap-add-profile"]'
     kind: interactive
@@ -8433,6 +9318,32 @@ controls:
   - id: upstream-section-toggle
     selector: '[data-testid="sockscap-section-upstream-toggle"]'
     kind: interactive
+  - id: upstream-kind
+    selector: '[data-testid="sockscap-upstream-kind"]'
+    kind: interactive
+  - id: upstream-uuid
+    selector: '[data-testid="sockscap-upstream-uuid"]'
+    kind: interactive
+  - id: upstream-uuid-store
+    selector: '[data-testid="sockscap-upstream-uuid-store"]'
+    kind: interactive
+  - id: upstream-host
+    selector: '[data-testid="sockscap-upstream-host"]'
+    kind: interactive
+  - id: upstream-port
+    selector: '[data-testid="sockscap-upstream-port"]'
+    kind: interactive
+  - id: test-upstream
+    selector: '[data-testid="sockscap-test-upstream"]'
+    kind: interactive
+  - id: share-link
+    selector: '[data-testid="sockscap-sharelink-input"]'
+    kind: interactive
+    optional: true
+  - id: import-share-link
+    selector: '[data-testid="sockscap-sharelink-import"]'
+    kind: interactive
+    optional: true
   - id: rules-section-toggle
     selector: '[data-testid="sockscap-section-rules-toggle"]'
     kind: interactive
@@ -8574,7 +9485,13 @@ controls:
 -->
 
 - 提供全局/按应用 TCP 路由、上游代理、GFWList、规则 dry-run、状态与流量统计的控制面板。
-- Linux 有权限时继续通过 nftables + cgroup v2 做透明 TCP 重定向；无 sudo、受限桌面容器等环境自动切换为“从 SocksCap 启动应用”的 loopback 捕获，不注入 HTTP_PROXY/ALL_PROXY 等代理变量。该模式只覆盖由面板启动的动态链接应用及其继承进程。
+- 启用 SocksCap 后，Tools 标签加载模块前端和样式，测试目标在独立宿主计算实际决策并显示命中的规则。TC-MODULES-073 核对旧配置与规则进入签名宿主，停用再启用后继续命中同一规则。TC-MODULES-074 在 Browser 从停用占位进入商店，在同一标签验证启用、试算、再次停用及恢复试算。TC-MODULES-108 覆盖签名 SocksCap 宿主两版本在线更新、握手失败回退、版本/runtime 清理与保留 Vault 上游重装。
+- TC-MODULES-080 从 macOS 原生面板启动针对单个程序的捕获，在等待系统批准时从商店停用。核对签名宿主、桥接进程、上游启动器、私有套接字、写锁和恢复记录。
+- TC-MODULES-085 从 Windows 原生面板启动捕获，核对 WinDivert 损坏拒绝和提权辅助进程的宿主归属。停用后验证宿主退出、转发监听端口关闭和恢复日志清理，卸载后核对保留配置与版本目录。TC-MODULES-074 和 TC-MODULES-085 验证卸载后重新打开工具时显示安装入口，捕获启动按钮已移除。
+- TC-MODULES-081 从邮件地址簿新增联系人并停用模块，逐阶段核对签名宿主、模块邮箱库中的联系人和旧缓存。重新启用后从写信界面选择联系人，再从地址簿删除同一条记录。
+- TC-MODULES-083 从保存的账户打开附件，复核签名 Mail 模块写入的实际文件、关闭后删除的查看器副本及再次打开时的服务器请求数。TC-MAIL-STORAGE-01 核对该账户的附件缓存开关保存后恢复。
+- TC-MODULES-075 验证上游 UUID 保存时的 Vault 设置、取消和续办。TC-MODULES-072 验证签名代理链接导入在完成首次 Vault 设置后继续保存端点。
+- Linux 有权限时继续通过 nftables + cgroup v2 做透明 TCP 重定向；无 sudo、受限桌面容器等环境自动切换为“从 SocksCap 启动应用”的 loopback 捕获，不注入 HTTP_PROXY/ALL_PROXY 等代理变量（0.1.13 起由签名 SocksCap Linux 包携带并通过 `runtime/linux-capture` 校验暂存 `taomni-sockscap-trace-launcher`）。该模式只覆盖由面板启动的动态链接应用及其继承进程。
 - 浏览器预览覆盖控制面板状态流转；内核捕获和原始目标恢复由 Rust 单元/集成验证覆盖。
 
 ---
@@ -11673,10 +12590,12 @@ area: tools/mfa
 components: [MfaTab, MfaPanel, MfaAccountRow, MfaCountdown, MfaEditDialog, MfaQrDialog, VaultGate]
 files:
   - src-tauri/src/mfa/mod.rs
-  - src-tauri/src/mfa/otp.rs
   - src-tauri/src/mfa/crypto.rs
   - src-tauri/src/mfa/store.rs
   - src-tauri/src/mfa/commands.rs
+  - src-tauri/src/mfa/backend.rs
+  - src-tauri/crates/taomni-mfa-api/src/
+  - src-tauri/crates/taomni-mfa-engine/src/
   - src/lib/mfa/types.ts
   - src/lib/mfa/ipc.ts
   - src/lib/mfa/sort.ts
@@ -11684,12 +12603,12 @@ files:
   - src/lib/mfa/qrSvg.ts
   - src/stores/mfaStore.ts
   - src/stubs/mfaStub.ts
-  - src/components/mfa/MfaTab.tsx
-  - src/components/mfa/MfaPanel.tsx
-  - src/components/mfa/MfaAccountRow.tsx
-  - src/components/mfa/MfaCountdown.tsx
-  - src/components/mfa/MfaEditDialog.tsx
-  - src/components/mfa/MfaQrDialog.tsx
+  - src-tauri/plugins/mfa/renderer/MfaTab.tsx
+  - src-tauri/plugins/mfa/renderer/MfaPanel.tsx
+  - src-tauri/plugins/mfa/renderer/MfaAccountRow.tsx
+  - src-tauri/plugins/mfa/renderer/MfaCountdown.tsx
+  - src-tauri/plugins/mfa/renderer/MfaEditDialog.tsx
+  - src-tauri/plugins/mfa/renderer/MfaQrDialog.tsx
   - src/components/vault/VaultGate.tsx
 controls:
   - id: open-sidebar
@@ -11880,6 +12799,7 @@ controls:
     optional: true       # first load only
   - id: load-error
     selector: '[data-testid="mfa-load-error"]'
+    # MFA_LEGACY_MIGRATION_REQUIRED directs the signed view to the module store.
     kind: display
     optional: true       # unreadable mfa.db
   - id: retry
@@ -11902,6 +12822,10 @@ controls:
 - 搜索（发行方/账户/分组/备注，Enter 复制首个结果，方向键在验证码间移动）、分组筛选（含无分组）、6 种排序（自定义/发行方/账户/最近使用/最常用/最近添加）、置顶、菜单上移/下移与拖拽调整自定义顺序；排序与筛选偏好持久化。
 - 右键或 ⋯ 菜单：编辑（发行方、账户、分组、备注）、显示二维码、置顶、上移/下移、删除（确认后执行）。
 - 显示二维码：重新输入主密码后由后端 `mfa_export_uri` 生成 `otpauth://` 链接并在本地渲染为二维码，供其他验证器扫码迁移；关闭即清除，再次打开需重新验证。
+- 锁定请求立即清除标签页、悬浮窗的验证码和导出弹窗；旧异步结果不能恢复已隐藏内容，解锁后重新读取账户与 HOTP 计数。`TC-MFA-013` 在 browser/native 验证悬浮窗与标签页同步门禁、错误口令拒绝及正确口令后的计数连续性。
+- `TC-MFA-014` 在 browser/native 验证设置页修改主密码后保留同一账户、HOTP 计数与原密钥；旧密码不能解锁或导出，新密码恢复原验证码与 secret。浏览器只证明门禁，实际密钥重包由 native 验证。
+- `TC-MFA-016` 在 browser/native 验证单次导出仅授权当前账户、错误密码没有可见的 QR 或密钥、取消后重开会清除密码和错误，并验证两个账户各自的密钥和保留状态。
+- 账户校验、OTP、AES-GCM、key-check、事务导入和偏好存储由不依赖 Tauri/Vault 的 `taomni-mfa-engine` 提供；当前核心适配层仍持有连接和准入，独立 MFA 宿主尚未交付。`TC-MFA-015` 在 browser/native 验证重复拒绝、编辑/置顶、偏好重载、HOTP 连续性和取消/确认删除；native 使用真实 Vault 与 `mfa.db`，不把 browser stub 或 WebView reload 记作独立宿主或正常进程重启证据。
 
 ### 27.2 添加账户：密钥、截图、屏幕扫描与摄像头 ✅
 
@@ -11911,23 +12835,30 @@ status: done
 area: tools/mfa
 components: [MfaAddDialog, MfaSecretForm, MfaImagePane, MfaScreenPane, MfaCameraPane, MfaImportPreview]
 files:
+  - src-tauri/src/capture/service.rs
+  - src-tauri/crates/taomni-capture/src/still/
+  - src-tauri/crates/taomni-capture/src/pixels.rs
+  - src-tauri/src/capture/plugin_service.rs
   - src-tauri/src/mfa/capture.rs
+  - src-tauri/src/mfa/backend.rs
+  - src-tauri/plugins/mfa/src/screen_scan.rs
   - src/lib/mfa/base32.ts
   - src/lib/mfa/otpauth.ts
   - src/lib/mfa/migration.ts
   - src/lib/mfa/qrImage.ts
   - src/lib/mfa/frames.ts
   - src/lib/mfa/sources.ts
-  - src/components/mfa/MfaAddDialog.tsx
-  - src/components/mfa/MfaSecretForm.tsx
-  - src/components/mfa/MfaImagePane.tsx
-  - src/components/mfa/MfaScreenPane.tsx
-  - src/components/mfa/MfaCameraPane.tsx
-  - src/components/mfa/MfaImportPreview.tsx
+  - src-tauri/plugins/mfa/renderer/MfaAddDialog.tsx
+  - src-tauri/plugins/mfa/renderer/MfaSecretForm.tsx
+  - src-tauri/plugins/mfa/renderer/MfaImagePane.tsx
+  - src-tauri/plugins/mfa/renderer/MfaScreenPane.tsx
+  - src-tauri/plugins/mfa/renderer/MfaCameraPane.tsx
+  - src-tauri/plugins/mfa/renderer/MfaImportPreview.tsx
 controls:
   - id: dialog
     selector: '[data-testid="mfa-add-dialog"]'
     kind: display
+    note: Screen import preview exposes the decoder owner in data-screen-decoder.
   - id: close
     selector: '[data-testid="mfa-add-close"]'
     kind: interactive
@@ -12079,7 +13010,8 @@ controls:
 - 密钥模式：发行方/账户/Base32 密钥（允许小写、空格分组）/分组，高级项可选 TOTP/HOTP、SHA1/256/512、6～8 位、周期或初始计数；粘贴 `otpauth://` 链接自动填表；逐项校验并拒绝重复密钥。
 - 截图模式：粘贴截图（按钮或 Ctrl/⌘+V，桌面版经 Rust arboard 读取系统剪贴板图片）、拖入或选择图片文件；在 MFA 标签上直接粘贴截图会跳到导入预览。
 - 屏幕扫描（桌面版）：临时隐藏 Taomni，截取所有显示器后恢复窗口；macOS 需屏幕录制权限。摄像头：设备选择、无设备/拒绝授权状态与重试，识别后立即停止视频流。
-- 二维码由渲染层 `qr` 解码；支持 Google Authenticator `otpauth-migration` 批量导出码。导入前预览每个账户（可取消勾选、改名、统一分组），已存在的账户标记为“已添加”。
+- 支持扫码的签名 MFA 宿主经核心授权读取屏幕帧并解码，旧版和不含该能力的宿主沿用渲染层解码。TC-MODULES-039 在 Linux 实际迁移后验证已安装宿主的识别与空结果。TC-MODULES-038 在 macOS 升级重启后扫描外部 AppKit 窗口显示的二维码。TC-MFA-007 验证浏览器显示桌面限定提示。
+- 支持 Google Authenticator `otpauth-migration` 批量导出码。导入前预览每个账户（可取消勾选、改名、统一分组），已存在的账户标记为“已添加”。
 
 ### 27.3 备份与恢复中的 MFA 数据 ✅
 
@@ -12121,6 +13053,8 @@ controls:
 -->
 
 - 轻量核心与完整备份都包含 `databases/mfa.db`；自定义范围勾选 MFA 时强制同时包含 `vault.db`（数据密钥在保险库中）。从未使用 MFA 的配置不生成 `mfa.db`。
+- 当前核心中的 Vault/MFA 快照在同一独占 lease 下完成，后台快照只暂缓新请求，不改变 Vault 锁定状态或安全 epoch；未打开的 MFA 库只读快照，不因备份初始化 schema。`TC-MFA-103` 在 native 验证锁定后备份、归档同时含两库，以及显式解锁后的原账户恢复；单元验证重包后的 key、key_check 和 RFC HOTP 连续性。
+- `TC-MODULES-013/014/015` 补 hello 运行、禁用、卸载保留数据三态的真实 stage/正常冷启动 apply、原代码状态、新 generation、原 Vault 密码及 RFC HOTP 恢复；尚待 runner 执行，不代替独立 MFA 插件的验收。`TC-BACKUP-RESTORE-001` 只验证 browser 确认界面的空/错密码、成功暂存及禁止重复确认；native 确认后自动 relaunch 的接管仍未验证。
 - 恢复时替换 `mfa.db` 并为原文件保留安全副本；恢复后若保险库与 `mfa.db` 不匹配，MFA 标签提示并提供清空重建入口。
 
 ### 27.4a 云端备份连接（开发中）
@@ -12300,14 +13234,14 @@ controls:
 - id: backup-cloud-includeMfa
   selector: '[data-testid="backup-cloud-includeMfa"]'
   kind: interactive
+- id: backup-cloud-includePlugins
+  selector: '[data-testid="backup-cloud-includePlugins"]'
+  kind: interactive
 - id: backup-cloud-includeConfigs
   selector: '[data-testid="backup-cloud-includeConfigs"]'
   kind: interactive
 - id: backup-cloud-includeServerCertificates
   selector: '[data-testid="backup-cloud-includeServerCertificates"]'
-  kind: interactive
-- id: backup-cloud-includeLanchat
-  selector: '[data-testid="backup-cloud-includeLanchat"]'
   kind: interactive
 - id: backup-cloud-includeLocalHistory
   selector: '[data-testid="backup-cloud-includeLocalHistory"]'
@@ -12353,6 +13287,7 @@ files:
 - src/stores/backupSettingsStore.ts
 - src/lib/backupSettings.ts
 - src/stubs/remoteBackupStub.ts
+- src/stubs/backupRestoreStub.ts
 - src-tauri/src/backup/settings.rs
 - src-tauri/src/backup/settings_model.rs
 - src-tauri/src/backup/range.rs
@@ -12413,6 +13348,18 @@ controls:
 - id: restore-dialog
   selector: '[data-testid="backup-restore-dialog"]'
   kind: display
+- id: restore-vault-password
+  selector: '[data-testid="backup-restore-vault-password"]'
+  kind: interactive
+- id: restore-confirm
+  selector: '[data-testid="backup-restore-confirm"]'
+  kind: interactive
+- id: restore-error
+  selector: '[data-testid="backup-restore-error"]'
+  kind: display
+- id: restore-staged
+  selector: '[data-testid="backup-restore-staged"]'
+  kind: display
 - id: range-summary
   selector: '[data-testid="backup-range-summary"]'
   kind: display
@@ -12434,14 +13381,14 @@ controls:
 - id: backup-global-includeMfa
   selector: '[data-testid="backup-global-includeMfa"]'
   kind: interactive
+- id: backup-global-includePlugins
+  selector: '[data-testid="backup-global-includePlugins"]'
+  kind: interactive
 - id: backup-global-includeConfigs
   selector: '[data-testid="backup-global-includeConfigs"]'
   kind: interactive
 - id: backup-global-includeServerCertificates
   selector: '[data-testid="backup-global-includeServerCertificates"]'
-  kind: interactive
-- id: backup-global-includeLanchat
-  selector: '[data-testid="backup-global-includeLanchat"]'
   kind: interactive
 - id: backup-global-includeMail
   selector: '[data-testid="backup-global-includeMail"]'
@@ -12470,14 +13417,14 @@ controls:
 - id: backup-local-includeMfa
   selector: '[data-testid="backup-local-includeMfa"]'
   kind: interactive
+- id: backup-local-includePlugins
+  selector: '[data-testid="backup-local-includePlugins"]'
+  kind: interactive
 - id: backup-local-includeConfigs
   selector: '[data-testid="backup-local-includeConfigs"]'
   kind: interactive
 - id: backup-local-includeServerCertificates
   selector: '[data-testid="backup-local-includeServerCertificates"]'
-  kind: interactive
-- id: backup-local-includeLanchat
-  selector: '[data-testid="backup-local-includeLanchat"]'
   kind: interactive
 - id: backup-local-includeLocalHistory
   selector: '[data-testid="backup-local-includeLocalHistory"]'
@@ -12520,12 +13467,18 @@ status: done
 area: screenshot/screen-record
 components: [ScreenshotOverlay, AnnotationCanvas, PinnedImage, PinToolsWindow, RecorderBar, ScrollCaptureBar, ScreenshotMenuButton, ControlBar, screenshot.ts, screenshot (tauri)]
 files:
+  - src-tauri/src/capture/
+  - src-tauri/crates/taomni-capture/src/engine/
+  - src-tauri/crates/taomni-capture/src/still/mac_snapshot.rs
+  - src-tauri/crates/taomni-capture/src/permissions.rs
   - src/components/screenshot/ScreenshotOverlay.tsx
   - src/components/screenshot/AnnotationCanvas.tsx
   - src/components/screenshot/ScreenshotFavorites.tsx
   - src/components/screenshot/PinnedImage.tsx
   - src/components/screenshot/PinToolsWindow.tsx
   - src/components/screenshot/RecorderBar.tsx
+  - src-tauri/plugins/screenshot/renderer/RecorderBar.tsx
+  - src/lib/screenshotRenderer.ts
   - src/components/screenshot/ScrollCaptureBar.tsx
   - src/components/screenshot/ScrollCaptureResult.tsx
   - src/components/screenshot/ScreenshotMenuButton.tsx
@@ -12545,6 +13498,14 @@ files:
   - src-tauri/src/screenshot/scroll.rs
   - src-tauri/src/screenshot/record.rs
   - src-tauri/src/screenshot/ocr.rs
+  - src-tauri/src/screenshot/ocr_commands.rs
+  - src-tauri/crates/taomni-screenshot-api/src/lib.rs
+  - src-tauri/crates/taomni-screenshot-ocr/src/lib.rs
+  - src-tauri/crates/taomni-screenshot-recording/src/lib.rs
+  - src-tauri/plugins/screenshot/module.json
+  - src-tauri/plugins/screenshot/src/lib.rs
+  - src-tauri/plugins/screenshot/src/recording.rs
+  - src-tauri/plugins/screenshot/renderer/index.ts
   - src-tauri/src/screenshot/qa.rs
   - src-tauri/src/screenshot/qa/pin_arrangement.rs
   - src-tauri/src/screenshot/qa_oracle.rs
@@ -13196,6 +14157,9 @@ controls:
 - 滚动截图开始前说明自动滚动与结束方式，进行中显示帧数、“完成”和“取消”；完成保留已捕获长图，取消保留原始选区和标注。滚动及录制期间使用选区外的原生红色边框和控制窗口，避免依赖平台的内容保护来排除控制画面；全屏等没有安全控制位置时隐藏控制窗口，截图快捷键结束采集后再显示预览。没有安全位置且快捷键未注册时拒绝启动并提示调整范围或启用快捷键。
 - Browser `TC-SHOT-001`–`021` 检查真实 renderer 输入、选区几何、`data-shapes` 历史、已绘制 canvas 颜色/线宽、PNG 解码尺寸、dialog 取消/确认、贴图 route 和快捷键/倒计时；浏览器 OCR 返回 `Taomni stub OCR\nuser@example.com`，滚动 stub 返回 400×1800 的可读长图，录制 stop 返回 PNG preview。请求/route/形状数断言不等于真实采集、拼接、GIF/MP4 编码或敏感像素遮盖证据；水印 apply/clear 状态不宣称水印输出像素通过。
 - Native `SHOT-N*` 用例负责真实屏幕、滚动注入/拼接、OS 剪贴板、媒体解码和窗口/全局热键边界。N2/N9 捕获完整长页并将产物逐像素/24×24 区块与真实 renderer canvas 保留的原画比对，覆盖文字、图案、分隔线及缺失/重复/错位/拉伸，不只检查高度或单列颜色。N5–N8 对 GIF/MP4 每一解码帧核对原画 frame id、每轮随机 nonce、区域像素及有序时间线，黑帧/错区域/静态或无关多帧均不得通过；保存原始 PNG、产物、逐帧指标/时间线和原图/实际/差异接触图。
+- `TC-MODULES-061` 安装并启用签名 Screenshot OCR 包，核对宿主与离线 WASM 的实际识别文字、撤销/重做、剪贴板像素和写租约，停用后再次执行原生截图，并用竞争采集租约确认录制先提示启用模块。Browser `TC-SHOT-021` 核对自动遮挡使用裁剪后的图片，并覆盖选区、历史和复制结果。`TC-MODULES-109` 覆盖签名 Screenshot 两版本在线更新、禁/启用回滚、握手失败恢复、无状态卸载清理与重装恢复原生 OCR/自动遮挡。
+- `TC-MODULES-062` 从同一签名宿主完成 GIF 和 MP4 录制，验证签名包内的录制界面、实际像素及时间戳、预览清理、取消时的临时文件与采集租约，以及停用后的写租约。Browser `TC-SHOT-006` 检查停止、预览和首帧复制。`TC-SHOT-020` 检查保存和取消录制后再次打开普通截图。
+- 默认基座对未安装或停用 Screenshot 模块的 OCR 和录制请求给出模块商店提示。生产 Cargo 树与前端产物清单覆盖引擎和语言资源的裁剪。隔离 QA 构建保留旧实现，用于回归旧配置与签名模块的切换。
 - 新增 Browser `TC-SHOT-022` 验证自由轮廓/退化拒绝/移动缩放/历史/切换/轮廓外命中，`TC-SHOT-023` 将两种轮廓 Pin 的实际 PNG 与导出前保留原图做独立 RGB/alpha 比对。Native `TC-SHOT-N11` 使用真实 OS 鼠标绘制凹形选区，分别核对 Pin 文件与 OS 剪贴板 RGBA；实际拖动 Pin 后读取窗口位置差/置顶状态，并检查独立副本存活/销毁。run36991920385（SHA63c275da）三端新增与保留流程已通过：各 browser23/23、native11/11，零失败零跳过；三端 Pin 实际位移均80×64，原画 RGB 完全一致且非边缘 alpha 无差异。Linux 置顶读取真实 X11 ABOVE atom，保留 GTK/Tao 缓存 false 作为诊断，不用缓存或 builder 声明代替实际 WM 状态。
 - `TC-SHOT-028` 覆盖多行输入、字体/字号、文字样式撤销/重做与窄窗口录制菜单；`TC-SHOT-003` 覆盖长图预览比例、100% 尺寸与完整输出。N3 同时检查原生菜单布局与剪贴板两行文字像素，N12 检查原生结果预览及继续标记比例。 验证 run37113915949（产品提交 `1b99b6a8`）：Linux/Windows/macOS browser 各 6/6、native 各 2/2，零失败零跳过；三端真实长图像素误差为 0，两行文字分别通过剪贴板像素检查。六组回执附件哈希、QA 构建源码身份及 15 个原生产物哈希已核验，报告保留于 `qa-ui-auto-report/hosted-37113915949/`。本地仅运行单测（截图相关 93 项、QA scenario 5 项）与目录静态校验；未在本地构建或运行 browser/native。
 - 合并后 `f60ba959` 的 macOS 兼容回归在 run37120338264（测试提交 `fac59f2b`）通过：Linux/Windows/macOS browser 各 6/6，native 分别 5/5、5/5、7/7，零失败零跳过。N14 的 GIF/MP4 分别记录 13/14 次 CoreGraphics 单帧读取、零持久流构造；全部帧匹配原画。N15 在 3.5 秒后仍显示权限说明、保留选区几何和标记，按钮及 Escape 退出均通过，未创建滚动控制窗口。六组源码/用例/构建身份、回执及附件哈希，另 931 个原生产物哈希已核对；证据位于 `qa-ui-auto-report/hosted-37120338264/`。本地仅运行单测（前端 77、Rust 截图 52、QA runner 6）及静态校验。Hosted macOS 为 15 ARM64；本结果不等于用户 macOS 14 Intel/VMware 的 WindowServer 长时稳定性实测。
@@ -13321,7 +14285,11 @@ controls:
 > - Ribbon `Packages`、`Macros`
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）
 
-- TC-MAIL-SYNC-03: native sparse UID command limits, FETCH reconnect, gap-free catch-up and full remote deletion/flag reconciliation (F-MAIL-5/F-MAIL-3).
+- TC-MAIL-SYNC-01 verifies that all 450 messages delivered while the tab was closed appear after reopening and that the newest body opens in browser and native mode (F-MAIL-5).
+- TC-MAIL-SYNC-02 verifies that remote deletions and read flags still match the reopened mailbox in browser and native mode (F-MAIL-5/F-MAIL-3).
+- TC-MAIL-SYNC-03 covers native sparse UID command limits, FETCH reconnect, gap-free catch-up, remote deletion and flag reconciliation, and runtime error checks (F-MAIL-5/F-MAIL-3).
+- TC-MAIL-IDLE-01 and TC-MAIL-POP3-01 check renderer and native connection behavior, including IDLE release after closing the tab, POP3 sync without duplicates and reading the newly downloaded message (F-MAIL-10/F-MAIL-17).
+- TC-MODULES-088 verifies IDLE delivery, close and reopen, and connection release after disabling the signed Mail module (F-MAIL-10).
 
 ---
 
@@ -13375,7 +14343,7 @@ files:
 - src/components/workspace/WorkspaceGitPanel.tsx
 - src/components/workspace/WorkspaceSessionPickerModal.tsx
 - src/components/workspace/WorkspaceSessionPane.tsx
-- src/components/mfa/MfaFloatingWindow.tsx
+- src-tauri/plugins/mfa/renderer/MfaFloatingWindow.tsx
 - src/components/agents/AgentsPlatformView.tsx
 - src/components/search/GlobalCommandModal.tsx
 - src/stores/workspacePlatformStore.ts
@@ -13457,12 +14425,6 @@ controls:
 - id: home-open-mfa
   selector: '[data-testid="home-open-mfa"]'
   kind: interactive
-- id: welcome-open-lanchat
-  selector: '[data-testid="welcome-open-lanchat"]'
-  kind: interactive
-- id: lanchat-roster-panel
-  selector: '[data-testid="lanchat-roster-panel"]'
-  kind: display
 - id: platform-toolbar-actions
   selector: '[data-testid="platform-toolbar-actions"]'
   kind: display
@@ -13561,7 +14523,7 @@ files:
 - src/components/workspace/WorkspaceGitPanel.tsx
 - src/components/workspace/WorkspaceSessionPickerModal.tsx
 - src/components/workspace/WorkspaceSessionPane.tsx
-- src/components/mfa/MfaFloatingWindow.tsx
+- src-tauri/plugins/mfa/renderer/MfaFloatingWindow.tsx
 - src/components/agents/AgentsPlatformView.tsx
 - src/components/search/GlobalCommandModal.tsx
 - src/stores/workspacePlatformStore.ts
@@ -14263,7 +15225,8 @@ files:
   - src/components/workspace/WorkspaceGitPanel.tsx
   - src/components/workspace/WorkspaceSessionPickerModal.tsx
   - src/components/workspace/WorkspaceSessionPane.tsx
-  - src/components/mfa/MfaFloatingWindow.tsx
+  - src/components/plugins/MfaSessionPane.tsx
+  - src-tauri/plugins/mfa/renderer/MfaFloatingWindow.tsx
   - src/components/agents/AgentsPlatformView.tsx
   - src/components/search/GlobalCommandModal.tsx
   - src/stores/workspacePlatformStore.ts
@@ -14280,6 +15243,9 @@ controls:
   - id: mfa-floating-drag-handle
     selector: '[data-testid="mfa-floating-drag-handle"]'
     kind: interactive
+  - id: mfa-floating-entry
+    selector: '[data-testid="mfa-floating-entry"]'
+    kind: display
   - id: mfa-floating-expand-tab
     selector: '[data-testid="mfa-floating-expand-tab"]'
     kind: interactive
@@ -14289,6 +15255,9 @@ controls:
   - id: mfa-floating-pin
     selector: '[data-testid="mfa-floating-pin"]'
     kind: interactive
+  - id: mfa-floating-code
+    selector: '[data-testid="mfa-floating-code"]'
+    kind: display
   - id: mfa-floating-search
     selector: '[data-testid="mfa-floating-search"]'
     kind: interactive
@@ -14324,7 +15293,7 @@ files:
   - src/components/workspace/WorkspaceGitPanel.tsx
   - src/components/workspace/WorkspaceSessionPickerModal.tsx
   - src/components/workspace/WorkspaceSessionPane.tsx
-  - src/components/mfa/MfaFloatingWindow.tsx
+  - src-tauri/plugins/mfa/renderer/MfaFloatingWindow.tsx
   - src/components/agents/AgentsPlatformView.tsx
   - src/components/search/GlobalCommandModal.tsx
   - src/stores/workspacePlatformStore.ts
@@ -14394,7 +15363,7 @@ files:
   - src/components/workspace/WorkspaceGitPanel.tsx
   - src/components/workspace/WorkspaceSessionPickerModal.tsx
   - src/components/workspace/WorkspaceSessionPane.tsx
-  - src/components/mfa/MfaFloatingWindow.tsx
+  - src-tauri/plugins/mfa/renderer/MfaFloatingWindow.tsx
   - src/components/agents/AgentsPlatformView.tsx
   - src/components/search/GlobalCommandModal.tsx
   - src/stores/workspacePlatformStore.ts
@@ -14441,7 +15410,7 @@ files:
 - src/components/workspace/WorkspaceGitPanel.tsx
 - src/components/workspace/WorkspaceSessionPickerModal.tsx
 - src/components/workspace/WorkspaceSessionPane.tsx
-- src/components/mfa/MfaFloatingWindow.tsx
+- src-tauri/plugins/mfa/renderer/MfaFloatingWindow.tsx
 - src/components/agents/AgentsPlatformView.tsx
 - src/components/search/GlobalCommandModal.tsx
 - src/stores/workspacePlatformStore.ts
@@ -14477,7 +15446,7 @@ controls:
 
 隐藏编辑器布局恢复：`TC-WS-038`（browser/native），通过用户入口隐藏 Project、切换到终端、从 Home 重载并恢复，保留草稿、活动标签及工具窗口；覆盖零尺寸面板注册顺序导致的崩溃。
 
-共享面板组件升级回归：`TC-WS-039`（browser/native），真实嵌套分栏、Documentation、侧栏拖动、终端隐藏、大预览和重载连续操作后保留草稿与编辑器所有权；与 `TC-WS-038` 一起显式断言未捕获异常、未处理 Promise、React 根错误与崩溃页，防止界面恢复后漏报组件异常。
+共享面板组件升级回归 `TC-WS-039` 在 Browser 和 Native 核对嵌套分栏、Documentation、侧栏拖动、终端隐藏、大预览、重载和隧道管理器标签切换。断言草稿及编辑器所有权，并检查未捕获异常、未处理的 Promise、React 根错误及崩溃页。安装 MFA 的场景由 `TC-MODULES-102` 核对相同的标签激活和关闭操作。
 
 TC-WS-075 adds native Home source-to-document activation coverage for the real `workspace_execution_model` command. It retains the 150ms frame and 1500ms content/highlight budgets, exact public contents and editor reuse; TC-WS-073/074 also reject automatic execution-model scans for ordinary folders.
 
@@ -14495,6 +15464,9 @@ status: partial
 area: mobile/control-plane
 components: [MobileServiceSettings, MobileHostSettings, MobileWeb, MobileRuntime]
 files:
+  - src-tauri/src/mobile/desktop/capture.rs
+  - src-tauri/src/capture/
+  - src-tauri/crates/taomni-capture/src/permissions.rs
   - src/components/settings/MobileServiceSettings.tsx
   - src/components/settings/MobileHostSettings.tsx
   - src/lib/mobileListener.ts
@@ -15258,6 +16230,9 @@ files:
   - src/components/tabbar/tabs/tabContextMenu.ts
   - src/components/explorer/ExplorerTabsFilter.tsx
   - src/components/explorer/ExplorerShell.tsx
+  - src/components/explorer/ExplorerNewFileDialog.tsx
+  - src/components/explorer/useExplorerOperations.ts
+  - src/components/explorer/explorerContextMenus.tsx
   - src/components/explorer/ExplorerAddressBar.tsx
   - src/components/explorer/ExplorerCommandBar.tsx
   - src/components/explorer/ExplorerNavTree.tsx
@@ -15456,6 +16431,9 @@ controls:
   - id: explorer-context-delete
     selector: '[data-testid="explorer-context-delete"]'
     kind: interactive
+  - id: explorer-context-open-with
+    selector: '[data-testid="explorer-context-open-with"]'
+    kind: interactive
   - id: explorer-context-new-file
     selector: '[data-testid="explorer-context-new-file"]'
     kind: interactive
@@ -15553,6 +16531,30 @@ controls:
   - id: explorer-nav-tree
     selector: '[data-testid="explorer-nav-tree"]'
     kind: display
+  - id: explorer-new-typed-file
+    selector: '[data-testid="explorer-new-typed-file"]'
+    kind: interactive
+  - id: explorer-context-new-typed-file
+    selector: '[data-testid="explorer-context-new-typed-file"]'
+    kind: interactive
+  - id: explorer-new-file-dialog
+    selector: '[data-testid="explorer-new-file-dialog"]'
+    kind: display
+  - id: explorer-new-file-type
+    selector: '[data-testid="explorer-new-file-type"]'
+    kind: interactive
+  - id: explorer-new-file-name
+    selector: '[data-testid="explorer-new-file-name"]'
+    kind: interactive
+  - id: explorer-new-file-error
+    selector: '[data-testid="explorer-new-file-error"]'
+    kind: display
+  - id: explorer-new-file-cancel
+    selector: '[data-testid="explorer-new-file-cancel"]'
+    kind: interactive
+  - id: explorer-new-file-create
+    selector: '[data-testid="explorer-new-file-create"]'
+    kind: interactive
   - id: explorer-new-file
     selector: '[data-testid="explorer-new-file"]'
     kind: interactive
@@ -15747,6 +16749,9 @@ File Explorer 是 Sessions 下方的独立工作区，Tools 面板不再提供�
 
 ## 全局文件打开 / 预览 / 编辑
 
+TC-FILE-OPEN-006 检查工作区入口去重和全局文件设置。TC-FILE-OPEN-049
+检查 Mail 附件的只读副本、去重和最终关闭清理，并在完整模块回归中使用已启用的 Mail。
+
 <!-- feature
 id: F-FILEOPEN-1
 title: Global File Opening and Shared Viewers
@@ -15764,13 +16769,16 @@ files:
   - src/components/settings/FileOpenSettings.tsx
   - src/components/chat/useChatFileLinks.ts
   - src/components/terminal/panel/fileLinks.ts
-  - src/components/mail/client/createAttachmentActions.tsx
+  - src-tauri/plugins/mail/renderer/client/createAttachmentActions.tsx
   - src/components/viewer/ViewerShell.tsx
   - src/components/viewer/TextEditor.tsx
   - src/components/viewer/ImageViewer.tsx
   - src/components/viewer/HtmlPreview.tsx
   - src/components/viewer/HtmlPreviewExternalLinkDialog.tsx
   - src/components/viewer/markdown/MarkdownEditor.tsx
+  - src/components/viewer/markdown/TableWidget.ts
+  - src/components/viewer/markdown/TableCell.ts
+  - src/components/viewer/markdown/markdownRender.ts
   - src/components/viewer/markdown/MarkdownExportMenu.tsx
   - src/components/viewer/markdown/DrawioExportSettings.tsx
   - src/components/viewer/markdown/DrawioImportDialog.tsx
@@ -15801,7 +16809,6 @@ files:
   - src/components/viewer/markdown/exportPdf.ts
   - src/components/viewer/markdown/pdfPages.ts
   - src/components/viewer/markdown/TableWidget.ts
-  - src/components/viewer/markdown/tableCellContent.ts
   - src/components/viewer/markdown/drawioMermaidGeometry.ts
   - src/components/viewer/markdown/wordSvg.ts
   - src/components/viewer/markdown/docxImages.ts

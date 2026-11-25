@@ -1,20 +1,20 @@
 //! Account-owned, resumable full-MIME storage. The renderer only starts or pauses it.
 
-mod limits;
-
 mod lifetime;
 
 mod commands;
+mod connection;
 
 mod sync;
 
 mod local_commands;
-
-mod download;
+mod owned;
+mod worker;
 
 #[cfg(test)]
 mod tests;
 
+pub(crate) use lifetime::ModuleCleanup;
 pub use lifetime::{ArchiveManager, ArchiveStatus};
 
 pub use commands::{mail_archive_pause, mail_archive_start, mail_archive_status};

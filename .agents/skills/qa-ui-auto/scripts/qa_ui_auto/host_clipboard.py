@@ -40,12 +40,13 @@ _PS_PRELUDE = (
 )
 
 
-def _ps(script: str, arg: str = "") -> str:
+def _ps(script: str, arg: str = "", *, strip: bool = True) -> str:
     exe = shutil.which("powershell.exe") or "powershell.exe"
     encoded = base64.b64encode(arg.encode("utf-8")).decode("ascii")
     out = _run([exe, "-NoProfile", "-NonInteractive", "-STA", "-Command", _PS_PRELUDE + script],
                env={"QA_CLIP_ARG": encoded})
-    return out.decode("utf-8", "replace").strip()
+    text = out.decode("utf-8", "replace")
+    return text.strip() if strip else text
 
 
 def _cf_html(fragment: str) -> str:
@@ -151,7 +152,7 @@ def set_text(text: str) -> None:
 def get_text() -> str:
     if SYSTEM == "Windows":
         return _ps("[Console]::OutputEncoding=[Text.Encoding]::UTF8; "
-                   "[Console]::Out.Write([System.Windows.Forms.Clipboard]::GetText())")
+                   "[Console]::Out.Write([System.Windows.Forms.Clipboard]::GetText())", strip=False)
     if SYSTEM == "Darwin":
         return _run(["pbpaste"], env={"LANG": "en_US.UTF-8"}).decode("utf-8", "replace")
     if _wayland_text():

@@ -19,9 +19,15 @@ vi.mock("../../lib/vnc", async (importOriginal) => ({
   redactVncHandoff: (params: unknown) => params,
 }));
 
-vi.mock("../../lib/i18n", () => ({
+vi.mock("../../lib/i18n", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/i18n")>()),
   useT: () => (key: string) => key,
   t: (key: string) => key,
+}));
+
+vi.mock("../../lib/ipc/plugin", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/ipc/plugin")>()),
+  listPlugins: async () => [],
 }));
 
 vi.mock("../../lib/appTheme", () => ({
@@ -66,7 +72,7 @@ vi.mock("../terminal/TerminalPanel", () => ({ TerminalPanel: () => null }));
 vi.mock("../chat/ChatDrawer", () => ({ ChatDrawer: () => null }));
 vi.mock("../tao/TaoRibbon", () => ({ TaoRibbon: () => null }));
 vi.mock("../agent/CcAgentBridge", () => ({ CcAgentBridge: () => null }));
-vi.mock("../vnc/VncPanel", () => ({
+vi.mock("../../../src-tauri/plugins/vnc-client/renderer/VncPanel", () => ({
   default: ({ host, port, viewerOptions }: { host: string; port: number; viewerOptions?: unknown }) => (
     <div
       data-vnc-panel-stub

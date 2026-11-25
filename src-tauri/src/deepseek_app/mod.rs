@@ -56,7 +56,7 @@ pub async fn deepseek_app_regenerate(
     state: State<'_, AppState>,
 ) -> Result<TaoResponse, String> {
     let request = {
-        let db = state.db.lock().map_err(|_| "database unavailable")?;
+        let db = state.core.db.lock().map_err(|_| "database unavailable")?;
         store::init(&db)?;
         store::last_request(&db, &thread_id)?
     };
@@ -76,7 +76,7 @@ pub async fn deepseek_app_continue(
     state: State<'_, AppState>,
 ) -> Result<TaoResponse, String> {
     let request = {
-        let db = state.db.lock().map_err(|_| "database unavailable")?;
+        let db = state.core.db.lock().map_err(|_| "database unavailable")?;
         store::init(&db)?;
         store::last_request(&db, &thread_id)?
     };
@@ -96,14 +96,14 @@ pub fn deepseek_app_stop(thread_id: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn deepseek_app_load_threads(state: State<'_, AppState>) -> Result<Vec<Value>, String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     store::init(&db)?;
     store::load_threads(&db)
 }
 
 #[tauri::command]
 pub fn deepseek_app_save_thread(thread: Value, state: State<'_, AppState>) -> Result<(), String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     store::init(&db)?;
     store::save_thread(&db, thread)
 }
@@ -114,7 +114,7 @@ pub fn deepseek_app_delete_thread(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     runtime::stop(&thread_id)?;
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     store::init(&db)?;
     store::delete_thread(&db, &thread_id)
 }
@@ -126,7 +126,7 @@ pub fn deepseek_app_clone_thread(
     through_message_index: Option<usize>,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
-    let db = state.db.lock().map_err(|_| "database unavailable")?;
+    let db = state.core.db.lock().map_err(|_| "database unavailable")?;
     store::init(&db)?;
     store::clone_thread(
         &db,

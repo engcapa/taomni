@@ -8,186 +8,42 @@
 //!   periodic scan skip folders the server reports unchanged (one round trip
 //!   instead of EXAMINE + SEARCHes).
 
-use std::collections::{HashMap, HashSet};
-use std::io::{Read, Write};
-
-use imap::types::NameAttribute;
+use taomni_mail_api::{FolderSubscription, folder_cache::FolderCacheAction};
+use taomni_mail_storage::cache::{refresh_subscription_flags, sync_folder_tree};
 use tauri::State;
 
-use super::sync::{FolderSyncState, quote_imap_string};
-use super::{MailAccountConfig, MailFolder, resolve_config, with_imap_session, with_mail_db};
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use super::{ImapSessionOpts, with_imap_session};
+use super::{
+    MailAccountConfig, MailFolder, ResolvedMailAccount, module_host, resolve_config, with_mail_db,
+    with_mail_db_async,
+};
 use crate::state::AppState;
 
-pub(super) const SUBSCRIBED_ATTRIBUTE: &str = "\\Subscribed";
+#[cfg(test)]
+use taomni_mail_engine::imap_folders::imap_list_folders;
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+pub(super) use taomni_mail_engine::imap_folders::imap_set_subscription;
+pub(super) use taomni_mail_storage::imap_folders::{SUBSCRIBED_ATTRIBUTE, folder_visible};
 
-/// RFC wire form of a LIST attribute (the `imap` crate only has Debug output).
-pub(super) fn attribute_string(attribute: &NameAttribute<'_>) -> String {
-    match attribute {
-        NameAttribute::NoInferiors => "\\Noinferiors".into(),
-        NameAttribute::NoSelect => "\\Noselect".into(),
-        NameAttribute::Marked => "\\Marked".into(),
-        NameAttribute::Unmarked => "\\Unmarked".into(),
-        NameAttribute::Custom(value) => value.to_string(),
-    }
+#[cfg(test)]
+use taomni_mail_engine::{
+    imap_folders::{FolderStatus, imap_folder_status},
+    imap_sync::{FolderSyncState, folder_unchanged},
+};
+
+pub(super) fn merge_folder_status(previous: &MailFolder, mut status: MailFolder) -> MailFolder {
+    status.flags.clone_from(&previous.flags);
+    status.delimiter.clone_from(&previous.delimiter);
+    status
 }
 
-pub(super) fn folder_is_inbox(folder: &MailFolder) -> bool {
-    folder.name.eq_ignore_ascii_case("INBOX")
-}
-
-pub(super) fn folder_is_subscribed(folder: &MailFolder) -> bool {
-    folder
-        .flags
-        .iter()
-        .any(|flag| flag.eq_ignore_ascii_case(SUBSCRIBED_ATTRIBUTE))
-}
-
-/// Whether the tree/sync should include `folder` under `subscribed_only`.
-pub(super) fn folder_visible(folder: &MailFolder, subscribed_only: bool) -> bool {
-    !subscribed_only || folder_is_inbox(folder) || folder_is_subscribed(folder)
-}
-
-/// Mark LSUB-reported folders `\Subscribed`. An empty or failed LSUB means
-/// the server does not track subscriptions: every folder counts as subscribed
-/// so "subscribed only" never hides a whole account.
-pub(super) fn mark_subscribed(folders: &mut [MailFolder], subscribed: Option<HashSet<String>>) {
-    let subscribed = subscribed.filter(|names| !names.is_empty());
-    for folder in folders.iter_mut() {
-        folder
-            .flags
-            .retain(|flag| !flag.eq_ignore_ascii_case(SUBSCRIBED_ATTRIBUTE));
-        let on = subscribed
-            .as_ref()
-            .is_none_or(|names| names.contains(&folder.name));
-        if on {
-            folder.flags.push(SUBSCRIBED_ATTRIBUTE.into());
-        }
-    }
-}
-
-pub(super) fn imap_subscribed_names<T: Read + Write>(
-    session: &mut imap::Session<T>,
-) -> Option<HashSet<String>> {
-    session
-        .lsub(Some(""), Some("*"))
-        .ok()
-        .map(|names| names.iter().map(|name| name.name().to_string()).collect())
-}
-
-pub(super) fn imap_set_subscription<T: Read + Write>(
-    session: &mut imap::Session<T>,
-    folder: &str,
-    subscribed: bool,
-) -> Result<(), String> {
-    let result = if subscribed {
-        session.subscribe(folder)
+pub(super) fn merge_selected_folder(folders: &mut Vec<MailFolder>, selected: MailFolder) {
+    if let Some(existing) = folders.iter_mut().find(|f| f.name == selected.name) {
+        *existing = merge_folder_status(existing, selected);
     } else {
-        session.unsubscribe(folder)
-    };
-    result.map_err(|e| {
-        let verb = if subscribed {
-            "SUBSCRIBE"
-        } else {
-            "UNSUBSCRIBE"
-        };
-        format!("IMAP {verb} {folder} failed: {e}")
-    })
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(super) struct FolderStatus {
-    pub messages: Option<u32>,
-    pub unseen: Option<u32>,
-    pub uid_next: Option<u32>,
-    pub uid_validity: Option<u32>,
-    pub highest_modseq: Option<u64>,
-}
-
-/// Parse `* STATUS <name> (KEY value ...)` from a raw response.
-pub(super) fn parse_status_response(raw: &str) -> Option<FolderStatus> {
-    let line = raw
-        .lines()
-        .map(str::trim)
-        .find(|line| line.to_ascii_uppercase().starts_with("* STATUS "))?;
-    let open = line.rfind('(')?;
-    let close = line.rfind(')')?;
-    if close <= open {
-        return None;
+        folders.push(selected);
     }
-    let mut status = FolderStatus::default();
-    let mut parts = line[open + 1..close].split_whitespace();
-    while let (Some(key), Some(value)) = (parts.next(), parts.next()) {
-        match key.to_ascii_uppercase().as_str() {
-            "MESSAGES" => status.messages = value.parse().ok(),
-            "UNSEEN" => status.unseen = value.parse().ok(),
-            "UIDNEXT" => status.uid_next = value.parse().ok(),
-            "UIDVALIDITY" => status.uid_validity = value.parse().ok(),
-            "HIGHESTMODSEQ" => status.highest_modseq = value.parse().ok(),
-            _ => {}
-        }
-    }
-    Some(status)
-}
-
-/// Raw STATUS: the crate's typed `status()` routes the attributes through the
-/// unsolicited channel, which desynced some Outlook + proxy streams.
-pub(super) fn imap_folder_status<T: Read + Write>(
-    session: &mut imap::Session<T>,
-    folder: &str,
-    condstore: bool,
-) -> Option<FolderStatus> {
-    let items = if condstore {
-        "(MESSAGES UNSEEN UIDNEXT UIDVALIDITY HIGHESTMODSEQ)"
-    } else {
-        "(MESSAGES UNSEEN UIDNEXT UIDVALIDITY)"
-    };
-    let raw = session
-        .run_command_and_read_response(format!("STATUS {} {items}", quote_imap_string(folder)))
-        .ok()?;
-    parse_status_response(&String::from_utf8_lossy(&raw))
-}
-
-/// True when STATUS proves nothing changed since the last sync: same
-/// UIDVALIDITY, no UID above the watermark and, because only CONDSTORE can
-/// reveal flag changes and expunges without a fetch, the same HIGHESTMODSEQ
-/// (plus the same message count when the cache holds the whole folder).
-pub(super) fn folder_unchanged(state: &FolderSyncState, status: &FolderStatus) -> bool {
-    if state.needs_repair {
-        return false;
-    }
-    let (Some(high), Some(uid_next)) = (state.high, status.uid_next) else {
-        return false;
-    };
-    if state.uid_validity.is_none() || state.uid_validity != status.uid_validity {
-        return false;
-    }
-    if uid_next.saturating_sub(1) > high {
-        return false;
-    }
-    match (state.highest_modseq, status.highest_modseq) {
-        (Some(cached), Some(remote)) if cached == remote => {}
-        _ => return false,
-    }
-    if state.complete && status.messages != Some(state.cached_uids.len() as u32) {
-        return false;
-    }
-    true
-}
-
-/// Special-folder override from the account settings (`sent`, `drafts`, ...).
-pub(super) fn special_folder_override(
-    config: &MailAccountConfig,
-    folders: &[MailFolder],
-    key: &str,
-) -> Option<String> {
-    let wanted = config.special_folders.get(key)?.trim();
-    if wanted.is_empty() {
-        return None;
-    }
-    folders
-        .iter()
-        .find(|folder| folder.name == wanted || folder.display_name == wanted)
-        .map(|folder| folder.name.clone())
 }
 
 /// LIST (+LSUB) the remote folder tree without syncing messages, so a new
@@ -198,31 +54,39 @@ pub async fn mail_list_folders(
     state: State<'_, AppState>,
 ) -> Result<Vec<MailFolder>, String> {
     if super::pop3::is_pop3(&config) {
-        return super::local_cmds::list_folders(&state, &config.session_id);
+        return super::local_cmds::list_folders(&state, &config.session_id).await;
     }
     let account = resolve_config(&state, config)?;
     let account_id = account.config.session_id.clone();
     let cache_enabled = account.config.cache.enabled;
-    let pool = std::sync::Arc::clone(&state.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    let listed = tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            super::ImapSessionOpts::default(),
-            |imap| imap.list_folders(&account.config.session_id),
-        )
-    })
-    .await
-    .map_err(|e| format!("mail list folders task failed: {e}"))??;
+    let listed = live_imap_folder_tree(&state, account, None, false).await?;
     if !cache_enabled {
         return Ok(listed);
     }
-    with_mail_db(&state, &account_id, |db| {
-        super::sync_folder_tree(db, &account_id, &listed)?;
-        super::list_cached_folders(db, &account_id)
+    cache_listed_folders(&state, &account_id, listed).await
+}
+
+pub(super) async fn cache_listed_folders(
+    state: &State<'_, AppState>,
+    account_id: &str,
+    listed: Vec<MailFolder>,
+) -> Result<Vec<MailFolder>, String> {
+    if module_host::publishes_folder_cache(&state.plugins) {
+        let cache = state.mail_db(account_id)?;
+        return module_host::update_folder_cache(
+            state.plugins.clone(),
+            cache,
+            account_id.to_owned(),
+            FolderCacheAction::List,
+            listed,
+        )
+        .await;
+    }
+    with_mail_db_async(state, account_id, move |db, account_id| {
+        sync_folder_tree(db, account_id, &listed)?;
+        super::list_cached_folders(db, account_id)
     })
+    .await
 }
 
 /// Subscribe or unsubscribe a folder; returns the updated cached folders.
@@ -235,93 +99,66 @@ pub async fn mail_set_folder_subscription(
 ) -> Result<Vec<MailFolder>, String> {
     if super::pop3::is_pop3(&config) {
         let _ = (&folder, subscribed);
-        return super::local_cmds::list_folders(&state, &config.session_id);
+        return super::local_cmds::list_folders(&state, &config.session_id).await;
     }
     let account = resolve_config(&state, config)?;
     let account_id = account.config.session_id.clone();
     let cache_enabled = account.config.cache.enabled;
-    let pool = std::sync::Arc::clone(&state.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    let listed = tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            super::ImapSessionOpts::default(),
-            |imap| {
-                imap.set_subscription(&folder, subscribed)?;
-                imap.list_folders(&account.config.session_id)
-            },
-        )
-    })
-    .await
-    .map_err(|e| format!("mail subscription task failed: {e}"))??;
+    let change = FolderSubscription { folder, subscribed };
+    let listed = live_imap_folder_tree(&state, account, Some(change), false).await?;
     if !cache_enabled {
         return Ok(listed);
     }
+    if module_host::publishes_folder_cache(&state.plugins) {
+        let cache = state.mail_db(&account_id)?;
+        return module_host::update_folder_cache(
+            state.plugins.clone(),
+            cache,
+            account_id,
+            FolderCacheAction::Subscription,
+            listed,
+        )
+        .await;
+    }
     with_mail_db(&state, &account_id, |db| {
-        let flags: HashMap<&str, &MailFolder> = listed
-            .iter()
-            .map(|folder| (folder.name.as_str(), folder))
-            .collect();
-        let mut cached = super::list_cached_folders(db, &account_id)?;
-        for folder in cached.iter_mut() {
-            if let Some(remote) = flags.get(folder.name.as_str()) {
-                folder.flags = remote.flags.clone();
-                super::upsert_folder(db, folder)?;
-            }
-        }
-        super::list_cached_folders(db, &account_id)
+        refresh_subscription_flags(db, &account_id, &listed)
+    })
+}
+
+pub(super) async fn live_imap_folder_tree(
+    state: &State<'_, AppState>,
+    account: ResolvedMailAccount,
+    subscription: Option<FolderSubscription>,
+    #[cfg_attr(not(any(test, feature = "legacy-mail-imap")), allow(unused_variables))]
+    background: bool,
+) -> Result<Vec<MailFolder>, String> {
+    if module_host::manages_imap_folders(&state.plugins) {
+        return module_host::imap_folder_tree(state.plugins.clone(), &account, subscription).await;
+    }
+    legacy_imap!({
+        let pool = std::sync::Arc::clone(&state.legacy.mail.mail_imap_pool);
+        let options = if background {
+            ImapSessionOpts::background()
+        } else {
+            ImapSessionOpts::default()
+        };
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::spawn_blocking(move || {
+            with_imap_session(&pool, &account, &handle, options, |imap| {
+                if let Some(change) = &subscription {
+                    imap.set_subscription(&change.folder, change.subscribed)?;
+                }
+                imap.list_folders(&account.config.session_id)
+            })
+        })
+        .await
+        .map_err(|error| format!("mail folder tree task failed: {error}"))?
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn folder(name: &str, flags: &[&str]) -> MailFolder {
-        MailFolder {
-            account_id: "acct".into(),
-            name: name.into(),
-            display_name: name.into(),
-            flags: flags.iter().map(|flag| flag.to_string()).collect(),
-            ..MailFolder::default()
-        }
-    }
-
-    #[test]
-    fn attributes_use_rfc_form() {
-        assert_eq!(attribute_string(&NameAttribute::NoSelect), "\\Noselect");
-        assert_eq!(
-            attribute_string(&NameAttribute::Custom("\\Sent".into())),
-            "\\Sent"
-        );
-    }
-
-    #[test]
-    fn subscriptions_mark_folders_and_empty_lsub_means_all() {
-        let mut folders = vec![
-            folder("INBOX", &[]),
-            folder("Work", &[]),
-            folder("Old", &[]),
-        ];
-        mark_subscribed(
-            &mut folders,
-            Some(["Work".to_string()].into_iter().collect()),
-        );
-        assert!(!folder_is_subscribed(&folders[0]));
-        assert!(folder_is_subscribed(&folders[1]));
-        assert!(!folder_is_subscribed(&folders[2]));
-        assert!(folder_visible(&folders[0], true), "INBOX always visible");
-        assert!(!folder_visible(&folders[2], true));
-        assert!(folder_visible(&folders[2], false));
-
-        mark_subscribed(&mut folders, Some(HashSet::new()));
-        assert!(folders.iter().all(folder_is_subscribed));
-        mark_subscribed(&mut folders, None);
-        assert!(folders.iter().all(folder_is_subscribed));
-        assert_eq!(folders[1].flags, vec![SUBSCRIBED_ATTRIBUTE.to_string()]);
-    }
 
     #[test]
     fn fake_server_lsub_subscribe_and_status() {
@@ -332,14 +169,14 @@ mod tests {
         let mut session = fake.session();
 
         imap_set_subscription(&mut session, "Old", false).unwrap();
-        let names = imap_subscribed_names(&mut session).unwrap();
-        assert!(names.contains("Work") && !names.contains("Old"));
-        let mut listed = super::super::imap_list_folders(&mut session, "acct").unwrap();
-        let old = listed.iter().find(|f| f.name == "Old").unwrap();
-        assert!(!folder_is_subscribed(old));
+        let listed = imap_list_folders(&mut session, "acct").unwrap();
+        let old = listed.iter().find(|folder| folder.name == "Old").unwrap();
+        assert!(!folder_visible(old, true));
+        let work = listed.iter().find(|folder| folder.name == "Work").unwrap();
+        assert!(folder_visible(work, true));
         imap_set_subscription(&mut session, "Old", true).unwrap();
-        mark_subscribed(&mut listed, imap_subscribed_names(&mut session));
-        assert!(listed.iter().all(folder_is_subscribed));
+        let listed = imap_list_folders(&mut session, "acct").unwrap();
+        assert!(listed.iter().all(|folder| folder_visible(folder, true)));
 
         let status = imap_folder_status(&mut session, "INBOX", true).unwrap();
         assert_eq!(status.messages, Some(3));
@@ -349,22 +186,6 @@ mod tests {
         assert!(status.highest_modseq.is_some());
         // The session stays usable after raw STATUS.
         session.examine("INBOX").unwrap();
-    }
-
-    #[test]
-    fn parses_status_line() {
-        let raw = "* STATUS \"Sent Items\" (MESSAGES 12 UNSEEN 3 UIDNEXT 40 UIDVALIDITY 7 HIGHESTMODSEQ 99)\r\na1 OK done\r\n";
-        assert_eq!(
-            parse_status_response(raw),
-            Some(FolderStatus {
-                messages: Some(12),
-                unseen: Some(3),
-                uid_next: Some(40),
-                uid_validity: Some(7),
-                highest_modseq: Some(99),
-            })
-        );
-        assert_eq!(parse_status_response("a1 NO nope\r\n"), None);
     }
 
     #[test]

@@ -172,3 +172,18 @@ impl DapManager {
         self.sessions.lock().await.remove(session_id)
     }
 }
+
+impl DapManager {
+    pub(crate) async fn shutdown(&self) {
+        let sessions = std::mem::take(&mut *self.sessions.lock().await);
+        for (_, session) in sessions {
+            let _ = session
+                .notify("disconnect", serde_json::json!({"terminateDebuggee": true}))
+                .await;
+            if let Some(mut child) = session.child.lock().await.take() {
+                let _ = child.start_kill();
+                let _ = child.wait().await;
+            }
+        }
+    }
+}

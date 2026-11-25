@@ -7,20 +7,31 @@
 
 use std::fs::File;
 use std::io::{BufWriter, Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use serde::Serialize;
+use taomni_mail_api::{
+    HOST_REQUEST_TIMEOUT, OPEN_IMAP_IMPORT,
+    imap_exchange::{ImportMessage, MAX_IMPORT_FILE_BYTES},
+};
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use taomni_mail_engine::mbox::imap_export_folder;
+use taomni_mail_storage::mbox::{
+    is_mbox, mbox_separator, mboxrd_escape, normalize_crlf, split_mbox,
+};
 use tauri::State;
 
+#[cfg(any(test, feature = "legacy-mail-imap"))]
+use super::{ActiveImapSession, ImapSessionOpts, with_imap_session};
 use super::{
-    ActiveImapSession, ImapSessionOpts, MailAccountConfig, resolve_config, with_imap_session,
+    MailAccountConfig, ResolvedMailAccount,
+    module_host::{HostedImap, export_imap_mbox, exports_imap_mbox, imports_imap},
+    resolve_config,
 };
+use crate::plugin::PluginRegistry;
 use crate::state::AppState;
-
-const EXPORT_CHUNK: usize = 50;
-/// Refuse imports above this size (the file is read into memory).
-const IMPORT_MAX_BYTES: u64 = 1024 * 1024 * 1024;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,7 +40,7 @@ pub struct MailExportResult {
     pub count: usize,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MailImportResult {
     pub imported: usize,
@@ -38,143 +49,19 @@ pub struct MailImportResult {
     pub first_error: Option<String>,
 }
 
-/// `From - Tue Sep 30 03:38:00 2026` (asctime, UTC).
-pub(super) fn mbox_separator(internal_ts: Option<i64>) -> String {
-    let when = internal_ts
-        .and_then(|ts| chrono::DateTime::from_timestamp(ts, 0))
-        .unwrap_or_else(chrono::Utc::now);
-    format!("From - {}\n", when.format("%a %b %e %H:%M:%S %Y"))
-}
-
-fn is_from_line(line: &[u8]) -> bool {
-    let quoted = line.iter().take_while(|b| **b == b'>').count();
-    line[quoted..].starts_with(b"From ")
-}
-
-/// mboxrd body: every line matching `^>*From ` gains one `>`; LF endings.
-pub(super) fn mboxrd_escape(raw: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(raw.len() + 64);
-    for line in raw.split(|b| *b == b'\n') {
-        let line = line.strip_suffix(b"\r").unwrap_or(line);
-        if is_from_line(line) {
-            out.push(b'>');
-        }
-        out.extend_from_slice(line);
-        out.push(b'\n');
-    }
-    // `split` yields a trailing empty piece for a final newline.
-    if raw.ends_with(b"\n") {
-        out.pop();
-    }
-    out
-}
-
-pub(super) fn is_mbox(data: &[u8]) -> bool {
-    data.starts_with(b"From ")
-}
-
-/// Split an mbox into RFC 5322 messages (CRLF endings, `>From ` unquoted).
-pub(super) fn split_mbox(data: &[u8]) -> Vec<Vec<u8>> {
-    let mut messages: Vec<Vec<u8>> = Vec::new();
-    let mut current: Option<Vec<Vec<u8>>> = None;
-    let mut previous_blank = true;
-    for line in data.split(|b| *b == b'\n') {
-        let line = line.strip_suffix(b"\r").unwrap_or(line);
-        if previous_blank && line.starts_with(b"From ") {
-            if let Some(lines) = current.take() {
-                messages.push(join_crlf(lines));
+impl MailImportResult {
+    fn record(&mut self, appended: Result<(), String>) {
+        match appended {
+            Ok(()) => self.imported += 1,
+            Err(error) => {
+                self.failed += 1;
+                self.first_error.get_or_insert(error);
             }
-            current = Some(Vec::new());
-            previous_blank = false;
-            continue;
-        }
-        previous_blank = line.is_empty();
-        if let Some(lines) = current.as_mut() {
-            let unquoted = if line.first() == Some(&b'>') && is_from_line(&line[1..]) {
-                &line[1..]
-            } else {
-                line
-            };
-            lines.push(unquoted.to_vec());
         }
     }
-    if let Some(lines) = current.take() {
-        messages.push(join_crlf(lines));
-    }
-    messages.retain(|message| !message.iter().all(u8::is_ascii_whitespace));
-    messages
 }
 
-fn join_crlf(mut lines: Vec<Vec<u8>>) -> Vec<u8> {
-    // Drop the blank separator line(s) before the next `From `.
-    while lines.last().is_some_and(|line| line.is_empty()) {
-        lines.pop();
-    }
-    let mut out = Vec::new();
-    for line in lines {
-        out.extend_from_slice(&line);
-        out.extend_from_slice(b"\r\n");
-    }
-    out
-}
-
-/// A single .eml with bare LF endings, normalised for IMAP APPEND.
-pub(super) fn normalize_crlf(raw: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(raw.len() + raw.len() / 32);
-    for (index, byte) in raw.iter().enumerate() {
-        if *byte == b'\n' && (index == 0 || raw[index - 1] != b'\r') {
-            out.push(b'\r');
-        }
-        out.push(*byte);
-    }
-    out
-}
-
-pub(super) fn imap_export_folder<T: Read + Write, W: Write>(
-    session: &mut imap::Session<T>,
-    folder: &str,
-    out: &mut W,
-) -> Result<usize, String> {
-    session
-        .examine(folder)
-        .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
-    let mut uids: Vec<u32> = session
-        .uid_search("ALL")
-        .map_err(|e| format!("IMAP UID SEARCH failed: {e}"))?
-        .into_iter()
-        .collect();
-    uids.sort_unstable();
-    let mut count = 0usize;
-    for chunk in uids.chunks(EXPORT_CHUNK) {
-        let set = chunk
-            .iter()
-            .map(u32::to_string)
-            .collect::<Vec<_>>()
-            .join(",");
-        let fetches = session
-            .uid_fetch(&set, "(UID INTERNALDATE BODY.PEEK[])")
-            .map_err(|e| format!("IMAP FETCH failed: {e}"))?;
-        let mut ordered: Vec<_> = fetches.iter().filter(|f| f.body().is_some()).collect();
-        ordered.sort_by_key(|f| f.uid.unwrap_or(0));
-        for fetch in ordered {
-            let body = fetch.body().unwrap_or_default();
-            let ts = fetch.internal_date().map(|d| d.timestamp());
-            out.write_all(mbox_separator(ts).as_bytes())
-                .and_then(|_| out.write_all(&mboxrd_escape(body)))
-                .and_then(|_| {
-                    if body.ends_with(b"\n") {
-                        out.write_all(b"\n")
-                    } else {
-                        out.write_all(b"\n\n")
-                    }
-                })
-                .map_err(|e| format!("writing mbox failed: {e}"))?;
-            count += 1;
-        }
-    }
-    Ok(count)
-}
-
+#[cfg(any(test, feature = "legacy-mail-imap"))]
 impl ActiveImapSession {
     fn export_folder<W: Write>(&mut self, folder: &str, out: &mut W) -> Result<usize, String> {
         match self {
@@ -194,7 +81,7 @@ pub async fn mail_export_mbox(
 ) -> Result<MailExportResult, String> {
     if super::pop3::is_pop3(&config) {
         let target = PathBuf::from(path.trim());
-        let raws = super::local_cmds::folder_raw(&state, &config.session_id, folder.trim())?;
+        let raws = super::local_cmds::folder_raw(&state, &config.session_id, folder.trim()).await?;
         let file = File::create(&target)
             .map_err(|e| format!("cannot create {}: {e}", target.display()))?;
         let mut out = BufWriter::new(file);
@@ -216,32 +103,41 @@ pub async fn mail_export_mbox(
     if target.as_os_str().is_empty() {
         return Err("export path is required".into());
     }
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    let target_for_task = target.clone();
-    let count = tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            ImapSessionOpts::default(),
-            |imap| {
-                // Recreated on a pooled-session retry so a partial file never stays.
-                let file = File::create(&target_for_task)
-                    .map_err(|e| format!("cannot create {}: {e}", target_for_task.display()))?;
-                let mut out = BufWriter::new(file);
-                let count = imap.export_folder(&folder, &mut out)?;
-                out.flush()
-                    .map_err(|e| format!("writing mbox failed: {e}"))?;
-                Ok(count)
-            },
-        )
-    })
-    .await
-    .map_err(|e| format!("mail export task failed: {e}"))??;
-    Ok(MailExportResult {
-        path: target.display().to_string(),
-        count,
+    if exports_imap_mbox(&state.plugins) {
+        let count = export_imap_mbox(state.plugins.clone(), &account, folder, &target).await?;
+        return Ok(MailExportResult {
+            path: target.display().to_string(),
+            count,
+        });
+    }
+    legacy_imap!({
+        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+        let handle = tokio::runtime::Handle::current();
+        let target_for_task = target.clone();
+        let count = tokio::task::spawn_blocking(move || {
+            with_imap_session(
+                &pool,
+                &account,
+                &handle,
+                ImapSessionOpts::default(),
+                |imap| {
+                    // Recreated on a pooled-session retry so a partial file never stays.
+                    let file = File::create(&target_for_task)
+                        .map_err(|e| format!("cannot create {}: {e}", target_for_task.display()))?;
+                    let mut out = BufWriter::new(file);
+                    let count = imap.export_folder(&folder, &mut out)?;
+                    out.flush()
+                        .map_err(|e| format!("writing mbox failed: {e}"))?;
+                    Ok(count)
+                },
+            )
+        })
+        .await
+        .map_err(|e| format!("mail export task failed: {e}"))??;
+        Ok(MailExportResult {
+            path: target.display().to_string(),
+            count,
+        })
     })
 }
 
@@ -254,29 +150,15 @@ pub async fn mail_import_messages(
     state: State<'_, AppState>,
 ) -> Result<MailImportResult, String> {
     let source = PathBuf::from(path.trim());
-    let size = std::fs::metadata(&source)
-        .map_err(|e| format!("cannot read {}: {e}", source.display()))?
-        .len();
-    if size > IMPORT_MAX_BYTES {
-        return Err("import file is larger than 1 GiB".into());
-    }
-    let data =
-        std::fs::read(&source).map_err(|e| format!("cannot read {}: {e}", source.display()))?;
-    let messages = if is_mbox(&data) {
-        split_mbox(&data)
-    } else {
-        vec![normalize_crlf(&data)]
-    };
+    let messages = tokio::task::spawn_blocking(move || read_import_file(&source))
+        .await
+        .map_err(|error| format!("mail import file task failed: {error}"))??;
     if messages.is_empty() {
-        return Ok(MailImportResult {
-            imported: 0,
-            failed: 0,
-            first_error: None,
-        });
+        return Ok(MailImportResult::default());
     }
     if super::pop3::is_pop3(&config) {
         let imported =
-            super::local_cmds::import(&state, &config.session_id, folder.trim(), &messages)?;
+            super::local_cmds::import(&state, &config.session_id, folder.trim(), messages).await?;
         return Ok(MailImportResult {
             imported,
             failed: 0,
@@ -284,77 +166,90 @@ pub async fn mail_import_messages(
         });
     }
     let account = resolve_config(&state, config)?;
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        let mut imported = 0usize;
-        let mut failed = 0usize;
-        let mut first_error = None;
-        for message in &messages {
-            let appended = with_imap_session(
-                &pool,
-                &account,
-                &handle,
-                ImapSessionOpts::default(),
-                |imap| imap.append(&folder, message, &["\\Seen"]),
-            );
-            match appended {
-                Ok(()) => imported += 1,
-                Err(e) => {
-                    failed += 1;
-                    first_error.get_or_insert(e);
-                }
+    if imports_imap(&state.plugins) {
+        return Ok(import_hosted(state.plugins.clone(), &account, folder, messages).await);
+    }
+    legacy_imap!({
+        let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::spawn_blocking(move || {
+            let mut result = MailImportResult::default();
+            for message in &messages {
+                let appended = with_imap_session(
+                    &pool,
+                    &account,
+                    &handle,
+                    ImapSessionOpts::default(),
+                    |imap| imap.append(&folder, message, &["\\Seen"]),
+                );
+                result.record(appended);
             }
-        }
-        MailImportResult {
-            imported,
-            failed,
-            first_error,
-        }
+            result
+        })
+        .await
+        .map_err(|e| format!("mail import task failed: {e}"))
     })
-    .await
-    .map_err(|e| format!("mail import task failed: {e}"))
+}
+
+fn read_import_file(source: &Path) -> Result<Vec<Vec<u8>>, String> {
+    let read_error = |error| format!("cannot read {}: {error}", source.display());
+    let file = File::open(source).map_err(read_error)?;
+    if file.metadata().map_err(read_error)?.len() > MAX_IMPORT_FILE_BYTES {
+        return Err("import file is larger than 1 GiB".into());
+    }
+    let mut data = Vec::new();
+    file.take(MAX_IMPORT_FILE_BYTES + 1)
+        .read_to_end(&mut data)
+        .map_err(read_error)?;
+    if data.len() as u64 > MAX_IMPORT_FILE_BYTES {
+        return Err("import file is larger than 1 GiB".into());
+    }
+    Ok(if is_mbox(&data) {
+        split_mbox(&data)
+    } else {
+        vec![normalize_crlf(&data)]
+    })
+}
+
+async fn import_hosted(
+    registry: Arc<PluginRegistry>,
+    account: &ResolvedMailAccount,
+    folder: String,
+    messages: Vec<Vec<u8>>,
+) -> MailImportResult {
+    let mut connection = None::<HostedImap>;
+    let mut result = MailImportResult::default();
+    for message in messages {
+        let request = ImportMessage {
+            folder: folder.clone(),
+        };
+        let append = async {
+            if connection.is_none() {
+                connection =
+                    Some(HostedImap::open(registry.clone(), account, OPEN_IMAP_IMPORT).await?);
+            }
+            connection
+                .as_mut()
+                .expect("open Mail import session")
+                .exchange(request, Some(message))
+                .await
+        };
+        let appended = tokio::time::timeout(HOST_REQUEST_TIMEOUT + Duration::from_secs(5), append)
+            .await
+            .unwrap_or_else(|_| Err("Mail import APPEND timed out".into()));
+        if appended.is_err() {
+            // A lost APPEND receipt is ambiguous. Open a fresh session only
+            // for the next message so the current one is never copied twice.
+            connection = None;
+        }
+        result.record(appended);
+    }
+    result
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn mboxrd_round_trip_keeps_from_lines() {
-        let one = b"Subject: one\r\n\r\nFrom the start\r\n>From quoted\r\nend\r\n".to_vec();
-        let two = b"Subject: two\n\nsecond body\n".to_vec();
-        let mut mbox = Vec::new();
-        for (raw, ts) in [(&one, 1_700_000_000), (&two, 1_700_000_100)] {
-            mbox.extend_from_slice(mbox_separator(Some(ts)).as_bytes());
-            mbox.extend_from_slice(&mboxrd_escape(raw));
-            mbox.extend_from_slice(b"\n");
-        }
-        let text = String::from_utf8_lossy(&mbox);
-        assert!(
-            text.starts_with("From - Tue Nov 14 22:13:20 2023\n"),
-            "{text}"
-        );
-        assert!(
-            text.contains("\n>From the start\n>>From quoted\n"),
-            "{text}"
-        );
-
-        let split = split_mbox(&mbox);
-        assert_eq!(split.len(), 2);
-        assert_eq!(
-            split[0],
-            b"Subject: one\r\n\r\nFrom the start\r\n>From quoted\r\nend\r\n".to_vec()
-        );
-        assert_eq!(split[1], b"Subject: two\r\n\r\nsecond body\r\n".to_vec());
-        assert!(is_mbox(&mbox));
-    }
-
-    #[test]
-    fn eml_is_normalised_to_crlf() {
-        assert_eq!(normalize_crlf(b"a\nb\r\nc\n"), b"a\r\nb\r\nc\r\n".to_vec());
-        assert!(!is_mbox(b"Subject: x\r\n\r\nbody"));
-    }
 
     #[test]
     fn export_then_import_on_fake_server() {

@@ -1,0 +1,36 @@
+id: TC-MODULES-094
+title: The core reports an unresolved SocksCap journal before the module is installed
+description: Start from an isolated profile with an unreadable old journal. Open Settings through the status bar and verify that the core reports the recovery condition and preserves the original input.
+covers: [F-Modules-1, F-Sockscap-1]
+tags: [modules, sockscap, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, sockscap_pending_recovery]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="status-sockscap-recovery"]', timeout_sec: 45}
+- click: '[data-testid="status-sockscap-recovery"]'
+- assert_text: {selector: '[data-testid="module-sockscap-recovery"]', contains: Cannot inspect SocksCap recovery data}
+- assert_enabled: '[data-testid="module-sockscap-recover"]'
+- assert_count: {selector: '[data-testid="module-action-disable-sockscap"]', equal: 0}
+- assert_file_sha256: {path: '${fixture.sockscap_recovery_marker}', equals: '${fixture.sockscap_recovery_marker_sha256}'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: retained-native-recovery
+    requirement: Startup detects the old journal and offers recovery without an installed module.
+    actions: [1, 3]
+    checkpoints:
+    - {step: 2, expectation: The core reports unresolved recovery in the status bar.}
+    - {step: 4, expectation: Settings shows the journal inspection error.}
+    - {step: 5, expectation: The recovery action is available in Settings.}
+    - {step: 6, expectation: No SocksCap module is enabled.}
+    - {step: 7, expectation: The legacy filesystem input retains its original bytes.}
+    - {step: 8, expectation: The app stays responsive without renderer runtime errors.}
+    results: [2, 4, 5, 6, 7, 8]
+  visual:
+  - {check: The status bar opens the recovery information, method: automated, reason: The case uses the actual desktop UI.}
+  native:
+  - {check: Startup finds the original legacy journal and leaves it available for recovery, method: automated, reason: The runner stages an unreadable journal and verifies its preserved marker.}

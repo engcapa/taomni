@@ -6,8 +6,8 @@
 	  Hardened-runtime resource-access entitlements. The notarized/signed build
 	  runs under the hardened runtime, which blocks camera and microphone access
 	  unless the app is explicitly entitled to them. These two keys let macOS
-	  show the TCC prompt (backed by the Info.plist usage strings) instead of
-	  silently denying getUserMedia for LanChat calls (issue #153).
+	  show the TCC prompt (backed by the Info.plist usage strings) for voice input
+	  and MFA camera scanning.
 
 	  Intentionally NOT enabling com.apple.security.app-sandbox: the app is not
 	  sandboxed (it bundles krb5 dylibs, opens LAN sockets, and accesses the

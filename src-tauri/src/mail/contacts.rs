@@ -8,13 +8,9 @@
 //! `addressbook-home-set` (RFC 6352 / RFC 6764). The composer's address
 //! autocomplete merges address book entries with collected contacts.
 
+mod book_store;
 mod model;
-
-mod storage;
-
-mod entries;
-
-mod suggestions;
+pub(super) use book_store::suggestions;
 
 mod dav_protocol;
 
@@ -25,15 +21,7 @@ mod commands;
 #[cfg(test)]
 mod tests;
 
-pub use model::{MailAddressBookEntry, MailCardDavSettings, MailCardDavSyncResult};
-
-pub(super) use model::{CardChange, StoredCard};
-
-pub(super) use storage::{apply_changes, load_cards, migrate_contact_tables, store_card};
-
-pub(super) use entries::{delete_entry, export_cards, import_cards, save_entry};
-
-pub(super) use suggestions::{address_book_suggestions, merge_suggestions};
+pub use model::{MailCardDavSettings, MailCardDavSyncResult};
 
 pub use commands::{
     mail_carddav_sync, mail_delete_address_book_entry, mail_export_vcards, mail_import_vcards,
