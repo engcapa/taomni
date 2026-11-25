@@ -32,7 +32,7 @@ on:
         type: boolean
         default: false
       package_first_release_version:
-        description: Pinned monolith for the first upgrade (empty = current pinned version, 0.5.12 = earlier baseline)
+        description: Public monolith version for the first upgrade (empty selects the current stable release)
         type: string
         default: ''
       package_relocation_linux:
@@ -212,8 +212,32 @@ env:
   PYTHONUNBUFFERED: '1'
 
 jobs:
+  first-upgrade-baseline:
+    if: inputs.package_run && (inputs.package_first_release_linux || inputs.package_first_release_desktop)
+    runs-on: ubuntu-latest
+    outputs:
+      baseline: ${{ steps.freeze.outputs.baseline }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - name: Freeze the public monolith and its four installer identities
+        id: freeze
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QA_FIRST_UPGRADE_VERSION: ${{ inputs.package_first_release_version }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+        run: python -m qa_ui_auto.legacy_baseline
+      - uses: actions/upload-artifact@v4
+        with:
+          name: first-upgrade-baseline-${{ github.run_id }}
+          path: first-upgrade-baseline.json
+          if-no-files-found: error
+
   installed-linux-mfa:
-    if: ${{ !inputs.signed_mfa_only && inputs.package_run != '' && (inputs.package_first_release_linux || inputs.package_upgrade_linux || inputs.package_relocation_linux || inputs.package_rdp_perf) }}
+    needs: first-upgrade-baseline
+    if: ${{ !cancelled() && needs.first-upgrade-baseline.result != 'failure' && !inputs.signed_mfa_only && inputs.package_run != '' && (inputs.package_first_release_linux || inputs.package_upgrade_linux || inputs.package_relocation_linux || inputs.package_rdp_perf) }}
     uses: ./.github/workflows/qa-modular-installed-mfa.yml
     with:
       head: ${{ inputs.head || github.sha }}
@@ -221,6 +245,7 @@ jobs:
       package_source: ${{ inputs.package_source }}
       package_version: ${{ inputs.package_version }}
       first_release: ${{ inputs.package_first_release_linux }}
+      first_release_baseline: ${{ needs.first-upgrade-baseline.outputs.baseline }}
       first_release_version: ${{ inputs.package_first_release_version }}
       verify_relocation: ${{ inputs.package_relocation_linux }}
       verify_rdp_perf: ${{ inputs.package_rdp_perf }}
@@ -230,8 +255,9 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   release-bundle-samples:
+    needs: first-upgrade-baseline
     if: >-
-      ${{ !inputs.signed_mfa_only && inputs.package_run != '' &&
+      ${{ !cancelled() && needs.first-upgrade-baseline.result != 'failure' && !inputs.signed_mfa_only && inputs.package_run != '' &&
       ((inputs.package_first_release_linux && inputs.package_first_release_desktop) ||
       (!inputs.package_first_release_linux && !inputs.package_upgrade_linux &&
       !inputs.package_relocation_linux && !inputs.package_rdp_perf)) }}
@@ -244,6 +270,7 @@ jobs:
       package_targets: ${{ inputs.package_targets }}
       upgrade_desktop: ${{ inputs.package_upgrade_desktop || inputs.package_first_release_desktop }}
       first_release: ${{ inputs.package_first_release_desktop }}
+      first_release_baseline: ${{ needs.first-upgrade-baseline.outputs.baseline }}
       first_release_version: ${{ inputs.package_first_release_version }}
       include_linux_inventory: ${{ inputs.package_first_release_linux && inputs.package_first_release_desktop }}
       macos_hardened_mfa: ${{ inputs.package_macos_hardened_mfa }}

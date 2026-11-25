@@ -26,6 +26,7 @@ on:
         type: boolean
         default: false
       first_release_version: {type: string, default: ''}
+      first_release_baseline: {type: string, default: ''}
       include_linux_inventory:
         type: boolean
         default: false
@@ -125,6 +126,7 @@ jobs:
       SAMPLE_VERSION: ${{ inputs.package_version }}
       SAMPLE_TARGET: ${{ matrix.target }}
       FIRST_RELEASE: ${{ inputs.first_release }}
+      QA_FIRST_UPGRADE_BASELINE: ${{ inputs.first_release_baseline }}
       QA_FIRST_UPGRADE_VERSION: ${{ inputs.first_release_version }}
     steps:
       - uses: actions/checkout@v4

@@ -2,11 +2,14 @@
 from dataclasses import dataclass
 import argparse
 import hashlib
+import json
 import os
 from pathlib import Path
 import platform
 import time
 import urllib.request
+
+from . import legacy_baseline
 
 
 @dataclass(frozen=True)
@@ -36,8 +39,6 @@ ASSETS = {
 }
 
 
-FIRST_UPGRADE_VERSION = "0.5.13"
-FIRST_UPGRADE_VERSIONS = (FIRST_UPGRADE_VERSION, "0.5.12")
 ASSETS_0_5_12 = {
     ("Linux", "x64"): ReleaseAsset(
         778338425, "Taomni_0.5.12_amd64.deb", 111121038,
@@ -74,10 +75,24 @@ RELEASES = {
 
 
 def first_upgrade_version():
-    version = os.environ.get("QA_FIRST_UPGRADE_VERSION") or FIRST_UPGRADE_VERSION
-    if version not in FIRST_UPGRADE_VERSIONS:
-        raise RuntimeError(f"No pinned first-upgrade installer for version {version!r}")
-    return version
+    return legacy_baseline.current()["version"]
+
+
+def release_assets(version):
+    if version in RELEASES and not (os.environ.get("QA_FIRST_UPGRADE_BASELINE")
+                                    or os.environ.get("QA_FIRST_UPGRADE_BASELINE_FILE")):
+        return RELEASES[version]
+    if version == "latest":
+        raise RuntimeError("No pinned installer for the literal version latest")
+    record = legacy_baseline.current()
+    if record["version"] != version:
+        if version in RELEASES:
+            return RELEASES[version]
+        raise RuntimeError("Requested installer differs from the first-upgrade baseline")
+    assets = {tuple(target.split("/")): ReleaseAsset(**values) for target, values in record["installers"].items()}
+    if version in RELEASES and (record["releaseId"], assets) != RELEASES[version]:
+        raise RuntimeError("Public installer identity differs from its historical pin")
+    return record["releaseId"], assets
 
 
 def selected_asset(system=None, machine=None, *, version=RELEASE_VERSION):
@@ -85,7 +100,7 @@ def selected_asset(system=None, machine=None, *, version=RELEASE_VERSION):
     machine = (machine or platform.machine()).lower()
     arch = {"amd64": "x64", "x86_64": "x64", "arm64": "arm64", "aarch64": "arm64"}.get(machine)
     try:
-        return RELEASES[version][1][(system, arch)]
+        return release_assets(version)[1][(system, arch)]
     except KeyError:
         raise RuntimeError(f"No pinned {version} installer for {system}/{machine}") from None
 
@@ -154,7 +169,17 @@ def main():
     token = os.environ.get("GH_TOKEN")
     if not token:
         raise SystemExit("Provide the hosted installer staging directory and a read-only GH_TOKEN")
-    asset = selected_asset(version=first_upgrade_version() if args.first_upgrade else args.version)
+    if args.first_upgrade:
+        record = legacy_baseline.current()
+        args.directory.mkdir(parents=True, exist_ok=True)
+        receipt = (args.directory / "first-upgrade-baseline.json").resolve()
+        receipt.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+        os.environ["QA_FIRST_UPGRADE_BASELINE_FILE"] = str(receipt)
+        github_env = os.environ.get("GITHUB_ENV")
+        if github_env:
+            with Path(github_env).open("a", encoding="utf-8") as output:
+                output.write(f"QA_FIRST_UPGRADE_BASELINE_FILE={receipt}\n")
+    asset = selected_asset(version=record["version"] if args.first_upgrade else args.version)
     download_asset(args.directory, asset, token=token)
     print(f"Verified {asset.name} (asset {asset.asset_id}, SHA-256 {asset.sha256})")
 

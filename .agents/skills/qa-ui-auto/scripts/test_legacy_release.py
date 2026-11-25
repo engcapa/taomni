@@ -3,6 +3,7 @@ from contextlib import closing
 from dataclasses import replace
 from email.message import Message
 import hashlib
+import json
 from io import BytesIO
 from pathlib import Path
 import sqlite3
@@ -10,7 +11,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from qa_ui_auto.legacy_release import ASSETS, download_asset, first_upgrade_version, main, selected_asset, verify_asset
+from qa_ui_auto import legacy_baseline
+from qa_ui_auto.legacy_release import ASSETS, RELEASES, download_asset, first_upgrade_version, main, selected_asset, verify_asset
 from qa_ui_auto.legacy_process import sanitized_output
 from qa_ui_auto.legacy_install import install
 from qa_ui_auto.fixtures.module_legacy_install import insert_business_rows, retained_manifest, session_rows
@@ -35,31 +37,66 @@ class PinnedReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "No pinned"):
             selected_asset("Linux", "x86_64", version="latest")
 
-    def test_first_upgrade_defaults_to_current_and_only_accepts_pinned_monoliths(self):
-        cases = (("", "0.5.13"), ("0.5.12", "0.5.12"), ("0.5.13", "0.5.13"))
-        for requested, expected in cases:
-            with self.subTest(requested=requested), patch.dict(
-                    "os.environ", {"QA_FIRST_UPGRADE_VERSION": requested}):
-                self.assertEqual(first_upgrade_version(), expected)
-        for requested in ("latest", "0.5.10", "0.6.0"):
-            with self.subTest(requested=requested), patch.dict(
-                    "os.environ", {"QA_FIRST_UPGRADE_VERSION": requested}):
-                with self.assertRaisesRegex(RuntimeError, "No pinned first-upgrade"):
-                    first_upgrade_version()
+    def published(self, version="0.5.14"):
+        release_id, assets = RELEASES["0.5.13"]
+        return {
+            "id": release_id, "tag_name": f"v{version}", "published_at": "2026-11-25T12:00:00Z",
+            "draft": False, "prerelease": False,
+            "assets": [{"id": a.asset_id, "name": a.name.replace("0.5.13", version), "size": a.size,
+                        "digest": f"sha256:{a.sha256}", "state": "uploaded"} for a in assets.values()],
+        }
 
-    def test_staging_uses_the_same_override_as_the_first_upgrade_fixture(self):
-        with (
-            patch.dict("os.environ", {"QA_FIRST_UPGRADE_VERSION": "0.5.12", "GH_TOKEN": "test-token"}),
-            patch("qa_ui_auto.legacy_release.platform.system", return_value="Linux"),
-            patch("qa_ui_auto.legacy_release.platform.machine", return_value="x86_64"),
-            patch("qa_ui_auto.legacy_release.download_asset") as download,
-            patch("builtins.print"),
-        ):
-            for flags, version in ((["--first-upgrade"], first_upgrade_version()), ([], "0.5.10")):
-                with self.subTest(flags=flags), patch("sys.argv", ["legacy_release", "legacy-input", *flags]):
+    def test_new_public_monolith_and_explicit_historical_version(self):
+        for requested, version, endpoint in [("", "0.5.14", "/latest"), ("v0.5.13", "0.5.13", "/tags/v0.5.13")]:
+            with self.subTest(requested=requested), patch.object(
+                    legacy_baseline, "metadata", return_value=self.published(version)) as api:
+                baseline = legacy_baseline.resolve(requested)
+                api.assert_called_once_with(endpoint)
+                with patch.dict("os.environ", {"QA_FIRST_UPGRADE_BASELINE": json.dumps(baseline)}):
+                    self.assertEqual(first_upgrade_version(), version)
+                    self.assertEqual(selected_asset("Linux", "amd64", version=version).name,
+                                     f"Taomni_{version}_amd64.deb")
+
+    def test_finds_latest_monolith_after_a_modular_release(self):
+        modular = self.published("0.6.0")
+        modular["assets"].append({"name": "modules.json"})
+        with patch.object(legacy_baseline, "metadata", side_effect=[modular, [modular, self.published()]]):
+            self.assertEqual(legacy_baseline.resolve()["version"], "0.5.14")
+
+    def test_rejects_incomplete_or_non_monolithic_release(self):
+        for change in ("draft", "prerelease", "module", "missing", "digest", "duplicate"):
+            release = self.published()
+            if change in ("draft", "prerelease"):
+                release[change] = True
+            elif change == "module":
+                release["assets"].append({"name": "modules.json"})
+            elif change == "missing":
+                release["assets"].pop()
+            elif change == "digest":
+                release["assets"][0]["digest"] = None
+            else:
+                release["assets"].append(release["assets"][0])
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                legacy_baseline.freeze(release, "")
+
+    def test_staging_and_install_use_one_observed_baseline_across_steps(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            env_file = folder / "github-env"
+            with patch.dict("os.environ", {"GH_TOKEN": "test-token", "GITHUB_ENV": str(env_file)}, clear=True), patch.object(
+                legacy_baseline, "metadata", return_value=self.published(),
+            ) as api, patch("qa_ui_auto.legacy_release.platform.system", return_value="Linux"), patch(
+                "qa_ui_auto.legacy_release.platform.machine", return_value="x86_64",
+            ), patch("qa_ui_auto.legacy_release.download_asset") as download, patch("builtins.print"):
+                with patch("sys.argv", ["legacy_release", str(folder), "--first-upgrade"]):
                     main()
-                    download.assert_called_with(Path("legacy-input"), selected_asset(version=version),
-                                                token="test-token")
+                asset = selected_asset(version=first_upgrade_version())
+                download.assert_called_once_with(folder, asset, token="test-token")
+                api.assert_called_once_with("/latest")
+                self.assertIn(str(folder / "first-upgrade-baseline.json"), env_file.read_text())
+                with patch("sys.argv", ["legacy_release", str(folder)]):
+                    main()
+                download.assert_called_with(folder, ASSETS[("Linux", "x64")], token="test-token")
 
     def test_only_explicit_supported_release_architectures_are_accepted(self):
         self.assertIs(selected_asset("Windows", "AMD64"), ASSETS[("Windows", "x64")])

@@ -7,7 +7,7 @@ import platform
 import plistlib
 import subprocess
 
-from .legacy_release import RELEASES, RELEASE_VERSION, selected_asset, verify_asset
+from .legacy_release import release_assets, RELEASE_VERSION, selected_asset, verify_asset
 
 
 def command(args, evidence, label, *, accepted=(0,), timeout=180, env=None):
@@ -132,7 +132,7 @@ def install(case_dir, work, *, version=RELEASE_VERSION, shared_msi_directory=Non
     if platform.system() != "Linux" and not executable.resolve().is_relative_to(destination):
         raise RuntimeError("Legacy executable is outside its run-owned installation")
     receipt = {"schema": "taomni.qa.legacy-install.v1", "repository": "engcapa/taomni",
-               "releaseId": RELEASES[version][0], "tag": f"v{version}", "assetId": asset.asset_id,
+               "releaseId": release_assets(version)[0], "tag": f"v{version}", "assetId": asset.asset_id,
                "assetName": asset.name, "assetBytes": asset.size, "assetSha256": asset.sha256,
                "executable": str(executable), "executableSha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
                "installation": details, "system": platform.system(), "machine": platform.machine()}
