@@ -2,6 +2,8 @@
 
 ## 0.6.0 当前候选
 
+**2026-11-25 生产验收结论：候选 `5e53df106` 可发布，公开发布按计划暂缓。** 本次放行复用 Release Bundle `45556290903` 的已验签资产。十模块迁移、四目标实际升级与回退、两套崩溃回归、G1–G11、发布演练和 AC-013 已完成。公开稳定版仍为 v0.5.13。[逐门回执](taomni-modular-0.6.0-5e53df106-receipts.md) · [正式版](https://github.com/engcapa/taomni/releases/latest)
+
 当前产品 SHA 为 `5e53df106549b9fa8a49e435120fc820c8e608ca`，已合入 `main` 的 `07031c6f5`。Windows 更新后首次启动使用桌面环境，基座继续清理旧单体语音 DLL，SocksCap 和 VNC 的宿主入口归各自模块。0.6.0 暂缓上线。四目标依赖清点已通过。三端原生运行合并验证十模块的双版本生命周期、业务迁移、备份还原和篡改拒绝。最新稳定单体实装与全模块回归复用这轮打包的签名资产。[候选提交](https://github.com/engcapa/taomni/commit/5e53df106) · [四目标构建](https://github.com/engcapa/taomni/actions/runs/45556290903) · [核心清点](https://github.com/engcapa/taomni/actions/runs/45556295313) · [纯核心回归](https://github.com/engcapa/taomni/actions/runs/45556300017) · [十模块原生验收](https://github.com/engcapa/taomni/actions/runs/45556693711)
 
 11 月 25 日 15:46（北京时间），四端基座安装件已归档。四端 updater 验签通过，17 个资产摘要与 11 个更新目标已逐项匹配。Windows 默认 NSIS 的原单体和候选安装在同一路径，升级后启动的程序与候选 NSIS 包内字节一致，原有四个语音 DLL 全部移除。回退后原程序、四个 DLL 和原 SSH/VNC 会话均恢复。首轮验收脚本误用 MSI 的程序摘要，修正后用同一产品安装件复验通过。[updater](https://github.com/engcapa/taomni/actions/runs/45556290903/artifacts/15000775815) · [NSIS 首轮](https://github.com/engcapa/taomni/actions/runs/45568185856/artifacts/15001595470) · [NSIS 实装与回退](https://github.com/engcapa/taomni/actions/runs/45568698025/artifacts/15001931217)
@@ -15,6 +17,10 @@ Linux 原生历史升级回归 30/30 通过，覆盖当前及旧 NewMob 数据�
 纯核心三端 Browser/Native 回归通过 132/132。全模块回归的 Linux 原生分片首次初始化时，工件下载工具漏取第二页中的 Mail 包，原件保留。验收工具已修正分页，Linux 两分片以相同源提交与签名包补验 26/26 项。全模块三端合计通过 144/144 项。G1–G11 已按 runner 镜像、包身份和原件逐条复核。[本候选逐门回执](taomni-modular-0.6.0-5e53df106-receipts.md) · [纯核心](https://github.com/engcapa/taomni/actions/runs/45556300017) · [全模块原运行](https://github.com/engcapa/taomni/actions/runs/45571123435) · [Linux 补跑](https://github.com/engcapa/taomni/actions/runs/45573044507)
 
 macOS ARM64 首轮测得纯核心就绪 RSS 从 221.84 MiB 升至 396.69 MiB。随后在相同签名安装件、路径和系统权限下，两个 GitHub runner 各交替启动四对。八对合计，就绪时间的配对中位数快 474 ms，就绪 RSS 高 4.6 MiB，空闲 30 秒物理占用高 6.0 MiB（−14.5 至 +37.7 MiB），峰值物理占用高 3.1 MiB（七对较高）。首轮 175 MiB 增幅未复现。独立堆采样显示活跃分配差约 0.5 MiB。Windows、macOS Intel 和 Linux 的原运行核心 RSS 分别减少 8.45、2.92、11.95 MiB。设计 §11 的内存目标与该 ARM64 实测差异一并保留。[ARM64 首次读数](https://github.com/engcapa/taomni/actions/runs/45571113510/artifacts/15001309935) · [配对原件一](https://github.com/engcapa/taomni/actions/runs/45577594130/artifacts/15006305591) · [配对原件二与分配栈](https://github.com/engcapa/taomni/actions/runs/45580069952/artifacts/15006918726) · [性能目标](taomni-modular-split-design.md#11-测试与验收)
+
+第三轮使用同一 macOS 26 ARM64 runner，在六种顺序下交错启动正式版、冻结候选与模型目录实验版。正式版和冻结候选的可执行文件摘要、授权和就绪条件与前两轮一致。对每组先计算冻结候选减正式版，再取全部 14 组的中位数，可得到就绪时间 −251 ms、就绪 RSS −2.89 MiB、空闲 30 秒 RSS −2.27 MiB、空闲 30 秒物理占用 −1.74 MiB。验收脚本原定内存指标是就绪后对已安装核心 PID 采三次 RSS。根据三轮全样本关闭该项。诊断用峰值物理占用仍有 +1.45 MiB 的中位差，14 组中 11 组较高。保留首次大幅读数和前两轮较高的结果，以便复查波动。[采样定义](../.agents/skills/qa-ui-auto/scripts/installed_core_resources.py) · [三版本原件](https://github.com/engcapa/taomni/actions/runs/45600688434/artifacts/15015838591)
+
+实验分支 `experiment/core-model-catalog-memory` 的 `b5e5110f4` 单独保存了模型目录优化。它相对冻结候选的空闲 30 秒物理占用降低 71.09 MiB（六对配对中位数），就绪时间配对中位数增加 0.51 秒。实验版的模型目录和纯基座回归通过 183/183。0.6.0 放行选用已完成四目标实装、全部模块与签名目录验收的 `5e53df106`。[实验提交](https://github.com/engcapa/taomni/commit/b5e5110f4) · [实验回归](https://github.com/engcapa/taomni/actions/runs/45593919458)
 
 Linux 终端 I/O 与模块安装已完成同机十轮交替实装。两版各测 300 次真实 PTY 输入，输入到 WebView 收到应答 p95 均为 2 ms。各 120 次完整 1 MiB 输出的中位吞吐均为 9.52 MiB/s。同一历史签名 MFA 包各安装 50 次，中位耗时从 M0 的 153.5 ms 降至候选的 138 ms。完整报告保留先导轮中 12.9% 的吞吐差异、探针改动及分布。[终端与安装报告](taomni-modular-io-performance-20261125.md)
 

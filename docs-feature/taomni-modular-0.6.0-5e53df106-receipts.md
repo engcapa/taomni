@@ -2,7 +2,7 @@
 
 产品源码 `5e53df106549b9fa8a49e435120fc820c8e608ca`。发布输入为 [Release Bundle 45556290903](https://github.com/engcapa/taomni/actions/runs/45556290903)。下表按门禁登记 runner 镜像、安装件、模块包或验收二进制 SHA-256、用例与 GitHub 原始工件内的路径。G9 和 G11 构建清点行标记清点回执摘要。原始分片包含 `runner_receipt.json`、选集、二进制身份及用例摘要。
 
-G1–G11 和两种安装配置的崩溃回归均已复核。AC-013 的资源与耗时比较另见[当前候选交接](taomni-modular-split-handoff.md#060-当前候选)。全模块 Linux 原生分片首次在下载 Mail 工件时中止。补跑使用相同产品源码、目录、签名包和用例，保留[原运行](https://github.com/engcapa/taomni/actions/runs/45571123435)和[补跑](https://github.com/engcapa/taomni/actions/runs/45573044507)。
+G1–G11 和两种安装配置的崩溃回归均已复核。AC-013 已完成；macOS ARM64 三轮共 14 对的原始结果与逐项资源、耗时比较见[当前候选交接](taomni-modular-split-handoff.md#060-当前候选)。全模块 Linux 原生分片首次在下载 Mail 工件时中止。补跑使用相同产品源码、目录、签名包和用例，保留[原运行](https://github.com/engcapa/taomni/actions/runs/45571123435)和[补跑](https://github.com/engcapa/taomni/actions/runs/45573044507)。
 
 ## G1 macOS 下载宿主与签名
 
