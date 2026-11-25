@@ -73,7 +73,7 @@ def main():
                   fixture=str(TOOLS/'modular_io_fixture.py'))
     try:
         with Desktop(EVIDENCE/'desktop', ['display','x11']):
-            for attempt in range(5):
+            for attempt in range(10):
                 order = ['baseline','candidate'] if attempt % 2 == 0 else ['candidate','baseline']
                 for key in order:
                     entry = {"build":key,"pair":attempt,"samples":sample(key,attempt,packages,module)}

@@ -2,18 +2,26 @@
 async function measureModularIo(input) {
   const { invoke, Channel } = window.__TAURI__.core;
   const id = crypto.randomUUID();
-  let accumulated = "";
+  const parts = [];
+  let suffix = "";
+  const decoder = new TextDecoder();
   let resolveOutput;
   let expected;
   const channel = new Channel((data) => {
     const bytes = new Uint8Array(data);
-    accumulated += new TextDecoder().decode(bytes);
-    if (resolveOutput && accumulated.includes(expected)) {
-      const result = { text: accumulated, at: performance.now() };
-      accumulated = "";
+    const part = decoder.decode(bytes);
+    parts.push(part);
+    const tail = suffix + part;
+    if (resolveOutput && tail.includes(expected)) {
+      const at = performance.now();
+      const result = { text: parts.join(""), at, chunks: parts.length };
+      parts.length = 0;
+      suffix = "";
       const resolve = resolveOutput;
       resolveOutput = null;
       resolve(result);
+    } else if (expected) {
+      suffix = tail.slice(1 - expected.length);
     }
   });
   function until(marker) {
@@ -36,14 +44,14 @@ async function measureModularIo(input) {
       if (reply.text !== marker) throw new Error("Wrong PTY echo: " + reply.text.slice(0, 120));
       if (i >= 5) timings.latencyMs.push(reply.at - start);
     }
-    for (let i = 0; i < 6; ++i) {
+    for (let i = 0; i < 13; ++i) {
       const receipt = until("AC13-END\n");
       const start = performance.now();
       await invoke("write_terminal", {sessionId: id, data: btoa("burst\n")});
       const reply = await receipt;
       const payload = reply.text.slice(0, -"AC13-END\n".length);
       if (payload.length !== 1048576 || /[^x]/.test(payload)) throw new Error("PTY payload corruption");
-      if (i > 0) timings.output.push({bytes: payload.length, elapsedMs: reply.at - start});
+      if (i > 0) timings.output.push({bytes: payload.length, chunks: reply.chunks, elapsedMs: reply.at - start});
     }
   } finally {
     await invoke("close_terminal", {sessionId: id});
