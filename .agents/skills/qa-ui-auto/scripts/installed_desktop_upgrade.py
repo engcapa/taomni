@@ -10,6 +10,7 @@ from uuid import UUID
 from types import SimpleNamespace
 
 import installed_first_release
+import installed_server_identities
 from installed_core_resources_desktop import ProfileRestoreError, record_desktop_comparison, sample_desktop
 
 from installed_desktop_mfa_crash import verify_crash_recovery
@@ -201,6 +202,8 @@ def execute(args):
         # Snapshot the historical files after the last legacy desktop run.
         stages["beforeUpgrade"] = start_profile(old_binary, profile, work, report, "original-reopen", expected_rows)
         retained = stages["beforeUpgrade"]["retainedFiles"]
+        if origin:
+            stages["legacyServerIdentities"] = installed_server_identities.seed(profile)
         if system == "Darwin":
             old_binary.parents[2].rename(work / "original.app")
 
@@ -230,6 +233,7 @@ def execute(args):
                 stages["firstBusinessInstall"] = installed_first_release.exercise(
                     ctx, candidate, work, profile, report, origin, environment=environment,
                 )
+                stages["migratedServerIdentities"] = installed_server_identities.verify(profile, stages["legacyServerIdentities"])
             except Exception as error:
                 recovery_failure = error
                 stages["firstBusinessInstall"] = {"passed": False, "error": str(error)}
@@ -279,6 +283,7 @@ def execute(args):
                 reopened, profile, work, report, "candidate-reinstalled-reopen", expected_rows,
                 stages["afterRollback"]["retainedFiles"],
             )
+            stages["afterReinstall"]["serverIdentities"] = installed_server_identities.verify(profile, stages["legacyServerIdentities"])
             stages["afterReinstall"]["enrollment"] = installed_first_release.enrollment(profile, origin)
             stages["afterReinstall"]["activePointers"] = observe_legacy_roster(profile / "plugins", origin, "mail")
         result.update(passed=True, sessionTypes=[row["session_type"] for row in expected_rows], retainedFiles=retained)

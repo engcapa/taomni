@@ -12,8 +12,8 @@ import unittest
 import zipfile
 
 from installed_mail_upgrade import (
-    ACCOUNT_NAME, LEGACY_BODY, LEGACY_SUBJECT, MAIL_PLAN, NEW_SUBJECT,
-    LegacyMailbox, account_stem, installed_package_identity, observe_staging,
+    ACCOUNT_NAME, LEGACY_SUBJECT, MAIL_PLAN, NEW_SUBJECT,
+    LegacyMailbox, account_stem, installed_package_identity, observe_staging, original_message,
 )
 from modular_bundle_inventory import digest
 from qa_ui_auto.steps import StepError
@@ -26,7 +26,7 @@ class InstalledMailUpgradeTests(unittest.TestCase):
         self.profile = Path(temporary.name).resolve()
         self.account = "legacy@example.test"
         self.unique_uid = 11
-        self.original = f"Subject: {LEGACY_SUBJECT}\r\n\r\n{LEGACY_BODY}\r\n".encode()
+        self.original = original_message()
         self.original_sha = hashlib.sha256(self.original).hexdigest()
         self.fingerprint = "sha256:" + "ab" * 32 + ":bytes:32"
         self.stem = account_stem(self.account)
@@ -94,6 +94,14 @@ class InstalledMailUpgradeTests(unittest.TestCase):
             self.mailbox.assert_retained()
         self.write_original(self.source, self.original[:-4] + b"oops")
         with self.assertRaisesRegex(RuntimeError, "does not match the indexed content"):
+            LegacyMailbox.observe(self.profile)
+
+    def test_matching_archive_digest_with_wrong_attachment_is_rejected(self):
+        self.source.unlink()
+        self.original = original_message(b"replacement payload")
+        self.original_sha = hashlib.sha256(self.original).hexdigest()
+        self.create_cache(self.source)
+        with self.assertRaisesRegex(RuntimeError, "archived attachment differs"):
             LegacyMailbox.observe(self.profile)
 
     def test_staging_accepts_only_verified_bytes_with_no_active_version_or_data(self):

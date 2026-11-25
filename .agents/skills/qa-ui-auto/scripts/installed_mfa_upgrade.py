@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 from ci_desktop import Desktop
 import installed_first_release
+import installed_server_identities
 import installed_mail_upgrade
 from installed_linux_formats import appimage_binary, install_rpm, prepare_appimage
 from installed_mfa_crash import abrupt_exit
@@ -237,8 +238,7 @@ def execute(args):
                 archive = origin.files["/" + receipt["archive"]]
                 server = FakeMailServer()
                 resources.callback(server.stop)
-                server.state.deliver("INBOX", 1, prefix=installed_mail_upgrade.LEGACY_PREFIX,
-                                     body=installed_mail_upgrade.LEGACY_BODY + "\r\n")
+                uid = server.state.append_raw("INBOX", installed_mail_upgrade.original_message(), [])
                 mail_package = origin.roster[installed_mail_upgrade.MAIL_ID]
 
                 def seed_mail(session):
@@ -263,6 +263,15 @@ def execute(args):
             if origin:
                 mail_input = installed_mail_upgrade.LegacyMailbox.observe(profile)
                 stages["legacyMail"] = mail_input.evidence()
+                if uid != mail_input.uid:
+                    raise RuntimeError("The old desktop archived a different attachment fixture")
+                # Keep the message available for sync, but only the original local archive
+                # can supply the expected attachment during the upgrade and rollback reads.
+                with server.state.lock:
+                    server.state.folders["INBOX"].messages[uid].raw = installed_mail_upgrade.original_message(
+                        b"Different remote attachment contents.\r\n",
+                    )
+                stages["legacyServerIdentities"] = installed_server_identities.seed(profile)
             candidate, replacement = replace_package(package, work, report / "candidate-install",
                                                      version=target["version"])
             stages["replacement"] = replacement
@@ -285,6 +294,7 @@ def execute(args):
                 stages["firstBusinessInstall"] = installed_first_release.exercise(
                     ctx, candidate, work, profile, report, origin, mail=read_migrated_mail,
                 )
+                stages["migratedServerIdentities"] = installed_server_identities.verify(profile, stages["legacyServerIdentities"])
                 stages["uninstalledMailData"] = mail_input.assert_uninstalled(
                     mail_package["version"], stages["migratedMail"]["syncedUid"],
                 )
@@ -307,6 +317,8 @@ def execute(args):
             if reinstalled["binarySha256"] != replacement["binarySha256"]:
                 raise RuntimeError("Candidate reinstall changed the installed executable")
             stages["reopenModule"] = inspect_accounts(ctx, candidate, work, report, "candidate-reopen", "359 152")
+            if origin:
+                stages["reinstalledServerIdentities"] = installed_server_identities.verify(profile, stages["legacyServerIdentities"])
             profile_lease = stages["desktopProfileLease"] = {"passed": False}
             verify_desktop_profile_lease(ctx, candidate, work, profile, report, profile_lease)
             if args.verify_relocation:

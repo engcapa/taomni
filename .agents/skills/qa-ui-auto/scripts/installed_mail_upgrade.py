@@ -2,6 +2,9 @@
 
 from contextlib import closing
 from dataclasses import dataclass
+from email import policy
+from email.message import EmailMessage
+from email.parser import BytesParser
 import gzip
 import hashlib
 import json
@@ -24,11 +27,25 @@ ACCOUNT_ROW = element("session-tree-item") + f'[data-session-name="{ACCOUNT_NAME
 LEGACY_PREFIX = "Legacy installed message"
 LEGACY_SUBJECT = f"{LEGACY_PREFIX} 0001"
 LEGACY_BODY = "Cached mail created by the installed monolithic application."
+ATTACHMENT_NAME = "legacy-installed.txt"
+ATTACHMENT = b"Attachment saved by the monolithic desktop.\r\n"
 NEW_PREFIX = "Post-upgrade installed message"
 NEW_SUBJECT = f"{NEW_PREFIX} 0001"
 MAIL_ID = "taomni-plugin-mail"
 MAIL_PLAN = "migration/mail-provision.json"
 MAIL_CARD = element("module-marketplace-card") + f'[data-module-id="{MAIL_ID}"]'
+
+
+def original_message(attachment=ATTACHMENT):
+    message = EmailMessage(policy=policy.SMTP)
+    message["From"] = "QA Sender <qa-sender@example.com>"
+    message["To"] = "qa@example.com"
+    message["Subject"] = LEGACY_SUBJECT
+    message["Message-ID"] = "<installed-first-release@example.test>"
+    message["Date"] = "Mon, 01 Jun 2026 08:00:00 +0000"
+    message.set_content(LEGACY_BODY)
+    message.add_attachment(attachment, maintype="text", subtype="plain", filename=ATTACHMENT_NAME)
+    return message.as_bytes()
 
 
 def read_rows(path, query, values):
@@ -84,6 +101,10 @@ def legacy_archive(db, account, uid):
         raise RuntimeError("The archived envelope does not match the indexed content")
     if LEGACY_BODY.encode() not in original:
         raise RuntimeError("The archived body differs from the message read in the legacy desktop")
+    envelope = BytesParser(policy=policy.default).parsebytes(original)
+    attachments = [(part.get_filename(), part.get_payload(decode=True)) for part in envelope.iter_attachments()]
+    if attachments != [(ATTACHMENT_NAME, ATTACHMENT)]:
+        raise RuntimeError("The archived attachment differs from the monolithic mailbox fixture")
     return path, archive_sha
 
 
@@ -126,7 +147,7 @@ class LegacyMailbox:
 
     def evidence(self):
         return {"accountId": self.account, "uid": self.uid, "originalSha256": self.archive_sha,
-                "legacyMailCacheFiles": self.source_files}
+                "legacyMailCacheFiles": self.source_files, "attachmentSha256": hashlib.sha256(ATTACHMENT).hexdigest()}
 
     def assert_retained(self):
         if LegacyMailbox.observe(self.profile) != self:
@@ -194,6 +215,21 @@ def assert_original_body(steps, scope=""):
     desktop_action(steps, "assert_text", {"selector": reader, "contains": LEGACY_BODY, "timeout_sec": 45})
 
 
+def read_attachment(steps):
+    attachment = element("mail-attachment-open") + f'[data-name="{ATTACHMENT_NAME}"]'
+    viewer = element("file-viewer") + '[data-readonly="true"]'
+    desktop_action(steps, "wait_for", attachment)
+    desktop_action(steps, "wait_for", {"selector": element("mail-body-warming-progress"), "state": "detached", "timeout_sec": 35})
+    desktop_action(steps, "dblclick", attachment)
+    desktop_action(steps, "wait_for", viewer)
+    # The viewer observation confines all reads to this run or a viewer-owned temporary file.
+    (steps.case_dir / "file-open-fixture.json").write_text(json.dumps({
+        "schema": "qa.file-open-fixture.v1", "mode": "native", "root": str(steps.case_dir.resolve()),
+    }), encoding="utf-8")
+    desktop_action(steps, "assert_file_open_bytes", {"selector": viewer, "sha256": hashlib.sha256(ATTACHMENT).hexdigest()})
+    close_tab(steps, "file-viewer")
+
+
 def read_original(steps):
     row = element("mail-message-row") + f'[data-subject="{LEGACY_SUBJECT}"]'
     desktop_action(steps, "wait_for", {"selector": row, "timeout_sec": 45})
@@ -201,6 +237,7 @@ def read_original(steps):
         desktop_action(steps, "click", row)
         desktop_action(steps, "wait_for", row + '[aria-pressed="true"]')
         assert_original_body(steps)
+        read_attachment(steps)
     except RuntimeError:
         steps.session.screenshot(steps.case_dir / "installed-mail-reader-failure.png")
         raise
@@ -318,6 +355,7 @@ def exercise_migrated(steps, mailbox, server, package):
     desktop_action(steps, "assert_text", {"selector": archive_read, "contains": LEGACY_SUBJECT})
     desktop_action(steps, "click", archive_read)
     assert_original_body(steps, element("mail-archive-preview") + " ")
+    desktop_action(steps, "assert_text", {"selector": element("mail-archive-attachment"), "contains": ATTACHMENT_NAME})
     desktop_action(steps, "screenshot", "installed-mail-migrated-archive.png")
     desktop_action(steps, "click", element("mail-archive-close"))
     result["writerLease"] = writer_lease(mailbox.profile / "plugins", enabled=True, slug="mail")
