@@ -392,6 +392,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
       {editing ? (
         <MfaEditDialog
           account={editing}
+          returnFocus={accountMenuTrigger.current}
           groups={groups}
           onClose={() => setEditing(null)}
           onSaved={(account) => {
