@@ -346,7 +346,7 @@ export function KeymapSettingsDialog({
             type="button"
             data-testid={`keymap-add-${item.id}`}
             aria-label={capturing ? `Recording shortcut for ${item.title}` : `Add shortcut to ${item.title}`}
-            className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-ui-small hover:bg-[var(--taomni-code-hover)]"
+            className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-ui-small hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={() => startKeyboardCapture(item.id, null)}
           >
             {capturing ? "recording…" : "+ Add"}

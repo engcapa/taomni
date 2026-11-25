@@ -47,7 +47,7 @@ export function EditorHostSurface(props: EditorHostSurfaceProps) {
             type="button"
             data-testid="completion-resolve-gate-retry"
             disabled={resolveGateUi.retrying}
-            className="shrink-0 rounded border border-[var(--taomni-border,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
+            className="shrink-0 rounded border border-[var(--taomni-divider,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
             onClick={() => {
               const id = resolveGateUi.id;
               editor.setResolveGateUi((gate) => gate?.id === id ? { ...gate, retrying: true, failed: false } : gate);
@@ -68,7 +68,7 @@ export function EditorHostSurface(props: EditorHostSurfaceProps) {
             type="button"
             data-testid="completion-resolve-gate-insert-without-import"
             disabled={resolveGateUi.retrying}
-            className="shrink-0 rounded border border-[var(--taomni-border,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
+            className="shrink-0 rounded border border-[var(--taomni-divider,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
             onClick={() => {
               const inserted = resolveGateUi.insertWithoutImport();
               if (inserted) {

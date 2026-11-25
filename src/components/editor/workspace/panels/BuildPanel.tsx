@@ -21,7 +21,7 @@ function DependencyRow({ node, depth }: { node: DependencyNode; depth: number })
   return (
     <>
       <div
-        className="flex items-center gap-1 py-0.5 pr-2 hover:bg-[var(--taomni-hover-bg)]"
+        className="flex items-center gap-1 py-0.5 pr-2 hover:bg-[var(--taomni-hover)]"
         style={{ paddingLeft: `${8 + depth * 12}px` }}
       >
         {hasChildren ? (
@@ -380,7 +380,7 @@ export function BuildPanel({ roots, active, onRunTask, onLoadModules, toolConfig
             <div key={key} className="select-none">
               <button
                 type="button"
-                className="w-full flex items-center gap-1 px-2 py-0.5 text-left hover:bg-[var(--taomni-hover-bg)]"
+                className="w-full flex items-center gap-1 px-2 py-0.5 text-left hover:bg-[var(--taomni-hover)]"
                 onClick={() => toggle(key)}
               >
                 {isCollapsed ? <ChevronRight className="h-3 w-3 shrink-0" /> : <ChevronDown className="h-3 w-3 shrink-0" />}
@@ -392,7 +392,7 @@ export function BuildPanel({ roots, active, onRunTask, onLoadModules, toolConfig
                   key={task.id}
                   type="button"
                   data-testid={`build-panel-task-${task.id}`}
-                  className="group w-full flex items-center gap-1.5 py-0.5 pl-6 pr-2 text-left hover:bg-[var(--taomni-hover-bg)]"
+                  className="group w-full flex items-center gap-1.5 py-0.5 pl-6 pr-2 text-left hover:bg-[var(--taomni-hover)]"
                   title={task.command}
                   disabled={executing}
                   onClick={() => runBuildTarget({
@@ -423,7 +423,7 @@ export function BuildPanel({ roots, active, onRunTask, onLoadModules, toolConfig
             <div key={key} className="select-none border-b border-[var(--taomni-code-border)] pb-1">
               <button
                 type="button"
-                className="flex w-full items-center gap-1 px-2 py-0.5 text-left hover:bg-[var(--taomni-hover-bg)]"
+                className="flex w-full items-center gap-1 px-2 py-0.5 text-left hover:bg-[var(--taomni-hover)]"
                 onClick={() => toggle(key)}
               >
                 {isCollapsed ? <ChevronRight className="h-3 w-3 shrink-0" /> : <ChevronDown className="h-3 w-3 shrink-0" />}
@@ -435,7 +435,7 @@ export function BuildPanel({ roots, active, onRunTask, onLoadModules, toolConfig
                   key={task.id}
                   type="button"
                   data-testid={`build-panel-target-${task.id}`}
-                  className="group flex w-full items-center gap-1.5 py-0.5 pl-6 pr-2 text-left hover:bg-[var(--taomni-hover-bg)] disabled:opacity-60"
+                  className="group flex w-full items-center gap-1.5 py-0.5 pl-6 pr-2 text-left hover:bg-[var(--taomni-hover)] disabled:opacity-60"
                   title={task.execution?.error ?? task.command}
                   disabled={executing || !!task.execution?.error}
                   onClick={() => runBuildTarget(task)}

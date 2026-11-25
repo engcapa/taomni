@@ -59,7 +59,7 @@ function TestRow({
   return (
     <>
       <div
-        className="group flex items-center gap-1 py-0.5 pr-2 hover:bg-[var(--taomni-hover-bg)]"
+        className="group flex items-center gap-1 py-0.5 pr-2 hover:bg-[var(--taomni-hover)]"
         style={{ paddingLeft: `${8 + depth * 12}px` }}
         data-testid={`tests-item-${item.fullName}`}
       >
@@ -216,7 +216,7 @@ export function TestsPanel({
               <button
                 type="button"
                 data-testid={`tests-failure-details-${result.id}`}
-                className="mt-0.5 block w-full whitespace-pre-wrap break-words border-l-2 border-red-500/50 pl-2 text-left text-ui-caption text-red-500 hover:bg-[var(--taomni-hover-bg)]"
+                className="mt-0.5 block w-full whitespace-pre-wrap break-words border-l-2 border-red-500/50 pl-2 text-left text-ui-caption text-red-500 hover:bg-[var(--taomni-hover)]"
                 onClick={() => onOpenFailure?.(result)}
               >
                 {result.message ?? result.details}

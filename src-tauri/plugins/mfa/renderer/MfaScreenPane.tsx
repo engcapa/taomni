@@ -70,7 +70,7 @@ export function MfaScreenPane({ onTexts }: { onTexts: (texts: string[], decoder:
         role="status"
         aria-live="polite"
         className="min-h-[18px] text-ui-body"
-        style={{ color: state.kind === "error" ? "var(--taomni-error, #c33)" : "var(--taomni-text-muted)" }}
+        style={{ color: state.kind === "error" ? "var(--taomni-danger-text, #c33)" : "var(--taomni-text-muted)" }}
       >
         {state.kind === "busy" ? t("mfa.screenScanning") : state.kind === "error" ? state.message : ""}
       </div>

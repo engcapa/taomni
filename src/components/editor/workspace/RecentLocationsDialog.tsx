@@ -112,7 +112,7 @@ export function RecentLocationsDialog({
       onKeyDown={handleKeyDown}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
     >
-      <div className="flex h-[75vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-ui-body text-[var(--taomni-code-fg)]">
+      <div className="flex h-[75vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-ui-body text-[var(--taomni-code-text)]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-3">
           <div className="flex items-center gap-2">
@@ -145,7 +145,7 @@ export function RecentLocationsDialog({
               data-testid="recent-locations-close"
               onClick={onClose}
               aria-label="Close"
-              className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-fg)]"
+              className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
             >
               <X className="h-4 w-4" />
             </button>
@@ -163,7 +163,7 @@ export function RecentLocationsDialog({
               placeholder="Search in recent locations and code snippets..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-9 pr-3 text-ui-body text-[var(--taomni-code-fg)] placeholder:text-[var(--taomni-code-muted)] focus:outline-none focus:border-sky-500"
+              className="h-8 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-9 pr-3 text-ui-body text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)] focus:outline-none focus:border-sky-500"
             />
           </div>
         </div>
@@ -195,7 +195,7 @@ export function RecentLocationsDialog({
                   <div className="flex items-center justify-between pb-1.5 border-b border-[var(--taomni-code-border)]/40 mb-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <Code2 className="h-4 w-4 text-sky-400 shrink-0" />
-                      <span className="font-medium text-ui-body text-[var(--taomni-code-fg)]">
+                      <span className="font-medium text-ui-body text-[var(--taomni-code-text)]">
                         {loc.title}
                       </span>
                       <span className="font-mono text-ui-small text-[var(--taomni-code-muted)]">
@@ -235,7 +235,7 @@ export function RecentLocationsDialog({
                   </div>
 
                   {/* Code snippet preview */}
-                  <div className="rounded bg-[var(--taomni-code-bg)] p-2 border border-[var(--taomni-code-border)]/40 font-mono text-ui-small text-[var(--taomni-code-fg)] whitespace-pre overflow-x-auto leading-relaxed">
+                  <div className="rounded bg-[var(--taomni-code-bg)] p-2 border border-[var(--taomni-code-border)]/40 font-mono text-ui-small text-[var(--taomni-code-text)] whitespace-pre overflow-x-auto leading-relaxed">
                     {loc.contextSnippet || loc.lineText}
                   </div>
                 </div>

@@ -99,7 +99,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
         {tooShort && (
           <div
             className="mt-2 text-ui-body"
-            style={{ color: "var(--taomni-error, #c33)" }}
+            style={{ color: "var(--taomni-danger-text, #c33)" }}
             data-testid="vault-setup-too-short"
           >
             {t("vault.tooShort")}
@@ -108,7 +108,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
         {mismatch && (
           <div
             className="mt-2 text-ui-body"
-            style={{ color: "var(--taomni-error, #c33)" }}
+            style={{ color: "var(--taomni-danger-text, #c33)" }}
             data-testid="vault-setup-mismatch"
           >
             {t("vault.mismatchLong")}
@@ -117,7 +117,7 @@ export function VaultSetupDialog({ onCancel, onSubmit }: VaultSetupDialogProps) 
         {error && (
           <div
             className="mt-2 text-ui-body"
-            style={{ color: "var(--taomni-error, #c33)" }}
+            style={{ color: "var(--taomni-danger-text, #c33)" }}
             data-testid="vault-setup-error"
           >
             {error}

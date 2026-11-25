@@ -93,7 +93,7 @@ export function MfaEditDialog({
           {t("mfa.note")}
           <textarea data-testid="mfa-edit-note" className="taomni-input mt-1 w-full" rows={2} value={note} onChange={(event) => setNote(event.target.value)} />
         </label>
-        {error ? <div data-testid="mfa-edit-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-error, #c33)" }}>{error}</div> : null}
+        {error ? <div data-testid="mfa-edit-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-danger-text, #c33)" }}>{error}</div> : null}
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" data-testid="mfa-edit-cancel" className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]" onClick={onClose} disabled={busy}>
             {t("mfa.cancel")}

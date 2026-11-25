@@ -483,7 +483,7 @@ export function LanguageServersSettings() {
                           {t("settings.languageServersJavaVmargsHint")}
                         </div>
                       </label>
-                      <div className="mt-3 border-t border-[var(--taomni-border)] pt-2">
+                      <div className="mt-3 border-t border-[var(--taomni-divider)] pt-2">
                         <div className="text-ui-small font-medium text-[var(--taomni-text)]">
                           {t("settings.languageServersJavaSettingsTitle")}
                         </div>
@@ -576,7 +576,7 @@ export function LanguageServersSettings() {
                           </span>
                         </label>
                       </div>
-                      <div className="mt-3 border-t border-[var(--taomni-border)] pt-2">
+                      <div className="mt-3 border-t border-[var(--taomni-divider)] pt-2">
                         <div className="text-ui-small font-medium text-[var(--taomni-text)]">
                           {t("settings.languageServersJavaBundlesTitle")}
                         </div>

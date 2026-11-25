@@ -175,7 +175,7 @@ export function SqlExecutionSettings() {
               <p
                 id={`${testId}-hint`}
                 className={`mt-1 text-ui-small ${error ? "" : "text-[var(--taomni-text-muted)]"}`}
-                style={error ? { color: "var(--taomni-warning, #b45309)" } : undefined}
+                style={error ? { color: "var(--taomni-warning-text, #b45309)" } : undefined}
                 data-testid={error ? `${testId}-error` : undefined}
               >
                 {error

@@ -61,7 +61,7 @@ export function GitCloneProgressView({ task }: GitCloneProgressViewProps) {
 
       {task.phase === "completed" && task.result && (
         <div data-testid="workspace-git-clone-success" className="rounded-lg border p-3 text-ui-body"
-          style={{ borderColor: "var(--taomni-success, #10b981)", background: "var(--taomni-card-bg)" }}>
+          style={{ borderColor: "var(--taomni-success-icon, #10b981)", background: "var(--taomni-card-bg)" }}>
           <strong className="block text-[var(--taomni-text)]">{t("gitClone.successTitle")}</strong>
           <code className="taomni-mono mt-1 block break-all text-ui-small text-[var(--taomni-text-muted)]">{task.result.repoRoot}</code>
           {task.result.branch && (

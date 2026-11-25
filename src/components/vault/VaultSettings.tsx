@@ -214,7 +214,7 @@ export function VaultSettings() {
       </div>
 
       {lockError && (
-        <div role="alert" data-testid="vault-operation-error" className="mb-4 text-ui-body" style={{ color: "var(--taomni-error, #c33)" }}>
+        <div role="alert" data-testid="vault-operation-error" className="mb-4 text-ui-body" style={{ color: "var(--taomni-danger-text, #c33)" }}>
           {lockError}
         </div>
       )}
@@ -254,7 +254,7 @@ export function VaultSettings() {
             data-testid="vault-change-master-new2"
           />
           {error && (
-            <div className="text-ui-body mb-2" style={{ color: "var(--taomni-error, #c33)" }}>
+            <div className="text-ui-body mb-2" style={{ color: "var(--taomni-danger-text, #c33)" }}>
               {error}
             </div>
           )}

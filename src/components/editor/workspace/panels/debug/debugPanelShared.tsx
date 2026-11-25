@@ -189,7 +189,7 @@ export function SectionAction({
       aria-pressed={active}
       className={`inline-flex h-5 w-5 items-center justify-center rounded ${
         active ? "text-amber-500" : "text-[var(--taomni-text-muted)]"
-      } hover:bg-[var(--taomni-hover-bg)]`}
+      } hover:bg-[var(--taomni-hover)]`}
       onClick={onClick}
     >
       {children}

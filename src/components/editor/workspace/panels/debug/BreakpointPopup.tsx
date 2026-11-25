@@ -100,7 +100,7 @@ export function BreakpointPopup({
         <button
           type="button"
           data-testid="debug-breakpoint-popup-done"
-          className="h-6 rounded border border-[var(--taomni-code-border)] px-3 text-ui-small hover:bg-[var(--taomni-hover-bg)]"
+          className="h-6 rounded border border-[var(--taomni-code-border)] px-3 text-ui-small hover:bg-[var(--taomni-hover)]"
           onClick={onClose}
         >
           Done

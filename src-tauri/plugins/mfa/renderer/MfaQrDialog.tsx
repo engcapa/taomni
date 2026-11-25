@@ -270,7 +270,7 @@ export function MfaQrDialog({
             />
           </label>
         )}
-        {error ? <div data-testid="mfa-qr-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-error, #c33)" }}>{error}</div> : null}
+        {error ? <div data-testid="mfa-qr-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-danger-text, #c33)" }}>{error}</div> : null}
         <div className="flex justify-end gap-2 pt-1">
           <button ref={closeRef} type="button" data-testid="mfa-qr-close" className="px-3.5 py-1.5 text-ui-body rounded-md border font-medium hover:bg-[var(--taomni-hover)] transition-colors" style={{ borderColor: "var(--taomni-input-border)" }} onClick={close}>
             {t("mfa.close")}

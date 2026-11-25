@@ -143,7 +143,7 @@ export function MfaImagePane({ onTexts }: { onTexts: (texts: string[]) => MfaTex
         role="status"
         aria-live="polite"
         className="min-h-[18px] text-ui-body"
-        style={{ color: state.kind === "error" ? "var(--taomni-error, #c33)" : "var(--taomni-text-muted)" }}
+        style={{ color: state.kind === "error" ? "var(--taomni-danger-text, #c33)" : "var(--taomni-text-muted)" }}
       >
         {state.kind === "busy" ? t("mfa.imageDecoding") : state.kind === "error" ? state.message : ""}
       </div>

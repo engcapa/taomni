@@ -114,7 +114,7 @@ export function MfaImportPreview({
               <div data-testid="mfa-import-item-label" className="truncate font-semibold">{row.label}</div>
               {row.input ? <div style={{ color: "var(--taomni-text-muted)" }}>{kindLabel(row.input)}</div> : null}
               {row.error ? (
-                <div data-testid="mfa-import-invalid" style={{ color: "var(--taomni-error, #c33)" }}>
+                <div data-testid="mfa-import-invalid" style={{ color: "var(--taomni-danger-text, #c33)" }}>
                   {t("mfa.previewInvalid", { error: row.error })}
                 </div>
               ) : null}
@@ -146,7 +146,7 @@ export function MfaImportPreview({
           {t("mfa.previewAllDuplicates")}
         </div>
       ) : null}
-      {error ? <div data-testid="mfa-import-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-error, #c33)" }}>{error}</div> : null}
+      {error ? <div data-testid="mfa-import-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-danger-text, #c33)" }}>{error}</div> : null}
       <div className="flex justify-end gap-2">
         <button type="button" data-testid="mfa-import-back" className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]" onClick={onBack} disabled={busy}>
           {t("mfa.previewBack")}

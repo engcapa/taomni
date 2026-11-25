@@ -58,7 +58,7 @@ export function LocalDirectoriesPanel({
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-input-bg)" }}
         role="alert"
       >
-        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-warning, #d97706)]" />
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-warning-text, #d97706)]" />
         <span className="min-w-0 flex-1 text-[var(--taomni-text-muted)]">
           {t("welcome.localDirectoriesLoadFailed", { error: loadError ?? "" })}
         </span>
@@ -135,7 +135,7 @@ export function LocalDirectoriesPanel({
                     {unavailable ? (
                       <span
                         data-testid="welcome-local-directory-unavailable"
-                        className="shrink-0 inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-ui-caption text-[var(--taomni-warning, #d97706)]"
+                        className="shrink-0 inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-ui-caption text-[var(--taomni-warning-text, #d97706)]"
                         style={{ borderColor: "var(--taomni-divider)" }}
                       >
                         <AlertTriangle className="w-3 h-3" />

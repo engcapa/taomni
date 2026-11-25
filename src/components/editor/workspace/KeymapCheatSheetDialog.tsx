@@ -100,7 +100,7 @@ export function KeymapCheatSheetDialog({
       data-testid="keymap-cheatsheet-dialog"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
     >
-      <div className="flex h-[80vh] w-full max-w-4xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-ui-body text-[var(--taomni-code-fg)]">
+      <div className="flex h-[80vh] w-full max-w-4xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-ui-body text-[var(--taomni-code-text)]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-3">
           <div className="flex items-center gap-2">
@@ -119,7 +119,7 @@ export function KeymapCheatSheetDialog({
             data-testid="keymap-cheatsheet-close"
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-fg)]"
+            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -155,7 +155,7 @@ export function KeymapCheatSheetDialog({
               placeholder="Search shortcut or action..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-7 w-60 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-7 pr-2 text-ui-small text-[var(--taomni-code-fg)] placeholder:text-[var(--taomni-code-muted)] focus:outline-none focus:border-sky-500"
+              className="h-7 w-60 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-7 pr-2 text-ui-small text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)] focus:outline-none focus:border-sky-500"
             />
           </div>
         </div>
@@ -217,7 +217,7 @@ export function KeymapCheatSheetDialog({
                             {parts.map((p, pIdx) => (
                               <kbd
                                 key={pIdx}
-                                className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 font-mono text-ui-caption font-semibold text-[var(--taomni-code-fg)] shadow-sm"
+                                className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 font-mono text-ui-caption font-semibold text-[var(--taomni-code-text)] shadow-sm"
                               >
                                 {p}
                               </kbd>
@@ -276,7 +276,7 @@ export function KeymapCheatSheetDialog({
             type="button"
             data-testid="keymap-cheatsheet-footer-close"
             onClick={onClose}
-            className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-3 py-1 text-[var(--taomni-code-fg)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-3 py-1 text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
           >
             Close
           </button>

@@ -59,7 +59,7 @@ export function CoveragePanel({
     return (
       <div data-testid="coverage-panel-empty" className="flex h-full flex-col items-center justify-center p-6 text-ui-body text-[var(--taomni-code-muted)]">
         <ShieldCheck className="h-10 w-10 text-[var(--taomni-code-muted)] opacity-40 mb-2" />
-        <p className="font-medium text-[var(--taomni-code-fg)]">No test coverage data loaded</p>
+        <p className="font-medium text-[var(--taomni-code-text)]">No test coverage data loaded</p>
         <p className="text-ui-small mt-1 max-w-md text-center">
           Run tests with coverage enabled (e.g. `pnpm test --coverage`, `mvn test -Pjacoco`, or `pytest --cov`) to generate `lcov.info` or `jacoco.xml`.
         </p>
@@ -68,7 +68,7 @@ export function CoveragePanel({
             type="button"
             data-testid="coverage-panel-reload-btn"
             onClick={onRefreshCoverage}
-            className="mt-3 flex items-center gap-1.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-3 py-1 text-ui-small text-[var(--taomni-code-fg)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            className="mt-3 flex items-center gap-1.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-3 py-1 text-ui-small text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             <span>Scan for Coverage Reports</span>
@@ -79,12 +79,12 @@ export function CoveragePanel({
   }
 
   return (
-    <div data-testid="coverage-panel" className="flex h-full flex-col text-ui-body text-[var(--taomni-code-fg)]">
+    <div data-testid="coverage-panel" className="flex h-full flex-col text-ui-body text-[var(--taomni-code-text)]">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/30 px-3 py-2 text-ui-small">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-[var(--taomni-code-fg)]">Overall Coverage:</span>
+            <span className="font-semibold text-[var(--taomni-code-text)]">Overall Coverage:</span>
             <span
               data-testid="coverage-overall-badge"
               className={`rounded border px-2 py-0.5 font-mono font-bold ${getPercentageColor(
@@ -135,7 +135,7 @@ export function CoveragePanel({
               data-testid="coverage-refresh-btn"
               onClick={onRefreshCoverage}
               labelKey="refreshCoverage"
-              className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-fg)]"
+              className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </IconButton>

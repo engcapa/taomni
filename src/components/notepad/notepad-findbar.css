@@ -279,7 +279,7 @@
 }
 
 .np-workbench .np-find-message.error {
-  color: var(--taomni-error, #dc2626);
+  color: var(--taomni-danger-text, #dc2626);
 }
 
 /* Action buttons */

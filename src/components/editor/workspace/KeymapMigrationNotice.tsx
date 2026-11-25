@@ -47,7 +47,7 @@ export function KeymapMigrationNotice({ onOpenKeymap, onDismiss }: KeymapMigrati
         <button
           type="button"
           aria-label="Close keymap notice"
-          className="rounded p-0.5 hover:bg-[var(--taomni-code-hover)]"
+          className="rounded p-0.5 hover:bg-[var(--taomni-code-active-line-bg)]"
           onClick={onDismiss}
         >
           <X size={12} />

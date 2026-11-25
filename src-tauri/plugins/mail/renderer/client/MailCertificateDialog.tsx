@@ -31,7 +31,7 @@ export function MailCertificateDialog(context: MailCertificateDialogContext) {
           {certReview.error && <div className="text-red-500">{certReview.error}</div>}
           {certReview.info && (
             <>
-              <div className="text-[var(--taomni-warning,#d97706)]">
+              <div className="text-[var(--taomni-warning-text,#d97706)]">
                 {certReview.info.trustedBySystem
                   ? "This certificate is trusted by the system."
                   : `Not trusted by the system: ${certReview.info.verifyError ?? "unknown issuer"}`}

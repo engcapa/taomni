@@ -120,7 +120,7 @@ export function VncSessionInfoDialog({ info, onClose }: { info: VncSessionInfo; 
         aria-modal="true"
         aria-labelledby="vnc-session-info-title"
         data-testid="vnc-session-info"
-        className="rounded-md border border-[var(--taomni-border)] bg-[var(--taomni-bg-elevated,var(--taomni-bg))] text-[var(--taomni-text)] shadow-xl"
+        className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-bg-elevated,var(--taomni-bg))] text-[var(--taomni-text)] shadow-xl"
         style={{ minWidth: 420, maxWidth: "90%", padding: 16 }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -129,7 +129,7 @@ export function VncSessionInfoDialog({ info, onClose }: { info: VncSessionInfo; 
             type="button"
             aria-label={t("vnc.close")}
             onClick={onClose}
-            className="rounded p-1 hover:bg-[var(--taomni-bg-hover)]"
+            className="rounded p-1 hover:bg-[var(--taomni-hover)]"
           >
             <X size={14} />
           </button>
@@ -148,7 +148,7 @@ export function VncSessionInfoDialog({ info, onClose }: { info: VncSessionInfo; 
             type="button"
             data-testid="vnc-session-info-ok"
             onClick={onClose}
-            className="rounded border border-[var(--taomni-border)] px-4 py-1 text-xs hover:bg-[var(--taomni-bg-hover)]"
+            className="rounded border border-[var(--taomni-divider)] px-4 py-1 text-xs hover:bg-[var(--taomni-hover)]"
           >
             OK
           </button>

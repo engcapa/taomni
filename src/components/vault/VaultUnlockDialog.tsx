@@ -155,7 +155,7 @@ export function VaultUnlockDialog({
         {error && (
           <div
             className="mt-2 text-ui-body"
-            style={{ color: "var(--taomni-error, #c33)" }}
+            style={{ color: "var(--taomni-danger-text, #c33)" }}
             data-testid="vault-unlock-error"
           >
             {error}

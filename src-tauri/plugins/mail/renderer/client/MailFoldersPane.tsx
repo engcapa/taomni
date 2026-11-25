@@ -152,7 +152,7 @@ export function MailFoldersPane(viewProps: MailFoldersPaneProps) {
                         <span className="min-w-0 flex-1 truncate" title={label === folder.name ? folder.name : `${label} (${folder.name})`}>{label}</span>
                         {folder.lastError && (
                           <span
-                            className="text-[var(--taomni-warning,#d97706)]"
+                            className="text-[var(--taomni-warning-text,#d97706)]"
                             data-testid="mail-folder-sync-error"
                             title={`Sync failed: ${folder.lastError}`}
                             aria-label={`Sync failed: ${folder.lastError}`}

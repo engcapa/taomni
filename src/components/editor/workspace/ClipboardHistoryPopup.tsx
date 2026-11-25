@@ -92,7 +92,7 @@ export function ClipboardHistoryPopup({
       onKeyDown={handleKeyDown}
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-[10vh]"
     >
-      <div className="flex w-full max-w-xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-fg)] shadow-2xl">
+      <div className="flex w-full max-w-xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-3 py-2">
           <div className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4 text-sky-400" />

@@ -111,7 +111,7 @@ export function BreakpointsDialog({ debug, initial = null, onOpenBreakpoint, onC
       >
         <div className="flex h-8 shrink-0 items-center justify-between border-b border-[var(--taomni-code-border)] px-3">
           <span className="font-semibold">Breakpoints</span>
-          <button type="button" aria-label="Close" className="rounded p-0.5 hover:bg-[var(--taomni-hover-bg)]" onClick={onClose}>
+          <button type="button" aria-label="Close" className="rounded p-0.5 hover:bg-[var(--taomni-hover)]" onClick={onClose}>
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -124,7 +124,7 @@ export function BreakpointsDialog({ debug, initial = null, onOpenBreakpoint, onC
                 aria-label="Remove"
                 title="Remove (Delete)"
                 disabled={selection.kind !== "line"}
-                className="rounded p-1 hover:bg-[var(--taomni-hover-bg)] disabled:opacity-30"
+                className="rounded p-1 hover:bg-[var(--taomni-hover)] disabled:opacity-30"
                 onClick={removeSelected}
               >
                 <Minus className="h-3.5 w-3.5" />
@@ -162,7 +162,7 @@ export function BreakpointsDialog({ debug, initial = null, onOpenBreakpoint, onC
                 const key = rowKey(row);
                 const selected = key === selectedKey;
                 const base = `flex w-full items-center gap-1.5 py-0.5 pr-2 text-left select-none ${
-                  selected ? "bg-[var(--taomni-accent)]/20" : "hover:bg-[var(--taomni-hover-bg)]"
+                  selected ? "bg-[var(--taomni-accent)]/20" : "hover:bg-[var(--taomni-hover)]"
                 }`;
                 if (row.kind === "group") {
                   return (

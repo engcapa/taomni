@@ -103,7 +103,7 @@ export function MailToolbar(viewProps: MailToolbarProps) {
             <span
               aria-hidden="true"
               className={`w-1.5 h-1.5 rounded-full ${idleState === "ready" || idleState === "changed"
-                ? "bg-[var(--taomni-success,#22c55e)]"
+                ? "bg-[var(--taomni-success-icon,#22c55e)]"
                 : "bg-[var(--taomni-text-muted)]"}`}
             />
             {!idleState || idleState === "ready" || idleState === "changed" ? "Push" : "Poll"}

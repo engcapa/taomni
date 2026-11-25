@@ -144,7 +144,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
           <button
             type="button"
             data-testid="keymap-scheme-copy"
-            className="rounded px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-hover)]"
+            className="rounded px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={() => {
               const source = draftScheme;
               const copy = createKeymapScheme({
@@ -165,7 +165,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
           <button
             type="button"
             data-testid="keymap-scheme-rename"
-            className="rounded px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
+            className="rounded px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
             disabled={!draftScheme || draftScheme.readOnly}
             onClick={async () => {
               if (!draftScheme) return;
@@ -180,7 +180,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
           <button
             type="button"
             data-testid="keymap-scheme-reset"
-            className="rounded px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
+            className="rounded px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
             disabled={!draftScheme || draftScheme.readOnly}
             onClick={() => {
               if (!draftScheme) return;
@@ -198,7 +198,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
           <button
             type="button"
             data-testid="keymap-scheme-delete"
-            className="rounded px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
+            className="rounded px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
             disabled={!draftScheme || draftScheme.readOnly}
             onClick={() => {
               if (!draftScheme) return;
@@ -212,7 +212,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
             type="button"
             aria-label="Close keymap settings"
             data-testid="keymap-settings-close"
-            className="ml-1 rounded p-1 hover:bg-[var(--taomni-code-hover)]"
+            className="ml-1 rounded p-1 hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={onClose}
           >
             <X size={14} />
@@ -271,7 +271,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
             aria-label="Find actions by shortcut"
             title="Find Actions by Shortcut"
             data-testid="keymap-find-by-shortcut"
-            className="shrink-0 rounded border border-[var(--taomni-code-border)] p-1 hover:bg-[var(--taomni-code-hover)] aria-pressed:bg-[var(--taomni-code-selection-match-bg)]"
+            className="shrink-0 rounded border border-[var(--taomni-code-border)] p-1 hover:bg-[var(--taomni-code-active-line-bg)] aria-pressed:bg-[var(--taomni-code-selection-match-bg)]"
             onClick={() => toggleShortcutFilter()}
           >
             <Keyboard size={14} />
@@ -290,7 +290,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
                   aria-expanded={expanded}
                   aria-selected={false}
                   data-testid={`keymap-group-${category}`}
-                  className="flex w-full items-center gap-1 py-1 text-left text-ui-body font-medium hover:bg-[var(--taomni-code-hover)]"
+                  className="flex w-full items-center gap-1 py-1 text-left text-ui-body font-medium hover:bg-[var(--taomni-code-active-line-bg)]"
                   onClick={() => toggleGroup(category)}
                 >
                   {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -313,7 +313,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
           const item = snapshot.find((entry) => entry.id === rowMenu.actionId);
           const row = rowBindings.get(rowMenu.actionId);
           if (!item) return null;
-          const menuItemClass = "block w-full px-3 py-1 text-left hover:bg-[var(--taomni-code-hover)] disabled:opacity-40";
+          const menuItemClass = "block w-full px-3 py-1 text-left hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40";
           return (
             <>
               <div className="fixed inset-0 z-20" onMouseDown={() => setRowMenu(null)} />
@@ -397,7 +397,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
               )}
               <div className="mt-3 flex justify-end gap-2">
                 <button type="button" data-testid="keymap-mouse-recorder-ok" disabled={!mouseShortcut}
-                  className="rounded border border-[var(--taomni-code-accent,#4b9edd)] px-3 py-0.5 hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
+                  className="rounded border border-[var(--taomni-code-accent,#4b9edd)] px-3 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
                   onClick={() => {
                     if (!mouseShortcut) return;
                     recorder.commitShortcut(mouseCapture.actionId, null, mouseShortcut);
@@ -406,7 +406,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
                   OK
                 </button>
                 <button type="button" data-testid="keymap-mouse-recorder-cancel" onClick={() => setMouseCapture(null)}
-                  className="rounded border border-[var(--taomni-code-border)] px-3 py-0.5 hover:bg-[var(--taomni-code-hover)]">
+                  className="rounded border border-[var(--taomni-code-border)] px-3 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)]">
                   Cancel
                 </button>
               </div>
@@ -491,7 +491,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
                 <button
                   type="button"
                   data-testid="keymap-recorder-ok"
-                  className="rounded border border-[var(--taomni-code-accent,#4b9edd)] px-3 py-0.5 hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
+                  className="rounded border border-[var(--taomni-code-accent,#4b9edd)] px-3 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
                   disabled={capturedStrokes.length === 0}
                   onClick={() => {
                     if (capturedStrokes.length === 0) return;
@@ -504,7 +504,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
                 <button
                   type="button"
                   data-testid="keymap-recorder-cancel"
-                  className="rounded border border-[var(--taomni-code-border)] px-3 py-0.5 hover:bg-[var(--taomni-code-hover)]"
+                  className="rounded border border-[var(--taomni-code-border)] px-3 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)]"
                   onClick={recorder.closeRecorder}
                 >
                   Cancel
@@ -519,7 +519,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
           <button
             type="button"
             data-testid="keymap-settings-ok"
-            className="rounded border border-[var(--taomni-code-border)] px-3 py-1 text-xs hover:bg-[var(--taomni-code-hover)]"
+            className="rounded border border-[var(--taomni-code-border)] px-3 py-1 text-xs hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={() => recorder.applyDraft(true)}
           >
             OK
@@ -527,7 +527,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
           <button
             type="button"
             data-testid="keymap-settings-cancel"
-            className="rounded border border-[var(--taomni-code-border)] px-3 py-1 text-xs hover:bg-[var(--taomni-code-hover)]"
+            className="rounded border border-[var(--taomni-code-border)] px-3 py-1 text-xs hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={onClose}
           >
             Cancel
@@ -535,7 +535,7 @@ export function KeymapSettingsView(inputs: KeymapSettingsViewProps) {
           <button
             type="button"
             data-testid="keymap-settings-apply"
-            className="rounded border border-[var(--taomni-code-accent, #4b9edd)] px-3 py-1 text-xs hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
+            className="rounded border border-[var(--taomni-code-accent, #4b9edd)] px-3 py-1 text-xs hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
             disabled={!dirty}
             onClick={() => recorder.applyDraft(false)}
           >

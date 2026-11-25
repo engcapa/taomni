@@ -92,7 +92,7 @@ export function DebugSubTabBar({
               className={`h-5 px-2 rounded-t flex items-center gap-1.5 font-medium transition-colors ${
                 isActive
                   ? "bg-[var(--taomni-code-bg)] text-[var(--taomni-text)] shadow-2xs border-b-2 border-b-[var(--taomni-accent)]"
-                  : "text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] hover:bg-[var(--taomni-hover-bg)]"
+                  : "text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)]"
               }`}
             >
               <Icon className="h-3 w-3 shrink-0" />

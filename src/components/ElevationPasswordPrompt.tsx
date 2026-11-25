@@ -94,7 +94,7 @@ export function ElevationPasswordPrompt({
             <div
               data-testid="sockscap-root-prompt-error"
               className="mt-2 text-ui-body"
-              style={{ color: "var(--taomni-error, #c33)" }}
+              style={{ color: "var(--taomni-danger-text, #c33)" }}
             >
               {error}
             </div>

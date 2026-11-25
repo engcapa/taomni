@@ -257,7 +257,7 @@ export function CcAgentBridge() {
               </span>
               <button
                 type="button"
-                className="shrink-0 rounded border border-[var(--taomni-border,#444)] px-2 py-0.5 hover:bg-[var(--taomni-bg-hover,#333)]"
+                className="shrink-0 rounded border border-[var(--taomni-divider,#444)] px-2 py-0.5 hover:bg-[var(--taomni-hover,#333)]"
                 onClick={() => void cancelCapture(c.captureId)}
               >
                 取消
@@ -279,7 +279,7 @@ export function CcAgentBridge() {
           data-queue-length={String(queue.length)}
         >
           {head.sourceWindow && (
-            <div className="rounded-t border border-[var(--taomni-border)] bg-[var(--taomni-panel-bg)] px-3 py-1 text-ui-body">
+            <div className="rounded-t border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] px-3 py-1 text-ui-body">
               {t("agent.approvalWindow", { name: head.sourceWindowTitle || head.sourceWindow })}
             </div>
           )}

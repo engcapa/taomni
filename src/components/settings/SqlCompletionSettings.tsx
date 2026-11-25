@@ -127,7 +127,7 @@ export function SqlCompletionSettings() {
             <p
               id="sql-completion-shortcut-hint"
               className={`mt-1 text-ui-small ${shortcutError ? "" : "text-[var(--taomni-text-muted)]"}`}
-              style={shortcutError ? { color: "var(--taomni-warning, #b45309)" } : undefined}
+              style={shortcutError ? { color: "var(--taomni-warning-text, #b45309)" } : undefined}
               data-testid={shortcutError ? "sql-completion-shortcut-error" : undefined}
             >
               {shortcutError

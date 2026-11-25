@@ -629,7 +629,7 @@ export function SqlEditorPanel({
         <div
           className="absolute right-2 bottom-2 max-w-[min(420px,calc(100%-1rem))] rounded px-2 py-1 text-ui-small pointer-events-none"
           style={{
-            color: metadataHint ? "var(--taomni-warning, #b45309)" : "var(--taomni-text-muted)",
+            color: metadataHint ? "var(--taomni-warning-text, #b45309)" : "var(--taomni-text-muted)",
             background: "var(--taomni-panel-bg)",
             border: "1px solid var(--taomni-divider)",
             boxShadow: "var(--taomni-shadow-sm)",

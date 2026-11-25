@@ -265,7 +265,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
         </button>
       </div>
       {status === "ready" && error ? (
-        <div data-testid="mfa-error" role="alert" className="flex items-center gap-2 border-b px-3 py-1.5 text-ui-body" style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-error, #c33)" }}>
+        <div data-testid="mfa-error" role="alert" className="flex items-center gap-2 border-b px-3 py-1.5 text-ui-body" style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-danger-text, #c33)" }}>
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
           <span className="flex-1 truncate">{t("mfa.errorPrefix", { error })}</span>
           <button type="button" className="rounded px-2 hover:bg-[var(--taomni-hover)]" onClick={() => store().clearError()}>
@@ -276,10 +276,10 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
       <div className="min-h-0 flex-1 overflow-y-auto">
         {keyError ? (
           <div data-testid="mfa-key-error" role="alert" className="mx-auto mt-10 max-w-[520px] space-y-3 px-6 text-center text-ui-body">
-            <AlertTriangle className="mx-auto h-8 w-8" style={{ color: "var(--taomni-error, #c33)" }} />
+            <AlertTriangle className="mx-auto h-8 w-8" style={{ color: "var(--taomni-danger-text, #c33)" }} />
             <div className="text-ui-title font-semibold">{t("mfa.keyErrorTitle")}</div>
             <div style={{ color: "var(--taomni-text-muted)" }}>{errorCode === "MFA_KEY_MISSING" ? t("mfa.keyMissing") : t("mfa.keyMismatch")}</div>
-            <button type="button" data-testid="mfa-reset-store" className="rounded px-3 py-1.5 text-white" style={{ background: "var(--taomni-error, #c33)" }} onClick={() => void resetStore()}>
+            <button type="button" data-testid="mfa-reset-store" className="rounded px-3 py-1.5 text-white" style={{ background: "var(--taomni-danger-text, #c33)" }} onClick={() => void resetStore()}>
               {t("mfa.resetStore")}
             </button>
           </div>
@@ -289,7 +289,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
               <div>{t("mfa.legacyMigrationRequired")}</div>
             ) : (
               <>
-                <div style={{ color: "var(--taomni-error, #c33)" }}>{t("mfa.errorPrefix", { error: error ?? "" })}</div>
+                <div style={{ color: "var(--taomni-danger-text, #c33)" }}>{t("mfa.errorPrefix", { error: error ?? "" })}</div>
                 <button type="button" data-testid="mfa-retry" className="rounded border px-3 py-1 hover:bg-[var(--taomni-hover)]" style={{ borderColor: "var(--taomni-input-border)" }} onClick={() => void store().load()}>
                   {t("mfa.retry")}
                 </button>

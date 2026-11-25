@@ -166,7 +166,7 @@ export function InlineRenamePopup({
           setActiveIndex(-1);
         }}
         onKeyDown={onKeyDown}
-        className="rounded-[2px] border border-[var(--taomni-code-accent,#3574f0)] bg-[var(--taomni-code-bg)] px-[2px] text-[var(--taomni-code-fg)] outline-none"
+        className="rounded-[2px] border border-[var(--taomni-code-accent,#3574f0)] bg-[var(--taomni-code-bg)] px-[2px] text-[var(--taomni-code-text)] outline-none"
         style={{
           fontFamily: anchor.fontFamily,
           fontSize: anchor.fontSize,
@@ -178,7 +178,7 @@ export function InlineRenamePopup({
         <div
           data-testid="code-workspace-inline-rename-error"
           role="alert"
-          className="mt-1 max-w-[360px] rounded border border-[var(--taomni-code-error,#e5484d)] bg-[var(--taomni-code-popup-bg,var(--taomni-code-bg))] px-2 py-1 text-ui-small text-[var(--taomni-code-fg)] shadow"
+          className="mt-1 max-w-[360px] rounded border border-[var(--taomni-code-error,#e5484d)] bg-[var(--taomni-code-popup-bg,var(--taomni-code-bg))] px-2 py-1 text-ui-small text-[var(--taomni-code-text)] shadow"
         >
           {error}
         </div>

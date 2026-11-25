@@ -57,7 +57,7 @@ export function ExceptionBreakpointsView({ debug }: ExceptionBreakpointsViewProp
             className="border-t border-[var(--taomni-code-border)]/40 first:border-t-0"
           >
             <label
-              className="flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover-bg)]"
+              className="flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover)]"
               title={filter.description}
             >
               <input
@@ -205,7 +205,7 @@ export function ExceptionBreakpointRulesView({
             data-exception-rule={rule.id}
             className="border-t border-[var(--taomni-code-border)]/40 first:border-t-0"
           >
-            <div className="flex min-w-0 items-center gap-1 px-3 py-0.5 hover:bg-[var(--taomni-hover-bg)]">
+            <div className="flex min-w-0 items-center gap-1 px-3 py-0.5 hover:bg-[var(--taomni-hover)]">
               <input
                 type="checkbox"
                 data-testid={`debug-exception-rule-enabled-${index}`}
@@ -248,7 +248,7 @@ export function ExceptionBreakpointRulesView({
               <button
                 type="button"
                 data-testid={`debug-exception-rule-edit-${index}`}
-                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)]"
+                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
                 title="Edit exception path"
                 aria-label="Edit exception path"
                 aria-expanded={editing}

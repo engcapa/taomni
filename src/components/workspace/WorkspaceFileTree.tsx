@@ -331,7 +331,7 @@ export function WorkspaceFileTree({
               onContextMenu={(event) => openEntryMenu(event, root, "", "folder")}
             >
               {isExpanded ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
-              <Folder className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--taomni-warning, #d97706)" }} />
+              <Folder className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--taomni-warning-text, #d97706)" }} />
               <span className="truncate font-semibold" style={{ fontSize: "var(--taomni-ui-font-size)" }}>{root.name}</span>
               <span className="ml-auto flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100">
                 <IconButton

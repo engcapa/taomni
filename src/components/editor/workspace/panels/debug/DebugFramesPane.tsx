@@ -207,7 +207,7 @@ export function DebugFramesPane({
                   role="option"
                   aria-selected={thread.id === shownThreadId}
                   data-testid={`debug-thread-${thread.id}`}
-                  className={`cursor-default truncate px-2 py-0.5 text-ui-caption hover:bg-[var(--taomni-hover-bg)] ${
+                  className={`cursor-default truncate px-2 py-0.5 text-ui-caption hover:bg-[var(--taomni-hover)] ${
                     thread.id === shownThreadId ? "bg-[var(--taomni-accent)]/15 font-medium" : ""
                   }`}
                   onClick={() => {
@@ -227,7 +227,7 @@ export function DebugFramesPane({
           aria-pressed={hideLibrary}
           aria-label="Hide Frames from Libraries"
           title="Hide Frames from Libraries"
-          className="h-5 w-5 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover-bg)] aria-pressed:bg-[var(--taomni-accent)]/20"
+          className="h-5 w-5 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] aria-pressed:bg-[var(--taomni-accent)]/20"
           onClick={toggleHideLibrary}
         >
           <Funnel className="h-3 w-3 text-[var(--taomni-text-muted)]" />
@@ -279,7 +279,7 @@ export function DebugFramesPane({
                 <div
                   key={`folded-${entry.firstId}`}
                   data-testid={`debug-frames-folded-${entry.firstId}`}
-                  className="cursor-default select-none px-2 py-0.5 text-ui-caption italic text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)]"
+                  className="cursor-default select-none px-2 py-0.5 text-ui-caption italic text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
                   title="Show frames from libraries"
                   onClick={toggleHideLibrary}
                 >
@@ -298,7 +298,7 @@ export function DebugFramesPane({
                 data-frame-id={frame.id}
                 data-library-frame={library ? "true" : undefined}
                 className={`flex cursor-default select-none items-center gap-1.5 px-2 py-0.5 ${
-                  selected ? "bg-[var(--taomni-accent)]/20" : "hover:bg-[var(--taomni-hover-bg)]"
+                  selected ? "bg-[var(--taomni-accent)]/20" : "hover:bg-[var(--taomni-hover)]"
                 }`}
                 onClick={() => selectFrame(frame, true)}
                 onContextMenu={(e) => handleFrameContextMenu(e, frame)}

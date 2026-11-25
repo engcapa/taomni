@@ -195,7 +195,7 @@ export function DapAdapterGuideDialog({
       data-testid="dap-adapter-guide-dialog"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
     >
-      <div className="flex h-[min(650px,90vh)] w-[min(820px,94vw)] flex-col overflow-hidden rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[var(--taomni-code-fg)] shadow-2xl">
+      <div className="flex h-[min(650px,90vh)] w-[min(820px,94vw)] flex-col overflow-hidden rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[var(--taomni-code-text)] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/40 px-4 py-3">
           <div className="flex items-center gap-2.5">
@@ -211,7 +211,7 @@ export function DapAdapterGuideDialog({
             type="button"
             data-testid="dap-guide-close-btn"
             onClick={onClose}
-            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-fg)]"
+            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -228,7 +228,7 @@ export function DapAdapterGuideDialog({
               className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-ui-body font-medium transition-colors ${
                 selectedLang === fixture.language
                   ? "border-emerald-500 text-emerald-400"
-                  : "border-transparent text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-fg)]"
+                  : "border-transparent text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
               }`}
             >
               <Code2 className="h-3.5 w-3.5" />
@@ -243,7 +243,7 @@ export function DapAdapterGuideDialog({
           <div className="rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/20 p-3.5">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="font-semibold text-ui-body text-[var(--taomni-code-fg)]">
+                <h3 className="font-semibold text-ui-body text-[var(--taomni-code-text)]">
                   {currentFixture.label}
                 </h3>
                 <p className="mt-1 text-ui-small text-[var(--taomni-code-muted)]">
@@ -293,7 +293,7 @@ export function DapAdapterGuideDialog({
                 <span>{copiedKey === "install" ? "Copied" : "Copy Command"}</span>
               </button>
             </div>
-            <pre className="rounded border border-[var(--taomni-code-border)] bg-black/40 p-2.5 font-mono text-ui-small text-[var(--taomni-code-fg)] overflow-x-auto">
+            <pre className="rounded border border-[var(--taomni-code-border)] bg-black/40 p-2.5 font-mono text-ui-small text-[var(--taomni-code-text)] overflow-x-auto">
               {details.installCommand}
             </pre>
           </div>
@@ -315,7 +315,7 @@ export function DapAdapterGuideDialog({
                 <span>{copiedKey === "config" ? "Copied" : "Copy JSON"}</span>
               </button>
             </div>
-            <pre className="rounded border border-[var(--taomni-code-border)] bg-black/40 p-2.5 font-mono text-ui-small text-[var(--taomni-code-fg)] overflow-x-auto">
+            <pre className="rounded border border-[var(--taomni-code-border)] bg-black/40 p-2.5 font-mono text-ui-small text-[var(--taomni-code-text)] overflow-x-auto">
               {details.defaultConfigSnippet}
             </pre>
           </div>

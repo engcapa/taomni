@@ -84,7 +84,7 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
           <button
             type="button"
             data-testid="debug-instruction-breakpoint-add"
-            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover-bg)] disabled:opacity-30"
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-30"
             title={canAdd ? "Add instruction breakpoint" : "The active adapter does not support instruction breakpoints"}
             aria-label="Add instruction breakpoint"
             disabled={!canAdd || !reference.trim()}
@@ -159,7 +159,7 @@ export function InstructionBreakpointsView({ debug }: { debug: CodeDebugSession;
             data-instruction-reference={breakpoint.instructionReference}
             className="border-t border-[var(--taomni-code-border)]/40"
           >
-            <div className="group flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover-bg)]">
+            <div className="group flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover)]">
               <input
                 type="checkbox"
                 data-testid={`debug-instruction-breakpoint-enabled-${index}`}

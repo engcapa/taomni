@@ -10,7 +10,7 @@ export function MfaCountdown({ remaining, period }: { remaining: number; period:
   const circumference = 2 * Math.PI * radius;
   const fraction = period > 0 ? Math.min(1, Math.max(0, remaining / period)) : 0;
   const warning = remaining <= MFA_WARNING_SECONDS;
-  const color = warning ? "var(--taomni-error, #d14343)" : "var(--taomni-accent)";
+  const color = warning ? "var(--taomni-danger-text, #d14343)" : "var(--taomni-accent)";
   return (
     <span
       data-testid="mfa-account-countdown"

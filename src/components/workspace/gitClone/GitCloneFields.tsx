@@ -137,7 +137,7 @@ export function GitCloneFields({
               </p>
             )}
             {probeError && (
-              <p data-testid="workspace-git-clone-probe-error" className="mt-1 text-ui-small" style={{ color: "var(--taomni-warning, #d97706)" }}>
+              <p data-testid="workspace-git-clone-probe-error" className="mt-1 text-ui-small" style={{ color: "var(--taomni-warning-text, #d97706)" }}>
                 {t("gitClone.branchCheckFailed", { error: probeError })}
               </p>
             )}
@@ -271,7 +271,7 @@ export function GitCloneFields({
           {form.proxyMode === "app" ? t("gitClone.proxyHintApp") : form.proxyMode === "none" ? t("gitClone.proxyHintNone") : t("gitClone.proxyHintCustom")}
         </p>
         {appProxyError && (
-          <p data-testid="workspace-git-clone-proxy-error" className="mt-1 text-ui-small" style={{ color: "var(--taomni-warning, #d97706)" }}>
+          <p data-testid="workspace-git-clone-proxy-error" className="mt-1 text-ui-small" style={{ color: "var(--taomni-warning-text, #d97706)" }}>
             {t("gitClone.appProxyUnavailable", { error: appProxyError })}
           </p>
         )}

@@ -34,3 +34,15 @@ test("identifies modal, command and simulated button ownership from JSX", () => 
   for (const [jsx, expected] of cases) assert.deepEqual(scanUI("src/Panel.tsx", jsx), expected);
   assert.deepEqual(scanUI("src/Panel.tsx", 'import { Save as SaveIcon } from "lucide-react"; const control = <button type="button"><SaveIcon /></button>'), { L11: 1 });
 });
+
+test("requires a theme, local or owning container declaration for every unguarded theme variable", async () => {
+  const { unresolvedTokens } = await import("./ui-standard-tokens.mjs");
+  const scopes = {
+    global: new Set(["--taomni-text"]),
+    scoped: [["src/workspace/", new Set(["--taomni-tree-height"])]],
+  };
+  const css = ".row { --taomni-local: 3px; height: var(--taomni-tree-height); gap: var(--taomni-local); color: var(--taomni-old, var(--taomni-text)); }";
+  assert.deepEqual(unresolvedTokens("src/workspace/row.css", css, scopes), []);
+  assert.deepEqual(unresolvedTokens("src/shell.css", css, scopes), ["--taomni-tree-height"]);
+  assert.deepEqual(unresolvedTokens("src/example.tsx", "var(--taomni-old, var(--taomni-typo))", scopes), ["--taomni-typo"]);
+});

@@ -30,7 +30,7 @@ export interface DebugToolWindowToolbarProps {
 }
 
 const toolButton =
-  "h-6 w-6 inline-flex items-center justify-center rounded transition-colors hover:bg-[var(--taomni-hover-bg)] disabled:opacity-30 disabled:pointer-events-none aria-pressed:bg-[var(--taomni-accent)]/20";
+  "h-6 w-6 inline-flex items-center justify-center rounded transition-colors hover:bg-[var(--taomni-hover)] disabled:opacity-30 disabled:pointer-events-none aria-pressed:bg-[var(--taomni-accent)]/20";
 
 function Separator() {
   return <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-[var(--taomni-code-border)]" />;

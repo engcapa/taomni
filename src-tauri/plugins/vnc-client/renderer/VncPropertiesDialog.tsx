@@ -78,12 +78,12 @@ export function VncPropertiesDialog({
         aria-modal="true"
         aria-labelledby="vnc-properties-title"
         data-testid="vnc-properties"
-        className="rounded-md border border-[var(--taomni-border)] bg-[var(--taomni-bg-elevated,var(--taomni-bg))] text-[var(--taomni-text)] shadow-xl"
+        className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-bg-elevated,var(--taomni-bg))] text-[var(--taomni-text)] shadow-xl"
         style={{ minWidth: 440, maxWidth: "90%", maxHeight: "90%", overflow: "auto", padding: 16, fontSize: 12 }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <h2 id="vnc-properties-title" style={{ fontSize: 14, fontWeight: 600 }}>{t("vnc.propertiesTitle")}</h2>
-          <button type="button" aria-label={t("vnc.close")} onClick={onClose} className="rounded p-1 hover:bg-[var(--taomni-bg-hover)]">
+          <button type="button" aria-label={t("vnc.close")} onClick={onClose} className="rounded p-1 hover:bg-[var(--taomni-hover)]">
             <X size={14} />
           </button>
         </div>
@@ -166,7 +166,7 @@ export function VncPropertiesDialog({
             <button
               type="button"
               data-testid="vnc-prop-ok-reconnect"
-              className="rounded border border-[var(--taomni-border)] px-4 py-1 hover:bg-[var(--taomni-bg-hover)]"
+              className="rounded border border-[var(--taomni-divider)] px-4 py-1 hover:bg-[var(--taomni-hover)]"
               onClick={() => onApply(draft, true)}
             >
               {t("vnc.propertiesOkReconnect")}
@@ -175,7 +175,7 @@ export function VncPropertiesDialog({
           <button
             type="button"
             data-testid="vnc-prop-ok"
-            className="rounded border border-[var(--taomni-border)] px-4 py-1 hover:bg-[var(--taomni-bg-hover)]"
+            className="rounded border border-[var(--taomni-divider)] px-4 py-1 hover:bg-[var(--taomni-hover)]"
             onClick={() => onApply(draft, false)}
           >
             {t("vnc.ok")}
@@ -183,7 +183,7 @@ export function VncPropertiesDialog({
           <button
             type="button"
             data-testid="vnc-prop-cancel"
-            className="rounded border border-[var(--taomni-border)] px-4 py-1 hover:bg-[var(--taomni-bg-hover)]"
+            className="rounded border border-[var(--taomni-divider)] px-4 py-1 hover:bg-[var(--taomni-hover)]"
             onClick={onClose}
           >
             {t("vnc.cancel")}

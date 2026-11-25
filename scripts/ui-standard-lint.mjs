@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { checkElement, importedIconNames } from "./ui-standard-controls.mjs";
 
+import { tokenScopes, unresolvedTokens } from "./ui-standard-tokens.mjs";
+
 const baselinePath = "scripts/ui-standard-baseline.json";
 const rules = {
   font: /\btext-\[\d+(?:\.\d+)?px\]/g,
@@ -95,13 +97,17 @@ export function sourceIncreases(base, observed) {
 function run() {
   const paths = sourcePaths(["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
   const observed = {};
+  const scopes = tokenScopes();
+  const missingTokens = [];
   for (const path of [...new Set(paths)].sort()) {
     if (!existsSync(path)) continue;
-    const counts = scanUI(path, readFileSync(path, "utf8"));
+    const source = readFileSync(path, "utf8");
+    const counts = scanUI(path, source);
+    for (const token of unresolvedTokens(path, source, scopes)) missingTokens.push(`${path} L03: ${token}`);
     if (Object.keys(counts).length) observed[path] = counts;
   }
   const initial = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, "utf8")) : {};
-  const violations = increases(observed, initial);
+  const violations = [...missingTokens, ...increases(observed, initial)];
   const baseIndex = process.argv.indexOf("--base");
   if (baseIndex !== -1) {
     const base = process.argv[baseIndex + 1];

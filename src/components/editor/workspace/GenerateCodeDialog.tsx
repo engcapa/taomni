@@ -68,7 +68,7 @@ export function GenerateCodeDialog({
       }}
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[12vh]"
     >
-      <div className="flex w-full max-w-lg flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-fg)] shadow-2xl">
+      <div className="flex w-full max-w-lg flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-sky-400" />
@@ -80,7 +80,7 @@ export function GenerateCodeDialog({
             onClick={onCancel}
             disabled={busy}
             aria-label="Close"
-            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-fg)] disabled:opacity-50"
+            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)] disabled:opacity-50"
           >
             <X className="h-4 w-4" />
           </button>

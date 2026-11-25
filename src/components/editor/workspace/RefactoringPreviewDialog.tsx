@@ -153,7 +153,7 @@ export function RefactoringPreviewDialog({
       data-testid="refactoring-preview-dialog"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
     >
-      <div className="flex h-[80vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-ui-body text-[var(--taomni-code-fg)]">
+      <div className="flex h-[80vh] w-full max-w-3xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-ui-body text-[var(--taomni-code-text)]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-3">
           <div>
@@ -200,7 +200,7 @@ export function RefactoringPreviewDialog({
             data-testid="refactoring-preview-close"
             onClick={onCancel}
             aria-label="Close"
-            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-fg)]"
+            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -312,7 +312,7 @@ export function RefactoringPreviewDialog({
                     type="button"
                     onClick={() => toggleCollapseFile(path)}
                     aria-label={`Toggle collapse for ${path}`}
-                    className="p-0.5 text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-fg)]"
+                    className="p-0.5 text-[var(--taomni-code-muted)] hover:text-[var(--taomni-code-text)]"
                   >
                     {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                   </button>
@@ -379,12 +379,12 @@ export function RefactoringPreviewDialog({
                             <pre
                               data-testid="refactoring-preview-before"
                               aria-label="Before"
-                              className="m-0 whitespace-pre-wrap break-all bg-red-500/10 px-2 py-0.5 text-[var(--taomni-code-fg)]"
+                              className="m-0 whitespace-pre-wrap break-all bg-red-500/10 px-2 py-0.5 text-[var(--taomni-code-text)]"
                             >{images.before.map((line) => `- ${line}`).join("\n")}</pre>
                             <pre
                               data-testid="refactoring-preview-after"
                               aria-label="After"
-                              className="m-0 whitespace-pre-wrap break-all bg-emerald-500/10 px-2 py-0.5 text-[var(--taomni-code-fg)]"
+                              className="m-0 whitespace-pre-wrap break-all bg-emerald-500/10 px-2 py-0.5 text-[var(--taomni-code-text)]"
                             >{images.after.map((line) => `+ ${line}`).join("\n")}</pre>
                           </div>
                         ) : (

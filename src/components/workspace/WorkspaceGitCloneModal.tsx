@@ -254,7 +254,7 @@ export function WorkspaceGitCloneModal() {
               )}
               {defaults && !defaults.gitAvailable && (
                 <div data-testid="workspace-git-clone-git-missing" role="alert" className="mb-3 rounded border px-3 py-2 text-ui-small"
-                  style={{ borderColor: "var(--taomni-warning, #d97706)" }}>
+                  style={{ borderColor: "var(--taomni-warning-text, #d97706)" }}>
                   {t("gitClone.gitUnavailable")}
                 </div>
               )}

@@ -151,7 +151,7 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
                 <button
                   type="button"
                   data-testid="debug-memory-read"
-                  className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1 text-ui-caption hover:bg-[var(--taomni-hover-bg)] disabled:opacity-30"
+                  className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1 text-ui-caption hover:bg-[var(--taomni-hover)] disabled:opacity-30"
                   aria-label="Read memory"
                   title="Read memory"
                   disabled={busy !== null}
@@ -187,7 +187,7 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
                 <button
                   type="button"
                   data-testid="debug-memory-write"
-                  className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1 text-ui-caption hover:bg-[var(--taomni-hover-bg)] disabled:opacity-30"
+                  className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1 text-ui-caption hover:bg-[var(--taomni-hover)] disabled:opacity-30"
                   aria-label="Write memory"
                   title="Write memory"
                   disabled={busy !== null || !writeData.trim()}
@@ -242,7 +242,7 @@ export function MemoryDisassemblyView({ debug }: MemoryDisassemblyViewProps) {
                 <button
                   type="button"
                   data-testid="debug-disassemble"
-                  className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1 text-ui-caption hover:bg-[var(--taomni-hover-bg)] disabled:opacity-30"
+                  className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1 text-ui-caption hover:bg-[var(--taomni-hover)] disabled:opacity-30"
                   aria-label="Disassemble memory"
                   title="Disassemble memory"
                   disabled={busy !== null}

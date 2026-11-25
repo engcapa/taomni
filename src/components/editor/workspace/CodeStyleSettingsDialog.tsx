@@ -178,7 +178,7 @@ export function CodeStyleSettingsDialog({
             type="button"
             data-testid="code-style-close"
             aria-label="Close code style settings"
-            className="rounded p-1 hover:bg-[var(--taomni-code-hover)]"
+            className="rounded p-1 hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={onClose}
           >
             <X className="h-3.5 w-3.5" />
@@ -203,7 +203,7 @@ export function CodeStyleSettingsDialog({
                     className={`flex w-full items-center gap-1 px-3 py-1 text-left ${
                       scheme.id === selectedId
                         ? "bg-[var(--taomni-code-active-line-bg)]"
-                        : "hover:bg-[var(--taomni-code-hover)]"
+                        : "hover:bg-[var(--taomni-code-active-line-bg)]"
                     }`}
                     onClick={() => setSelectedId(scheme.id)}
                   >
@@ -221,7 +221,7 @@ export function CodeStyleSettingsDialog({
               <button
                 type="button"
                 data-testid="code-style-copy"
-                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 hover:bg-[var(--taomni-code-hover)]"
+                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)]"
                 onClick={() => {
                   const base = `${selected.name} copy`;
                   let name = base;
@@ -246,7 +246,7 @@ export function CodeStyleSettingsDialog({
                 type="button"
                 data-testid="code-style-rename"
                 disabled={isBuiltIn}
-                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
+                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
                 onClick={() => {
                   setRenaming(true);
                   setRenameDraft(selected.name);
@@ -258,7 +258,7 @@ export function CodeStyleSettingsDialog({
                 type="button"
                 data-testid="code-style-delete"
                 disabled={isBuiltIn}
-                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
+                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
                 onClick={() => {
                   const result = deleteCodeStyleScheme(store, selected.id);
                   if ("error" in result) {
@@ -277,7 +277,7 @@ export function CodeStyleSettingsDialog({
                 data-testid="code-style-reset"
                 disabled={isBuiltIn}
                 title="Clear all fields back to defaults"
-                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
+                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
                 onClick={() => {
                   const result = resetCodeStyleSchemeValues(store, selected.id);
                   if ("error" in result) {
@@ -330,7 +330,7 @@ export function CodeStyleSettingsDialog({
                 <button
                   type="button"
                   data-testid="code-style-rename-confirm"
-                  className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 hover:bg-[var(--taomni-code-hover)]"
+                  className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)]"
                   onClick={() => {
                     const result = renameCodeStyleScheme(store, selected.id, renameDraft);
                     if ("error" in result) {
@@ -347,7 +347,7 @@ export function CodeStyleSettingsDialog({
                 <button
                   type="button"
                   data-testid="code-style-rename-cancel"
-                  className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 hover:bg-[var(--taomni-code-hover)]"
+                  className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)]"
                   onClick={() => setRenaming(false)}
                 >
                   Cancel
@@ -496,7 +496,7 @@ export function CodeStyleSettingsDialog({
                       data-testid="code-style-add-exclusion-btn"
                       disabled={isBuiltIn || !newExclusionPattern.trim()}
                       onClick={handleAddExclusion}
-                      className="rounded border border-[var(--taomni-code-border)] px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
+                      className="rounded border border-[var(--taomni-code-border)] px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
                     >
                       Add
                     </button>

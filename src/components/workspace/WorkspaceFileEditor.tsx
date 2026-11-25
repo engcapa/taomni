@@ -195,7 +195,7 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
       >
         <span className="truncate text-ui-small font-semibold" data-testid="workspace-editor-title">
           {path}
-          {document?.dirty && <span style={{ color: "var(--taomni-warning, #d97706)" }}> ●</span>}
+          {document?.dirty && <span style={{ color: "var(--taomni-warning-text, #d97706)" }}> ●</span>}
         </span>
         <span className="ml-auto flex items-center gap-1">
           <button

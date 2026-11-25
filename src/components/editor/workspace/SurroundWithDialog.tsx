@@ -56,7 +56,7 @@ export function SurroundWithDialog({ open, languageId, onClose, onPick }: Surrou
       onKeyDown={handleKeyDown}
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[12vh]"
     >
-      <div className="flex w-full max-w-md flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-fg)] shadow-2xl">
+      <div className="flex w-full max-w-md flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">
           <div className="flex items-center gap-2">
             <BoxSelect className="h-4 w-4 text-sky-400" />
@@ -67,7 +67,7 @@ export function SurroundWithDialog({ open, languageId, onClose, onPick }: Surrou
             data-testid="surround-with-close"
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-fg)]"
+            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -92,7 +92,7 @@ export function SurroundWithDialog({ open, languageId, onClose, onPick }: Surrou
                 }}
                 className={`flex w-full items-center justify-between rounded px-3 py-1.5 text-left ${
                   idx === selectedIndex
-                    ? "bg-sky-500/15 text-[var(--taomni-code-fg)]"
+                    ? "bg-sky-500/15 text-[var(--taomni-code-text)]"
                     : "hover:bg-[var(--taomni-code-active-line-bg)]"
                 }`}
               >

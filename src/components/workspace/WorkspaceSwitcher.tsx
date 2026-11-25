@@ -106,7 +106,7 @@ export function WorkspaceSwitcher({ onAddFolder }: WorkspaceSwitcherProps) {
           <span
             aria-hidden="true"
             className="h-2 w-2 shrink-0 rounded-full"
-            style={{ background: active.isDefault ? "var(--taomni-success)" : "var(--taomni-accent)" }}
+            style={{ background: active.isDefault ? "var(--taomni-success-icon)" : "var(--taomni-accent)" }}
           />
           <span className="truncate text-[var(--taomni-text)]" style={{ fontSize: "var(--taomni-ui-font-size)" }}>
             {active.name}

@@ -320,7 +320,7 @@ export function EditorGroup({
               {activeFile.library?.decompiled && (
                 <div
                   data-testid="code-workspace-decompiled-banner"
-                  className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-amber-500/30 bg-amber-500/10 text-ui-body text-[var(--taomni-code-fg)]"
+                  className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-amber-500/30 bg-amber-500/10 text-ui-body text-[var(--taomni-code-text)]"
                 >
                   <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
                   <span className="min-w-0 flex-1 truncate">

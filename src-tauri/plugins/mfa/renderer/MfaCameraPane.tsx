@@ -155,7 +155,7 @@ export function MfaCameraPane({ onTexts }: { onTexts: (texts: string[]) => MfaTe
           role="status"
           aria-live="polite"
           className="flex-1 text-ui-body"
-          style={{ color: live ? "var(--taomni-text-muted)" : "var(--taomni-error, #c33)" }}
+          style={{ color: live ? "var(--taomni-text-muted)" : "var(--taomni-danger-text, #c33)" }}
         >
           {statusText}
         </div>

@@ -118,7 +118,7 @@ export function NewJavaClassDialog({
       onKeyDown={handleKeyDown}
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[12vh]"
     >
-      <div className="flex w-full max-w-md flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-fg)] shadow-2xl">
+      <div className="flex w-full max-w-md flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-ui-body text-[var(--taomni-code-text)] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-2.5">
           <div className="flex items-center gap-2 font-medium">
@@ -132,7 +132,7 @@ export function NewJavaClassDialog({
                 onClick={onOpenSettings}
                 labelKey="editFileTemplates"
                 data-testid="new-java-class-edit-templates"
-                className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-hover)] hover:text-[var(--taomni-code-fg)]"
+                className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
               >
                 <Settings2 className="h-4 w-4" />
               </IconButton>
@@ -141,7 +141,7 @@ export function NewJavaClassDialog({
               type="button"
               onClick={onClose}
               data-testid="new-java-class-cancel"
-              className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-hover)] hover:text-[var(--taomni-code-fg)]"
+              className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
             >
               <X className="h-4 w-4" />
             </button>
@@ -163,7 +163,7 @@ export function NewJavaClassDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. MyService"
               data-testid="new-java-class-name-input"
-              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-fg)] outline-none focus:border-blue-500"
+              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] outline-none focus:border-blue-500"
             />
           </div>
 
@@ -176,7 +176,7 @@ export function NewJavaClassDialog({
               value={kind}
               onChange={(e) => setKind(e.target.value as JavaTemplateKind)}
               data-testid="new-java-class-kind-select"
-              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-fg)] outline-none focus:border-blue-500"
+              className="w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-input-bg,var(--taomni-code-bg))] px-2.5 py-1.5 text-ui-body text-[var(--taomni-code-text)] outline-none focus:border-blue-500"
             >
               {TEMPLATE_KIND_OPTIONS.map((opt) => (
                 <option key={opt.kind} value={opt.kind}>
@@ -187,10 +187,10 @@ export function NewJavaClassDialog({
           </div>
 
           {/* Package and Facts Information */}
-          <div className="rounded bg-[var(--taomni-code-hover)]/40 px-3 py-2 text-ui-small space-y-1">
+          <div className="rounded bg-[var(--taomni-code-active-line-bg)]/40 px-3 py-2 text-ui-small space-y-1">
             <div className="flex items-center justify-between" data-testid="new-java-class-package">
               <span className="text-[var(--taomni-code-muted)]">Package:</span>
-              <span className="font-mono text-[var(--taomni-code-fg)]">
+              <span className="font-mono text-[var(--taomni-code-text)]">
                 {packageName || "(default package)"}
               </span>
             </div>
@@ -222,7 +222,7 @@ export function NewJavaClassDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded px-3 py-1 text-ui-small text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-hover)] hover:text-[var(--taomni-code-fg)]"
+            className="rounded px-3 py-1 text-ui-small text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
           >
             Cancel
           </button>

@@ -249,7 +249,7 @@ export function DebugVariablesPane({
               data-testid="debug-variables-search-toggle"
               aria-label="Filter variables"
               title="Filter variables"
-              className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover-bg)]"
+              className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
               onClick={() => setFilterOpen(true)}
             >
               <Search className="h-3 w-3 text-[var(--taomni-text-muted)]" />
@@ -262,7 +262,7 @@ export function DebugVariablesPane({
             data-testid="debug-variables-sort"
             aria-pressed={sortMode === "alphabetical"}
             onClick={onToggleSortMode}
-            className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover-bg)] aria-pressed:bg-[var(--taomni-accent)]/20"
+            className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] aria-pressed:bg-[var(--taomni-accent)]/20"
             labelKey="sortVariables"
           >
             <ArrowUpDown className="h-3 w-3 text-[var(--taomni-text-muted)]" />

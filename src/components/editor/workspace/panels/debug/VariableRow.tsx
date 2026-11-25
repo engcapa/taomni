@@ -65,7 +65,7 @@ export function VariableRow({
         aria-expanded={expandable ? node.expanded : undefined}
         data-var-key={key}
         className={`group flex items-start gap-1 py-0.5 pr-2 cursor-default select-none ${
-          selected ? "bg-[var(--taomni-accent)]/20" : "hover:bg-[var(--taomni-hover-bg)]"
+          selected ? "bg-[var(--taomni-accent)]/20" : "hover:bg-[var(--taomni-hover)]"
         }`}
         style={{ paddingLeft: `${8 + depth * 12}px` }}
         onClick={() => onSelect?.(key, node)}

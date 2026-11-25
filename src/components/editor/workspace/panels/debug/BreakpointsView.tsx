@@ -52,7 +52,7 @@ export function BreakpointsView({
         const sourceModeMetadata = sourceModes.find((mode) => mode.mode === sourceMode);
         return (
           <div key={`${path}:${bp.line}`} className="border-b border-[var(--taomni-code-border)]/40 last:border-b-0">
-            <div className="group flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover-bg)]">
+            <div className="group flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover)]">
               <input
                 type="checkbox"
                 data-testid={`debug-breakpoint-enabled-${bp.line}`}

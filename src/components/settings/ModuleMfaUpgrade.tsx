@@ -108,7 +108,7 @@ export function ModuleMfaUpgrade({ eligible, installed = false }: { eligible: bo
         </div>
       </fieldset>
       {busy && <p role="status">{t("settings.moduleUpgradeWorking")}</p>}
-      {error && <p role="alert" data-testid="module-upgrade-mfa-error" className="break-words text-[var(--taomni-error)]">{error}</p>}
+      {error && <p role="alert" data-testid="module-upgrade-mfa-error" className="break-words text-[var(--taomni-danger-text)]">{error}</p>}
     </form>}
   </div>;
 }

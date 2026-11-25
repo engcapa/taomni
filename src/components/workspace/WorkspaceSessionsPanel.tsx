@@ -94,7 +94,7 @@ export function WorkspaceSessionsPanel({ workspace, onOpenSessionPicker, onOpenS
       >
         <Star
           className="h-3 w-3"
-          style={{ color: workspace.pinnedSessionIds.includes(session.id) ? "var(--taomni-warning, #d97706)" : undefined }}
+          style={{ color: workspace.pinnedSessionIds.includes(session.id) ? "var(--taomni-warning-text, #d97706)" : undefined }}
         />
       </button>
     </div>

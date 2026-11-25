@@ -189,7 +189,7 @@ export function DebugConsolePane({ debug, stopped, visible = true, onOpenLocatio
             className={`inline-flex h-5 items-center gap-1 rounded px-1.5 text-ui-caption transition-colors ${
               followTail
                 ? "bg-sky-500/20 text-sky-400 font-medium"
-                : "text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)]"
+                : "text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
             }`}
             title="Follow tail (auto-scroll on new output)"
             onClick={() => setFollowTail((v) => !v)}
@@ -201,7 +201,7 @@ export function DebugConsolePane({ debug, stopped, visible = true, onOpenLocatio
             <button
               type="button"
               data-testid="debug-console-scroll-bottom"
-              className="inline-flex h-5 items-center gap-1 rounded px-1.5 text-ui-caption text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)] hover:text-[var(--taomni-text)] transition-colors"
+              className="inline-flex h-5 items-center gap-1 rounded px-1.5 text-ui-caption text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)] transition-colors"
               title="Scroll to end"
               onClick={scrollToBottom}
             >
@@ -212,7 +212,7 @@ export function DebugConsolePane({ debug, stopped, visible = true, onOpenLocatio
           <button
             type="button"
             data-testid="debug-console-clear"
-            className="inline-flex h-5 items-center gap-1 rounded px-1.5 text-ui-caption text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)] hover:text-[var(--taomni-text)] transition-colors"
+            className="inline-flex h-5 items-center gap-1 rounded px-1.5 text-ui-caption text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)] transition-colors"
             title="Clear console"
             onClick={() => debug.clearConsole()}
           >
@@ -264,7 +264,7 @@ export function DebugConsolePane({ debug, stopped, visible = true, onOpenLocatio
           data-testid="debug-console-submit"
           onClick={submitConsole}
           disabled={!stopped || !consoleInput.trim()}
-          className="rounded p-1 text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover-bg)] hover:text-[var(--taomni-text)] disabled:opacity-30 disabled:pointer-events-none transition-colors"
+          className="rounded p-1 text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)] disabled:opacity-30 disabled:pointer-events-none transition-colors"
           labelKey="sendEnter"
         >
           <CornerDownLeft className="h-3.5 w-3.5" />

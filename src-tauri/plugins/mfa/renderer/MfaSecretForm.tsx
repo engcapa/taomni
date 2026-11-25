@@ -186,7 +186,7 @@ export function MfaSecretForm({
         </div>
       ) : null}
       {notice && !error ? <div data-testid="mfa-add-notice" className="text-ui-body" style={{ color: "var(--taomni-success-text, #2f855a)" }}>{notice}</div> : null}
-      {error ? <div data-testid="mfa-add-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-error, #c33)" }}>{error.message}</div> : null}
+      {error ? <div data-testid="mfa-add-error" role="alert" className="text-ui-body" style={{ color: "var(--taomni-danger-text, #c33)" }}>{error.message}</div> : null}
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" data-testid="mfa-add-cancel" className="px-3 py-1 text-ui-body rounded hover:bg-[var(--taomni-hover)]" onClick={onCancel} disabled={busy}>
           {t("mfa.cancel")}

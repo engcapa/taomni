@@ -80,7 +80,7 @@ export function EvaluateExpressionDialog({ debug, initialExpression = "", onClos
       >
         <div className="flex h-8 shrink-0 items-center justify-between border-b border-[var(--taomni-code-border)] px-3">
           <span className="font-semibold">Evaluate</span>
-          <button type="button" aria-label="Close" className="rounded p-0.5 hover:bg-[var(--taomni-hover-bg)]" onClick={onClose}>
+          <button type="button" aria-label="Close" className="rounded p-0.5 hover:bg-[var(--taomni-hover)]" onClick={onClose}>
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -118,7 +118,7 @@ export function EvaluateExpressionDialog({ debug, initialExpression = "", onClos
             type="button"
             data-testid="debug-evaluate-add-watch"
             disabled={!expression.trim()}
-            className="h-6 rounded border border-[var(--taomni-code-border)] px-3 hover:bg-[var(--taomni-hover-bg)] disabled:opacity-40"
+            className="h-6 rounded border border-[var(--taomni-code-border)] px-3 hover:bg-[var(--taomni-hover)] disabled:opacity-40"
             onClick={() => debug.addWatchExpression(expression.trim())}
           >
             Add to Watches

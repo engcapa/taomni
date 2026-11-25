@@ -114,7 +114,7 @@ export function DataBreakpointsView({
             <button
               type="button"
               data-testid="debug-data-breakpoint-add"
-              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover-bg)] disabled:opacity-30"
+              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-30"
               title="Add data breakpoint for the expression or address"
               aria-label="Add data breakpoint"
               disabled={!targetName.trim() || addingTarget}
@@ -187,7 +187,7 @@ export function DataBreakpointsView({
             data-data-breakpoint-persistent={breakpoint.canPersist ? "true" : "false"}
             className="border-t border-[var(--taomni-code-border)]/40"
           >
-            <div className="group flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover-bg)]">
+            <div className="group flex items-center gap-2 px-3 py-0.5 hover:bg-[var(--taomni-hover)]">
               <input
                 type="checkbox"
                 data-testid={`debug-data-breakpoint-enabled-${index}`}
