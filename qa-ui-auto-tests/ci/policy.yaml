@@ -312,7 +312,9 @@ cases:
 - TC-UIC-014-explorer-filter-focus
 - TC-UIC-015-module-install-error
 - TC-UIC-016-home-launch-actions
+- TC-UIC-017-workspace-keymap-reference
 - TC-UIC-DLG-explorer-new-file
+- TC-UIC-DLG-mail-attachment-reminder
 - TC-MOBILE-001
 - TC-MOBILE-002
 - TC-MOBILE-003

@@ -64,6 +64,23 @@ describe("KeymapCheatSheetDialog", () => {
     expect(screen.queryByText("Unbound Action")).toBeNull();
   });
 
+  it("renders each host-formatted binding once, including multi-stroke and literal plus shortcuts", () => {
+    const onClose = vi.fn();
+    render(<KeymapCheatSheetDialog open onClose={onClose} actionSnapshots={[
+      snapshotFixture({ id: "test.bindings", title: "Bindings", category: "Edit",
+        keybinding: "Ctrl++", keybindings: ["Ctrl++", "Ctrl+K Ctrl+S"] }),
+    ]} />);
+    const row = screen.getByTestId("keymap-item-test.bindings");
+    expect(Array.from(row.querySelectorAll("kbd"), (key) => key.textContent)).toEqual(["Ctrl++", "Ctrl+K Ctrl+S"]);
+    expect(screen.getAllByText("or")).toHaveLength(1);
+    const search = screen.getByRole("textbox", { name: "Search shortcut or action" });
+    expect(search).toHaveFocus();
+    fireEvent.keyDown(search, { key: "Escape", isComposing: true });
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.keyDown(search, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it("filters by search term", () => {
     const onClose = vi.fn();
     render(

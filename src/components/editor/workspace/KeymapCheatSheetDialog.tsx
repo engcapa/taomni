@@ -1,5 +1,8 @@
-import { useMemo, useState } from "react";
-import { Keyboard, Search, Sparkles, X } from "lucide-react";
+import { Fragment, useId, useMemo, useState } from "react";
+import { Keyboard, Search, TriangleAlert, X } from "lucide-react";
+import { IconButton } from "../../ui/IconButton";
+import { ModalSurface } from "../../ui/ModalSurface";
+import { useT } from "../../../lib/i18n";
 import type { ActionSnapshotItem } from "./workspaceActionHost";
 
 export interface KeymapCheatSheetDialogProps {
@@ -13,33 +16,14 @@ export interface KeymapCheatSheetDialogProps {
   actionSnapshots: ActionSnapshotItem[];
 }
 
-function parseKeyParts(binding: string): string[] {
-  return binding
-    .split("+")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((p) => {
-      if (p.toLowerCase() === "mod") return "Ctrl / ⌘";
-      if (p.toLowerCase() === "ctrl") return "Ctrl";
-      if (p.toLowerCase() === "shift") return "Shift";
-      if (p.toLowerCase() === "alt") return "Alt / ⌥";
-      if (p.toLowerCase() === "meta" || p.toLowerCase() === "cmd") return "⌘";
-      if (p.toLowerCase() === "arrowup" || p.toLowerCase() === "up") return "↑";
-      if (p.toLowerCase() === "arrowdown" || p.toLowerCase() === "down") return "↓";
-      if (p.toLowerCase() === "arrowleft" || p.toLowerCase() === "left") return "←";
-      if (p.toLowerCase() === "arrowright" || p.toLowerCase() === "right") return "→";
-      if (p.toLowerCase() === "enter") return "Enter ↵";
-      if (p.toLowerCase() === "escape" || p.toLowerCase() === "esc") return "Esc";
-      return p.toUpperCase();
-    });
-}
-
 export function KeymapCheatSheetDialog({
   open,
   onClose,
   onExecuteCommand,
   actionSnapshots,
 }: KeymapCheatSheetDialogProps) {
+  const t = useT();
+  const titleId = useId();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const boundCommands = useMemo(
@@ -93,195 +77,173 @@ export function KeymapCheatSheetDialog({
   if (!open) return null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="keymap-cheatsheet-title"
+    <ModalSurface
+      initialFocus='[data-testid="keymap-search-input"]'
+      onCancel={onClose}
+      aria-labelledby={titleId}
       data-testid="keymap-cheatsheet-dialog"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="taomni-modal h-[80vh] !w-[min(56rem,calc(100vw-32px))] !gap-0 !p-0 overflow-hidden"
     >
-      <div className="flex h-[80vh] w-full max-w-4xl flex-col rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] shadow-2xl text-ui-body text-[var(--taomni-code-text)]">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--taomni-code-border)] px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Keyboard className="h-5 w-5 text-sky-400" />
-            <div>
-              <h2 id="keymap-cheatsheet-title" className="text-ui-title font-semibold">
-                Keyboard Shortcuts & Keymap
-              </h2>
-              <p className="text-ui-small text-[var(--taomni-code-muted)] mt-0.5">
-                {boundCommands.length} shortcut keybindings configured (IntelliJ IDEA keymap layout)
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            data-testid="keymap-cheatsheet-close"
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded p-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Toolbar & Search */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/30 px-4 py-2 text-ui-small">
-          {/* Category Chips */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {categories.map((category) => (
-              <button
-                key={category}
-                type="button"
-                data-testid={`keymap-category-${category}`}
-                onClick={() => setSelectedCategory(category)}
-                className={`rounded-full px-2.5 py-0.5 transition-colors ${
-                  selectedCategory === category
-                    ? "bg-sky-500/20 text-sky-400 font-semibold border border-sky-500/40"
-                    : "text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
-                }`}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-
-          {/* Search Input */}
-          <div className="relative flex items-center">
-            <Search className="absolute left-2 h-3.5 w-3.5 text-[var(--taomni-code-muted)]" />
-            <input
-              type="text"
-              data-testid="keymap-search-input"
-              placeholder="Search shortcut or action..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-7 w-60 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] pl-7 pr-2 text-ui-small text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)] focus:outline-none focus:border-sky-500"
-            />
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-[var(--taomni-divider)] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Keyboard className="h-5 w-5 text-ui-info" />
+          <div>
+            <h2 id={titleId} className="text-ui-title font-semibold">
+              {t("keymapReference.title")}
+            </h2>
+            <p className="text-ui-small text-[var(--taomni-text-muted)] mt-0.5">
+              {t("keymapReference.count", { count: boundCommands.length })}
+            </p>
           </div>
         </div>
+        <IconButton
+          data-testid="keymap-cheatsheet-close"
+          onClick={onClose}
+          labelKey="close"
+          className="rounded p-1 text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)]"
+        >
+          <X className="h-4 w-4" />
+        </IconButton>
+      </div>
 
-        {/* Table Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 divide-y divide-[var(--taomni-code-border)]/40">
-          {filteredCommands.length === 0 ? (
-            <div className="p-8 text-center text-[var(--taomni-code-muted)]">
-              No keyboard shortcuts found matching &quot;{search}&quot;
-            </div>
-          ) : (
-            filteredCommands.map((command) => {
-              const bindings = [command.keybinding, ...(command.keybindings ?? [])].filter(
-                Boolean,
-              ) as string[];
-
-              const provenance = command.provenance;
-              const enabled = "enabled" in command ? command.enabled : true;
-
-              return (
-                <div
-                  key={command.id}
-                  data-testid={`keymap-item-${command.id}`}
-                  className="group flex items-center justify-between py-2 px-2 rounded hover:bg-[var(--taomni-code-active-line-bg)]/50 transition-colors"
-                >
-                  <div className="flex items-center gap-2 min-w-0 pr-4">
-                    <span className="rounded bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 text-ui-caption text-[var(--taomni-code-muted)] shrink-0 font-medium">
-                      {command.category}
-                    </span>
-                    {provenance && (
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-ui-caption font-medium shrink-0 ${
-                          provenance === "local"
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                            : provenance === "provider"
-                              ? "bg-sky-500/10 text-sky-400 border border-sky-500/20"
-                              : provenance === "index"
-                                ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
-                                : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                        }`}
-                      >
-                        {provenance === "local" ? "Local" : provenance === "provider" ? "LSP" : provenance === "index" ? "Index" : "Partial"}
-                      </span>
-                    )}
-                    <div className="min-w-0 truncate">
-                      <span className="font-medium text-ui-body">{command.title}</span>
-                      <span className="ml-2 font-mono text-ui-caption text-[var(--taomni-code-muted)] opacity-60">
-                        {command.id}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="flex items-center gap-1.5">
-                      {bindings.map((b, idx) => {
-                        const parts = parseKeyParts(b);
-                        return (
-                          <div key={idx} className="flex items-center gap-1">
-                            {parts.map((p, pIdx) => (
-                              <kbd
-                                key={pIdx}
-                                className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)] px-1.5 py-0.5 font-mono text-ui-caption font-semibold text-[var(--taomni-code-text)] shadow-sm"
-                              >
-                                {p}
-                              </kbd>
-                            ))}
-                            {idx < bindings.length - 1 && (
-                              <span className="text-ui-caption text-[var(--taomni-code-muted)] mx-0.5">or</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                      {bindings.length === 0 && (
-                        <span className="text-ui-caption text-[var(--taomni-code-muted)] opacity-70">no shortcut</span>
-                      )}
-                      {bindings.length > 1 && (
-                        <span className="text-ui-caption text-[var(--taomni-code-muted)] mx-0.5">or</span>
-                      )}
-                      {(command.bindingConflicts?.length ?? 0) > 0 && (
-                        <span
-                          data-testid={`keymap-conflict-${command.id}`}
-                          aria-label="conflict"
-                          title={`Also used by: ${command.bindingConflicts!.map((entry) => entry.actionIds.join(", ")).join("; ")}`}
-                          className="text-amber-500"
-                        >
-                          ⚠
-                        </span>
-                      )}
-                    </div>
-
-                    {onExecuteCommand && enabled && (
-                      <button
-                        type="button"
-                        data-testid={`keymap-run-${command.id}`}
-                        onClick={() => {
-                          onClose();
-                          onExecuteCommand(command.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 rounded px-2 py-0.5 text-ui-caption font-medium bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 transition-opacity"
-                      >
-                        Run
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
+      {/* Toolbar & Search */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-hover)]/30 px-4 py-2 text-ui-small">
+        {/* Category Chips */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {categories.map((category) => (
+            <button
+              key={category}
+              type="button"
+              data-testid={`keymap-category-${category}`}
+              aria-pressed={selectedCategory === category}
+              onClick={() => setSelectedCategory(category)}
+              className={`rounded-full px-2.5 py-0.5 transition-colors ${
+                selectedCategory === category
+                  ? "bg-[var(--taomni-selected)] text-[var(--taomni-text)] font-semibold border border-[var(--taomni-selected-border)]"
+                  : "text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
+              }`}
+            >
+              {category === "All" ? t("keymapReference.all") : category}
+            </button>
+          ))}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-active-line-bg)]/20 px-4 py-2.5 text-ui-small text-[var(--taomni-code-muted)]">
-          <div className="flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-            <span>IntelliJ IDEA keymap & actions · Local / LSP provider-backed execution</span>
-          </div>
-          <button
-            type="button"
-            data-testid="keymap-cheatsheet-footer-close"
-            onClick={onClose}
-            className="rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-3 py-1 text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
-          >
-            Close
-          </button>
+        {/* Search Input */}
+        <div className="relative flex max-w-full items-center">
+          <Search className="absolute left-2 h-3.5 w-3.5 text-[var(--taomni-text-muted)]" />
+          <input
+            type="text"
+            data-testid="keymap-search-input"
+            aria-label={t("keymapReference.search")}
+            placeholder={t("keymapReference.search")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-7 w-60 max-w-full rounded border border-[var(--taomni-divider)] bg-[var(--taomni-input-bg)] pl-7 pr-2 text-ui-small text-[var(--taomni-text)] placeholder:text-[var(--taomni-text-muted)] focus-visible:keyboard-outline"
+          />
         </div>
       </div>
-    </div>
+
+      {/* Table Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-3 divide-y divide-[var(--taomni-divider)]/40">
+        {filteredCommands.length === 0 ? (
+          <div className="p-8 text-center text-[var(--taomni-text-muted)]">
+            {t("keymapReference.empty", { search })}
+          </div>
+        ) : (
+          filteredCommands.map((command) => {
+            const bindings = Array.from(new Set([command.keybinding, ...(command.keybindings ?? [])]
+              .filter((label): label is string => Boolean(label))));
+            const provenance = command.provenance;
+            return (
+              <div
+                key={command.id}
+                data-testid={`keymap-item-${command.id}`}
+                className="group flex items-center justify-between py-2 px-2 rounded hover:bg-[var(--taomni-hover)]/50 transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0 pr-4">
+                  <span className="rounded bg-[var(--taomni-hover)] px-1.5 py-0.5 text-ui-caption text-[var(--taomni-text-muted)] shrink-0 font-medium">
+                    {command.category}
+                  </span>
+                  {provenance && (
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-ui-caption font-medium shrink-0 ${
+                        provenance === "local"
+                          ? "bg-ui-success-surface text-ui-success border border-ui-success-border"
+                          : provenance === "provider"
+                            ? "bg-ui-info-surface text-ui-info border border-ui-info-border"
+                            : provenance === "index"
+                              ? "bg-[var(--taomni-chrome-bg)] text-[var(--taomni-text)] border border-[var(--taomni-divider)]"
+                              : "bg-ui-warning-surface text-ui-warning border border-ui-warning-border"
+                      }`}
+                    >
+                      {t(`keymapReference.${provenance === "provider" ? "provider" : provenance === "local" ? "local" : provenance === "index" ? "index" : "partial"}`)}
+                    </span>
+                  )}
+                  <div className="min-w-0 truncate">
+                    <span className="font-medium text-ui-body">{command.title}</span>
+                    <span className="ml-2 font-mono text-ui-caption text-[var(--taomni-text-muted)]">
+                      {command.id}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    {bindings.map((binding, index) => (
+                      <Fragment key={binding}>
+                        {index > 0 && <span className="text-ui-caption text-[var(--taomni-text-muted)]">{t("keymapReference.or")}</span>}
+                        <kbd className="whitespace-nowrap rounded border border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)] px-1.5 py-0.5 font-mono text-ui-caption font-semibold">
+                          {binding}
+                        </kbd>
+                      </Fragment>
+                    ))}
+                    {bindings.length === 0 && (
+                      <span className="text-ui-caption text-[var(--taomni-text-muted)]">{t("keymapReference.unbound")}</span>
+                    )}
+                    {(command.bindingConflicts?.length ?? 0) > 0 && (
+                      <span
+                        data-testid={`keymap-conflict-${command.id}`}
+                        role="img"
+                        aria-label={t("keymapReference.conflict", { actions: command.bindingConflicts!.flatMap((entry) => entry.actionIds).join(", ") })}
+                        className="text-ui-warning"
+                      >
+                        <TriangleAlert aria-hidden="true" className="size-4" />
+                      </span>
+                    )}
+                  </div>
+
+                  {onExecuteCommand && command.enabled && (
+                    <button
+                      type="button"
+                      data-testid={`keymap-run-${command.id}`}
+                      onClick={() => {
+                        onClose();
+                        onExecuteCommand(command.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 rounded px-2 py-0.5 text-ui-caption font-medium bg-ui-info-surface text-ui-info hover:bg-[var(--taomni-hover)] transition-opacity"
+                    >
+                      {t("keymapReference.run")}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-end border-t border-[var(--taomni-divider)] bg-[var(--taomni-hover)]/20 px-4 py-2.5 text-ui-small text-[var(--taomni-text-muted)]">
+        <button
+          type="button"
+          data-testid="keymap-cheatsheet-footer-close"
+          onClick={onClose}
+          className="rounded border border-[var(--taomni-divider)] bg-[var(--taomni-input-bg)] px-3 py-1 text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)]"
+        >
+          {t("common.close")}
+        </button>
+      </div>
+    </ModalSurface>
   );
 }

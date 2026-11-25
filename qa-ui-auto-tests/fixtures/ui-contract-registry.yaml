@@ -20,3 +20,23 @@ dialogs:
       - wait_for: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
       - click: '[data-testid="explorer-cmd-new"]'
       - click: '[data-testid="explorer-new-typed-file"]'
+  - slug: mail-attachment-reminder
+    title: A missing attachment returns keyboard users to the same outgoing draft
+    covers: [F-MAIL-15]
+    fixtures: [reset_db, mail_server]
+    panel: mail-attach-reminder
+    heading: Attachment missing
+    first: mail-attach-reminder-cancel
+    last: mail-attach-reminder-attach
+    return_to: mail-compose-send
+    open:
+      - open: ${cfg.app.base_url}
+      - seed_storage: {key: taomni.quickConnectVisible, value: 'true'}
+      - reload_window: null
+      - fill: {selector: '[data-testid="qc-input"]', value: '${fixture.mail_quick_connect}'}
+      - click: '[data-testid="qc-submit"]'
+      - click: '[data-testid="mail-compose-open"]'
+      - fill: {selector: '[data-testid="mail-recipient-to"] input', value: receiver@example.com}
+      - press: Enter
+      - fill: {selector: '[data-testid="mail-compose-subject"]', value: Report attached}
+      - press: {selector: '[data-testid="mail-compose-send"]', key: Enter}

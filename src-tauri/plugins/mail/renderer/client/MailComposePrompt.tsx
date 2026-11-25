@@ -1,84 +1,34 @@
 import { AlertTriangle } from "lucide-react";
-import { type ComposePromptState } from "./types";
+import { Button } from "../../../../../src/components/ui/Button";
+import { Modal } from "../../../../../src/components/ui/Modal";
+import { useT } from "../../../../../src/lib/i18n";
+import type { ComposePromptState } from "./types";
 
-
-export function MailComposePrompt({
-  prompt,
-  onClose,
-  onAttach,
-  onSendAnyway,
-}: {
+export function MailComposePrompt({ prompt, onClose, onAttach, onSendAnyway }: {
   prompt: ComposePromptState;
   onClose: () => void;
   onAttach: () => void;
   onSendAnyway: () => void;
 }) {
-  const attachmentPrompt = prompt.kind === "attachment";
-  return (
-    <div
-      className="fixed inset-0 z-[960] flex items-center justify-center bg-black/40 px-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={prompt.title}
-      data-testid={attachmentPrompt ? "mail-attach-reminder" : "mail-compose-error-dialog"}
-      onClick={onClose}
-    >
-      <div
-        className="w-[min(460px,calc(100vw-32px))] rounded-md border p-4 shadow-2xl"
-        style={{ background: "var(--taomni-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start gap-2">
-          <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${attachmentPrompt ? "text-ui-warning" : "text-ui-danger"}`} />
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold">{prompt.title}</div>
-            <div className="mt-2 whitespace-pre-line text-ui-body" data-testid="mail-compose-prompt-message">
-              {prompt.message}
-            </div>
-          </div>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          {attachmentPrompt ? (
-            <>
-              <button
-                type="button"
-                className="taomni-btn h-7 px-2.5 text-ui-body"
-                data-testid="mail-attach-reminder-cancel"
-                onClick={onClose}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="taomni-btn h-7 px-2.5 text-ui-body"
-                data-testid="mail-attach-reminder-attach"
-                onClick={onAttach}
-              >
-                Attach…
-              </button>
-              <button
-                type="button"
-                className="taomni-btn h-7 px-2.5 text-ui-body"
-                data-primary="true"
-                data-testid="mail-attach-reminder-send"
-                onClick={onSendAnyway}
-              >
-                Send anyway
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="taomni-btn h-7 px-3 text-ui-body"
-              data-primary="true"
-              data-testid="mail-compose-error-ok"
-              onClick={onClose}
-            >
-              OK
-            </button>
-          )}
-        </div>
-      </div>
+  const t = useT();
+  const attachment = prompt.kind === "attachment";
+  const first = attachment ? "mail-attach-reminder-cancel" : "mail-compose-error-ok";
+  return <Modal
+    testId={attachment ? "mail-attach-reminder" : "mail-compose-error-dialog"}
+    role={attachment ? "dialog" : "alertdialog"}
+    title={t(attachment ? "mailCompose.attachmentMissing" : "mailCompose.cannotSend")}
+    tone={attachment ? "default" : "error"}
+    initialFocus={`[data-testid="${first}"]`}
+    onCancel={onClose}
+    footer={attachment ? <>
+      <Button data-testid="mail-attach-reminder-cancel" onClick={onClose}>{t("common.cancel")}</Button>
+      <Button data-testid="mail-attach-reminder-send" onClick={onSendAnyway}>{t("mailCompose.sendAnyway")}</Button>
+      <Button variant="primary" data-testid="mail-attach-reminder-attach" onClick={onAttach}>{t("mailCompose.attach")}</Button>
+    </> : <Button variant="primary" data-testid="mail-compose-error-ok" onClick={onClose}>{t("common.ok")}</Button>}
+  >
+    <div className="flex items-start gap-2">
+      <AlertTriangle aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${attachment ? "text-ui-warning" : "text-ui-danger"}`} />
+      <p data-testid="mail-compose-prompt-message">{attachment ? t("mailCompose.attachmentReminder") : prompt.message}</p>
     </div>
-  );
+  </Modal>;
 }

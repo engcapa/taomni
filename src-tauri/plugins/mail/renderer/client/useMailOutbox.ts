@@ -1,3 +1,4 @@
+import { t } from "../../../../../src/lib/i18n";
 import { useCallback, useEffect, useRef, type SetStateAction } from "react";
 import { isRecoveryStartup } from "../../../../../src/lib/runtimeRecovery";
 import { mailDeleteDraft, mailListDrafts, mailSaveDraft, mailSendMessage, type MailDraft, type MailSendRequest, type MailSendResult } from "../../../../../src/lib/mail";
@@ -48,9 +49,9 @@ export function useMailOutbox(context: UseMailOutboxContext) {
     const textBody = source.textBody.trim() || mailHtmlToPlainText(htmlBody);
     const sendHtml = source.richFormatUsed || hasRichMailFormatting(htmlBody);
     const recipients = [...source.to, ...source.cc, ...source.bcc];
-    if (recipients.length === 0) return "At least one recipient is required.";
+    if (recipients.length === 0) return t("mailCompose.recipientRequired");
     const invalidRecipient = recipients.find((recipient) => !isValidEmailAddress(recipient.email));
-    if (invalidRecipient) return `Invalid recipient: ${recipientLabel(invalidRecipient)}`;
+    if (invalidRecipient) return t("mailCompose.invalidRecipient", { recipient: recipientLabel(invalidRecipient) });
     return {
       to: source.to.map(formatRecipientForSend),
       cc: source.cc.map(formatRecipientForSend),
@@ -148,7 +149,7 @@ export function useMailOutbox(context: UseMailOutboxContext) {
   const showComposeError = (message: string) => {
     setError(null);
     setStatus(null);
-    setComposePrompt({ kind: "error", title: "Cannot send message", message });
+    setComposePrompt({ kind: "error", message });
   };
 
   /** Send one queued message; failures stay queued with a retry backoff. */
@@ -269,11 +270,7 @@ export function useMailOutbox(context: UseMailOutboxContext) {
       && mentionsAttachment(draft.subject, draft.textBody, draft.htmlBody)) {
       setError(null);
       setStatus(null);
-      setComposePrompt({
-        kind: "attachment",
-        title: "Attachment missing",
-        message: "The message mentions an attachment, but no file is attached. Add an attachment or send anyway.",
-      });
+      setComposePrompt({ kind: "attachment" });
       return;
     }
     setComposePrompt(null);
